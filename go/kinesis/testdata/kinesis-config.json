@@ -1,0 +1,10 @@
+{
+    "region": "local",
+    "endpoint": "http://localhost:4566",
+    "awsAccessKeyId": "x",
+    "awsSecretAccessKey": "x",
+    "partitionRange": {
+        "begin": "00000000",
+        "end": "ffffffff"
+    }
+}
