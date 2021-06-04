@@ -9,4 +9,5 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	go.gazette.dev/core v0.88.0
+	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 )

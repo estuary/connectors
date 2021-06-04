@@ -6,22 +6,22 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go/protocol"
+	"github.com/estuary/connectors/go/airbyte"
 	log "github.com/sirupsen/logrus"
 )
 
 // Config represents the fully merged endpoint configuration for Kinesis.
 // It matches the `KinesisConfig` struct in `crates/sources/src/specs.rs`
 type Config struct {
-	PartitionRange     *protocol.PartitionRange `json:"partitionRange"`
-	Endpoint           string                   `json:"endpoint"`
-	Region             string                   `json:"region"`
-	AWSAccessKeyID     string                   `json:"awsAccessKeyId"`
-	AWSSecretAccessKey string                   `json:"awsSecretAccessKey"`
+	PartitionRange     *airbyte.PartitionRange `json:"partitionRange"`
+	Endpoint           string                  `json:"endpoint"`
+	Region             string                  `json:"region"`
+	AWSAccessKeyID     string                  `json:"awsAccessKeyId"`
+	AWSSecretAccessKey string                  `json:"awsSecretAccessKey"`
 }
 
 func (c *Config) Validate() error {
@@ -127,7 +127,7 @@ func listAllStreams(ctx context.Context, client *kinesis.Kinesis) ([]string, err
 		}
 		resp, err := client.ListStreamsWithContext(ctx, &req)
 		if err != nil {
-			if isRetryable(err) {
+			if request.IsErrorRetryable(err) {
 				log.WithField("error", err).Warnf("error while listing streams (will retry): %T %#v", err, err)
 				select {
 				case <-errBackoff.nextBackoff():
@@ -172,31 +172,7 @@ func (b *backoff) nextBackoff() <-chan time.Time {
 	b.currentMillis = nextMillis
 	return ch
 }
+
 func (b *backoff) reset() {
 	b.currentMillis = b.initialMillis
-}
-
-var terminalErrors = map[string]bool{
-	"ResourceNotFoundException": true,
-	// This means we sent an invalid request, which is likely indicative of a bug in our code.
-	"InvalidArgumentException": true,
-	// The kinesis client wraps context.Canceled errors. This is fine :/
-	"RequestCanceled": true,
-}
-
-// Returns true if this error represents something that ought to be retried.
-// Basically, this is any error except those that we're sure are terminal.
-func isRetryable(err error) bool {
-	switch typed := err.(type) {
-	case awserr.RequestFailure:
-		// Don't consider authentication or authorization errors retryable since they will require
-		// human intervention.
-		// It's not at all clear from their docs what error `Code` this would map to, which is why
-		// this case is handled separately.
-		return typed.StatusCode() != 403
-	case awserr.Error:
-		return !terminalErrors[typed.Code()]
-	default:
-		return true
-	}
 }

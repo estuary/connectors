@@ -8,37 +8,37 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go/protocol"
+	"github.com/estuary/connectors/go/airbyte"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	protocol.RunMain(spec, doCheck, doDiscover, doRead)
+	airbyte.RunMain(spec, doCheck, doDiscover, doRead)
 }
 
 // TODO: update docs link to kinesis connector-specific docs after they are written
-var spec = protocol.Spec{
+var spec = airbyte.Spec{
 	SupportsIncremental:           true,
-	SupportedDestinationSyncModes: protocol.AllDestinationSyncModes,
+	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
 	ConnectionSpecification:       configJSONSchema,
 }
 
-func doCheck(args protocol.CheckCmd) error {
-	var result = &protocol.ConnectionStatus{
-		Status: protocol.StatusSucceeded,
+func doCheck(args airbyte.CheckCmd) error {
+	var result = &airbyte.ConnectionStatus{
+		Status: airbyte.StatusSucceeded,
 	}
 	var _, err = tryListingStreams(args.ConfigFile)
 	if err != nil {
-		result.Status = protocol.StatusFailed
+		result.Status = airbyte.StatusFailed
 		result.Message = err.Error()
 	}
-	return protocol.NewStdoutEncoder().Encode(protocol.Message{
-		Type:             protocol.MessageTypeConnectionStatus,
+	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
+		Type:             airbyte.MessageTypeConnectionStatus,
 		ConnectionStatus: result,
 	})
 }
 
-func tryListingStreams(configFile protocol.ConfigFile) ([]string, error) {
+func tryListingStreams(configFile airbyte.ConfigFile) ([]string, error) {
 	var _, client, err = parseConfigAndConnect(configFile)
 	if err != nil {
 		return nil, err
@@ -47,17 +47,17 @@ func tryListingStreams(configFile protocol.ConfigFile) ([]string, error) {
 	return listAllStreams(ctx, client)
 }
 
-func doDiscover(args protocol.DiscoverCmd) error {
+func doDiscover(args airbyte.DiscoverCmd) error {
 	var catalog, err = discoverCatalog(args.ConfigFile)
 	if err != nil {
 		return err
 	}
 	log.Infof("Discover completed with %d streams", len(catalog.Streams))
-	var encoder = protocol.NewStdoutEncoder()
+	var encoder = airbyte.NewStdoutEncoder()
 	return encoder.Encode(catalog)
 }
 
-func discoverCatalog(config protocol.ConfigFile) (*protocol.Catalog, error) {
+func discoverCatalog(config airbyte.ConfigFile) (*airbyte.Catalog, error) {
 	var _, client, err = parseConfigAndConnect(config)
 	if err != nil {
 		return nil, err
@@ -65,23 +65,23 @@ func discoverCatalog(config protocol.ConfigFile) (*protocol.Catalog, error) {
 	var ctx = context.Background()
 	streamNames, err := listAllStreams(ctx, client)
 
-	var schema = protocol.UnknownSchema()
+	var schema = airbyte.UnknownSchema()
 
-	var catalog = &protocol.Catalog{
-		Streams: make([]protocol.Stream, len(streamNames)),
+	var catalog = &airbyte.Catalog{
+		Streams: make([]airbyte.Stream, len(streamNames)),
 	}
 	for i, name := range streamNames {
-		catalog.Streams[i] = protocol.Stream{
+		catalog.Streams[i] = airbyte.Stream{
 			Name:                name,
 			JSONSchema:          schema,
-			SupportedSyncModes:  []protocol.SyncMode{protocol.SyncModeIncremental},
+			SupportedSyncModes:  []airbyte.SyncMode{airbyte.SyncModeIncremental},
 			SourceDefinedCursor: true,
 		}
 	}
 	return catalog, nil
 }
 
-func put(state *protocol.State, source *kinesisSource, sequenceNumber string) {
+func put(state *airbyte.State, source *recordSource, sequenceNumber string) {
 	var streamMap, ok = state.Data[source.stream]
 	if !ok {
 		streamMap = make(map[string]interface{})
@@ -90,7 +90,7 @@ func put(state *protocol.State, source *kinesisSource, sequenceNumber string) {
 	streamMap.(map[string]interface{})[source.shardID] = sequenceNumber
 }
 
-func copyStreamState(state *protocol.Message, stream string) (map[string]string, error) {
+func copyStreamState(state *airbyte.Message, stream string) (map[string]string, error) {
 	var dest = make(map[string]string)
 	// Is there an entry for this stream
 	if ss, ok := state.State.Data[stream]; ok {
@@ -110,29 +110,28 @@ func copyStreamState(state *protocol.Message, stream string) (map[string]string,
 	return dest, nil
 }
 
-func doRead(args protocol.ReadCmd) error {
+func doRead(args airbyte.ReadCmd) error {
 	var config, client, err = parseConfigAndConnect(args.ConfigFile)
 	if err != nil {
 		return err
 	}
-	var catalog protocol.ConfiguredCatalog
-	err = args.CatalogFile.Parse(&catalog)
-	if err != nil {
+	var catalog airbyte.ConfiguredCatalog
+	if err = args.CatalogFile.Parse(&catalog); err != nil {
 		return fmt.Errorf("parsing configured catalog: %w", err)
 	}
-	err = catalog.Validate()
-	if err != nil {
+
+	if err = catalog.Validate(); err != nil {
 		return fmt.Errorf("configured catalog is invalid: %w", err)
 	}
 
-	var stateMessage = protocol.Message{
-		Type: protocol.MessageTypeState,
-		State: &protocol.State{
+	var stateMessage = airbyte.Message{
+		Type: airbyte.MessageTypeState,
+		State: &airbyte.State{
 			Data: make(map[string]interface{}),
 		},
 	}
-	err = args.StateFile.Parse(&stateMessage.State.Data)
-	if err != nil {
+
+	if err = args.StateFile.Parse(&stateMessage.State.Data); err != nil {
 		return fmt.Errorf("parsing state file: %w", err)
 	}
 
@@ -151,9 +150,9 @@ func doRead(args protocol.ReadCmd) error {
 	}
 
 	// We'll re-use this same message instance for all records we print
-	var recordMessage = protocol.Message{
-		Type:   protocol.MessageTypeRecord,
-		Record: &protocol.Record{},
+	var recordMessage = airbyte.Message{
+		Type:   airbyte.MessageTypeRecord,
+		Record: &airbyte.Record{},
 	}
 	// We're all set to start printing data to stdout
 	var encoder = json.NewEncoder(os.Stdout)
@@ -161,33 +160,30 @@ func doRead(args protocol.ReadCmd) error {
 		var next = <-dataCh
 		if next.Error != nil {
 			// time to bail
-			var errMessage = protocol.NewLogMessage(protocol.LogLevelFatal, "read failed due to error: %v", next.Error)
+			var errMessage = airbyte.NewLogMessage(airbyte.LogLevelFatal, "read failed due to error: %v", next.Error)
 			// Printing the error may fail, but we'll ignore that error and return the original
 			_ = encoder.Encode(errMessage)
 			cancelFunc()
 			return next.Error
-		} else {
-			recordMessage.Record.Stream = next.Source.stream
-			for _, record := range next.Records {
-				recordMessage.Record.Data = record
-				recordMessage.Record.EmittedAt = time.Now().UTC().UnixNano() / int64(time.Millisecond)
-				var err = encoder.Encode(recordMessage)
-				if err != nil {
-					cancelFunc()
-					return err
-				}
-			}
-			put(stateMessage.State, next.Source, next.SequenceNumber)
-			err = encoder.Encode(stateMessage)
-			if err != nil {
+		}
+		recordMessage.Record.Stream = next.Source.stream
+		for _, record := range next.Records {
+			recordMessage.Record.Data = record
+			recordMessage.Record.EmittedAt = time.Now().UTC().UnixNano() / int64(time.Millisecond)
+			if err := encoder.Encode(recordMessage); err != nil {
 				cancelFunc()
 				return err
 			}
 		}
+		put(stateMessage.State, next.Source, next.SequenceNumber)
+		if err := encoder.Encode(stateMessage); err != nil {
+			cancelFunc()
+			return err
+		}
 	}
 }
 
-func parseConfigAndConnect(configFile protocol.ConfigFile) (config Config, client *kinesis.Kinesis, err error) {
+func parseConfigAndConnect(configFile airbyte.ConfigFile) (config Config, client *kinesis.Kinesis, err error) {
 	err = configFile.ConfigFile.Parse(&config)
 	if err != nil {
 		err = fmt.Errorf("parsing config file: %w", err)
@@ -197,7 +193,7 @@ func parseConfigAndConnect(configFile protocol.ConfigFile) (config Config, clien
 	// range.
 	if config.PartitionRange == nil {
 		log.Info("Assuming full partition range since no partitionRange was included in the configuration")
-		var fullRange = protocol.NewFullPartitionRange()
+		var fullRange = airbyte.NewFullPartitionRange()
 		config.PartitionRange = &fullRange
 	}
 	client, err = connect(&config)

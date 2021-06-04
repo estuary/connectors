@@ -8,6 +8,7 @@ package main
 // You can run such a container using:
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,14 +19,14 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go/protocol"
+	"github.com/estuary/connectors/go/airbyte"
 	"github.com/stretchr/testify/require"
 )
 
 const recordCount = 6
 
 func TestKinesisCapture(t *testing.T) {
-	var configFile = protocol.JSONFile("testdata/kinesis-config.json")
+	var configFile = airbyte.JSONFile("testdata/kinesis-config.json")
 	var conf = Config{}
 	var err = configFile.Parse(&conf)
 	require.NoError(t, err)
@@ -56,10 +57,10 @@ func TestKinesisCapture(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	// Assert that discover will return the expected stream
-	catalog, err := discoverCatalog(protocol.ConfigFile{ConfigFile: configFile})
+	catalog, err := discoverCatalog(airbyte.ConfigFile{ConfigFile: configFile})
 	require.NoError(t, err, "discover failed")
 
-	var discoveredStream protocol.Stream
+	var discoveredStream airbyte.Stream
 	for _, s := range catalog.Streams {
 		if s.Name == stream {
 			discoveredStream = s
@@ -82,7 +83,7 @@ func TestKinesisCapture(t *testing.T) {
 		case next := <-dataCh:
 			require.NoError(t, next.Error, "readResult had error")
 			for _, rec := range next.Records {
-				if rec["canary"] == canary {
+				if bytes.Contains(rec, []byte(canary)) {
 					foundRecords++
 				} else {
 					fmt.Printf("Got record that doesn't match canary: %#v\n", rec)
@@ -98,20 +99,10 @@ func TestKinesisCapture(t *testing.T) {
 // The kinesis stream could take a while before it becomes active, so this just polls until the
 // status indicates that it's active.
 func awaitStreamActive(t *testing.T, client *kinesis.Kinesis, stream string) {
-	var err error
-	for i := 0; i < 20; i++ {
-		<-time.After(time.Second)
-		var input = kinesis.DescribeStreamSummaryInput{
-			StreamName: &stream,
-		}
-		resp, err := client.DescribeStreamSummary(&input)
-		if err == nil && *resp.StreamDescriptionSummary.StreamStatus == kinesis.StreamStatusActive {
-			t.Log("kinesis stream is now active")
-			break
-		} else {
-			t.Logf("kinesis stream not yet active, resp: %#v, err: %v", resp, err)
-		}
+	var input = kinesis.DescribeStreamInput{
+		StreamName: &stream,
 	}
+	var err = client.WaitUntilStreamExists(&input)
 	require.NoError(t, err, "error waiting for kinesis stream to become active")
 }
 

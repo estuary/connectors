@@ -1,6 +1,7 @@
-package protocol
+package airbyte
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
@@ -105,10 +106,10 @@ type ConnectionStatus struct {
 }
 
 type Record struct {
-	Stream    string                 `json:"stream"`
-	Data      map[string]interface{} `json:"data"`
-	EmittedAt int64                  `json:"emitted_at"`
-	Namespace string                 `json:"namespace,omitempty"`
+	Stream    string          `json:"stream"`
+	Data      json.RawMessage `json:"data"`
+	EmittedAt int64           `json:"emitted_at"`
+	Namespace string          `json:"namespace,omitempty"`
 }
 
 type LogLevel string
