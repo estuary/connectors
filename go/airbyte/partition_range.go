@@ -1,4 +1,4 @@
-package protocol
+package airbyte
 
 import (
 	"encoding/hex"
@@ -11,7 +11,9 @@ import (
 )
 
 // PartitionRange is the parsed shard labels that determine the range of partitions that this shard
-// will be responsible for.
+// will be responsible for. Note that this is not actually a part of the airbyte spec. This is
+// included in the airbyte package because we might eventually propose adding it to the spec, and
+// for lack of a better place to put it.
 type PartitionRange struct {
 	BeginInclusive uint32
 	EndInclusive   uint32
@@ -24,27 +26,25 @@ func NewFullPartitionRange() PartitionRange {
 	}
 }
 
-// TODO: this is gross, but I'm not sure if there's a better way
 func (pr *PartitionRange) UnmarshalJSON(bytes []byte) error {
-	// This map will be the whole object if
-	var tmp = make(map[string]string)
-	var err = json.Unmarshal(bytes, &tmp)
-	if err != nil {
+	var tmp = struct{ Begin, End string }{}
+	if err := json.Unmarshal(bytes, &tmp); err != nil {
 		return err
 	}
-	if begin, ok := tmp["begin"]; ok {
-		b, err := strconv.ParseUint(begin, 16, 32)
+
+	if tmp.Begin != "" {
+		begin, err := strconv.ParseUint(tmp.Begin, 16, 32)
 		if err != nil {
 			return fmt.Errorf("parsing partition range 'begin': %w", err)
 		}
-		pr.BeginInclusive = uint32(b)
+		pr.BeginInclusive = uint32(begin)
 	}
-	if end, ok := tmp["end"]; ok {
-		b, err := strconv.ParseUint(end, 16, 32)
+	if tmp.End != "" {
+		end, err := strconv.ParseUint(tmp.End, 16, 32)
 		if err != nil {
 			return fmt.Errorf("parsing partition range 'end': %w", err)
 		}
-		pr.EndInclusive = uint32(b)
+		pr.EndInclusive = uint32(end)
 	}
 	return nil
 }
