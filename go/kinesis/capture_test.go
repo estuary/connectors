@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"os"
 	"testing"
@@ -23,9 +24,109 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const recordCount = 6
+func TestIsRecordWithinRange(t *testing.T) {
+	var flowRange = airbyte.PartitionRange{
+		BeginInclusive: 5,
+		EndExclusive:   10,
+	}
+	var kinesisRange = airbyte.PartitionRange{
+		BeginInclusive: 7,
+		EndExclusive:   15,
+	}
+	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 7))
+}
 
-func TestKinesisCapture(t *testing.T) {
+func TestKinesisCaptureWithShardOverlap(t *testing.T) {
+	var configFile = airbyte.JSONFile("testdata/kinesis-config.json")
+	var conf = Config{}
+	var err = configFile.Parse(&conf)
+	require.NoError(t, err)
+	client, err := connect(&conf)
+	require.NoError(t, err)
+
+	var stream = "test-" + randAlpha(6)
+	var testShards int64 = 3
+	var createStreamReq = &kinesis.CreateStreamInput{
+		StreamName: &stream,
+		ShardCount: &testShards,
+	}
+	_, err = client.CreateStream(createStreamReq)
+	require.NoError(t, err, "failed to create stream")
+
+	defer func() {
+		var deleteStreamReq = kinesis.DeleteStreamInput{
+			StreamName: &stream,
+		}
+		var _, err = client.DeleteStream(&deleteStreamReq)
+		require.NoError(t, err, "failed to delete stream")
+	}()
+	awaitStreamActive(t, client, stream)
+
+	var dataCh = make(chan readResult)
+	var ctx, cancelFunc = context.WithCancel(context.Background())
+	defer cancelFunc()
+
+	var shard1Conf = conf
+	shard1Conf.PartitionRange = &airbyte.PartitionRange{
+		BeginInclusive: 0,
+		EndExclusive:   math.MaxUint32 / 2,
+	}
+	go readStream(ctx, shard1Conf, client, stream, nil, dataCh)
+
+	var shard2Conf = conf
+	shard2Conf.PartitionRange = &airbyte.PartitionRange{
+		BeginInclusive: math.MaxUint32 / 2,
+		EndExclusive:   math.MaxUint32,
+	}
+	go readStream(ctx, shard2Conf, client, stream, nil, dataCh)
+
+	var partitionKeys = []string{"furst", "sekund", "thuurd", "phorth"}
+	var sequencNumbers = make(map[string]string)
+	for i := 0; i < 24; i++ {
+		var partitionKey = partitionKeys[i%(len(partitionKeys)-1)]
+		var input = &kinesis.PutRecordInput{
+			StreamName:   &stream,
+			PartitionKey: &partitionKey,
+			Data:         []byte(fmt.Sprintf(`{"partitionKey":%q, "counter": %d}`, partitionKey, i)),
+		}
+		if prevSeq, ok := sequencNumbers[partitionKey]; ok {
+			input.SequenceNumberForOrdering = &prevSeq
+		}
+		resp, err := client.PutRecord(input)
+		require.NoError(t, err, "failed to put record")
+		sequencNumbers[partitionKey] = *resp.SequenceNumber
+	}
+
+	var countersByPartition = make(map[string]int)
+	var foundRecords = 0
+	for foundRecords < 24 {
+		select {
+		case next := <-dataCh:
+			require.NoError(t, next.Error, "readResult had error")
+			for _, rec := range next.Records {
+				var target = struct {
+					PartitionKey string
+					Counter      int
+				}{}
+				err = json.Unmarshal(rec, &target)
+				require.NoError(t, err, "failed to unmarshal record")
+
+				if lastCounter, ok := countersByPartition[target.PartitionKey]; ok {
+					require.Greaterf(t, target.Counter, lastCounter, "expected counter for partition '%s' to increase", target.PartitionKey)
+				}
+				countersByPartition[target.PartitionKey] = target.Counter
+				foundRecords++
+			}
+		case <-time.After(time.Second * 5):
+			require.Fail(t, "timed out receiving next record")
+		}
+	}
+	require.Equal(t, 24, foundRecords)
+}
+
+const basicTestRecordCount = 6
+
+func DontTestBasicKinesisCapture(t *testing.T) {
 	var configFile = airbyte.JSONFile("testdata/kinesis-config.json")
 	var conf = Config{}
 	var err = configFile.Parse(&conf)
@@ -78,7 +179,7 @@ func TestKinesisCapture(t *testing.T) {
 	go addData(ctx, t, client, stream, canary)
 
 	var foundRecords = 0
-	for foundRecords < recordCount {
+	for foundRecords < basicTestRecordCount {
 		select {
 		case next := <-dataCh:
 			require.NoError(t, next.Error, "readResult had error")
@@ -93,7 +194,7 @@ func TestKinesisCapture(t *testing.T) {
 			require.Fail(t, "timed out receiving next record")
 		}
 	}
-	require.Equal(t, recordCount, foundRecords)
+	require.Equal(t, basicTestRecordCount, foundRecords)
 }
 
 // The kinesis stream could take a while before it becomes active, so this just polls until the
@@ -108,7 +209,7 @@ func awaitStreamActive(t *testing.T, client *kinesis.Kinesis, stream string) {
 
 func addData(ctx context.Context, t *testing.T, client *kinesis.Kinesis, stream, canary string) {
 	var input = &kinesis.PutRecordsInput{
-		Records:    make([]*kinesis.PutRecordsRequestEntry, recordCount),
+		Records:    make([]*kinesis.PutRecordsRequestEntry, basicTestRecordCount),
 		StreamName: &stream,
 	}
 	for i := range input.Records {
