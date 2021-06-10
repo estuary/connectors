@@ -19,23 +19,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func parseKinesisShardRange(begin, end string) (airbyte.PartitionRange, error) {
-	var r = airbyte.PartitionRange{}
-	var begin128, ok = new(big.Int).SetString(begin, 10)
-	if !ok {
-		return r, fmt.Errorf("failed to parse kinesis shard range begin: '%s'", begin)
-	}
-	r.BeginInclusive = uint32(begin128.Rsh(begin128, 96).Uint64())
-
-	end128, ok := new(big.Int).SetString(end, 10)
-	if !ok {
-		return r, fmt.Errorf("failed to parse kinesis shard range end: '%s'", end)
-	}
-	r.EndExclusive = uint32(end128.Rsh(end128, 96).Uint64())
-
-	return r, nil
-}
-
 type kinesisCapture struct {
 	client             *kinesis.Kinesis
 	ctx                context.Context
@@ -199,6 +182,23 @@ func (kc *kinesisCapture) sendErr(err error, source *recordSource) {
 	}
 }
 
+func parseKinesisShardRange(begin, end string) (airbyte.PartitionRange, error) {
+	var r = airbyte.PartitionRange{}
+	var begin128, ok = new(big.Int).SetString(begin, 10)
+	if !ok {
+		return r, fmt.Errorf("failed to parse kinesis shard range begin: '%s'", begin)
+	}
+	r.Begin = uint32(begin128.Rsh(begin128, 96).Uint64())
+
+	end128, ok := new(big.Int).SetString(end, 10)
+	if !ok {
+		return r, fmt.Errorf("failed to parse kinesis shard range end: '%s'", end)
+	}
+	r.End = uint32(end128.Rsh(end128, 96).Uint64())
+
+	return r, nil
+}
+
 func (kc *kinesisCapture) overlapsHashRange(shard *kinesis.Shard) (airbyte.ShardRangeResult, error) {
 	var kinesisRange, err = parseKinesisShardRange(*shard.HashKeyRange.StartingHashKey, *shard.HashKeyRange.EndingHashKey)
 	if err != nil {
@@ -213,8 +213,8 @@ func (kc *kinesisCapture) startReadingShard(shardID string) {
 	var logEntry = log.WithFields(log.Fields{
 		"kinesisStream":     kc.stream,
 		"kinesisShardId":    shardID,
-		"captureRangeStart": kc.config.PartitionRange.BeginInclusive,
-		"captureRangeEnd":   kc.config.PartitionRange.EndExclusive,
+		"captureRangeStart": kc.config.PartitionRange.Begin,
+		"captureRangeEnd":   kc.config.PartitionRange.End,
 	})
 	var shard, err = kc.getShard(shardID)
 	if err != nil {
@@ -459,10 +459,10 @@ func isRecordWithinRange(flowRange airbyte.PartitionRange, kinesisRange airbyte.
 	if kinesisRange.Includes(keyHash) {
 		log.Infof("PartitionKey hashes into normal kinesis shard range (yay)")
 		return rangeOverlap.Includes(keyHash)
-	} else if flowRange.BeginInclusive <= kinesisRange.BeginInclusive && keyHash < kinesisRange.BeginInclusive {
+	} else if flowRange.Begin <= kinesisRange.Begin && keyHash < kinesisRange.Begin {
 		log.Infof("PartitionKey hashes below kinesis shard range (booo)")
 		return true
-	} else if flowRange.EndExclusive >= kinesisRange.EndExclusive && keyHash >= kinesisRange.EndExclusive {
+	} else if flowRange.End >= kinesisRange.End && keyHash >= kinesisRange.End {
 		log.Infof("PartitionKey hashes above kinesis shard range (booo)")
 		return true
 	}
