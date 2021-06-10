@@ -26,12 +26,12 @@ import (
 
 func TestIsRecordWithinRange(t *testing.T) {
 	var flowRange = airbyte.PartitionRange{
-		BeginInclusive: 5,
-		EndExclusive:   10,
+		Begin: 5,
+		End:   10,
 	}
 	var kinesisRange = airbyte.PartitionRange{
-		BeginInclusive: 7,
-		EndExclusive:   15,
+		Begin: 7,
+		End:   15,
 	}
 	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 7))
 }
@@ -68,15 +68,15 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 
 	var shard1Conf = conf
 	shard1Conf.PartitionRange = &airbyte.PartitionRange{
-		BeginInclusive: 0,
-		EndExclusive:   math.MaxUint32 / 2,
+		Begin: 0,
+		End:   math.MaxUint32 / 2,
 	}
 	go readStream(ctx, shard1Conf, client, stream, nil, dataCh)
 
 	var shard2Conf = conf
 	shard2Conf.PartitionRange = &airbyte.PartitionRange{
-		BeginInclusive: math.MaxUint32 / 2,
-		EndExclusive:   math.MaxUint32,
+		Begin: math.MaxUint32 / 2,
+		End:   math.MaxUint32,
 	}
 	go readStream(ctx, shard2Conf, client, stream, nil, dataCh)
 
