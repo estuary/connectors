@@ -8,14 +8,11 @@ package main
 // You can run such a container using:
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -33,7 +30,24 @@ func TestIsRecordWithinRange(t *testing.T) {
 		Begin: 7,
 		End:   15,
 	}
+	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 5))
 	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 7))
+	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 10))
+	// Record is outside of the kinesis range, but is claimed by the flow shard because it overlaps
+	// the low end of the kinesis range
+	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 4))
+
+	require.False(t, isRecordWithinRange(flowRange, kinesisRange, 11))
+	require.False(t, isRecordWithinRange(flowRange, kinesisRange, 17))
+
+	flowRange.Begin = 8
+	flowRange.End = 20
+	// The record is no longer claimed by the flow shard because its range does not overlap the low
+	// end of the kinesis range
+	require.False(t, isRecordWithinRange(flowRange, kinesisRange, 4))
+	// These should now be claimed because the flow range overlaps the high end of the kinesis range
+	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 17))
+	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 9999))
 }
 
 func TestKinesisCaptureWithShardOverlap(t *testing.T) {
@@ -92,9 +106,15 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 		if prevSeq, ok := sequencNumbers[partitionKey]; ok {
 			input.SequenceNumberForOrdering = &prevSeq
 		}
-		resp, err := client.PutRecord(input)
-		require.NoError(t, err, "failed to put record")
-		sequencNumbers[partitionKey] = *resp.SequenceNumber
+
+		var doPut = func() bool {
+			var resp, putErr = client.PutRecord(input)
+			if putErr == nil {
+				sequencNumbers[partitionKey] = *resp.SequenceNumber
+			}
+			return putErr == nil
+		}
+		require.Eventually(t, doPut, time.Second, time.Millisecond*100, "failed to put record")
 	}
 
 	var countersByPartition = make(map[string]int)
@@ -124,79 +144,6 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 	require.Equal(t, 24, foundRecords)
 }
 
-const basicTestRecordCount = 6
-
-func DontTestBasicKinesisCapture(t *testing.T) {
-	var configFile = airbyte.JSONFile("testdata/kinesis-config.json")
-	var conf = Config{}
-	var err = configFile.Parse(&conf)
-	require.NoError(t, err)
-	client, err := connect(&conf)
-	require.NoError(t, err)
-
-	var stream = "test-" + randAlpha(6)
-	var testShards int64 = 2
-	var createStreamReq = &kinesis.CreateStreamInput{
-		StreamName: &stream,
-		ShardCount: &testShards,
-	}
-	_, err = client.CreateStream(createStreamReq)
-	require.NoError(t, err, "failed to create stream")
-	// Setup this defer before waiting for the stream to be active, that way we can still delete it
-	// if there's an error waiting for it to become active.
-	defer func() {
-		var deleteStreamReq = kinesis.DeleteStreamInput{
-			StreamName: &stream,
-		}
-		var _, err = client.DeleteStream(&deleteStreamReq)
-		require.NoError(t, err, "failed to delete stream")
-	}()
-	awaitStreamActive(t, client, stream)
-
-	tempDir, err := ioutil.TempDir("", "kinesis-test-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	// Assert that discover will return the expected stream
-	catalog, err := discoverCatalog(airbyte.ConfigFile{ConfigFile: configFile})
-	require.NoError(t, err, "discover failed")
-
-	var discoveredStream airbyte.Stream
-	for _, s := range catalog.Streams {
-		if s.Name == stream {
-			discoveredStream = s
-			break
-		}
-	}
-	require.NotEmpty(t, discoveredStream.Name, "discover did not return the expected stream")
-
-	// Generate a random string that we'll put in each record so we can read it back.
-	var canary = randAlpha(24)
-	var dataCh = make(chan readResult)
-	var ctx, cancelFunc = context.WithCancel(context.Background())
-	defer cancelFunc()
-	go readStream(ctx, conf, client, stream, nil, dataCh)
-	go addData(ctx, t, client, stream, canary)
-
-	var foundRecords = 0
-	for foundRecords < basicTestRecordCount {
-		select {
-		case next := <-dataCh:
-			require.NoError(t, next.Error, "readResult had error")
-			for _, rec := range next.Records {
-				if bytes.Contains(rec, []byte(canary)) {
-					foundRecords++
-				} else {
-					fmt.Printf("Got record that doesn't match canary: %#v\n", rec)
-				}
-			}
-		case <-time.After(time.Second * 5):
-			require.Fail(t, "timed out receiving next record")
-		}
-	}
-	require.Equal(t, basicTestRecordCount, foundRecords)
-}
-
 // The kinesis stream could take a while before it becomes active, so this just polls until the
 // status indicates that it's active.
 func awaitStreamActive(t *testing.T, client *kinesis.Kinesis, stream string) {
@@ -205,43 +152,6 @@ func awaitStreamActive(t *testing.T, client *kinesis.Kinesis, stream string) {
 	}
 	var err = client.WaitUntilStreamExists(&input)
 	require.NoError(t, err, "error waiting for kinesis stream to become active")
-}
-
-func addData(ctx context.Context, t *testing.T, client *kinesis.Kinesis, stream, canary string) {
-	var input = &kinesis.PutRecordsInput{
-		Records:    make([]*kinesis.PutRecordsRequestEntry, basicTestRecordCount),
-		StreamName: &stream,
-	}
-	for i := range input.Records {
-		var partKey = randAlpha(8)
-		input.Records[i] = &kinesis.PutRecordsRequestEntry{
-			Data:         []byte(fmt.Sprintf(`{"foo": "bar", "id": %d, "canary": "%s"}`, i, canary)),
-			PartitionKey: &partKey,
-		}
-	}
-
-	var err error
-	var resp *kinesis.PutRecordsOutput
-	var doPutRecords = func() bool {
-		resp, err = client.PutRecords(input)
-		return err == nil && (resp.FailedRecordCount == nil || *resp.FailedRecordCount == 0)
-	}
-	require.Eventuallyf(
-		t,
-		doPutRecords,
-		time.Second*5,
-		time.Millisecond*200,
-		"Failed to put records, resp: %#v, err: %v",
-		resp, err,
-	)
-}
-
-func writeJSONFile(t *testing.T, obj interface{}, path string) {
-	var f, err = os.Create(path)
-	require.NoError(t, err)
-	err = json.NewEncoder(f).Encode(obj)
-	require.NoError(t, err)
-	require.NoError(t, f.Close())
 }
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyz"
