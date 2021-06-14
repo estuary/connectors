@@ -3,25 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go/airbyte"
+	"github.com/estuary/connectors/go/shardrange"
 	log "github.com/sirupsen/logrus"
 )
 
 // Config represents the fully merged endpoint configuration for Kinesis.
 // It matches the `KinesisConfig` struct in `crates/sources/src/specs.rs`
 type Config struct {
-	PartitionRange     *airbyte.PartitionRange `json:"partitionRange"`
-	Endpoint           string                  `json:"endpoint"`
-	Region             string                  `json:"region"`
-	AWSAccessKeyID     string                  `json:"awsAccessKeyId"`
-	AWSSecretAccessKey string                  `json:"awsSecretAccessKey"`
+	ShardRange         *shardrange.Range `json:"shardRange"`
+	Endpoint           string            `json:"endpoint"`
+	Region             string            `json:"region"`
+	AWSAccessKeyID     string            `json:"awsAccessKeyId"`
+	AWSSecretAccessKey string            `json:"awsSecretAccessKey"`
 }
 
 func (c *Config) Validate() error {
@@ -42,7 +40,6 @@ var configJSONSchema = map[string]interface{}{
 	"title":   "Kinesis Source Spec",
 	"type":    "object",
 	"required": []string{
-		"stream",
 		"region",
 		"awsAccessKeyId",
 		"awsSecretAccessKey",
@@ -53,6 +50,11 @@ var configJSONSchema = map[string]interface{}{
 			"title":       "AWS Region",
 			"description": "The name of the AWS region where the Kinesis stream is located",
 			"default":     "us-east-1",
+		},
+		"endpoint": map[string]interface{}{
+			"type":        "string",
+			"title":       "AWS Endpoint",
+			"description": "The AWS endpoint URI to connect to, useful if you're capturing from a kinesis-compatible API that isn't provided by AWS",
 		},
 		"awsAccessKeyId": map[string]interface{}{
 			"type":        "string",
@@ -66,7 +68,7 @@ var configJSONSchema = map[string]interface{}{
 			"description": "Part of the AWS credentials that will be used to connect to Kinesis",
 			"default":     "example-aws-secret-access-key",
 		},
-		"partitionRange": map[string]interface{}{
+		"shardRange": map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"end": map[string]interface{}{
@@ -112,11 +114,6 @@ func listAllStreams(ctx context.Context, client *kinesis.Kinesis) ([]string, err
 	var streams []string
 	var lastStream *string = nil
 	var limit = int64(100)
-	var errBackoff = backoff{
-		initialMillis: 200,
-		maxMillis:     1000,
-		multiplier:    1.5,
-	}
 	var reqNum int
 	for {
 		reqNum++
@@ -127,52 +124,18 @@ func listAllStreams(ctx context.Context, client *kinesis.Kinesis) ([]string, err
 		}
 		resp, err := client.ListStreamsWithContext(ctx, &req)
 		if err != nil {
-			if request.IsErrorRetryable(err) {
-				log.WithField("error", err).Warnf("error while listing streams (will retry): %T %#v", err, err)
-				select {
-				case <-errBackoff.nextBackoff():
-				case <-ctx.Done():
-					return nil, ctx.Err()
-				}
-			} else {
-				return nil, err
-			}
+			return nil, err
+		}
+		log.WithField("responseStreamCount", len(resp.StreamNames)).Debug("got ListStreams response")
+		for _, name := range resp.StreamNames {
+			streams = append(streams, *name)
+		}
+		if resp.HasMoreStreams != nil && *resp.HasMoreStreams {
+			lastStream = resp.StreamNames[len(resp.StreamNames)-1]
 		} else {
-			log.WithField("responseStreamCount", len(resp.StreamNames)).Debug("got ListStreams response")
-			for _, name := range resp.StreamNames {
-				streams = append(streams, *name)
-			}
-			if resp.HasMoreStreams != nil && *resp.HasMoreStreams {
-				lastStream = resp.StreamNames[len(resp.StreamNames)-1]
-			} else {
-				break
-			}
+			break
 		}
 	}
 	log.WithField("streamCount", len(streams)).Debug("finished listing streams successfully")
 	return streams, nil
-}
-
-type backoff struct {
-	initialMillis int64
-	maxMillis     int64
-	multiplier    float64
-	currentMillis int64
-}
-
-func (b *backoff) nextBackoff() <-chan time.Time {
-	if b.currentMillis == 0 {
-		b.reset()
-	}
-	var ch = time.After(time.Duration(b.currentMillis) * time.Millisecond)
-	var nextMillis = int64(float64(b.currentMillis) * b.multiplier)
-	if nextMillis > b.maxMillis {
-		nextMillis = b.maxMillis
-	}
-	b.currentMillis = nextMillis
-	return ch
-}
-
-func (b *backoff) reset() {
-	b.currentMillis = b.initialMillis
 }

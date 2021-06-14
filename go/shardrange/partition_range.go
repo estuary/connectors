@@ -1,4 +1,4 @@
-package airbyte
+package shardrange
 
 import (
 	"encoding/hex"
@@ -10,23 +10,22 @@ import (
 	"github.com/minio/highwayhash"
 )
 
-// PartitionRange is the parsed shard labels that determine the range of partitions that this shard
-// will be responsible for. Note that this is not actually a part of the airbyte spec. This is
-// included in the airbyte package because we might eventually propose adding it to the spec, and
-// for lack of a better place to put it. The range is inclusive on both sides.
-type PartitionRange struct {
+// Range is the parsed shard labels that determine the range of partitions that this shard
+// will be responsible for. The range is inclusive on both sides.
+type Range struct {
 	Begin uint32
 	End   uint32
 }
 
-func NewFullPartitionRange() PartitionRange {
-	return PartitionRange{
+// NewFullRange returns a Range that covers the entire uint32 space.
+func NewFullRange() Range {
+	return Range{
 		Begin: 0,
 		End:   math.MaxUint32,
 	}
 }
 
-func (pr *PartitionRange) UnmarshalJSON(bytes []byte) error {
+func (pr *Range) UnmarshalJSON(bytes []byte) error {
 	var tmp = struct{ Begin, End string }{}
 	if err := json.Unmarshal(bytes, &tmp); err != nil {
 		return err
@@ -49,13 +48,13 @@ func (pr *PartitionRange) UnmarshalJSON(bytes []byte) error {
 	return nil
 }
 
-func (r PartitionRange) Includes(hash uint32) bool {
+func (r Range) Includes(hash uint32) bool {
 	return hash >= r.Begin && hash <= r.End
 }
 
 // Intersection returns the intersection of two overlapping PartitionRanges. If the ranges do not
 // overlap, this function will panic.
-func (r PartitionRange) Intersection(other PartitionRange) PartitionRange {
+func (r Range) Intersection(other Range) Range {
 	var result = r
 	if other.Begin > r.Begin {
 		result.Begin = other.Begin
@@ -71,7 +70,7 @@ func (r PartitionRange) Intersection(other PartitionRange) PartitionRange {
 
 // IncludesHwHash determines whether the given partition id is included in this partition range.
 // This uses a stable hash function (Highway hash) that is guaranteed never to change.
-func (r PartitionRange) IncludesHwHash(partitionID []byte) bool {
+func (r Range) IncludesHwHash(partitionID []byte) bool {
 	var hashed = hwHashPartition(partitionID)
 	return r.Includes(hashed)
 }
@@ -84,15 +83,16 @@ func hwHashPartition(partitionId []byte) uint32 {
 	return uint32(highwayhash.Sum64(partitionId, highwayHashKey) >> 32)
 }
 
-type ShardRangeResult int
+// OverlapResult is the result of checking whether one Range overlaps another.
+type OverlapResult int
 
 const (
-	NoOverlap      ShardRangeResult = 0
-	PartialOverlap ShardRangeResult = 1
-	FullyInclusive ShardRangeResult = 2
+	NoOverlap      OverlapResult = 0
+	PartialOverlap OverlapResult = 1
+	FullyInclusive OverlapResult = 2
 )
 
-func (rr ShardRangeResult) String() string {
+func (rr OverlapResult) String() string {
 	switch rr {
 	case NoOverlap:
 		return "NoOverlap"
@@ -105,7 +105,10 @@ func (rr ShardRangeResult) String() string {
 	}
 }
 
-func (pr PartitionRange) Overlaps(other PartitionRange) ShardRangeResult {
+// Overlaps checks whether `other` overlaps this Range. Note that this is *not* reflexive. For example:
+// [1-10].Overlaps([4-6]) == FullyInclusive
+// But [4-6].Overlaps([1-10]) == PartialOverlap
+func (pr Range) Overlaps(other Range) OverlapResult {
 	var includesBegin = pr.Includes(other.Begin)
 	var includesEnd = pr.Includes(other.End)
 	if includesBegin && includesEnd {
