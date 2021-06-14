@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/estuary/connectors/go/airbyte"
+	"github.com/estuary/connectors/go/shardrange"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -81,7 +82,7 @@ func discoverCatalog(config airbyte.ConfigFile) (*airbyte.Catalog, error) {
 	return catalog, nil
 }
 
-func put(state *airbyte.State, source *recordSource, sequenceNumber string) {
+func updateState(state *airbyte.State, source *recordSource, sequenceNumber string) {
 	var streamMap, ok = state.Data[source.stream]
 	if !ok {
 		streamMap = make(map[string]interface{})
@@ -158,16 +159,16 @@ func doRead(args airbyte.ReadCmd) error {
 	var encoder = json.NewEncoder(os.Stdout)
 	for {
 		var next = <-dataCh
-		if next.Error != nil {
+		if next.err != nil {
 			// time to bail
-			var errMessage = airbyte.NewLogMessage(airbyte.LogLevelFatal, "read failed due to error: %v", next.Error)
+			var errMessage = airbyte.NewLogMessage(airbyte.LogLevelFatal, "read failed due to error: %v", next.err)
 			// Printing the error may fail, but we'll ignore that error and return the original
 			_ = encoder.Encode(errMessage)
 			cancelFunc()
-			return next.Error
+			return next.err
 		}
-		recordMessage.Record.Stream = next.Source.stream
-		for _, record := range next.Records {
+		recordMessage.Record.Stream = next.source.stream
+		for _, record := range next.records {
 			recordMessage.Record.Data = record
 			recordMessage.Record.EmittedAt = time.Now().UTC().UnixNano() / int64(time.Millisecond)
 			if err := encoder.Encode(recordMessage); err != nil {
@@ -175,7 +176,7 @@ func doRead(args airbyte.ReadCmd) error {
 				return err
 			}
 		}
-		put(stateMessage.State, next.Source, next.SequenceNumber)
+		updateState(stateMessage.State, next.source, next.sequenceNumber)
 		if err := encoder.Encode(stateMessage); err != nil {
 			cancelFunc()
 			return err
@@ -191,10 +192,10 @@ func parseConfigAndConnect(configFile airbyte.ConfigFile) (config Config, client
 	}
 	// If the partition range was not included in the configuration, then we'll assume the full
 	// range.
-	if config.PartitionRange == nil {
+	if config.ShardRange == nil {
 		log.Info("Assuming full partition range since no partitionRange was included in the configuration")
-		var fullRange = airbyte.NewFullPartitionRange()
-		config.PartitionRange = &fullRange
+		var fullRange = shardrange.NewFullRange()
+		config.ShardRange = &fullRange
 	}
 	client, err = connect(&config)
 	if err != nil {

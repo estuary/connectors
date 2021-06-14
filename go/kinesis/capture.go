@@ -2,24 +2,48 @@ package main
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	//"math"
-	"math/big"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go/airbyte"
+	"github.com/estuary/connectors/go/shardrange"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
 
-type kinesisCapture struct {
+// readStream starts reading the given kinesis stream, delivering both records and errors from all
+// kinsis shards over the given `resultsCh`.
+func readStream(ctx context.Context, config Config, client *kinesis.Kinesis, stream string, state map[string]string, resultsCh chan<- readResult) {
+	var kc = &streamReader{
+		client:         client,
+		ctx:            ctx,
+		stream:         stream,
+		config:         config,
+		dataCh:         resultsCh,
+		readingShards:  make(map[string]bool),
+		shardSequences: state,
+	}
+	var err = kc.startReadingStream()
+	if err != nil {
+		select {
+		case resultsCh <- readResult{
+			source: &recordSource{
+				stream: stream,
+			},
+			err: err,
+		}:
+		case <-ctx.Done():
+		}
+	} else {
+		log.WithField("stream", stream).Infof("Started reading kinesis stream")
+	}
+}
+
+// Represents an ongoing read of a kinesis stream.
+type streamReader struct {
 	client             *kinesis.Kinesis
 	ctx                context.Context
 	stream             string
@@ -32,7 +56,6 @@ type kinesisCapture struct {
 	// the same state, regardless of whether they're triggered by the initial shard listing or
 	// returned as a child shard id when reaching the end of an existing shard.
 	shardSequences map[string]string
-	shardListing   map[string]*kinesis.Shard
 }
 
 type recordSource struct {
@@ -40,55 +63,41 @@ type recordSource struct {
 	shardID string
 }
 
+// readResult is the message that's sent on the channel to the main thread. It will either contain
+// records or an error.
 type readResult struct {
-	Source         *recordSource
-	Error          error
-	Records        []json.RawMessage
-	SequenceNumber string
+	// Identifies the kinesis stream and shard that the records came from.
+	source *recordSource
+	err    error
+	// A batch of records from kinesis.
+	records []json.RawMessage
+	// The highest sequence number in the batch, which should be added to the state.
+	sequenceNumber string
 }
 
-func readStream(ctx context.Context, config Config, client *kinesis.Kinesis, stream string, state map[string]string, dataCh chan<- readResult) {
-	var kc = &kinesisCapture{
-		client:         client,
-		ctx:            ctx,
-		stream:         stream,
-		config:         config,
-		dataCh:         dataCh,
-		readingShards:  make(map[string]bool),
-		shardListing:   make(map[string]*kinesis.Shard),
-		shardSequences: state,
-	}
-	var err = kc.startReadingStream()
-	if err != nil {
-		select {
-		case dataCh <- readResult{
-			Source: &recordSource{
-				stream: stream,
-			},
-			Error: err,
-		}:
-		case <-ctx.Done():
-		}
-	} else {
-		log.WithField("stream", stream).Infof("Started reading kinesis stream")
-	}
-}
-
-func (kc *kinesisCapture) startReadingStream() error {
-	initialShardIDs, err := kc.listInitialShards()
+// startReadingStream synchronously lists kinesis shards and begins background reads of the ones that overlap this capture shard range.
+func (kc *streamReader) startReadingStream() error {
+	initialShards, err := kc.listInitialShards()
 	if err != nil {
 		return fmt.Errorf("listing kinesis shards: %w", err)
-	} else if len(initialShardIDs) == 0 {
+	} else if len(initialShards) == 0 {
 		return fmt.Errorf("No kinesis shards found for the given stream")
 	}
 	log.WithFields(log.Fields{
 		"kinesisStream":        kc.stream,
-		"initialKinesisShards": initialShardIDs,
-	}).Infof("Will start reading from %d kinesis shards", len(initialShardIDs))
+		"initialKinesisShards": initialShards,
+	}).Infof("Will start reading from %d kinesis shards", len(initialShards))
 
-	// Start reading from all the known shards.
-	for _, kinesisShardID := range initialShardIDs {
-		go kc.startReadingShard(kinesisShardID)
+	for _, kinesisShard := range initialShards {
+		var reader, err = kc.newShardReader(*kinesisShard.ShardId, func(_ string) (*kinesis.Shard, error) {
+			return kinesisShard, nil
+		})
+		if err != nil {
+			return err
+		} else if reader != nil {
+			go reader.readShard()
+		}
+		// If reader == nil, then we should not read this shard
 	}
 	return nil
 }
@@ -100,7 +109,15 @@ func (kc *kinesisCapture) startReadingStream() error {
 // initially. It will omit shards that meet *all* of the following conditions:
 // - Has a parent id
 // - The parent shard still has data that is within the retention period.
-func (kc *kinesisCapture) listInitialShards() ([]string, error) {
+// - This capture shard has not previously started reading that shard, as indicated by the state.
+//
+// This function will return the parents of shards that we've already started reading. This is
+// intentional, and important, in order to handle the case where the Flow capture shard has split,
+// and we need to also start reading shards that are siblings of those that are included in the
+// state. We also don't do any filtering based on shard ranges here, in order to keep a single code
+// path for doing that.
+func (kc *streamReader) listInitialShards() ([]*kinesis.Shard, error) {
+	var shardListing = make(map[string]*kinesis.Shard)
 	var nextToken = ""
 	for {
 		var listShardsReq = kinesis.ListShardsInput{}
@@ -114,7 +131,7 @@ func (kc *kinesisCapture) listInitialShards() ([]string, error) {
 			return nil, fmt.Errorf("listing shards: %w", err)
 		}
 		for _, shard := range listShardsResp.Shards {
-			kc.shardListing[*shard.ShardId] = shard
+			shardListing[*shard.ShardId] = shard
 		}
 
 		if listShardsResp.NextToken != nil && (*listShardsResp.NextToken) != "" {
@@ -126,13 +143,13 @@ func (kc *kinesisCapture) listInitialShards() ([]string, error) {
 
 	// Now iterate the map and return all shards in the oldest generation.
 	// Reading those shards will yield the child shards once we reach the end of each parent.
-	var shards []string
-	for shardID, shard := range kc.shardListing {
+	var shards []*kinesis.Shard
+	for shardID, shard := range shardListing {
 		// Does the shard have a parent
 		if shard.ParentShardId != nil {
 			// Was the parent included in the ListShards output, meaning it still contains data that
 			// falls inside the retention period.
-			if _, parentIsListed := kc.shardListing[*shard.ParentShardId]; parentIsListed {
+			if _, parentIsListed := shardListing[*shard.ParentShardId]; parentIsListed {
 				// And finally, have we already started reading from this shard? If so, then we'll
 				// want to continue reading from it, even if it might otherwise be excluded.
 				if _, ok := kc.shardSequences[shardID]; !ok {
@@ -140,22 +157,18 @@ func (kc *kinesisCapture) listInitialShards() ([]string, error) {
 						"kinesisStream":        kc.stream,
 						"kinesisShardId":       shardID,
 						"kinesisParentShardId": *shard,
-					}).Info("Skipping shard for now since we will start reading a parent of this shard")
+					}).Debug("Skipping shard for now since we will start reading a parent of this shard")
 					continue
 				}
 			}
 		}
-		shards = append(shards, shardID)
+		shards = append(shards, shard)
 	}
 	return shards, nil
 }
 
-// getShard returns the kinesis shard with the given id. If the shard was part of the original
-// listing, then this will return that prior copy.
-func (kc *kinesisCapture) getShard(id string) (*kinesis.Shard, error) {
-	if shard := kc.shardListing[id]; shard != nil {
-		return shard, nil
-	}
+// getShard returns the kinesis shard with the given id.
+func (kc *streamReader) getShard(id string) (*kinesis.Shard, error) {
 	var input = kinesis.ListShardsInput{
 		StreamName: &kc.stream,
 		ShardFilter: &kinesis.ShardFilter{
@@ -172,68 +185,57 @@ func (kc *kinesisCapture) getShard(id string) (*kinesis.Shard, error) {
 	return out.Shards[0], nil
 }
 
-func (kc *kinesisCapture) sendErr(err error, source *recordSource) {
-	select {
-	case kc.dataCh <- readResult{
-		Source: source,
-		Error:  err,
-	}:
-	case <-kc.ctx.Done():
-	}
-}
-
-func parseKinesisShardRange(begin, end string) (airbyte.PartitionRange, error) {
-	var r = airbyte.PartitionRange{}
-	var begin128, ok = new(big.Int).SetString(begin, 10)
-	if !ok {
-		return r, fmt.Errorf("failed to parse kinesis shard range begin: '%s'", begin)
-	}
-	r.Begin = uint32(begin128.Rsh(begin128, 96).Uint64())
-
-	end128, ok := new(big.Int).SetString(end, 10)
-	if !ok {
-		return r, fmt.Errorf("failed to parse kinesis shard range end: '%s'", end)
-	}
-	r.End = uint32(end128.Rsh(end128, 96).Uint64())
-
-	return r, nil
-}
-
-func (kc *kinesisCapture) overlapsHashRange(shard *kinesis.Shard) (airbyte.ShardRangeResult, error) {
+func (kc *streamReader) overlapsHashRange(shard *kinesis.Shard) (shardrange.OverlapResult, error) {
 	var kinesisRange, err = parseKinesisShardRange(*shard.HashKeyRange.StartingHashKey, *shard.HashKeyRange.EndingHashKey)
 	if err != nil {
-		return airbyte.NoOverlap, err
+		return shardrange.NoOverlap, err
 	}
-	return kc.config.PartitionRange.Overlaps(kinesisRange), nil
+	return kc.config.ShardRange.Overlaps(kinesisRange), nil
 }
 
-// startReadingShard is always intented to be called within its own new goroutine. It will first
-// check whether the shard is already being read and return early if so.
-func (kc *kinesisCapture) startReadingShard(shardID string) {
+func (kc *streamReader) startReadingShardByID(shardID string) {
+	var reader, err = kc.newShardReader(shardID, kc.getShard)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Error("reading kinesis shard failed")
+		select {
+		case <-kc.ctx.Done():
+		case kc.dataCh <- readResult{
+			source: &recordSource{stream: kc.stream, shardID: shardID},
+			err:    err,
+		}:
+		}
+	} else if reader != nil {
+		reader.readShard()
+	}
+	// If reader is nil, then it's just because we're either already reading this shard, or it's
+	// outside of our assigned range, so just return.
+}
+
+func (kc *streamReader) newShardReader(shardID string, getShard func(string) (*kinesis.Shard, error)) (*shardReader, error) {
+	var shard, err = getShard(shardID)
+	if err != nil {
+		return nil, fmt.Errorf("getting shard: %w", err)
+	}
 	var logEntry = log.WithFields(log.Fields{
 		"kinesisStream":     kc.stream,
-		"kinesisShardId":    shardID,
-		"captureRangeStart": kc.config.PartitionRange.Begin,
-		"captureRangeEnd":   kc.config.PartitionRange.End,
+		"kinesisShardId":    *shard.ShardId,
+		"captureRangeStart": kc.config.ShardRange.Begin,
+		"captureRangeEnd":   kc.config.ShardRange.End,
 	})
-	var shard, err = kc.getShard(shardID)
-	if err != nil {
-		kc.sendErr(err, &recordSource{stream: kc.stream, shardID: shardID})
-		return
+	var source = &recordSource{
+		stream:  kc.stream,
+		shardID: *shard.ShardId,
 	}
 	kinesisRange, err := parseKinesisShardRange(*shard.HashKeyRange.StartingHashKey, *shard.HashKeyRange.EndingHashKey)
 	if err != nil {
-		kc.sendErr(err, &recordSource{stream: kc.stream, shardID: shardID})
-		return
+		return nil, fmt.Errorf("parsing kinesis shard range: %w", err)
 	}
-	rangeResult, err := kc.config.PartitionRange.Overlaps(kinesisRange), nil
-	if err != nil {
-		kc.sendErr(err, &recordSource{stream: kc.stream, shardID: shardID})
-		return
-	}
-	if rangeResult == airbyte.NoOverlap {
+	var rangeResult = kc.config.ShardRange.Overlaps(kinesisRange)
+	if rangeResult == shardrange.NoOverlap {
 		logEntry.Info("Will not read kinesis shard because it falls outside of our hash range")
-		return
+		return nil, nil
 	}
 
 	// Kinesis shards can merge or split, forming new child shards. We need to guard against reading
@@ -243,37 +245,26 @@ func (kc *kinesisCapture) startReadingShard(shardID string) {
 	// reading. To guard against this, we use a mutex around a map that tracks which shards we've
 	// already started reading.
 	kc.readingShardsMutex.Lock()
-	var isReadingShard = kc.readingShards[shardID]
+	var isReadingShard = kc.readingShards[*shard.ShardId]
 	if !isReadingShard {
-		kc.readingShards[shardID] = true
+		kc.readingShards[*shard.ShardId] = true
 	}
 	kc.readingShardsMutex.Unlock()
 	if isReadingShard {
 		logEntry.Debug("A read for this kinesis shard is already in progress")
-		return
+		return nil, nil
 	}
-	defer logEntry.Info("Finished reading kinesis shard")
-	logEntry.WithField("RangeOverlap", rangeResult).Info("Starting read")
 
-	var source = &recordSource{
-		stream:  kc.stream,
-		shardID: shardID,
-	}
-	var shardReader = kinesisShardReader{
-		filterRecords:     rangeResult == airbyte.PartialOverlap,
+	return &shardReader{
+		rangeOverlap:      rangeResult,
 		kinesisShardRange: kinesisRange,
 		parent:            kc,
 		source:            source,
-		lastSequenceID:    kc.shardSequences[shardID],
-		noDataBackoff: backoff{
-			initialMillis: 200,
-			maxMillis:     1000,
-			multiplier:    1.5,
-		},
-		errorBackoff: backoff{
-			initialMillis: 200,
-			maxMillis:     5000,
-			multiplier:    1.5,
+		lastSequenceID:    kc.shardSequences[*shard.ShardId],
+		noDataBackoff: noDataBackoff{
+			initial:    time.Millisecond * 200,
+			max:        time.Second,
+			multiplier: 1.5,
 		},
 		// The maximum number of records to return in a single GetRecords request.
 		// This starting value is somewhat arbitrarily based on records averaging roughly 500
@@ -281,52 +272,7 @@ func (kc *kinesisCapture) startReadingShard(shardID string) {
 		// sizes, so this value is merely a reasonable starting point.
 		limitPerReq: 2000,
 		logEntry:    logEntry,
-	}
-
-	for {
-		var shardIter, err = kc.getShardIterator(shardID, shardReader.lastSequenceID)
-		if err == nil {
-			// We were able to obtain a shardIterator, so now we drive it as far as we can.
-			if err = shardReader.readShardIterator(shardIter); err == nil || isContextCanceled(err) {
-				return
-			} else {
-				// Don't wait before retrying, since the previous failure was from GetRecords and
-				// the next call will be to GetShardIterator, which have separate rate limits.
-				logEntry.WithField("error", err).Warn("reading kinesis shardIterator returned error (will retry)")
-			}
-		} else if request.IsErrorRetryable(err) {
-			select {
-			case <-shardReader.errorBackoff.nextBackoff():
-				err = nil
-				// loop around and try again
-			case <-kc.ctx.Done():
-				return
-			}
-		} else if isMissingResource(err) {
-			// This means that the shard fell off the end of the kinesis retention period sometime
-			// after we started trying to read it. This is probably not indicative of any problem,
-			// but rather just peculiar timing where we start reading the shard right before the
-			// last record in the shard expires. Log it just because it's expected to be exceedingly
-			// rare, and I want to know if it happens with any frequency.
-			logEntry.Info("Stopping read of kinesis shard because it has been deleted")
-			return
-		} else if isContextCanceled(err) {
-			return
-		} else {
-			// oh well, we tried. Time to call it a day
-			logEntry.WithField("error", err).Error("reading kinesis shard failed")
-			var message = readResult{
-				Error:  err,
-				Source: source,
-			}
-			select {
-			case kc.dataCh <- message:
-				return
-			case <-kc.ctx.Done():
-				return
-			}
-		}
-	}
+	}, nil
 }
 
 func isMissingResource(err error) bool {
@@ -339,40 +285,58 @@ func isMissingResource(err error) bool {
 }
 
 // A reader of an individual kinesis shard.
-type kinesisShardReader struct {
-	// filterRecords indicates that this capture shard is only partially responsible for  the given
-	// kinesis shard. This happens when the flow capture shard key range only partially overlaps the
-	// key hash range of the kinesis shard. If false, then this capture shard is exclusively
-	// responsible for all the records in the kinesis shard.
-	filterRecords bool
+type shardReader struct {
+	rangeOverlap shardrange.OverlapResult
 	// The key hash range of the kinesis shard, which has been translated from 128bit to the 32bit
 	// space.
-	kinesisShardRange airbyte.PartitionRange
-	parent            *kinesisCapture
+	kinesisShardRange shardrange.Range
+	parent            *streamReader
 	source            *recordSource
 	lastSequenceID    string
-	noDataBackoff     backoff
-	errorBackoff      backoff
+	noDataBackoff     noDataBackoff
 	limitPerReq       int64
 	logEntry          *log.Entry
 }
 
+func (r *shardReader) readShard() {
+	r.logEntry.WithField("RangeOverlap", r.rangeOverlap).Info("Starting read")
+	defer r.logEntry.Info("Finished reading kinesis shard")
+
+	for {
+		var shardIter, err = r.getShardIterator()
+		if err == nil {
+			// We were able to obtain a shardIterator, so now we drive it as far as we can.
+			// Only return if the error from readShardIterator is nil or indicates the context was
+			// cancelled. For everything else, we'll retry with a new shard iterator. The everything
+			// else here is most likely to be due to the stream being temporarily unavailable due to
+			// re-sharding.
+			if err = r.readShardIterator(shardIter); err == nil || isContextCanceled(err) {
+				return
+			} else {
+				// Don't wait before retrying, since the previous failure was from GetRecords and
+				// the next call will be to GetShardIterator, which have separate rate limits.
+				r.logEntry.WithField("error", err).Warn("reading kinesis shardIterator returned error (will retry)")
+			}
+		} else if isMissingResource(err) {
+			// This means that the shard fell off the end of the kinesis retention period sometime
+			// after we started trying to read it. This is probably not indicative of any problem,
+			// but rather just peculiar timing where we start reading the shard right before the
+			// last record in the shard expires. Log it just because it's expected to be exceedingly
+			// rare, and I want to know if it happens with any frequency.
+			r.logEntry.Info("Stopping read of kinesis shard because it has been deleted")
+			return
+		} else {
+			// oh well, we tried. Time to call it a day
+
+			return
+		}
+	}
+}
+
 // Continuously loops and reads records until it encounters an error that requires acquisition of a new shardIterator.
-func (r *kinesisShardReader) readShardIterator(iteratorID string) error {
+func (r *shardReader) readShardIterator(iteratorID string) error {
 	var shardIter = &iteratorID
 
-	var errorBackoff = backoff{
-		initialMillis: 250,
-		maxMillis:     5000,
-		multiplier:    2.0,
-	}
-	// This separate backoff is used only for cases where GetRecords returns no data.
-	// The initialMillis is set to match the 5 TPS rate limit of the api.
-	var noDataBackoff = backoff{
-		initialMillis: 200,
-		maxMillis:     1000,
-		multiplier:    1.5,
-	}
 	// GetRecords will immediately return a response without any records if there are none available
 	// immediately. This means that this loop is executed very frequently, even when there is no
 	// data available. The rate limiter helps prevent sending requests that would likely result in a
@@ -387,17 +351,7 @@ func (r *kinesisShardReader) readShardIterator(iteratorID string) error {
 			Limit:         &r.limitPerReq,
 		}
 		var getRecordsResp, err = r.parent.client.GetRecordsWithContext(r.parent.ctx, &getRecordsReq)
-		if err == nil {
-			errorBackoff.reset()
-		} else if request.IsErrorRetryable(err) {
-			r.logEntry.WithField("error", err).Warn("got kinesis error (will retry)")
-			err = nil
-			select {
-			case <-errorBackoff.nextBackoff():
-			case <-r.parent.ctx.Done():
-				return r.parent.ctx.Err()
-			}
-		} else {
+		if err != nil {
 			r.logEntry.WithField("error", err).Warn("reading kinesis shard iterator failed")
 			return err
 		}
@@ -406,19 +360,19 @@ func (r *kinesisShardReader) readShardIterator(iteratorID string) error {
 		// shard because it has been either split or merged, so we need to start new reads of the
 		// child shards.
 		for _, childShard := range getRecordsResp.ChildShards {
-			go r.parent.startReadingShard(*childShard.ShardId)
+			go r.parent.startReadingShardByID(*childShard.ShardId)
 		}
 
 		if len(getRecordsResp.Records) > 0 {
-			noDataBackoff.reset()
+			r.noDataBackoff.reset()
 			r.updateRecordLimit(getRecordsResp)
 
 			var lastSequenceID = *getRecordsResp.Records[len(getRecordsResp.Records)-1].SequenceNumber
 			var msg = readResult{
-				Source:         r.source,
-				Records:        r.copyRecords(getRecordsResp),
-				Error:          err,
-				SequenceNumber: lastSequenceID,
+				source:         r.source,
+				records:        r.extractRecords(getRecordsResp),
+				err:            err,
+				sequenceNumber: lastSequenceID,
 			}
 			select {
 			case r.parent.dataCh <- msg:
@@ -427,15 +381,15 @@ func (r *kinesisShardReader) readShardIterator(iteratorID string) error {
 				return nil
 			}
 		} else {
-			// If there were no records in the response then we'll wait at least a while before
-			// making another request. The amount of time we wait depends on whether we're caught up
-			// or not. If the response indicates that there is more data in the shard, then we'll
-			// wait the minimum amount of time so that we don't overflow the 5 TPS rate limit on
-			// GetRecords. If we're caught up, then we'll increase the backoff a bit.
+			// Are we behind the tip of the shard? If so, then we'll make another request as soon as
+			// we can. If we're caught up with the tip of the shard and there's still no data, then
+			// we'll start applying a backoff so that we can releive some pressure on the network
+			// when a kinesis shard has a lower data volume.
 			if getRecordsResp.MillisBehindLatest != nil && *getRecordsResp.MillisBehindLatest > 0 {
-				noDataBackoff.reset()
+				r.noDataBackoff.reset()
+			} else {
+				<-r.noDataBackoff.nextBackoff()
 			}
-			<-noDataBackoff.nextBackoff()
 		}
 
 		// A new ShardIterator will be returned even when there's no records returned. We need to
@@ -446,35 +400,14 @@ func (r *kinesisShardReader) readShardIterator(iteratorID string) error {
 	return nil
 }
 
-func isRecordWithinRange(flowRange airbyte.PartitionRange, kinesisRange airbyte.PartitionRange, keyHash uint32) bool {
-	var rangeOverlap = flowRange.Intersection(kinesisRange)
-
-	// Normally, the kinesis range will always include the key hash because that's normally how the
-	// record would have been written to this kinesis shard in the first place. But kinesis also
-	// allows supplying an `ExplicitHashKey`, which overrides the default hashing of the partition
-	// key to allow for manually selecting which shard a record will be written to. If the
-	// `ExplicitHashKey` was used, then the md5 hash of the partition key may fall outside of the
-	// kinesis hash key range. If so, then we may still claim that record in the second or third
-	// condition.
-	if kinesisRange.Includes(keyHash) {
-		log.Infof("PartitionKey hashes into normal kinesis shard range (yay)")
-		return rangeOverlap.Includes(keyHash)
-	} else if flowRange.Begin <= kinesisRange.Begin && keyHash < kinesisRange.Begin {
-		log.Infof("PartitionKey hashes below kinesis shard range (booo)")
-		return true
-	} else if flowRange.End >= kinesisRange.End && keyHash >= kinesisRange.End {
-		log.Infof("PartitionKey hashes above kinesis shard range (booo)")
-		return true
-	}
-	return false
-}
-
-func (r *kinesisShardReader) copyRecords(resp *kinesis.GetRecordsOutput) []json.RawMessage {
-	if r.filterRecords {
+// Extracts the records from a response, filtering the records if necessary due to claiming partial
+// ownership over the kinesis shard.
+func (r *shardReader) extractRecords(resp *kinesis.GetRecordsOutput) []json.RawMessage {
+	if r.rangeOverlap == shardrange.PartialOverlap {
 		var result []json.RawMessage
 		for _, rec := range resp.Records {
-			var keyHash = hashPartitionKey(rec.PartitionKey)
-			if isRecordWithinRange(*r.parent.config.PartitionRange, r.kinesisShardRange, keyHash) {
+			var keyHash = hashPartitionKey(*rec.PartitionKey)
+			if isRecordWithinRange(*r.parent.config.ShardRange, r.kinesisShardRange, keyHash) {
 				result = append(result, json.RawMessage(rec.Data))
 			}
 		}
@@ -488,23 +421,13 @@ func (r *kinesisShardReader) copyRecords(resp *kinesis.GetRecordsOutput) []json.
 	}
 }
 
-// Applies the same hash operation that kinesis uses to determine which shard a given record should
-// map to, and then truncates the lower 96 bits to translate it into the uint32 hashed key space.
-func hashPartitionKey(key *string) uint32 {
-	var sum = md5.Sum([]byte(*key))
-	// This is meant to be equivalent to sum >> 96
-	// TODO: verify that the right byte order with actual kinesis. This works with localstack, so
-	// hopefully the two are the same
-	return binary.BigEndian.Uint32(sum[:4])
-}
-
 // Updates the Limit used for GetRecords requests. The goal is to always set the limit such that we
 // can get about 1MiB of data returned on each request. This target is somewhat arbitrary, but
 // seemed reasonable based on kinesis service limits here:
 // https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html
 // This function will adjust the limit slowly so we don't end up going back and forth rapidly
 // between wildly different limits.
-func (r *kinesisShardReader) updateRecordLimit(resp *kinesis.GetRecordsOutput) {
+func (r *shardReader) updateRecordLimit(resp *kinesis.GetRecordsOutput) {
 	// update some stats, which we'll use to determine the Limit used in GetRecords requests
 	var totalBytes int
 	for _, rec := range resp.Records {
@@ -527,19 +450,19 @@ func (r *kinesisShardReader) updateRecordLimit(resp *kinesis.GetRecordsOutput) {
 	r.limitPerReq = newLimit
 }
 
-func (kc *kinesisCapture) getShardIterator(shardID, sequenceID string) (string, error) {
+func (r *shardReader) getShardIterator() (string, error) {
 	var shardIterReq = kinesis.GetShardIteratorInput{
-		StreamName: &kc.stream,
-		ShardId:    &shardID,
+		StreamName: &r.parent.stream,
+		ShardId:    &r.source.shardID,
 	}
-	if sequenceID != "" {
-		shardIterReq.StartingSequenceNumber = &sequenceID
+	if r.lastSequenceID != "" {
+		shardIterReq.StartingSequenceNumber = &r.lastSequenceID
 		shardIterReq.ShardIteratorType = &START_AFTER_SEQ
 	} else {
 		shardIterReq.ShardIteratorType = &START_AT_BEGINNING
 	}
 
-	shardIterResp, err := kc.client.GetShardIteratorWithContext(kc.ctx, &shardIterReq)
+	shardIterResp, err := r.parent.client.GetShardIteratorWithContext(r.parent.ctx, &shardIterReq)
 	if err != nil {
 		return "", err
 	}
@@ -561,4 +484,32 @@ func isContextCanceled(err error) bool {
 	default:
 		return err == context.Canceled
 	}
+}
+
+// noDataBackoff is a simple exponential noDataBackoff implementation for use exclusively when the kinesis
+// GetRecords response is empty AND we are caught up with the head of the stream. Since kinesis is
+// polling based, it doesn't make a ton of sense for us to make 5 requests per second just in case
+// some data may get added to a slow stream. So in that case we will wait a little longer in between
+// requests.
+type noDataBackoff struct {
+	initial    time.Duration
+	max        time.Duration
+	multiplier float64
+	next       time.Duration
+}
+
+func (b *noDataBackoff) nextBackoff() <-chan time.Time {
+	if b.next == 0 {
+		b.reset()
+	}
+	var ch = time.After(b.next)
+	b.next = time.Millisecond * time.Duration(int64(float64(b.next.Milliseconds())*b.multiplier))
+	if b.next > b.max {
+		b.next = b.max
+	}
+	return ch
+}
+
+func (b *noDataBackoff) reset() {
+	b.next = b.initial
 }

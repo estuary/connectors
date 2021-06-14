@@ -2,12 +2,9 @@ package main
 
 import (
 	"math"
-	//"math/big"
 	"testing"
 
-	//"github.com/aws/aws-sdk-go/aws"
-	//"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go/airbyte"
+	"github.com/estuary/connectors/go/shardrange"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,7 +47,7 @@ func TestHashPartitionKeyMatchesKinesisHashing(t *testing.T) {
 		{"crepes", false},
 	}
 	for _, tc := range testCases {
-		var keyHash = hashPartitionKey(&tc.partitionKey)
+		var keyHash = hashPartitionKey(tc.partitionKey)
 		require.Equalf(t, tc.included, shard0Range.Includes(keyHash), "TC: %#v", tc)
 	}
 }
@@ -68,21 +65,21 @@ func TestShardRangeTranslation(t *testing.T) {
 }
 
 func TestShardRangeOverlaps(t *testing.T) {
-	testRangeOverlap(t, airbyte.FullyInclusive, 0, math.MaxUint32, "0", maxKinesisHash)
-	testRangeOverlap(t, airbyte.FullyInclusive, 0, math.MaxUint32, "1", maxKinesisHash)
-	testRangeOverlap(t, airbyte.PartialOverlap, 1, math.MaxUint32, "0", maxKinesisHash)
+	testRangeOverlap(t, shardrange.FullyInclusive, 0, math.MaxUint32, "0", maxKinesisHash)
+	testRangeOverlap(t, shardrange.FullyInclusive, 0, math.MaxUint32, "1", maxKinesisHash)
+	testRangeOverlap(t, shardrange.PartialOverlap, 1, math.MaxUint32, "0", maxKinesisHash)
 	// This huge number is equivalent to 5 << 96, so this case is testing the boundary where the
 	// kinesis range begin is the same as the flow range exclusive end.
-	testRangeOverlap(t, airbyte.PartialOverlap, 0, 5, "396140812571321687967719751680", maxKinesisHash)
-	testRangeOverlap(t, airbyte.NoOverlap, 0, 5, "475368975085586025561263702016", maxKinesisHash)
+	testRangeOverlap(t, shardrange.PartialOverlap, 0, 5, "396140812571321687967719751680", maxKinesisHash)
+	testRangeOverlap(t, shardrange.NoOverlap, 0, 5, "475368975085586025561263702016", maxKinesisHash)
 
 	// This huge number is equivalent to 20 << 96, so should partially overlap
-	testRangeOverlap(t, airbyte.PartialOverlap, 10, 20, "1584563250285286751870879006720", maxKinesisHash)
-	testRangeOverlap(t, airbyte.FullyInclusive, 20, 20, "1584563250285286751870879006720", "1584563250285286751870879006721")
+	testRangeOverlap(t, shardrange.PartialOverlap, 10, 20, "1584563250285286751870879006720", maxKinesisHash)
+	testRangeOverlap(t, shardrange.FullyInclusive, 20, 20, "1584563250285286751870879006720", "1584563250285286751870879006721")
 }
 
-func testRangeOverlap(t *testing.T, expected airbyte.ShardRangeResult, flowBegin, flowEnd uint32, kinesisBegin, kinesisEnd string) {
-	var flowRange = &airbyte.PartitionRange{
+func testRangeOverlap(t *testing.T, expected shardrange.OverlapResult, flowBegin, flowEnd uint32, kinesisBegin, kinesisEnd string) {
+	var flowRange = &shardrange.Range{
 		Begin: flowBegin,
 		End:   flowEnd,
 	}

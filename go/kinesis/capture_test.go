@@ -6,6 +6,9 @@ package main
 // testdata/kinesis-config.json points to the correct instance. The config that's there is
 // intended for use with a localstack container.
 // You can run such a container using:
+// docker run --rm -it -p 4566:4566 -p 4571:4571 -e 'SERVICES=kinesis' -e 'KINESIS_ERROR_PROBABILITY=0.2' localstack/localstack
+// The KINESIS_ERROR_PROBABILITY simulates ProvisionedThroughputExceededExceptions in order to
+// exercise the retry logic.
 
 import (
 	"context"
@@ -18,15 +21,16 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/estuary/connectors/go/airbyte"
+	"github.com/estuary/connectors/go/shardrange"
 	"github.com/stretchr/testify/require"
 )
 
 func TestIsRecordWithinRange(t *testing.T) {
-	var flowRange = airbyte.PartitionRange{
+	var flowRange = shardrange.Range{
 		Begin: 5,
 		End:   10,
 	}
-	var kinesisRange = airbyte.PartitionRange{
+	var kinesisRange = shardrange.Range{
 		Begin: 7,
 		End:   15,
 	}
@@ -81,14 +85,14 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 	defer cancelFunc()
 
 	var shard1Conf = conf
-	shard1Conf.PartitionRange = &airbyte.PartitionRange{
+	shard1Conf.ShardRange = &shardrange.Range{
 		Begin: 0,
 		End:   math.MaxUint32 / 2,
 	}
 	go readStream(ctx, shard1Conf, client, stream, nil, dataCh)
 
 	var shard2Conf = conf
-	shard2Conf.PartitionRange = &airbyte.PartitionRange{
+	shard2Conf.ShardRange = &shardrange.Range{
 		Begin: math.MaxUint32 / 2,
 		End:   math.MaxUint32,
 	}
@@ -122,8 +126,8 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 	for foundRecords < 24 {
 		select {
 		case next := <-dataCh:
-			require.NoError(t, next.Error, "readResult had error")
-			for _, rec := range next.Records {
+			require.NoError(t, next.err, "readResult had error")
+			for _, rec := range next.records {
 				var target = struct {
 					PartitionKey string
 					Counter      int
