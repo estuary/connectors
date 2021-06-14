@@ -1,4 +1,4 @@
-package airbyte
+package shardrange
 
 import (
 	"math"
@@ -9,7 +9,7 @@ import (
 
 func TestPartitionRangeOverlap(t *testing.T) {
 	for _, testCase := range []struct {
-		expected                 ShardRangeResult
+		expected                 OverlapResult
 		flowStart, flowEnd       uint32
 		kinesisStart, kinesisEnd uint32
 	}{
@@ -20,11 +20,11 @@ func TestPartitionRangeOverlap(t *testing.T) {
 		{NoOverlap, 0, 5, 9, 10},
 		{NoOverlap, 6, 8, 0, 0},
 	} {
-		var flowRange = PartitionRange{
+		var flowRange = Range{
 			Begin: testCase.flowStart,
 			End:   testCase.flowEnd,
 		}
-		var kinesisRange = PartitionRange{
+		var kinesisRange = Range{
 			Begin: testCase.kinesisStart,
 			End:   testCase.kinesisEnd,
 		}
