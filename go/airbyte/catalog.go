@@ -129,7 +129,9 @@ type Log struct {
 }
 
 type State struct {
-	Data map[string]interface{} `json:"data"`
+	// Data is the actual state associated with the ingestion. This must be a JSON _Object_ in order
+	// to comply with the airbyte specification.
+	Data interface{} `json:"data"`
 }
 
 type Spec struct {

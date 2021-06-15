@@ -14,11 +14,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"math"
 	"math/rand"
+	"path"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/estuary/connectors/go/airbyte"
 	"github.com/estuary/connectors/go/shardrange"
@@ -146,6 +150,140 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 		}
 	}
 	require.Equal(t, 24, foundRecords)
+}
+
+func TestKinesisCapture(t *testing.T) {
+	var configFile = airbyte.ConfigFile{
+		ConfigFile: airbyte.JSONFile("testdata/kinesis-config.json"),
+	}
+	var conf = Config{}
+	var err = configFile.ConfigFile.Parse(&conf)
+	require.NoError(t, err)
+	client, err := connect(&conf)
+	require.NoError(t, err)
+
+	var stream = "test-" + randAlpha(6)
+	var testShards int64 = 1
+	var createStreamReq = &kinesis.CreateStreamInput{
+		StreamName: &stream,
+		ShardCount: &testShards,
+	}
+	_, err = client.CreateStream(createStreamReq)
+	require.NoError(t, err, "failed to create stream")
+
+	defer func() {
+		var deleteStreamReq = kinesis.DeleteStreamInput{
+			StreamName: &stream,
+		}
+		var _, err = client.DeleteStream(&deleteStreamReq)
+		require.NoError(t, err, "failed to delete stream")
+	}()
+	awaitStreamActive(t, client, stream)
+
+	tmpDir, err := ioutil.TempDir("", "kinesis-capture-test-")
+	require.NoError(t, err)
+
+	// We'll seed the state with a random value so that we can assert that it gets included in the
+	// final state. This is to ensure that we don't loose state if the connector gets invoked with a
+	// different set of streams.
+	var canaryState = randAlpha(20)
+	var stateFile = path.Join(tmpDir, "state.json")
+	var stateJson = fmt.Sprintf(`{"canary": {"foo": %q}}`, canaryState)
+	err = ioutil.WriteFile(stateFile, []byte(stateJson), 0644)
+	require.NoError(t, err)
+
+	// Test the discover command and assert that it returns the stream we just created
+	catalog, err := discoverCatalog(configFile)
+	require.NoError(t, err, "discover catalog failed")
+
+	require.GreaterOrEqual(t, len(catalog.Streams), 1)
+	var discoveredStream *airbyte.Stream
+	for _, s := range catalog.Streams {
+		if s.Name == stream {
+			discoveredStream = &s
+			break
+		}
+	}
+	require.NotNil(t, discoveredStream, "missing expected stream")
+	var configuredCatalog = airbyte.ConfiguredCatalog{
+		Streams: []airbyte.ConfiguredStream{{
+			Stream:   *discoveredStream,
+			SyncMode: airbyte.SyncModeIncremental,
+		}},
+	}
+	catalogJson, err := json.Marshal(&configuredCatalog)
+	require.NoError(t, err)
+	var catalogFile = path.Join(tmpDir, "catalog.json")
+	err = ioutil.WriteFile(catalogFile, catalogJson, 0644)
+	require.NoError(t, err)
+
+	// Test a basic read and assert that we get a proper state message at the end
+	var readArgs = airbyte.ReadCmd{
+		ConfigFile:  configFile,
+		CatalogFile: airbyte.JSONFile(catalogFile),
+		StateFile:   airbyte.JSONFile(stateFile),
+	}
+
+	var ctx, cancelFunc = context.WithCancel(context.Background())
+	defer cancelFunc()
+	var reader, writer = io.Pipe()
+
+	go func() {
+		var failure = readStreamsTo(ctx, readArgs, writer)
+		writer.Close()
+		if failure != nil {
+			fmt.Printf("readStreamsTo failed with error: %v\n", failure)
+		}
+	}()
+	var recordCount = 3
+	var lastSeq string
+	var shardId string
+	for i := 0; i < recordCount; i++ {
+		var input = kinesis.PutRecordInput{
+			StreamName:   &stream,
+			Data:         []byte(`{"oh":"my"}`),
+			PartitionKey: aws.String("wat"),
+		}
+		require.Eventually(t, func() bool {
+			out, err := client.PutRecord(&input)
+			if err == nil {
+				lastSeq = *out.SequenceNumber
+				shardId = *out.ShardId
+			}
+			return err == nil
+		}, time.Second, time.Millisecond*20, "failed to put record")
+	}
+
+	var decoder = json.NewDecoder(reader)
+	var foundRecords = 0
+	for foundRecords < recordCount {
+		var msg = airbyte.Message{}
+		err = decoder.Decode(&msg)
+		require.NoError(t, err)
+		if msg.Record != nil {
+			foundRecords++
+		}
+	}
+	// After reading all the records, we should have a final state message.
+	// There may have been intermediate state messages, but the goal here is to verify the last
+	// one to make sure it includes the expected sequence number and the canary state we passed
+	// in at the beginning
+	var stateMessage = struct {
+		State struct {
+			Data map[string]map[string]string
+		}
+	}{}
+	err = decoder.Decode(&stateMessage)
+	require.NoError(t, err)
+	require.NotNil(t, stateMessage.State, "expected non-nill state")
+
+	var canaryResult, hasCanary = stateMessage.State.Data["canary"]
+	require.True(t, hasCanary, "missing canary state")
+	require.Equal(t, canaryState, canaryResult["foo"])
+
+	var streamResult, hasStream = stateMessage.State.Data[stream]
+	require.True(t, hasStream, "missing stream state")
+	require.Equal(t, lastSeq, streamResult[shardId])
 }
 
 // The kinesis stream could take a while before it becomes active, so this just polls until the

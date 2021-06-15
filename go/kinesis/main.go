@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -82,36 +83,31 @@ func discoverCatalog(config airbyte.ConfigFile) (*airbyte.Catalog, error) {
 	return catalog, nil
 }
 
-func updateState(state *airbyte.State, source *recordSource, sequenceNumber string) {
-	var streamMap, ok = state.Data[source.stream]
+func updateState(state map[string]map[string]string, source *recordSource, sequenceNumber string) {
+	var streamMap, ok = state[source.stream]
 	if !ok {
-		streamMap = make(map[string]interface{})
-		state.Data[source.stream] = streamMap
+		streamMap = make(map[string]string)
+		state[source.stream] = streamMap
 	}
-	streamMap.(map[string]interface{})[source.shardID] = sequenceNumber
+	streamMap[source.shardID] = sequenceNumber
 }
 
-func copyStreamState(state *airbyte.Message, stream string) (map[string]string, error) {
+func copyStreamState(state map[string]map[string]string, stream string) (map[string]string, error) {
 	var dest = make(map[string]string)
 	// Is there an entry for this stream
-	if ss, ok := state.State.Data[stream]; ok {
-		// Does the entry for this stream have the right type
-		if typedSS, ok := ss.(map[string]interface{}); ok {
-			for k, v := range typedSS {
-				if vstr, ok := v.(string); ok {
-					dest[k] = vstr
-				} else {
-					return nil, fmt.Errorf("found a non-string value in state map for stream: '%s'", stream)
-				}
-			}
-		} else {
-			return nil, fmt.Errorf("invalid state for stream '%s', expected values to be maps of string to string", stream)
+	if ss, ok := state[stream]; ok {
+		for k, v := range ss {
+			dest[k] = v
 		}
 	}
 	return dest, nil
 }
 
 func doRead(args airbyte.ReadCmd) error {
+	return readStreamsTo(context.Background(), args, os.Stdout)
+}
+
+func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) error {
 	var config, client, err = parseConfigAndConnect(args.ConfigFile)
 	if err != nil {
 		return err
@@ -124,25 +120,25 @@ func doRead(args airbyte.ReadCmd) error {
 	if err = catalog.Validate(); err != nil {
 		return fmt.Errorf("configured catalog is invalid: %w", err)
 	}
-
+	var stateMap = make(map[string]map[string]string)
 	var stateMessage = airbyte.Message{
 		Type: airbyte.MessageTypeState,
 		State: &airbyte.State{
-			Data: make(map[string]interface{}),
+			Data: stateMap,
 		},
 	}
 
-	if err = args.StateFile.Parse(&stateMessage.State.Data); err != nil {
+	if err = args.StateFile.Parse(&stateMap); err != nil {
 		return fmt.Errorf("parsing state file: %w", err)
 	}
 
 	var dataCh = make(chan readResult, 8)
-	var ctx, cancelFunc = context.WithCancel(context.Background())
+	ctx, cancelFunc := context.WithCancel(ctx)
 
 	log.WithField("streamCount", len(catalog.Streams)).Info("Starting to read stream(s)")
 
 	for _, stream := range catalog.Streams {
-		streamState, err := copyStreamState(&stateMessage, stream.Stream.Name)
+		streamState, err := copyStreamState(stateMap, stream.Stream.Name)
 		if err != nil {
 			cancelFunc()
 			return fmt.Errorf("invalid state for stream %s: %w", stream.Stream.Name, err)
@@ -156,7 +152,7 @@ func doRead(args airbyte.ReadCmd) error {
 		Record: &airbyte.Record{},
 	}
 	// We're all set to start printing data to stdout
-	var encoder = json.NewEncoder(os.Stdout)
+	var encoder = json.NewEncoder(output)
 	for {
 		var next = <-dataCh
 		if next.err != nil {
@@ -176,7 +172,7 @@ func doRead(args airbyte.ReadCmd) error {
 				return err
 			}
 		}
-		updateState(stateMessage.State, next.source, next.sequenceNumber)
+		updateState(stateMap, next.source, next.sequenceNumber)
 		if err := encoder.Encode(stateMessage); err != nil {
 			cancelFunc()
 			return err
