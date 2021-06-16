@@ -7,7 +7,7 @@ import (
 	"os"
 
 	flags "github.com/jessevdk/go-flags"
-	mbp "go.gazette.dev/core/mainboilerplate"
+	log "github.com/sirupsen/logrus"
 )
 
 // JSONFile represents a path to a file with JSON contents.
@@ -30,52 +30,54 @@ type ConfigFile struct {
 	ConfigFile JSONFile `long:"config"`
 }
 
+// LogConfig configures handling of application log events.
 type LogConfig struct {
-	Config mbp.LogConfig `group:"Logging" namespace:"log" env-namespace:"LOG"`
+	Level  string `long:"level" env:"LEVEL" default:"info" choice:"info" choice:"debug" choice:"warn" description:"Logging level"`
+	Format string `long:"format" env:"FORMAT" default:"text" choice:"json" choice:"text" choice:"color" description:"Logging output format"`
 }
 
 type SpecCmd struct {
-	LogConfig
+	LogConfig  `group:"Logging" namespace:"log" env-namespace:"LOG"`
 	actualSpec Spec `no-flag:"y"`
 }
 
 func (c *SpecCmd) Execute(_ []string) error {
-	mbp.InitLog(c.LogConfig.Config)
+	initLog(c.LogConfig)
 	return NewStdoutEncoder().Encode(&c.actualSpec)
 }
 
 type CheckCmd struct {
 	ConfigFile
-	LogConfig
-	doCheck func(CheckCmd) error `no-flag:"y"`
+	LogConfig `group:"Logging" namespace:"log" env-namespace:"LOG"`
+	doCheck   func(CheckCmd) error `no-flag:"y"`
 }
 
 func (c *CheckCmd) Execute(_ []string) error {
-	mbp.InitLog(c.LogConfig.Config)
+	initLog(c.LogConfig)
 	return c.doCheck(*c)
 }
 
 type DiscoverCmd struct {
 	ConfigFile
-	LogConfig
+	LogConfig  `group:"Logging" namespace:"log" env-namespace:"LOG"`
 	doDiscover func(DiscoverCmd) error `no-flag:"y"`
 }
 
 func (c *DiscoverCmd) Execute(_ []string) error {
-	mbp.InitLog(c.LogConfig.Config)
+	initLog(c.LogConfig)
 	return c.doDiscover(*c)
 }
 
 type ReadCmd struct {
 	ConfigFile
-	LogConfig
+	LogConfig   `group:"Logging" namespace:"log" env-namespace:"LOG"`
 	StateFile   JSONFile            `long:"state"`
 	CatalogFile JSONFile            `long:"catalog"`
 	doRead      func(ReadCmd) error `no-flag:"y"`
 }
 
 func (c *ReadCmd) Execute(_ []string) error {
-	mbp.InitLog(c.LogConfig.Config)
+	initLog(c.LogConfig)
 	return c.doRead(*c)
 }
 
@@ -114,4 +116,20 @@ func RunMain(spec Spec, doCheck func(CheckCmd) error, doDiscover func(DiscoverCm
 
 func NewStdoutEncoder() *json.Encoder {
 	return json.NewEncoder(os.Stdout)
+}
+
+func initLog(cfg LogConfig) {
+	if cfg.Format == "json" {
+		log.SetFormatter(&log.JSONFormatter{})
+	} else if cfg.Format == "text" {
+		log.SetFormatter(&log.TextFormatter{})
+	} else if cfg.Format == "color" {
+		log.SetFormatter(&log.TextFormatter{ForceColors: true})
+	}
+
+	if lvl, err := log.ParseLevel(cfg.Level); err != nil {
+		log.WithField("err", err).Fatal("unrecognized log level")
+	} else {
+		log.SetLevel(lvl)
+	}
 }

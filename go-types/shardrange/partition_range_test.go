@@ -3,8 +3,6 @@ package shardrange
 import (
 	"math"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestPartitionRangeOverlap(t *testing.T) {
@@ -28,6 +26,10 @@ func TestPartitionRangeOverlap(t *testing.T) {
 			Begin: testCase.kinesisStart,
 			End:   testCase.kinesisEnd,
 		}
-		require.Equalf(t, testCase.expected, flowRange.Overlaps(kinesisRange), "testCase: %#v", testCase)
+
+		if o := flowRange.Overlaps(kinesisRange); o != testCase.expected {
+			t.Logf("expected %#v, but got %#v", testCase.expected, o)
+			t.Fail()
+		}
 	}
 }
