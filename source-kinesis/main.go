@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go/airbyte"
-	"github.com/estuary/connectors/go/shardrange"
+	"github.com/estuary/connectors/airbyte"
+	"github.com/estuary/connectors/shardrange"
 	log "github.com/sirupsen/logrus"
 )
 

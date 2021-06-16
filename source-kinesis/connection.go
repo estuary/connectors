@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go/shardrange"
+	"github.com/estuary/connectors/shardrange"
 	log "github.com/sirupsen/logrus"
 )
 
