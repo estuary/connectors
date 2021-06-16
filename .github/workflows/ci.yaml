@@ -14,9 +14,9 @@ jobs:
         image: localstack/localstack
         env:
           # Only use a limited number of services in order to speed up the startup time.
-          SERVICES: 'kinesis,s3'
+          SERVICES: "kinesis,s3"
           # Randomly return rate limiting errors from the kinesis api to exercise those code paths.
-          KINESIS_ERROR_PROBABILITY: '0.4'
+          KINESIS_ERROR_PROBABILITY: "0.4"
         ports:
           - 4566:4566
           - 4571:4571
@@ -28,7 +28,3 @@ jobs:
           fetch-depth: 0
           submodules: true
       - run: go test -tags kinesistest -v ./...
-
-
-
-

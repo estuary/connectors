@@ -9,7 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go/shardrange"
+	"github.com/estuary/connectors/shardrange"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
