@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/estuary/connectors/shardrange"
+	"github.com/estuary/connectors/go-types/shardrange"
 	"github.com/stretchr/testify/require"
 )
 

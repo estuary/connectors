@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/estuary/connectors/shardrange"
+	"github.com/estuary/connectors/go-types/shardrange"
 )
 
 // Applies the same hash operation that kinesis uses to determine which shard a given record should

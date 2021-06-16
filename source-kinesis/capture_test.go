@@ -24,8 +24,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/airbyte"
-	"github.com/estuary/connectors/shardrange"
+	"github.com/estuary/connectors/go-types/airbyte"
+	"github.com/estuary/connectors/go-types/shardrange"
 	"github.com/stretchr/testify/require"
 )
 
