@@ -14,6 +14,8 @@ const (
 	SyncModeFullRefresh SyncMode = "full_refresh"
 )
 
+var AllSyncModes = []SyncMode{SyncModeIncremental, SyncModeFullRefresh}
+
 type Stream struct {
 	Name                    string          `json:"name"`
 	JSONSchema              json.RawMessage `json:"json_schema"`
