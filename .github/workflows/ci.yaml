@@ -30,5 +30,16 @@ jobs:
         with:
           fetch-depth: 0
           submodules: true
-      - run: pushd go-types && go test -v ./...
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --manifest-path parser/Cargo.toml
+      - uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: --force --path parser
       - run: pushd source-kinesis && go test -tags kinesistest -v ./...
+      - run: pushd source-s3 && go test -v ./...
