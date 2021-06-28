@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/estuary/connectors/go-types/airbyte"
@@ -93,20 +94,7 @@ func doRead(args airbyte.ReadCmd) error {
 		return fmt.Errorf("parsing state file: %w", err)
 	}
 
-	var dataCh = make(chan readResult, 8)
 	var nStreams = len(catalog.Streams)
-
-	log.WithField("streamCount", nStreams).Info("Starting to read stream(s)")
-
-	for _, stream := range catalog.Streams {
-		var state = copyStreamState(stateMap[stream.Stream.Name])
-		capture, err := NewCapture(&config, client, stream.Stream.Name, state)
-		if err != nil {
-			cancelFunc()
-			return err
-		}
-		go capture.Start(ctx, dataCh)
-	}
 
 	// We'll re-use this same message instance for all records we print
 	var recordMessage = airbyte.Message{
@@ -116,20 +104,21 @@ func doRead(args airbyte.ReadCmd) error {
 	// We're all set to start printing data to stdout
 	var encoder = json.NewEncoder(os.Stdout)
 
-	var chunker = txnChunker{
-		lastTxnTime: time.Now(),
-	}
+	var chunker = txnChunker{}
 
 	var completedStreams = 0
-	for {
-		var next = <-dataCh
+	var mutex = sync.Mutex{}
+	var onResult = func(next readResult) error {
+		mutex.Lock()
+		defer mutex.Unlock()
+
 		if next.err == StreamCompleted {
 			completedStreams++
 			if completedStreams == nStreams {
 				log.WithField("nStreams", nStreams).Info("All streams completed")
-				return nil
+				cancelFunc()
 			}
-			continue
+			return nil
 		} else if next.err != nil {
 			// time to bail
 			var errMessage = airbyte.NewLogMessage(airbyte.LogLevelFatal, "read failed due to error: %v", next.err)
@@ -162,7 +151,23 @@ func doRead(args airbyte.ReadCmd) error {
 			}
 			chunker.reset()
 		}
+		return nil
 	}
+
+	log.WithField("streamCount", nStreams).Info("Starting to read stream(s)")
+	for _, stream := range catalog.Streams {
+		var state = copyStreamState(stateMap[stream.Stream.Name])
+		capture, err := NewStream(&config, client, stream.Stream.Name, state)
+		if err != nil {
+			cancelFunc()
+			return err
+		}
+		go capture.Start(ctx, onResult)
+	}
+
+	<-ctx.Done()
+	log.Info("Finished all reads")
+	return err
 }
 
 func writeState(message *airbyte.Message, state map[string]streamState, encoder *json.Encoder) error {
@@ -185,11 +190,11 @@ func updateState(state map[string]streamState, rr *readResult) {
 }
 
 // txnChunker decides when we should emit State messages, based on thresholds for the number of
-// records or bytes, or the duration of the transaction.
+// records or bytes. This is to prevent individual transactions from becoming too large when the
+// connector is used with Flow or other systems that can checkpoint whenever a State message is emitted.
 type txnChunker struct {
-	records     int
-	bytes       int
-	lastTxnTime time.Time
+	records int
+	bytes   int
 }
 
 // shouldEmitState returns true if the readResult contains a record that puts us over any of the
@@ -197,17 +202,12 @@ type txnChunker struct {
 func (t *txnChunker) shouldEmitState(rr *readResult) bool {
 	var size = len(rr.record)
 	if size > 0 {
-		// start the timer from when we see the first record in a transaction.
-		if t.records == 0 {
-			t.lastTxnTime = time.Now()
-		}
 		t.records++
 		t.bytes = t.bytes + size
 	}
 
 	return t.records >= recordsPerTxn ||
 		t.bytes >= bytesPerTxn ||
-		(t.records > 0 && time.Since(t.lastTxnTime) >= durationPerTxn) ||
 		rr.state.Complete
 }
 
@@ -221,4 +221,3 @@ func (t *txnChunker) reset() {
 // persisting state checkpoints.
 const recordsPerTxn = 256
 const bytesPerTxn = 1024 * 1024 * 2
-const durationPerTxn = time.Second

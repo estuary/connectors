@@ -11,7 +11,7 @@ type JsonPointer string
 // Eventually, it might be nice to generate this definition from the json schema output from the
 // parser.
 type Config struct {
-	AddSourceOffset       string                      `json:"addSourceOffset,omitempty"`
+	AddRecordOffset       string                      `json:"addRecordOffset,omitempty"`
 	AddValues             map[JsonPointer]interface{} `json:"addValues,omitempty"`
 	Format                string                      `json:"format,omitempty"`
 	Filename              string                      `json:"filename,omitempty"`
@@ -37,7 +37,7 @@ func (c *Config) Copy() Config {
 	}
 
 	return Config{
-		AddSourceOffset: c.AddSourceOffset,
+		AddRecordOffset: c.AddRecordOffset,
 		AddValues:       newAddValues,
 		Format:          c.Format,
 		Filename:        c.Filename,

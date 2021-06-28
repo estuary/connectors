@@ -29,7 +29,7 @@ type readResult struct {
 	record      json.RawMessage
 }
 
-func NewCapture(config *Config, client *s3.S3, streamID string, state streamState) (*capture, error) {
+func NewStream(config *Config, client *s3.S3, streamID string, state streamState) (*stream, error) {
 	var bucket, prefix = parseStreamName(streamID)
 	var matchKey *regexp.Regexp
 	var err error
@@ -39,7 +39,7 @@ func NewCapture(config *Config, client *s3.S3, streamID string, state streamStat
 			return nil, fmt.Errorf("invalid regex for matchKey: %w", err)
 		}
 	}
-	return &capture{
+	return &stream{
 		streamID:  streamID,
 		bucket:    bucket,
 		prefix:    prefix,
@@ -50,19 +50,16 @@ func NewCapture(config *Config, client *s3.S3, streamID string, state streamStat
 	}, nil
 }
 
-func (c *capture) Start(ctx context.Context, resultsCh chan<- readResult) {
-	var err = c.captureStreamInternal(ctx, resultsCh)
+func (c *stream) Start(ctx context.Context, onResult func(readResult) error) {
+	var err = c.captureStreamInternal(ctx, onResult)
 	// Send a StreamCompleted to indicate that we've completed successfully
 	if err == nil {
 		err = StreamCompleted
 	}
-	select {
-	case <-ctx.Done():
-	case resultsCh <- readResult{err: err}:
-	}
+	onResult(readResult{err: err})
 }
 
-type capture struct {
+type stream struct {
 	streamID  string
 	bucket    string
 	prefix    string
@@ -72,7 +69,7 @@ type capture struct {
 	matchKeys *regexp.Regexp
 }
 
-func (c *capture) captureStreamInternal(ctx context.Context, resultsCh chan<- readResult) error {
+func (c *stream) captureStreamInternal(ctx context.Context, onResult func(readResult) error) error {
 	log.Debug("Starting cature")
 	var listResults = listAllObjects(ctx, c.bucket, c.prefix, c.client)
 	var objectCount = 0
@@ -85,7 +82,7 @@ func (c *capture) captureStreamInternal(ctx context.Context, resultsCh chan<- re
 		if c.matchKeys != nil && !c.matchKeys.MatchString(result.object.relativeKey) {
 			continue
 		}
-		if err := c.importObject(ctx, result.object, resultsCh); err != nil {
+		if err := c.importObject(ctx, result.object, onResult); err != nil {
 			return fmt.Errorf("failed to import object: '%s': %w", result.object.relativeKey, err)
 		}
 	}
@@ -93,13 +90,13 @@ func (c *capture) captureStreamInternal(ctx context.Context, resultsCh chan<- re
 	return nil
 }
 
-func (c *capture) importObject(ctx context.Context, obj *s3Object, resultsCh chan<- readResult) error {
-	// We always use the full key for checking against the shard range
-	// because the configured prefix could change, and would thus change the relative keys.
+func (c *stream) importObject(ctx context.Context, obj *s3Object, onResult func(readResult) error) error {
 	var fullKey = obj.fullKey()
 
 	// Does this key hash into our shard's assigned range?
-	if !c.config.ShardRange.IncludesHwHash([]byte(fullKey)) {
+	// We hash the bucket and the full key just to be on the safe side.
+	var hashKey = obj.bucket + "/" + fullKey
+	if !c.config.ShardRange.IncludesHwHash([]byte(hashKey)) {
 		return nil
 	}
 
@@ -132,44 +129,32 @@ func (c *capture) importObject(ctx context.Context, obj *s3Object, resultsCh cha
 	defer os.Remove(configFile.Name())
 	parseConfig.WriteToFile(configFile)
 
-	parseResults, err := parser.ParseStream(ctx, configFile.Name(), resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to execute parser: %w", err)
-	}
-
 	var docCount uint64 = 0
-	for result := range parseResults {
-		if result.Error != nil {
-			return fmt.Errorf("failed to parse '%s': %w", obj.relativeKey, err)
-		}
+	err = parser.ParseStream(ctx, configFile.Name(), resp.Body, func(data json.RawMessage) error {
 		docCount++
 		// Do we need to skip this record because it's already been ingested, as indicated by the
 		// offset in the state?
-		if docCount < skipRecords {
-			continue
+		if docCount > skipRecords {
+			return onResult(readResult{
+				bucket:      c.bucket,
+				streamID:    c.streamID,
+				relativeKey: obj.relativeKey,
+				record:      data,
+				state: &objectState{
+					ETag:         *resp.ETag,
+					LastModified: *resp.LastModified,
+					RecordCount:  docCount,
+					Complete:     false,
+				},
+			})
 		}
-		select {
-		case <-ctx.Done():
-			return nil
-		case resultsCh <- readResult{
-			bucket:      c.bucket,
-			streamID:    c.streamID,
-			relativeKey: obj.relativeKey,
-			record:      result.Document,
-			state: &objectState{
-				ETag:         *resp.ETag,
-				LastModified: *resp.LastModified,
-				RecordCount:  docCount,
-				Complete:     false,
-			},
-		}:
-		}
-	}
-	// Send a final readResult to update the state to complete
-	select {
-	case <-ctx.Done():
 		return nil
-	case resultsCh <- readResult{
+	})
+	if err != nil {
+		return err
+	}
+
+	return onResult(readResult{
 		bucket:      c.bucket,
 		streamID:    c.streamID,
 		relativeKey: obj.relativeKey,
@@ -179,12 +164,10 @@ func (c *capture) importObject(ctx context.Context, obj *s3Object, resultsCh cha
 			RecordCount:  docCount,
 			Complete:     true,
 		},
-	}:
-	}
-	return nil
+	})
 }
 
-func (c *capture) makeParseConfig(relativeKey string, contentType *string, contentEncoding *string) *parser.Config {
+func (c *stream) makeParseConfig(relativeKey string, contentType *string, contentEncoding *string) *parser.Config {
 	var parseConfig = parser.Config{}
 	if c.config.Parser != nil {
 		parseConfig = c.config.Parser.Copy()
@@ -198,8 +181,8 @@ func (c *capture) makeParseConfig(relativeKey string, contentType *string, conte
 		parseConfig.ContentEncoding = *contentEncoding
 	}
 	// If the user supplied a location for this, then we'll use that. Otherwise, use the default
-	if parseConfig.AddSourceOffset == "" {
-		parseConfig.AddSourceOffset = defaultSourceOffsetLocation
+	if parseConfig.AddRecordOffset == "" {
+		parseConfig.AddRecordOffset = defaultRecordOffsetLocation
 	}
 	if parseConfig.AddValues == nil {
 		parseConfig.AddValues = make(map[parser.JsonPointer]interface{})
@@ -209,7 +192,7 @@ func (c *capture) makeParseConfig(relativeKey string, contentType *string, conte
 }
 
 const sourceFilenameLocation = "/_meta/sourceFile"
-const defaultSourceOffsetLocation = "/_meta/sourceFileLocation"
+const defaultRecordOffsetLocation = "/_meta/recordOffset"
 
 func shouldImport(obj *s3Object, matchKey *regexp.Regexp, state streamState) bool {
 	if matchKey != nil && !matchKey.MatchString(obj.relativeKey) {

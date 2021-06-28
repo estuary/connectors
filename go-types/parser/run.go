@@ -24,29 +24,30 @@ type Result struct {
 }
 
 // ParseStream invokes the parser using the given config file and inputStream representing the data
-// to parse. The results from the parser are provided asynchronously on the returned channel. An
-// error is returned directly only if there's a problem spawning the child process. Parsing errors
-// are always reported on the returned channel.
-func ParseStream(ctx context.Context, configPath string, inputStream io.Reader) (<-chan Result, error) {
+// to parse. The `onRecord` function is called for each JSON document emitted by the parser. The
+// data provided to the callback is from a shared buffer, and must not be retained after the
+// callback returns. You need to copy the data if you need it longer than that.
+func ParseStream(ctx context.Context, configPath string, inputStream io.Reader, onRecord func(json.RawMessage) error) error {
 	var cmd = exec.Command(ParserExecutable, "parse", "--config-file", configPath)
+	if log.IsLevelEnabled(log.DebugLevel) {
+		cmd.Args = append(cmd.Args, "--log", "parser=debug")
+	}
 	cmd.Stdin = inputStream
 
 	var stdout, err = cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if err = cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start parser: %w", err)
+		return fmt.Errorf("failed to start parser: %w", err)
 	}
 	go forwardStderr(stderr)
 
-	var resultCh = make(chan Result)
-	go handleParseResults(ctx, stdout, cmd, resultCh)
-	return resultCh, nil
+	return handleParseResults(ctx, stdout, cmd, onRecord)
 }
 
 // GetSpec invokes the parser to get the configuration json schema. The returned schema can then be
@@ -59,8 +60,7 @@ func GetSpec() (json.RawMessage, error) {
 	return json.RawMessage(spec), nil
 }
 
-// TODO: This function is messy as hell. Give it some love
-func handleParseResults(ctx context.Context, stdout io.Reader, cmd *exec.Cmd, resultCh chan<- Result) {
+func handleParseResults(ctx context.Context, stdout io.Reader, cmd *exec.Cmd, onRecord func(json.RawMessage) error) error {
 	defer func() {
 		if isRunning(cmd) {
 			e := cmd.Process.Kill()
@@ -69,39 +69,28 @@ func handleParseResults(ctx context.Context, stdout io.Reader, cmd *exec.Cmd, re
 	}()
 	var scanner = bufio.NewScanner(stdout)
 	var err error
-	for scanner.Scan() && err == nil {
-		select {
-		case <-ctx.Done():
-			return
-		case resultCh <- Result{Document: json.RawMessage(scanner.Bytes())}:
+	for scanner.Scan() {
+		if err = onRecord(json.RawMessage(scanner.Bytes())); err != nil {
+			return err
 		}
 	}
-	if err == nil {
-		err = scanner.Err()
+	if err = scanner.Err(); err != nil {
+		return fmt.Errorf("reading next output: %w", err)
 	}
-	if err == nil {
-		log.Debug("waiting for parser process to exit")
-		err = cmd.Wait()
-	}
-	if err != nil {
-		log.WithField("error", err).Errorf("parser failed")
-		select {
-		case <-ctx.Done():
-			return
-		case resultCh <- Result{Error: err}:
-		}
-	}
-	close(resultCh)
+	log.Debug("waiting for parser process to exit")
+	return cmd.Wait()
 }
 
-// TODO: consider logging parser stderr instead of writing directly to stderr
 func forwardStderr(stderr io.Reader) {
 	var scanner = bufio.NewScanner(stderr)
 	for scanner.Scan() {
 		fmt.Fprintln(os.Stderr, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		log.WithField("error", err).Errorf("reading parser stderr pipe failed")
+		// It's unlikely that an error here would be anything more than a red herring. If the
+		// scanner does return an error, it's mostly likely due to the stderr pipe getting closed
+		// when the Cmd is done, which is racey.
+		log.WithField("error", err).Debug("reading parser stderr pipe failed")
 	}
 }
 
