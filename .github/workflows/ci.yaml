@@ -33,4 +33,10 @@ jobs:
         with:
           toolchain: stable
           target: x86_64-unknown-linux-musl
-      - run: make testAll
+      - run: make test-all
+      - name: Login to GitHub package docker registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login --username ${{ github.actor }} --password-stdin ghcr.io
+      - run: make pushAll
+
