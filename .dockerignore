@@ -1,0 +1,7 @@
+# Ignore everything except for the specific files we actually care about. This is to avoid sending a
+# massive build context to the docker daemon, and also allows us to avoid copying everything we
+# might need into a temp directory.
+*
+!source-kinesis/source-kinesis
+!source-s3/source-s3
+!parser/target/x86_64-unknown-linux-musl/release/parser
