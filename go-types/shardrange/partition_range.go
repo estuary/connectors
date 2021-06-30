@@ -25,6 +25,17 @@ func NewFullRange() Range {
 	}
 }
 
+func (pr Range) MarshalJSON() ([]byte, error) {
+	var tmp = struct {
+		Begin string `json:"begin"`
+		End   string `json:"end"`
+	}{
+		Begin: fmt.Sprintf("%08x", pr.Begin),
+		End:   fmt.Sprintf("%08x", pr.End),
+	}
+	return json.Marshal(tmp)
+}
+
 func (pr *Range) UnmarshalJSON(bytes []byte) error {
 	var tmp = struct{ Begin, End string }{}
 	if err := json.Unmarshal(bytes, &tmp); err != nil {

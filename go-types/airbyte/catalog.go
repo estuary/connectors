@@ -3,6 +3,8 @@ package airbyte
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/estuary/connectors/go-types/shardrange"
 )
 
 type SyncMode string
@@ -74,6 +76,8 @@ type Catalog struct {
 
 type ConfiguredCatalog struct {
 	Streams []ConfiguredStream `json:"streams"`
+	Block   bool               `json:"block"`
+	Range   shardrange.Range   `json:"range"`
 }
 
 func (c *ConfiguredCatalog) Validate() error {
