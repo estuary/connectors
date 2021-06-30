@@ -13,13 +13,13 @@ const (
 )
 
 type Stream struct {
-	Name                    string                 `json:"name"`
-	JSONSchema              map[string]interface{} `json:"json_schema"`
-	SupportedSyncModes      []SyncMode             `json:"supported_sync_modes"`
-	SourceDefinedCursor     bool                   `json:"source_defined_cursor,omitempty"`
-	DefaultCursorField      []string               `json:"default_cursor_field,omitempty"`
-	SourceDefinedPrimaryKey []string               `json:"source_defined_primary_key,omitempty"`
-	Namespace               string                 `json:"namespace,omitempty"`
+	Name                    string          `json:"name"`
+	JSONSchema              json.RawMessage `json:"json_schema"`
+	SupportedSyncModes      []SyncMode      `json:"supported_sync_modes"`
+	SourceDefinedCursor     bool            `json:"source_defined_cursor,omitempty"`
+	DefaultCursorField      []string        `json:"default_cursor_field,omitempty"`
+	SourceDefinedPrimaryKey []string        `json:"source_defined_primary_key,omitempty"`
+	Namespace               string          `json:"namespace,omitempty"`
 }
 
 func (s *Stream) Validate() error {
@@ -88,11 +88,6 @@ func (c *ConfiguredCatalog) Validate() error {
 	return nil
 }
 
-// UnknownSchema returns a JSON schema to use for Streams where the actual schema is unknown.
-func UnknownSchema() map[string]interface{} {
-	return map[string]interface{}{"type": "object"}
-}
-
 type Status string
 
 const (
@@ -131,15 +126,15 @@ type Log struct {
 type State struct {
 	// Data is the actual state associated with the ingestion. This must be a JSON _Object_ in order
 	// to comply with the airbyte specification.
-	Data interface{} `json:"data"`
+	Data json.RawMessage `json:"data"`
 }
 
 type Spec struct {
-	DocumentationURL              string                 `json:"documentationUrl,omitempty"`
-	ChangelogURL                  string                 `json:"changelogUrl,omitempty"`
-	ConnectionSpecification       map[string]interface{} `json:"connectionSpecification"`
-	SupportsIncremental           bool                   `json:"supportsIncremental,omitempty"`
-	SupportedDestinationSyncModes []DestinationSyncMode  `json:"supported_destination_sync_modes,omitempty"`
+	DocumentationURL              string                `json:"documentationUrl,omitempty"`
+	ChangelogURL                  string                `json:"changelogUrl,omitempty"`
+	ConnectionSpecification       json.RawMessage       `json:"connectionSpecification"`
+	SupportsIncremental           bool                  `json:"supportsIncremental,omitempty"`
+	SupportedDestinationSyncModes []DestinationSyncMode `json:"supported_destination_sync_modes,omitempty"`
 }
 
 type MessageType string
