@@ -1,8 +1,11 @@
 package shardrange
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestPartitionRangeOverlap(t *testing.T) {
@@ -32,4 +35,19 @@ func TestPartitionRangeOverlap(t *testing.T) {
 			t.Fail()
 		}
 	}
+}
+
+func TestRangeRoundTrip(t *testing.T) {
+	var rng = Range{
+		Begin: 12345,
+		End:   678910,
+	}
+
+	var b, err = json.Marshal(rng)
+	require.NoError(t, err)
+	require.Equal(t, `{"begin":"00003039","end":"000a5bfe"}`, string(b))
+
+	var rng2 Range
+	require.NoError(t, json.Unmarshal(b, &rng2))
+	require.Equal(t, rng, rng2)
 }
