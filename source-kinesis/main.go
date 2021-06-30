@@ -22,7 +22,7 @@ func main() {
 var spec = airbyte.Spec{
 	SupportsIncremental:           true,
 	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
-	ConnectionSpecification:       configJSONSchema,
+	ConnectionSpecification:       json.RawMessage(configJSONSchema),
 }
 
 func doCheck(args airbyte.CheckCmd) error {
@@ -67,15 +67,13 @@ func discoverCatalog(config airbyte.ConfigFile) (*airbyte.Catalog, error) {
 	var ctx = context.Background()
 	streamNames, err := listAllStreams(ctx, client)
 
-	var schema = airbyte.UnknownSchema()
-
 	var catalog = &airbyte.Catalog{
 		Streams: make([]airbyte.Stream, len(streamNames)),
 	}
 	for i, name := range streamNames {
 		catalog.Streams[i] = airbyte.Stream{
 			Name:                name,
-			JSONSchema:          schema,
+			JSONSchema:          json.RawMessage(`{"type":"object"}`),
 			SupportedSyncModes:  []airbyte.SyncMode{airbyte.SyncModeIncremental},
 			SourceDefinedCursor: true,
 		}
@@ -121,12 +119,6 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 		return fmt.Errorf("configured catalog is invalid: %w", err)
 	}
 	var stateMap = make(map[string]map[string]string)
-	var stateMessage = airbyte.Message{
-		Type: airbyte.MessageTypeState,
-		State: &airbyte.State{
-			Data: stateMap,
-		},
-	}
 
 	if err = args.StateFile.Parse(&stateMap); err != nil {
 		return fmt.Errorf("parsing state file: %w", err)
@@ -173,7 +165,16 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 			}
 		}
 		updateState(stateMap, next.source, next.sequenceNumber)
-		if err := encoder.Encode(stateMessage); err != nil {
+
+		stateRaw, err := json.Marshal(stateMap)
+		if err == nil {
+			err = encoder.Encode(airbyte.Message{
+				Type:  airbyte.MessageTypeState,
+				State: &airbyte.State{Data: json.RawMessage(stateRaw)},
+			})
+		}
+
+		if err != nil {
 			cancelFunc()
 			return err
 		}

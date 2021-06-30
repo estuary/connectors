@@ -35,49 +35,49 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-var configJSONSchema = map[string]interface{}{
+var configJSONSchema = `{
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"title":   "Kinesis Source Spec",
 	"type":    "object",
-	"required": []string{
+	"required": [
 		"region",
 		"awsAccessKeyId",
 		"awsSecretAccessKey",
-	},
-	"properties": map[string]interface{}{
-		"region": map[string]interface{}{
+	],
+	"properties": {
+		"region": {
 			"type":        "string",
 			"title":       "AWS Region",
 			"description": "The name of the AWS region where the Kinesis stream is located",
 			"default":     "us-east-1",
 		},
-		"endpoint": map[string]interface{}{
+		"endpoint": {
 			"type":        "string",
 			"title":       "AWS Endpoint",
 			"description": "The AWS endpoint URI to connect to, useful if you're capturing from a kinesis-compatible API that isn't provided by AWS",
 		},
-		"awsAccessKeyId": map[string]interface{}{
+		"awsAccessKeyId": {
 			"type":        "string",
 			"title":       "AWS Access Key ID",
 			"description": "Part of the AWS credentials that will be used to connect to Kinesis",
 			"default":     "example-aws-access-key-id",
 		},
-		"awsSecretAccessKey": map[string]interface{}{
+		"awsSecretAccessKey": {
 			"type":        "string",
 			"title":       "AWS Secret Access Key",
 			"description": "Part of the AWS credentials that will be used to connect to Kinesis",
 			"default":     "example-aws-secret-access-key",
 		},
-		"shardRange": map[string]interface{}{
+		"shardRange": {
 			"type": "object",
-			"properties": map[string]interface{}{
-				"end": map[string]interface{}{
+			"properties": {
+				"end": {
 					"type":        "string",
 					"pattern":     "^[0-9a-fA-F]{8}$",
 					"title":       "Partition range begin",
 					"description": "Unsigned 32 bit integer represented as a hexidecimal string, which is used to determine which partitions this instance will be responsible for",
 				},
-				"begin": map[string]interface{}{
+				"begin": {
 					"type":        "string",
 					"pattern":     "^[0-9a-fA-F]{8}$",
 					"title":       "Partition range begin",
@@ -86,7 +86,7 @@ var configJSONSchema = map[string]interface{}{
 			},
 		},
 	},
-}
+}`
 
 func connect(config *Config) (*kinesis.Kinesis, error) {
 	var err = config.Validate()
