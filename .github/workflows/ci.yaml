@@ -11,7 +11,10 @@ jobs:
     services:
       localstack:
         # Provides local ephemeral versions of AWS services to use during tests.
-        image: localstack/localstack
+        #
+        # TODO: 0.12.14 introduces a new (undocumented) kinesis mock,
+        # and breaks source-kinesis tests for unknown reasons.
+        image: localstack/localstack:0.12.13
         env:
           # Only use a limited number of services in order to speed up the startup time.
           SERVICES: "kinesis,s3"
@@ -27,4 +30,5 @@ jobs:
         with:
           fetch-depth: 0
           submodules: true
+      - run: pushd go-types && go test -v ./...
       - run: pushd source-kinesis && go test -tags kinesistest -v ./...
