@@ -25,18 +25,18 @@ func NewFullRange() Range {
 	}
 }
 
-func (pr Range) MarshalJSON() ([]byte, error) {
+func (r Range) MarshalJSON() ([]byte, error) {
 	var tmp = struct {
 		Begin string `json:"begin"`
 		End   string `json:"end"`
 	}{
-		Begin: fmt.Sprintf("%08x", pr.Begin),
-		End:   fmt.Sprintf("%08x", pr.End),
+		Begin: fmt.Sprintf("%08x", r.Begin),
+		End:   fmt.Sprintf("%08x", r.End),
 	}
 	return json.Marshal(tmp)
 }
 
-func (pr *Range) UnmarshalJSON(bytes []byte) error {
+func (r *Range) UnmarshalJSON(bytes []byte) error {
 	var tmp = struct{ Begin, End string }{}
 	if err := json.Unmarshal(bytes, &tmp); err != nil {
 		return err
@@ -47,14 +47,21 @@ func (pr *Range) UnmarshalJSON(bytes []byte) error {
 		if err != nil {
 			return fmt.Errorf("parsing partition range 'begin': %w", err)
 		}
-		pr.Begin = uint32(begin)
+		r.Begin = uint32(begin)
 	}
 	if tmp.End != "" {
 		end, err := strconv.ParseUint(tmp.End, 16, 32)
 		if err != nil {
 			return fmt.Errorf("parsing partition range 'end': %w", err)
 		}
-		pr.End = uint32(end)
+		r.End = uint32(end)
+	}
+	return nil
+}
+
+func (r Range) Validate() error {
+	if r.Begin > r.End {
+		return fmt.Errorf("expected Begin <= End")
 	}
 	return nil
 }
@@ -119,9 +126,9 @@ func (rr OverlapResult) String() string {
 // Overlaps checks whether `other` overlaps this Range. Note that this is *not* reflexive. For example:
 // [1-10].Overlaps([4-6]) == FullyInclusive
 // But [4-6].Overlaps([1-10]) == PartialOverlap
-func (pr Range) Overlaps(other Range) OverlapResult {
-	var includesBegin = pr.Includes(other.Begin)
-	var includesEnd = pr.Includes(other.End)
+func (r Range) Overlaps(other Range) OverlapResult {
+	var includesBegin = r.Includes(other.Begin)
+	var includesEnd = r.Includes(other.End)
 	if includesBegin && includesEnd {
 		return FullyInclusive
 	} else if includesBegin != includesEnd {

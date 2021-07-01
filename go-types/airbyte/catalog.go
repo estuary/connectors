@@ -76,7 +76,7 @@ type Catalog struct {
 
 type ConfiguredCatalog struct {
 	Streams []ConfiguredStream `json:"streams"`
-	Block   bool               `json:"block"`
+	Tail    bool               `json:"tail"`
 	Range   shardrange.Range   `json:"range"`
 }
 
@@ -86,8 +86,11 @@ func (c *ConfiguredCatalog) Validate() error {
 	}
 	for i, s := range c.Streams {
 		if err := s.Validate(); err != nil {
-			return fmt.Errorf("invalid configured stream at index %d: %w", i, err)
+			return fmt.Errorf("Streams[%d]: %w", i, err)
 		}
+	}
+	if err := c.Range.Validate(); err != nil {
+		return fmt.Errorf("Range: %w", err)
 	}
 	return nil
 }

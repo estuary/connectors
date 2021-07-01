@@ -42,6 +42,7 @@ func TestRangeRoundTrip(t *testing.T) {
 		Begin: 12345,
 		End:   678910,
 	}
+	require.NoError(t, rng.Validate())
 
 	var b, err = json.Marshal(rng)
 	require.NoError(t, err)
@@ -49,5 +50,6 @@ func TestRangeRoundTrip(t *testing.T) {
 
 	var rng2 Range
 	require.NoError(t, json.Unmarshal(b, &rng2))
+	require.NoError(t, rng2.Validate())
 	require.Equal(t, rng, rng2)
 }
