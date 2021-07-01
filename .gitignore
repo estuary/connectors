@@ -1,1 +1,3 @@
 /.build/
+/source-kinesis/source-kinesis
+/source-s3/source-s3
