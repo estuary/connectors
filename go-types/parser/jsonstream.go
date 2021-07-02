@@ -1,4 +1,4 @@
-package jsonl
+package parser
 
 import (
 	"bytes"
@@ -7,9 +7,9 @@ import (
 	"io"
 )
 
-// Stream is an io.Writer implementation that parses JSONL output, typically from the invocation
+// jsonStream is an io.Writer implementation that parses JSONL output, typically from the invocation
 // of an external program. It invokes callbacks for each decoded JSON document or on an error.
-type Stream struct {
+type jsonStream struct {
 	// OnNew returns a value to decode into
 	OnNew func() interface{}
 	// OnDecode is called with the decoded values
@@ -20,7 +20,7 @@ type Stream struct {
 	buffer  []byte
 }
 
-func (o *Stream) Write(b []byte) (int, error) {
+func (o *jsonStream) Write(b []byte) (int, error) {
 	if len(o.buffer) == 0 {
 		o.buffer = append([]byte(nil), b...) // Clone.
 	} else {
@@ -49,7 +49,7 @@ func (o *Stream) Write(b []byte) (int, error) {
 	}
 }
 
-func (o *Stream) Close() error {
+func (o *jsonStream) Close() error {
 	if len(o.buffer) != 0 {
 		o.OnError(fmt.Errorf("connector stdout closed without a final newline: %q", string(o.buffer)))
 	}

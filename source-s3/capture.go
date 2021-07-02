@@ -8,12 +8,9 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
-	//"strings"
-	//"time"
 
-	//"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
-	//"github.com/estuary/connectors/go-types/airbyte"
+	"github.com/estuary/connectors/go-types/airbyte"
 	"github.com/estuary/connectors/go-types/parser"
 	log "github.com/sirupsen/logrus"
 )
@@ -29,8 +26,8 @@ type readResult struct {
 	record      json.RawMessage
 }
 
-func NewStream(config *Config, client *s3.S3, streamID string, state streamState) (*stream, error) {
-	var bucket, prefix = parseStreamName(streamID)
+func NewStream(config *Config, client *s3.S3, configuredStream airbyte.ConfiguredStream, state streamState) (*stream, error) {
+	var bucket, prefix = parseStreamName(configuredStream.Stream.Name)
 	var matchKey *regexp.Regexp
 	var err error
 	if config.MatchKeys != "" {
@@ -40,13 +37,14 @@ func NewStream(config *Config, client *s3.S3, streamID string, state streamState
 		}
 	}
 	return &stream{
-		streamID:  streamID,
-		bucket:    bucket,
-		prefix:    prefix,
-		state:     state,
-		client:    client,
-		config:    config,
-		matchKeys: matchKey,
+		streamID:         configuredStream.Stream.Name,
+		bucket:           bucket,
+		prefix:           prefix,
+		state:            state,
+		client:           client,
+		config:           config,
+		matchKeys:        matchKey,
+		collectionSchema: configuredStream.Stream.JSONSchema,
 	}, nil
 }
 
@@ -60,56 +58,66 @@ func (c *stream) Start(ctx context.Context, onResult func(readResult) error) {
 }
 
 type stream struct {
-	streamID  string
-	bucket    string
-	prefix    string
-	state     streamState
-	client    *s3.S3
-	config    *Config
-	matchKeys *regexp.Regexp
+	streamID         string
+	bucket           string
+	prefix           string
+	state            streamState
+	client           *s3.S3
+	config           *Config
+	matchKeys        *regexp.Regexp
+	collectionSchema json.RawMessage
 }
 
 func (c *stream) captureStreamInternal(ctx context.Context, onResult func(readResult) error) error {
 	log.Debug("Starting cature")
 	var listResults = listAllObjects(ctx, c.bucket, c.prefix, c.client)
 	var objectCount = 0
+	var importedCount = 0
 	for result := range listResults {
 		objectCount++
 		if result.err != nil {
 			return fmt.Errorf("listing objects: %w", result.err)
 		}
-		// Should we skip importing this item because it doesn't match the configured regex?
-		if c.matchKeys != nil && !c.matchKeys.MatchString(result.object.relativeKey) {
-			continue
-		}
-		if err := c.importObject(ctx, result.object, onResult); err != nil {
-			return fmt.Errorf("failed to import object: '%s': %w", result.object.relativeKey, err)
+		if yes, skipRecords := c.shouldImport(result.object); yes {
+			if err := c.importObject(ctx, result.object, skipRecords, onResult); err != nil {
+				return fmt.Errorf("failed to import object: '%s': %w", result.object.relativeKey, err)
+			}
+			importedCount++
 		}
 	}
-	log.WithField("observedObjects", objectCount).Info("completed processing stream")
+	log.WithFields(log.Fields{
+		"observedObjects": objectCount,
+		"importedObjects": importedCount,
+	}).Info("completed processing stream")
 	return nil
 }
 
-func (c *stream) importObject(ctx context.Context, obj *s3Object, onResult func(readResult) error) error {
-	var fullKey = obj.fullKey()
-
+func (c *stream) shouldImport(obj *s3Object) (bool, uint64) {
+	// Should we skip importing this item because it doesn't match the configured regex?
+	if c.matchKeys != nil && !c.matchKeys.MatchString(obj.relativeKey) {
+		return false, 0
+	}
 	// Does this key hash into our shard's assigned range?
 	// We hash the bucket and the full key just to be on the safe side.
-	var hashKey = obj.bucket + "/" + fullKey
+	var hashKey = obj.bucket + "/" + obj.fullKey()
 	if !c.config.ShardRange.IncludesHwHash([]byte(hashKey)) {
-		return nil
+		return false, 0
 	}
 
-	var skipRecords uint64
 	var prevState = c.state[obj.relativeKey]
 	// Does our state indiate that we've already imported this object?
 	if prevState != nil && prevState.ETag == obj.etag {
 		if prevState.Complete {
-			return nil
+			return false, 0
 		} else {
-			skipRecords = prevState.RecordCount
+			return true, prevState.RecordCount
 		}
 	}
+	return true, 0
+}
+
+func (c *stream) importObject(ctx context.Context, obj *s3Object, skipRecords uint64, onResult func(readResult) error) error {
+	var fullKey = obj.fullKey()
 
 	var getInput = s3.GetObjectInput{
 		Bucket: &obj.bucket,
@@ -187,12 +195,15 @@ func (c *stream) makeParseConfig(relativeKey string, contentType *string, conten
 	if parseConfig.AddValues == nil {
 		parseConfig.AddValues = make(map[parser.JsonPointer]interface{})
 	}
+	if parseConfig.Schema == nil {
+		parseConfig.Schema = c.collectionSchema
+	}
 	parseConfig.AddValues[sourceFilenameLocation] = relativeKey
 	return &parseConfig
 }
 
-const sourceFilenameLocation = "/_meta/sourceFile"
-const defaultRecordOffsetLocation = "/_meta/recordOffset"
+const sourceFilenameLocation = "/_meta/source/file"
+const defaultRecordOffsetLocation = "/_meta/source/record"
 
 func shouldImport(obj *s3Object, matchKey *regexp.Regexp, state streamState) bool {
 	if matchKey != nil && !matchKey.MatchString(obj.relativeKey) {
