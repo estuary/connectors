@@ -41,7 +41,7 @@ $(build_dir):
 
 build_connectors = $(addprefix $(build_dir)/build-,$(connectors))
 
-$(build_connectors): $(build_dir)/build-%: $(parser) % | $(build_dir)
+$(build_connectors): $(build_dir)/build-%: $(parser) % go-types | $(build_dir)
 	cd $* && go build
 	docker build -t ghcr.io/estuary/$*:$(version) --build-arg connector=$* .
 	@# This file is only used so that make can correctly determine if targets need rebuilt
