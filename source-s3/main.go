@@ -10,6 +10,7 @@ import (
 
 	"github.com/estuary/connectors/go-types/airbyte"
 	"github.com/estuary/connectors/go-types/parser"
+	"github.com/estuary/connectors/go-types/shardrange"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -154,10 +155,15 @@ func doRead(args airbyte.ReadCmd) error {
 		return nil
 	}
 
+	var shardRange = catalog.Range
+	if shardRange.IsZeroed() {
+		log.Info("Assuming full partition range since no partitionRange was included in the catalog")
+		shardRange = shardrange.NewFullRange()
+	}
 	log.WithField("streamCount", nStreams).Info("Starting to read stream(s)")
 	for _, stream := range catalog.Streams {
 		var state = copyStreamState(stateMap[stream.Stream.Name])
-		capture, err := NewStream(&config, client, stream, state)
+		capture, err := NewStream(&config, client, stream, state, shardRange)
 		if err != nil {
 			cancelFunc()
 			return err

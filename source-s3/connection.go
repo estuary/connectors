@@ -11,21 +11,17 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/estuary/connectors/go-types/airbyte"
 	"github.com/estuary/connectors/go-types/parser"
-	"github.com/estuary/connectors/go-types/shardrange"
-	log "github.com/sirupsen/logrus"
 )
 
 type Config struct {
-	// TODO: move shard range out of config
-	ShardRange         *shardrange.Range `json:"shardRange"`
-	Endpoint           string            `json:"endpoint"`
-	Bucket             string            `json:"bucket"`
-	Prefix             string            `json:"prefix"`
-	MatchKeys          string            `json:"matchKeys"`
-	Region             string            `json:"region"`
-	AWSAccessKeyID     string            `json:"awsAccessKeyId"`
-	AWSSecretAccessKey string            `json:"awsSecretAccessKey"`
-	Parser             *parser.Config    `json:"parser"`
+	Endpoint           string         `json:"endpoint"`
+	Bucket             string         `json:"bucket"`
+	Prefix             string         `json:"prefix"`
+	MatchKeys          string         `json:"matchKeys"`
+	Region             string         `json:"region"`
+	AWSAccessKeyID     string         `json:"awsAccessKeyId"`
+	AWSSecretAccessKey string         `json:"awsSecretAccessKey"`
+	Parser             *parser.Config `json:"parser"`
 }
 
 func (c *Config) Validate() error {
@@ -140,13 +136,6 @@ func parseConfigAndConnect(ctx context.Context, configFile airbyte.ConfigFile) (
 	if err != nil {
 		err = fmt.Errorf("parsing config file: %w", err)
 		return
-	}
-	// If the partition range was not included in the configuration, then we'll assume the full
-	// range.
-	if config.ShardRange == nil {
-		log.Info("Assuming full partition range since no partitionRange was included in the configuration")
-		var fullRange = shardrange.NewFullRange()
-		config.ShardRange = &fullRange
 	}
 	client, err = connect(ctx, &config)
 	if err != nil {

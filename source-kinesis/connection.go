@@ -8,18 +8,16 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go-types/shardrange"
 	log "github.com/sirupsen/logrus"
 )
 
 // Config represents the fully merged endpoint configuration for Kinesis.
 // It matches the `KinesisConfig` struct in `crates/sources/src/specs.rs`
 type Config struct {
-	ShardRange         *shardrange.Range `json:"shardRange"`
-	Endpoint           string            `json:"endpoint"`
-	Region             string            `json:"region"`
-	AWSAccessKeyID     string            `json:"awsAccessKeyId"`
-	AWSSecretAccessKey string            `json:"awsSecretAccessKey"`
+	Endpoint           string `json:"endpoint"`
+	Region             string `json:"region"`
+	AWSAccessKeyID     string `json:"awsAccessKeyId"`
+	AWSSecretAccessKey string `json:"awsSecretAccessKey"`
 }
 
 func (c *Config) Validate() error {
@@ -67,24 +65,7 @@ var configJSONSchema = `{
 			"title":       "AWS Secret Access Key",
 			"description": "Part of the AWS credentials that will be used to connect to Kinesis",
 			"default":     "example-aws-secret-access-key",
-		},
-		"shardRange": {
-			"type": "object",
-			"properties": {
-				"end": {
-					"type":        "string",
-					"pattern":     "^[0-9a-fA-F]{8}$",
-					"title":       "Partition range begin",
-					"description": "Unsigned 32 bit integer represented as a hexidecimal string, which is used to determine which partitions this instance will be responsible for",
-				},
-				"begin": {
-					"type":        "string",
-					"pattern":     "^[0-9a-fA-F]{8}$",
-					"title":       "Partition range begin",
-					"description": "Unsigned 32 bit integer represented as a hexidecimal string, which is used to determine which partitions this instance will be responsible for",
-				},
-			},
-		},
+		}
 	},
 }`
 

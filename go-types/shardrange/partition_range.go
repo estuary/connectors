@@ -25,6 +25,11 @@ func NewFullRange() Range {
 	}
 }
 
+// IsZeroed returns true if the begin and end are both 0
+func (r Range) IsZeroed() bool {
+	return r.Begin == 0 && r.End == 0
+}
+
 func (r Range) MarshalJSON() ([]byte, error) {
 	var tmp = struct {
 		Begin string `json:"begin"`

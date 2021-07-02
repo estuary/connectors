@@ -88,19 +88,17 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 	var ctx, cancelFunc = context.WithCancel(context.Background())
 	defer cancelFunc()
 
-	var shard1Conf = conf
-	shard1Conf.ShardRange = &shardrange.Range{
+	var shard1Range = shardrange.Range{
 		Begin: 0,
 		End:   math.MaxUint32 / 2,
 	}
-	go readStream(ctx, shard1Conf, client, stream, nil, dataCh)
+	go readStream(ctx, shard1Range, client, stream, nil, dataCh)
 
-	var shard2Conf = conf
-	shard2Conf.ShardRange = &shardrange.Range{
+	var shard2Range = shardrange.Range{
 		Begin: math.MaxUint32 / 2,
 		End:   math.MaxUint32,
 	}
-	go readStream(ctx, shard2Conf, client, stream, nil, dataCh)
+	go readStream(ctx, shard2Range, client, stream, nil, dataCh)
 
 	var partitionKeys = []string{"furst", "sekund", "thuurd", "phorth"}
 	var sequencNumbers = make(map[string]string)
