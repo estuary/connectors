@@ -157,7 +157,7 @@ func doRead(args airbyte.ReadCmd) error {
 	log.WithField("streamCount", nStreams).Info("Starting to read stream(s)")
 	for _, stream := range catalog.Streams {
 		var state = copyStreamState(stateMap[stream.Stream.Name])
-		capture, err := NewStream(&config, client, stream.Stream.Name, state)
+		capture, err := NewStream(&config, client, stream, state)
 		if err != nil {
 			cancelFunc()
 			return err

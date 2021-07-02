@@ -8,8 +8,6 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/estuary/connectors/go-types/firsterror"
-	"github.com/estuary/connectors/go-types/jsonl"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -31,28 +29,28 @@ func ParseStream(ctx context.Context, configPath string, inputStream io.Reader, 
 	}
 	cmd.Stdin = inputStream
 
-	var firstError = &firsterror.Collector{}
+	var firstError = &firstError{}
 	var stdoutJson, stderrJson json.RawMessage
-	cmd.Stdout = &jsonl.Stream{
+	cmd.Stdout = &jsonStream{
 		OnNew: func() interface{} { return &stdoutJson },
 		OnDecode: func(val interface{}) error {
 			return onRecord(stdoutJson)
 		},
 		OnError: func(err error) {
-			firstError.OnError(err)
+			firstError.SetIfNil(err)
 		},
 	}
-	cmd.Stderr = &jsonl.Stream{
+	cmd.Stderr = &jsonStream{
 		OnNew: func() interface{} { return &stderrJson },
 		OnDecode: func(val interface{}) error {
 			return onRecord(stdoutJson)
 		},
 		OnError: func(err error) {
-			firstError.OnError(err)
+			firstError.SetIfNil(err)
 		},
 	}
 
-	firstError.OnError(cmd.Run())
+	firstError.SetIfNil(cmd.Run())
 	return firstError.First()
 }
 

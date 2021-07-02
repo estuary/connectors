@@ -18,8 +18,6 @@ jobs:
         env:
           # Only use a limited number of services in order to speed up the startup time.
           SERVICES: "kinesis,s3"
-          # Randomly return rate limiting errors from the kinesis api to exercise those code paths.
-          KINESIS_ERROR_PROBABILITY: "0.1"
         ports:
           - 4566:4566
           - 4571:4571
@@ -38,5 +36,5 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | \
             docker login --username ${{ github.actor }} --password-stdin ghcr.io
-      - run: make pushAll
+      - run: make push-all
 

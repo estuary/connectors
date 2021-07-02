@@ -54,9 +54,9 @@ $(push_connectors): $(build_dir)/push-%: $(build_dir)/build-%
 	@# This file is only used so that make can correctly determine if targets need rebuilt
 	echo $(version) > $@
 
-.PHONY: buildAll
-buildAll: $(build_connectors)
+.PHONY: build-all
+build-all: $(build_connectors)
 
-.PHONY: pushAll
-pushAll: $(push_connectors)
+.PHONY: push-all
+push-all: $(push_connectors)
 

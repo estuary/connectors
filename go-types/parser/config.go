@@ -18,7 +18,7 @@ type Config struct {
 	ContentType           string                      `json:"contentType,omitempty"`
 	ContentEncoding       string                      `json:"contentEncoding,omitempty"`
 	Projections           map[string]JsonPointer      `json:"projections,omitempty"`
-	Schema                interface{}                 `json:"schema,omitempty"`
+	Schema                json.RawMessage             `json:"schema,omitempty"`
 	FileExtensionMappings map[string]string           `json:"fileExtensionMappings,omitempty"`
 }
 

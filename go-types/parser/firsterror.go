@@ -1,20 +1,19 @@
-package firsterror
+package parser
 
 import (
-	"sync"
+    "sync"
 
 	log "github.com/sirupsen/logrus"
 )
-
-// Collector is used to accumulate at most one error, which will be the first one that occurs.
-type Collector struct {
+// firstError is used to accumulate at most one error, which will be the first one that occurs.
+type firstError struct {
 	first error
 	mutex sync.Mutex
 }
 
-// OnError sets the first error, if it is not already set, and if e is not nil. If the first error
+// SetIfNil sets the first error, if it is not already set, and if e is not nil. If the first error
 // has already been set, then e is logged and ignored.
-func (c *Collector) OnError(e error) {
+func (c *firstError) SetIfNil(e error) {
 	if e == nil {
 		return
 	}
@@ -28,7 +27,7 @@ func (c *Collector) OnError(e error) {
 }
 
 // First returns the first error, or nil if no non-nil error was provided to OnError.
-func (c *Collector) First() error {
+func (c *firstError) First() error {
 	c.mutex.Lock()
 	var e = c.first
 	c.mutex.Unlock()
