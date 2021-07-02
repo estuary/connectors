@@ -41,7 +41,11 @@ $(build_dir):
 
 build_connectors = $(addprefix $(build_dir)/build-,$(connectors))
 
-$(build_connectors): $(build_dir)/build-%: $(parser) % go-types | $(build_dir)
+# Second expansion is needed to defer the expansion of $(shell find % -type f) until after the rule
+# is matched. This ensures that the connector will be rebuilt if any file within its source
+# directory is modified.
+.SECONDEXPANSION:
+$(build_connectors): $(build_dir)/build-%: $(parser) % go-types $$(shell find % -type f) | $(build_dir)
 	cd $* && go build
 	docker build -t ghcr.io/estuary/$*:$(version) --build-arg connector=$* .
 	@# This file is only used so that make can correctly determine if targets need rebuilt
