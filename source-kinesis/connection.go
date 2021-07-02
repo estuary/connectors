@@ -40,33 +40,33 @@ var configJSONSchema = `{
 	"required": [
 		"region",
 		"awsAccessKeyId",
-		"awsSecretAccessKey",
+		"awsSecretAccessKey"
 	],
 	"properties": {
 		"region": {
 			"type":        "string",
 			"title":       "AWS Region",
 			"description": "The name of the AWS region where the Kinesis stream is located",
-			"default":     "us-east-1",
+			"default":     "us-east-1"
 		},
 		"endpoint": {
 			"type":        "string",
 			"title":       "AWS Endpoint",
-			"description": "The AWS endpoint URI to connect to, useful if you're capturing from a kinesis-compatible API that isn't provided by AWS",
+			"description": "The AWS endpoint URI to connect to, useful if you're capturing from a kinesis-compatible API that isn't provided by AWS"
 		},
 		"awsAccessKeyId": {
 			"type":        "string",
 			"title":       "AWS Access Key ID",
 			"description": "Part of the AWS credentials that will be used to connect to Kinesis",
-			"default":     "example-aws-access-key-id",
+			"default":     "example-aws-access-key-id"
 		},
 		"awsSecretAccessKey": {
 			"type":        "string",
 			"title":       "AWS Secret Access Key",
 			"description": "Part of the AWS credentials that will be used to connect to Kinesis",
-			"default":     "example-aws-secret-access-key",
+			"default":     "example-aws-secret-access-key"
 		}
-	},
+	}
 }`
 
 func connect(config *Config) (*kinesis.Kinesis, error) {

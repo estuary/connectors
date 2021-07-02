@@ -38,14 +38,14 @@ func (c *Config) Validate() error {
 }
 
 func configJSONSchema(parserSchema json.RawMessage) json.RawMessage {
-	return json.RawMessage(fmt.Sprintf(`
+	return json.RawMessage(fmt.Sprintf(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"title":   "S3 Source Spec",
 		"type":    "object",
-		"required": {
+		"required": [
 			"awsAccessKeyId",
 			"awsSecretAccessKey"
-		},
+		],
 		"properties": {
 			"bucket": {
 				"type":        "string",
@@ -63,7 +63,7 @@ func configJSONSchema(parserSchema json.RawMessage) json.RawMessage {
 				"format":      "regex",
 				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose key (relative to the prefix) matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files."
 			},
-			"parser": parserSchema,
+			"parser": %s,
 			"region": {
 				"type":        "string",
 				"title":       "AWS Region",
@@ -86,26 +86,9 @@ func configJSONSchema(parserSchema json.RawMessage) json.RawMessage {
 				"title":       "AWS Secret Access Key",
 				"description": "Part of the AWS credentials that will be used to connect to S3",
 				"default":     "example-aws-secret-access-key"
-			},
-			"shardRange": {
-				"type": "object",
-				"properties": {
-					"end": {
-						"type":        "string",
-						"pattern":     "^[0-9a-fA-F]{8}$",
-						"title":       "Partition range begin",
-						"description": "Unsigned 32 bit integer represented as a hexidecimal string, which is used to determine which partitions this instance will be responsible for"
-					}
-					"begin": {
-						"type":        "string",
-						"pattern":     "^[0-9a-fA-F]{8}$",
-						"title":       "Partition range begin",
-						"description": "Unsigned 32 bit integer represented as a hexidecimal string, which is used to determine which partitions this instance will be responsible for"
-					}
-				}
 			}
 		}
-    `))
+    }`, string(parserSchema)))
 }
 
 func connect(ctx context.Context, config *Config) (*s3.S3, error) {
