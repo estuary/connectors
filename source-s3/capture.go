@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/estuary/connectors/go-types/airbyte"
 	"github.com/estuary/connectors/go-types/parser"
+	"github.com/estuary/connectors/go-types/shardrange"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,7 +27,7 @@ type readResult struct {
 	record      json.RawMessage
 }
 
-func NewStream(config *Config, client *s3.S3, configuredStream airbyte.ConfiguredStream, state streamState) (*stream, error) {
+func NewStream(config *Config, client *s3.S3, configuredStream airbyte.ConfiguredStream, state streamState, shardRange shardrange.Range) (*stream, error) {
 	var bucket, prefix = parseStreamName(configuredStream.Stream.Name)
 	var matchKey *regexp.Regexp
 	var err error
@@ -36,6 +37,12 @@ func NewStream(config *Config, client *s3.S3, configuredStream airbyte.Configure
 			return nil, fmt.Errorf("invalid regex for matchKey: %w", err)
 		}
 	}
+
+	var projections = make(map[string]parser.JsonPointer)
+	for k, v := range configuredStream.Projections {
+		projections[k] = parser.JsonPointer(v)
+	}
+
 	return &stream{
 		streamID:         configuredStream.Stream.Name,
 		bucket:           bucket,
@@ -45,11 +52,13 @@ func NewStream(config *Config, client *s3.S3, configuredStream airbyte.Configure
 		config:           config,
 		matchKeys:        matchKey,
 		collectionSchema: configuredStream.Stream.JSONSchema,
+		projections:      projections,
+		shardRange:       shardRange,
 	}, nil
 }
 
-func (c *stream) Start(ctx context.Context, onResult func(readResult) error) {
-	var err = c.captureStreamInternal(ctx, onResult)
+func (s *stream) Start(ctx context.Context, onResult func(readResult) error) {
+	var err = s.captureStreamInternal(ctx, onResult)
 	// Send a StreamCompleted to indicate that we've completed successfully
 	if err == nil {
 		err = StreamCompleted
@@ -66,11 +75,13 @@ type stream struct {
 	config           *Config
 	matchKeys        *regexp.Regexp
 	collectionSchema json.RawMessage
+	projections      map[string]parser.JsonPointer
+	shardRange       shardrange.Range
 }
 
-func (c *stream) captureStreamInternal(ctx context.Context, onResult func(readResult) error) error {
+func (s *stream) captureStreamInternal(ctx context.Context, onResult func(readResult) error) error {
 	log.Debug("Starting cature")
-	var listResults = listAllObjects(ctx, c.bucket, c.prefix, c.client)
+	var listResults = listAllObjects(ctx, s.bucket, s.prefix, s.client)
 	var objectCount = 0
 	var importedCount = 0
 	for result := range listResults {
@@ -78,8 +89,8 @@ func (c *stream) captureStreamInternal(ctx context.Context, onResult func(readRe
 		if result.err != nil {
 			return fmt.Errorf("listing objects: %w", result.err)
 		}
-		if yes, skipRecords := c.shouldImport(result.object); yes {
-			if err := c.importObject(ctx, result.object, skipRecords, onResult); err != nil {
+		if yes, skipRecords := s.shouldImport(result.object); yes {
+			if err := s.importObject(ctx, result.object, skipRecords, onResult); err != nil {
 				return fmt.Errorf("failed to import object: '%s': %w", result.object.relativeKey, err)
 			}
 			importedCount++
@@ -100,7 +111,7 @@ func (c *stream) shouldImport(obj *s3Object) (bool, uint64) {
 	// Does this key hash into our shard's assigned range?
 	// We hash the bucket and the full key just to be on the safe side.
 	var hashKey = obj.bucket + "/" + obj.fullKey()
-	if !c.config.ShardRange.IncludesHwHash([]byte(hashKey)) {
+	if !c.shardRange.IncludesHwHash([]byte(hashKey)) {
 		return false, 0
 	}
 
@@ -116,20 +127,20 @@ func (c *stream) shouldImport(obj *s3Object) (bool, uint64) {
 	return true, 0
 }
 
-func (c *stream) importObject(ctx context.Context, obj *s3Object, skipRecords uint64, onResult func(readResult) error) error {
+func (s *stream) importObject(ctx context.Context, obj *s3Object, skipRecords uint64, onResult func(readResult) error) error {
 	var fullKey = obj.fullKey()
 
 	var getInput = s3.GetObjectInput{
 		Bucket: &obj.bucket,
 		Key:    &fullKey,
 	}
-	var resp, err = c.client.GetObject(&getInput)
+	var resp, err = s.client.GetObject(&getInput)
 	if err != nil {
 		return fmt.Errorf("getObject failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	var parseConfig = c.makeParseConfig(obj.relativeKey, resp.ContentType, resp.ContentEncoding)
+	var parseConfig = s.makeParseConfig(obj.relativeKey, resp.ContentType, resp.ContentEncoding)
 	configFile, err := ioutil.TempFile("", "parser-config-*.json")
 	if err != nil {
 		return fmt.Errorf("creating parser config temp file: %w", err)
@@ -144,8 +155,8 @@ func (c *stream) importObject(ctx context.Context, obj *s3Object, skipRecords ui
 		// offset in the state?
 		if docCount > skipRecords {
 			return onResult(readResult{
-				bucket:      c.bucket,
-				streamID:    c.streamID,
+				bucket:      s.bucket,
+				streamID:    s.streamID,
 				relativeKey: obj.relativeKey,
 				record:      data,
 				state: &objectState{
@@ -163,8 +174,8 @@ func (c *stream) importObject(ctx context.Context, obj *s3Object, skipRecords ui
 	}
 
 	return onResult(readResult{
-		bucket:      c.bucket,
-		streamID:    c.streamID,
+		bucket:      s.bucket,
+		streamID:    s.streamID,
 		relativeKey: obj.relativeKey,
 		state: &objectState{
 			ETag:         *resp.ETag,
@@ -175,10 +186,10 @@ func (c *stream) importObject(ctx context.Context, obj *s3Object, skipRecords ui
 	})
 }
 
-func (c *stream) makeParseConfig(relativeKey string, contentType *string, contentEncoding *string) *parser.Config {
+func (s *stream) makeParseConfig(relativeKey string, contentType *string, contentEncoding *string) *parser.Config {
 	var parseConfig = parser.Config{}
-	if c.config.Parser != nil {
-		parseConfig = c.config.Parser.Copy()
+	if s.config.Parser != nil {
+		parseConfig = s.config.Parser.Copy()
 	}
 
 	parseConfig.Filename = relativeKey
@@ -196,8 +207,9 @@ func (c *stream) makeParseConfig(relativeKey string, contentType *string, conten
 		parseConfig.AddValues = make(map[parser.JsonPointer]interface{})
 	}
 	if parseConfig.Schema == nil {
-		parseConfig.Schema = c.collectionSchema
+		parseConfig.Schema = s.collectionSchema
 	}
+	parseConfig.Projections = s.projections
 	parseConfig.AddValues[sourceFilenameLocation] = relativeKey
 	return &parseConfig
 }

@@ -106,7 +106,7 @@ func doRead(args airbyte.ReadCmd) error {
 }
 
 func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) error {
-	var config, client, err = parseConfigAndConnect(args.ConfigFile)
+	var _, client, err = parseConfigAndConnect(args.ConfigFile)
 	if err != nil {
 		return err
 	}
@@ -129,13 +129,19 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 
 	log.WithField("streamCount", len(catalog.Streams)).Info("Starting to read stream(s)")
 
+	var shardRange = catalog.Range
+	if shardRange.IsZeroed() {
+		log.Info("using full shard range since no range was given in the catalog")
+		shardRange = shardrange.NewFullRange()
+	}
+
 	for _, stream := range catalog.Streams {
 		streamState, err := copyStreamState(stateMap, stream.Stream.Name)
 		if err != nil {
 			cancelFunc()
 			return fmt.Errorf("invalid state for stream %s: %w", stream.Stream.Name, err)
 		}
-		go readStream(ctx, config, client, stream.Stream.Name, streamState, dataCh)
+		go readStream(ctx, shardRange, client, stream.Stream.Name, streamState, dataCh)
 	}
 
 	// We'll re-use this same message instance for all records we print
@@ -182,20 +188,11 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 }
 
 func parseConfigAndConnect(configFile airbyte.ConfigFile) (config Config, client *kinesis.Kinesis, err error) {
-	err = configFile.ConfigFile.Parse(&config)
-	if err != nil {
+	if err = configFile.ConfigFile.Parse(&config); err != nil {
 		err = fmt.Errorf("parsing config file: %w", err)
 		return
 	}
-	// If the partition range was not included in the configuration, then we'll assume the full
-	// range.
-	if config.ShardRange == nil {
-		log.Info("Assuming full partition range since no partitionRange was included in the configuration")
-		var fullRange = shardrange.NewFullRange()
-		config.ShardRange = &fullRange
-	}
-	client, err = connect(&config)
-	if err != nil {
+	if client, err = connect(&config); err != nil {
 		err = fmt.Errorf("failed to connect: %w", err)
 	}
 	return

@@ -53,6 +53,36 @@ type ConfiguredStream struct {
 	DestinationSyncMode DestinationSyncMode `json:"destination_sync_mode"`
 	CursorField         []string            `json:"cursor_field,omitempty"`
 	PrimaryKey          []string            `json:"primary_key,omitempty"`
+	Projections         map[string]string   `json:"estuary.dev/projections"`
+}
+
+// This impl exists solely so that we can allow deserializing either the namespaced or
+// non-namepsaced version of Projections, for the purpose of compatibility.
+func (s *ConfiguredStream) UnmarshalJSON(b []byte) error {
+	var tmp = struct {
+		Stream              Stream              `json:"stream"`
+		SyncMode            SyncMode            `json:"sync_mode"`
+		DestinationSyncMode DestinationSyncMode `json:"destination_sync_mode"`
+		CursorField         []string            `json:"cursor_field,omitempty"`
+		PrimaryKey          []string            `json:"primary_key,omitempty"`
+		NSProjections       map[string]string   `json:"estuary.dev/projections"`
+		Projections         map[string]string   `json:"projections"`
+	}{}
+	if err := json.Unmarshal(b, &tmp); err != nil {
+		return err
+	}
+	*s = ConfiguredStream{
+		Stream:              tmp.Stream,
+		SyncMode:            tmp.SyncMode,
+		DestinationSyncMode: tmp.DestinationSyncMode,
+		CursorField:         tmp.CursorField,
+		PrimaryKey:          tmp.PrimaryKey,
+		Projections:         tmp.NSProjections,
+	}
+	if len(s.Projections) == 0 {
+		s.Projections = tmp.Projections
+	}
+	return nil
 }
 
 func (c *ConfiguredStream) Validate() error {
@@ -78,8 +108,41 @@ type Catalog struct {
 
 type ConfiguredCatalog struct {
 	Streams []ConfiguredStream `json:"streams"`
-	Tail    bool               `json:"tail"`
-	Range   shardrange.Range   `json:"range"`
+	Tail    bool               `json:"estuary.dev/tail"`
+	Range   shardrange.Range   `json:"estuary.dev/range"`
+}
+
+// This impl exists solely so that we can accept either the namespaced or non-namespaced identifiers
+// for tail and range, for the purpose of compatibility.
+func (c *ConfiguredCatalog) UnmarshalJSON(b []byte) error {
+	var tmp = struct {
+		Streams []ConfiguredStream `json:"streams"`
+		NSTail  *bool              `json:"estuary.dev/tail"`
+		Tail    *bool              `json:"tail"`
+		NSRange *shardrange.Range  `json:"estuary.dev/range"`
+		Range   *shardrange.Range  `json:"range"`
+	}{}
+	if err := json.Unmarshal(b, &tmp); err != nil {
+		return err
+	}
+	var tail bool
+	if tmp.NSTail != nil {
+		tail = *tmp.NSTail
+	} else if tmp.Tail != nil {
+		tail = *tmp.Tail
+	}
+	var r shardrange.Range
+	if tmp.NSRange != nil {
+		r = *tmp.NSRange
+	} else if tmp.Range != nil {
+		r = *tmp.Range
+	}
+	*c = ConfiguredCatalog{
+		Streams: tmp.Streams,
+		Tail:    tail,
+		Range:   r,
+	}
+	return nil
 }
 
 func (c *ConfiguredCatalog) Validate() error {

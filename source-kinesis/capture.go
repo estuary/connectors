@@ -16,12 +16,13 @@ import (
 
 // readStream starts reading the given kinesis stream, delivering both records and errors from all
 // kinsis shards over the given `resultsCh`.
-func readStream(ctx context.Context, config Config, client *kinesis.Kinesis, stream string, state map[string]string, resultsCh chan<- readResult) {
+func readStream(ctx context.Context, shardRange shardrange.Range, client *kinesis.Kinesis, stream string, state map[string]string, resultsCh chan<- readResult) {
+
 	var kc = &streamReader{
 		client:         client,
 		ctx:            ctx,
 		stream:         stream,
-		config:         config,
+		shardRange:     shardRange,
 		dataCh:         resultsCh,
 		readingShards:  make(map[string]bool),
 		shardSequences: state,
@@ -47,7 +48,7 @@ type streamReader struct {
 	client             *kinesis.Kinesis
 	ctx                context.Context
 	stream             string
-	config             Config
+	shardRange         shardrange.Range
 	dataCh             chan<- readResult
 	readingShards      map[string]bool
 	readingShardsMutex sync.Mutex
@@ -190,7 +191,7 @@ func (kc *streamReader) overlapsHashRange(shard *kinesis.Shard) (shardrange.Over
 	if err != nil {
 		return shardrange.NoOverlap, err
 	}
-	return kc.config.ShardRange.Overlaps(kinesisRange), nil
+	return kc.shardRange.Overlaps(kinesisRange), nil
 }
 
 func (kc *streamReader) startReadingShardByID(shardID string) {
@@ -221,8 +222,8 @@ func (kc *streamReader) newShardReader(shardID string, getShard func(string) (*k
 	var logEntry = log.WithFields(log.Fields{
 		"kinesisStream":     kc.stream,
 		"kinesisShardId":    *shard.ShardId,
-		"captureRangeStart": kc.config.ShardRange.Begin,
-		"captureRangeEnd":   kc.config.ShardRange.End,
+		"captureRangeStart": kc.shardRange.Begin,
+		"captureRangeEnd":   kc.shardRange.End,
 	})
 	var source = &recordSource{
 		stream:  kc.stream,
@@ -232,7 +233,7 @@ func (kc *streamReader) newShardReader(shardID string, getShard func(string) (*k
 	if err != nil {
 		return nil, fmt.Errorf("parsing kinesis shard range: %w", err)
 	}
-	var rangeResult = kc.config.ShardRange.Overlaps(kinesisRange)
+	var rangeResult = kc.shardRange.Overlaps(kinesisRange)
 	if rangeResult == shardrange.NoOverlap {
 		logEntry.Info("Will not read kinesis shard because it falls outside of our hash range")
 		return nil, nil
@@ -407,7 +408,7 @@ func (r *shardReader) extractRecords(resp *kinesis.GetRecordsOutput) []json.RawM
 		var result []json.RawMessage
 		for _, rec := range resp.Records {
 			var keyHash = hashPartitionKey(*rec.PartitionKey)
-			if isRecordWithinRange(*r.parent.config.ShardRange, r.kinesisShardRange, keyHash) {
+			if isRecordWithinRange(r.parent.shardRange, r.kinesisShardRange, keyHash) {
 				result = append(result, json.RawMessage(rec.Data))
 			}
 		}
