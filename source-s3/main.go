@@ -86,7 +86,7 @@ func doRead(args airbyte.ReadCmd) error {
 		return fmt.Errorf("configured catalog is invalid: %w", err)
 	}
 
-	var stateMap = make(map[string]streamState)
+	var stateMap = make(stateMap)
 	var stateMessage = airbyte.Message{
 		Type:  airbyte.MessageTypeState,
 		State: &airbyte.State{},

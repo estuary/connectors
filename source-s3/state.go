@@ -23,3 +23,10 @@ func copyStreamState(s streamState) streamState {
 	}
 	return c
 }
+
+// stateMap is a map of streamStates, keyed on stream.
+type stateMap map[string]streamState
+
+func (s stateMap) Validate() error {
+	return nil
+}

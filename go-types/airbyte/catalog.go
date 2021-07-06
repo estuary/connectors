@@ -22,7 +22,7 @@ type Stream struct {
 	SupportedSyncModes      []SyncMode      `json:"supported_sync_modes"`
 	SourceDefinedCursor     bool            `json:"source_defined_cursor,omitempty"`
 	DefaultCursorField      []string        `json:"default_cursor_field,omitempty"`
-	SourceDefinedPrimaryKey []string        `json:"source_defined_primary_key,omitempty"`
+	SourceDefinedPrimaryKey [][]string      `json:"source_defined_primary_key,omitempty"`
 	Namespace               string          `json:"namespace,omitempty"`
 }
 
