@@ -4,7 +4,10 @@ build_dir = .build
 version = $(shell git describe --always --dirty --tags)
 
 # Enumeration of all the connectors. These names are expected to match the name of the directories.
-connectors = source-s3 source-kinesis
+connectors = \
+	source-hello-world \
+	source-kinesis \
+	source-s3
 
 parser_target_dir = parser/target/x86_64-unknown-linux-musl/release
 parser = $(parser_target_dir)/parser

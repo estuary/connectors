@@ -66,6 +66,9 @@ func discoverCatalog(config airbyte.ConfigFile) (*airbyte.Catalog, error) {
 	}
 	var ctx = context.Background()
 	streamNames, err := listAllStreams(ctx, client)
+	if err != nil {
+		return nil, err
+	}
 
 	var catalog = &airbyte.Catalog{
 		Streams: make([]airbyte.Stream, len(streamNames)),
@@ -115,11 +118,7 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 		return fmt.Errorf("parsing configured catalog: %w", err)
 	}
 
-	if err = catalog.Validate(); err != nil {
-		return fmt.Errorf("configured catalog is invalid: %w", err)
-	}
-	var stateMap = make(map[string]map[string]string)
-
+	var stateMap = make(stateMap)
 	if err = args.StateFile.Parse(&stateMap); err != nil {
 		return fmt.Errorf("parsing state file: %w", err)
 	}
@@ -196,4 +195,10 @@ func parseConfigAndConnect(configFile airbyte.ConfigFile) (config Config, client
 		err = fmt.Errorf("failed to connect: %w", err)
 	}
 	return
+}
+
+type stateMap map[string]map[string]string
+
+func (s stateMap) Validate() error {
+	return nil // No-op.
 }

@@ -3,7 +3,6 @@ package airbyte
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	flags "github.com/jessevdk/go-flags"
@@ -14,20 +13,30 @@ import (
 type JSONFile string
 
 // Parse unmarshals the JSON contents into the given target.
-func (c JSONFile) Parse(target interface{}) error {
-	var bytes, err = ioutil.ReadFile(string(c))
+func (c JSONFile) Parse(target interface{ Validate() error }) error {
+	var r, err = os.Open(string(c))
 	if err != nil {
-		return fmt.Errorf("reading '%s': %w", string(c), err)
+		return fmt.Errorf("opening '%s': %w", c, err)
 	}
-	err = json.Unmarshal(bytes, target)
-	if err != nil {
-		return fmt.Errorf("parsing '%s' json: %w", string(c), err)
+
+	var d = json.NewDecoder(r)
+	d.DisallowUnknownFields()
+
+	if err = d.Decode(target); err != nil {
+		return fmt.Errorf("decoding '%s': %w", c, err)
+	} else if err = target.Validate(); err != nil {
+		return fmt.Errorf("validating '%s': %w", c, err)
 	}
 	return nil
 }
 
 type ConfigFile struct {
-	ConfigFile JSONFile `long:"config"`
+	ConfigFile JSONFile `long:"config" description:"Path to connector configuration"`
+}
+
+// Parse delegates to JSONFile.Parse.
+func (c ConfigFile) Parse(target interface{ Validate() error }) error {
+	return c.ConfigFile.Parse(target)
 }
 
 // LogConfig configures handling of application log events.
@@ -43,7 +52,11 @@ type SpecCmd struct {
 
 func (c *SpecCmd) Execute(_ []string) error {
 	initLog(c.LogConfig)
-	return NewStdoutEncoder().Encode(&c.actualSpec)
+	return NewStdoutEncoder().Encode(
+		&Message{
+			Type: MessageTypeSpec,
+			Spec: &c.actualSpec,
+		})
 }
 
 type CheckCmd struct {
@@ -105,7 +118,7 @@ func RunMain(spec Spec, doCheck func(CheckCmd) error, doDiscover func(DiscoverCm
 	}
 	parser.AddCommand("read", "Read records from the remote system", "Reads records and prints them to stdout", &readCmd)
 
-	// This will actually execute the given subcommand because that's clearly what "parse" means.
+	// This will actually execute the given subcommand because that's clearly what "parse" means /s.
 	var _, err = parser.Parse()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: ", err)
