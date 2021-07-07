@@ -25,8 +25,8 @@ func NewFullRange() Range {
 	}
 }
 
-// IsZeroed returns true if the begin and end are both 0
-func (r Range) IsZeroed() bool {
+// IsZero returns true if the begin and end are both 0
+func (r Range) IsZero() bool {
 	return r.Begin == 0 && r.End == 0
 }
 

@@ -130,7 +130,7 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 	log.WithField("streamCount", len(catalog.Streams)).Info("Starting to read stream(s)")
 
 	var shardRange = catalog.Range
-	if shardRange.IsZeroed() {
+	if shardRange.IsZero() {
 		log.Info("using full shard range since no range was given in the catalog")
 		shardRange = shardrange.NewFullRange()
 	}

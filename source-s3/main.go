@@ -156,7 +156,7 @@ func doRead(args airbyte.ReadCmd) error {
 	}
 
 	var shardRange = catalog.Range
-	if shardRange.IsZeroed() {
+	if shardRange.IsZero() {
 		log.Info("Assuming full partition range since no partitionRange was included in the catalog")
 		shardRange = shardrange.NewFullRange()
 	}
