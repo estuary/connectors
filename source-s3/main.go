@@ -4,228 +4,280 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"sync"
-	"time"
+	"io"
+	"strings"
 
-	"github.com/estuary/connectors/go-types/airbyte"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/estuary/connectors/go-types/filesource"
 	"github.com/estuary/connectors/go-types/parser"
-	"github.com/estuary/connectors/go-types/shardrange"
-	log "github.com/sirupsen/logrus"
 )
 
-func main() {
-	var parserSpec, err = parser.GetSpec()
-	if err != nil {
-		panic(err)
-	}
-	var spec = airbyte.Spec{
-		SupportsIncremental:           true,
-		SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
-		ConnectionSpecification:       configJSONSchema(parserSpec),
-	}
-	airbyte.RunMain(spec, doCheck, doDiscover, doRead)
+type config struct {
+	AWSAccessKeyID     string         `json:"awsAccessKeyId"`
+	AWSSecretAccessKey string         `json:"awsSecretAccessKey"`
+	Bucket             string         `json:"bucket"`
+	Endpoint           string         `json:"endpoint"`
+	MatchKeys          string         `json:"matchKeys"`
+	Parser             *parser.Config `json:"parser"`
+	Prefix             string         `json:"prefix"`
+	Region             string         `json:"region"`
 }
 
-func doCheck(args airbyte.CheckCmd) error {
-	var result = &airbyte.ConnectionStatus{
-		Status: airbyte.StatusSucceeded,
+func (c *config) Validate() error {
+	if c.Region == "" && c.Endpoint == "" {
+		return fmt.Errorf("must supply one of 'region' or 'endpoint'")
 	}
-	var _, err = discoverCatalog(args.ConfigFile)
-	if err != nil {
-		result.Status = airbyte.StatusFailed
-		result.Message = err.Error()
+	if c.AWSAccessKeyID == "" && c.AWSSecretAccessKey != "" {
+		return fmt.Errorf("missing awsAccessKeyID")
 	}
-	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
-		Type:             airbyte.MessageTypeConnectionStatus,
-		ConnectionStatus: result,
-	})
+	if c.AWSAccessKeyID != "" && c.AWSSecretAccessKey == "" {
+		return fmt.Errorf("missing awsSecretAccessKey")
+	}
+	return nil
 }
 
-func doDiscover(args airbyte.DiscoverCmd) error {
-	var catalog, err = discoverCatalog(args.ConfigFile)
-	if err != nil {
-		return err
-	}
-	log.Infof("Discover completed with %d streams", len(catalog.Streams))
-	var encoder = airbyte.NewStdoutEncoder()
-	return encoder.Encode(catalog)
+func (c *config) DiscoverRoot() string {
+	return partsToPath(c.Bucket, c.Prefix)
 }
 
-func discoverCatalog(configFile airbyte.ConfigFile) (*airbyte.Catalog, error) {
-	var ctx = context.Background()
-	var config, client, err = parseConfigAndConnect(ctx, configFile)
+func (c *config) FilesAreMonotonic() bool {
+	return false
+}
+
+func (c *config) ParserConfig() *parser.Config {
+	return c.Parser
+}
+
+func (c *config) PathRegex() string {
+	return c.MatchKeys
+}
+
+type s3Store struct {
+	s3 *s3.S3
+}
+
+func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
+	var c = aws.NewConfig()
+
+	if cfg.AWSSecretAccessKey != "" {
+		var creds = credentials.NewStaticCredentials(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, "")
+		c = c.WithCredentials(creds)
+	}
+	c = c.WithCredentialsChainVerboseErrors(true)
+
+	if cfg.Region != "" {
+		c = c.WithRegion(cfg.Region)
+	}
+	if cfg.Endpoint != "" {
+		c = c.WithEndpoint(cfg.Endpoint)
+	}
+
+	awsSession, err := session.NewSession(c)
+	if err != nil {
+		return nil, fmt.Errorf("creating aws config: %w", err)
+	}
+
+	return &s3Store{s3: s3.New(awsSession)}, nil
+}
+
+func (s *s3Store) List(_ context.Context, query filesource.Query) (filesource.Listing, error) {
+	var bucket, prefix, err = pathToParts(query.Prefix)
 	if err != nil {
 		return nil, err
 	}
 
-	streams, err := discoverStreams(ctx, &config, client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list objects: %w", err)
+	var input = s3.ListObjectsV2Input{
+		Bucket: aws.String(bucket),
+		Prefix: aws.String(prefix),
 	}
 
-	var catalog = &airbyte.Catalog{
-		Streams: streams,
+	if !query.Recursive {
+		input.Delimiter = aws.String(s3Delimiter)
 	}
-	return catalog, nil
+
+	if query.StartAt == "" {
+		// Pass.
+	} else if _, startAt, err := pathToParts(query.StartAt); err != nil {
+		return nil, err
+	} else {
+		// Trim last character to map StartAt into StartAfter.
+		input.StartAfter = aws.String(startAt[:len(startAt)-1])
+	}
+
+	return &s3Listing{
+		s3:    s.s3,
+		input: input,
+	}, nil
 }
 
-func doRead(args airbyte.ReadCmd) error {
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
-	var config, client, err = parseConfigAndConnect(ctx, args.ConfigFile)
+func (s *s3Store) Read(_ context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
+	var bucket, key, err = pathToParts(obj.Path)
 	if err != nil {
+		return nil, filesource.ObjectInfo{}, err
+	}
+
+	var getInput = s3.GetObjectInput{
+		Bucket:            aws.String(bucket),
+		Key:               aws.String(key),
+		IfUnmodifiedSince: &obj.ModTime,
+	}
+	resp, err := s.s3.GetObject(&getInput)
+	if err != nil {
+		return nil, filesource.ObjectInfo{}, err
+	}
+
+	obj.ContentType = aws.StringValue(resp.ContentType)
+	obj.ContentEncoding = aws.StringValue(resp.ContentEncoding)
+
+	return resp.Body, obj, nil
+}
+
+type s3Listing struct {
+	s3     *s3.S3
+	input  s3.ListObjectsV2Input
+	output s3.ListObjectsV2Output
+}
+
+func (l *s3Listing) Next() (filesource.ObjectInfo, error) {
+	var bucket = aws.StringValue(l.input.Bucket)
+
+	for {
+		if len(l.output.CommonPrefixes) != 0 {
+			var prefix = l.output.CommonPrefixes[0]
+			l.output.CommonPrefixes = l.output.CommonPrefixes[1:]
+
+			return filesource.ObjectInfo{
+				Path:     partsToPath(bucket, aws.StringValue(prefix.Prefix)),
+				IsPrefix: true,
+			}, nil
+		}
+
+		for len(l.output.Contents) != 0 {
+			var obj = l.output.Contents[0]
+			l.output.Contents = l.output.Contents[1:]
+
+			// returns true if the object is one that may be readable. This function filters out any objects
+			// with a "glacier" storage class because those objects could take minutes or even hours to
+			// retrieve. This behavior matches that of other popular tool that ingest from S3.
+			if sc := aws.StringValue(obj.StorageClass); sc == s3.StorageClassGlacier || sc == s3.StorageClassDeepArchive {
+				continue
+			}
+
+			return filesource.ObjectInfo{
+				Path:       partsToPath(bucket, aws.StringValue(obj.Key)),
+				ContentSum: aws.StringValue(obj.ETag),
+				Size:       aws.Int64Value(obj.Size),
+				ModTime:    aws.TimeValue(obj.LastModified),
+			}, nil
+		}
+
+		if err := l.poll(); err != nil {
+			return filesource.ObjectInfo{}, err
+		}
+	}
+}
+
+func (l *s3Listing) poll() error {
+	var input = l.input
+
+	if l.output.Prefix == nil {
+		// Very first query.
+	} else if !aws.BoolValue(l.output.IsTruncated) {
+		return io.EOF
+	} else {
+		input.StartAfter = nil
+		input.ContinuationToken = l.output.NextContinuationToken
+	}
+
+	if out, err := l.s3.ListObjectsV2(&input); err != nil {
 		return err
-	}
-	var catalog airbyte.ConfiguredCatalog
-	if err = args.CatalogFile.Parse(&catalog); err != nil {
-		return fmt.Errorf("parsing configured catalog: %w", err)
+	} else {
+		l.output = *out
 	}
 
-	if err = catalog.Validate(); err != nil {
-		return fmt.Errorf("configured catalog is invalid: %w", err)
+	return nil
+}
+
+// Parses a path into its constituent bucket and prefix. The prefix may be empty.
+func pathToParts(path string) (bucket, key string, _ error) {
+	if ind := strings.IndexByte(path, ':'); ind == -1 {
+		return "", "", fmt.Errorf("%q is missing `bucket:` prefix", path)
+	} else {
+		return path[:ind], path[ind+1:], nil
 	}
+}
 
-	var stateMap = make(stateMap)
-	var stateMessage = airbyte.Message{
-		Type:  airbyte.MessageTypeState,
-		State: &airbyte.State{},
-	}
-	if len(args.StateFile) > 0 {
-		if err = args.StateFile.Parse(&stateMap); err != nil {
-			return fmt.Errorf("parsing state file: %w", err)
-		}
-	}
+// Forms a path from a bucket and key.
+func partsToPath(bucket, key string) string {
+	return bucket + ":" + key
+}
 
-	var nStreams = len(catalog.Streams)
+func main() {
 
-	// We'll re-use this same message instance for all records we print
-	var recordMessage = airbyte.Message{
-		Type:   airbyte.MessageTypeRecord,
-		Record: &airbyte.Record{},
-	}
-	// We're all set to start printing data to stdout
-	var encoder = json.NewEncoder(os.Stdout)
-
-	var chunker = txnChunker{}
-
-	var completedStreams = 0
-	var mutex = sync.Mutex{}
-	var onResult = func(next readResult) error {
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		if next.err == StreamCompleted {
-			completedStreams++
-			if completedStreams == nStreams {
-				log.WithField("nStreams", nStreams).Info("All streams completed")
-				cancelFunc()
+	var src = filesource.Source{
+		NewConfig: func() filesource.Config { return new(config) },
+		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
+			return newS3Store(ctx, cfg.(*config))
+		},
+		ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
+			return json.RawMessage(fmt.Sprintf(`{
+		"$schema": "http://json-schema.org/draft-07/schema#",
+		"title":   "S3 Source Spec",
+		"type":    "object",
+		"required": [
+			"awsAccessKeyId",
+			"awsSecretAccessKey"
+		],
+		"properties": {
+			"bucket": {
+				"type":        "string",
+				"title":       "Bucket",
+				"description": "Name of the S3 bucket"
+			},
+			"prefix": {
+				"type":        "string",
+				"title":       "Prefix",
+				"description": "Prefix within the bucket to capture from."
+			},
+			"matchKeys": {
+				"type":        "string",
+				"title":       "Match Keys",
+				"format":      "regex",
+				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose key (relative to the prefix) matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files."
+			},
+			"parser": %s,
+			"region": {
+				"type":        "string",
+				"title":       "AWS Region",
+				"description": "The name of the AWS region where the S3 stream is located",
+				"default":     "us-east-1"
+			},
+			"endpoint": {
+				"type":        "string",
+				"title":       "AWS Endpoint",
+				"description": "The AWS endpoint URI to connect to, useful if you're capturing from a S3-compatible API that isn't provided by AWS"
+			},
+			"awsAccessKeyId": {
+				"type":        "string",
+				"title":       "AWS Access Key ID",
+				"description": "Part of the AWS credentials that will be used to connect to S3",
+				"default":     "example-aws-access-key-id"
+			},
+			"awsSecretAccessKey": {
+				"type":        "string",
+				"title":       "AWS Secret Access Key",
+				"description": "Part of the AWS credentials that will be used to connect to S3",
+				"default":     "example-aws-secret-access-key"
 			}
-			return nil
-		} else if next.err != nil {
-			// time to bail
-			var errMessage = airbyte.NewLogMessage(airbyte.LogLevelFatal, "read failed due to error: %v", next.err)
-			// Printing the error may fail, but we'll ignore that error and return the original
-			_ = encoder.Encode(errMessage)
-			cancelFunc()
-			return next.err
 		}
-
-		// It's expected that some readReuslts might *only* contain a state update, but no record
-		// data. This happens when we've reached the end of a file and need to update the state to
-		// indicate that it's completed.
-		if len(next.record) > 0 {
-			recordMessage.Record.Stream = next.streamID
-			recordMessage.Record.Data = next.record
-			recordMessage.Record.EmittedAt = time.Now().UTC().UnixNano() / int64(time.Millisecond)
-			if err := encoder.Encode(recordMessage); err != nil {
-				cancelFunc()
-				return err
-			}
-		}
-
-		updateState(stateMap, &next)
-
-		// Should we emit a state checkpoint?
-		if chunker.shouldEmitState(&next) {
-			if err := writeState(&stateMessage, stateMap, encoder); err != nil {
-				cancelFunc()
-				return fmt.Errorf("failed to write state: %w", err)
-			}
-			chunker.reset()
-		}
-		return nil
+    }`, string(parserSchema)))
+		},
 	}
 
-	var shardRange = catalog.Range
-	if shardRange.IsZero() {
-		log.Info("Assuming full partition range since no partitionRange was included in the catalog")
-		shardRange = shardrange.NewFullRange()
-	}
-	log.WithField("streamCount", nStreams).Info("Starting to read stream(s)")
-	for _, stream := range catalog.Streams {
-		var state = copyStreamState(stateMap[stream.Stream.Name])
-		capture, err := NewStream(&config, client, stream, state, shardRange)
-		if err != nil {
-			cancelFunc()
-			return err
-		}
-		go capture.Start(ctx, onResult)
-	}
-
-	<-ctx.Done()
-	log.Info("Finished all reads")
-	return err
+	src.Main()
 }
 
-func writeState(message *airbyte.Message, state map[string]streamState, encoder *json.Encoder) error {
-	var serialized, err = json.Marshal(state)
-	if err != nil {
-		return err
-	}
-	message.State.Data = json.RawMessage(serialized)
-	return encoder.Encode(message)
-}
-
-func updateState(state map[string]streamState, rr *readResult) {
-	var ss, exists = state[rr.streamID]
-	if !exists {
-		ss = make(streamState)
-		state[rr.streamID] = ss
-	}
-
-	ss[rr.relativeKey] = rr.state
-}
-
-// txnChunker decides when we should emit State messages, based on thresholds for the number of
-// records or bytes. This is to prevent individual transactions from becoming too large when the
-// connector is used with Flow or other systems that can checkpoint whenever a State message is emitted.
-type txnChunker struct {
-	records int
-	bytes   int
-}
-
-// shouldEmitState returns true if the readResult contains a record that puts us over any of the
-// thresholds, or if it indicates the completion of a file.
-func (t *txnChunker) shouldEmitState(rr *readResult) bool {
-	var size = len(rr.record)
-	if size > 0 {
-		t.records++
-		t.bytes = t.bytes + size
-	}
-
-	return t.records >= recordsPerTxn ||
-		t.bytes >= bytesPerTxn ||
-		rr.state.Complete
-}
-
-func (t *txnChunker) reset() {
-	t.records = 0
-	t.bytes = 0
-}
-
-// These values were chosen somewhat arbitrarily, with the goal of preventing any single transaction
-// from becoming too large or slow, while also allowing us to amortize the cost of serializing and
-// persisting state checkpoints.
-const recordsPerTxn = 256
-const bytesPerTxn = 1024 * 1024 * 2
+const s3Delimiter = "/"
