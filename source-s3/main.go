@@ -91,8 +91,10 @@ func doRead(args airbyte.ReadCmd) error {
 		Type:  airbyte.MessageTypeState,
 		State: &airbyte.State{},
 	}
-	if err = args.StateFile.Parse(&stateMap); err != nil {
-		return fmt.Errorf("parsing state file: %w", err)
+	if len(args.StateFile) > 0 {
+		if err = args.StateFile.Parse(&stateMap); err != nil {
+			return fmt.Errorf("parsing state file: %w", err)
+		}
 	}
 
 	var nStreams = len(catalog.Streams)
