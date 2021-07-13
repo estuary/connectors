@@ -6,5 +6,6 @@ require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/minio/highwayhash v1.0.2
 	github.com/sirupsen/logrus v1.8.1
-	github.com/stretchr/testify v1.2.2 // indirect
+	github.com/stretchr/testify v1.2.2
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 )
