@@ -119,8 +119,10 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 	}
 
 	var stateMap = make(stateMap)
-	if err = args.StateFile.Parse(&stateMap); err != nil {
-		return fmt.Errorf("parsing state file: %w", err)
+	if len(args.StateFile) > 0 {
+		if err = args.StateFile.Parse(&stateMap); err != nil {
+			return fmt.Errorf("parsing state file: %w", err)
+		}
 	}
 
 	var dataCh = make(chan readResult, 8)
