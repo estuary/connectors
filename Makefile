@@ -5,6 +5,7 @@ version = $(shell git describe --always --dirty --tags)
 
 # Enumeration of all the connectors. These names are expected to match the name of the directories.
 connectors = \
+	source-gcs \
 	source-hello-world \
 	source-kinesis \
 	source-s3
@@ -22,10 +23,6 @@ $(parser): parser
 test-parser:
 	cargo test $(parser_cargo_args)
 
-.PHONY: test-source-s3
-test-source-s3:
-	cd source-s3 && go test -v ./...
-
 .PHONY: test-source-kinesis
 test-source-kinesis:
 	cd source-kinesis && go test -tags kinesistest -v ./...
@@ -35,7 +32,7 @@ test-go-types:
 	cd go-types && go test -v ./...
 
 .PHONY: test-all
-test-all: test-parser test-go-types test-source-kinesis test-source-s3
+test-all: test-parser test-go-types test-source-kinesis
 
 # build_dir should be used as an order-only pre-requisite, because otherwise it would always cause
 # targets to rebuild if any file in the build directory was newer than the current target.
