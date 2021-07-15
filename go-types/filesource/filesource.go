@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Config of a filesource.
 type Config interface {
 	// Validate returns an error if the Config is malformed.
 	Validate() error
@@ -34,6 +36,7 @@ type Config interface {
 	PathRegex() string
 }
 
+// Source is implements a capture connector using provided callbacks.
 type Source struct {
 	// ConfigSchema returns the JSON schema of the source's configuration,
 	// given a parser JSON schema it may wish to embed.
@@ -44,11 +47,18 @@ type Source struct {
 	Connect func(context.Context, Config) (Store, error)
 }
 
+// Store is a minimal interface of an binary large object storage service.
+// It supports ordered listings of objects, and reading an single object.
 type Store interface {
+	// List objects of the Store.
 	List(context.Context, Query) (Listing, error)
+	// Read an object of the Store. The argument ObjectInfo is returned,
+	// and may be enhanced with additional fields which weren't previously
+	// available from the List API (for example, ContentEncoding).
 	Read(context.Context, ObjectInfo) (io.ReadCloser, ObjectInfo, error)
 }
 
+// Query of objects to be returned by a Listing.
 type Query struct {
 	// Prefix constrains the listing to paths which begin with the prefix.
 	Prefix string
@@ -74,17 +84,35 @@ func (f ListingFunc) Next() (ObjectInfo, error) { return f() }
 
 // ObjectInfo is returned by a Listing.
 type ObjectInfo struct {
-	Path            string
-	IsPrefix        bool
-	ContentSum      string
-	Size            int64
-	ContentType     string
+	// Path is the absolute path of the object or common prefix (if IsPrefix).
+	Path string
+	// IsPrefix indicates that Path is a common prefix of other objects.
+	IsPrefix bool
+	// ContentSum is an implementation-defined content sum.
+	ContentSum string
+	// Size of the object, in bytes.
+	Size int64
+	// ContentType of the object, if known.
+	ContentType string
+	// ContentEncoding of the object, if known.
 	ContentEncoding string
-	ModTime         time.Time
+	// ModTime of the objection.
+	ModTime time.Time
 }
 
-// ----------------------------------------------------------------
-//
+// PathToParts splits a path into a bucket and key. The key may be empty.
+func PathToParts(path string) (bucket, key string) {
+	if ind := strings.IndexByte(path, '/'); ind == -1 {
+		return path, ""
+	} else {
+		return path[:ind], path[ind+1:]
+	}
+}
+
+// PartsToPath maps a bucket and key into a path.
+func PartsToPath(bucket, key string) string {
+	return bucket + "/" + key
+}
 
 type connector struct {
 	config Config
@@ -100,13 +128,10 @@ func newConnector(src Source, args airbyte.ConfigFile) (*connector, error) {
 
 	var store, err = src.Connect(context.Background(), cfg)
 	if err != nil {
-		return nil, fmt.Errorf("building filesystem: %w", err)
+		return nil, fmt.Errorf("connecting to store: %w", err)
 	}
 
-	return &connector{
-		config: cfg,
-		store:  store,
-	}, nil
+	return &connector{config: cfg, store: store}, nil
 }
 
 func (src Source) Main() {
@@ -180,7 +205,7 @@ func (src Source) Discover(args airbyte.DiscoverCmd) error {
 		if hasObjects || len(streams) == 0 {
 			streams = append(streams, airbyte.Stream{
 				Name:               prefix,
-				JSONSchema:         json.RawMessage(documentSchema),
+				JSONSchema:         json.RawMessage(discoverDocumentSchema),
 				SupportedSyncModes: airbyte.AllSyncModes,
 				SourceDefinedPrimaryKey: [][]string{
 					{"_meta", "file"},
@@ -212,7 +237,7 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 		return fmt.Errorf("parsing configured catalog: %w", err)
 	}
 
-	var states = make(prefixStates)
+	var states = make(States)
 	if args.StateFile != "" {
 		if err = args.StateFile.Parse(&states); err != nil {
 			return fmt.Errorf("parsing state: %w", err)
@@ -220,7 +245,7 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 	}
 
 	// Time horizon used for identifying files which fall within a modification time window.
-	var horizon = time.Now().Add(-30 * time.Second).Round(time.Second).UTC()
+	var horizon = time.Now().Add(-horizonDelta).Round(time.Second).UTC()
 
 	var sharedMu = new(sync.Mutex)
 	var enc = airbyte.NewStdoutEncoder()
@@ -238,19 +263,16 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 		var prefix = stream.Stream.Name
 		var state = states[prefix]
 
-		// If MaxMod is zero, then we're beginning a new sweep of this prefix.
-		if state.MaxMod.IsZero() {
-			state.MaxMod = horizon
-		}
+		state.startSweep(horizon)
 
 		var r = &reader{
 			connector:   conn,
-			prefix:      prefix,
-			state:       state,
-			range_:      catalog.Range,
-			projections: make(map[string]parser.JsonPointer),
 			pathRe:      pathRe,
+			prefix:      prefix,
+			projections: make(map[string]parser.JsonPointer),
+			range_:      catalog.Range,
 			schema:      stream.Stream.JSONSchema,
+			state:       state,
 		}
 		for k, v := range stream.Projections {
 			r.projections[k] = parser.JsonPointer(v)
@@ -274,58 +296,18 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 type reader struct {
 	*connector
 
-	projections map[string]parser.JsonPointer
-	schema      json.RawMessage
-	prefix      string
-	state       prefixState
-	range_      shardrange.Range
 	pathRe      *regexp.Regexp
+	prefix      string
+	projections map[string]parser.JsonPointer
+	range_      shardrange.Range
+	schema      json.RawMessage
+	state       State
 
 	shared struct {
 		mu     *sync.Mutex
-		states prefixStates
+		states States
 		enc    *json.Encoder
 	}
-}
-
-type prefixStates map[string]prefixState
-
-func (p prefixStates) Validate() error {
-	for prefix, state := range p {
-		if err := state.Validate(); err != nil {
-			return fmt.Errorf("prefix %s: %w", prefix, err)
-		}
-	}
-	return nil
-}
-
-type prefixState struct {
-	// Minimim time that's an inclusive lower-bound of files processed in this sweep.
-	MinMod time.Time `json:"minMod,omitempty"`
-	// Maximum time that's an exclusive upper-bound of files processed in this sweep.
-	// If MaxMod is zero, then this state checkpoint was generated after the completion
-	// of a prior sweep and before the commencement of the next one.
-	MaxMod time.Time `json:"maxMod,omitempty"`
-	// Base path which is currently being processed, or was last processed (if Complete).
-	Path string `json:"path,omitempty"`
-	// Number of records from the file at |Path| which have been emitted.
-	Records int `json:"records,omitempty"`
-	// Whether the file at |Path| is complete.
-	Complete bool `json:"complete,omitempty"`
-}
-
-func (p prefixState) Validate() error {
-	if !p.MaxMod.IsZero() && !p.MaxMod.After(p.MinMod) {
-		return fmt.Errorf("expected MaxMod > MinMod")
-	} else if p.Records < 0 {
-		return fmt.Errorf("expected Records >= 0")
-	} else if p.Complete && p.Records != 0 {
-		return fmt.Errorf("didn't expect Records > 0 when Complete")
-	} else if p.Complete && p.Path == "" {
-		return fmt.Errorf("didn't expect Complete when Path is empty")
-	}
-
-	return nil
 }
 
 func (r *reader) sweep(ctx context.Context) error {
@@ -355,22 +337,15 @@ func (r *reader) sweep(ctx context.Context) error {
 		}
 	}
 
-	// Update state to reflect that the sweep was completed.
-	// A MaxMod of zero indicates this checkpoint is between sweeps.
-	// The next invocation will supply a new MaxMod.
-	r.state.MinMod, r.state.MaxMod = r.state.MaxMod, time.Time{}
-
-	if !r.config.FilesAreMonotonic() {
-		r.state.Path = ""
-		r.state.Complete = false
-	}
+	r.log("completed sweep of %s from %s through %s",
+		r.prefix, r.state.MinBound, r.state.MaxBound)
+	r.state.finishSweep(r.config.FilesAreMonotonic())
 
 	// Write a final checkpoint to mark the completion of the sweep.
-	if err := r.commitLines(nil); err != nil {
+	if err := r.emit(nil); err != nil {
 		return err
 	}
 
-	r.log("completed sweep of %q through modification time %s", r.prefix, r.state.MinMod)
 	return nil
 }
 
@@ -381,24 +356,16 @@ func (r *reader) log(msg string, args ...interface{}) {
 }
 
 func (r *reader) shouldSkip(obj ObjectInfo) (_ bool, reason string) {
-	// Have we already processed through this filename in this sweep?
-	if r.state.Path > obj.Path {
-		return true, "state.Path > obj.Path"
-	}
-	if r.state.Path == obj.Path && r.state.Complete {
-		return true, "state.Path == obj.Path && Complete"
+	if skip, reason := r.state.shouldSkip(obj.Path, obj.ModTime); skip {
+		return skip, reason
 	}
 	// Is the path excluded by our regex ?
 	if r.pathRe != nil && !r.pathRe.MatchString(obj.Path) {
 		return true, "regex not matched"
 	}
-	// Is the path modified before our window (inclusive) ?
-	if r.state.MinMod.After(obj.ModTime) {
-		return true, "MinMod.After(obj.ModTime)"
-	}
-	// Is the path modified after our window (exclusive) ?
-	if r.state.MaxMod.Before(obj.ModTime) {
-		return true, "MaxMod.After(obj.ModTime)"
+	// Is it outside of our responsible key range?
+	if !r.range_.IncludesHwHash([]byte(obj.Path)) {
+		return true, "path not in range"
 	}
 
 	return false, ""
@@ -411,6 +378,10 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 	}
 	defer rr.Close()
 
+	if ok := r.state.startPath(obj.Path, obj.ModTime); !ok {
+		log.WithField("path", obj.Path).Debug("skipping path (after Read)")
+		return nil
+	}
 	r.log("processing file %q", obj.Path)
 
 	tmp, err := ioutil.TempFile("", "parser-config-*.json")
@@ -423,43 +394,19 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 		return fmt.Errorf("writing parser config: %w", err)
 	}
 
-	// Skip tracks records remaining to skip, because they've already
-	// been ingested in a prior invocation of this capture.
-	var skip int
-
-	if r.state.Path == obj.Path {
-		if r.state.Complete {
-			panic("should have been filtered already")
-		}
-		skip = r.state.Records
-	}
-
-	r.state.Path = obj.Path
-	r.state.Records = 0
-	r.state.Complete = false
-
 	err = parser.ParseStream(ctx, tmp.Name(), rr, func(lines []json.RawMessage) error {
-		r.state.Records += len(lines)
-
-		if ll := len(lines); ll < skip {
-			skip -= ll
+		if lines = r.state.nextLines(lines); lines == nil {
 			return nil
-		} else if skip != 0 {
-			lines = lines[skip:]
-			skip = 0
 		}
-
-		return r.commitLines(lines)
+		return r.emit(lines)
 	})
 	if err != nil {
 		return err
 	}
+	r.state.finishPath()
 
 	// Write a final checkpoint to mark the completion of the file.
-	r.state.Complete = true
-	r.state.Records = 0
-
-	if err := r.commitLines(nil); err != nil {
+	if err := r.emit(nil); err != nil {
 		return err
 	}
 
@@ -495,7 +442,7 @@ func (r *reader) makeParseConfig(obj ObjectInfo) *parser.Config {
 	return cfg
 }
 
-func (r *reader) commitLines(lines []json.RawMessage) error {
+func (r *reader) emit(lines []json.RawMessage) error {
 	// Message which wraps Records we'll generate.
 	var wrapper = &airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
@@ -510,7 +457,7 @@ func (r *reader) commitLines(lines []json.RawMessage) error {
 	var stateWrapper = &struct {
 		Type  airbyte.MessageType `json:"type"`
 		State struct {
-			Data prefixStates
+			Data States
 		} `json:"state,omitempty"`
 	}{
 		Type: airbyte.MessageTypeState,
@@ -538,26 +485,36 @@ func (r *reader) commitLines(lines []json.RawMessage) error {
 	return nil
 }
 
-const discoverListLimit = 256
-const metaFileLocation = "/_meta/file"
-const metaOffsetLocation = "/_meta/offset"
-
-const documentSchema = `
-{
-	"type": "object",
-	"properties": {
-		"_meta": {
-			"type": "object",
-			"properties": {
-				"file": { "type": "string" },
-				"offset": {
-					"type": "integer",
-					"minimum": 0
-				}
-			},
-			"required": ["file", "offset"]
-		}
-	},
-	"required": ["_meta"]
-}
-`
+const (
+	// horizonDelta is the time horizon used to bound modification times we'll examine
+	// in a given sweep of the Store. Given a sampled wall-time T, we presume (hope)
+	// that no files will appear in the store after T having a modification time of
+	// T - horizonDelta.
+	horizonDelta = time.Second * 30
+	// How many prefix or object listing to examine in a given prefix walked by discover.
+	discoverListLimit = 256
+	// Location of the filename in produced documents.
+	metaFileLocation = "/_meta/file"
+	// Location of the record offset in produced documents.
+	metaOffsetLocation = "/_meta/offset"
+	// Baseline document schema for resource streams we discover.
+	// This could be improved by attempting to infer schema of store documents
+	// from actual file content.
+	discoverDocumentSchema = `{
+		"type": "object",
+		"properties": {
+			"_meta": {
+				"type": "object",
+				"properties": {
+					"file": { "type": "string" },
+					"offset": {
+						"type": "integer",
+						"minimum": 0
+					}
+				},
+				"required": ["file", "offset"]
+			}
+		},
+		"required": ["_meta"]
+	}`
+)
