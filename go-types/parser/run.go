@@ -93,12 +93,6 @@ type parserStdout struct {
 func (r *parserStdout) Write(p []byte) (int, error) {
 	var n = len(p)
 
-	// If there was an unconsumed remainder, prefix it into |p|.
-	if len(r.rem) != 0 {
-		p = append(r.rem, p...)
-		r.rem = nil
-	}
-
 	// Accumulate linebreaks of |p| into |lines|.
 	var lines = r.scratch[:0]
 	for {
@@ -106,8 +100,17 @@ func (r *parserStdout) Write(p []byte) (int, error) {
 		if pivot == -1 {
 			break
 		}
+		var line = p[:pivot]
 
-		lines = append(lines, p[:pivot+1])
+		// If there was an unconsumed remainder, prefix it into |next|.
+		if len(r.rem) != 0 {
+			line = append(r.rem, line...)
+			r.rem = r.rem[:0]
+
+			// Note that |lines| continues to reference |r.rem|.
+		}
+
+		lines = append(lines, line)
 		p = p[pivot+1:]
 	}
 
@@ -115,10 +118,9 @@ func (r *parserStdout) Write(p []byte) (int, error) {
 		r.onError(err)
 	}
 
-	// Clone unconsumed remainder of |p| for next Write invocation.
-	if len(p) != 0 {
-		r.rem = append([]byte(nil), p...)
-	}
+	// Copy unconsumed remainder of |p| for next Write invocation.
+	// Safe because onLines() doesn't retain |lines| after it returns.
+	r.rem = append(r.rem, p...)
 	r.scratch = lines[:0]
 
 	return n, nil
