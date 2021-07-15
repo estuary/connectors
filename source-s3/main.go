@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -18,6 +17,7 @@ import (
 type config struct {
 	AWSAccessKeyID     string         `json:"awsAccessKeyId"`
 	AWSSecretAccessKey string         `json:"awsSecretAccessKey"`
+	AscendingKeys      bool           `json:"ascendingKeys"`
 	Bucket             string         `json:"bucket"`
 	Endpoint           string         `json:"endpoint"`
 	MatchKeys          string         `json:"matchKeys"`
@@ -40,11 +40,11 @@ func (c *config) Validate() error {
 }
 
 func (c *config) DiscoverRoot() string {
-	return partsToPath(c.Bucket, c.Prefix)
+	return filesource.PartsToPath(c.Bucket, c.Prefix)
 }
 
 func (c *config) FilesAreMonotonic() bool {
-	return false
+	return c.AscendingKeys
 }
 
 func (c *config) ParserConfig() *parser.Config {
@@ -84,10 +84,7 @@ func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
 }
 
 func (s *s3Store) List(_ context.Context, query filesource.Query) (filesource.Listing, error) {
-	var bucket, prefix, err = pathToParts(query.Prefix)
-	if err != nil {
-		return nil, err
-	}
+	var bucket, prefix = filesource.PathToParts(query.Prefix)
 
 	var input = s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
@@ -100,10 +97,9 @@ func (s *s3Store) List(_ context.Context, query filesource.Query) (filesource.Li
 
 	if query.StartAt == "" {
 		// Pass.
-	} else if _, startAt, err := pathToParts(query.StartAt); err != nil {
-		return nil, err
 	} else {
 		// Trim last character to map StartAt into StartAfter.
+		_, startAt := filesource.PathToParts(query.StartAt)
 		input.StartAfter = aws.String(startAt[:len(startAt)-1])
 	}
 
@@ -114,10 +110,7 @@ func (s *s3Store) List(_ context.Context, query filesource.Query) (filesource.Li
 }
 
 func (s *s3Store) Read(_ context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-	var bucket, key, err = pathToParts(obj.Path)
-	if err != nil {
-		return nil, filesource.ObjectInfo{}, err
-	}
+	var bucket, key = filesource.PathToParts(obj.Path)
 
 	var getInput = s3.GetObjectInput{
 		Bucket:            aws.String(bucket),
@@ -150,7 +143,7 @@ func (l *s3Listing) Next() (filesource.ObjectInfo, error) {
 			l.output.CommonPrefixes = l.output.CommonPrefixes[1:]
 
 			return filesource.ObjectInfo{
-				Path:     partsToPath(bucket, aws.StringValue(prefix.Prefix)),
+				Path:     filesource.PartsToPath(bucket, aws.StringValue(prefix.Prefix)),
 				IsPrefix: true,
 			}, nil
 		}
@@ -167,7 +160,7 @@ func (l *s3Listing) Next() (filesource.ObjectInfo, error) {
 			}
 
 			return filesource.ObjectInfo{
-				Path:       partsToPath(bucket, aws.StringValue(obj.Key)),
+				Path:       filesource.PartsToPath(bucket, aws.StringValue(obj.Key)),
 				ContentSum: aws.StringValue(obj.ETag),
 				Size:       aws.Int64Value(obj.Size),
 				ModTime:    aws.TimeValue(obj.LastModified),
@@ -201,20 +194,6 @@ func (l *s3Listing) poll() error {
 	return nil
 }
 
-// Parses a path into its constituent bucket and prefix. The prefix may be empty.
-func pathToParts(path string) (bucket, key string, _ error) {
-	if ind := strings.IndexByte(path, ':'); ind == -1 {
-		return "", "", fmt.Errorf("%q is missing `bucket:` prefix", path)
-	} else {
-		return path[:ind], path[ind+1:], nil
-	}
-}
-
-// Forms a path from a bucket and key.
-func partsToPath(bucket, key string) string {
-	return bucket + ":" + key
-}
-
 func main() {
 
 	var src = filesource.Source{
@@ -223,7 +202,7 @@ func main() {
 			return newS3Store(ctx, cfg.(*config))
 		},
 		ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
-			return json.RawMessage(fmt.Sprintf(`{
+			return json.RawMessage(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"title":   "S3 Source Spec",
 		"type":    "object",
@@ -232,34 +211,6 @@ func main() {
 			"awsSecretAccessKey"
 		],
 		"properties": {
-			"bucket": {
-				"type":        "string",
-				"title":       "Bucket",
-				"description": "Name of the S3 bucket"
-			},
-			"prefix": {
-				"type":        "string",
-				"title":       "Prefix",
-				"description": "Prefix within the bucket to capture from."
-			},
-			"matchKeys": {
-				"type":        "string",
-				"title":       "Match Keys",
-				"format":      "regex",
-				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose key (relative to the prefix) matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files."
-			},
-			"parser": %s,
-			"region": {
-				"type":        "string",
-				"title":       "AWS Region",
-				"description": "The name of the AWS region where the S3 stream is located",
-				"default":     "us-east-1"
-			},
-			"endpoint": {
-				"type":        "string",
-				"title":       "AWS Endpoint",
-				"description": "The AWS endpoint URI to connect to, useful if you're capturing from a S3-compatible API that isn't provided by AWS"
-			},
 			"awsAccessKeyId": {
 				"type":        "string",
 				"title":       "AWS Access Key ID",
@@ -271,9 +222,42 @@ func main() {
 				"title":       "AWS Secret Access Key",
 				"description": "Part of the AWS credentials that will be used to connect to S3",
 				"default":     "example-aws-secret-access-key"
+			},
+			"ascendingKeys": {
+				"type":        "boolean",
+				"title":       "Ascending Keys",
+				"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
+				"default":     false
+			},
+			"bucket": {
+				"type":        "string",
+				"title":       "Bucket",
+				"description": "Name of the S3 bucket"
+			},
+			"endpoint": {
+				"type":        "string",
+				"title":       "AWS Endpoint",
+				"description": "The AWS endpoint URI to connect to, useful if you're capturing from a S3-compatible API that isn't provided by AWS"
+			},
+			"matchKeys": {
+				"type":        "string",
+				"title":       "Match Keys",
+				"format":      "regex",
+				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files."
+			},
+			"prefix": {
+				"type":        "string",
+				"title":       "Prefix",
+				"description": "Prefix within the bucket to capture from."
+			},
+			"region": {
+				"type":        "string",
+				"title":       "AWS Region",
+				"description": "The name of the AWS region where the S3 stream is located",
+				"default":     "us-east-1"
 			}
 		}
-    }`, string(parserSchema)))
+    }`)
 		},
 	}
 
