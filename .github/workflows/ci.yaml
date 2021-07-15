@@ -31,6 +31,7 @@ jobs:
         with:
           toolchain: stable
           target: x86_64-unknown-linux-musl
+      - run: sudo apt-get install -y musl-tools
       - run: make test-all
       - name: Login to GitHub package docker registry
         run: |
