@@ -401,7 +401,7 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 		return r.emit(lines)
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse object %q: %w", obj.Path, err)
 	}
 	r.state.finishPath()
 
