@@ -65,6 +65,8 @@ func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
 	if cfg.AWSSecretAccessKey != "" {
 		var creds = credentials.NewStaticCredentials(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, "")
 		c = c.WithCredentials(creds)
+	} else {
+		c = c.WithCredentials(credentials.AnonymousCredentials)
 	}
 	c = c.WithCredentialsChainVerboseErrors(true)
 
