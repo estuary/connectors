@@ -45,7 +45,7 @@ build_connectors = $(addprefix $(build_dir)/build-,$(connectors))
 # is matched. This ensures that the connector will be rebuilt if any file within its source
 # directory is modified.
 .SECONDEXPANSION:
-$(build_connectors): $(build_dir)/build-%: $(parser) % go-types $$(shell find % -type f) | $(build_dir)
+$(build_connectors): $(build_dir)/build-%: $(parser) % go-types $(shell find go-types -type f) $$(shell find % -type f) | $(build_dir)
 	cd $* && go build
 	docker build -t ghcr.io/estuary/$*:$(version) --build-arg connector=$* .
 	@# This file is only used so that make can correctly determine if targets need rebuilt
