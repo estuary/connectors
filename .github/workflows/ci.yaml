@@ -37,5 +37,13 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | \
             docker login --username ${{ github.actor }} --password-stdin ghcr.io
+      - name: Tidy up, and ensure that generated files are unchanged.
+      # Tidy up before further invocations using `git describe --dirty`
+        run: |
+          # In case any tests left their data laying around
+          git clean --force -d
+          git diff
+          [[ -z "$(git status --porcelain)" ]] || exit 1
+        shell: bash
       - run: make push-all
 
