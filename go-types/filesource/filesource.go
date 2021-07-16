@@ -229,12 +229,13 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 	if err != nil {
 		return err
 	}
-	var catalog = airbyte.ConfiguredCatalog{
-		// Process all files, unless the parsed catalog says otherwise.
-		Range: shardrange.NewFullRange(),
-	}
+	var catalog = airbyte.ConfiguredCatalog{}
 	if err = args.CatalogFile.Parse(&catalog); err != nil {
 		return fmt.Errorf("parsing configured catalog: %w", err)
+	}
+	if catalog.Range.IsZero() {
+		// Process all files, unless the parsed catalog says otherwise.
+		catalog.Range = shardrange.NewFullRange()
 	}
 
 	var states = make(States)
