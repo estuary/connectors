@@ -64,3 +64,10 @@ build-all: $(build_connectors)
 .PHONY: push-all
 push-all: $(push_connectors)
 
+integration_test_connectors = $(addprefix int-test-,$(connectors))
+.PHONY: $(integration_test_connectors)
+$(integration_test_connectors): int-test-%: | $(build_dir)
+	CONNECTOR=$* VERSION=$(version) ./tests/run.sh
+
+.PHONY: integration-tests
+integration-tests: $(integration_test_connectors)

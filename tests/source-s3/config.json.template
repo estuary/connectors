@@ -1,0 +1,7 @@
+{
+  "awsAccessKeyId": "${AWS_ACCESS_KEY_ID}",
+  "awsSecretAccessKey": "${AWS_SECRET_ACCESS_KEY}",
+  "region": "${AWS_DEFAULT_REGION}",
+  "bucket": "${TEST_S3_BUCKET}",
+  "endpoint": "${TEST_S3_ENDPOINT}"
+}
