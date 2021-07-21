@@ -1,0 +1,34 @@
+collections:
+  tests/${CONNECTOR}/data:
+    schema:
+      properties:
+        id: { type: integer }
+        canary: {type: string}
+      required: [id, canary]
+      type: object
+    key: [/id]
+
+captures:
+  tests/${CONNECTOR}/from-source:
+    endpoint:
+      airbyteSource:
+        image: "${CONNECTOR_IMAGE}"
+        config: ${CONNECTOR_CONFIG}
+    bindings:
+      - resource:
+          stream: "${STREAM}"
+          syncMode: incremental
+        target: tests/${CONNECTOR}/data
+
+materializations:
+  tests/${CONNECTOR}/to-sqlite:
+    endpoint:
+      sqlite:
+        path: materialization.db
+    bindings:
+      - resource:
+          table: test_results
+        source: tests/${CONNECTOR}/data
+
+
+
