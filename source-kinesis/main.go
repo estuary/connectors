@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
@@ -136,14 +137,26 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 		shardRange = shardrange.NewFullRange()
 	}
 
+	var stopAt *time.Time
+	if !catalog.Tail {
+		var t = time.Now().UTC()
+		log.Infof("reading in non-tailing mode until: %v", t)
+		stopAt = &t
+	} else {
+		log.Info("reading indefinitely because tail==true")
+	}
+	var waitGroup = new(sync.WaitGroup)
 	for _, stream := range catalog.Streams {
 		streamState, err := copyStreamState(stateMap, stream.Stream.Name)
 		if err != nil {
 			cancelFunc()
 			return fmt.Errorf("invalid state for stream %s: %w", stream.Stream.Name, err)
 		}
-		go readStream(ctx, shardRange, client, stream.Stream.Name, streamState, dataCh)
+		waitGroup.Add(1)
+		go readStream(ctx, shardRange, client, stream.Stream.Name, streamState, dataCh, stopAt, waitGroup)
 	}
+
+	go closeChannelWhenDone(dataCh, waitGroup)
 
 	// We'll re-use this same message instance for all records we print
 	var recordMessage = airbyte.Message{
@@ -152,40 +165,48 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 	}
 	// We're all set to start printing data to stdout
 	var encoder = json.NewEncoder(output)
-	for {
-		var next = <-dataCh
+	for next := range dataCh {
 		if next.err != nil {
 			// time to bail
 			var errMessage = airbyte.NewLogMessage(airbyte.LogLevelFatal, "read failed due to error: %v", next.err)
 			// Printing the error may fail, but we'll ignore that error and return the original
 			_ = encoder.Encode(errMessage)
-			cancelFunc()
-			return next.err
+			err = next.err
+			break
 		}
 		recordMessage.Record.Stream = next.source.stream
 		for _, record := range next.records {
 			recordMessage.Record.Data = record
 			recordMessage.Record.EmittedAt = time.Now().UTC().UnixNano() / int64(time.Millisecond)
-			if err := encoder.Encode(recordMessage); err != nil {
-				cancelFunc()
-				return err
+			if err = encoder.Encode(recordMessage); err != nil {
+				break
 			}
 		}
 		updateState(stateMap, next.source, next.sequenceNumber)
 
 		stateRaw, err := json.Marshal(stateMap)
-		if err == nil {
-			err = encoder.Encode(airbyte.Message{
-				Type:  airbyte.MessageTypeState,
-				State: &airbyte.State{Data: json.RawMessage(stateRaw)},
-			})
+		if err != nil {
+			break
+		}
+		if err = encoder.Encode(airbyte.Message{
+			Type:  airbyte.MessageTypeState,
+			State: &airbyte.State{Data: json.RawMessage(stateRaw)},
+		}); err != nil {
+			break
 		}
 
 		if err != nil {
-			cancelFunc()
-			return err
+			break
 		}
 	}
+	cancelFunc()
+	return err
+}
+
+func closeChannelWhenDone(dataCh chan readResult, waitGroup *sync.WaitGroup) {
+	waitGroup.Wait()
+	log.Info("All reads have completed")
+	close(dataCh)
 }
 
 func parseConfigAndConnect(configFile airbyte.ConfigFile) (config Config, client *kinesis.Kinesis, err error) {
