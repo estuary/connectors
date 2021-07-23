@@ -33,6 +33,14 @@ jobs:
           target: x86_64-unknown-linux-musl
       - run: sudo apt-get install -y musl-tools
       - run: make test-all
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          export_default_credentials: true
+      - name: Connector integration tests
+        run: make integration-tests
       - name: Login to GitHub package docker registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | \
