@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-export STREAM="estuary-test-$(cat /dev/urandom | tr -dc 'a-z' | head -c 6)"
+export STREAM="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
 
 config_json_template='{
     "googleCredentials": $GCP_SERVICE_ACCOUNT_KEY,
