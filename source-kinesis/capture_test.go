@@ -19,6 +19,7 @@ import (
 	"math"
 	"math/rand"
 	"path"
+	"sync"
 	"testing"
 	"time"
 
@@ -87,18 +88,21 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 	var dataCh = make(chan readResult)
 	var ctx, cancelFunc = context.WithCancel(context.Background())
 	defer cancelFunc()
+	var waitGroup = new(sync.WaitGroup)
 
 	var shard1Range = shardrange.Range{
 		Begin: 0,
 		End:   math.MaxUint32 / 2,
 	}
-	go readStream(ctx, shard1Range, client, stream, nil, dataCh)
+	waitGroup.Add(1)
+	go readStream(ctx, shard1Range, client, stream, nil, dataCh, nil, waitGroup)
 
 	var shard2Range = shardrange.Range{
 		Begin: math.MaxUint32 / 2,
 		End:   math.MaxUint32,
 	}
-	go readStream(ctx, shard2Range, client, stream, nil, dataCh)
+	waitGroup.Add(1)
+	go readStream(ctx, shard2Range, client, stream, nil, dataCh, nil, waitGroup)
 
 	var partitionKeys = []string{"furst", "sekund", "thuurd", "phorth"}
 	var sequencNumbers = make(map[string]string)
@@ -208,6 +212,7 @@ func TestKinesisCapture(t *testing.T) {
 			Stream:   *discoveredStream,
 			SyncMode: airbyte.SyncModeIncremental,
 		}},
+		Tail: true,
 	}
 	catalogJson, err := json.Marshal(&configuredCatalog)
 	require.NoError(t, err)

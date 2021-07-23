@@ -15,8 +15,13 @@ import (
 )
 
 // readStream starts reading the given kinesis stream, delivering both records and errors from all
-// kinsis shards over the given `resultsCh`.
-func readStream(ctx context.Context, shardRange shardrange.Range, client *kinesis.Kinesis, stream string, state map[string]string, resultsCh chan<- readResult) {
+// kinsis shards over the given `resultsCh`. If `stopAt` is non-nil, then the this will only read
+// records up through _approximately_ that time, or until millisBehindLatest indicates we're caught
+// up to the tip of the stream. Otherwise, this will continue to read indefinitely.
+// The `wg` is expected to have been incremented once _prior_ to calling this function. It will be
+// further incremented and decremented behind the scenes, but will be decremented back down to the
+// prior value when the read is finished.
+func readStream(ctx context.Context, shardRange shardrange.Range, client *kinesis.Kinesis, stream string, state map[string]string, resultsCh chan<- readResult, stopAt *time.Time, wg *sync.WaitGroup) {
 
 	var kc = &streamReader{
 		client:         client,
@@ -26,8 +31,14 @@ func readStream(ctx context.Context, shardRange shardrange.Range, client *kinesi
 		dataCh:         resultsCh,
 		readingShards:  make(map[string]bool),
 		shardSequences: state,
+		stopAt:         stopAt,
+		waitGroup:      wg,
 	}
 	var err = kc.startReadingStream()
+	// The waitGroup had 1 added to it prior to this function being called, and we decrement it now,
+	// only after startReadingStream is done, because startReadingStream will synchronously
+	// increment the waitGroup for each shard it reads.
+	wg.Done()
 	if err != nil {
 		select {
 		case resultsCh <- readResult{
@@ -50,6 +61,8 @@ type streamReader struct {
 	stream             string
 	shardRange         shardrange.Range
 	dataCh             chan<- readResult
+	stopAt             *time.Time
+	waitGroup          *sync.WaitGroup
 	readingShards      map[string]bool
 	readingShardsMutex sync.Mutex
 	// shardSequences is a copy of the capture state, which just tracks the sequenceID for each
@@ -96,7 +109,11 @@ func (kc *streamReader) startReadingStream() error {
 		if err != nil {
 			return err
 		} else if reader != nil {
-			go reader.readShard()
+			kc.waitGroup.Add(1)
+			go func() {
+				reader.readShard()
+				kc.waitGroup.Done()
+			}()
 		}
 		// If reader == nil, then we should not read this shard
 	}
@@ -195,23 +212,27 @@ func (kc *streamReader) overlapsHashRange(shard *kinesis.Shard) (shardrange.Over
 }
 
 func (kc *streamReader) startReadingShardByID(shardID string) {
-	var reader, err = kc.newShardReader(shardID, kc.getShard)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Error("reading kinesis shard failed")
-		select {
-		case <-kc.ctx.Done():
-		case kc.dataCh <- readResult{
-			source: &recordSource{stream: kc.stream, shardID: shardID},
-			err:    err,
-		}:
+	kc.waitGroup.Add(1)
+	go func() {
+		var reader, err = kc.newShardReader(shardID, kc.getShard)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Error("reading kinesis shard failed")
+			select {
+			case <-kc.ctx.Done():
+			case kc.dataCh <- readResult{
+				source: &recordSource{stream: kc.stream, shardID: shardID},
+				err:    err,
+			}:
+			}
+		} else if reader != nil {
+			reader.readShard()
 		}
-	} else if reader != nil {
-		reader.readShard()
-	}
-	// If reader is nil, then it's just because we're either already reading this shard, or it's
-	// outside of our assigned range, so just return.
+		// If reader is nil, then it's just because we're either already reading this shard, or it's
+		// outside of our assigned range, so we just decrement the waitGroup
+		kc.waitGroup.Done()
+	}()
 }
 
 func (kc *streamReader) newShardReader(shardID string, getShard func(string) (*kinesis.Shard, error)) (*shardReader, error) {
@@ -361,7 +382,7 @@ func (r *shardReader) readShardIterator(iteratorID string) error {
 		// shard because it has been either split or merged, so we need to start new reads of the
 		// child shards.
 		for _, childShard := range getRecordsResp.ChildShards {
-			go r.parent.startReadingShardByID(*childShard.ShardId)
+			r.parent.startReadingShardByID(*childShard.ShardId)
 		}
 
 		if len(getRecordsResp.Records) > 0 {
@@ -390,6 +411,27 @@ func (r *shardReader) readShardIterator(iteratorID string) error {
 				r.noDataBackoff.reset()
 			} else {
 				<-r.noDataBackoff.nextBackoff()
+			}
+		}
+
+		// If the connector is not in tailing mode, then we'll check to see if we've read all the
+		// records up through the timestamp of the desired stop point.
+		if r.parent.stopAt != nil {
+			if *getRecordsResp.MillisBehindLatest < 1000 {
+				// Regardless of whether the response contains records or not, we can be done if
+				// millisBehindLatest approaches 0, because that indicates that we've read all the
+				// records in the stream, at least for now. We allow for some slippage here because
+				// the returned value is relative to the tip of the _stream_, and so we may not ever
+				// read millisBehindLatest of 0 if there are many shards, since it only takes one
+				// record added to one shard to make that value non-zero.
+				r.logEntry.Info("stopping because millisBehindLatest < 1000")
+				return nil
+			} else if len(getRecordsResp.Records) > 0 {
+				var lastRecordTS = getRecordsResp.Records[len(getRecordsResp.Records)-1].ApproximateArrivalTimestamp
+				if lastRecordTS.After(*r.parent.stopAt) {
+					r.logEntry.Infof("Finished reading records through: %v", lastRecordTS)
+					return nil
+				}
 			}
 		}
 
