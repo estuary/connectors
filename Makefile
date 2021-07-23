@@ -3,6 +3,10 @@
 build_dir = .build
 version = $(shell git describe --always --dirty --tags)
 
+.PHONY: print-version
+print-version:
+	@echo $(version)
+
 # Enumeration of all the connectors. These names are expected to match the name of the directories.
 connectors = \
 	source-gcs \
@@ -67,7 +71,9 @@ push-all: $(push_connectors)
 integration_test_connectors = $(addprefix int-test-,$(connectors))
 .PHONY: $(integration_test_connectors)
 $(integration_test_connectors): int-test-%: $(build_dir)/build-% | $(build_dir)
-	CONNECTOR=$* VERSION=$(version) ./tests/run.sh
+	if [ -d tests/$* ]; then \
+		CONNECTOR=$* VERSION=$(version) ./tests/run.sh; \
+	fi
 
 .PHONY: integration-tests
 integration-tests: $(integration_test_connectors)
