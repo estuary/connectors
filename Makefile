@@ -3,6 +3,10 @@
 build_dir = .build
 version = $(shell git describe --always --dirty --tags)
 
+.PHONY: print-version
+print-version:
+	@echo $(version)
+
 # Enumeration of all the connectors. These names are expected to match the name of the directories.
 connectors = \
 	source-gcs \
@@ -39,13 +43,21 @@ test-all: test-parser test-go-types test-source-kinesis
 $(build_dir):
 	mkdir -p $(build_dir)
 
+$(build_dir)/version: | $(build_dir)
+	@if [ -f $(build_dir)/version ] && [ "$$(cat $(build_dir)/version)" == "$(version)" ]; then \
+		echo "version up to date"; \
+	else \
+		echo "$(version)" > $(build_dir)/version; \
+	fi
+
+
 build_connectors = $(addprefix $(build_dir)/build-,$(connectors))
 
 # Second expansion is needed to defer the expansion of $(shell find % -type f) until after the rule
 # is matched. This ensures that the connector will be rebuilt if any file within its source
 # directory is modified.
 .SECONDEXPANSION:
-$(build_connectors): $(build_dir)/build-%: $(parser) % go-types $(shell find go-types -type f) $$(shell find % -type f) | $(build_dir)
+$(build_connectors): $(build_dir)/build-%: $(parser) % go-types $(shell find go-types -type f) $$(shell find % -type f) $(build_dir)/version | $(build_dir)
 	cd $* && go build
 	docker build -t ghcr.io/estuary/$*:$(version) --build-arg connector=$* .
 	@# This file is only used so that make can correctly determine if targets need rebuilt
@@ -66,8 +78,14 @@ push-all: $(push_connectors)
 
 integration_test_connectors = $(addprefix int-test-,$(connectors))
 .PHONY: $(integration_test_connectors)
-$(integration_test_connectors): int-test-%: | $(build_dir)
-	CONNECTOR=$* VERSION=$(version) ./tests/run.sh
+# The 'int-test-%' here is extracting the connector name from the full target name.
+# The actual pre-requisites come after the second ':'.
+# The | separates regular pre-requisites from "order-only" pre-requisites. In this case, it prevents
+# the integration tests from being re-run due to the timestamp on our build directory being updated.
+$(integration_test_connectors): int-test-%: $(build_dir)/build-% | $(build_dir)
+	if [ -d tests/$* ]; then \
+		CONNECTOR=$* VERSION=$(version) ./tests/run.sh; \
+	fi
 
 .PHONY: integration-tests
 integration-tests: $(integration_test_connectors)
