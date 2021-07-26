@@ -43,13 +43,21 @@ test-all: test-parser test-go-types test-source-kinesis
 $(build_dir):
 	mkdir -p $(build_dir)
 
+$(build_dir)/version: | $(build_dir)
+	@if [ -f $(build_dir)/version ] && [ "$$(cat $(build_dir)/version)" == "$(version)" ]; then \
+		echo "version up to date"; \
+	else \
+		echo "$(version)" > $(build_dir)/version; \
+	fi
+
+
 build_connectors = $(addprefix $(build_dir)/build-,$(connectors))
 
 # Second expansion is needed to defer the expansion of $(shell find % -type f) until after the rule
 # is matched. This ensures that the connector will be rebuilt if any file within its source
 # directory is modified.
 .SECONDEXPANSION:
-$(build_connectors): $(build_dir)/build-%: $(parser) % go-types $(shell find go-types -type f) $$(shell find % -type f) | $(build_dir)
+$(build_connectors): $(build_dir)/build-%: $(parser) % go-types $(shell find go-types -type f) $$(shell find % -type f) $(build_dir)/version | $(build_dir)
 	cd $* && go build
 	docker build -t ghcr.io/estuary/$*:$(version) --build-arg connector=$* .
 	@# This file is only used so that make can correctly determine if targets need rebuilt

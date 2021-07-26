@@ -28,7 +28,14 @@ function pollDevelop() {
     local directory="$2"
     # run as root, not the flow user, since the user within the container needs to access the
     # docker socket.
-    docker run --user 0 --rm --mount type=bind,source=/tmp,target=/tmp --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock --mount type=bind,source=`pwd`,target=/home/flow/project --network=host "${FLOW_IMAGE}" flowctl develop --poll --source "$catalog" --directory "$directory"
+    docker run --user 0 --rm \
+        --mount type=bind,source=/tmp,target=/tmp \
+        --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+        --mount type=bind,source=`pwd`,target=/home/flow/project \
+        --network=host \
+        "${FLOW_IMAGE}" \
+        flowctl develop --poll --source "$catalog" --directory "$directory" \
+        || bail "flowctl develop failed"
     echo -e "\nfinished polling"
 }
 
@@ -50,11 +57,11 @@ fi
 mkdir -p "$test_dir"
 
 echo "testing connector: '$CONNECTOR'"
-# First step is to get the spec from the connector, just as a basic sanity check.
-docker run --rm "$CONNECTOR_IMAGE" spec | jq -c
+# First step is to get the spec from the connector and ensure it's valid json
+docker run --rm "$CONNECTOR_IMAGE" spec | jq -cM || bail "failed to validate spec"
 
 echo -e "\nexecuting setup"
-source "tests/${CONNECTOR}/setup.sh" || bail "${CONNECTOR}/setup.sh not found"
+source "tests/${CONNECTOR}/setup.sh" || bail "${CONNECTOR}/setup.sh failed"
 if [[ -z "$STREAM" ]]; then
     bail "setup did not set STREAM"
 fi
