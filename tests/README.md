@@ -8,9 +8,11 @@ Each subdirectory here is a test of the source connector with the same name. Eac
 must contain the following files:
 
 - `setup.sh`: Executed to setup the test. This script is expected to export the env variables
-  `CONNECTOR_CONFIG` and `STREAM`, which are used to generate the Flow catalog yaml.
-- `cleanup.sh`: Cleans up any test resources. Can read the `STREAM` variable so it knows what to
-  cleanup.
+  `CONNECTOR_CONFIG` and `RESOURCE`, which are used to generate the Flow catalog yaml.
+  Can also export other env variables, for example so it can track things that need to be cleaned
+  up.
+- `cleanup.sh`: Cleans up any test resources. Can read any variables exported by `setup.sh` so it
+  knows what to cleanup.
 - `expected.txt`: The expected contents of the materialized table. The tests will execute the query:
   `select id, canary from test_results;` and expect that the results of that match `expected.txt`
   exactly.

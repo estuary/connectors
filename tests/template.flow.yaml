@@ -16,7 +16,7 @@ captures:
         config: ${CONNECTOR_CONFIG}
     bindings:
       - resource:
-          stream: "${STREAM}"
+          <<: ${RESOURCE}
           syncMode: incremental
         target: tests/${CONNECTOR}/data
 

@@ -62,8 +62,8 @@ docker run --rm "$CONNECTOR_IMAGE" spec | jq -cM || bail "failed to validate spe
 
 echo -e "\nexecuting setup"
 source "tests/${CONNECTOR}/setup.sh" || bail "${CONNECTOR}/setup.sh failed"
-if [[ -z "$STREAM" ]]; then
-    bail "setup did not set STREAM"
+if [[ -z "$RESOURCE" ]]; then
+    bail "setup did not set RESOURCE"
 fi
 if [[ -z "$CONNECTOR_CONFIG" ]]; then
     bail "setup did not set CONNECTOR_CONFIG"
