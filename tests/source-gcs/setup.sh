@@ -1,21 +1,22 @@
 #!/bin/bash
 
 set -e
-export STREAM="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
+export TEST_BUCKET="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
+export RESOURCE="{ stream: ${TEST_BUCKET} }"
 
 config_json_template='{
     "googleCredentials": $GCP_SERVICE_ACCOUNT_KEY,
-    "bucket": "${STREAM}"
+    "bucket": "${TEST_BUCKET}"
 }'
 
 export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
 
-gsutil mb -p "$GCP_PROJECT_ID" "gs://${STREAM}"
+gsutil mb -p "$GCP_PROJECT_ID" "gs://${TEST_BUCKET}"
 
 root_dir="$(git rev-parse --show-toplevel)"
 
 for file in $(find ${root_dir}/tests/files -type f); do
-    gsutil cp ${file} gs://${STREAM}/testprefix/$(basename $file)
+    gsutil cp ${file} gs://${TEST_BUCKET}/testprefix/$(basename $file)
 done
 
 sleep_seconds=30
