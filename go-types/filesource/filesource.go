@@ -216,12 +216,14 @@ func (src Source) Discover(args airbyte.DiscoverCmd) error {
 		stack = stack[1:]
 	}
 
-	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
+	err = airbyte.NewStdoutEncoder().Encode(airbyte.Message{
 		Type: airbyte.MessageTypeCatalog,
 		Catalog: &airbyte.Catalog{
 			Streams: streams,
 		},
 	})
+	time.Sleep(time.Second)
+	return err
 }
 
 func (src Source) Read(args airbyte.ReadCmd) error {
