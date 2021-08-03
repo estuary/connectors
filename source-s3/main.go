@@ -209,20 +209,20 @@ func main() {
 		"title":   "S3 Source Spec",
 		"type":    "object",
 		"required": [
-			"awsAccessKeyId",
-			"awsSecretAccessKey"
+			"bucket",
+			"region"
 		],
 		"properties": {
 			"awsAccessKeyId": {
 				"type":        "string",
 				"title":       "AWS Access Key ID",
-				"description": "Part of the AWS credentials that will be used to connect to S3",
+				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
 				"default":     "example-aws-access-key-id"
 			},
 			"awsSecretAccessKey": {
 				"type":        "string",
 				"title":       "AWS Secret Access Key",
-				"description": "Part of the AWS credentials that will be used to connect to S3",
+				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
 				"default":     "example-aws-secret-access-key"
 			},
 			"ascendingKeys": {
@@ -255,7 +255,7 @@ func main() {
 			"region": {
 				"type":        "string",
 				"title":       "AWS Region",
-				"description": "The name of the AWS region where the S3 stream is located",
+				"description": "The name of the AWS region where the S3 bucket is located. \"us-east-1\" is a popular default you can try, if you're unsure what to put here.",
 				"default":     "us-east-1"
 			}
 		}
