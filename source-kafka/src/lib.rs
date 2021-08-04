@@ -2,6 +2,8 @@ use tracing::info;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
 
+mod airbyte;
+
 pub mod connector;
 
 pub fn run(cmd: connector::Command) -> color_eyre::Result<()> {
