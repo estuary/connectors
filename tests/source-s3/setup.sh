@@ -22,6 +22,9 @@ for file in $(find ${root_dir}/tests/files -type f); do
     aws s3 cp ${file} s3://${TEST_BUCKET}/testprefix/$(basename $file)
 done
 
+# add an empty prefix to ensure that it gets filtered out
+aws s3api put-object --bucket "$TEST_BUCKET" --key "testprefix/"
+
 sleep_seconds=30
 echo "Sleeping for ${sleep_seconds} seconds to account for filesource clock delta"
 sleep $sleep_seconds
