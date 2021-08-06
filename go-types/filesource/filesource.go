@@ -360,6 +360,11 @@ func (r *reader) shouldSkip(obj ObjectInfo) (_ bool, reason string) {
 	if skip, reason := r.state.shouldSkip(obj.Path, obj.ModTime); skip {
 		return skip, reason
 	}
+	// Is this a 0-sized object? These are commonly used to represent something approximating a
+	// directory, and should always be filtered out.
+	if obj.Size == 0 {
+		return true, "object has size of 0"
+	}
 	// Is the path excluded by our regex ?
 	if r.pathRe != nil && !r.pathRe.MatchString(obj.Path) {
 		return true, "regex not matched"
