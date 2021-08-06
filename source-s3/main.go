@@ -154,9 +154,9 @@ func (l *s3Listing) Next() (filesource.ObjectInfo, error) {
 			var obj = l.output.Contents[0]
 			l.output.Contents = l.output.Contents[1:]
 
-			// returns true if the object is one that may be readable. This function filters out any objects
-			// with a "glacier" storage class because those objects could take minutes or even hours to
-			// retrieve. This behavior matches that of other popular tool that ingest from S3.
+			// Filter out any objects with a "glacier" storage class because those objects could
+			// take minutes or even hours to retrieve. This behavior matches that of other popular
+			// tool that ingest from S3.
 			if sc := aws.StringValue(obj.StorageClass); sc == s3.StorageClassGlacier || sc == s3.StorageClassDeepArchive {
 				continue
 			}
