@@ -4,10 +4,13 @@ use tracing_subscriber::EnvFilter;
 
 pub mod connector;
 
-pub fn run(cmd: connector::Command) {
+pub fn run(cmd: connector::Command) -> color_eyre::Result<()> {
     setup_tracing();
+    color_eyre::install()?;
 
     info!("You have selected {:?}", cmd);
+
+    Ok(())
 }
 
 fn setup_tracing() {
