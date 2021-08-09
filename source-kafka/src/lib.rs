@@ -1,6 +1,7 @@
 extern crate serde_with;
 
-use tracing::info;
+use std::io::stdout;
+
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
 
@@ -14,7 +15,10 @@ pub fn run(cmd: connector::Command) -> color_eyre::Result<()> {
     setup_tracing();
     color_eyre::install()?;
 
-    info!("You have selected {:?}", cmd);
+    match cmd {
+        connector::Command::Spec => run_spec(),
+        _other => todo!("Command not yet supported"),
+    }
 
     Ok(())
 }
@@ -25,4 +29,19 @@ fn setup_tracing() {
         .with_writer(std::io::stderr)
         .with_env_filter(EnvFilter::from_default_env())
         .init();
+}
+
+#[tracing::instrument(level = "debug")]
+fn run_spec() {
+    let message: airbyte::Spec<configuration::Configuration> = airbyte::Spec::new(true, vec![]);
+
+    write_message(message);
+}
+
+fn write_message<M: airbyte::Message>(message: M) {
+    serde_json::to_writer(&mut stdout(), &airbyte::Envelope::from(message))
+        .expect("to serialize and write the message");
+
+    // Include a newline to break up the document stream.
+    println!();
 }

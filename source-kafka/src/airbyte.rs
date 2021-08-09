@@ -1,37 +1,32 @@
 #![allow(dead_code)]
 
+use std::marker::PhantomData;
+
 use chrono::{DateTime, Utc};
+use schemars::{schema_for, JsonSchema};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{json, Value};
 
-// TODO: use schemars to actually generate a meaningful schema rather than hardcoding this.
-#[derive(Debug, Default)]
-pub struct ConnectionSpecification;
+#[derive(Debug)]
+pub struct ConnectionSpecification<C> {
+    config_type: PhantomData<C>,
+}
 
-impl Serialize for ConnectionSpecification {
+impl<C> Default for ConnectionSpecification<C> {
+    fn default() -> Self {
+        Self {
+            config_type: PhantomData,
+        }
+    }
+}
+
+impl<C: JsonSchema> Serialize for ConnectionSpecification<C> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        json!({
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "title": "Kafka Source Spec",
-            "type": "object",
-            "required": [
-                "bootstrap_servers",
-            ],
-            "properties": {
-                "bootstrap_servers": {
-                "type": "array",
-                "items": { "type": "string" },
-                "minItems": 1,
-                "title": "Bootstrap Servers",
-                "description": "The initial set of brokers to connect to. Once connected, the remainder of the cluster can be found through these brokers.",
-                "default": "localhost:9092"
-                },
-            },
-        }).serialize(serializer)
+        schema_for!(C).serialize(serializer)
     }
 }
 
@@ -43,15 +38,15 @@ pub enum DestinationSyncMode {
 }
 
 #[derive(Serialize, Debug)]
-pub struct Spec {
+pub struct Spec<C: JsonSchema> {
     #[serde(rename = "connectionSpecification")]
-    connection_specification: ConnectionSpecification,
+    connection_specification: ConnectionSpecification<C>,
     #[serde(rename = "supportsIncremental")]
     supports_incremental: bool,
     supported_destination_sync_modes: Vec<DestinationSyncMode>,
 }
 
-impl Spec {
+impl<C: JsonSchema> Spec<C> {
     pub fn new(incremental: bool, sync_modes: Vec<DestinationSyncMode>) -> Self {
         Self {
             connection_specification: ConnectionSpecification::default(),
@@ -182,7 +177,16 @@ macro_rules! impl_message {
     };
 }
 
-impl_message!(Spec, "SPEC", "spec");
+impl<C: JsonSchema + Serialize> Message for Spec<C> {
+    fn type_id(&self) -> &'static str {
+        "SPEC"
+    }
+
+    fn data_key(&self) -> &'static str {
+        "spec"
+    }
+}
+
 impl_message!(ConnectionStatus, "CONNECTION_STATUS", "connectionStatus");
 impl_message!(Catalog, "CATALOG", "catalog");
 impl_message!(Record, "RECORD", "record");
@@ -231,9 +235,15 @@ impl<T: Message> Serialize for Envelope<T> {
 mod test {
     use super::*;
 
+    #[derive(JsonSchema, Serialize)]
+    struct SampleConfig {
+        foo: String,
+    }
+
     #[test]
     fn serialize_spec_test() {
-        let spec: Envelope<Spec> = Spec::new(true, vec![DestinationSyncMode::Append]).into();
+        let spec: Envelope<Spec<SampleConfig>> =
+            Spec::new(true, vec![DestinationSyncMode::Append]).into();
 
         let serialized = serde_json::to_string(&spec).expect("to serialize spec to json");
         // TODO: replace with serde_test assertions instead.

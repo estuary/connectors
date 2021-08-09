@@ -2,6 +2,7 @@
 
 use std::{fmt::Display, io::Read};
 
+use schemars::JsonSchema;
 use serde::{de::Visitor, Deserialize, Serialize};
 
 #[derive(Debug, thiserror::Error)]
@@ -16,8 +17,13 @@ pub enum Error {
     NoBootstrapServersGiven,
 }
 
-#[derive(Deserialize, Default, Serialize)]
+/// # Kafka Connector Configuration
+#[derive(Deserialize, Default, JsonSchema, Serialize)]
 pub struct Configuration {
+    /// The initial servers in the Kafka cluster to initially connect to. The Kafka
+    /// client will be informed of the rest of the cluster nodes by connecting to
+    /// one of these nodes.
+    #[schemars(with = "Vec<String>")]
     pub bootstrap_servers: Vec<BootstrapServer>,
 }
 
@@ -41,10 +47,6 @@ impl Configuration {
     }
 }
 
-/// The initial servers in the Kafka cluster to initially connect to. The Kafka
-/// client will be informed of the rest of the cluster nodes by connecting to
-/// one of these nodes.
-//
 // Note: The Rust `url` crate doesn't like `ip:port` pairs without a scheme.
 // Kafka doesn't specify a scheme for the `bootstrap_servers` values, so
 // expecting anyone to add one is really odd. Thus, we parse these values
