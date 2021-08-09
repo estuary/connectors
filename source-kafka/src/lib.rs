@@ -1,8 +1,11 @@
+extern crate serde_with;
+
 use tracing::info;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
 
 mod airbyte;
+mod catalog;
 mod configuration;
 
 pub mod connector;
