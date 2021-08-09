@@ -1,6 +1,9 @@
 extern crate serde_with;
 
-use std::io::stdout;
+use std::fmt::Debug;
+use std::fs::File;
+use std::io::{stdout, BufReader};
+use std::path::Path;
 
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
@@ -8,6 +11,7 @@ use tracing_subscriber::EnvFilter;
 mod airbyte;
 mod catalog;
 mod configuration;
+mod kafka;
 
 pub mod connector;
 
@@ -16,11 +20,24 @@ pub fn run(cmd: connector::Command) -> color_eyre::Result<()> {
     color_eyre::install()?;
 
     match cmd {
-        connector::Command::Spec => run_spec(),
+        connector::Command::Spec => run_spec()?,
+        connector::Command::Check { config } => run_check(&config)?,
         _other => todo!("Command not yet supported"),
     }
 
     Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+enum Error {
+    #[error("failed to validate connector configuration")]
+    Configuration(#[from] configuration::Error),
+
+    #[error("failed to validate connector catalog")]
+    Catalog(#[from] catalog::Error),
+
+    #[error("failed when interacting with kafka")]
+    Kafka(#[from] kafka::Error),
 }
 
 fn setup_tracing() {
@@ -32,10 +49,21 @@ fn setup_tracing() {
 }
 
 #[tracing::instrument(level = "debug")]
-fn run_spec() {
+fn run_spec() -> Result<(), Error> {
     let message: airbyte::Spec<configuration::Configuration> = airbyte::Spec::new(true, vec![]);
 
     write_message(message);
+    Ok(())
+}
+
+#[tracing::instrument(level = "debug")]
+fn run_check<P: AsRef<Path> + Debug>(config_path: P) -> Result<(), Error> {
+    let configuration = read_config_file(config_path)?;
+    let consumer = kafka::consumer_from_config(&configuration)?;
+    let message = kafka::test_connection(&consumer);
+
+    write_message(message);
+    Ok(())
 }
 
 fn write_message<M: airbyte::Message>(message: M) {
@@ -44,4 +72,14 @@ fn write_message<M: airbyte::Message>(message: M) {
 
     // Include a newline to break up the document stream.
     println!();
+}
+
+fn read_config_file<P: AsRef<Path>>(
+    config_path: P,
+) -> Result<configuration::Configuration, configuration::Error> {
+    let file = File::open(config_path)?;
+    let reader = BufReader::new(file);
+    let configuration = configuration::Configuration::parse(reader)?;
+
+    Ok(configuration)
 }
