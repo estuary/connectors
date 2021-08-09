@@ -22,6 +22,7 @@ pub fn run(cmd: connector::Command) -> color_eyre::Result<()> {
     match cmd {
         connector::Command::Spec => run_spec()?,
         connector::Command::Check { config } => run_check(&config)?,
+        connector::Command::Discover { config } => run_discover(&config)?,
         _other => todo!("Command not yet supported"),
     }
 
@@ -61,6 +62,18 @@ fn run_check<P: AsRef<Path> + Debug>(config_path: P) -> Result<(), Error> {
     let configuration = read_config_file(config_path)?;
     let consumer = kafka::consumer_from_config(&configuration)?;
     let message = kafka::test_connection(&consumer);
+
+    write_message(message);
+    Ok(())
+}
+
+#[tracing::instrument(level = "debug")]
+fn run_discover<P: AsRef<Path> + Debug>(config_path: P) -> Result<(), Error> {
+    let configuration = read_config_file(config_path)?;
+    let consumer = kafka::consumer_from_config(&configuration)?;
+    let metadata = kafka::fetch_metadata(&consumer)?;
+    let streams = kafka::available_streams(&metadata);
+    let message = airbyte::Catalog::new(streams);
 
     write_message(message);
     Ok(())

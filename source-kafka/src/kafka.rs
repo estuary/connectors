@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::error::KafkaError;
-use rdkafka::metadata::Metadata;
+use rdkafka::metadata::{Metadata, MetadataTopic};
 use rdkafka::ClientConfig;
 
 use crate::airbyte;
@@ -44,4 +44,20 @@ pub fn fetch_metadata<C: Consumer>(consumer: &C) -> Result<Metadata, Error> {
     consumer
         .fetch_metadata(None, Some(KAFKA_TIMEOUT))
         .map_err(Error::Metadata)
+}
+
+pub fn available_streams(metadata: &Metadata) -> Vec<airbyte::Stream> {
+    metadata
+        .topics()
+        .iter()
+        .filter(reject_internal_topics)
+        .map(MetadataTopic::name)
+        .map(|s| airbyte::Stream::new(s.to_owned()))
+        .collect()
+}
+
+static KAFKA_INTERNAL_TOPICS: [&str; 1] = ["__consumer_offsets"];
+
+fn reject_internal_topics(topic: &&MetadataTopic) -> bool {
+    !KAFKA_INTERNAL_TOPICS.contains(&topic.name())
 }
