@@ -5,10 +5,10 @@ use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::error::KafkaError;
 use rdkafka::message::BorrowedMessage;
 use rdkafka::metadata::{Metadata, MetadataTopic};
-use rdkafka::{ClientConfig, Message, Offset, Timestamp, TopicPartitionList};
+use rdkafka::{ClientConfig, Message, Timestamp, TopicPartitionList};
 
-use crate::airbyte;
 use crate::configuration::Configuration;
+use crate::{airbyte, state};
 
 const KAFKA_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -64,24 +64,25 @@ pub fn available_streams(metadata: &Metadata) -> Vec<airbyte::Stream> {
         .collect()
 }
 
-/// Subscribes to the given topic partitions and begins reading from the specified offsets.
+/// Subscribes to the given topic/partitions and begins reading from the specified offsets.
 ///
 /// **Warning**: This will _unsubscribe_ the consumer from any previous topic partitions.
 pub fn subscribe(
     consumer: &BaseConsumer,
-    topic: &str,
-    partition_offsets: &[(i32, Offset)],
-) -> Result<(), Error> {
+    topics: &state::TopicSet,
+) -> Result<TopicPartitionList, Error> {
     let mut topic_partition_list = TopicPartitionList::new();
-    for (p, o) in partition_offsets {
+    for topic in &topics.0 {
         topic_partition_list
-            .add_partition_offset(topic, *p, *o)
+            .add_partition_offset(&topic.name, topic.partition, topic.offset.next().into())
             .map_err(Error::Subscription)?;
     }
+
     consumer
         .assign(&topic_partition_list)
         .map_err(Error::Subscription)?;
-    Ok(())
+
+    Ok(topic_partition_list)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -98,13 +99,14 @@ pub enum ProcessingError {
 
 pub fn process_message<'m>(
     msg: &'m BorrowedMessage<'m>,
-) -> Result<airbyte::Record, ProcessingError> {
+) -> Result<(airbyte::Record, state::Topic), ProcessingError> {
     let payload = parse_message(msg)?;
     let emitted_at = timestamp_to_datetime(msg.timestamp());
     let namespace = format!("Partition {}", msg.partition());
 
     let message = airbyte::Record::new(msg.topic().to_owned(), payload, emitted_at, namespace);
-    Ok(message)
+    let state = state::Topic::new(msg.topic(), msg.partition(), state::Offset::from(msg));
+    Ok((message, state))
 }
 
 // TODO: replace with CLI parser?

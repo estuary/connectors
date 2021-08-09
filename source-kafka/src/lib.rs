@@ -1,8 +1,10 @@
 extern crate serde_with;
 
+use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::fs::File;
-use std::io::{stdout, BufReader};
+use std::io::stdout;
+use std::io::BufReader;
 use std::path::Path;
 
 use tracing::info;
@@ -13,6 +15,7 @@ mod airbyte;
 mod catalog;
 mod configuration;
 mod kafka;
+mod state;
 
 pub mod connector;
 
@@ -25,8 +28,10 @@ pub fn run(cmd: connector::Command) -> color_eyre::Result<()> {
         connector::Command::Check { config } => run_check(&config)?,
         connector::Command::Discover { config } => run_discover(&config)?,
         connector::Command::Read {
-            config, catalog, ..
-        } => run_read(&config, &catalog)?,
+            config,
+            catalog,
+            state,
+        } => run_read(&config, &catalog, state.as_ref())?,
     }
 
     Ok(())
@@ -45,6 +50,9 @@ enum Error {
 
     #[error("failed to process message")]
     Message(#[from] kafka::ProcessingError),
+
+    #[error("failed to track state")]
+    State(#[from] state::Error),
 }
 
 fn setup_tracing() {
@@ -86,33 +94,32 @@ fn run_discover<P: AsRef<Path> + Debug>(config_path: P) -> Result<(), Error> {
 }
 
 #[tracing::instrument(level = "debug")]
-fn run_read<P: AsRef<Path> + Debug>(config_path: P, catalog_path: P) -> Result<(), Error> {
+fn run_read<P: AsRef<Path> + Debug>(
+    config_path: P,
+    catalog_path: P,
+    state_path: Option<P>,
+) -> Result<(), Error> {
     let configuration = read_config_file(config_path)?;
     let catalog = read_catalog_file(catalog_path)?;
+
     let consumer = kafka::consumer_from_config(&configuration)?;
     let metadata = kafka::fetch_metadata(&consumer)?;
-    let topics = metadata.topics();
 
-    for stream in catalog.streams {
-        if let Some(topic) = topics.iter().find(|t| t.name() == stream.name) {
-            // TODO: For now we'll subscribe to all partitions from the beginning of time.
-            let partition_offsets: Vec<(i32, rdkafka::Offset)> = topic
-                .partitions()
-                .iter()
-                .map(|p| (p.id(), rdkafka::Offset::Beginning))
-                .collect();
-            kafka::subscribe(&consumer, topic.name(), &partition_offsets)?;
-        }
-    }
+    let mut topic_states = read_state_file(state_path)?;
+    topic_states.discover_existing_partitions(&catalog, &metadata);
+    kafka::subscribe(&consumer, &topic_states)?;
 
     for (msg, i) in consumer.iter().zip(0..) {
         let msg = msg.map_err(kafka::Error::Read)?;
-        let message = kafka::process_message(&msg)?;
+        let (message, topic) = kafka::process_message(&msg)?;
 
         write_message(message);
 
-        if i % 100 == 0 {
-            info!("Processed {} messages!", i);
+        topic_states.checkpoint(&topic);
+        write_message(airbyte::State::try_from(&topic_states)?);
+
+        if i % 5 == 0 {
+            info!(?topic, "Processed {} messages!", i + 1);
         }
     }
 
@@ -143,4 +150,16 @@ fn read_catalog_file<P: AsRef<Path>>(catalog_path: P) -> Result<airbyte::Catalog
     let catalog = serde_json::from_reader(reader)?;
 
     Ok(catalog)
+}
+
+fn read_state_file<P: AsRef<Path>>(state_path: Option<P>) -> Result<state::TopicSet, state::Error> {
+    if let Some(state_path) = state_path {
+        let file = File::open(state_path)?;
+        let reader = BufReader::new(file);
+        let topics = serde_json::from_reader(reader)?;
+
+        Ok(topics)
+    } else {
+        Ok(state::TopicSet::default())
+    }
 }
