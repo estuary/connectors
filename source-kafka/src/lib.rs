@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::{stdout, BufReader};
 use std::path::Path;
 
+use tracing::info;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
 
@@ -23,7 +24,9 @@ pub fn run(cmd: connector::Command) -> color_eyre::Result<()> {
         connector::Command::Spec => run_spec()?,
         connector::Command::Check { config } => run_check(&config)?,
         connector::Command::Discover { config } => run_discover(&config)?,
-        _other => todo!("Command not yet supported"),
+        connector::Command::Read {
+            config, catalog, ..
+        } => run_read(&config, &catalog)?,
     }
 
     Ok(())
@@ -39,6 +42,9 @@ enum Error {
 
     #[error("failed when interacting with kafka")]
     Kafka(#[from] kafka::Error),
+
+    #[error("failed to process message")]
+    Message(#[from] kafka::ProcessingError),
 }
 
 fn setup_tracing() {
@@ -79,6 +85,40 @@ fn run_discover<P: AsRef<Path> + Debug>(config_path: P) -> Result<(), Error> {
     Ok(())
 }
 
+#[tracing::instrument(level = "debug")]
+fn run_read<P: AsRef<Path> + Debug>(config_path: P, catalog_path: P) -> Result<(), Error> {
+    let configuration = read_config_file(config_path)?;
+    let catalog = read_catalog_file(catalog_path)?;
+    let consumer = kafka::consumer_from_config(&configuration)?;
+    let metadata = kafka::fetch_metadata(&consumer)?;
+    let topics = metadata.topics();
+
+    for stream in catalog.streams {
+        if let Some(topic) = topics.iter().find(|t| t.name() == stream.name) {
+            // TODO: For now we'll subscribe to all partitions from the beginning of time.
+            let partition_offsets: Vec<(i32, rdkafka::Offset)> = topic
+                .partitions()
+                .iter()
+                .map(|p| (p.id(), rdkafka::Offset::Beginning))
+                .collect();
+            kafka::subscribe(&consumer, topic.name(), &partition_offsets)?;
+        }
+    }
+
+    for (msg, i) in consumer.iter().zip(0..) {
+        let msg = msg.map_err(kafka::Error::Read)?;
+        let message = kafka::process_message(&msg)?;
+
+        write_message(message);
+
+        if i % 100 == 0 {
+            info!("Processed {} messages!", i);
+        }
+    }
+
+    Ok(())
+}
+
 fn write_message<M: airbyte::Message>(message: M) {
     serde_json::to_writer(&mut stdout(), &airbyte::Envelope::from(message))
         .expect("to serialize and write the message");
@@ -95,4 +135,12 @@ fn read_config_file<P: AsRef<Path>>(
     let configuration = configuration::Configuration::parse(reader)?;
 
     Ok(configuration)
+}
+
+fn read_catalog_file<P: AsRef<Path>>(catalog_path: P) -> Result<airbyte::Catalog, catalog::Error> {
+    let file = File::open(catalog_path)?;
+    let reader = BufReader::new(file);
+    let catalog = serde_json::from_reader(reader)?;
+
+    Ok(catalog)
 }
