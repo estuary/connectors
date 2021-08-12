@@ -47,6 +47,26 @@ impl Offset {
     }
 }
 
+impl PartialOrd for Offset {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        use std::cmp::Ordering;
+
+        match (self, other) {
+            (Offset::Start, Offset::Start) => Some(Ordering::Equal),
+            (Offset::Start, Offset::End) => Some(Ordering::Less),
+            (Offset::Start, Offset::UpThrough(-1)) => Some(Ordering::Equal),
+            (Offset::Start, Offset::UpThrough(_)) => Some(Ordering::Less),
+            (Offset::End, Offset::Start) => Some(Ordering::Greater),
+            (Offset::End, Offset::End) => Some(Ordering::Equal),
+            (Offset::End, Offset::UpThrough(_)) => Some(Ordering::Greater),
+            (Offset::UpThrough(-1), Offset::Start) => Some(Ordering::Equal),
+            (Offset::UpThrough(_), Offset::Start) => Some(Ordering::Greater),
+            (Offset::UpThrough(_), Offset::End) => Some(Ordering::Less),
+            (Offset::UpThrough(l), Offset::UpThrough(r)) => Some(l.cmp(r)),
+        }
+    }
+}
+
 impl From<Offset> for rdkafka::Offset {
     fn from(orig: Offset) -> Self {
         match orig {
@@ -139,7 +159,7 @@ impl TopicSet {
         Ok(reconciled)
     }
 
-    fn offset_for(&self, topic: &str, partition_id: i32) -> Option<Offset> {
+    pub fn offset_for(&self, topic: &str, partition_id: i32) -> Option<Offset> {
         self.find_entry(topic, partition_id).map(|t| t.offset)
     }
 

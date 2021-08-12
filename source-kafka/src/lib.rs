@@ -7,13 +7,13 @@ use std::io::stdout;
 use std::io::BufReader;
 use std::path::Path;
 
-use tracing::info;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
 
 mod airbyte;
 mod catalog;
 mod configuration;
+mod halting;
 mod kafka;
 mod state;
 
@@ -109,19 +109,21 @@ fn run_read<P: AsRef<Path> + Debug>(
     let mut topic_states =
         state::TopicSet::reconcile_catalog_state(&metadata, &catalog, &persisted_state)?;
     kafka::subscribe(&consumer, &topic_states)?;
+    let watermarks = kafka::high_watermarks(&consumer, &topic_states)?;
+    let halt_check = halting::HaltCheck::new(&catalog, watermarks);
 
-    for (msg, i) in consumer.iter().zip(0..) {
-        let msg = msg.map_err(kafka::Error::Read)?;
-        let (message, topic) = kafka::process_message(&msg)?;
+    while !halt_check.should_halt(&topic_states) {
+        let msg = consumer
+            .poll(None)
+            .expect("Polling without a timeout should always produce a message")
+            .map_err(kafka::Error::Read)?;
 
-        write_message(message);
+        let (record, topic) = kafka::process_message(&msg)?;
 
         topic_states.checkpoint(&topic);
-        write_message(airbyte::State::try_from(&topic_states)?);
 
-        if i % 5 == 0 {
-            info!(?topic, "Processed {} messages!", i + 1);
-        }
+        write_message(record);
+        write_message(airbyte::State::try_from(&topic_states)?);
     }
 
     Ok(())

@@ -92,6 +92,42 @@ pub fn subscribe(
     Ok(topic_partition_list)
 }
 
+pub fn high_watermarks(
+    consumer: &BaseConsumer,
+    topics: &state::TopicSet,
+) -> Result<state::TopicSet, Error> {
+    let mut watermarks = state::TopicSet::default();
+
+    for topic in topics.0.iter() {
+        // The low watermark represents the first message that can be read.
+        // The high watermark is the "latest head" offset of the partition. This
+        // is effectively the index of the next message to be read.
+        let (low, high) = consumer
+            .fetch_watermarks(&topic.name, topic.partition, KAFKA_TIMEOUT)
+            .map_err(Error::Metadata)?;
+
+        let offset = if high == 0 || high == low {
+            // We can consider a partition to be at the beginning if:
+            // - If the next message we receive will be Offset=0, then we haven't
+            // read *any* messages yet.
+            // - The low watermark can change over time as Kafka performs
+            // compaction on the partition. If we've compacted away _all_ the
+            // previous messages, the next message we can read will be the very
+            // first message which currently exists in this partition.
+            state::Offset::Start
+        } else {
+            // We subtract 1 from the high watermark since it is zero-indexed.
+            // If we try to read up *through* `high`, we'll potentially sit here
+            // forever waiting on the next message to come through.
+            state::Offset::UpThrough(high - 1)
+        };
+
+        watermarks.add_new(state::Topic::new(&topic.name, topic.partition, offset));
+    }
+
+    Ok(watermarks)
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ProcessingError {
     #[error("failed when interacting with kafka")]

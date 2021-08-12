@@ -110,11 +110,11 @@ impl Catalog {
 
 #[derive(Serialize, Debug)]
 pub struct Record {
-    stream: String,
-    data: Value,
+    pub stream: String,
+    pub data: Value,
     #[serde(with = "chrono::serde::ts_seconds")]
-    emitted_at: DateTime<Utc>,
-    namespace: String,
+    pub emitted_at: DateTime<Utc>,
+    pub namespace: String,
 }
 
 impl Record {
