@@ -4,11 +4,11 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::error::KafkaError;
 use rdkafka::message::BorrowedMessage;
-use rdkafka::metadata::{Metadata, MetadataTopic};
+use rdkafka::metadata::{Metadata, MetadataPartition, MetadataTopic};
 use rdkafka::{ClientConfig, Message, Timestamp, TopicPartitionList};
 
 use crate::configuration::Configuration;
-use crate::{airbyte, state};
+use crate::{airbyte, catalog, state};
 
 const KAFKA_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -62,6 +62,13 @@ pub fn available_streams(metadata: &Metadata) -> Vec<airbyte::Stream> {
         .map(MetadataTopic::name)
         .map(|s| airbyte::Stream::new(s.to_owned()))
         .collect()
+}
+
+pub fn find_topic<'m>(metadata: &'m Metadata, needle: &str) -> Option<&'m MetadataTopic> {
+    metadata
+        .topics()
+        .iter()
+        .find(|topic| topic.name() == needle)
 }
 
 /// Subscribes to the given topic/partitions and begins reading from the specified offsets.
@@ -136,4 +143,10 @@ fn timestamp_to_datetime(timestamp: Timestamp) -> DateTime<Utc> {
         .to_millis()
         .map(|ms| DateTime::from_utc(NaiveDateTime::from_timestamp(ms / 1000, 0), Utc))
         .unwrap_or_else(Utc::now)
+}
+
+pub fn build_shard_key(topic: &MetadataTopic, partition: &MetadataPartition) -> catalog::ShardKey {
+    catalog::ShardKey::default()
+        .add_str(topic.name())
+        .add_int(partition.id())
 }

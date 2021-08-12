@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::ops::RangeInclusive;
 
 use highway::{HighwayHash, HighwayHasher};
@@ -16,6 +14,9 @@ pub enum Error {
 
     #[error("failed to validate connector catalog")]
     Format(#[from] serde_json::Error),
+
+    #[error("cannot subscribe to non-existent stream: {0}")]
+    MissingStream(String),
 }
 
 #[serde_as]

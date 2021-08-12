@@ -1,11 +1,11 @@
-use std::collections::HashSet;
 use std::convert::TryFrom;
 
 use rdkafka::message::BorrowedMessage;
 use rdkafka::metadata::Metadata;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
-use crate::airbyte;
+use crate::{airbyte, catalog, kafka};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -107,33 +107,46 @@ impl TopicSet {
     ///   1. The connected Kafka Cluster
     ///   2. The ConfiguredCatalogSpec
     ///   3. The StateFile
-    pub fn discover_existing_partitions(
-        &mut self,
-        catalog: &airbyte::Catalog,
+    pub fn reconcile_catalog_state(
         metadata: &Metadata,
-    ) {
-        let catalog_streams = catalog
-            .streams
-            .iter()
-            .map(|s| &s.name[..])
-            .collect::<HashSet<&str>>();
-        let mut in_kafka = HashSet::new();
+        catalog: &catalog::ConfiguredCatalog,
+        loaded_state: &TopicSet,
+    ) -> Result<TopicSet, catalog::Error> {
+        let mut reconciled = TopicSet::default();
 
-        for topic in metadata.topics() {
-            if catalog_streams.contains(topic.name()) {
+        for configured_stream in catalog.streams.iter() {
+            if let Some(topic) = kafka::find_topic(metadata, &configured_stream.stream.name) {
                 for partition in topic.partitions() {
-                    in_kafka.insert((topic.name(), partition.id()));
-                    self.add_new(Topic::new(topic.name(), partition.id(), Offset::Start));
+                    if catalog.responsible_for_shard(kafka::build_shard_key(topic, partition)) {
+                        info!("Responsible for {}/{}: YES", topic.name(), partition.id());
+
+                        let offset = loaded_state
+                            .offset_for(topic.name(), partition.id())
+                            .unwrap_or(Offset::Start);
+
+                        reconciled.add_new(Topic::new(topic.name(), partition.id(), offset));
+                    } else {
+                        info!("Responsible for {}/{}: NO", topic.name(), partition.id());
+                    }
                 }
+            } else {
+                return Err(catalog::Error::MissingStream(
+                    configured_stream.stream.name.clone(),
+                ));
             }
         }
 
-        let filtered = self
-            .0
-            .drain(0..)
-            .filter(|topic| in_kafka.contains(&(&topic.name, topic.partition)))
-            .collect();
-        self.0 = filtered;
+        Ok(reconciled)
+    }
+
+    fn offset_for(&self, topic: &str, partition_id: i32) -> Option<Offset> {
+        self.find_entry(topic, partition_id).map(|t| t.offset)
+    }
+
+    fn find_entry(&self, topic: &str, partition: i32) -> Option<&Topic> {
+        self.0
+            .iter()
+            .find(|t| t.name == topic && t.partition == partition)
     }
 
     fn find_entry_mut(&mut self, topic: &str, partition: i32) -> Option<&mut Topic> {

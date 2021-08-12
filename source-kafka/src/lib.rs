@@ -101,12 +101,13 @@ fn run_read<P: AsRef<Path> + Debug>(
 ) -> Result<(), Error> {
     let configuration = read_config_file(config_path)?;
     let catalog = read_catalog_file(catalog_path)?;
+    let persisted_state = read_state_file(state_path)?;
 
     let consumer = kafka::consumer_from_config(&configuration)?;
     let metadata = kafka::fetch_metadata(&consumer)?;
 
-    let mut topic_states = read_state_file(state_path)?;
-    topic_states.discover_existing_partitions(&catalog, &metadata);
+    let mut topic_states =
+        state::TopicSet::reconcile_catalog_state(&metadata, &catalog, &persisted_state)?;
     kafka::subscribe(&consumer, &topic_states)?;
 
     for (msg, i) in consumer.iter().zip(0..) {
@@ -144,7 +145,9 @@ fn read_config_file<P: AsRef<Path>>(
     Ok(configuration)
 }
 
-fn read_catalog_file<P: AsRef<Path>>(catalog_path: P) -> Result<airbyte::Catalog, catalog::Error> {
+fn read_catalog_file<P: AsRef<Path>>(
+    catalog_path: P,
+) -> Result<catalog::ConfiguredCatalog, catalog::Error> {
     let file = File::open(catalog_path)?;
     let reader = BufReader::new(file);
     let catalog = serde_json::from_reader(reader)?;
