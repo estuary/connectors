@@ -3,6 +3,8 @@ use std::{fmt::Display, io::Read};
 use schemars::JsonSchema;
 use serde::{de::Visitor, Deserialize, Serialize};
 
+use crate::connector;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("failed to read the configuration file")]
@@ -26,7 +28,19 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn parse<R: Read>(reader: R) -> Result<Configuration, Error> {
+    pub fn brokers(&self) -> String {
+        self.bootstrap_servers
+            .iter()
+            .map(|url| url.to_string())
+            .collect::<Vec<String>>()
+            .join(",")
+    }
+}
+
+impl connector::ConnectorConfig for Configuration {
+    type Error = Error;
+
+    fn parse(reader: impl Read) -> Result<Self, Self::Error> {
         let configuration: Configuration = serde_json::from_reader(reader)?;
 
         if configuration.bootstrap_servers.is_empty() {
@@ -34,14 +48,6 @@ impl Configuration {
         }
 
         Ok(configuration)
-    }
-
-    pub fn brokers(&self) -> String {
-        self.bootstrap_servers
-            .iter()
-            .map(|url| url.to_string())
-            .collect::<Vec<String>>()
-            .join(",")
     }
 }
 
@@ -141,5 +147,20 @@ mod test {
 
         let brokers = config.brokers();
         assert_eq!("localhost:9092,172.22.36.2:9093,localhost:9094", brokers);
+    }
+
+    #[test]
+    fn parse_config_file_test() {
+        use connector::ConnectorConfig;
+
+        let input = std::io::Cursor::new(
+            r#"
+        {
+            "bootstrap_servers": ["localhost:9093"]
+        }
+        "#,
+        );
+
+        Configuration::parse(input).expect("to parse");
     }
 }

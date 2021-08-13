@@ -5,7 +5,7 @@ use rdkafka::metadata::Metadata;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::{airbyte, catalog, kafka};
+use crate::{airbyte, catalog, connector, kafka};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -190,6 +190,16 @@ impl TryFrom<&TopicSet> for airbyte::State {
     }
 }
 
+impl connector::ConnectorConfig for TopicSet {
+    type Error = Error;
+
+    fn parse(reader: impl std::io::Read) -> Result<Self, Self::Error> {
+        let topics = serde_json::from_reader(reader)?;
+
+        Ok(topics)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -247,5 +257,26 @@ mod test {
             Offset::UpThrough(11),
             Offset::Start,
         );
+    }
+
+    #[test]
+    fn parse_state_file_test() {
+        use connector::ConnectorConfig;
+
+        let input = std::io::Cursor::new(
+            r#"
+            [
+                {
+                    "name": "test",
+                    "partition": 0,
+                    "offset": {
+                        "UpThrough": 100
+                    }
+                }
+            ]
+        "#,
+        );
+
+        TopicSet::parse(input).expect("to parse");
     }
 }

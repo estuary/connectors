@@ -1,9 +1,12 @@
+use std::io::Read;
 use std::ops::RangeInclusive;
 
 use highway::{HighwayHash, HighwayHasher};
 use serde::Deserialize;
 use serde_with::serde_as;
 use serde_with::FromInto;
+
+use crate::connector;
 
 mod shard_range;
 
@@ -57,6 +60,16 @@ impl Default for ConfiguredCatalog {
             tail: tail_default(),
             range: range_default(),
         }
+    }
+}
+
+impl connector::ConnectorConfig for ConfiguredCatalog {
+    type Error = Error;
+
+    fn parse(reader: impl Read) -> Result<Self, Self::Error> {
+        let catalog = serde_json::from_reader(reader)?;
+
+        Ok(catalog)
     }
 }
 
@@ -120,6 +133,32 @@ mod test {
         assert_eq!("test", parsed.streams[0].stream.name);
         assert_eq!(false, parsed.tail);
         assert_eq!(65_536..=u32::MAX, parsed.range);
+    }
+
+    #[test]
+    fn parse_catalog_file_test() {
+        use connector::ConnectorConfig;
+
+        let input = std::io::Cursor::new(
+            r#"
+        {
+            "streams": [
+                {
+                    "stream": {
+                        "name": "test"
+                    },
+                    "estuary.dev/range": {
+                        "begin": "00010000",
+                        "end": "ffffffff"
+                    }
+                }
+            ],
+            "estuary.dev/tail": false
+        }
+        "#,
+        );
+
+        ConfiguredCatalog::parse(input).expect("to parse");
     }
 
     #[test]
