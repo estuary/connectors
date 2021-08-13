@@ -1,0 +1,10 @@
+contexts:
+  alice:
+    brokers:
+    - localhost:9092
+    sasl:
+      enabled: true
+      mechanism: scram-sha256
+      password: alice-pass
+      username: alice
+current-context: alice
