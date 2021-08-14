@@ -4,14 +4,13 @@ use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::io::Write;
 
-mod airbyte;
-mod catalog;
-mod configuration;
-mod halting;
-mod kafka;
-mod state;
-
+pub mod airbyte;
+pub mod catalog;
+pub mod configuration;
 pub mod connector;
+pub mod halting;
+pub mod kafka;
+pub mod state;
 
 pub struct KafkaConnector;
 
