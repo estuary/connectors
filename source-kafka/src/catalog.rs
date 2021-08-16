@@ -2,6 +2,7 @@
 
 use std::ops::RangeInclusive;
 
+use highway::{HighwayHash, HighwayHasher};
 use serde::Deserialize;
 use serde_with::serde_as;
 use serde_with::FromInto;
@@ -42,6 +43,12 @@ pub struct ConfiguredCatalog {
     pub range: RangeInclusive<u32>,
 }
 
+impl ConfiguredCatalog {
+    pub fn responsible_for_shard(&self, key: impl Into<ShardKey>) -> bool {
+        self.range.contains(&key.into().hash())
+    }
+}
+
 impl Default for ConfiguredCatalog {
     fn default() -> Self {
         Self {
@@ -70,6 +77,25 @@ fn range_default() -> RangeInclusive<u32> {
     0..=u32::MAX
 }
 
+#[derive(Default)]
+pub struct ShardKey(HighwayHasher);
+
+impl ShardKey {
+    pub fn add_int(mut self, n: impl Into<i64>) -> Self {
+        self.0.append(&n.into().to_be_bytes());
+        self
+    }
+
+    pub fn add_str(mut self, s: &str) -> Self {
+        self.0.append(s.as_bytes());
+        self
+    }
+
+    fn hash(self) -> u32 {
+        self.0.finalize64() as u32
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -93,5 +119,29 @@ mod test {
         assert_eq!("test", parsed.streams[0].stream.name);
         assert_eq!(false, parsed.tail);
         assert_eq!(65_536..=u32::MAX, parsed.range);
+    }
+
+    #[test]
+    fn shard_assignment_test() {
+        let stream = Stream {
+            name: "test".to_owned(),
+        };
+        let streams = vec![ConfiguredStream { stream: stream }];
+        let catalog = ConfiguredCatalog {
+            streams,
+            tail: false,
+            range: 0..=0x7fffffff,
+        };
+
+        let shards = (0..10).map(|n| ShardKey::default().add_int(n));
+        let shards_covered = 2;
+
+        assert_eq!(
+            shards_covered,
+            shards
+                .map(|n| catalog.responsible_for_shard(n))
+                .filter(|b| *b)
+                .count()
+        );
     }
 }
