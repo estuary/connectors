@@ -1,0 +1,20 @@
+version: "3.7"
+
+services:
+  db:
+    image: postgres:latest
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+    volumes:
+      - postgres-testdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: flow
+      POSTGRES_USER: flow
+      POSTGRES_PASSWORD: flow
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres-testdata: {}
