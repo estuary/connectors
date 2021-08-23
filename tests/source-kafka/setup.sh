@@ -7,7 +7,13 @@ export RESOURCE="{ stream: ${TEST_STREAM} }"
 # Because Flow uses network=host, the port exposed to Flow is different than the
 # one we use when running `docker exec` below.
 export CONNECTOR_CONFIG='{
-  "bootstrap_servers": ["localhost:9092"]
+  "bootstrap_servers": ["localhost:9092"],
+  "authentication": {
+    "mechanism": "SCRAM-SHA-256",
+    "username": "alice",
+    "password": "alice-pass"
+  },
+  "tls": "cleartext"
 }'
 
 root_dir="$(git rev-parse --show-toplevel)"

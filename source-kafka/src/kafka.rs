@@ -28,12 +28,29 @@ pub enum Error {
 }
 
 pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsumer, Error> {
-    ClientConfig::new()
-        .set("bootstrap.servers", configuration.brokers())
-        .set("enable.auto.commit", "false")
-        .set("group.id", "source-kafka")
-        .create()
-        .map_err(Error::Config)
+    let mut config = ClientConfig::new();
+
+    config.set("bootstrap.servers", configuration.brokers());
+
+    // We want to avoid writing ConsumerGroup commits back to Kafka. We manage
+    // our own transactional semantics within Flow, so we don't need to rely on
+    // Kafka to help with that.
+    config.set("enable.auto.commit", "false");
+
+    // Despite wanting to avoid using ConsumerGroups, we *must* set this
+    // `group.id` in order to subscribe to topics. librdkafka will throw an
+    // error if this is left blank.
+    config.set("group.id", "source-kafka");
+
+    config.set("security.protocol", configuration.security_protocol());
+
+    if let Some(ref auth) = configuration.authentication {
+        config.set("sasl.mechanism", auth.mechanism.to_string());
+        config.set("sasl.username", &auth.username);
+        config.set("sasl.password", &auth.password);
+    }
+
+    config.create().map_err(Error::Config)
 }
 
 pub fn test_connection<C: Consumer>(consumer: &C) -> airbyte::ConnectionStatus {
