@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/estuary/connectors/go-types/airbyte"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pglogrepl"
+	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 )
@@ -263,7 +267,162 @@ func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) ([]DBPrimaryKey, error)
 	return keys, err
 }
 
+const SLOT_NAME = "estuary_flow_slot"
+const OUTPUT_PLUGIN = "pgoutput"
+
 func doRead(args airbyte.ReadCmd) error {
+	var config Config
+	if err := args.ConfigFile.Parse(&config); err != nil {
+		return err
+	}
+	var catalog airbyte.ConfiguredCatalog
+	if err := args.CatalogFile.Parse(&catalog); err != nil {
+		return errors.Wrap(err, "unable to parse catalog")
+	}
+
+	ctx := context.Background()
+	connConfig, err := pgx.ParseConfig(config.ConnectionURI)
+	if err != nil {
+		return err
+	}
+	// The URI provided in config.json should lack the `replication=database`
+	// setting in order for discovery to work using the same URI, but that means
+	// that we have to explicitly add `replication=database` for reads.
+	connConfig.RuntimeParams["replication"] = "database"
+	conn, err := pgx.ConnectConfig(ctx, connConfig)
+	if err != nil {
+		return errors.Wrap(err, "unable to connect to database")
+	}
+	defer conn.Close(ctx)
+	pgConn := conn.PgConn()
+
+	sysident, err := pglogrepl.IdentifySystem(ctx, pgConn)
+	if err != nil {
+		return errors.Wrap(err, "unable to identify system")
+	}
+	log.Printf("IdentifySystem: %v", sysident)
+
+	_, err = pglogrepl.CreateReplicationSlot(ctx, pgConn, SLOT_NAME, OUTPUT_PLUGIN, pglogrepl.CreateReplicationSlotOptions{Temporary: true})
+	if err != nil {
+		return errors.Wrap(err, "unable to create replication slot")
+	}
+
+	// TODO: Use createSlotResult.SnapshotName to perform a consistent read of all data prior
+	// to actually starting replication here
+
+	startLSN := sysident.XLogPos
+	if err = pglogrepl.StartReplication(ctx, pgConn, SLOT_NAME, startLSN, pglogrepl.StartReplicationOptions{
+		PluginArgs: []string{`"proto_version" '1'`, `"publication_names" 'estuary_flow_publication'`},
+	}); err != nil {
+		return errors.Wrap(err, "unable to start replication")
+	}
+
+	clientXLogPos := sysident.XLogPos
+	standbyMessageTimeout := time.Second * 10
+	nextStandbyMessageDeadline := time.Now().Add(standbyMessageTimeout)
+
+	for {
+		// TODO: Suppose that we use this same standby message deadline as the
+		// trigger for emitting a new state message to stdout? Probably using a
+		// dirty flag to avoid redundancy, but maybe not even bothering with that
+		// since one message every 10s in the absence of any changes is negligible.
+		if time.Now().After(nextStandbyMessageDeadline) {
+			err = pglogrepl.SendStandbyStatusUpdate(context.Background(), pgConn, pglogrepl.StandbyStatusUpdate{WALWritePosition: clientXLogPos})
+			if err != nil {
+				log.Fatalln("SendStandbyStatusUpdate failed:", err)
+			}
+			log.Println("Sent Standby status message")
+			nextStandbyMessageDeadline = time.Now().Add(standbyMessageTimeout)
+		}
+
+		receiveCtx, cancel := context.WithDeadline(ctx, nextStandbyMessageDeadline)
+		msg, err := pgConn.ReceiveMessage(receiveCtx)
+		cancel()
+		if pgconn.Timeout(err) {
+			continue
+		}
+		if err != nil {
+			return errors.Wrap(err, "error receiving message")
+		}
+
+		switch msg := msg.(type) {
+		case *pgproto3.CopyData:
+			switch msg.Data[0] {
+			case pglogrepl.PrimaryKeepaliveMessageByteID:
+				pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(msg.Data[1:])
+				if err != nil {
+					return errors.Wrap(err, "error parsing keepalive")
+				}
+				log.Printf("KeepAlive: ServerWALEnd=%q, ReplyRequested=%v", pkm.ServerWALEnd, pkm.ReplyRequested)
+				if pkm.ReplyRequested {
+					nextStandbyMessageDeadline = time.Now()
+				}
+			case pglogrepl.XLogDataByteID:
+				xld, err := pglogrepl.ParseXLogData(msg.Data[1:])
+				if err != nil {
+					return errors.Wrap(err, "error parsing XLogData")
+				}
+				if err := handleChangeMessage(xld.WALStart, xld.ServerWALEnd, xld.ServerTime, xld.WALData); err != nil {
+					return err
+				}
+				clientXLogPos = xld.WALStart + pglogrepl.LSN(len(xld.WALData))
+			default:
+				log.Printf("Received unknown CopyData message: %v", msg)
+			}
+		default:
+			log.Printf("Received unexpected message: %v", msg)
+		}
+	}
+
 	// TODO: Implement
+	return nil
+}
+
+func handleChangeMessage(walStart, serverWALEnd pglogrepl.LSN, serverTime time.Time, walData []byte) error {
+	log.Printf("XLogData(WALStart=%q, WALEnd=%q)", walStart, serverWALEnd)
+	msg, err := pglogrepl.Parse(walData)
+	if err != nil {
+		return errors.Wrap(err, "error parsing logical replication message")
+	}
+	switch msg := msg.(type) {
+	case *pglogrepl.BeginMessage:
+		log.Printf("  Begin(finalLSN=%q, xid=%v)", msg.FinalLSN, msg.Xid)
+	case *pglogrepl.RelationMessage:
+		log.Printf("  Relation(rid=%v, namespace=%v, relName=%v)", msg.RelationID, msg.Namespace, msg.RelationName)
+		for _, column := range msg.Columns {
+			log.Printf("    Column(name=%v, dataType=%v, typeMod=%v)", column.Name, column.DataType, column.TypeModifier)
+		}
+	case *pglogrepl.InsertMessage:
+		log.Printf("  Insert(rid=%v)", msg.RelationID)
+		if msg.Tuple != nil {
+			for _, column := range msg.Tuple.Columns {
+				log.Printf("    Column(type=%q, data=%q)", column.DataType, column.Data)
+			}
+		}
+	case *pglogrepl.UpdateMessage:
+		log.Printf("  Update(rid=%v)", msg.RelationID)
+		if msg.NewTuple != nil {
+			for _, column := range msg.NewTuple.Columns {
+				log.Printf("    Column(type=%q, data=%q)", column.DataType, column.Data)
+			}
+		}
+	case *pglogrepl.DeleteMessage:
+		log.Printf("  Delete(rid=%v)", msg.RelationID)
+		if msg.OldTuple != nil {
+			for _, column := range msg.OldTuple.Columns {
+				log.Printf("    Column(type=%q, data=%q)", column.DataType, column.Data)
+			}
+		}
+	case *pglogrepl.CommitMessage:
+		log.Printf("  Commit(commitLSN=%q, txEndLSN=%q)", msg.CommitLSN, msg.TransactionEndLSN)
+	// case *pglogrepl.OriginMessage:
+	// 	log.Printf("  Origin()")
+	// case *pglogrepl.TypeMessage:
+	// 	log.Printf("  Type()")
+	// case *pglogrepl.TruncateMessage:
+	// 	log.Printf("  Truncate()")
+	default:
+		log.Printf("  Unhandled message type %q", msg.Type())
+	}
 	return nil
 }
