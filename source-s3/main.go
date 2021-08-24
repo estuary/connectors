@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/estuary/connectors/go-types/filesource"
-	"github.com/estuary/connectors/go-types/parser"
+	"github.com/estuary/connectors/filesource"
+	"github.com/estuary/connectors/parser"
 )
 
 type config struct {

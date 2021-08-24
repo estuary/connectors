@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/estuary/connectors/go-types/shardrange"
+	"github.com/estuary/protocols/airbyte"
 )
 
 // Applies the same hash operation that kinesis uses to determine which shard a given record should
@@ -19,8 +19,8 @@ func hashPartitionKey(key string) uint32 {
 
 // Parses the kinesis shard range and translates it into a 32 bit PartitionRange, suitable for
 // comparison with the Flow shard range.
-func parseKinesisShardRange(begin, end string) (shardrange.Range, error) {
-	var r = shardrange.Range{}
+func parseKinesisShardRange(begin, end string) (airbyte.Range, error) {
+	var r = airbyte.Range{}
 	var begin128, ok = new(big.Int).SetString(begin, 10)
 	if !ok {
 		return r, fmt.Errorf("failed to parse kinesis shard range begin: '%s'", begin)
@@ -42,7 +42,7 @@ func parseKinesisShardRange(begin, end string) (shardrange.Range, error) {
 // `kinesisRange`, but this may not always be true if an "ExplicitHashKey" was used when adding the
 // record. In that case, this function will always produce a consistent result that guarantees that
 // exactly one Flow shard will process each record.
-func isRecordWithinRange(flowRange shardrange.Range, kinesisRange shardrange.Range, partitionKeyHash uint32) bool {
+func isRecordWithinRange(flowRange airbyte.Range, kinesisRange airbyte.Range, partitionKeyHash uint32) bool {
 	var rangeOverlap = flowRange.Intersection(kinesisRange)
 
 	// Normally, the kinesis range will always include the key hash because that's normally how the

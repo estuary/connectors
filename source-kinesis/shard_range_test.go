@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/estuary/connectors/go-types/shardrange"
+	"github.com/estuary/protocols/airbyte"
 	"github.com/stretchr/testify/require"
 )
 
@@ -65,21 +65,21 @@ func TestShardRangeTranslation(t *testing.T) {
 }
 
 func TestShardRangeOverlaps(t *testing.T) {
-	testRangeOverlap(t, shardrange.FullyInclusive, 0, math.MaxUint32, "0", maxKinesisHash)
-	testRangeOverlap(t, shardrange.FullyInclusive, 0, math.MaxUint32, "1", maxKinesisHash)
-	testRangeOverlap(t, shardrange.PartialOverlap, 1, math.MaxUint32, "0", maxKinesisHash)
+	testRangeOverlap(t, airbyte.FullRangeOverlap, 0, math.MaxUint32, "0", maxKinesisHash)
+	testRangeOverlap(t, airbyte.FullRangeOverlap, 0, math.MaxUint32, "1", maxKinesisHash)
+	testRangeOverlap(t, airbyte.PartialRangeOverlap, 1, math.MaxUint32, "0", maxKinesisHash)
 	// This huge number is equivalent to 5 << 96, so this case is testing the boundary where the
 	// kinesis range begin is the same as the flow range exclusive end.
-	testRangeOverlap(t, shardrange.PartialOverlap, 0, 5, "396140812571321687967719751680", maxKinesisHash)
-	testRangeOverlap(t, shardrange.NoOverlap, 0, 5, "475368975085586025561263702016", maxKinesisHash)
+	testRangeOverlap(t, airbyte.PartialRangeOverlap, 0, 5, "396140812571321687967719751680", maxKinesisHash)
+	testRangeOverlap(t, airbyte.NoRangeOverlap, 0, 5, "475368975085586025561263702016", maxKinesisHash)
 
 	// This huge number is equivalent to 20 << 96, so should partially overlap
-	testRangeOverlap(t, shardrange.PartialOverlap, 10, 20, "1584563250285286751870879006720", maxKinesisHash)
-	testRangeOverlap(t, shardrange.FullyInclusive, 20, 20, "1584563250285286751870879006720", "1584563250285286751870879006721")
+	testRangeOverlap(t, airbyte.PartialRangeOverlap, 10, 20, "1584563250285286751870879006720", maxKinesisHash)
+	testRangeOverlap(t, airbyte.FullRangeOverlap, 20, 20, "1584563250285286751870879006720", "1584563250285286751870879006721")
 }
 
-func testRangeOverlap(t *testing.T, expected shardrange.OverlapResult, flowBegin, flowEnd uint32, kinesisBegin, kinesisEnd string) {
-	var flowRange = &shardrange.Range{
+func testRangeOverlap(t *testing.T, expected airbyte.RangeOverlap, flowBegin, flowEnd uint32, kinesisBegin, kinesisEnd string) {
+	var flowRange = &airbyte.Range{
 		Begin: flowBegin,
 		End:   flowEnd,
 	}

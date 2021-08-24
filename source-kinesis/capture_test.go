@@ -25,17 +25,16 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go-types/airbyte"
-	"github.com/estuary/connectors/go-types/shardrange"
+	"github.com/estuary/protocols/airbyte"
 	"github.com/stretchr/testify/require"
 )
 
 func TestIsRecordWithinRange(t *testing.T) {
-	var flowRange = shardrange.Range{
+	var flowRange = airbyte.Range{
 		Begin: 5,
 		End:   10,
 	}
-	var kinesisRange = shardrange.Range{
+	var kinesisRange = airbyte.Range{
 		Begin: 7,
 		End:   15,
 	}
@@ -90,14 +89,14 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 	defer cancelFunc()
 	var waitGroup = new(sync.WaitGroup)
 
-	var shard1Range = shardrange.Range{
+	var shard1Range = airbyte.Range{
 		Begin: 0,
 		End:   math.MaxUint32 / 2,
 	}
 	waitGroup.Add(1)
 	go readStream(ctx, shard1Range, client, stream, nil, dataCh, nil, waitGroup)
 
-	var shard2Range = shardrange.Range{
+	var shard2Range = airbyte.Range{
 		Begin: math.MaxUint32 / 2,
 		End:   math.MaxUint32,
 	}
