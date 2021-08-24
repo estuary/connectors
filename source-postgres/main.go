@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/estuary/connectors/go-types/airbyte"
@@ -362,7 +363,7 @@ func doRead(args airbyte.ReadCmd) error {
 				if err != nil {
 					return errors.Wrap(err, "error parsing XLogData")
 				}
-				if err := handleChangeMessage(xld.WALStart, xld.ServerWALEnd, xld.ServerTime, xld.WALData); err != nil {
+				if err := handleChangeMessage(ctx, xld.WALStart, xld.ServerWALEnd, xld.ServerTime, xld.WALData); err != nil {
 					return err
 				}
 				clientXLogPos = xld.WALStart + pglogrepl.LSN(len(xld.WALData))
@@ -378,51 +379,97 @@ func doRead(args airbyte.ReadCmd) error {
 	return nil
 }
 
-func handleChangeMessage(walStart, serverWALEnd pglogrepl.LSN, serverTime time.Time, walData []byte) error {
-	log.Printf("XLogData(WALStart=%q, WALEnd=%q)", walStart, serverWALEnd)
+type RelationID = uint32
+
+var relations = make(map[RelationID]pglogrepl.RelationMessage)
+
+func handleChangeMessage(ctx context.Context, walStart, serverWALEnd pglogrepl.LSN, serverTime time.Time, walData []byte) error {
 	msg, err := pglogrepl.Parse(walData)
 	if err != nil {
 		return errors.Wrap(err, "error parsing logical replication message")
 	}
+
+	log.Printf("XLogData(Type=%s, WALStart=%q, ServerWALEnd=%q)", msg.Type(), walStart, serverWALEnd)
+
 	switch msg := msg.(type) {
 	case *pglogrepl.BeginMessage:
-		log.Printf("  Begin(finalLSN=%q, xid=%v)", msg.FinalLSN, msg.Xid)
-	case *pglogrepl.RelationMessage:
-		log.Printf("  Relation(rid=%v, namespace=%v, relName=%v)", msg.RelationID, msg.Namespace, msg.RelationName)
-		for _, column := range msg.Columns {
-			log.Printf("    Column(name=%v, dataType=%v, typeMod=%v)", column.Name, column.DataType, column.TypeModifier)
-		}
-	case *pglogrepl.InsertMessage:
-		log.Printf("  Insert(rid=%v)", msg.RelationID)
-		if msg.Tuple != nil {
-			for _, column := range msg.Tuple.Columns {
-				log.Printf("    Column(type=%q, data=%q)", column.DataType, column.Data)
-			}
-		}
-	case *pglogrepl.UpdateMessage:
-		log.Printf("  Update(rid=%v)", msg.RelationID)
-		if msg.NewTuple != nil {
-			for _, column := range msg.NewTuple.Columns {
-				log.Printf("    Column(type=%q, data=%q)", column.DataType, column.Data)
-			}
-		}
-	case *pglogrepl.DeleteMessage:
-		log.Printf("  Delete(rid=%v)", msg.RelationID)
-		if msg.OldTuple != nil {
-			for _, column := range msg.OldTuple.Columns {
-				log.Printf("    Column(type=%q, data=%q)", column.DataType, column.Data)
-			}
-		}
+		log.Printf("Begin(finalLSN=%q, xid=%v)", msg.FinalLSN, msg.Xid)
 	case *pglogrepl.CommitMessage:
-		log.Printf("  Commit(commitLSN=%q, txEndLSN=%q)", msg.CommitLSN, msg.TransactionEndLSN)
+		log.Printf("Commit(commitLSN=%q, txEndLSN=%q)", msg.CommitLSN, msg.TransactionEndLSN)
 	// case *pglogrepl.OriginMessage:
 	// 	log.Printf("  Origin()")
 	// case *pglogrepl.TypeMessage:
 	// 	log.Printf("  Type()")
 	// case *pglogrepl.TruncateMessage:
 	// 	log.Printf("  Truncate()")
+	case *pglogrepl.RelationMessage:
+		// Keep track of the relation in order to understand future Insert/Update/Delete messages
+		//
+		// TODO(wgd): How do we know when to delete a relation? Worst-case we can use a timestamp
+		// and a separate grooming thread to delete them after some time window has elapsed, but
+		// I haven't been able to find any documentation of any of these logical replication
+		// messages so I'm hesitant to make assumptions about anything.
+		relations[msg.RelationID] = *msg
+	case *pglogrepl.InsertMessage:
+		return handleDataMessage(ctx, msg.Type(), msg.RelationID, msg.Tuple)
+	case *pglogrepl.UpdateMessage:
+		return handleDataMessage(ctx, msg.Type(), msg.RelationID, msg.NewTuple)
+	case *pglogrepl.DeleteMessage:
+		return handleDataMessage(ctx, msg.Type(), msg.RelationID, msg.OldTuple)
 	default:
-		log.Printf("  Unhandled message type %q", msg.Type())
+		log.Printf("Unhandled message type %q", msg.Type())
 	}
 	return nil
+}
+
+func handleDataMessage(ctx context.Context, msgType pglogrepl.MessageType, relID RelationID, tuple *pglogrepl.TupleData) error {
+	rel, ok := relations[relID]
+	if !ok {
+		return errors.Errorf("unknown relation %d", relID)
+	}
+
+	fields := make(map[string]interface{})
+	if msgType == pglogrepl.MessageTypeDelete {
+		fields["_deleted"] = true
+	}
+
+	log.Printf("%s(rid=%v, namespace=%v, relName=%v)", msgType, rel.RelationID, rel.Namespace, rel.RelationName)
+	if tuple != nil {
+		for idx, col := range tuple.Columns {
+			log.Printf("  (name=%q, type=%q, data=%q)", rel.Columns[idx].Name, col.DataType, col.Data)
+
+			colName := rel.Columns[idx].Name
+			switch col.DataType {
+			case 'n':
+				fields[colName] = nil
+			case 't':
+				fields[colName] = encodeColumnData(col.Data, rel.Columns[idx].DataType, rel.Columns[idx].TypeModifier)
+			default:
+				return errors.Errorf("unhandled column data type %v", col.DataType)
+			}
+		}
+	}
+
+	rawData, err := json.Marshal(fields)
+	if err != nil {
+		return errors.Wrap(err, "error encoding message data")
+	}
+	if err := json.NewEncoder(os.Stdout).Encode(airbyte.Message{
+		Type: airbyte.MessageTypeRecord,
+		Record: &airbyte.Record{
+			Stream:    rel.RelationName,
+			Namespace: rel.Namespace,
+			EmittedAt: time.Now().Unix(),
+			Data:      json.RawMessage(rawData),
+		},
+	}); err != nil {
+		return errors.Wrap(err, "error writing output message")
+	}
+	return nil
+}
+
+func encodeColumnData(data []byte, dataType, typeMod uint32) interface{} {
+	// TODO(wgd): Use `dataType` and `typeMod` to more intelligently convert
+	// text-format values from Postgres into JSON-encodable values.
+	return string(data)
 }
