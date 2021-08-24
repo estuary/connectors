@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/estuary/connectors/go-types/airbyte"
+	"github.com/estuary/protocols/airbyte"
 )
 
 type Config struct {

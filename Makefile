@@ -23,20 +23,21 @@ parser_cargo_args = --release --manifest-path parser/Cargo.toml --target x86_64-
 $(parser): parser
 	cargo build $(parser_cargo_args)
 
+.PHONY: test-filesource
+test-filesource:
+	go test -v ./filesource/...
+
 .PHONY: test-parser
 test-parser:
 	cargo test $(parser_cargo_args)
+	go test -v ./parser/...
 
 .PHONY: test-source-kinesis
 test-source-kinesis:
-	cd source-kinesis && go test -tags kinesistest -v ./...
-
-.PHONY: test-go-types
-test-go-types:
-	cd go-types && go test -v ./...
+	go test -tags kinesistest -v ./source-kinesis/...
 
 .PHONY: test-all
-test-all: test-parser test-go-types test-source-kinesis
+test-all: test-filesource test-parser test-source-kinesis
 
 # build_dir should be used as an order-only pre-requisite, because otherwise it would always cause
 # targets to rebuild if any file in the build directory was newer than the current target.
@@ -56,8 +57,9 @@ build_connectors = $(addprefix $(build_dir)/build-,$(connectors))
 # Second expansion is needed to defer the expansion of $(shell find % -type f) until after the rule
 # is matched. This ensures that the connector will be rebuilt if any file within its source
 # directory is modified.
+# TODO(johnny): How should this change for the protocols refactor ?
 .SECONDEXPANSION:
-$(build_connectors): $(build_dir)/build-%: $(parser) % go-types $(shell find go-types -type f) $$(shell find % -type f) $(build_dir)/version | $(build_dir)
+$(build_connectors): $(build_dir)/build-%: $(parser) % filesource $(shell find filesource -type f) $$(shell find % -type f) $(build_dir)/version | $(build_dir)
 	cd $* && go build
 	docker build -t ghcr.io/estuary/$*:$(version) --build-arg connector=$* .
 	@# This file is only used so that make can correctly determine if targets need rebuilt

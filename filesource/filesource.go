@@ -12,9 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/estuary/connectors/go-types/airbyte"
-	"github.com/estuary/connectors/go-types/parser"
-	"github.com/estuary/connectors/go-types/shardrange"
+	"github.com/estuary/connectors/parser"
+	"github.com/estuary/protocols/airbyte"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -235,7 +234,7 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 	}
 	if catalog.Range.IsZero() {
 		// Process all files, unless the parsed catalog says otherwise.
-		catalog.Range = shardrange.NewFullRange()
+		catalog.Range = airbyte.NewFullRange()
 	}
 
 	var states = make(States)
@@ -300,7 +299,7 @@ type reader struct {
 	pathRe      *regexp.Regexp
 	prefix      string
 	projections map[string]parser.JsonPointer
-	range_      shardrange.Range
+	range_      airbyte.Range
 	schema      json.RawMessage
 	state       State
 

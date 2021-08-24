@@ -10,8 +10,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go-types/airbyte"
-	"github.com/estuary/connectors/go-types/shardrange"
+	"github.com/estuary/protocols/airbyte"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -134,7 +133,7 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 	var shardRange = catalog.Range
 	if shardRange.IsZero() {
 		log.Info("using full shard range since no range was given in the catalog")
-		shardRange = shardrange.NewFullRange()
+		shardRange = airbyte.NewFullRange()
 	}
 
 	var stopAt *time.Time

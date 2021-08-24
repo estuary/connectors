@@ -9,7 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/connectors/go-types/shardrange"
+	"github.com/estuary/protocols/airbyte"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
@@ -21,7 +21,7 @@ import (
 // The `wg` is expected to have been incremented once _prior_ to calling this function. It will be
 // further incremented and decremented behind the scenes, but will be decremented back down to the
 // prior value when the read is finished.
-func readStream(ctx context.Context, shardRange shardrange.Range, client *kinesis.Kinesis, stream string, state map[string]string, resultsCh chan<- readResult, stopAt *time.Time, wg *sync.WaitGroup) {
+func readStream(ctx context.Context, shardRange airbyte.Range, client *kinesis.Kinesis, stream string, state map[string]string, resultsCh chan<- readResult, stopAt *time.Time, wg *sync.WaitGroup) {
 
 	var kc = &streamReader{
 		client:         client,
@@ -59,7 +59,7 @@ type streamReader struct {
 	client             *kinesis.Kinesis
 	ctx                context.Context
 	stream             string
-	shardRange         shardrange.Range
+	shardRange         airbyte.Range
 	dataCh             chan<- readResult
 	stopAt             *time.Time
 	waitGroup          *sync.WaitGroup
@@ -95,7 +95,7 @@ func (kc *streamReader) startReadingStream() error {
 	if err != nil {
 		return fmt.Errorf("listing kinesis shards: %w", err)
 	} else if len(initialShards) == 0 {
-		return fmt.Errorf("No kinesis shards found for the given stream")
+		return fmt.Errorf("no kinesis shards found for the given stream")
 	}
 	log.WithFields(log.Fields{
 		"kinesisStream":        kc.stream,
@@ -203,14 +203,6 @@ func (kc *streamReader) getShard(id string) (*kinesis.Shard, error) {
 	return out.Shards[0], nil
 }
 
-func (kc *streamReader) overlapsHashRange(shard *kinesis.Shard) (shardrange.OverlapResult, error) {
-	var kinesisRange, err = parseKinesisShardRange(*shard.HashKeyRange.StartingHashKey, *shard.HashKeyRange.EndingHashKey)
-	if err != nil {
-		return shardrange.NoOverlap, err
-	}
-	return kc.shardRange.Overlaps(kinesisRange), nil
-}
-
 func (kc *streamReader) startReadingShardByID(shardID string) {
 	kc.waitGroup.Add(1)
 	go func() {
@@ -255,7 +247,7 @@ func (kc *streamReader) newShardReader(shardID string, getShard func(string) (*k
 		return nil, fmt.Errorf("parsing kinesis shard range: %w", err)
 	}
 	var rangeResult = kc.shardRange.Overlaps(kinesisRange)
-	if rangeResult == shardrange.NoOverlap {
+	if rangeResult == airbyte.NoRangeOverlap {
 		logEntry.Info("Will not read kinesis shard because it falls outside of our hash range")
 		return nil, nil
 	}
@@ -308,10 +300,10 @@ func isMissingResource(err error) bool {
 
 // A reader of an individual kinesis shard.
 type shardReader struct {
-	rangeOverlap shardrange.OverlapResult
+	rangeOverlap airbyte.RangeOverlap
 	// The key hash range of the kinesis shard, which has been translated from 128bit to the 32bit
 	// space.
-	kinesisShardRange shardrange.Range
+	kinesisShardRange airbyte.Range
 	parent            *streamReader
 	source            *recordSource
 	lastSequenceID    string
@@ -446,7 +438,7 @@ func (r *shardReader) readShardIterator(iteratorID string) error {
 // Extracts the records from a response, filtering the records if necessary due to claiming partial
 // ownership over the kinesis shard.
 func (r *shardReader) extractRecords(resp *kinesis.GetRecordsOutput) []json.RawMessage {
-	if r.rangeOverlap == shardrange.PartialOverlap {
+	if r.rangeOverlap == airbyte.PartialRangeOverlap {
 		var result []json.RawMessage
 		for _, rec := range resp.Records {
 			var keyHash = hashPartitionKey(*rec.PartitionKey)

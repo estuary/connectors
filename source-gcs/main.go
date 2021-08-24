@@ -8,8 +8,8 @@ import (
 	"io"
 
 	"cloud.google.com/go/storage"
-	"github.com/estuary/connectors/go-types/filesource"
-	"github.com/estuary/connectors/go-types/parser"
+	"github.com/estuary/connectors/filesource"
+	"github.com/estuary/connectors/parser"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
