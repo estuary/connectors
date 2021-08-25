@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pglogrepl v0.0.0-20210731151948-9f1effd582c4
 	github.com/jackc/pgproto3 v1.1.0
 	github.com/jackc/pgproto3/v2 v2.1.1
+	github.com/jackc/pgtype v1.8.1
 	github.com/jackc/pgx/v4 v4.13.0
 	github.com/pkg/errors v0.8.1
 	github.com/stretchr/testify v1.7.0

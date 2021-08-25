@@ -12,12 +12,127 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgproto3/v2"
+	"github.com/jackc/pgtype"
 	"github.com/pkg/errors"
 )
 
 type ChangeEventHandler func(namespace, table string, eventType string, fields map[string]interface{}) error
+type XLogEventHandler func(ctx context.Context, xld pglogrepl.XLogData) error
+
+// One change that could simplify things a bit would be to have the
+// `ChangeEventHandler` type be an interface with `HandleData()`
+// and `HandleState()` methods. This would allow us to avoid
+// outputting directly to stdout.
 
 func streamReplicationEvents(ctx context.Context, conn *pgconn.PgConn, slotName, pubName string, startLSN pglogrepl.LSN, handler ChangeEventHandler) error {
+	connInfo := pgtype.NewConnInfo()
+	relations := make(map[uint32]pglogrepl.RelationMessage)
+	return streamXLogEvents(ctx, conn, slotName, pubName, startLSN, func(ctx context.Context, xld pglogrepl.XLogData) error {
+		msg, err := pglogrepl.Parse(xld.WALData)
+		if err != nil {
+			return errors.Wrap(err, "error parsing logical replication message")
+		}
+
+		log.Printf("XLogData(Type=%s, WALStart=%q, Length=%d)", msg.Type(), xld.WALStart, len(xld.WALData))
+		if xld.ServerWALEnd != xld.WALStart {
+			log.Printf("  !!! ServerWALEnd=%q", xld.ServerWALEnd)
+		}
+
+		var relID uint32
+		var tuple *pglogrepl.TupleData
+		switch msg := msg.(type) {
+		case *pglogrepl.InsertMessage:
+			tuple, relID = msg.Tuple, msg.RelationID
+		case *pglogrepl.UpdateMessage:
+			tuple, relID = msg.NewTuple, msg.RelationID
+		case *pglogrepl.DeleteMessage:
+			tuple, relID = msg.OldTuple, msg.RelationID
+
+		case *pglogrepl.BeginMessage:
+			log.Printf("Begin(WALStart=%q, FinalLSN=%q, XID=%v)", xld.WALStart, msg.FinalLSN, msg.Xid)
+			return nil
+		case *pglogrepl.CommitMessage:
+			log.Printf("Commit(WALStart=%q, CommitLSN=%q, TXEndLSN=%q)", xld.WALStart, msg.CommitLSN, msg.TransactionEndLSN)
+			rawState, err := json.Marshal(ResumeState{
+				ResumeLSN: msg.CommitLSN,
+			})
+			if err != nil {
+				return errors.Wrap(err, "error encoding state message")
+			}
+			if err := json.NewEncoder(os.Stdout).Encode(airbyte.Message{
+				Type:  airbyte.MessageTypeState,
+				State: &airbyte.State{Data: json.RawMessage(rawState)},
+			}); err != nil {
+				return errors.Wrap(err, "error writing state message")
+			}
+			return nil
+		case *pglogrepl.RelationMessage:
+			// Keep track of the relation in order to understand future Insert/Update/Delete messages
+			//
+			// TODO(wgd): How do we know when to delete a relation? Worst-case we can use a timestamp
+			// and a separate grooming thread to delete them after some time window has elapsed, but
+			// I haven't been able to find any documentation of any of these logical replication
+			// messages so I'm hesitant to make assumptions about anything.
+			relations[msg.RelationID] = *msg
+			return nil
+		default:
+			log.Printf("UnhandledMessage(WALStart=%q, Type=%v)", xld.WALStart, msg.Type())
+			return nil
+		}
+
+		// Because all message cases other than Insert/Update/Delete return,
+		// at this point we're handling actual data messages.
+		rel, ok := relations[relID]
+		if !ok {
+			return errors.Errorf("unknown relation %d", relID)
+		}
+
+		fields := make(map[string]interface{})
+		log.Printf("%s(WALStart=%q, RID=%v, Namespace=%v, RelName=%v)", xld.WALStart, msg.Type(), rel.RelationID, rel.Namespace, rel.RelationName)
+		if tuple != nil {
+			for idx, col := range tuple.Columns {
+				log.Printf("  (name=%q, type=%q, data=%q)", rel.Columns[idx].Name, col.DataType, col.Data)
+
+				colName := rel.Columns[idx].Name
+				switch col.DataType {
+				case 'n':
+					fields[colName] = nil
+				case 't':
+					val, err := decodeTextColumnData(connInfo, col.Data, rel.Columns[idx].DataType, rel.Columns[idx].TypeModifier)
+					if err != nil {
+						return errors.Wrap(err, "error decoding column data")
+					}
+					fields[colName] = val
+				default:
+					return errors.Errorf("unhandled column data type %v", col.DataType)
+				}
+			}
+		}
+
+		if err := handler(rel.Namespace, rel.RelationName, msg.Type().String(), fields); err != nil {
+			return errors.Wrap(err, "error handling change event")
+		}
+		return nil
+	})
+}
+
+func decodeTextColumnData(connInfo *pgtype.ConnInfo, data []byte, dataType, typeMod uint32) (interface{}, error) {
+	var decoder pgtype.TextDecoder
+	if dt, ok := connInfo.DataTypeForOID(dataType); ok {
+		decoder, ok = dt.Value.(pgtype.TextDecoder)
+		if !ok {
+			decoder = &pgtype.GenericText{}
+		}
+	} else {
+		decoder = &pgtype.GenericText{}
+	}
+	if err := decoder.DecodeText(connInfo, data); err != nil {
+		return nil, err
+	}
+	return decoder.(pgtype.Value).Get(), nil
+}
+
+func streamXLogEvents(ctx context.Context, conn *pgconn.PgConn, slotName, pubName string, startLSN pglogrepl.LSN, handler XLogEventHandler) error {
 	sysident, err := pglogrepl.IdentifySystem(ctx, conn)
 	if err != nil {
 		return errors.Wrap(err, "unable to identify system")
@@ -51,7 +166,15 @@ func streamReplicationEvents(ctx context.Context, conn *pgconn.PgConn, slotName,
 		}
 
 		if time.Now().After(nextStandbyMessageDeadline) {
-			if err := pglogrepl.SendStandbyStatusUpdate(context.Background(), conn, pglogrepl.StandbyStatusUpdate{WALWritePosition: clientXLogPos}); err != nil {
+			// TODO(wgd): Set `WALFlushPosition` and/or `WALApplyPosition` to inform
+			// Postgres about permanent changes to the replication slot LSN. In theory
+			// we can advance the slot LSN after each new state update is emitted, since
+			// at that point if the connector is killed and restarted it should only
+			// resume from that newer LSN. However we might want to delay that a bit
+			// since there's no *confirmation* of a state update.
+			if err := pglogrepl.SendStandbyStatusUpdate(ctx, conn, pglogrepl.StandbyStatusUpdate{
+				WALWritePosition: clientXLogPos,
+			}); err != nil {
 				log.Fatalln("SendStandbyStatusUpdate failed:", err)
 			}
 			log.Println("Sent Standby status message")
@@ -85,7 +208,7 @@ func streamReplicationEvents(ctx context.Context, conn *pgconn.PgConn, slotName,
 				if err != nil {
 					return errors.Wrap(err, "error parsing XLogData")
 				}
-				if err := processXLogData(ctx, xld, handler); err != nil {
+				if err := handler(ctx, xld); err != nil {
 					return err
 				}
 				clientXLogPos = xld.WALStart + pglogrepl.LSN(len(xld.WALData))
@@ -96,99 +219,4 @@ func streamReplicationEvents(ctx context.Context, conn *pgconn.PgConn, slotName,
 			log.Printf("Received unexpected message: %v", msg)
 		}
 	}
-}
-
-// TODO: Don't use a global for these
-type RelationID = uint32
-
-var relations = make(map[RelationID]pglogrepl.RelationMessage)
-
-func processXLogData(ctx context.Context, xld pglogrepl.XLogData, handler ChangeEventHandler) error {
-	msg, err := pglogrepl.Parse(xld.WALData)
-	if err != nil {
-		return errors.Wrap(err, "error parsing logical replication message")
-	}
-
-	log.Printf("XLogData(Type=%s, WALStart=%q, Length=%d)", msg.Type(), xld.WALStart, len(xld.WALData))
-	if xld.ServerWALEnd != xld.WALStart {
-		log.Printf("  !!! ServerWALEnd=%q", xld.ServerWALEnd)
-	}
-
-	switch msg := msg.(type) {
-	case *pglogrepl.BeginMessage:
-		log.Printf("Begin(finalLSN=%q, xid=%v)", msg.FinalLSN, msg.Xid)
-	case *pglogrepl.CommitMessage:
-		log.Printf("Commit(commitLSN=%q, txEndLSN=%q)", msg.CommitLSN, msg.TransactionEndLSN)
-		rawState, err := json.Marshal(ResumeState{
-			ResumeLSN: msg.CommitLSN,
-		})
-		if err != nil {
-			return errors.Wrap(err, "error encoding state message")
-		}
-		if err := json.NewEncoder(os.Stdout).Encode(airbyte.Message{
-			Type:  airbyte.MessageTypeState,
-			State: &airbyte.State{Data: json.RawMessage(rawState)},
-		}); err != nil {
-			return errors.Wrap(err, "error writing state message")
-		}
-	// case *pglogrepl.OriginMessage:
-	// 	log.Printf("  Origin()")
-	// case *pglogrepl.TypeMessage:
-	// 	log.Printf("  Type()")
-	// case *pglogrepl.TruncateMessage:
-	// 	log.Printf("  Truncate()")
-	case *pglogrepl.RelationMessage:
-		// Keep track of the relation in order to understand future Insert/Update/Delete messages
-		//
-		// TODO(wgd): How do we know when to delete a relation? Worst-case we can use a timestamp
-		// and a separate grooming thread to delete them after some time window has elapsed, but
-		// I haven't been able to find any documentation of any of these logical replication
-		// messages so I'm hesitant to make assumptions about anything.
-		relations[msg.RelationID] = *msg
-	case *pglogrepl.InsertMessage:
-		return processDataMessage(ctx, msg.Type(), msg.RelationID, msg.Tuple, handler)
-	case *pglogrepl.UpdateMessage:
-		return processDataMessage(ctx, msg.Type(), msg.RelationID, msg.NewTuple, handler)
-	case *pglogrepl.DeleteMessage:
-		return processDataMessage(ctx, msg.Type(), msg.RelationID, msg.OldTuple, handler)
-	default:
-		log.Printf("Unhandled message type %q", msg.Type())
-	}
-	return nil
-}
-
-func processDataMessage(ctx context.Context, msgType pglogrepl.MessageType, relID RelationID, tuple *pglogrepl.TupleData, handler ChangeEventHandler) error {
-	rel, ok := relations[relID]
-	if !ok {
-		return errors.Errorf("unknown relation %d", relID)
-	}
-
-	fields := make(map[string]interface{})
-	log.Printf("%s(rid=%v, namespace=%v, relName=%v)", msgType, rel.RelationID, rel.Namespace, rel.RelationName)
-	if tuple != nil {
-		for idx, col := range tuple.Columns {
-			log.Printf("  (name=%q, type=%q, data=%q)", rel.Columns[idx].Name, col.DataType, col.Data)
-
-			colName := rel.Columns[idx].Name
-			switch col.DataType {
-			case 'n':
-				fields[colName] = nil
-			case 't':
-				fields[colName] = encodeColumnData(col.Data, rel.Columns[idx].DataType, rel.Columns[idx].TypeModifier)
-			default:
-				return errors.Errorf("unhandled column data type %v", col.DataType)
-			}
-		}
-	}
-
-	if err := handler(rel.Namespace, rel.RelationName, msgType.String(), fields); err != nil {
-		return errors.Wrap(err, "error handling change event")
-	}
-	return nil
-}
-
-func encodeColumnData(data []byte, dataType, typeMod uint32) interface{} {
-	// TODO(wgd): Use `dataType` and `typeMod` to more intelligently convert
-	// text-format values from Postgres into JSON-encodable values.
-	return string(data)
 }
