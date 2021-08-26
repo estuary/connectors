@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v4"
@@ -19,11 +18,29 @@ type TableSnapshotStream struct {
 }
 
 func SnapshotTable(ctx context.Context, conn *pgx.Conn, namespace, table string) (*TableSnapshotStream, error) {
-	transaction, err := conn.Begin(ctx)
+	transaction, err := conn.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel:   pgx.Serializable,
+		AccessMode: pgx.ReadOnly,
+	})
 	if err != nil {
+		conn.Close(ctx)
 		return nil, errors.Wrap(err, "unable to begin transaction")
 	}
+	stream := &TableSnapshotStream{
+		conn:        conn,
+		transaction: transaction,
+		namespace:   namespace,
+		table:       table,
+	}
+	if err := stream.queryTransactionLSN(ctx); err != nil {
+		stream.transaction.Rollback(ctx)
+		stream.conn.Close(ctx)
+		return nil, err
+	}
+	return stream, nil
+}
 
+func (s *TableSnapshotStream) queryTransactionLSN(ctx context.Context) error {
 	// TODO(wgd): Using `pg_current_wal_lsn()` isn't technically correct, ideally
 	// there would be some query we could execute to get an LSN corresponding to
 	// the current transaction. But this will do until it becomes a problem or I
@@ -33,18 +50,11 @@ func SnapshotTable(ctx context.Context, conn *pgx.Conn, namespace, table string)
 	// with a UUID for syncing up SELECT results with WAL entries, and say no
 	// more about it for now.
 	var txLSN pglogrepl.LSN
-	if err := transaction.QueryRow(ctx, `SELECT * FROM pg_current_wal_lsn();`).Scan(&txLSN); err != nil {
-		return nil, errors.Wrap(err, "unable to query transaction LSN")
+	if err := s.transaction.QueryRow(ctx, `SELECT * FROM pg_current_wal_lsn();`).Scan(&txLSN); err != nil {
+		return errors.Wrap(err, "unable to query transaction LSN")
 	}
-	log.Printf("Transaction LSN: %q", txLSN)
-
-	return &TableSnapshotStream{
-		conn:        conn,
-		transaction: transaction,
-		namespace:   namespace,
-		table:       table,
-		txLSN:       txLSN,
-	}, nil
+	s.txLSN = txLSN
+	return nil
 }
 
 func (s *TableSnapshotStream) TransactionLSN() pglogrepl.LSN {
@@ -52,7 +62,6 @@ func (s *TableSnapshotStream) TransactionLSN() pglogrepl.LSN {
 }
 
 func (s *TableSnapshotStream) Process(ctx context.Context, handler ChangeEventHandler) error {
-	log.Printf("streamSnapshotEvents()")
 	rows, err := s.conn.Query(ctx, fmt.Sprintf(`SELECT * FROM %s.%s;`, s.namespace, s.table))
 	if err != nil {
 		return errors.Wrap(err, "unable to execute query")
@@ -77,5 +86,8 @@ func (s *TableSnapshotStream) Process(ctx context.Context, handler ChangeEventHa
 }
 
 func (s *TableSnapshotStream) Close(ctx context.Context) error {
-	return s.transaction.Rollback(ctx)
+	if err := s.transaction.Rollback(ctx); err != nil {
+		return err
+	}
+	return s.conn.Close(ctx)
 }

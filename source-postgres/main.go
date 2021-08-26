@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/estuary/connectors/go-types/airbyte"
@@ -39,208 +40,263 @@ const configSchema = `{
 	"required": [ "connectionURI" ]
 }`
 
-const SLOT_NAME = "estuary_flow_slot"
-const PUBLICATION_NAME = "estuary_flow_publication"
-const OUTPUT_PLUGIN = "pgoutput"
-
-type ResumeState struct {
-	SlotName  string
-	ResumeLSN pglogrepl.LSN
-}
-
-func (rs *ResumeState) Validate() error {
-	return nil
-}
+// Guarantee that the connector will not run longer than 48 hours without a
+// restart. Since advancing the PostgreSQL replication slot `restart_lsn` only
+// happens on restart (see comment in `replication.go` for explanation), this
+// connector requires occasional restarts to allow PostgreSQL to free older WAL
+// segments.
+const poisonPillDuration = 48 * time.Hour
 
 func doRead(args airbyte.ReadCmd) error {
-	var config Config
-	if err := args.ConfigFile.Parse(&config); err != nil {
-		return err
+	state := new(CaptureState)
+	if state.Streams == nil {
+		state.Streams = make(map[string]*TableState)
 	}
-	var catalog airbyte.ConfiguredCatalog
-	if err := args.CatalogFile.Parse(&catalog); err != nil {
-		return errors.Wrap(err, "unable to parse catalog")
-	}
-	var state ResumeState
+
 	if args.StateFile != "" {
-		if err := args.StateFile.Parse(&state); err != nil {
+		if err := args.StateFile.Parse(state); err != nil {
 			return errors.Wrap(err, "unable to parse state file")
 		}
 	}
-
-	ctx := context.Background()
-	connConfig, err := pgx.ParseConfig(config.ConnectionURI)
-	if err != nil {
+	if err := args.ConfigFile.Parse(&state.config); err != nil {
 		return err
 	}
+	if err := args.CatalogFile.Parse(&state.catalog); err != nil {
+		return errors.Wrap(err, "unable to parse catalog")
+	}
+	state.output = NewMessageOutput()
 
-	// Connect normally
-	conn, err := pgx.ConnectConfig(ctx, connConfig)
+	state.output.debugOutputDelay = 1 * time.Second // DEBUG CHANGE, DO NOT COMMIT
+
+	ctx, cancel := context.WithTimeout(context.Background(), poisonPillDuration)
+	defer cancel()
+
+	return state.Process(ctx)
+}
+
+type CaptureState struct {
+	CurrentLSN pglogrepl.LSN          `json:"current_lsn"`
+	Streams    map[string]*TableState `json:"streams"`
+
+	openTransactions int
+
+	config  Config
+	catalog airbyte.ConfiguredCatalog
+	output  *MessageOutput
+}
+
+type TableState struct {
+	Mode        string        `json:"mode"`
+	SnapshotLSN pglogrepl.LSN `json:"scanned_lsn,omitempty"`
+}
+
+func (cs *CaptureState) Validate() error {
+	return nil
+}
+
+const SLOT_NAME = "estuary_flow_slot"
+const PUBLICATION_NAME = "estuary_flow_publication"
+
+func (cs *CaptureState) Process(ctx context.Context) error {
+	// Normal database connection used for table scanning
+	conn, err := pgx.Connect(ctx, cs.config.ConnectionURI)
 	if err != nil {
 		return errors.Wrap(err, "unable to connect to database")
 	}
-	defer conn.Close(ctx)
 
-	// Connect with replication=database
-	replConfig, err := pgconn.ParseConfig(config.ConnectionURI)
+	// Replication database connection used for event streaming
+	replicationConnConfig, err := pgconn.ParseConfig(cs.config.ConnectionURI)
 	if err != nil {
 		return err
 	}
-	replConfig.RuntimeParams["replication"] = "database"
-	replConn, err := pgconn.ConnectConfig(ctx, replConfig)
+	// Always connect with replication=database
+	replicationConnConfig.RuntimeParams["replication"] = "database"
+	replicationConn, err := pgconn.ConnectConfig(ctx, replicationConnConfig)
 	if err != nil {
 		return errors.Wrap(err, "unable to establish replication connection")
 	}
 
-	snapshot, err := SnapshotTable(ctx, conn, "public", "babynames")
-	if err != nil {
-		return errors.Wrap(err, "error creating table snapshot stream")
-	}
-	log.Printf("Created table snapshot stream at LSN=%q", snapshot.TransactionLSN())
-	if err := snapshot.Process(ctx, emitChangeRecord); err != nil {
-		return errors.Wrap(err, "error processing snapshot events")
-	}
-	log.Printf("Table snapshot processing complete")
+	// Database capture in a nutshell:
+	//   1. If this is the first time we're starting, immediately go get the current
+	//      server LSN, this is where we will begin replication in step 3. If we're
+	//      resuming then we already have our start point and this is not necessary.
+	//   2. For all tables which are in the ConfiguredCatalog but not in the current CaptureState:
+	//      - Perform a full scan of the table, turning every result row into an `Insert` event
+	//      - Obtain an LSN corresponding to this table scan contents, such that events older
+	//        than this LSN are already taken into account and newer events represent changes
+	//        from that baseline.
+	//      - Add an entry to CaptureState indicating that this table is in the `Snapshot(<LSN>)`
+	//        state, and emit the resulting CaptureState.
+	//   3. Begin replication from `CurrentLSN`
+	//      - Each time a "consistent point" is reached where there are no open transactions,
+	//        update the `CurrentLSN` to the new point and emit a state update.
+	//      - Whenever a change event (Insert/Update/Delete) occurs, look up the table state
+	//        - If it's `Active` then emit the event.
+	//        - If it's `Snapshot(<LSN>)` and `eventLSN` > `snapshotLSN` then enter `Active` state and emit the event.
+	//        - If it's `Snapshot(<LSN>)` and `eventLSN` <= `snapshotLSN` then discard the event.
 
-	// TODO: Emit a state update as soon as the snapshot is complete, don't
-	// wait for the first COMMIT message to occur. Or modify the logic in
-	// `streamReplicationEvents` to emit eagerly before doing anything else.
-	sysident, err := pglogrepl.IdentifySystem(ctx, replConn)
-	if err != nil {
-		return errors.Wrap(err, "unable to get current LSN from database")
+	// Step One: Get the current server LSN if our start point isn't already known
+	if cs.CurrentLSN == 0 {
+		sysident, err := pglogrepl.IdentifySystem(ctx, replicationConn)
+		if err != nil {
+			conn.Close(ctx)
+			return errors.Wrap(err, "unable to get current LSN from database")
+		}
+		cs.CurrentLSN = sysident.XLogPos
 	}
-	stream, err := StartReplication(ctx, replConn, SLOT_NAME, PUBLICATION_NAME, sysident.XLogPos)
+
+	// Step Two: Table Scanning
+	// TODO(wgd): Remove stream state entries if the catalog entry is deleted
+	for _, catalogStream := range cs.catalog.Streams {
+		streamName := catalogStream.Stream.Name
+		if _, ok := cs.Streams[streamName]; ok {
+			continue
+		}
+		if err := cs.PerformTableSnapshot(ctx, conn, streamName); err != nil {
+			return err
+		}
+	}
+
+	// Step Three: Stream replication events
+	// TODO(wgd): Get slot name and publication name from the config or the catalog or whatever
+	stream, err := StartReplication(ctx, replicationConn, SLOT_NAME, PUBLICATION_NAME, cs.CurrentLSN)
 	if err != nil {
 		return errors.Wrap(err, "unable to start replication stream")
 	}
-
-	log.Printf("Beginning stream processing")
-	if err := stream.Process(ctx, emitChangeRecord); err != nil {
+	defer stream.Close(ctx)
+	if err := stream.Process(ctx, cs.HandleReplicationEvent); err != nil {
 		return errors.Wrap(err, "error processing replication events")
 	}
-	log.Printf("Stream processing completed (this shouldn't happen)")
-
-	// What's the data type for the state encoding which can represent
-	// things like "The connector was previously running on tables 'foo'
-	// and 'bar' through to <LSN>, and now it's been relaunched and there
-	// is a new table 'baz' which needs to be snapshot-scanned" and then
-	// a bit later "The table 'baz' has been snapshot-scanned and we are
-	// now doing a catchup stream of the replication events until we reach
-	// the same point in the logs"?
-	//
-	// Or rather, our state encoding largely just needs to represent the
-	// checkpoints in that process. Since there's no way to *resume* the
-	// snapshot scanning part, that should be treated as atomic. So we
-	// need to keep track of each table separately, and there are two
-	// states that a table can be in:
-	//   + Catchup(<LSN>) - Until we catch up with <LSN> in the replication
-	//     stream we will discard all events for this table.
-	//   + Active() - Just emit records for this table.
-	//
-	// What happens if the connector is shut down, a table is removed from
-	// the catalog, it's re-run for a while, and then the table is re-added?
-	// There's no hope of doing something better than re-scanning, so that
-	// implies that if a table vanishes from the catalog while being mentioned
-	// in the resume state we should erase it from future resume state outputs.
-
-	// There are two viable approaches here: either suspend log processing
-	// entirely using context cancellation, or else cause it to block on
-	// a semaphore *inside* of the handler until we're ready to resume.
-
-	// Okay, so the idea is that we're going to start up by opening a
-	// transaction for the full table scan and figure out what tables
-	// will need said full scan. These can be immediately scanned and
-	// the corresponding records emitted to stdout.
-	//
-	// Then we begin streaming processing from our resume cursor, and
-	// what we need to do is filter out any change events from our new
-	// tables until such a time as the change LSNs are greater than
-	// the transaction LSN in which we read the table initially.
-	//
-	// Now, what are the semantics if the connector crashes or gets
-	// killed prior to finishing the table scan and/or catch-up
-	// streaming? As I understand it, Flow/Gazette will bundle
-	// together data records and state updates into a "Checkpoint"
-	// of some sort, so what are the consistency guarantees there?
-	//
-	// I'm especially worried about the following scenario:
-	//   1. Connector launches, reads all table contents, begins catch-up
-	//      streaming (that is, event processing where the current LSN is
-	//      still less than the "start emitting events for the new table"
-	//      threshold), and emits at least one state update.
-	//   2. Connector gets killed
-	//   3. Some rows get deleted from that table
-	//   4. Connector is re-launched
-	//
-	// If we're not careful this could result in some deletions that will
-	// never be noticed. But if the checkpointing behavior relies on there
-	// being state updates then we might be able to provide better guarantees
-	// by suppressing any state updates until the catch-up streaming ends.
-	//
-	// Of course there's the possibility of a reinforcing loop there, if the
-	// catch-up streaming process consistently takes longer than the "kill and
-	// restart connector" threshold then the amount of data to be caught up on
-	// will just keep growing larger and larger each time it runs.
-	//
-	// Which brings us back to the "chunked" table scan option, which would
-	// require us to interleave table scans with replication event handling,
-	// but would in exchange allow us to say "when doing stream processing,
-	// ignore events on <table> for keys between <key> and <key> until you
-	// reach sequence number <LSN>".
-
-	// But that's more complex than currently required. To start with, let's
-	// simply do the "initial table scan" case. But specifically let's have
-	// an LSN per table
-
+	log.Printf("Stream processing terminated without error. That shouldn't be possible.")
 	return nil
 }
 
-func emitChangeRecord(event string, lsn pglogrepl.LSN, ns, table string, fields map[string]interface{}) error {
-	log.Printf("%s(LSN=%q, Table=%s.%s)", event, lsn, ns, table)
+func (cs *CaptureState) PerformTableSnapshot(ctx context.Context, conn *pgx.Conn, streamName string) error {
+	snapshot, err := SnapshotTable(ctx, conn, "public", streamName)
+	if err != nil {
+		return errors.Wrap(err, "error creating table snapshot stream")
+	}
+	defer snapshot.Close(ctx)
+	log.Printf("Scanning table %q at LSN=%q", streamName, snapshot.TransactionLSN())
+	if err := snapshot.Process(ctx, cs.HandleSnapshotEvent); err != nil {
+		return errors.Wrap(err, "error processing snapshot events")
+	}
+	log.Printf("Done scanning table %q at LSN=%q", streamName, snapshot.TransactionLSN())
+	cs.Streams[streamName] = &TableState{
+		Mode:        "Snapshot",
+		SnapshotLSN: snapshot.TransactionLSN(),
+	}
+	return cs.output.EmitState(cs)
+}
 
+func (cs *CaptureState) HandleSnapshotEvent(event string, lsn pglogrepl.LSN, ns, table string, fields map[string]interface{}) error {
+	// Snapshot "events" are just a bunch of fake "Insert"s and should be emitted unconditionally
+	return cs.HandleChangeEvent(event, lsn, ns, table, fields)
+}
+
+func (cs *CaptureState) HandleReplicationEvent(event string, lsn pglogrepl.LSN, ns, table string, fields map[string]interface{}) error {
+	if event == "Begin" {
+		cs.openTransactions++
+		return nil
+	}
 	if event == "Commit" {
 		// TODO(wgd): What exactly are the semantics of transaction committing in the
 		// logical replication WAL? Should we be buffering Insert/Update/Delete operations
 		// and only emitting them as part of the Commit?
-		rawState, err := json.Marshal(ResumeState{
-			ResumeLSN: lsn,
-		})
-		if err != nil {
-			return errors.Wrap(err, "error encoding state message")
-		}
-		if err := json.NewEncoder(os.Stdout).Encode(airbyte.Message{
-			Type:  airbyte.MessageTypeState,
-			State: &airbyte.State{Data: json.RawMessage(rawState)},
-		}); err != nil {
-			return errors.Wrap(err, "error writing state message")
+		cs.openTransactions--
+		if cs.openTransactions == 0 {
+			log.Printf("Consistent Point at LSN=%q", lsn)
+			cs.CurrentLSN = lsn
+			return cs.output.EmitState(cs)
 		}
 		return nil
 	}
 
-	if event == "Begin" {
-		log.Printf("Ignoring BEGIN at LSN=%q", pglogrepl.LSN(lsn))
+	tableState := cs.Streams[table]
+	// Tables for which we're not tracking state by the time replication event
+	// processing has begun are tables that aren't configured in the catalog,
+	// so don't emit any change messages for them.
+	if tableState == nil {
 		return nil
 	}
+	// Tables in the "Snapshot" state shouldn't emit change messages until we
+	// reach the appropriate LSN
+	if tableState.Mode == "Snapshot" && lsn < tableState.SnapshotLSN {
+		log.Printf("Filtered %s on %q at LSN=%q", event, table, lsn)
+		return nil
+	}
+	// Once we've reached the LSN at which the table was scanned, it becomes active
+	if tableState.Mode == "Snapshot" && lsn >= tableState.SnapshotLSN {
+		log.Printf("Stream %q marked active at LSN=%q", table, lsn)
+		tableState.Mode = "Active"
+		tableState.SnapshotLSN = 0
+	}
+	// And once a table is active we emit its events
+	if tableState.Mode == "Active" {
+		return cs.HandleChangeEvent(event, lsn, ns, table, fields)
+	}
+	// This should never happen
+	return errors.Errorf("invalid state %#v for table %q", tableState, table)
+}
 
-	fields["_type"] = event
+func (cs *CaptureState) HandleChangeEvent(event string, lsn pglogrepl.LSN, ns, table string, fields map[string]interface{}) error {
+	//log.Printf("%s(LSN=%q, Table=%s.%s)", event, lsn, ns, table)
+
+	// TODO(wgd): Should these field names and values aim for exact
+	// compatibility with Airbyte Postgres CDC operation?
+	fields["_change_type"] = event
+	fields["_change_lsn"] = lsn
+	if event == "Insert" || event == "Update" {
+		fields["_updated_at"] = time.Now()
+	}
 	if event == "Delete" {
-		fields["_deleted"] = true
+		fields["_deleted_at"] = time.Now()
 	}
+	return cs.output.EmitRecord(ns, table, fields)
+}
 
-	rawData, err := json.Marshal(fields)
+// A MessageOutput is a thread-safe JSON-encoding output stream with convenience
+// methods for emitting Airbyte Records and State messages.
+type MessageOutput struct {
+	sync.Mutex
+	encoder *json.Encoder
+
+	debugOutputDelay time.Duration // DEBUG CHANGE, DO NOT COMMIT
+}
+
+func NewMessageOutput() *MessageOutput {
+	return &MessageOutput{encoder: json.NewEncoder(os.Stdout)}
+}
+
+func (m *MessageOutput) EmitRecord(ns, stream string, data interface{}) error {
+	rawData, err := json.Marshal(data)
 	if err != nil {
-		return errors.Wrap(err, "error encoding message data")
+		return errors.Wrap(err, "error encoding record data")
 	}
-	if err := json.NewEncoder(os.Stdout).Encode(airbyte.Message{
+	m.Lock()
+	defer m.Unlock()
+	time.Sleep(m.debugOutputDelay) // DEBUG CHANGE, DO NOT COMMIT
+	return m.encoder.Encode(airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
 		Record: &airbyte.Record{
 			Namespace: ns,
-			Stream:    table,
+			Stream:    stream,
 			EmittedAt: time.Now().Unix(),
 			Data:      json.RawMessage(rawData),
 		},
-	}); err != nil {
-		return errors.Wrap(err, "error writing output message")
+	})
+}
+
+func (m *MessageOutput) EmitState(state interface{}) error {
+	rawState, err := json.Marshal(state)
+	if err != nil {
+		return errors.Wrap(err, "error encoding state message")
 	}
-	return nil
+	m.Lock()
+	defer m.Unlock()
+	time.Sleep(m.debugOutputDelay) // DEBUG CHANGE, DO NOT COMMIT
+	return m.encoder.Encode(airbyte.Message{
+		Type:  airbyte.MessageTypeState,
+		State: &airbyte.State{Data: json.RawMessage(rawState)},
+	})
 }
