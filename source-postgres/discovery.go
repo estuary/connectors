@@ -11,9 +11,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+// TODO(wgd): Figure out what sync modes are appropriate for this connector.
+// Is it even possible to say that a connector doesn't support full refresh?
+// If not, what are the semantics of performing a full refresh here?
 var spec = airbyte.Spec{
-	SupportsIncremental:           true,                            // TODO(wgd): Verify that this is true once implemented
-	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes, // TODO(wgd): Verify that this is true once implemented
+	SupportsIncremental:           true,
+	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
 	ConnectionSpecification:       json.RawMessage(configSchema),
 }
 
@@ -97,7 +100,7 @@ func discoverCatalog(configFile airbyte.ConfigFile) (*airbyte.Catalog, error) {
 		log.Printf("  Columns: %v", table.Columns)
 		log.Printf("  Primary Keys: %v", table.PrimaryKeys)
 
-		// TODO: Maybe generate the schema in a less hackish fashion
+		// TODO(wgd): Maybe generate the schema in a less hackish fashion
 		rowSchema := `{"type":"object","properties":{`
 		for idx, column := range table.Columns {
 			if idx > 0 {
@@ -153,6 +156,9 @@ func getColumns(ctx context.Context, conn *pgx.Conn) ([]DBColumn, error) {
 	return columns, err
 }
 
+// TODO(wgd): Revisit whether the PostgreSQL Schema -> JSON Spec translation for
+// column types can be done automatically, or at least flesh out the set of types
+// handled in this map.
 var postgresTypeToJSON = map[string]string{
 	"int4":    `{"type":"number"}`,
 	"varchar": `{"type":"string"}`,

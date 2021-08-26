@@ -26,11 +26,10 @@ type ReplicationStream struct {
 	commitLSN  uint64
 	conn       *pgconn.PgConn
 
-	closed                bool
 	standbyStatusDeadline time.Time
 
 	connInfo  *pgtype.ConnInfo
-	relations map[uint32]pglogrepl.RelationMessage
+	relations map[uint32]*pglogrepl.RelationMessage
 }
 
 const standbyStatusInterval = 10 * time.Second
@@ -64,14 +63,10 @@ func StartReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		//
 		// This hinges on connectors getting shut down and restarted every so often, which is a
 		// guarantee that should ideally be provided by the runtime anyway.
-		//
-		// TODO(wgd): Consider adding a "Poison Pill" deadline to the initial context in main.go
-		// which will cause the connector to automatically shut down after a day or two, there's
-		// no need to rely solely on the runtime being perfect in this regard.
 		commitLSN: uint64(startLSN),
 		conn:      conn,
 		connInfo:  pgtype.NewConnInfo(),
-		relations: make(map[uint32]pglogrepl.RelationMessage),
+		relations: make(map[uint32]*pglogrepl.RelationMessage),
 	}
 
 	log.Printf("Streaming events from LSN %q", stream.currentLSN)
@@ -91,85 +86,69 @@ func StartReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 
 func (s *ReplicationStream) Process(ctx context.Context, handler ChangeEventHandler) error {
 	for {
-		if s.closed {
-			return errors.New("stream has been closed")
-		}
-
 		xld, err := s.receiveXLogData(ctx)
 		if err != nil {
 			return err
 		}
-
 		msg, err := pglogrepl.Parse(xld.WALData)
 		if err != nil {
 			return errors.Wrap(err, "error parsing logical replication message")
 		}
 
-		var relID uint32
-		var tuple *pglogrepl.TupleData
 		switch msg := msg.(type) {
 		case *pglogrepl.InsertMessage:
-			tuple, relID = msg.Tuple, msg.RelationID
+			s.processChange(ctx, msg.Type().String(), xld, msg.Tuple, msg.RelationID, handler)
 		case *pglogrepl.UpdateMessage:
-			tuple, relID = msg.NewTuple, msg.RelationID
+			s.processChange(ctx, msg.Type().String(), xld, msg.NewTuple, msg.RelationID, handler)
 		case *pglogrepl.DeleteMessage:
-			tuple, relID = msg.OldTuple, msg.RelationID
-
+			s.processChange(ctx, msg.Type().String(), xld, msg.OldTuple, msg.RelationID, handler)
 		case *pglogrepl.BeginMessage:
-			//log.Printf("Begin(WALStart=%q, FinalLSN=%q, XID=%v)", xld.WALStart, msg.FinalLSN, msg.Xid)
 			handler("Begin", msg.FinalLSN, "", "", nil)
-			continue
 		case *pglogrepl.CommitMessage:
-			//log.Printf("Commit(WALStart=%q, CommitLSN=%q, TXEndLSN=%q)", xld.WALStart, msg.CommitLSN, msg.TransactionEndLSN)
 			handler("Commit", msg.TransactionEndLSN, "", "", nil)
-			continue
 		case *pglogrepl.RelationMessage:
 			// Keep track of the relation in order to understand future Insert/Update/Delete messages
 			//
-			// TODO(wgd): How do we know when to delete a relation? Worst-case we can use a timestamp
-			// and a separate grooming thread to delete them after some time window has elapsed, but
-			// I haven't been able to find any documentation of any of these logical replication
-			// messages so I'm hesitant to make assumptions about anything.
-			s.relations[msg.RelationID] = *msg
-			continue
+			// TODO(wgd): How do we know when to delete a relation? If it's guaranteed that they won't
+			// be reused across transactions then we could keep track of BEGIN/COMMIT counts and clear
+			// the relations map whenever we reach a point outside of any transactions, but I'm not
+			// sure if that's guaranteed to happen either on a busy database.
+			s.relations[msg.RelationID] = msg
 		default:
-			log.Printf("UnhandledMessage(WALStart=%q, Type=%v)", xld.WALStart, msg.Type())
-			continue
-		}
-
-		// Because all message cases other than Insert/Update/Delete return,
-		// at this point we're handling actual data messages.
-		rel, ok := s.relations[relID]
-		if !ok {
-			return errors.Errorf("unknown relation %d", relID)
-		}
-
-		fields := make(map[string]interface{})
-		//log.Printf("%s(WALStart=%q, RID=%v, Namespace=%v, RelName=%v)", msg.Type(), xld.WALStart, rel.RelationID, rel.Namespace, rel.RelationName)
-		if tuple != nil {
-			for idx, col := range tuple.Columns {
-				//log.Printf("  (name=%q, type=%q, data=%q)", rel.Columns[idx].Name, col.DataType, col.Data)
-
-				colName := rel.Columns[idx].Name
-				switch col.DataType {
-				case 'n':
-					fields[colName] = nil
-				case 't':
-					val, err := s.decodeTextColumnData(col.Data, rel.Columns[idx].DataType)
-					if err != nil {
-						return errors.Wrap(err, "error decoding column data")
-					}
-					fields[colName] = val
-				default:
-					return errors.Errorf("unhandled column data type %v", col.DataType)
-				}
-			}
-		}
-
-		if err := handler(msg.Type().String(), xld.WALStart, rel.Namespace, rel.RelationName, fields); err != nil {
-			return errors.Wrap(err, "error handling change event")
+			log.Printf("Unhandled Message (Type=%v, WALStart=%q)", xld.WALStart, msg.Type())
 		}
 	}
+}
+
+func (s *ReplicationStream) processChange(ctx context.Context, event string, xld pglogrepl.XLogData, tuple *pglogrepl.TupleData, relID uint32, handler ChangeEventHandler) error {
+	rel, ok := s.relations[relID]
+	if !ok {
+		return errors.Errorf("unknown relation ID %d", relID)
+	}
+
+	fields := make(map[string]interface{})
+	if tuple != nil {
+		for idx, col := range tuple.Columns {
+			colName := rel.Columns[idx].Name
+			switch col.DataType {
+			case 'n':
+				fields[colName] = nil
+			case 't':
+				val, err := s.decodeTextColumnData(col.Data, rel.Columns[idx].DataType)
+				if err != nil {
+					return errors.Wrap(err, "error decoding column data")
+				}
+				fields[colName] = val
+			default:
+				return errors.Errorf("unhandled column data type %v", col.DataType)
+			}
+		}
+	}
+
+	if err := handler(event, xld.WALStart, rel.Namespace, rel.RelationName, fields); err != nil {
+		return errors.Wrap(err, "error handling change event")
+	}
+	return nil
 }
 
 func (s *ReplicationStream) decodeTextColumnData(data []byte, dataType uint32) (interface{}, error) {
@@ -224,7 +203,6 @@ func (s *ReplicationStream) receiveXLogData(ctx context.Context) (pglogrepl.XLog
 				if err != nil {
 					return pglogrepl.XLogData{}, errors.Wrap(err, "error parsing keepalive")
 				}
-				//log.Printf("KeepAlive: ServerWALEnd=%q, ReplyRequested=%v", pkm.ServerWALEnd, pkm.ReplyRequested)
 				if pkm.ReplyRequested {
 					s.standbyStatusDeadline = time.Now()
 				}
@@ -252,14 +230,9 @@ func (s *ReplicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 		log.Fatalln("SendStandbyStatusUpdate failed:", err)
 		return err
 	}
-	//log.Printf("Sent Standby Status Update with LSN=%q", commitLSN)
 	return nil
 }
 
 func (s *ReplicationStream) Close(ctx context.Context) error {
-	if s.closed {
-		return errors.New("stream already closed")
-	}
-	s.closed = true
 	return s.conn.Close(ctx)
 }

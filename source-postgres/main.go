@@ -20,10 +20,23 @@ func main() {
 }
 
 type Config struct {
-	ConnectionURI string `json:"connectionURI"`
+	ConnectionURI   string `json:"connectionURI"`
+	SlotName        string `json:"slot_name"`
+	PublicationName string `json:"publication_name"`
 }
 
-func (c *Config) Validate() error { return nil }
+func (c *Config) Validate() error {
+	if c.ConnectionURI == "" {
+		return errors.New("Database Connection URI must be set")
+	}
+	if c.SlotName == "" {
+		c.SlotName = "flow_slot"
+	}
+	if c.PublicationName == "" {
+		c.PublicationName = "flow_publication"
+	}
+	return nil
+}
 
 const configSchema = `{
 	"$schema": "http://json-schema.org/draft-07/schema#",
@@ -35,6 +48,18 @@ const configSchema = `{
 			"title":       "Database Connection URI",
 			"description": "Connection parameters, as a libpq-compatible connection string",
 			"default":     "postgres://flow:flow@localhost:5432/flow"
+		},
+		"slot_name": {
+			"type":        "string",
+			"title":       "Replication Slot Name",
+			"description": "The name of the PostgreSQL replication slot to replicate from",
+			"default":     "flow_slot"
+		},
+		"publication_name": {
+			"type":        "string",
+			"title":       "Publication Name",
+			"description": "The name of the PostgreSQL publication to replicate from",
+			"default":     "flow_publication"
 		}
 	},
 	"required": [ "connectionURI" ]
@@ -66,8 +91,6 @@ func doRead(args airbyte.ReadCmd) error {
 	}
 	state.output = NewMessageOutput()
 
-	state.output.debugOutputDelay = 1 * time.Second // DEBUG CHANGE, DO NOT COMMIT
-
 	ctx, cancel := context.WithTimeout(context.Background(), poisonPillDuration)
 	defer cancel()
 
@@ -93,9 +116,6 @@ type TableState struct {
 func (cs *CaptureState) Validate() error {
 	return nil
 }
-
-const SLOT_NAME = "estuary_flow_slot"
-const PUBLICATION_NAME = "estuary_flow_publication"
 
 func (cs *CaptureState) Process(ctx context.Context) error {
 	// Normal database connection used for table scanning
@@ -147,6 +167,8 @@ func (cs *CaptureState) Process(ctx context.Context) error {
 
 	// Step Two: Table Scanning
 	// TODO(wgd): Remove stream state entries if the catalog entry is deleted
+	// TODO(wgd): While I'm thinking about the catalog, what exactly am I supposed
+	// to do with the various other fields of `airbyte.ConfiguredStream`?
 	for _, catalogStream := range cs.catalog.Streams {
 		streamName := catalogStream.Stream.Name
 		if _, ok := cs.Streams[streamName]; ok {
@@ -158,8 +180,7 @@ func (cs *CaptureState) Process(ctx context.Context) error {
 	}
 
 	// Step Three: Stream replication events
-	// TODO(wgd): Get slot name and publication name from the config or the catalog or whatever
-	stream, err := StartReplication(ctx, replicationConn, SLOT_NAME, PUBLICATION_NAME, cs.CurrentLSN)
+	stream, err := StartReplication(ctx, replicationConn, cs.config.SlotName, cs.config.PublicationName, cs.CurrentLSN)
 	if err != nil {
 		return errors.Wrap(err, "unable to start replication stream")
 	}
@@ -203,6 +224,13 @@ func (cs *CaptureState) HandleReplicationEvent(event string, lsn pglogrepl.LSN, 
 		// TODO(wgd): What exactly are the semantics of transaction committing in the
 		// logical replication WAL? Should we be buffering Insert/Update/Delete operations
 		// and only emitting them as part of the Commit?
+		//
+		// TODO(wgd): I don't really like this logic for when to emit a state update. It's
+		// definitely correct, in that it will only ever emit an update when it's safe to,
+		// but I don't know if it's guaranteed that such points will occur regularly on a
+		// sufficiently busy database, and also if there's any way a transaction can BEGIN
+		// in the WAL and not COMMIT within a finite timespan then that's another thing
+		// that could prevent state updates for an unbounded amount of time.
 		cs.openTransactions--
 		if cs.openTransactions == 0 {
 			log.Printf("Consistent Point at LSN=%q", lsn)
@@ -240,8 +268,6 @@ func (cs *CaptureState) HandleReplicationEvent(event string, lsn pglogrepl.LSN, 
 }
 
 func (cs *CaptureState) HandleChangeEvent(event string, lsn pglogrepl.LSN, ns, table string, fields map[string]interface{}) error {
-	//log.Printf("%s(LSN=%q, Table=%s.%s)", event, lsn, ns, table)
-
 	// TODO(wgd): Should these field names and values aim for exact
 	// compatibility with Airbyte Postgres CDC operation?
 	fields["_change_type"] = event
@@ -260,8 +286,6 @@ func (cs *CaptureState) HandleChangeEvent(event string, lsn pglogrepl.LSN, ns, t
 type MessageOutput struct {
 	sync.Mutex
 	encoder *json.Encoder
-
-	debugOutputDelay time.Duration // DEBUG CHANGE, DO NOT COMMIT
 }
 
 func NewMessageOutput() *MessageOutput {
@@ -275,7 +299,6 @@ func (m *MessageOutput) EmitRecord(ns, stream string, data interface{}) error {
 	}
 	m.Lock()
 	defer m.Unlock()
-	time.Sleep(m.debugOutputDelay) // DEBUG CHANGE, DO NOT COMMIT
 	return m.encoder.Encode(airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
 		Record: &airbyte.Record{
@@ -294,7 +317,6 @@ func (m *MessageOutput) EmitState(state interface{}) error {
 	}
 	m.Lock()
 	defer m.Unlock()
-	time.Sleep(m.debugOutputDelay) // DEBUG CHANGE, DO NOT COMMIT
 	return m.encoder.Encode(airbyte.Message{
 		Type:  airbyte.MessageTypeState,
 		State: &airbyte.State{Data: json.RawMessage(rawState)},
