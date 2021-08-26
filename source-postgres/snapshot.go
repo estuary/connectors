@@ -19,6 +19,10 @@ type TableSnapshotStream struct {
 
 func SnapshotTable(ctx context.Context, conn *pgx.Conn, namespace, table string) (*TableSnapshotStream, error) {
 	transaction, err := conn.BeginTx(ctx, pgx.TxOptions{
+		// We could probably get away with `RepeatableRead` isolation here, but
+		// I see no reason not to err on the side of getting the strongest
+		// guarantees that we can, especially since the full scan is not the
+		// normal mode of operation and happens just once per table.
 		IsoLevel:   pgx.Serializable,
 		AccessMode: pgx.ReadOnly,
 	})
