@@ -22,7 +22,6 @@ type ChangeEventHandler func(event string, lsn pglogrepl.LSN, namespace, table s
 type ReplicationStream struct {
 	replSlot   string
 	pubName    string
-	startLSN   pglogrepl.LSN
 	currentLSN pglogrepl.LSN
 	commitLSN  uint64
 	conn       *pgconn.PgConn
@@ -40,21 +39,49 @@ func StartReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 	stream := &ReplicationStream{
 		replSlot:   slot,
 		pubName:    publication,
-		startLSN:   startLSN,
 		currentLSN: startLSN,
-		commitLSN:  uint64(startLSN),
-		conn:       conn,
-		connInfo:   pgtype.NewConnInfo(),
-		relations:  make(map[uint32]pglogrepl.RelationMessage),
+		// The "Commit LSN" is initialized to `startLSN` when the replication stream is created,
+		// and will never be updated after that. Why is that? It's because the Source Connector
+		// "API" we're using has very limited avenues for feedback from the data consumer to us.
+		//
+		// For context, `commitLSN` is the LSN that we send to PostgreSQL in `StandbyStatusUpdate`
+		// messages to tell the DB that we're done with the WAL up to a given point and will never
+		// request to restart streaming from an older point. So we have to update it *eventually*
+		// in order to avoid an unbounded space leak, but it's not really critical to update it
+		// frequently, and we can be pretty conservative about advancing it.
+		//
+		// The problem is that we don't have many guarantees about when our records and state
+		// updates will be durably committed by the consumer. At any moment our connector here
+		// might get killed and then re-launched with a state that we emitted hours ago, so
+		// without the consumer giving us an explicit acknowledgement we can't assume that it's
+		// safe to advance the `commitLSN` cursor. But there is no such ACK message, is there?
+		//
+		// Well, we actually do get one form of acknowledgement: we know that when the connector
+		// is restarted with a provided `state.json` to resume from, that state must have gotten
+		// committed by the consumer. So provided that the connector is periodically killed and
+		// restarted, we will periodically advance the `commitLSN` and thereby allow PostgreSQL
+		// to free older segments of the WAL.
+		//
+		// This hinges on connectors getting shut down and restarted every so often, which is a
+		// guarantee that should ideally be provided by the runtime anyway.
+		//
+		// TODO(wgd): Consider adding a "Poison Pill" deadline to the initial context in main.go
+		// which will cause the connector to automatically shut down after a day or two, there's
+		// no need to rely solely on the runtime being perfect in this regard.
+		commitLSN: uint64(startLSN),
+		conn:      conn,
+		connInfo:  pgtype.NewConnInfo(),
+		relations: make(map[uint32]pglogrepl.RelationMessage),
 	}
 
 	log.Printf("Streaming events from LSN %q", stream.currentLSN)
-	if err := pglogrepl.StartReplication(ctx, stream.conn, stream.replSlot, stream.startLSN, pglogrepl.StartReplicationOptions{
+	if err := pglogrepl.StartReplication(ctx, stream.conn, stream.replSlot, stream.currentLSN, pglogrepl.StartReplicationOptions{
 		PluginArgs: []string{
 			`"proto_version" '1'`,
 			fmt.Sprintf(`"publication_names" '%s'`, stream.pubName),
 		},
 	}); err != nil {
+		conn.Close(ctx)
 		return nil, errors.Wrap(err, "unable to start replication")
 	}
 
@@ -89,11 +116,11 @@ func (s *ReplicationStream) Process(ctx context.Context, handler ChangeEventHand
 			tuple, relID = msg.OldTuple, msg.RelationID
 
 		case *pglogrepl.BeginMessage:
-			log.Printf("Begin(WALStart=%q, FinalLSN=%q, XID=%v)", xld.WALStart, msg.FinalLSN, msg.Xid)
+			//log.Printf("Begin(WALStart=%q, FinalLSN=%q, XID=%v)", xld.WALStart, msg.FinalLSN, msg.Xid)
 			handler("Begin", msg.FinalLSN, "", "", nil)
 			continue
 		case *pglogrepl.CommitMessage:
-			log.Printf("Commit(WALStart=%q, CommitLSN=%q, TXEndLSN=%q)", xld.WALStart, msg.CommitLSN, msg.TransactionEndLSN)
+			//log.Printf("Commit(WALStart=%q, CommitLSN=%q, TXEndLSN=%q)", xld.WALStart, msg.CommitLSN, msg.TransactionEndLSN)
 			handler("Commit", msg.TransactionEndLSN, "", "", nil)
 			continue
 		case *pglogrepl.RelationMessage:
@@ -118,10 +145,10 @@ func (s *ReplicationStream) Process(ctx context.Context, handler ChangeEventHand
 		}
 
 		fields := make(map[string]interface{})
-		log.Printf("%s(WALStart=%q, RID=%v, Namespace=%v, RelName=%v)", msg.Type(), xld.WALStart, rel.RelationID, rel.Namespace, rel.RelationName)
+		//log.Printf("%s(WALStart=%q, RID=%v, Namespace=%v, RelName=%v)", msg.Type(), xld.WALStart, rel.RelationID, rel.Namespace, rel.RelationName)
 		if tuple != nil {
 			for idx, col := range tuple.Columns {
-				log.Printf("  (name=%q, type=%q, data=%q)", rel.Columns[idx].Name, col.DataType, col.Data)
+				//log.Printf("  (name=%q, type=%q, data=%q)", rel.Columns[idx].Name, col.DataType, col.Data)
 
 				colName := rel.Columns[idx].Name
 				switch col.DataType {
@@ -197,7 +224,7 @@ func (s *ReplicationStream) receiveXLogData(ctx context.Context) (pglogrepl.XLog
 				if err != nil {
 					return pglogrepl.XLogData{}, errors.Wrap(err, "error parsing keepalive")
 				}
-				log.Printf("KeepAlive: ServerWALEnd=%q, ReplyRequested=%v", pkm.ServerWALEnd, pkm.ReplyRequested)
+				//log.Printf("KeepAlive: ServerWALEnd=%q, ReplyRequested=%v", pkm.ServerWALEnd, pkm.ReplyRequested)
 				if pkm.ReplyRequested {
 					s.standbyStatusDeadline = time.Now()
 				}
@@ -225,14 +252,14 @@ func (s *ReplicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 		log.Fatalln("SendStandbyStatusUpdate failed:", err)
 		return err
 	}
-	log.Printf("Sent Standby Status Update with LSN=%q", commitLSN)
+	//log.Printf("Sent Standby Status Update with LSN=%q", commitLSN)
 	return nil
 }
 
-func (s *ReplicationStream) Close() error {
+func (s *ReplicationStream) Close(ctx context.Context) error {
 	if s.closed {
 		return errors.New("stream already closed")
 	}
 	s.closed = true
-	return nil
+	return s.conn.Close(ctx)
 }
