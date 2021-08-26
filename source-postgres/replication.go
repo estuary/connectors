@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"os"
+	"sync/atomic"
 	"time"
 
-	"github.com/estuary/connectors/go-types/airbyte"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgproto3/v2"
@@ -16,26 +14,68 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ChangeEventHandler func(namespace, table string, eventType string, fields map[string]interface{}) error
-type XLogEventHandler func(ctx context.Context, xld pglogrepl.XLogData) error
+type ChangeEventHandler func(event string, lsn pglogrepl.LSN, namespace, table string, fields map[string]interface{}) error
 
-// One change that could simplify things a bit would be to have the
-// `ChangeEventHandler` type be an interface with `HandleData()`
-// and `HandleState()` methods. This would allow us to avoid
-// outputting directly to stdout.
+// A ReplicationStream represents the process of receiving PostgreSQL
+// Logical Replication events, managing keepalives and status updates,
+// and translating changes into a more friendly representation.
+type ReplicationStream struct {
+	replSlot   string
+	pubName    string
+	startLSN   pglogrepl.LSN
+	currentLSN pglogrepl.LSN
+	commitLSN  uint64
+	conn       *pgconn.PgConn
 
-func streamReplicationEvents(ctx context.Context, conn *pgconn.PgConn, slotName, pubName string, startLSN pglogrepl.LSN, handler ChangeEventHandler) error {
-	connInfo := pgtype.NewConnInfo()
-	relations := make(map[uint32]pglogrepl.RelationMessage)
-	return streamXLogEvents(ctx, conn, slotName, pubName, startLSN, func(ctx context.Context, xld pglogrepl.XLogData) error {
+	closed                bool
+	standbyStatusDeadline time.Time
+
+	connInfo  *pgtype.ConnInfo
+	relations map[uint32]pglogrepl.RelationMessage
+}
+
+const standbyStatusInterval = 10 * time.Second
+
+func StartReplication(ctx context.Context, conn *pgconn.PgConn, slot, publication string, startLSN pglogrepl.LSN) (*ReplicationStream, error) {
+	stream := &ReplicationStream{
+		replSlot:   slot,
+		pubName:    publication,
+		startLSN:   startLSN,
+		currentLSN: startLSN,
+		commitLSN:  uint64(startLSN),
+		conn:       conn,
+		connInfo:   pgtype.NewConnInfo(),
+		relations:  make(map[uint32]pglogrepl.RelationMessage),
+	}
+
+	log.Printf("Streaming events from LSN %q", stream.currentLSN)
+	if err := pglogrepl.StartReplication(ctx, stream.conn, stream.replSlot, stream.startLSN, pglogrepl.StartReplicationOptions{
+		PluginArgs: []string{
+			`"proto_version" '1'`,
+			fmt.Sprintf(`"publication_names" '%s'`, stream.pubName),
+		},
+	}); err != nil {
+		return nil, errors.Wrap(err, "unable to start replication")
+	}
+
+	stream.standbyStatusDeadline = time.Now().Add(standbyStatusInterval)
+	return stream, nil
+}
+
+func (s *ReplicationStream) Process(ctx context.Context, handler ChangeEventHandler) error {
+	for {
+		if s.closed {
+			return errors.New("stream has been closed")
+		}
+
+		xld, err := s.receiveXLogData(ctx)
+		if err != nil {
+			return err
+		}
+
 		msg, err := pglogrepl.Parse(xld.WALData)
 		if err != nil {
 			return errors.Wrap(err, "error parsing logical replication message")
-		}
-
-		log.Printf("XLogData(Type=%s, WALStart=%q, Length=%d)", msg.Type(), xld.WALStart, len(xld.WALData))
-		if xld.ServerWALEnd != xld.WALStart {
-			log.Printf("  !!! ServerWALEnd=%q", xld.ServerWALEnd)
 		}
 
 		var relID uint32
@@ -50,22 +90,12 @@ func streamReplicationEvents(ctx context.Context, conn *pgconn.PgConn, slotName,
 
 		case *pglogrepl.BeginMessage:
 			log.Printf("Begin(WALStart=%q, FinalLSN=%q, XID=%v)", xld.WALStart, msg.FinalLSN, msg.Xid)
-			return nil
+			handler("Begin", msg.FinalLSN, "", "", nil)
+			continue
 		case *pglogrepl.CommitMessage:
 			log.Printf("Commit(WALStart=%q, CommitLSN=%q, TXEndLSN=%q)", xld.WALStart, msg.CommitLSN, msg.TransactionEndLSN)
-			rawState, err := json.Marshal(ResumeState{
-				ResumeLSN: msg.CommitLSN,
-			})
-			if err != nil {
-				return errors.Wrap(err, "error encoding state message")
-			}
-			if err := json.NewEncoder(os.Stdout).Encode(airbyte.Message{
-				Type:  airbyte.MessageTypeState,
-				State: &airbyte.State{Data: json.RawMessage(rawState)},
-			}); err != nil {
-				return errors.Wrap(err, "error writing state message")
-			}
-			return nil
+			handler("Commit", msg.TransactionEndLSN, "", "", nil)
+			continue
 		case *pglogrepl.RelationMessage:
 			// Keep track of the relation in order to understand future Insert/Update/Delete messages
 			//
@@ -73,22 +103,22 @@ func streamReplicationEvents(ctx context.Context, conn *pgconn.PgConn, slotName,
 			// and a separate grooming thread to delete them after some time window has elapsed, but
 			// I haven't been able to find any documentation of any of these logical replication
 			// messages so I'm hesitant to make assumptions about anything.
-			relations[msg.RelationID] = *msg
-			return nil
+			s.relations[msg.RelationID] = *msg
+			continue
 		default:
 			log.Printf("UnhandledMessage(WALStart=%q, Type=%v)", xld.WALStart, msg.Type())
-			return nil
+			continue
 		}
 
 		// Because all message cases other than Insert/Update/Delete return,
 		// at this point we're handling actual data messages.
-		rel, ok := relations[relID]
+		rel, ok := s.relations[relID]
 		if !ok {
 			return errors.Errorf("unknown relation %d", relID)
 		}
 
 		fields := make(map[string]interface{})
-		log.Printf("%s(WALStart=%q, RID=%v, Namespace=%v, RelName=%v)", xld.WALStart, msg.Type(), rel.RelationID, rel.Namespace, rel.RelationName)
+		log.Printf("%s(WALStart=%q, RID=%v, Namespace=%v, RelName=%v)", msg.Type(), xld.WALStart, rel.RelationID, rel.Namespace, rel.RelationName)
 		if tuple != nil {
 			for idx, col := range tuple.Columns {
 				log.Printf("  (name=%q, type=%q, data=%q)", rel.Columns[idx].Name, col.DataType, col.Data)
@@ -98,7 +128,7 @@ func streamReplicationEvents(ctx context.Context, conn *pgconn.PgConn, slotName,
 				case 'n':
 					fields[colName] = nil
 				case 't':
-					val, err := decodeTextColumnData(connInfo, col.Data, rel.Columns[idx].DataType, rel.Columns[idx].TypeModifier)
+					val, err := s.decodeTextColumnData(col.Data, rel.Columns[idx].DataType)
 					if err != nil {
 						return errors.Wrap(err, "error decoding column data")
 					}
@@ -109,16 +139,15 @@ func streamReplicationEvents(ctx context.Context, conn *pgconn.PgConn, slotName,
 			}
 		}
 
-		if err := handler(rel.Namespace, rel.RelationName, msg.Type().String(), fields); err != nil {
+		if err := handler(msg.Type().String(), xld.WALStart, rel.Namespace, rel.RelationName, fields); err != nil {
 			return errors.Wrap(err, "error handling change event")
 		}
-		return nil
-	})
+	}
 }
 
-func decodeTextColumnData(connInfo *pgtype.ConnInfo, data []byte, dataType, typeMod uint32) (interface{}, error) {
+func (s *ReplicationStream) decodeTextColumnData(data []byte, dataType uint32) (interface{}, error) {
 	var decoder pgtype.TextDecoder
-	if dt, ok := connInfo.DataTypeForOID(dataType); ok {
+	if dt, ok := s.connInfo.DataTypeForOID(dataType); ok {
 		decoder, ok = dt.Value.(pgtype.TextDecoder)
 		if !ok {
 			decoder = &pgtype.GenericText{}
@@ -126,69 +155,38 @@ func decodeTextColumnData(connInfo *pgtype.ConnInfo, data []byte, dataType, type
 	} else {
 		decoder = &pgtype.GenericText{}
 	}
-	if err := decoder.DecodeText(connInfo, data); err != nil {
+	if err := decoder.DecodeText(s.connInfo, data); err != nil {
 		return nil, err
 	}
 	return decoder.(pgtype.Value).Get(), nil
 }
 
-func streamXLogEvents(ctx context.Context, conn *pgconn.PgConn, slotName, pubName string, startLSN pglogrepl.LSN, handler XLogEventHandler) error {
-	sysident, err := pglogrepl.IdentifySystem(ctx, conn)
-	if err != nil {
-		return errors.Wrap(err, "unable to identify system")
-	}
-	log.Printf("IdentifySystem: %v", sysident)
-
-	if startLSN == 0 {
-		startLSN = sysident.XLogPos
-	} else {
-		log.Printf("Resuming from LSN %q", startLSN)
-	}
-
-	if err = pglogrepl.StartReplication(ctx, conn, slotName, startLSN, pglogrepl.StartReplicationOptions{
-		PluginArgs: []string{
-			`"proto_version" '1'`,
-			fmt.Sprintf(`"publication_names" '%s'`, pubName),
-		},
-	}); err != nil {
-		return errors.Wrap(err, "unable to start replication")
-	}
-
-	clientXLogPos := startLSN
-	standbyMessageTimeout := time.Second * 10
-	nextStandbyMessageDeadline := time.Now().Add(standbyMessageTimeout)
-
+// receiveXLogData returns the next transaction log message from the database,
+// blocking until a message is available, the context is cancelled, or an error
+// occurs. In the process it takes care of sending Standby Status Update messages
+// back to the database, so it must be called regularly over the life of a
+// replication stream.
+func (s *ReplicationStream) receiveXLogData(ctx context.Context) (pglogrepl.XLogData, error) {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return pglogrepl.XLogData{}, ctx.Err()
 		default:
 		}
 
-		if time.Now().After(nextStandbyMessageDeadline) {
-			// TODO(wgd): Set `WALFlushPosition` and/or `WALApplyPosition` to inform
-			// Postgres about permanent changes to the replication slot LSN. In theory
-			// we can advance the slot LSN after each new state update is emitted, since
-			// at that point if the connector is killed and restarted it should only
-			// resume from that newer LSN. However we might want to delay that a bit
-			// since there's no *confirmation* of a state update.
-			if err := pglogrepl.SendStandbyStatusUpdate(ctx, conn, pglogrepl.StandbyStatusUpdate{
-				WALWritePosition: clientXLogPos,
-			}); err != nil {
-				log.Fatalln("SendStandbyStatusUpdate failed:", err)
-			}
-			log.Println("Sent Standby status message")
-			nextStandbyMessageDeadline = time.Now().Add(standbyMessageTimeout)
+		if time.Now().After(s.standbyStatusDeadline) {
+			s.sendStandbyStatusUpdate(ctx)
+			s.standbyStatusDeadline = time.Now().Add(standbyStatusInterval)
 		}
 
-		receiveCtx, cancelReceiveCtx := context.WithDeadline(ctx, nextStandbyMessageDeadline)
-		msg, err := conn.ReceiveMessage(receiveCtx)
+		receiveCtx, cancelReceiveCtx := context.WithDeadline(ctx, s.standbyStatusDeadline)
+		msg, err := s.conn.ReceiveMessage(receiveCtx)
 		cancelReceiveCtx()
 		if pgconn.Timeout(err) {
 			continue
 		}
 		if err != nil {
-			return errors.Wrap(err, "error receiving message")
+			return pglogrepl.XLogData{}, err
 		}
 
 		switch msg := msg.(type) {
@@ -197,21 +195,19 @@ func streamXLogEvents(ctx context.Context, conn *pgconn.PgConn, slotName, pubNam
 			case pglogrepl.PrimaryKeepaliveMessageByteID:
 				pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(msg.Data[1:])
 				if err != nil {
-					return errors.Wrap(err, "error parsing keepalive")
+					return pglogrepl.XLogData{}, errors.Wrap(err, "error parsing keepalive")
 				}
 				log.Printf("KeepAlive: ServerWALEnd=%q, ReplyRequested=%v", pkm.ServerWALEnd, pkm.ReplyRequested)
 				if pkm.ReplyRequested {
-					nextStandbyMessageDeadline = time.Now()
+					s.standbyStatusDeadline = time.Now()
 				}
 			case pglogrepl.XLogDataByteID:
 				xld, err := pglogrepl.ParseXLogData(msg.Data[1:])
 				if err != nil {
-					return errors.Wrap(err, "error parsing XLogData")
+					return xld, errors.Wrap(err, "error parsing XLogData")
 				}
-				if err := handler(ctx, xld); err != nil {
-					return err
-				}
-				clientXLogPos = xld.WALStart + pglogrepl.LSN(len(xld.WALData))
+				s.currentLSN = xld.WALStart + pglogrepl.LSN(len(xld.WALData))
+				return xld, nil
 			default:
 				log.Printf("Received unknown CopyData message: %v", msg)
 			}
@@ -219,4 +215,24 @@ func streamXLogEvents(ctx context.Context, conn *pgconn.PgConn, slotName, pubNam
 			log.Printf("Received unexpected message: %v", msg)
 		}
 	}
+}
+
+func (s *ReplicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
+	commitLSN := pglogrepl.LSN(atomic.LoadUint64(&s.commitLSN))
+	if err := pglogrepl.SendStandbyStatusUpdate(ctx, s.conn, pglogrepl.StandbyStatusUpdate{
+		WALWritePosition: commitLSN,
+	}); err != nil {
+		log.Fatalln("SendStandbyStatusUpdate failed:", err)
+		return err
+	}
+	log.Printf("Sent Standby Status Update with LSN=%q", commitLSN)
+	return nil
+}
+
+func (s *ReplicationStream) Close() error {
+	if s.closed {
+		return errors.New("stream already closed")
+	}
+	s.closed = true
+	return nil
 }
