@@ -14,7 +14,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ChangeEventHandler func(event string, lsn pglogrepl.LSN, namespace, table string, fields map[string]interface{}) error
+type ChangeEventHandler func(evt *ChangeEvent) error
+
+type ChangeEvent struct {
+	Type      string
+	XID       pgtype.XID
+	LSN       pglogrepl.LSN
+	Namespace string
+	Table     string
+	Fields    map[string]interface{}
+}
 
 // A ReplicationStream represents the process of receiving PostgreSQL
 // Logical Replication events, managing keepalives and status updates,
@@ -28,8 +37,10 @@ type ReplicationStream struct {
 
 	standbyStatusDeadline time.Time
 
-	connInfo  *pgtype.ConnInfo
-	relations map[uint32]*pglogrepl.RelationMessage
+	connInfo       *pgtype.ConnInfo
+	relations      map[uint32]*pglogrepl.RelationMessage
+	inTransaction  bool
+	transactionXID uint32
 }
 
 const standbyStatusInterval = 10 * time.Second
@@ -95,32 +106,99 @@ func (s *ReplicationStream) Process(ctx context.Context, handler ChangeEventHand
 			return errors.Wrap(err, "error parsing logical replication message")
 		}
 
+		// Some notes on the Logical Replication / pgoutput message stream, since
+		// as far as I can tell this isn't documented anywhere but comments in the
+		// relevant PostgreSQL sources.
+		//
+		// The stream of messages we're processing here isn't necessarily in the
+		// same order as the underlying PostgreSQL WAL. The 'Reorder Buffer' logic
+		// (https://github.com/postgres/postgres/blob/master/src/backend/replication/logical/reorderbuffer.c)
+		// assembles individual changes into transactions and then only when it's
+		// committed does the output plugin get invoked to send us these messages.
+		//
+		// Consequently, we can rely on getting a BEGIN, then some changes, and
+		// finally a COMMIT message in that order. This is why only the BEGIN
+		// message includes an XID, it's implicit in any subsequent messages.
+		//
+		// The `Relation` messages are how `pgoutput` tells us about the columns
+		// of a particular table at the time a transaction was performed. Change
+		// messages won't include this information, instead they just encode a
+		// sequence of values along with a "Relation ID" which can be used to
+		// look it up. We will only be given a particular relation once (unless
+		// it changes on the server) in a given replication session, so entries
+		// in the relations mapping will never be removed.
 		switch msg := msg.(type) {
-		case *pglogrepl.InsertMessage:
-			s.processChange(ctx, msg.Type().String(), xld, msg.Tuple, msg.RelationID, handler)
-		case *pglogrepl.UpdateMessage:
-			s.processChange(ctx, msg.Type().String(), xld, msg.NewTuple, msg.RelationID, handler)
-		case *pglogrepl.DeleteMessage:
-			s.processChange(ctx, msg.Type().String(), xld, msg.OldTuple, msg.RelationID, handler)
-		case *pglogrepl.BeginMessage:
-			handler("Begin", msg.FinalLSN, "", "", nil)
-		case *pglogrepl.CommitMessage:
-			handler("Commit", msg.TransactionEndLSN, "", "", nil)
 		case *pglogrepl.RelationMessage:
-			// Keep track of the relation in order to understand future Insert/Update/Delete messages
-			//
-			// TODO(wgd): How do we know when to delete a relation? If it's guaranteed that they won't
-			// be reused across transactions then we could keep track of BEGIN/COMMIT counts and clear
-			// the relations map whenever we reach a point outside of any transactions, but I'm not
-			// sure if that's guaranteed to happen either on a busy database.
 			s.relations[msg.RelationID] = msg
+		case *pglogrepl.BeginMessage:
+			if s.inTransaction {
+				return errors.New("got BEGIN message while another transaction in progress")
+			}
+			s.inTransaction = true
+			s.transactionXID = msg.Xid
+		case *pglogrepl.InsertMessage:
+			if err := s.processChange(ctx, msg.Type().String(), xld, msg.Tuple, msg.RelationID, handler); err != nil {
+				return err
+			}
+		case *pglogrepl.UpdateMessage:
+			if err := s.processChange(ctx, msg.Type().String(), xld, msg.NewTuple, msg.RelationID, handler); err != nil {
+				return err
+			}
+		case *pglogrepl.DeleteMessage:
+			if err := s.processChange(ctx, msg.Type().String(), xld, msg.OldTuple, msg.RelationID, handler); err != nil {
+				return err
+			}
+		case *pglogrepl.CommitMessage:
+			if !s.inTransaction {
+				return errors.New("got COMMIT message without a transaction in progress")
+			}
+			evt := &ChangeEvent{
+				Type: "Commit",
+				LSN:  msg.TransactionEndLSN,
+			}
+			evt.XID.Set(s.transactionXID)
+			if err := handler(evt); err != nil {
+				return err
+			}
+			s.inTransaction = false
+			s.transactionXID = 0
 		default:
-			log.Printf("Unhandled Message (Type=%v, WALStart=%q)", xld.WALStart, msg.Type())
+			// Unhandled messages are considered a fatal error. There are a bunch of
+			// oddball message types that aren't currently implemented in this connector
+			// (e.g. truncate, streaming transactions, or two-phase commits) and if we
+			// blithely ignored them and continued we're pretty much guaranteed to end
+			// up in an inconsistent state with the Postgres tables. Much better to die
+			// quickly and give humans a chance to fix things.
+			//
+			// If a human is reading this comment because this happened to you, you have
+			// three options to resolve the problem:
+			//
+			//   1. Implement additional logic to handle whatever edge case you hit.
+			//
+			//   2. If your use-case can tolerate a completely different set of
+			//      tradeoffs you can use the Airbyte Postgres source connector
+			//      IN NON-CDC MODE.
+			//
+			//      Note that in CDC mode that connector uses Debezium, which will choke
+			//      on these same edge cases, with the exception of TRUNCATE/TYPE/ORIGIN.
+			//      (See https://github.com/debezium/debezium/blob/52333596dec168a22674e04f8cd94b1f56607f73/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/connection/pgoutput/PgOutputMessageDecoder.java#L106)
+			//
+			//   3. Force a full refresh of the relevant table. This will re-scan the
+			//      current table contents and then begin replication after the event
+			//      that caused this to fail.
+			//
+			//      But of course if this wasn't a one-off event it will fail again the
+			//      next time a problematic statement is executed on this table.
+			return errors.Errorf("unhandled message (Type=%v, WALStart=%q)", msg.Type(), xld.WALStart)
 		}
 	}
 }
 
-func (s *ReplicationStream) processChange(ctx context.Context, event string, xld pglogrepl.XLogData, tuple *pglogrepl.TupleData, relID uint32, handler ChangeEventHandler) error {
+func (s *ReplicationStream) processChange(ctx context.Context, eventType string, xld pglogrepl.XLogData, tuple *pglogrepl.TupleData, relID uint32, handler ChangeEventHandler) error {
+	if !s.inTransaction {
+		return errors.Errorf("got %s message without a transaction in progress", eventType)
+	}
+
 	rel, ok := s.relations[relID]
 	if !ok {
 		return errors.Errorf("unknown relation ID %d", relID)
@@ -145,7 +223,15 @@ func (s *ReplicationStream) processChange(ctx context.Context, event string, xld
 		}
 	}
 
-	if err := handler(event, xld.WALStart, rel.Namespace, rel.RelationName, fields); err != nil {
+	evt := &ChangeEvent{
+		Type:      eventType,
+		LSN:       xld.WALStart,
+		Namespace: rel.Namespace,
+		Table:     rel.RelationName,
+		Fields:    fields,
+	}
+	evt.XID.Set(s.transactionXID)
+	if err := handler(evt); err != nil {
 		return errors.Wrap(err, "error handling change event")
 	}
 	return nil
