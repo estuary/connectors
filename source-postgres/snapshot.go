@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pglogrepl"
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 )
@@ -12,12 +14,10 @@ import (
 type TableSnapshotStream struct {
 	conn        *pgx.Conn
 	transaction pgx.Tx
-	namespace   string
-	table       string
 	txLSN       pglogrepl.LSN
 }
 
-func SnapshotTable(ctx context.Context, conn *pgx.Conn, namespace, table string) (*TableSnapshotStream, error) {
+func SnapshotTable(ctx context.Context, conn *pgx.Conn) (*TableSnapshotStream, error) {
 	transaction, err := conn.BeginTx(ctx, pgx.TxOptions{
 		// We could probably get away with `RepeatableRead` isolation here, but
 		// I see no reason not to err on the side of getting the strongest
@@ -33,8 +33,6 @@ func SnapshotTable(ctx context.Context, conn *pgx.Conn, namespace, table string)
 	stream := &TableSnapshotStream{
 		conn:        conn,
 		transaction: transaction,
-		namespace:   namespace,
-		table:       table,
 	}
 	if err := stream.queryTransactionLSN(ctx); err != nil {
 		stream.transaction.Rollback(ctx)
@@ -65,28 +63,64 @@ func (s *TableSnapshotStream) TransactionLSN() pglogrepl.LSN {
 	return s.txLSN
 }
 
-func (s *TableSnapshotStream) Process(ctx context.Context, handler ChangeEventHandler) error {
-	rows, err := s.conn.Query(ctx, fmt.Sprintf(`SELECT * FROM %s.%s;`, s.namespace, s.table))
+const (
+	selectQueryStart = `SELECT ctid, * FROM %s.%s ORDER BY ctid LIMIT %d;`
+	selectQueryNext  = `SELECT ctid, * FROM %s.%s WHERE ctid > $1 ORDER BY ctid LIMIT %d;`
+	selectChunkSize  = 1
+)
+
+func (s *TableSnapshotStream) ScanStart(ctx context.Context, namespace, table string, handler ChangeEventHandler) (int, pgtype.TID, error) {
+	log.Printf("Scanning table %q from start", table)
+	rows, err := s.conn.Query(ctx, fmt.Sprintf(selectQueryStart, namespace, table, selectChunkSize))
 	if err != nil {
-		return errors.Wrap(err, "unable to execute query")
+		return 0, pgtype.TID{}, errors.Wrap(err, "unable to execute query")
 	}
 	defer rows.Close()
+	return s.processQueryResults(ctx, namespace, table, rows, handler)
+}
+
+func (s *TableSnapshotStream) ScanFrom(ctx context.Context, namespace, table string, prevTID pgtype.TID, handler ChangeEventHandler) (int, pgtype.TID, error) {
+	log.Printf("Scanning table %q from previous TID '(%d,%d)'", table, prevTID.BlockNumber, prevTID.OffsetNumber)
+	rows, err := s.conn.Query(ctx, fmt.Sprintf(selectQueryNext, namespace, table, selectChunkSize), prevTID)
+	if err != nil {
+		return 0, prevTID, errors.Wrap(err, "unable to execute query")
+	}
+	defer rows.Close()
+	return s.processQueryResults(ctx, namespace, table, rows, handler)
+}
+
+func (s *TableSnapshotStream) processQueryResults(ctx context.Context, namespace, table string, rows pgx.Rows, handler ChangeEventHandler) (int, pgtype.TID, error) {
 	cols := rows.FieldDescriptions()
+	var lastTID pgtype.TID
+	var rowsProcessed int
 	for rows.Next() {
 		fields := make(map[string]interface{})
 		vals, err := rows.Values()
 		if err != nil {
-			return errors.Wrap(err, "unable to get row values")
+			return rowsProcessed, lastTID, errors.Wrap(err, "unable to get row values")
 		}
 		for idx, val := range vals {
 			colName := string(cols[idx].Name)
+			if colName == "ctid" {
+				if tid, ok := val.(pgtype.TID); ok {
+					lastTID = tid
+				}
+				continue
+			}
 			fields[colName] = val
 		}
-		if err := handler("Insert", s.txLSN, s.namespace, s.table, fields); err != nil {
-			return errors.Wrap(err, "error handling change event")
+		if err := handler(&ChangeEvent{
+			Type:      "Insert",
+			LSN:       s.txLSN,
+			Namespace: namespace,
+			Table:     table,
+			Fields:    fields,
+		}); err != nil {
+			return rowsProcessed, lastTID, errors.Wrap(err, "error handling change event")
 		}
+		rowsProcessed++
 	}
-	return nil
+	return rowsProcessed, lastTID, nil
 }
 
 func (s *TableSnapshotStream) Close(ctx context.Context) error {
