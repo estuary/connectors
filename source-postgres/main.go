@@ -101,8 +101,6 @@ type CaptureState struct {
 	CurrentLSN pglogrepl.LSN          `json:"current_lsn"`
 	Streams    map[string]*TableState `json:"streams"`
 
-	openTransactions int
-
 	config  Config
 	catalog airbyte.ConfiguredCatalog
 	output  *MessageOutput
@@ -165,17 +163,59 @@ func (cs *CaptureState) Process(ctx context.Context) error {
 		cs.CurrentLSN = sysident.XLogPos
 	}
 
-	// Step Two: Table Scanning
-	// TODO(wgd): Remove stream state entries if the catalog entry is deleted
+	// Synchronize stream states with the configured catalog. If a new stream has
+	// been added then it's initialized in the "Pending" state, and if a previously
+	// configured stream has been removed then the corresponding state entry should
+	// be removed.
+	//
 	// TODO(wgd): While I'm thinking about the catalog, what exactly am I supposed
 	// to do with the various other fields of `airbyte.ConfiguredStream`?
+	catalogStateDirty := false
 	for _, catalogStream := range cs.catalog.Streams {
+		// Create state entries for catalog streams that don't already have one
 		streamName := catalogStream.Stream.Name
-		if _, ok := cs.Streams[streamName]; ok {
-			continue
+		if _, ok := cs.Streams[streamName]; !ok {
+			log.Printf("Initializing new stream %q as Pending", streamName)
+			cs.Streams[streamName] = &TableState{Mode: "Pending"}
+			catalogStateDirty = true
 		}
-		if err := cs.PerformTableSnapshot(ctx, conn, streamName); err != nil {
-			return err
+	}
+	for streamName := range cs.Streams {
+		// Delete state entries for streams that are no longer in the catalog
+		streamExistsInCatalog := false
+		for _, catalogStream := range cs.catalog.Streams {
+			if streamName == catalogStream.Stream.Name {
+				streamExistsInCatalog = true
+				break
+			}
+		}
+		if !streamExistsInCatalog {
+			log.Printf("Forgetting stream %q which is no longer in catalog", streamName)
+			delete(cs.Streams, streamName)
+			catalogStateDirty = true
+		}
+	}
+	// This isn't strictly necessary since we should get the exact same result
+	// if re-run with the previous input state and the same catalog, but it's
+	// cheap and makes it easier to read and understand the sequence of state
+	// outputs.
+	if catalogStateDirty {
+		cs.output.EmitState(cs)
+	}
+
+	// Step Two: Table Scanning. If no scans are pending, we skip the whole
+	// process of creating a snapshot.
+	if cs.HasPendingScans() {
+		snapshot, err := SnapshotTable(ctx, conn)
+		if err != nil {
+			return errors.Wrap(err, "error creating table snapshot stream")
+		}
+		if snapshot.TransactionLSN() < cs.CurrentLSN {
+			return errors.Errorf("table snapshot (LSN=%q) is older than the current replication LSN (%q)", snapshot.TransactionLSN(), cs.CurrentLSN)
+		}
+		defer snapshot.Close(ctx)
+		for cs.HasPendingScans() {
+			cs.PerformNextScan(ctx, snapshot)
 		}
 	}
 
@@ -192,55 +232,73 @@ func (cs *CaptureState) Process(ctx context.Context) error {
 	return nil
 }
 
-func (cs *CaptureState) PerformTableSnapshot(ctx context.Context, conn *pgx.Conn, streamName string) error {
-	snapshot, err := SnapshotTable(ctx, conn, "public", streamName)
-	if err != nil {
-		return errors.Wrap(err, "error creating table snapshot stream")
-	}
-	defer snapshot.Close(ctx)
-	log.Printf("Scanning table %q at LSN=%q", streamName, snapshot.TransactionLSN())
-	if err := snapshot.Process(ctx, cs.HandleSnapshotEvent); err != nil {
-		return errors.Wrap(err, "error processing snapshot events")
-	}
-	log.Printf("Done scanning table %q at LSN=%q", streamName, snapshot.TransactionLSN())
-	cs.Streams[streamName] = &TableState{
-		Mode:        "Snapshot",
-		SnapshotLSN: snapshot.TransactionLSN(),
-	}
-	return cs.output.EmitState(cs)
-}
-
-func (cs *CaptureState) HandleSnapshotEvent(event string, lsn pglogrepl.LSN, ns, table string, fields map[string]interface{}) error {
-	// Snapshot "events" are just a bunch of fake "Insert"s and should be emitted unconditionally
-	return cs.HandleChangeEvent(event, lsn, ns, table, fields)
-}
-
-func (cs *CaptureState) HandleReplicationEvent(event string, lsn pglogrepl.LSN, ns, table string, fields map[string]interface{}) error {
-	if event == "Begin" {
-		cs.openTransactions++
-		return nil
-	}
-	if event == "Commit" {
-		// TODO(wgd): What exactly are the semantics of transaction committing in the
-		// logical replication WAL? Should we be buffering Insert/Update/Delete operations
-		// and only emitting them as part of the Commit?
-		//
-		// TODO(wgd): I don't really like this logic for when to emit a state update. It's
-		// definitely correct, in that it will only ever emit an update when it's safe to,
-		// but I don't know if it's guaranteed that such points will occur regularly on a
-		// sufficiently busy database, and also if there's any way a transaction can BEGIN
-		// in the WAL and not COMMIT within a finite timespan then that's another thing
-		// that could prevent state updates for an unbounded amount of time.
-		cs.openTransactions--
-		if cs.openTransactions == 0 {
-			log.Printf("Consistent Point at LSN=%q", lsn)
-			cs.CurrentLSN = lsn
-			return cs.output.EmitState(cs)
+func (cs *CaptureState) HasPendingScans() bool {
+	for _, tableState := range cs.Streams {
+		if tableState.Mode == "Pending" {
+			return true
 		}
-		return nil
+	}
+	return false
+}
+
+func (cs *CaptureState) PerformNextScan(ctx context.Context, snapshot *TableSnapshotStream) error {
+	for streamName, tableState := range cs.Streams {
+		if tableState.Mode != "Pending" {
+			continue
+		}
+
+		log.Printf("Scanning table %q at LSN=%q", streamName, snapshot.TransactionLSN())
+		// The way scanning works here is that each call to `ProcessFrom` yields a
+		// single finite chunk of results plus some information that can be used to
+		// fetch the next chunk next time, and then we repeat this process iteratively
+		// until there are no more results.
+		//
+		// Thus after each chunk we can emit a new state update in the near future.
+		// But currently the code doesn't quite do that bit, that's just the ultimate
+		// goal towards which the current structure of the code is aimed.
+		//
+		// TODO(wgd): Restructure things so that:
+		//   3. The transition "Pending->Scanning" invokes ProcessStart and stores a "PrevTID" field in TableState
+		//   4. Probably some other stuff, but we'll need to resolve some of the other issues around
+		//      resuming and identifying ranges when streaming first.
+		// TODO(wgd): Add support for namespaces other than "public"
+		// TODO(wgd): Emit state updates and add resume capability in between chunks
+		count, prevTID, err := snapshot.ScanStart(ctx, "public", streamName, cs.HandleSnapshotEvent)
+		if err != nil {
+			return errors.Wrap(err, "error processing snapshot events")
+		}
+		for count > 0 {
+			count, prevTID, err = snapshot.ScanFrom(ctx, "public", streamName, prevTID, cs.HandleSnapshotEvent)
+			if err != nil {
+				return errors.Wrap(err, "error processing snapshot events")
+			}
+		}
+
+		log.Printf("Done scanning table %q at LSN=%q", streamName, snapshot.TransactionLSN())
+		cs.Streams[streamName].Mode = "Snapshot"
+		cs.Streams[streamName].SnapshotLSN = snapshot.TransactionLSN()
+		return cs.output.EmitState(cs)
+	}
+	return errors.New("no scans pending")
+}
+
+func (cs *CaptureState) HandleSnapshotEvent(evt *ChangeEvent) error {
+	// Snapshot "events" are just a bunch of fake "Insert"s and should be emitted unconditionally
+	return cs.HandleChangeEvent(evt)
+}
+
+func (cs *CaptureState) HandleReplicationEvent(evt *ChangeEvent) error {
+	// TODO(wgd): The only thing the 'Begin' and 'Commit' event is used for is
+	// to signal that we could emit a state update. Can this be done better?
+	if evt.Type == "Commit" {
+		// TODO(wgd): There will be a "Commit" event after every transaction, so if there
+		// are a bunch of independent single-row INSERTs we could end up emitting one state
+		// output per row added, which is too much. Add some rate-limiting to EmitState.
+		cs.CurrentLSN = evt.LSN
+		return cs.output.EmitState(cs)
 	}
 
-	tableState := cs.Streams[table]
+	tableState := cs.Streams[evt.Table]
 	// Tables for which we're not tracking state by the time replication event
 	// processing has begun are tables that aren't configured in the catalog,
 	// so don't emit any change messages for them.
@@ -249,36 +307,36 @@ func (cs *CaptureState) HandleReplicationEvent(event string, lsn pglogrepl.LSN, 
 	}
 	// Tables in the "Snapshot" state shouldn't emit change messages until we
 	// reach the appropriate LSN
-	if tableState.Mode == "Snapshot" && lsn < tableState.SnapshotLSN {
-		log.Printf("Filtered %s on %q at LSN=%q", event, table, lsn)
+	if tableState.Mode == "Snapshot" && evt.LSN < tableState.SnapshotLSN {
+		log.Printf("Filtered %s on %q at LSN=%q", evt.Type, evt.Table, evt.LSN)
 		return nil
 	}
 	// Once we've reached the LSN at which the table was scanned, it becomes active
-	if tableState.Mode == "Snapshot" && lsn >= tableState.SnapshotLSN {
-		log.Printf("Stream %q marked active at LSN=%q", table, lsn)
+	if tableState.Mode == "Snapshot" && evt.LSN >= tableState.SnapshotLSN {
+		log.Printf("Stream %q marked active at LSN=%q", evt.Table, evt.LSN)
 		tableState.Mode = "Active"
 		tableState.SnapshotLSN = 0
 	}
 	// And once a table is active we emit its events
 	if tableState.Mode == "Active" {
-		return cs.HandleChangeEvent(event, lsn, ns, table, fields)
+		return cs.HandleChangeEvent(evt)
 	}
 	// This should never happen
-	return errors.Errorf("invalid state %#v for table %q", tableState, table)
+	return errors.Errorf("invalid state %#v for table %q", tableState, evt.Table)
 }
 
-func (cs *CaptureState) HandleChangeEvent(event string, lsn pglogrepl.LSN, ns, table string, fields map[string]interface{}) error {
+func (cs *CaptureState) HandleChangeEvent(evt *ChangeEvent) error {
 	// TODO(wgd): Should these field names and values aim for exact
 	// compatibility with Airbyte Postgres CDC operation?
-	fields["_change_type"] = event
-	fields["_change_lsn"] = lsn
-	if event == "Insert" || event == "Update" {
-		fields["_updated_at"] = time.Now()
+	evt.Fields["_change_type"] = evt.Type
+	evt.Fields["_change_lsn"] = evt.LSN
+	if evt.Type == "Insert" || evt.Type == "Update" {
+		evt.Fields["_updated_at"] = time.Now()
 	}
-	if event == "Delete" {
-		fields["_deleted_at"] = time.Now()
+	if evt.Type == "Delete" {
+		evt.Fields["_deleted_at"] = time.Now()
 	}
-	return cs.output.EmitRecord(ns, table, fields)
+	return cs.output.EmitRecord(evt.Namespace, evt.Table, evt.Fields)
 }
 
 // A MessageOutput is a thread-safe JSON-encoding output stream with convenience
