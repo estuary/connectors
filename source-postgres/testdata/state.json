@@ -1,1 +1,1 @@
-{"current_lsn":23237584,"streams":{"babynames":{"mode":"Active"}}}
+{"current_lsn":22951936,"streams":{"babynames":{"mode":"Scanning","scan_key":["id"],"scan_ranges":[{"lsn":22951936,"key":"FQI="}]},"surnames":{"mode":"Scanning","scan_key":["id"]}}}

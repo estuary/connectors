@@ -10,7 +10,8 @@
         "default_cursor_field": [],
         "source_defined_primary_key": [["id"]],
         "namespace":"public" },
-    "sync_mode": "incremental" },
+    "sync_mode": "incremental",
+    "primary_key": [["id"]] },
   { "stream": {
       "name": "surnames",
         "json_schema": {
@@ -22,4 +23,5 @@
         "default_cursor_field": [],
         "source_defined_primary_key": [["id"]],
         "namespace":"public" },
-    "sync_mode": "incremental" } ] }
+    "sync_mode": "incremental",
+    "primary_key": [["id"]] } ] }

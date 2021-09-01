@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log"
+	"time"
 
+	"github.com/estuary/protocols/fdb/tuple"
 	"github.com/jackc/pglogrepl"
-	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 )
@@ -64,50 +66,130 @@ func (s *TableSnapshotStream) TransactionLSN() pglogrepl.LSN {
 }
 
 const (
-	selectQueryStart = `SELECT ctid, * FROM %s.%s ORDER BY ctid LIMIT %d;`
-	selectQueryNext  = `SELECT ctid, * FROM %s.%s WHERE ctid > $1 ORDER BY ctid LIMIT %d;`
-	selectChunkSize  = 1
+	selectQueryStart = `SELECT * FROM %s.%s ORDER BY %s LIMIT %d;`
+	selectQueryNext  = `SELECT * FROM %s.%s WHERE %s > $1 ORDER BY %s LIMIT %d;`
+	selectChunkSize  = 2 // TODO(wgd): Make this much much larger after testing
 )
 
-func (s *TableSnapshotStream) ScanStart(ctx context.Context, namespace, table string, handler ChangeEventHandler) (int, pgtype.TID, error) {
+func buildScanQuery(namespace, table string, pkey []string, isStart bool) string {
+	pkeyTupleExpr := ""
+	argsTupleExpr := ""
+	for idx, keyName := range pkey {
+		if idx > 0 {
+			pkeyTupleExpr += ", "
+			argsTupleExpr += ", "
+		}
+		pkeyTupleExpr += keyName
+		argsTupleExpr += fmt.Sprintf("$%d", idx+1)
+	}
+
+	query := fmt.Sprintf("SELECT * FROM %s.%s", namespace, table)
+	if !isStart {
+		query += fmt.Sprintf(" WHERE (%s) > (%s)", pkeyTupleExpr, argsTupleExpr)
+	}
+	query += fmt.Sprintf(" ORDER BY (%s)", pkeyTupleExpr)
+	query += fmt.Sprintf(" LIMIT %d;", selectChunkSize)
+	log.Printf("Built Scan Query: %q", query)
+	return query
+}
+
+func (s *TableSnapshotStream) ScanStart(ctx context.Context, namespace, table string, pkey []string, handler ChangeEventHandler) (int, []byte, error) {
 	log.Printf("Scanning table %q from start", table)
-	rows, err := s.conn.Query(ctx, fmt.Sprintf(selectQueryStart, namespace, table, selectChunkSize))
+	time.Sleep(1 * time.Second)
+	query := buildScanQuery(namespace, table, pkey, true)
+	rows, err := s.conn.Query(ctx, query)
 	if err != nil {
-		return 0, pgtype.TID{}, errors.Wrap(err, "unable to execute query")
+		return 0, nil, errors.Wrap(err, "unable to execute query")
 	}
 	defer rows.Close()
-	return s.processQueryResults(ctx, namespace, table, rows, handler)
+	return s.processQueryResults(ctx, namespace, table, pkey, rows, handler)
 }
 
-func (s *TableSnapshotStream) ScanFrom(ctx context.Context, namespace, table string, prevTID pgtype.TID, handler ChangeEventHandler) (int, pgtype.TID, error) {
-	log.Printf("Scanning table %q from previous TID '(%d,%d)'", table, prevTID.BlockNumber, prevTID.OffsetNumber)
-	rows, err := s.conn.Query(ctx, fmt.Sprintf(selectQueryNext, namespace, table, selectChunkSize), prevTID)
+// We translate a list of column values (representing the primary key of a
+// database row) into a list of bytes using the FoundationDB tuple encoding
+// package. This tuple encoding has the useful property that lexicographic
+// comparison of these bytes is equivalent to lexicographic comparison of
+// the equivalent values, and thus we don't have to write code to do that.
+//
+// Encoding primary keys like this also makes `state.json` round-tripping
+// across restarts trivial.
+func packTuple(xs []interface{}) (bs []byte, err error) {
+	var t []tuple.TupleElement
+	for _, x := range xs {
+		// Values not natively supported by the FoundationDB tuple encoding code
+		// must be converted into ones that are.
+		switch x := x.(type) {
+		case int32:
+			t = append(t, int(x))
+		default:
+			t = append(t, x)
+		}
+	}
+
+	// The `Pack()` function doesn't have an error return value, and instead
+	// will just panic with a string value if given an unsupported value type.
+	// This defer will catch and translate these panics into proper error returns.
+	defer func() {
+		if r := recover(); r != nil {
+			if errStr, ok := r.(string); ok {
+				err = errors.New(errStr)
+			} else {
+				panic(r)
+			}
+		}
+	}()
+	return tuple.Tuple(t).Pack(), nil
+}
+
+func unpackTuple(bs []byte) ([]interface{}, error) {
+	t, err := tuple.Unpack(bs)
 	if err != nil {
-		return 0, prevTID, errors.Wrap(err, "unable to execute query")
+		return nil, err
+	}
+	var xs []interface{}
+	for _, elem := range t {
+		xs = append(xs, elem)
+	}
+	return xs, nil
+}
+
+func (s *TableSnapshotStream) ScanFrom(ctx context.Context, namespace, table string, pkey []string, prevKey []byte, handler ChangeEventHandler) (int, []byte, error) {
+	log.Printf("Scanning table %q from previous key %q", table, base64.StdEncoding.EncodeToString(prevKey))
+	args, err := unpackTuple(prevKey)
+	if err != nil {
+		return 0, nil, errors.Wrap(err, "error unpacking encoded tuple")
+	}
+	if len(args) != len(pkey) {
+		return 0, nil, errors.Errorf("expected %d primary-key values but got %d", len(pkey), len(args))
+	}
+	query := buildScanQuery(namespace, table, pkey, false)
+	rows, err := s.conn.Query(ctx, query, args...)
+	if err != nil {
+		return 0, prevKey, errors.Wrap(err, "unable to execute query")
 	}
 	defer rows.Close()
-	return s.processQueryResults(ctx, namespace, table, rows, handler)
+	return s.processQueryResults(ctx, namespace, table, pkey, rows, handler)
 }
 
-func (s *TableSnapshotStream) processQueryResults(ctx context.Context, namespace, table string, rows pgx.Rows, handler ChangeEventHandler) (int, pgtype.TID, error) {
+func (s *TableSnapshotStream) processQueryResults(ctx context.Context, namespace, table string, pkey []string, rows pgx.Rows, handler ChangeEventHandler) (int, []byte, error) {
 	cols := rows.FieldDescriptions()
-	var lastTID pgtype.TID
+	// Allocate the `lastKey` array just once, we'll give it new values each time through the loop
+	lastKey := make([]interface{}, len(pkey))
 	var rowsProcessed int
 	for rows.Next() {
 		fields := make(map[string]interface{})
 		vals, err := rows.Values()
 		if err != nil {
-			return rowsProcessed, lastTID, errors.Wrap(err, "unable to get row values")
+			return rowsProcessed, nil, errors.Wrap(err, "unable to get row values")
 		}
+		// Fill out the `fields` map with column name-value mappings
 		for idx, val := range vals {
 			colName := string(cols[idx].Name)
-			if colName == "ctid" {
-				if tid, ok := val.(pgtype.TID); ok {
-					lastTID = tid
-				}
-				continue
-			}
 			fields[colName] = val
+		}
+		// Fill out the `lastKey` array with field values corresponding to `pkey` column names
+		for idx, colName := range pkey {
+			lastKey[idx] = fields[colName]
 		}
 		if err := handler(&ChangeEvent{
 			Type:      "Insert",
@@ -116,11 +198,18 @@ func (s *TableSnapshotStream) processQueryResults(ctx context.Context, namespace
 			Table:     table,
 			Fields:    fields,
 		}); err != nil {
-			return rowsProcessed, lastTID, errors.Wrap(err, "error handling change event")
+			return rowsProcessed, nil, errors.Wrap(err, "error handling change event")
 		}
 		rowsProcessed++
 	}
-	return rowsProcessed, lastTID, nil
+	if rowsProcessed == 0 {
+		return 0, nil, nil
+	}
+	key, err := packTuple(lastKey)
+	if err != nil {
+		return rowsProcessed, nil, err
+	}
+	return rowsProcessed, key, nil
 }
 
 func (s *TableSnapshotStream) Close(ctx context.Context) error {
