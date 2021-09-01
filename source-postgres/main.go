@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"log"
@@ -8,11 +9,25 @@ import (
 	"sync"
 	"time"
 
-	"github.com/estuary/connectors/go-types/airbyte"
+	"github.com/estuary/protocols/airbyte"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
+)
+
+const (
+	// Emit a log message to stderr for each event which is filtered out during
+	// replication due to an LSN which indicates that it was already observed
+	// during the initial table scan.
+	LogFilteredEvents = true
+
+	// Guarantee that the connector will not run longer than 48 hours without a
+	// restart. Since advancing the PostgreSQL replication slot `restart_lsn` only
+	// happens on restart (see comment in `replication.go` for explanation), this
+	// connector requires occasional restarts to allow PostgreSQL to free older WAL
+	// segments.
+	PoisonPillDuration = 48 * time.Hour
 )
 
 func main() {
@@ -65,13 +80,6 @@ const configSchema = `{
 	"required": [ "connectionURI" ]
 }`
 
-// Guarantee that the connector will not run longer than 48 hours without a
-// restart. Since advancing the PostgreSQL replication slot `restart_lsn` only
-// happens on restart (see comment in `replication.go` for explanation), this
-// connector requires occasional restarts to allow PostgreSQL to free older WAL
-// segments.
-const poisonPillDuration = 48 * time.Hour
-
 func doRead(args airbyte.ReadCmd) error {
 	state := new(CaptureState)
 	if state.Streams == nil {
@@ -91,8 +99,12 @@ func doRead(args airbyte.ReadCmd) error {
 	}
 	state.output = NewMessageOutput()
 
-	ctx, cancel := context.WithTimeout(context.Background(), poisonPillDuration)
-	defer cancel()
+	ctx := context.Background()
+	if PoisonPillDuration > 0 {
+		limitedCtx, cancel := context.WithTimeout(ctx, PoisonPillDuration)
+		defer cancel()
+		ctx = limitedCtx
+	}
 
 	return state.Process(ctx)
 }
@@ -107,8 +119,17 @@ type CaptureState struct {
 }
 
 type TableState struct {
-	Mode        string        `json:"mode"`
-	SnapshotLSN pglogrepl.LSN `json:"scanned_lsn,omitempty"`
+	Mode       string       `json:"mode"`
+	ScanKey    []string     `json:"scan_key"`
+	ScanRanges []TableRange `json:"scan_ranges,omitempty"`
+}
+
+const ScanStateScanning = "Scanning"
+const ScanStateActive = "Active"
+
+type TableRange struct {
+	ScannedLSN pglogrepl.LSN `json:"lsn"`
+	EndKey     []byte        `json:"key"`
 }
 
 func (cs *CaptureState) Validate() error {
@@ -138,20 +159,23 @@ func (cs *CaptureState) Process(ctx context.Context) error {
 	//   1. If this is the first time we're starting, immediately go get the current
 	//      server LSN, this is where we will begin replication in step 3. If we're
 	//      resuming then we already have our start point and this is not necessary.
-	//   2. For all tables which are in the ConfiguredCatalog but not in the current CaptureState:
-	//      - Perform a full scan of the table, turning every result row into an `Insert` event
-	//      - Obtain an LSN corresponding to this table scan contents, such that events older
-	//        than this LSN are already taken into account and newer events represent changes
-	//        from that baseline.
-	//      - Add an entry to CaptureState indicating that this table is in the `Snapshot(<LSN>)`
-	//        state, and emit the resulting CaptureState.
-	//   3. Begin replication from `CurrentLSN`
-	//      - Each time a "consistent point" is reached where there are no open transactions,
-	//        update the `CurrentLSN` to the new point and emit a state update.
-	//      - Whenever a change event (Insert/Update/Delete) occurs, look up the table state
-	//        - If it's `Active` then emit the event.
-	//        - If it's `Snapshot(<LSN>)` and `eventLSN` > `snapshotLSN` then enter `Active` state and emit the event.
-	//        - If it's `Snapshot(<LSN>)` and `eventLSN` <= `snapshotLSN` then discard the event.
+	//   2. Examine the configured catalog and resume state for mismatches, and update
+	//      the state to reflect any new streams.
+	//   3. Perform table scanning/snapshotting work until there's none left
+	//      - For each stream, we keep track of its 'Mode' (Scanning/Active) and a set
+	//        of (ScannedLSN, LastKey) ranges which define the "chunks" in which the
+	//        initial table capture was performed.
+	//      - Each newly created stream starts in the "Scanning" mode with no ranges.
+	//      - For each stream in the "Scanning" mode, issue a SQL query to fetch the
+	//        next chunk of rows.
+	//        - If there are no more rows to fetch, change mode to "Active".
+	//        - Otherwise update the appropriate range information.
+	//        - Finally issue a state update either way.
+	//   4. Begin replication streaming from `CurrentLSN`
+	//      - Each time a `Commit` message is received, update `CurrentLSN` and emit a state update.
+	//      - Whenever a change event (Insert/Update/Delete) occurs, look up the appropriate
+	//        range based on the primary key, and if `EventLSN > ScannedLSN` then emit a
+	//        change message.
 
 	// Step One: Get the current server LSN if our start point isn't already known
 	if cs.CurrentLSN == 0 {
@@ -167,17 +191,31 @@ func (cs *CaptureState) Process(ctx context.Context) error {
 	// been added then it's initialized in the "Pending" state, and if a previously
 	// configured stream has been removed then the corresponding state entry should
 	// be removed.
-	//
-	// TODO(wgd): While I'm thinking about the catalog, what exactly am I supposed
-	// to do with the various other fields of `airbyte.ConfiguredStream`?
 	catalogStateDirty := false
 	for _, catalogStream := range cs.catalog.Streams {
 		// Create state entries for catalog streams that don't already have one
 		streamName := catalogStream.Stream.Name
-		if _, ok := cs.Streams[streamName]; !ok {
-			log.Printf("Initializing new stream %q as Pending", streamName)
-			cs.Streams[streamName] = &TableState{Mode: "Pending"}
+		streamState, ok := cs.Streams[streamName]
+
+		if len(catalogStream.PrimaryKey) < 1 {
+			return errors.Errorf("stream %q: no primary key specified", streamName)
+		}
+		var pkey []string
+		for _, col := range catalogStream.PrimaryKey {
+			if len(col) != 1 {
+				return errors.Errorf("stream %q: primary key path %q must contain exactly one string", streamName, col)
+			}
+			pkey = append(pkey, col[0])
+		}
+
+		if !ok {
+			log.Printf("Initializing new stream %q as %q", streamName, ScanStateScanning)
+			cs.Streams[streamName] = &TableState{Mode: ScanStateScanning, ScanKey: pkey}
 			catalogStateDirty = true
+			continue
+		}
+		if !stringsEqual(streamState.ScanKey, pkey) {
+			return errors.Errorf("stream %q: primary key changed (was %q, now %q)", streamName, streamState.ScanKey, catalogStream.PrimaryKey)
 		}
 	}
 	for streamName := range cs.Streams {
@@ -186,7 +224,6 @@ func (cs *CaptureState) Process(ctx context.Context) error {
 		for _, catalogStream := range cs.catalog.Streams {
 			if streamName == catalogStream.Stream.Name {
 				streamExistsInCatalog = true
-				break
 			}
 		}
 		if !streamExistsInCatalog {
@@ -215,7 +252,9 @@ func (cs *CaptureState) Process(ctx context.Context) error {
 		}
 		defer snapshot.Close(ctx)
 		for cs.HasPendingScans() {
-			cs.PerformNextScan(ctx, snapshot)
+			if err := cs.PerformNextScan(ctx, snapshot); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -234,7 +273,7 @@ func (cs *CaptureState) Process(ctx context.Context) error {
 
 func (cs *CaptureState) HasPendingScans() bool {
 	for _, tableState := range cs.Streams {
-		if tableState.Mode == "Pending" {
+		if tableState.Mode == ScanStateScanning {
 			return true
 		}
 	}
@@ -243,40 +282,50 @@ func (cs *CaptureState) HasPendingScans() bool {
 
 func (cs *CaptureState) PerformNextScan(ctx context.Context, snapshot *TableSnapshotStream) error {
 	for streamName, tableState := range cs.Streams {
-		if tableState.Mode != "Pending" {
+		if tableState.Mode != "Scanning" {
 			continue
 		}
 
-		log.Printf("Scanning table %q at LSN=%q", streamName, snapshot.TransactionLSN())
-		// The way scanning works here is that each call to `ProcessFrom` yields a
-		// single finite chunk of results plus some information that can be used to
-		// fetch the next chunk next time, and then we repeat this process iteratively
-		// until there are no more results.
-		//
-		// Thus after each chunk we can emit a new state update in the near future.
-		// But currently the code doesn't quite do that bit, that's just the ultimate
-		// goal towards which the current structure of the code is aimed.
-		//
-		// TODO(wgd): Restructure things so that:
-		//   3. The transition "Pending->Scanning" invokes ProcessStart and stores a "PrevTID" field in TableState
-		//   4. Probably some other stuff, but we'll need to resolve some of the other issues around
-		//      resuming and identifying ranges when streaming first.
-		// TODO(wgd): Add support for namespaces other than "public"
-		// TODO(wgd): Emit state updates and add resume capability in between chunks
-		count, prevTID, err := snapshot.ScanStart(ctx, "public", streamName, cs.HandleSnapshotEvent)
-		if err != nil {
-			return errors.Wrap(err, "error processing snapshot events")
-		}
-		for count > 0 {
-			count, prevTID, err = snapshot.ScanFrom(ctx, "public", streamName, prevTID, cs.HandleSnapshotEvent)
+		// If there are no scanned ranges, start a new scan and initialize the scanned ranges list.
+		// TODO(wgd): What happens if the table is entirely empty? I'm pretty sure our end key is
+		// nil, then.
+		if len(tableState.ScanRanges) == 0 {
+			_, endKey, err := snapshot.ScanStart(ctx, "public", streamName, tableState.ScanKey, cs.HandleSnapshotEvent)
 			if err != nil {
 				return errors.Wrap(err, "error processing snapshot events")
 			}
+			tableState.ScanRanges = []TableRange{{
+				ScannedLSN: snapshot.TransactionLSN(),
+				EndKey:     endKey,
+			}}
+			return cs.output.EmitState(cs)
 		}
 
-		log.Printf("Done scanning table %q at LSN=%q", streamName, snapshot.TransactionLSN())
-		cs.Streams[streamName].Mode = "Snapshot"
-		cs.Streams[streamName].SnapshotLSN = snapshot.TransactionLSN()
+		// If the most recently scanned range had a different LSN than the current snapshot,
+		// there must have been a restart in between. Create a new scan range, initialized
+		// to the zero-length range after the previous range.
+		lastRange := &tableState.ScanRanges[len(tableState.ScanRanges)-1]
+		if lastRange.ScannedLSN != snapshot.TransactionLSN() {
+			tableState.ScanRanges = append(tableState.ScanRanges, TableRange{
+				ScannedLSN: snapshot.TransactionLSN(),
+				EndKey:     lastRange.EndKey,
+			})
+			lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
+		}
+
+		// At this point `lastRange` must refer to a range with the same `ScannedLSN`
+		// as our current table scanning transaction, so we reach the core loop of our
+		// table scanning logic: scan another chunk from the database and update the
+		// scan state.
+		count, nextKey, err := snapshot.ScanFrom(ctx, "public", streamName, tableState.ScanKey, lastRange.EndKey, cs.HandleSnapshotEvent)
+		if err != nil {
+			return errors.Wrap(err, "error processing snapshot events")
+		}
+		if count == 0 {
+			tableState.Mode = ScanStateActive
+		} else {
+			lastRange.EndKey = nextKey
+		}
 		return cs.output.EmitState(cs)
 	}
 	return errors.New("no scans pending")
@@ -288,8 +337,8 @@ func (cs *CaptureState) HandleSnapshotEvent(evt *ChangeEvent) error {
 }
 
 func (cs *CaptureState) HandleReplicationEvent(evt *ChangeEvent) error {
-	// TODO(wgd): The only thing the 'Begin' and 'Commit' event is used for is
-	// to signal that we could emit a state update. Can this be done better?
+	// TODO(wgd): The only thing the 'Commit' event is used for is to signal that
+	// we could emit a state update. Can this be done better?
 	if evt.Type == "Commit" {
 		// TODO(wgd): There will be a "Commit" event after every transaction, so if there
 		// are a bunch of independent single-row INSERTs we could end up emitting one state
@@ -299,30 +348,72 @@ func (cs *CaptureState) HandleReplicationEvent(evt *ChangeEvent) error {
 	}
 
 	tableState := cs.Streams[evt.Table]
-	// Tables for which we're not tracking state by the time replication event
-	// processing has begun are tables that aren't configured in the catalog,
-	// so don't emit any change messages for them.
 	if tableState == nil {
+		// Tables for which we're not tracking state by the time replication event
+		// processing has begun are tables that aren't configured in the catalog,
+		// so don't do any further processing on their events.
 		return nil
 	}
-	// Tables in the "Snapshot" state shouldn't emit change messages until we
-	// reach the appropriate LSN
-	if tableState.Mode == "Snapshot" && evt.LSN < tableState.SnapshotLSN {
-		log.Printf("Filtered %s on %q at LSN=%q", evt.Type, evt.Table, evt.LSN)
+	if tableState.Mode != ScanStateActive {
+		// This should never happen since the table scanning state machine ought to
+		// progress every table into the Active state before moving on to replication,
+		// but better safe than sorry.
+		return errors.Errorf("invalid state %#v for table %q", tableState, evt.Table)
+	}
+
+	// For each event, we need to figure out what "scan range" it falls into
+	// based on the primary key, and compare the event LSN to the LSN at which
+	// that range was scanned.
+	//
+	// TODO(wgd): Double-check that this will always be correct, given my
+	// current understanding of PostgreSQL logical replication internals.
+	isFiltered, err := cs.checkRangeLSN(tableState, evt.Fields, evt.LSN)
+	if err != nil {
+		return errors.Wrap(err, "could not determine whether to filter event")
+	}
+	if isFiltered {
+		if LogFilteredEvents {
+			log.Printf("Filtered %s on %q at LSN=%q with values %v", evt.Type, evt.Table, evt.LSN, evt.Fields)
+		}
 		return nil
 	}
-	// Once we've reached the LSN at which the table was scanned, it becomes active
-	if tableState.Mode == "Snapshot" && evt.LSN >= tableState.SnapshotLSN {
-		log.Printf("Stream %q marked active at LSN=%q", evt.Table, evt.LSN)
-		tableState.Mode = "Active"
-		tableState.SnapshotLSN = 0
+	return cs.HandleChangeEvent(evt)
+}
+
+func (cs *CaptureState) checkRangeLSN(tableState *TableState, fields map[string]interface{}, lsn pglogrepl.LSN) (bool, error) {
+	// If the table was empty during the initial scan there will be no scan range
+	// entries in the state (because we have no 'Last Key' to track them with),
+	// so in this special case we know that no events on the table should be
+	// filtered.
+	if len(tableState.ScanRanges) == 0 {
+		return false, nil
 	}
-	// And once a table is active we emit its events
-	if tableState.Mode == "Active" {
-		return cs.HandleChangeEvent(evt)
+
+	// If there's only one scan range we can skip the entire encoding and
+	// key comparison process and just use its `ScannedLSN` for all rows.
+	if len(tableState.ScanRanges) > 1 {
+		// Otherwise we have to actually implement generic primary key comparison
+		var keyElems []interface{}
+		for _, keyName := range tableState.ScanKey {
+			keyElems = append(keyElems, fields[keyName])
+		}
+		keyBytes, err := packTuple(keyElems)
+		if err != nil {
+			return false, errors.Wrap(err, "error encoding primary key for comparison")
+		}
+		for _, scanRange := range tableState.ScanRanges {
+			if bytes.Compare(keyBytes, scanRange.EndKey) < 0 {
+				isFiltered := lsn < scanRange.ScannedLSN
+				return isFiltered, nil
+			}
+		}
 	}
-	// This should never happen
-	return errors.Errorf("invalid state %#v for table %q", tableState, evt.Table)
+
+	// If the key did not fall into any known scan range during the previous
+	// bit of code then conceptually it falls into the last range.
+	scannedLSN := tableState.ScanRanges[len(tableState.ScanRanges)-1].ScannedLSN
+	isFiltered := lsn < scannedLSN
+	return isFiltered, nil
 }
 
 func (cs *CaptureState) HandleChangeEvent(evt *ChangeEvent) error {
@@ -379,4 +470,16 @@ func (m *MessageOutput) EmitState(state interface{}) error {
 		Type:  airbyte.MessageTypeState,
 		State: &airbyte.State{Data: json.RawMessage(rawState)},
 	})
+}
+
+func stringsEqual(xs, ys []string) bool {
+	if len(xs) != len(ys) {
+		return false
+	}
+	for i := range xs {
+		if xs[i] != ys[i] {
+			return false
+		}
+	}
+	return true
 }
