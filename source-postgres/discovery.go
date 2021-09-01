@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/estuary/connectors/go-types/airbyte"
+	"github.com/estuary/protocols/airbyte"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 )
