@@ -1,9 +1,9 @@
-# Ignore everything except for the specific files we actually care about. This is to avoid sending a
-# massive build context to the docker daemon, and also allows us to avoid copying everything we
-# might need into a temp directory.
-*
+.build
+.git
+.github
+infra
+tests
+*/target
+
+# We use the statically-compiled parser cli in the docker builds, so we can't ignore it.
 !parser/target/x86_64-unknown-linux-musl/release/parser
-!source-gcs/source-gcs
-!source-hello-world/source-hello-world
-!source-kinesis/source-kinesis
-!source-s3/source-s3
