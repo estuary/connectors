@@ -23,6 +23,9 @@ parser_cargo_args = --release --manifest-path parser/Cargo.toml --target x86_64-
 $(parser): parser
 	cargo build $(parser_cargo_args)
 
+# TODO: talk to Phil about make again
+parser_cli: $(parser)
+
 .PHONY: test-filesource
 test-filesource:
 	go test -v ./filesource/...
