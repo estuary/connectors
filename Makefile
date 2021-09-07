@@ -63,23 +63,12 @@ build_connectors = $(addprefix $(build_dir)/build-,$(connectors))
 # TODO(johnny): How should this change for the protocols refactor ?
 .SECONDEXPANSION:
 $(build_connectors): $(build_dir)/build-%: $(parser) % filesource $(shell find filesource -type f) $$(shell find % -type f) $(build_dir)/version | $(build_dir)
-	cd $* && go build
-	docker build -t ghcr.io/estuary/$*:$(version) --build-arg connector=$* .
-	@# This file is only used so that make can correctly determine if targets need rebuilt
-	echo $(version) > $@
-
-push_connectors = $(addprefix $(build_dir)/push-,$(connectors))
-
-$(push_connectors): $(build_dir)/push-%: $(build_dir)/build-%
-	docker push ghcr.io/estuary/$*:$(version)
+	docker build --file $* -t ghcr.io/estuary/$*:$(version)
 	@# This file is only used so that make can correctly determine if targets need rebuilt
 	echo $(version) > $@
 
 .PHONY: build-all
 build-all: $(build_connectors)
-
-.PHONY: push-all
-push-all: $(push_connectors)
 
 integration_test_connectors = $(addprefix int-test-,$(connectors))
 .PHONY: $(integration_test_connectors)
