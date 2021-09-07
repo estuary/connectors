@@ -7,64 +7,120 @@ on:
     branches: [main]
 
 jobs:
-  build:
-    services:
-      localstack:
-        # Provides local ephemeral versions of AWS services to use during tests.
-        #
-        # TODO: 0.12.14 introduces a new (undocumented) kinesis mock,
-        # and breaks source-kinesis tests for unknown reasons.
-        image: localstack/localstack:0.12.13
-        env:
-          # Only use a limited number of services in order to speed up the startup time.
-          SERVICES: "kinesis,s3"
-        ports:
-          - 4566:4566
-          - 4571:4571
+  build_parser:
     runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-musl
+
+      - name: Install MUSL
+        run: sudo apt-get install -y musl-tools
+
+      - name: Cargo Cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            parser/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build Parser
+        run: make parser_cli
+
+      - uses: actions/upload-artifact@v1
+        with:
+          name: parser_binary
+          path: parser/target/x86_64-unknown-linux-musl/release/parser
+
+  build_connectors:
+    needs: build_parser
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        connector:
+          - source-gcs
+          - source-hello-world
+          - source-kinesis
+          - source-s3
 
     steps:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - uses: actions-rs/toolchain@v1
+
+      - name: Prepare
+        id: prep
+        run: |
+          TAG=$(echo $GITHUB_SHA | head -c7)
+          echo ::set-output name=tag::${TAG}
+
+      - uses: actions/download-artifact@v1
         with:
-          toolchain: stable
-          target: x86_64-unknown-linux-musl
-      - run: sudo apt-get install -y musl-tools
-      - run: make test-all
+          name: parser_binary
+          path: parser/target/x86_64-unknown-linux-musl/release/
+
+      # Downloaded artifacts lose their prior permission settings
+      - name: Adjust parser permissions
+        run: chmod +x parser/target/x86_64-unknown-linux-musl/release/parser
+
       - name: Set up Cloud SDK
+        if: matrix.connector == 'source-gcs'
         uses: google-github-actions/setup-gcloud@master
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
           export_default_credentials: true
+
       - name: Configure AWS credentials from Test account
+        if: matrix.connector == 'source-kinesis' || matrix.connector == 'source-s3'
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
-      - name: Connector integration tests
-        run: make integration-tests
+
+      - name: Login to GitHub package docker registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login --username ${{ github.actor }} --password-stdin ghcr.io
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build ${{ matrix.connector }} Docker Image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ${{ matrix.connector }}/Dockerfile
+          load: true
+          tags: ghcr.io/estuary/${{ matrix.connector }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: ${{ matrix.connector }} integration tests
+        if: matrix.connector != 'source-hello-world'
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
           AWS_DEFAULT_OUTPUT: json
+        run: CONNECTOR=${{ matrix.connector }} VERSION=test ./tests/run.sh;
 
-      - name: Login to GitHub package docker registry
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login --username ${{ github.actor }} --password-stdin ghcr.io
-      - name: Tidy up, and ensure that generated files are unchanged.
-      # Tidy up before further invocations using `git describe --dirty`
-        run: |
-          # In case any tests left their data laying around
-          git clean --force -d
-          git diff
-          [[ -z "$(git status --porcelain)" ]] || exit 1
-        shell: bash
-      - run: make push-all
-
+      - name: Push ${{ matrix.connector }} image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ${{ matrix.connector }}/Dockerfile
+          push: true
+          tags: ghcr.io/estuary/${{ matrix.connector }}:${{ steps.prep.outputs.tag }}
