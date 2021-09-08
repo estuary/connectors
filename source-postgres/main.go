@@ -21,13 +21,6 @@ const (
 	// replication due to an LSN which indicates that it was already observed
 	// during the initial table scan.
 	LogFilteredEvents = true
-
-	// Guarantee that the connector will not run longer than 48 hours without a
-	// restart. Since advancing the PostgreSQL replication slot `restart_lsn` only
-	// happens on restart (see comment in `replication.go` for explanation), this
-	// connector requires occasional restarts to allow PostgreSQL to free older WAL
-	// segments.
-	PoisonPillDuration = 48 * time.Hour
 )
 
 func main() {
@@ -35,9 +28,11 @@ func main() {
 }
 
 type Config struct {
-	ConnectionURI   string `json:"connectionURI"`
-	SlotName        string `json:"slot_name"`
-	PublicationName string `json:"publication_name"`
+	ConnectionURI      string  `json:"connectionURI"`
+	SlotName           string  `json:"slot_name"`
+	PublicationName    string  `json:"publication_name"`
+	PollTimeoutSeconds float64 `json:"poll_timeout_seconds"`
+	MaxLifespanSeconds float64 `json:"max_lifespan_seconds"`
 }
 
 func (c *Config) Validate() error {
@@ -49,6 +44,9 @@ func (c *Config) Validate() error {
 	}
 	if c.PublicationName == "" {
 		c.PublicationName = "flow_publication"
+	}
+	if c.PollTimeoutSeconds == 0 {
+		c.PollTimeoutSeconds = 10
 	}
 	return nil
 }
@@ -75,6 +73,18 @@ const configSchema = `{
 			"title":       "Publication Name",
 			"description": "The name of the PostgreSQL publication to replicate from",
 			"default":     "flow_publication"
+		},
+		"poll_timeout_seconds": {
+			"type":        "number",
+			"title":       "Poll Timeout (seconds)",
+			"description": "When tail=false, controls how long to sit idle before shutting down",
+			"default":     10
+		},
+		"max_lifespan_seconds": {
+			"type":        "number",
+			"title":       "Maximum Connector Lifespan (seconds)",
+			"description": "When nonzero, imposes a maximum runtime after which to unconditionally shut down",
+			"default":     0
 		}
 	},
 	"required": [ "connectionURI" ]
@@ -105,11 +115,6 @@ type TableRange struct {
 
 func doRead(args airbyte.ReadCmd) error {
 	ctx := context.Background()
-	if PoisonPillDuration > 0 {
-		limitedCtx, cancel := context.WithTimeout(ctx, PoisonPillDuration)
-		defer cancel()
-		ctx = limitedCtx
-	}
 
 	state := &PersistentState{Streams: make(map[string]*TableState)}
 	if args.StateFile != "" {
@@ -128,6 +133,12 @@ func doRead(args airbyte.ReadCmd) error {
 		return errors.Wrap(err, "unable to parse catalog")
 	}
 
+	if config.MaxLifespanSeconds != 0 {
+		limitedCtx, cancel := context.WithTimeout(ctx, time.Duration(config.MaxLifespanSeconds*float64(time.Second)))
+		defer cancel()
+		ctx = limitedCtx
+	}
+
 	capture, err := NewCapture(ctx, state, config, catalog)
 	if err != nil {
 		return err
@@ -138,10 +149,25 @@ func doRead(args airbyte.ReadCmd) error {
 	if err := capture.ScanTables(ctx); err != nil {
 		return errors.Wrap(err, "error scanning table contents")
 	}
-	if err := capture.StreamChanges(ctx); err != nil {
-		return errors.Wrap(err, "error streaming replication events")
+
+	// In non-tailing mode (which should only occur during development) we need
+	// to shut down after no further changes have been reported for a while. To
+	// do this we create a cancellable context, and a watchdog timer which will
+	// perform said cancellation if `PollingTimeout` elapses between resets.
+	if !catalog.Tail {
+		streamCtx, streamCancel := context.WithCancel(ctx)
+		defer streamCancel()
+		wdtDuration := time.Duration(config.PollTimeoutSeconds * float64(time.Second))
+		capture.watchdog = time.AfterFunc(wdtDuration, streamCancel)
+		ctx = streamCtx
 	}
-	return errors.New("read process should never terminate")
+
+	err = capture.StreamChanges(ctx)
+	if errors.Is(err, context.Canceled) && !catalog.Tail {
+		log.Printf("Shut down due to lack of activity, set `tail: true` in catalog to avoid this")
+		return nil
+	}
+	return err
 }
 
 type Capture struct {
@@ -151,6 +177,7 @@ type Capture struct {
 	output   *MessageOutput             // A JSON-encoding wrapper around stdout
 	connScan *pgx.Conn                  // The DB connection used for table scanning
 	connRepl *pgconn.PgConn             // The DB connection used for replication streaming
+	watchdog *time.Timer                // If non-nil, the Reset() method will be invoked whenever a replication event is received
 }
 
 func NewCapture(ctx context.Context, state *PersistentState, config *Config, catalog *airbyte.ConfiguredCatalog) (*Capture, error) {
@@ -368,6 +395,12 @@ func (c *Capture) StreamChanges(ctx context.Context) error {
 }
 
 func (c *Capture) HandleReplicationEvent(evt *ChangeEvent) error {
+	// When in non-tailing mode, reset the shutdown watchdog whenever an event happens.
+	if c.watchdog != nil {
+		wdtDuration := time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
+		c.watchdog.Reset(wdtDuration)
+	}
+
 	// TODO(wgd): The only thing the 'Commit' event is used for is to signal that
 	// we could emit a state update. Can this be done better?
 	//
