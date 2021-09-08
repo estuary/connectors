@@ -1,0 +1,58 @@
+version: "3"
+services:
+  # Secured Kafka with SCRAM enabled
+  kafka:
+    image: 'bitnami/kafka:latest'
+    ports:
+      - '9092:9092'
+    volumes:
+      - kafka_data:/bitnami/kafka
+      # TODO: I don't believe we *should* need to create this file ourselves.
+      # The Bitnami image attempts to build this configuration file from the
+      # environment variables provided, but I believe there is a bug (many
+      # bugs?) in their 800 line bash script. Check back in on this in the
+      # future so we don't need to maintain this file ourselves.
+      - ./kafka_jaas.conf:/bitnami/kafka/config/kafka_jaas.conf
+    depends_on:
+      - zookeeper
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ZOOKEEPER_PROTOCOL=SASL
+      - KAFKA_ZOOKEEPER_USER=zoo
+      - KAFKA_ZOOKEEPER_PASSWORD=keeper
+
+      # We'll use SASL/SCRAM for our external clients, and SASL/PLAIN for the
+      # internal broker communication.
+      - KAFKA_CFG_SASL_ENABLED_MECHANISMS=PLAIN,SCRAM-SHA-256
+      - KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN
+
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
+      - KAFKA_CFG_LISTENERS=INTERNAL://:29092,EXTERNAL://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+
+      # These values are used by the Docker entrypoint script to create
+      # users/passwords stored in Zookeeper. If we change the kafka_jaas.conf,
+      # we may need to adjust these values. Be careful, since things may
+      # continue to work locally between reboots of Kafka because settings are
+      # stored in Zookeeper.
+      - KAFKA_CLIENT_USERS=alice,bob
+      - KAFKA_CLIENT_PASSWORDS=alice-pass,bob-pass
+
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --zookeeper zookeeper:2181 --list"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  zookeeper:
+    image: 'bitnami/zookeeper:latest'
+    volumes:
+      - zookeeper_data:/bitnami/zookeeper
+    environment:
+      - ZOO_ENABLE_AUTH=yes
+      - ZOO_SERVER_USERS=zoo
+      - ZOO_SERVER_PASSWORDS=keeper
+volumes:
+  kafka_data:
+  zookeeper_data:

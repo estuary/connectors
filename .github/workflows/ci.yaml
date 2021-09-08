@@ -53,6 +53,7 @@ jobs:
         connector:
           - source-gcs
           - source-hello-world
+          - source-kafka
           - source-kinesis
           - source-s3
     steps:
@@ -74,6 +75,17 @@ jobs:
       # Downloaded artifacts lose their prior permission settings
       - name: Adjust parser permissions
         run: chmod +x parser/target/x86_64-unknown-linux-musl/release/parser
+
+      - name: Install kafkactl
+        if: matrix.connector == 'source-kafka'
+        env:
+          version: 1.20.0
+          checksum: ff285ce7eefa956234e65f9ff98160c2c365973ca598187cee81da1377b139d1
+        run: |
+          curl -L -o "kafkactl_${version}_linux_amd64.deb" "https://github.com/deviceinsight/kafkactl/releases/download/v${version}/kafkactl_${version}_linux_amd64.deb" && \
+          echo "$checksum kafkactl_${version}_linux_amd64.deb" | sha256sum --check && \
+          sudo dpkg -i "kafkactl_${version}_linux_amd64.deb" && \
+          rm "kafkactl_${version}_linux_amd64.deb"
 
       - name: Set up Cloud SDK
         if: matrix.connector == 'source-gcs'
@@ -108,6 +120,12 @@ jobs:
           tags: ghcr.io/estuary/${{ matrix.connector }}:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Start Dockerized test infrastructure
+        if: matrix.connector == 'source-kafka'
+        run: |
+         docker-compose --file infra/docker-compose.yaml up --detach zookeeper
+         docker-compose --file infra/docker-compose.yaml up --detach kafka
 
       - name: ${{ matrix.connector }} integration tests
         if: matrix.connector != 'source-hello-world'
