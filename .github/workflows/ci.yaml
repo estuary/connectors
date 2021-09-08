@@ -56,6 +56,10 @@ jobs:
           - source-kafka
           - source-kinesis
           - source-s3
+          - materialize-postgres
+          - materialize-snowflake
+          - materialize-webhook
+
     steps:
       - uses: actions/checkout@v2
         with:
@@ -128,7 +132,12 @@ jobs:
          docker-compose --file infra/docker-compose.yaml up --detach kafka
 
       - name: ${{ matrix.connector }} integration tests
-        if: matrix.connector != 'source-hello-world'
+        if: |
+          contains('
+            source-gcs
+            source-kinesis
+            source-s3
+            ', matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

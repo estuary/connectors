@@ -1,0 +1,186 @@
+package boilerplate
+
+import (
+	"bufio"
+	"context"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"syscall"
+
+	pm "github.com/estuary/protocols/materialize"
+	protoio "github.com/gogo/protobuf/io"
+	"github.com/gogo/protobuf/proto"
+	"github.com/jessevdk/go-flags"
+	"google.golang.org/grpc/metadata"
+)
+
+// RunMain is the boilerplate main function of a materialization connector.
+func RunMain(srv pm.DriverServer) {
+	var parser = flags.NewParser(nil, flags.Default)
+	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+
+	var cmd = cmdCommon{
+		ctx: ctx,
+		srv: srv,
+		r:   bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
+		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+	}
+
+	parser.AddCommand("spec", "Write the connector specification",
+		"Write the connector specification to stdout, then exit", &specCmd{cmd})
+	parser.AddCommand("validate", "Validate a materialization",
+		"Validate a proposed ValidateRequest read from stdin", &validateCmd{cmd})
+	parser.AddCommand("apply", "Apply a materialization",
+		"Apply a proposed ApplyRequest read from stdin", &applyCmd{cmd})
+	parser.AddCommand("transactions", "Run materialization transactions",
+		"Run a stream of transactions read from stdin", &transactionsCmd{cmd})
+
+	var _, err = parser.Parse()
+	if err != nil {
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
+type cmdCommon struct {
+	ctx context.Context
+	srv pm.DriverServer
+	r   *bufio.Reader
+	w   protoio.Writer
+}
+
+type protoValidator interface {
+	proto.Message
+	Validate() error
+}
+
+func (c *cmdCommon) readMsg(m protoValidator) error {
+	var lengthBytes [4]byte
+
+	if _, err := io.ReadFull(c.r, lengthBytes[:]); err == io.EOF {
+		return err
+	} else if err != nil {
+		return fmt.Errorf("reading message length: %w", err)
+	}
+
+	var len = int(binary.LittleEndian.Uint32(lengthBytes[:]))
+
+	// Fetch next length-delimited message into a buffer.
+	// In the garden-path case, we decode directly from the
+	// bufio.Reader internal buffer without copying
+	// (having just read the length, the message itself
+	// is probably _already_ in the bufio.Reader buffer).
+	//
+	// If the message is larger than the internal buffer,
+	// we allocate and read it directly.
+	var b, err = c.r.Peek(len)
+
+	if err == nil {
+		// The Discard contract guarantees we won't error.
+		// It's safe to reference |b| until the next Peek.
+		if _, err = c.r.Discard(len); err != nil {
+			panic(err)
+		}
+	} else if err != io.ErrShortBuffer {
+		return fmt.Errorf("reading message (into buffer): %w", err)
+	} else {
+		// Non-garden path: we must allocate and read a larger buffer.
+		b = make([]byte, len)
+		if _, err = io.ReadFull(c.r, b); err != nil {
+			return fmt.Errorf("reading message (directly): %w", err)
+		}
+	}
+
+	if err := proto.Unmarshal(b, m); err != nil {
+		return fmt.Errorf("decoding message: %w", err)
+	} else if err = m.Validate(); err != nil {
+		return fmt.Errorf("validating message: %w", err)
+	}
+
+	return nil
+}
+
+type specCmd struct{ cmdCommon }
+type validateCmd struct{ cmdCommon }
+type applyCmd struct{ cmdCommon }
+type transactionsCmd struct{ cmdCommon }
+
+func (c specCmd) Execute(args []string) error {
+	var req pm.SpecRequest
+
+	if err := c.readMsg(&req); err != nil {
+		return fmt.Errorf("reading request: %w", err)
+	} else if resp, err := c.srv.Spec(c.ctx, &req); err != nil {
+		return err
+	} else if err = c.w.WriteMsg(resp); err != nil {
+		return fmt.Errorf("writing response: %w", err)
+	}
+	return nil
+}
+
+func (c validateCmd) Execute(args []string) error {
+	var req pm.ValidateRequest
+
+	if err := c.readMsg(&req); err != nil {
+		return fmt.Errorf("reading request: %w", err)
+	} else if resp, err := c.srv.Validate(c.ctx, &req); err != nil {
+		return err
+	} else if err = c.w.WriteMsg(resp); err != nil {
+		return fmt.Errorf("writing response: %w", err)
+	}
+	return nil
+}
+
+func (c applyCmd) Execute(args []string) error {
+	var req pm.ApplyRequest
+
+	if err := c.readMsg(&req); err != nil {
+		return fmt.Errorf("reading request: %w", err)
+	} else if resp, err := c.srv.Apply(c.ctx, &req); err != nil {
+		return err
+	} else if err = c.w.WriteMsg(resp); err != nil {
+		return fmt.Errorf("writing response: %w", err)
+	}
+
+	return nil
+}
+
+func (c transactionsCmd) Execute(args []string) error {
+	return c.srv.Transactions(&txnAdapter{cmdCommon: c.cmdCommon})
+}
+
+// txnAdapter is a pm.Driver_TransactionsServer built from
+// os.Stdin and os.Stdout.
+type txnAdapter struct{ cmdCommon }
+
+func (a *txnAdapter) Send(m *pm.TransactionResponse) error {
+	return a.SendMsg(m)
+}
+func (a *txnAdapter) Recv() (*pm.TransactionRequest, error) {
+	m := new(pm.TransactionRequest)
+	if err := a.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+func (a *txnAdapter) Context() context.Context {
+	return a.ctx
+}
+func (a *txnAdapter) SetHeader(metadata.MD) error {
+	panic("SetHeader is not supported")
+}
+func (a *txnAdapter) SendHeader(metadata.MD) error {
+	panic("SendHeader is not supported")
+}
+func (a *txnAdapter) SetTrailer(metadata.MD) {
+	panic("SetTrailer is not supported")
+}
+func (a *txnAdapter) SendMsg(m interface{}) error {
+	return a.w.WriteMsg(m.(proto.Message))
+}
+func (a *txnAdapter) RecvMsg(m interface{}) error {
+	return a.readMsg(m.(protoValidator))
+}
