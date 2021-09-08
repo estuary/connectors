@@ -1,4 +1,5 @@
-{ "streams": [
+{ "tail": true,
+  "streams": [
   { "stream": {
       "name": "babynames",
         "json_schema": {

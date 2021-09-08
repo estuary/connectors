@@ -98,7 +98,7 @@ func (s *TableSnapshotStream) ScanStart(ctx context.Context, namespace, table st
 	query := buildScanQuery(namespace, table, pkey, true)
 	rows, err := s.conn.Query(ctx, query)
 	if err != nil {
-		return 0, nil, errors.Wrap(err, "unable to execute query")
+		return 0, nil, errors.Wrapf(err, "unable to execute query %q", query)
 	}
 	defer rows.Close()
 	return s.dispatchResults(ctx, namespace, table, pkey, rows, handler)
@@ -116,7 +116,7 @@ func (s *TableSnapshotStream) ScanFrom(ctx context.Context, namespace, table str
 	query := buildScanQuery(namespace, table, pkey, false)
 	rows, err := s.conn.Query(ctx, query, args...)
 	if err != nil {
-		return 0, prevKey, errors.Wrap(err, "unable to execute query")
+		return 0, prevKey, errors.Wrapf(err, "unable to execute query %q", query)
 	}
 	defer rows.Close()
 	return s.dispatchResults(ctx, namespace, table, pkey, rows, handler)
