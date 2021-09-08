@@ -15,6 +15,7 @@ services:
       POSTGRES_PASSWORD: flow
     ports:
       - "5432:5432"
+    network_mode: "host"
 
 volumes:
   postgres-testdata: {}
