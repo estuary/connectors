@@ -4,8 +4,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
 
 use source_kafka::connector::Command;
-fn main() -> color_eyre::Result<()> {
-    color_eyre::install()?;
+fn main() -> eyre::Result<()> {
     setup_tracing();
 
     let cmd = Command::from_args();

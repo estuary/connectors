@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::path::{Path, PathBuf};
 
-use color_eyre::eyre::Context;
+use eyre::Context;
 use structopt::StructOpt;
 
 use crate::airbyte;
@@ -46,7 +46,7 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn execute<C: Connector>(&self) -> color_eyre::Result<()> {
+    pub fn execute<C: Connector>(&self) -> eyre::Result<()> {
         let stdout_guard = stdout();
         let mut stdout = Box::new(stdout_guard.lock());
 
@@ -90,7 +90,7 @@ impl Command {
     }
 }
 
-fn open_file(path: impl AsRef<Path>) -> color_eyre::Result<File> {
+fn open_file(path: impl AsRef<Path>) -> eyre::Result<File> {
     File::open(&path).wrap_err(format!("failed to read {:?}", path.as_ref()))
 }
 
@@ -105,15 +105,15 @@ pub trait Connector {
     type ConfiguredCatalog: ConnectorConfig;
     type State: ConnectorConfig;
 
-    fn spec(output: &mut dyn Write) -> color_eyre::Result<()>;
-    fn check(output: &mut dyn Write, config: Self::Config) -> color_eyre::Result<()>;
-    fn discover(output: &mut dyn Write, config: Self::Config) -> color_eyre::Result<()>;
+    fn spec(output: &mut dyn Write) -> eyre::Result<()>;
+    fn check(output: &mut dyn Write, config: Self::Config) -> eyre::Result<()>;
+    fn discover(output: &mut dyn Write, config: Self::Config) -> eyre::Result<()>;
     fn read(
         output: &mut dyn Write,
         config: Self::Config,
         catalog: Self::ConfiguredCatalog,
         state: Option<Self::State>,
-    ) -> color_eyre::Result<()>;
+    ) -> eyre::Result<()>;
 }
 
 #[derive(Debug, thiserror::Error)]

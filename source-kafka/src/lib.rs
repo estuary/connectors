@@ -19,14 +19,14 @@ impl connector::Connector for KafkaConnector {
     type ConfiguredCatalog = catalog::ConfiguredCatalog;
     type State = state::TopicSet;
 
-    fn spec(output: &mut dyn Write) -> color_eyre::Result<()> {
+    fn spec(output: &mut dyn Write) -> eyre::Result<()> {
         let message: airbyte::Spec<configuration::Configuration> = airbyte::Spec::new(true, vec![]);
 
         connector::write_message(output, message)?;
         Ok(())
     }
 
-    fn check(output: &mut dyn Write, config: Self::Config) -> color_eyre::Result<()> {
+    fn check(output: &mut dyn Write, config: Self::Config) -> eyre::Result<()> {
         let consumer = kafka::consumer_from_config(&config)?;
         let message = kafka::test_connection(&consumer);
 
@@ -34,7 +34,7 @@ impl connector::Connector for KafkaConnector {
         Ok(())
     }
 
-    fn discover(output: &mut dyn Write, config: Self::Config) -> color_eyre::Result<()> {
+    fn discover(output: &mut dyn Write, config: Self::Config) -> eyre::Result<()> {
         let consumer = kafka::consumer_from_config(&config)?;
         let metadata = kafka::fetch_metadata(&consumer)?;
         let streams = kafka::available_streams(&metadata);
@@ -49,7 +49,7 @@ impl connector::Connector for KafkaConnector {
         config: Self::Config,
         catalog: Self::ConfiguredCatalog,
         persisted_state: Option<Self::State>,
-    ) -> color_eyre::Result<()> {
+    ) -> eyre::Result<()> {
         let consumer = kafka::consumer_from_config(&config)?;
         let metadata = kafka::fetch_metadata(&consumer)?;
 

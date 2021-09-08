@@ -35,7 +35,7 @@ mod test {
     use serde_json::{from_value, json};
 
     #[test]
-    fn shard_range_definition_parsing_test() -> color_eyre::Result<()> {
+    fn shard_range_definition_parsing_test() -> eyre::Result<()> {
         let zero: Hex32 = from_value(json!("00000000"))?;
         let two_five_five: Hex32 = from_value(json!("000000ff"))?;
 
@@ -51,7 +51,7 @@ mod test {
     }
 
     #[test]
-    fn hex_32_parsing_test() -> color_eyre::Result<()> {
+    fn hex_32_parsing_test() -> eyre::Result<()> {
         let zero: Hex32 = from_value(json!("00000000"))?;
         let one: Hex32 = from_value(json!("00000001"))?;
         let two_five_five: Hex32 = from_value(json!("000000ff"))?;

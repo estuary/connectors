@@ -10,7 +10,7 @@ doctest = false
 
 [dependencies]
 chrono = { version = "0.4.19", features = ["serde"] }
-color-eyre = "0.5.11"
+eyre = "0.6.5"
 highway = "0.6.4"
 rdkafka = { version = "0.26", features = ["cmake-build", "gssapi", "libz", "sasl", "ssl"], default-features = false }
 schemars = "0.8.3"
