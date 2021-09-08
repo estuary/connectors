@@ -7,7 +7,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/estuary/protocols/fdb/tuple"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
@@ -102,55 +101,7 @@ func (s *TableSnapshotStream) ScanStart(ctx context.Context, namespace, table st
 		return 0, nil, errors.Wrap(err, "unable to execute query")
 	}
 	defer rows.Close()
-	return s.processQueryResults(ctx, namespace, table, pkey, rows, handler)
-}
-
-// We translate a list of column values (representing the primary key of a
-// database row) into a list of bytes using the FoundationDB tuple encoding
-// package. This tuple encoding has the useful property that lexicographic
-// comparison of these bytes is equivalent to lexicographic comparison of
-// the equivalent values, and thus we don't have to write code to do that.
-//
-// Encoding primary keys like this also makes `state.json` round-tripping
-// across restarts trivial.
-func packTuple(xs []interface{}) (bs []byte, err error) {
-	var t []tuple.TupleElement
-	for _, x := range xs {
-		// Values not natively supported by the FoundationDB tuple encoding code
-		// must be converted into ones that are.
-		switch x := x.(type) {
-		case int32:
-			t = append(t, int(x))
-		default:
-			t = append(t, x)
-		}
-	}
-
-	// The `Pack()` function doesn't have an error return value, and instead
-	// will just panic with a string value if given an unsupported value type.
-	// This defer will catch and translate these panics into proper error returns.
-	defer func() {
-		if r := recover(); r != nil {
-			if errStr, ok := r.(string); ok {
-				err = errors.New(errStr)
-			} else {
-				panic(r)
-			}
-		}
-	}()
-	return tuple.Tuple(t).Pack(), nil
-}
-
-func unpackTuple(bs []byte) ([]interface{}, error) {
-	t, err := tuple.Unpack(bs)
-	if err != nil {
-		return nil, err
-	}
-	var xs []interface{}
-	for _, elem := range t {
-		xs = append(xs, elem)
-	}
-	return xs, nil
+	return s.dispatchResults(ctx, namespace, table, pkey, rows, handler)
 }
 
 func (s *TableSnapshotStream) ScanFrom(ctx context.Context, namespace, table string, pkey []string, prevKey []byte, handler ChangeEventHandler) (int, []byte, error) {
@@ -168,29 +119,59 @@ func (s *TableSnapshotStream) ScanFrom(ctx context.Context, namespace, table str
 		return 0, prevKey, errors.Wrap(err, "unable to execute query")
 	}
 	defer rows.Close()
-	return s.processQueryResults(ctx, namespace, table, pkey, rows, handler)
+	return s.dispatchResults(ctx, namespace, table, pkey, rows, handler)
 }
 
-func (s *TableSnapshotStream) processQueryResults(ctx context.Context, namespace, table string, pkey []string, rows pgx.Rows, handler ChangeEventHandler) (int, []byte, error) {
+func (s *TableSnapshotStream) dispatchResults(ctx context.Context, namespace, table string, pkey []string, rows pgx.Rows, handler ChangeEventHandler) (int, []byte, error) {
 	cols := rows.FieldDescriptions()
-	// Allocate the `lastKey` array just once, we'll give it new values each time through the loop
-	lastKey := make([]interface{}, len(pkey))
+	var lastKey []byte
 	var rowsProcessed int
 	for rows.Next() {
+		// Fill out the `fields` map with column name-value mappings
 		fields := make(map[string]interface{})
 		vals, err := rows.Values()
 		if err != nil {
 			return rowsProcessed, nil, errors.Wrap(err, "unable to get row values")
 		}
-		// Fill out the `fields` map with column name-value mappings
 		for idx, val := range vals {
 			colName := string(cols[idx].Name)
 			fields[colName] = val
 		}
-		// Fill out the `lastKey` array with field values corresponding to `pkey` column names
+
+		// Encode this row's primary key as a serialized tuple, and as a sanity
+		// check require that it be greater than the previous row's key.
+		keyFields := make([]interface{}, len(pkey))
 		for idx, colName := range pkey {
-			lastKey[idx] = fields[colName]
+			keyFields[idx] = fields[colName]
 		}
+		rowKey, err := packTuple(keyFields)
+		if err != nil {
+			return rowsProcessed, nil, errors.Wrap(err, "unable to encode row primary key")
+		}
+		// TODO(wgd): Should this check be made optional or break-glass-able somehow?
+		if lastKey != nil && compareTuples(lastKey, rowKey) >= 0 {
+			// This is an opportunistic sanity-check of what should be an invariant.
+			// This check should only fail if PostgreSQL returns result rows in an order
+			// which does not match the lexicographical sort order of the encoded tuples.
+			//
+			// The failure mode that this is guarding against is very much a corner case:
+			//
+			//   + If the ordering of encoded tuples doesn't precisely match the equivalent
+			//     PostgreSQL `ORDER BY` ordering.
+			//   + ...and the scan of some particular table is interrupted and restarted
+			//     across multiple runs of this source connector.
+			//   + ...and there are concurrent modifications to the table, on rows which
+			//     fall in different "connector restarts" according to PostgreSQL and our
+			//     own tuple comparison.
+			//
+			// Then it is possible for these concurrent modifications to either be repeated
+			// (the replication event should have been filtered but wasn't) or omitted (the
+			// replication event was filtered when it shouldn't have been) once replication
+			// begins.
+			return rowsProcessed, nil, errors.Errorf("primary key ordering failure: prev=%q, next=%q", lastKey, rowKey)
+		}
+		lastKey = rowKey
+
 		if err := handler(&ChangeEvent{
 			Type:      "Insert",
 			LSN:       s.txLSN,
@@ -202,14 +183,7 @@ func (s *TableSnapshotStream) processQueryResults(ctx context.Context, namespace
 		}
 		rowsProcessed++
 	}
-	if rowsProcessed == 0 {
-		return 0, nil, nil
-	}
-	key, err := packTuple(lastKey)
-	if err != nil {
-		return rowsProcessed, nil, err
-	}
-	return rowsProcessed, key, nil
+	return rowsProcessed, lastKey, nil
 }
 
 func (s *TableSnapshotStream) Close(ctx context.Context) error {
