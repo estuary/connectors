@@ -19,9 +19,9 @@ function bail() {
 test -n "$CONNECTOR" || bail "must specify CONNECTOR env variable"
 test -n "$VERSION" || bail "must specify VERSION env variable"
 
-FLOW_IMAGE="quay.io/estuary/flow:v0.1.0-376-g273cd3d"
+FLOW_IMAGE="ghcr.io/estuary/flow:v0.1.0-406-gebef86c"
 # the connector image needs to be available to envsubst
-export CONNECTOR_IMAGE="ghcr.io/estuary/${CONNECTOR}:${VERSION}" 
+export CONNECTOR_IMAGE="ghcr.io/estuary/${CONNECTOR}:${VERSION}"
 
 function pollDevelop() {
     local catalog="$1"
