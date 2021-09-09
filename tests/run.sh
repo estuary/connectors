@@ -52,7 +52,7 @@ actual="${test_dir}/actual_test_results.txt"
 # won't exist as long as we do a clean checkout, but for local runs, I'd rather error out than to
 # run 'sudo rm'.
 if [[ -d "${test_dir}" ]]; then
-    bail "The test directory must not already exist prior to a test run"
+    bail "The test directory must not already exist prior to a test run. Consider deleting $test_dir if running manually"
 fi
 mkdir -p "$test_dir"
 
