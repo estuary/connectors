@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"log"
-	"time"
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type TableSnapshotStream struct {
@@ -84,14 +83,18 @@ func (s *TableSnapshotStream) buildScanQuery(namespace, table string, pkey []str
 	}
 	query += fmt.Sprintf(" ORDER BY (%s)", pkeyTupleExpr)
 	query += fmt.Sprintf(" LIMIT %d;", s.SelectChunkSize)
-	log.Printf("Built Scan Query: %q", query)
 	return query
 }
 
 func (s *TableSnapshotStream) ScanStart(ctx context.Context, namespace, table string, pkey []string, handler ChangeEventHandler) (int, []byte, error) {
-	log.Printf("Scanning table %q from start", table)
-	time.Sleep(1 * time.Second)
+	logrus.WithFields(logrus.Fields{
+		"namespace":  namespace,
+		"table":      table,
+		"primaryKey": pkey,
+	}).Info("scanning from start")
+
 	query := s.buildScanQuery(namespace, table, pkey, true)
+	logrus.WithField("query", query).Debug("executing query")
 	rows, err := s.conn.Query(ctx, query)
 	if err != nil {
 		return 0, nil, errors.Wrapf(err, "unable to execute query %q", query)
@@ -101,7 +104,13 @@ func (s *TableSnapshotStream) ScanStart(ctx context.Context, namespace, table st
 }
 
 func (s *TableSnapshotStream) ScanFrom(ctx context.Context, namespace, table string, pkey []string, prevKey []byte, handler ChangeEventHandler) (int, []byte, error) {
-	log.Printf("Scanning table %q from previous key %q", table, base64.StdEncoding.EncodeToString(prevKey))
+	logrus.WithFields(logrus.Fields{
+		"namespace":  namespace,
+		"table":      table,
+		"primaryKey": pkey,
+		"resumeKey":  base64.StdEncoding.EncodeToString(prevKey),
+	}).Info("scanning next chunk")
+
 	args, err := unpackTuple(prevKey)
 	if err != nil {
 		return 0, nil, errors.Wrap(err, "error unpacking encoded tuple")
@@ -110,6 +119,7 @@ func (s *TableSnapshotStream) ScanFrom(ctx context.Context, namespace, table str
 		return 0, nil, errors.Errorf("expected %d primary-key values but got %d", len(pkey), len(args))
 	}
 	query := s.buildScanQuery(namespace, table, pkey, false)
+	logrus.WithField("query", query).WithField("args", args).Debug("executing query")
 	rows, err := s.conn.Query(ctx, query, args...)
 	if err != nil {
 		return 0, prevKey, errors.Wrapf(err, "unable to execute query %q", query)
