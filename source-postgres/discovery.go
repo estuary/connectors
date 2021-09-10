@@ -44,13 +44,6 @@ func doDiscover(args airbyte.DiscoverCmd) error {
 	})
 }
 
-type DBTable struct {
-	TableSchema string
-	TableName   string
-	Columns     []DBColumn
-	PrimaryKeys []DBPrimaryKey
-}
-
 func discoverCatalog(configFile airbyte.ConfigFile) (*airbyte.Catalog, error) {
 	var config Config
 	if err := configFile.Parse(&config); err != nil {
@@ -64,41 +57,16 @@ func discoverCatalog(configFile airbyte.ConfigFile) (*airbyte.Catalog, error) {
 	}
 	defer conn.Close(ctx)
 
-	// Get lists of all columns and primary keys in the database
-	columns, err := getColumns(ctx, conn)
+	tables, err := GetDatabaseTables(ctx, conn)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to list database columns")
-	}
-	primaryKeys, err := getPrimaryKeys(ctx, conn)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to list database primary keys")
-	}
-
-	// Aggregate column and primary key information into DBTable structs using
-	// (TableSchema, TableName) tuples combined into a string ID.
-	tables := make(map[string]*DBTable)
-	for _, column := range columns {
-		id := column.TableSchema + ":" + column.TableName
-		if _, ok := tables[id]; !ok {
-			tables[id] = &DBTable{TableSchema: column.TableSchema, TableName: column.TableName}
-		}
-		tables[id].Columns = append(tables[id].Columns, column)
-	}
-	for _, key := range primaryKeys {
-		id := key.TableSchema + ":" + key.TableName
-		if _, ok := tables[id]; !ok {
-			// We only need primary key info for tables which getColumns() returned,
-			// so if the table doesn't exist at this point then skip it.
-			continue
-		}
-		tables[id].PrimaryKeys = append(tables[id].PrimaryKeys, key)
+		return nil, err
 	}
 
 	catalog := new(airbyte.Catalog)
 	for _, table := range tables {
-		log.Printf("Found table (%v, %v)", table.TableSchema, table.TableName)
-		log.Printf("  Columns: %v", table.Columns)
-		log.Printf("  Primary Keys: %v", table.PrimaryKeys)
+		log.Printf("Found table %s.%s", table.TableSchema, table.TableName)
+		log.Printf("  Primary Key: %q", table.PrimaryKey)
+		log.Printf("  Column Info: %v", table.Columns)
 
 		// TODO(wgd): Maybe generate the schema in a less hackish fashion
 		rowSchema := `{"type":"object","properties":{`
@@ -106,14 +74,18 @@ func discoverCatalog(configFile airbyte.ConfigFile) (*airbyte.Catalog, error) {
 			if idx > 0 {
 				rowSchema += ","
 			}
-			rowSchema += fmt.Sprintf("%q:%s", column.ColumnName, postgresTypeToJSON[column.DataType])
+			jsonType, ok := postgresTypeToJSON[column.DataType]
+			if !ok {
+				return nil, errors.Errorf("cannot translate PostgreSQL column type %q to JSON schema", column.DataType)
+			}
+			rowSchema += fmt.Sprintf("%q:%s", column.ColumnName, jsonType)
 		}
 		rowSchema += `}}`
 		log.Printf("  Schema: %v", rowSchema)
 
-		var primaryKeys []string
-		for _, pk := range table.PrimaryKeys {
-			primaryKeys = append(primaryKeys, pk.ColumnName)
+		var sourceDefinedPrimaryKey [][]string
+		for _, colName := range table.PrimaryKey {
+			sourceDefinedPrimaryKey = append(sourceDefinedPrimaryKey, []string{colName})
 		}
 
 		catalog.Streams = append(catalog.Streams, airbyte.Stream{
@@ -122,19 +94,79 @@ func discoverCatalog(configFile airbyte.ConfigFile) (*airbyte.Catalog, error) {
 			JSONSchema:              json.RawMessage(rowSchema),
 			SupportedSyncModes:      airbyte.AllSyncModes,
 			SourceDefinedCursor:     true,
-			SourceDefinedPrimaryKey: [][]string{primaryKeys},
+			SourceDefinedPrimaryKey: sourceDefinedPrimaryKey,
 		})
 	}
 	return catalog, err
 }
 
-type DBColumn struct {
+// TODO(wgd): Revisit whether the PostgreSQL Schema -> JSON Spec translation for
+// column types can be done automatically, or at least flesh out the set of types
+// handled in this map.
+var postgresTypeToJSON = map[string]string{
+	"int4":    `{"type":"number"}`,
+	"float4":  `{"type":"number"}`,
+	"varchar": `{"type":"string"}`,
+	"text":    `{"type":"string"}`,
+}
+
+type TableInfo struct {
+	TableSchema string
+	TableName   string
+	Columns     []ColumnInfo
+	PrimaryKey  []string
+}
+
+type ColumnInfo struct {
 	TableSchema string
 	TableName   string
 	ColumnName  string
 	ColumnIndex int
 	IsNullable  bool
 	DataType    string
+}
+
+// GetDatabaseTables queries the database to produce a list of all tables
+// (with the exception of some internal system schemas) with information
+// about their column types and primary key.
+func GetDatabaseTables(ctx context.Context, conn *pgx.Conn) ([]TableInfo, error) {
+	// Get lists of all columns and primary keys in the database
+	columns, err := getColumns(ctx, conn)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to list database columns")
+	}
+	primaryKeys, err := GetPrimaryKeys(ctx, conn)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to list database primary keys")
+	}
+
+	// Aggregate column and primary key information into TableInfo structs
+	// using a map from fully-qualified "<schema>.<name>" table names to
+	// the corresponding TableInfo.
+	tableMap := make(map[string]*TableInfo)
+	for _, column := range columns {
+		id := column.TableSchema + "." + column.TableName
+		if _, ok := tableMap[id]; !ok {
+			tableMap[id] = &TableInfo{TableSchema: column.TableSchema, TableName: column.TableName}
+		}
+		tableMap[id].Columns = append(tableMap[id].Columns, column)
+	}
+	for id, key := range primaryKeys {
+		// The `getColumns()` query implements the "exclude system schemas" logic,
+		// so here we ignore primary key information for tables we don't care about.
+		if _, ok := tableMap[id]; !ok {
+			continue
+		}
+		tableMap[id].PrimaryKey = key
+	}
+
+	// Now that aggregation is complete, discard map keys and return
+	// just the list of TableInfo structs.
+	var tables []TableInfo
+	for _, info := range tableMap {
+		tables = append(tables, *info)
+	}
+	return tables, nil
 }
 
 const COLUMNS_QUERY = `
@@ -144,9 +176,9 @@ const COLUMNS_QUERY = `
         AND table_schema != 'pg_internal' AND table_schema != 'catalog_history'
   ORDER BY table_schema, table_name, ordinal_position;`
 
-func getColumns(ctx context.Context, conn *pgx.Conn) ([]DBColumn, error) {
-	var columns []DBColumn
-	var sc DBColumn
+func getColumns(ctx context.Context, conn *pgx.Conn) ([]ColumnInfo, error) {
+	var columns []ColumnInfo
+	var sc ColumnInfo
 	_, err := conn.QueryFunc(ctx, COLUMNS_QUERY, nil,
 		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.ColumnIndex, &sc.ColumnName, &sc.IsNullable, &sc.DataType},
 		func(r pgx.QueryFuncRow) error {
@@ -156,26 +188,10 @@ func getColumns(ctx context.Context, conn *pgx.Conn) ([]DBColumn, error) {
 	return columns, err
 }
 
-// TODO(wgd): Revisit whether the PostgreSQL Schema -> JSON Spec translation for
-// column types can be done automatically, or at least flesh out the set of types
-// handled in this map.
-var postgresTypeToJSON = map[string]string{
-	"int4":    `{"type":"number"}`,
-	"varchar": `{"type":"string"}`,
-}
-
-type DBPrimaryKey struct {
-	TableSchema string
-	TableName   string
-	ColumnName  string
-	ColumnIndex int
-	PKName      string
-}
-
 // Query copied from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with
 // the always-NULL `TABLE_CAT` column omitted.
 const PRIMARY_KEYS_QUERY = `
-  SELECT result.TABLE_SCHEM, result.TABLE_NAME, result.COLUMN_NAME, result.KEY_SEQ, result.PK_NAME
+  SELECT result.TABLE_SCHEM, result.TABLE_NAME, result.COLUMN_NAME, result.KEY_SEQ
   FROM (
     SELECT n.nspname AS TABLE_SCHEM,
       ct.relname AS TABLE_NAME, a.attname AS COLUMN_NAME,
@@ -193,13 +209,22 @@ const PRIMARY_KEYS_QUERY = `
   ORDER BY result.table_name, result.pk_name, result.key_seq;
 `
 
-func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) ([]DBPrimaryKey, error) {
-	var keys []DBPrimaryKey
-	var sk DBPrimaryKey
+// GetPrimaryKeys queries the database to produce a map from table names to
+// primary keys. Table names are fully qualified as "<schema>.<name>", and
+// primary keys are represented as a list of column names, in the order that
+// they form the table's primary key.
+func GetPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, error) {
+	keys := make(map[string][]string)
+	var tableSchema, tableName, columnName string
+	var columnIndex int
 	_, err := conn.QueryFunc(ctx, PRIMARY_KEYS_QUERY, nil,
-		[]interface{}{&sk.TableSchema, &sk.TableName, &sk.ColumnName, &sk.ColumnIndex, &sk.PKName},
+		[]interface{}{&tableSchema, &tableName, &columnName, &columnIndex},
 		func(r pgx.QueryFuncRow) error {
-			keys = append(keys, sk)
+			id := fmt.Sprintf("%s.%s", tableSchema, tableName)
+			keys[id] = append(keys[id], columnName)
+			if columnIndex != len(keys[id]) {
+				return errors.Errorf("primary key column %q appears out of order (expected index %d, in context %q)", columnName, columnIndex, keys[id])
+			}
 			return nil
 		})
 	return keys, err

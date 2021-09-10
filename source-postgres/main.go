@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +20,18 @@ const (
 	// replication due to an LSN which indicates that it was already observed
 	// during the initial table scan.
 	LogFilteredEvents = true
+
+	// TODO(wgd): More principled handling of schemas throughout the code. Should
+	// it be possible to interact with tables from schemas other than "public"?
+	// If so, can we avoid making every stream be named "public.foo" in the
+	// simple cases?
+	DatabaseSchemaName = "public"
+
+	// The number of rows to read from the table in a single SELECT query
+	// during the table-scanning phase of operation.
+	//
+	// TODO(wgd): Make this much much larger after testing
+	SelectChunkSize = 65536
 )
 
 func main() {
@@ -227,36 +238,36 @@ func (c *Capture) UpdateState(ctx context.Context) error {
 	// Streams may be added to the catalog at various times. We need to
 	// initialize new state entries for these streams, and while we're at
 	// it this is a good time to sanity-check the primary key configuration.
+	var primaryKeys map[string][]string // Cache so we only query this once
 	for _, catalogStream := range c.catalog.Streams {
 		streamName := catalogStream.Stream.Name
-		streamState, stateOk := c.state.Streams[streamName]
-
-		// Extract the list of column names that forms the primary key of the stream.
-		// Note that this doesn't necessarily have to match the primary key of the
-		// underlying database table (although a mismatch might make the initial
-		// table scan less efficient).
-		var primaryKey []string
-		for _, col := range catalogStream.PrimaryKey {
-			if len(col) != 1 {
-				return errors.Errorf("stream %q: primary key path %q must contain exactly one string", streamName, col)
-			}
-			primaryKey = append(primaryKey, col[0])
-		}
-		if len(primaryKey) < 1 {
-			return errors.Errorf("stream %q: no primary key specified", streamName)
-		}
-
-		// Only now that we've computed the `primaryKey` list can we initialize a
-		// new stream state entry where necessary.
-		if !stateOk {
-			c.state.Streams[streamName] = &TableState{Mode: ScanStateScanning, ScanKey: primaryKey}
-			stateDirty = true
+		if _, ok := c.state.Streams[streamName]; ok {
+			// If the stream state is already initialized there's nothing to do here
 			continue
 		}
 
-		if strings.Join(streamState.ScanKey, ";") != strings.Join(primaryKey, ";") {
-			return errors.Errorf("stream %q: primary key changed (was %q, now %q)", streamName, streamState.ScanKey, primaryKey)
+		// Table scanning requires a key for chunking the SELECTs and later
+		// LSN range mapping. There's generally no better choice for this
+		// than the native primary key of the table.
+		//
+		// There's some logic here to cache the `GetPrimaryKeys` call so that
+		// when initializing multiple streams we only query the DB once.
+		if primaryKeys == nil {
+			pkeys, err := GetPrimaryKeys(ctx, c.connScan)
+			if err != nil {
+				return errors.Wrapf(err, "error initializing stream %q scan key", streamName)
+			}
+			primaryKeys = pkeys
 		}
+
+		// TODO(wgd): Fix handling of multiple Schemas
+		primaryKey := primaryKeys[DatabaseSchemaName+"."+streamName]
+		if len(primaryKey) == 0 {
+			return errors.Errorf("stream %q: no primary key found", streamName)
+		}
+
+		c.state.Streams[streamName] = &TableState{Mode: ScanStateScanning, ScanKey: primaryKey}
+		stateDirty = true
 	}
 
 	// Likewise streams may be removed from the catalog, and we need to forget
@@ -296,7 +307,7 @@ func (c *Capture) ScanTables(ctx context.Context) error {
 		return nil
 	}
 
-	snapshot, err := SnapshotTable(ctx, c.connScan)
+	snapshot, err := SnapshotTable(ctx, c.connScan, SelectChunkSize)
 	if err != nil {
 		return errors.Wrap(err, "error creating table snapshot stream")
 	}
@@ -331,7 +342,8 @@ func (c *Capture) ScanNext(ctx context.Context, snapshot *TableSnapshotStream) e
 		// If this stream has no previously scanned range information, request the first
 		// chunk, then initialize the scanned ranges list and emit a state update.
 		if len(tableState.ScanRanges) == 0 {
-			_, endKey, err := snapshot.ScanStart(ctx, "public", streamName, tableState.ScanKey, c.HandleChangeEvent)
+			// TODO(wgd): Fix handling of multiple Schemas
+			_, endKey, err := snapshot.ScanStart(ctx, DatabaseSchemaName, streamName, tableState.ScanKey, c.HandleChangeEvent)
 			if err != nil {
 				return errors.Wrap(err, "error processing snapshot events")
 			}
@@ -361,7 +373,8 @@ func (c *Capture) ScanNext(ctx context.Context, snapshot *TableSnapshotStream) e
 		// This is the core operation where we spend most of our time when scanning
 		// table contents: reading the next chunk from the table and extending the
 		// endpoint of `lastRange`.
-		count, nextKey, err := snapshot.ScanFrom(ctx, "public", streamName, tableState.ScanKey, lastRange.EndKey, c.HandleChangeEvent)
+		// TODO(wgd): Fix handling of multiple Schemas
+		count, nextKey, err := snapshot.ScanFrom(ctx, DatabaseSchemaName, streamName, tableState.ScanKey, lastRange.EndKey, c.HandleChangeEvent)
 		if err != nil {
 			return errors.Wrap(err, "error processing snapshot events")
 		}
