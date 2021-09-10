@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync/atomic"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgtype"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type ChangeEventHandler func(evt *ChangeEvent) error
@@ -80,7 +80,12 @@ func StartReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		relations: make(map[uint32]*pglogrepl.RelationMessage),
 	}
 
-	log.Printf("Streaming events from LSN %q", stream.currentLSN)
+	logrus.WithFields(logrus.Fields{
+		"startLSN":    stream.currentLSN,
+		"publication": stream.pubName,
+		"slot":        stream.replSlot,
+	}).Info("starting replication")
+
 	if err := pglogrepl.StartReplication(ctx, stream.conn, stream.replSlot, stream.currentLSN, pglogrepl.StartReplicationOptions{
 		PluginArgs: []string{
 			`"proto_version" '1'`,
@@ -267,7 +272,9 @@ func (s *ReplicationStream) receiveXLogData(ctx context.Context) (pglogrepl.XLog
 		}
 
 		if time.Now().After(s.standbyStatusDeadline) {
-			s.sendStandbyStatusUpdate(ctx)
+			if err := s.sendStandbyStatusUpdate(ctx); err != nil {
+				return pglogrepl.XLogData{}, errors.Wrap(err, "failed to send status update")
+			}
 			s.standbyStatusDeadline = time.Now().Add(standbyStatusInterval)
 		}
 
@@ -300,23 +307,19 @@ func (s *ReplicationStream) receiveXLogData(ctx context.Context) (pglogrepl.XLog
 				s.currentLSN = xld.WALStart + pglogrepl.LSN(len(xld.WALData))
 				return xld, nil
 			default:
-				log.Printf("Received unknown CopyData message: %v", msg)
+				logrus.WithField("message", msg).Warn("unknown CopyData message")
 			}
 		default:
-			log.Printf("Received unexpected message: %v", msg)
+			logrus.WithField("message", msg).Warn("unexpected message")
 		}
 	}
 }
 
 func (s *ReplicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 	commitLSN := pglogrepl.LSN(atomic.LoadUint64(&s.commitLSN))
-	if err := pglogrepl.SendStandbyStatusUpdate(ctx, s.conn, pglogrepl.StandbyStatusUpdate{
+	return pglogrepl.SendStandbyStatusUpdate(ctx, s.conn, pglogrepl.StandbyStatusUpdate{
 		WALWritePosition: commitLSN,
-	}); err != nil {
-		log.Fatalln("SendStandbyStatusUpdate failed:", err)
-		return err
-	}
-	return nil
+	})
 }
 
 func (s *ReplicationStream) Close(ctx context.Context) error {
