@@ -4,53 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/estuary/protocols/airbyte"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
-// TODO(wgd): Figure out what sync modes are appropriate for this connector.
-// Is it even possible to say that a connector doesn't support full refresh?
-// If not, what are the semantics of performing a full refresh here?
-var spec = airbyte.Spec{
-	SupportsIncremental:           true,
-	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
-	ConnectionSpecification:       json.RawMessage(configSchema),
-}
-
-func doCheck(args airbyte.CheckCmd) error {
-	result := &airbyte.ConnectionStatus{Status: airbyte.StatusSucceeded}
-	if _, err := discoverCatalog(args.ConfigFile); err != nil {
-		result.Status = airbyte.StatusFailed
-		result.Message = err.Error()
-	}
-	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
-		Type:             airbyte.MessageTypeConnectionStatus,
-		ConnectionStatus: result,
-	})
-}
-
-func doDiscover(args airbyte.DiscoverCmd) error {
-	catalog, err := discoverCatalog(args.ConfigFile)
-	if err != nil {
-		return err
-	}
-	log.Printf("Discover completed with %d streams", len(catalog.Streams))
-	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
-		Type:    airbyte.MessageTypeCatalog,
-		Catalog: catalog,
-	})
-}
-
-func discoverCatalog(configFile airbyte.ConfigFile) (*airbyte.Catalog, error) {
-	var config Config
-	if err := configFile.Parse(&config); err != nil {
-		return nil, err
-	}
-
-	ctx := context.Background()
+func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, error) {
 	conn, err := pgx.Connect(ctx, config.ConnectionURI)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to connect to database")
@@ -64,24 +25,32 @@ func discoverCatalog(configFile airbyte.ConfigFile) (*airbyte.Catalog, error) {
 
 	catalog := new(airbyte.Catalog)
 	for _, table := range tables {
-		log.Printf("Found table %s.%s", table.TableSchema, table.TableName)
-		log.Printf("  Primary Key: %q", table.PrimaryKey)
-		log.Printf("  Column Info: %v", table.Columns)
+		logrus.WithFields(logrus.Fields{
+			"namespace":  table.TableSchema,
+			"table":      table.TableName,
+			"primaryKey": table.PrimaryKey,
+		}).Info("discovered table")
 
 		// TODO(wgd): Maybe generate the schema in a less hackish fashion
-		rowSchema := `{"type":"object","properties":{`
+		schema := `{"type":"object","properties":{`
 		for idx, column := range table.Columns {
 			if idx > 0 {
-				rowSchema += ","
+				schema += ","
 			}
 			jsonType, ok := postgresTypeToJSON[column.DataType]
 			if !ok {
 				return nil, errors.Errorf("cannot translate PostgreSQL column type %q to JSON schema", column.DataType)
 			}
-			rowSchema += fmt.Sprintf("%q:%s", column.ColumnName, jsonType)
+			schema += fmt.Sprintf("%q:%s", column.ColumnName, jsonType)
 		}
-		rowSchema += `}}`
-		log.Printf("  Schema: %v", rowSchema)
+		schema += `}}`
+
+		logrus.WithFields(logrus.Fields{
+			"namespace": table.TableSchema,
+			"table":     table.TableName,
+			"columns":   table.Columns,
+			"schema":    schema,
+		}).Debug("translated table schema")
 
 		var sourceDefinedPrimaryKey [][]string
 		for _, colName := range table.PrimaryKey {
@@ -91,7 +60,7 @@ func discoverCatalog(configFile airbyte.ConfigFile) (*airbyte.Catalog, error) {
 		catalog.Streams = append(catalog.Streams, airbyte.Stream{
 			Name:                    table.TableName,
 			Namespace:               table.TableSchema,
-			JSONSchema:              json.RawMessage(rowSchema),
+			JSONSchema:              json.RawMessage(schema),
 			SupportedSyncModes:      airbyte.AllSyncModes,
 			SourceDefinedCursor:     true,
 			SourceDefinedPrimaryKey: sourceDefinedPrimaryKey,
@@ -227,5 +196,8 @@ func GetPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, e
 			}
 			return nil
 		})
+	for tableID, key := range keys {
+		logrus.WithField("table", tableID).WithField("primaryKey", key).Debug("got primary key")
+	}
 	return keys, err
 }
