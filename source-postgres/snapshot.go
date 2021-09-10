@@ -13,12 +13,13 @@ import (
 )
 
 type TableSnapshotStream struct {
-	conn        *pgx.Conn
-	transaction pgx.Tx
-	txLSN       pglogrepl.LSN
+	conn            *pgx.Conn
+	transaction     pgx.Tx
+	txLSN           pglogrepl.LSN
+	SelectChunkSize int
 }
 
-func SnapshotTable(ctx context.Context, conn *pgx.Conn) (*TableSnapshotStream, error) {
+func SnapshotTable(ctx context.Context, conn *pgx.Conn, chunkSize int) (*TableSnapshotStream, error) {
 	transaction, err := conn.BeginTx(ctx, pgx.TxOptions{
 		// We could probably get away with `RepeatableRead` isolation here, but
 		// I see no reason not to err on the side of getting the strongest
@@ -32,8 +33,9 @@ func SnapshotTable(ctx context.Context, conn *pgx.Conn) (*TableSnapshotStream, e
 		return nil, errors.Wrap(err, "unable to begin transaction")
 	}
 	stream := &TableSnapshotStream{
-		conn:        conn,
-		transaction: transaction,
+		conn:            conn,
+		transaction:     transaction,
+		SelectChunkSize: chunkSize,
 	}
 	if err := stream.queryTransactionLSN(ctx); err != nil {
 		stream.transaction.Rollback(ctx)
@@ -64,13 +66,7 @@ func (s *TableSnapshotStream) TransactionLSN() pglogrepl.LSN {
 	return s.txLSN
 }
 
-const (
-	selectQueryStart = `SELECT * FROM %s.%s ORDER BY %s LIMIT %d;`
-	selectQueryNext  = `SELECT * FROM %s.%s WHERE %s > $1 ORDER BY %s LIMIT %d;`
-	selectChunkSize  = 2 // TODO(wgd): Make this much much larger after testing
-)
-
-func buildScanQuery(namespace, table string, pkey []string, isStart bool) string {
+func (s *TableSnapshotStream) buildScanQuery(namespace, table string, pkey []string, isStart bool) string {
 	pkeyTupleExpr := ""
 	argsTupleExpr := ""
 	for idx, keyName := range pkey {
@@ -87,7 +83,7 @@ func buildScanQuery(namespace, table string, pkey []string, isStart bool) string
 		query += fmt.Sprintf(" WHERE (%s) > (%s)", pkeyTupleExpr, argsTupleExpr)
 	}
 	query += fmt.Sprintf(" ORDER BY (%s)", pkeyTupleExpr)
-	query += fmt.Sprintf(" LIMIT %d;", selectChunkSize)
+	query += fmt.Sprintf(" LIMIT %d;", s.SelectChunkSize)
 	log.Printf("Built Scan Query: %q", query)
 	return query
 }
@@ -95,7 +91,7 @@ func buildScanQuery(namespace, table string, pkey []string, isStart bool) string
 func (s *TableSnapshotStream) ScanStart(ctx context.Context, namespace, table string, pkey []string, handler ChangeEventHandler) (int, []byte, error) {
 	log.Printf("Scanning table %q from start", table)
 	time.Sleep(1 * time.Second)
-	query := buildScanQuery(namespace, table, pkey, true)
+	query := s.buildScanQuery(namespace, table, pkey, true)
 	rows, err := s.conn.Query(ctx, query)
 	if err != nil {
 		return 0, nil, errors.Wrapf(err, "unable to execute query %q", query)
@@ -113,7 +109,7 @@ func (s *TableSnapshotStream) ScanFrom(ctx context.Context, namespace, table str
 	if len(args) != len(pkey) {
 		return 0, nil, errors.Errorf("expected %d primary-key values but got %d", len(pkey), len(args))
 	}
-	query := buildScanQuery(namespace, table, pkey, false)
+	query := s.buildScanQuery(namespace, table, pkey, false)
 	rows, err := s.conn.Query(ctx, query, args...)
 	if err != nil {
 		return 0, prevKey, errors.Wrapf(err, "unable to execute query %q", query)
