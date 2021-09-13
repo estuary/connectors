@@ -12,13 +12,17 @@ import (
 )
 
 type TableSnapshotStream struct {
-	conn            *pgx.Conn
-	transaction     pgx.Tx
-	txLSN           pglogrepl.LSN
-	SelectChunkSize int
+	conn        *pgx.Conn
+	transaction pgx.Tx
+	txLSN       pglogrepl.LSN
 }
 
-func SnapshotTable(ctx context.Context, conn *pgx.Conn, chunkSize int) (*TableSnapshotStream, error) {
+// This is a variable to facilitate testing (because if we had to fill up
+// a table with tens of thousands of rows to test chunking behavior it would
+// make tests a lot slower for no good reason).
+var SnapshotChunkSize = 4096
+
+func SnapshotTable(ctx context.Context, conn *pgx.Conn) (*TableSnapshotStream, error) {
 	transaction, err := conn.BeginTx(ctx, pgx.TxOptions{
 		// We could probably get away with `RepeatableRead` isolation here, but
 		// I see no reason not to err on the side of getting the strongest
@@ -32,9 +36,8 @@ func SnapshotTable(ctx context.Context, conn *pgx.Conn, chunkSize int) (*TableSn
 		return nil, errors.Wrap(err, "unable to begin transaction")
 	}
 	stream := &TableSnapshotStream{
-		conn:            conn,
-		transaction:     transaction,
-		SelectChunkSize: chunkSize,
+		conn:        conn,
+		transaction: transaction,
 	}
 	if err := stream.queryTransactionLSN(ctx); err != nil {
 		stream.transaction.Rollback(ctx)
@@ -57,6 +60,7 @@ func (s *TableSnapshotStream) queryTransactionLSN(ctx context.Context) error {
 	if err := s.transaction.QueryRow(ctx, `SELECT * FROM pg_current_wal_lsn();`).Scan(&txLSN); err != nil {
 		return errors.Wrap(err, "unable to query transaction LSN")
 	}
+	logrus.WithField("lsn", txLSN).Info("current WAL LSN at TX start")
 	s.txLSN = txLSN
 	return nil
 }
@@ -82,7 +86,7 @@ func (s *TableSnapshotStream) buildScanQuery(namespace, table string, pkey []str
 		query += fmt.Sprintf(" WHERE (%s) > (%s)", pkeyTupleExpr, argsTupleExpr)
 	}
 	query += fmt.Sprintf(" ORDER BY (%s)", pkeyTupleExpr)
-	query += fmt.Sprintf(" LIMIT %d;", s.SelectChunkSize)
+	query += fmt.Sprintf(" LIMIT %d;", SnapshotChunkSize)
 	return query
 }
 

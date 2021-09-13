@@ -1,0 +1,2 @@
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"test_emptytable":{"mode":"Scanning","scan_key":["id"]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"test_emptytable":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234}]}}}}}
