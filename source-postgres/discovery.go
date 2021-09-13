@@ -126,6 +126,7 @@ func GetDatabaseTables(ctx context.Context, conn *pgx.Conn) ([]TableInfo, error)
 		if _, ok := tableMap[id]; !ok {
 			continue
 		}
+		logrus.WithField("table", id).WithField("key", key).Debug("queried primary key")
 		tableMap[id].PrimaryKey = key
 	}
 
@@ -196,8 +197,5 @@ func GetPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, e
 			}
 			return nil
 		})
-	for tableID, key := range keys {
-		logrus.WithField("table", tableID).WithField("primaryKey", key).Debug("got primary key")
-	}
 	return keys, err
 }
