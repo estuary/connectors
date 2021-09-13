@@ -1,1 +1,0 @@
-{"type":"STATE","state":{"data":{"cdc":false,"cdc_state":{"state":{"{\"schema\":null,\"payload\":[\"flow\",{\"server\":\"flow\"}]}":"{\"last_snapshot_record\":true,\"lsn\":23002408,\"txId\":532,\"ts_usec\":1629764583868000,\"snapshot\":true}"}},"streams":[{"stream_name":"babynames","stream_namespace":"public","cursor_field":[]}]}}}

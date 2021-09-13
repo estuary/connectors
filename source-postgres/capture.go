@@ -20,12 +20,6 @@ const (
 	// If so, can we avoid making every stream be named "public.foo" in the
 	// simple cases?
 	DatabaseSchemaName = "public"
-
-	// The number of rows to read from the table in a single SELECT query
-	// during the table-scanning phase of operation.
-	//
-	// TODO(wgd): Make this much much larger after testing
-	SelectChunkSize = 65536
 )
 
 type PersistentState struct {
@@ -48,7 +42,7 @@ const ScanStateActive = "Active"
 
 type TableRange struct {
 	ScannedLSN pglogrepl.LSN `json:"lsn"`
-	EndKey     []byte        `json:"key"`
+	EndKey     []byte        `json:"key,omitempty"`
 }
 
 type Capture struct {
@@ -60,6 +54,13 @@ type Capture struct {
 	connScan *pgx.Conn      // The DB connection used for table scanning
 	connRepl *pgconn.PgConn // The DB connection used for replication streaming
 	watchdog *time.Timer    // If non-nil, the Reset() method will be invoked whenever a replication event is received
+
+	// We keep a count of change events since the last state checkpoint was
+	// emitted. Currently this is only used to suppress "empty" commit messages
+	// from triggering a state update (which improves test stability), but
+	// this could also be used to "coalesce" smaller transactions in the
+	// future.
+	changesSinceLastCheckpoint int
 }
 
 type MessageOutput interface {
@@ -178,6 +179,9 @@ func (c *Capture) UpdateState(ctx context.Context) error {
 		// Print a warning if the two are not the same.
 		dbTableID := strings.ToLower(DatabaseSchemaName + "." + streamName)
 		primaryKey := dbPrimaryKeys[dbTableID]
+		if len(primaryKey) != 0 {
+			logrus.WithField("table", dbTableID).WithField("key", primaryKey).Debug("queried primary key")
+		}
 		if len(catalogPrimaryKey) > 0 {
 			if strings.Join(primaryKey, ",") != strings.Join(catalogPrimaryKey, ",") {
 				logrus.WithFields(logrus.Fields{
@@ -242,7 +246,7 @@ func (c *Capture) ScanTables(ctx context.Context) error {
 		return nil
 	}
 
-	snapshot, err := SnapshotTable(ctx, c.connScan, SelectChunkSize)
+	snapshot, err := SnapshotTable(ctx, c.connScan)
 	if err != nil {
 		return errors.Wrap(err, "error creating table snapshot stream")
 	}
@@ -278,7 +282,7 @@ func (c *Capture) ScanNext(ctx context.Context, snapshot *TableSnapshotStream) e
 		// chunk, then initialize the scanned ranges list and emit a state update.
 		if len(tableState.ScanRanges) == 0 {
 			// TODO(wgd): Fix handling of multiple Schemas
-			_, endKey, err := snapshot.ScanStart(ctx, DatabaseSchemaName, streamName, tableState.ScanKey, c.HandleChangeEvent)
+			count, endKey, err := snapshot.ScanStart(ctx, DatabaseSchemaName, streamName, tableState.ScanKey, c.HandleChangeEvent)
 			if err != nil {
 				return errors.Wrap(err, "error processing snapshot events")
 			}
@@ -286,6 +290,15 @@ func (c *Capture) ScanNext(ctx context.Context, snapshot *TableSnapshotStream) e
 				ScannedLSN: snapshot.TransactionLSN(),
 				EndKey:     endKey,
 			}}
+
+			// If the initial scan returned zero rows then we proceed immediately
+			// to 'Active' for this table. Note that in this case the 'EndKey' of
+			// the range will be "", but that's okay because the `filteredLSN`
+			// check isn't going to examine the key anyway since there's just one
+			// scan range.
+			if count == 0 {
+				tableState.Mode = ScanStateActive
+			}
 			return c.EmitState(c.State)
 		}
 
@@ -361,12 +374,12 @@ func (c *Capture) HandleReplicationEvent(evt *ChangeEvent) error {
 	// ranges and drop into the fast-path of not doing any range comparison. Is there
 	// ever a point where we can definitively say "Yes, we're fully caught up now"?
 	if evt.Type == "Commit" {
-		logrus.WithFields(logrus.Fields{
-			"lsn": evt.LSN,
-			"xid": evt.XID,
-		}).Debug("replication commit event")
-		c.State.CurrentLSN = evt.LSN
-		return c.EmitState(c.State)
+		logrus.WithFields(logrus.Fields{"lsn": evt.LSN, "xid": evt.XID}).Debug("replication commit event")
+		if c.changesSinceLastCheckpoint > 0 {
+			c.State.CurrentLSN = evt.LSN
+			return c.EmitState(c.State)
+		}
+		return nil
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -452,6 +465,7 @@ func (c *Capture) HandleChangeEvent(evt *ChangeEvent) error {
 }
 
 func (c *Capture) EmitRecord(ns, stream string, data interface{}) error {
+	c.changesSinceLastCheckpoint++
 	rawData, err := json.Marshal(data)
 	if err != nil {
 		return errors.Wrap(err, "error encoding record data")
@@ -468,6 +482,7 @@ func (c *Capture) EmitRecord(ns, stream string, data interface{}) error {
 }
 
 func (c *Capture) EmitState(state interface{}) error {
+	c.changesSinceLastCheckpoint = 0
 	rawState, err := json.Marshal(state)
 	if err != nil {
 		return errors.Wrap(err, "error encoding state message")
