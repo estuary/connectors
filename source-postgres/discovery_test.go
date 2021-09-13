@@ -8,16 +8,12 @@ import (
 	"github.com/estuary/protocols/airbyte"
 )
 
-// TODO(wgd): Figure out if there's a better way to specify this. Maybe
-// a flag with this as default value? How do flags work in `go test` again?
-const TestingConnectionURI = "postgres://flow:flow@localhost:5432/flow"
-
 func TestTrivialPass(t *testing.T) {
 	t.Logf("Trivially Passing Test: %v", "Woo!")
 }
 
 func TestDiscoverySimple(t *testing.T) {
-	cfg, ctx := testDefaultConfig, shortTestContext(t)
+	cfg, ctx := TestDefaultConfig, shortTestContext(t)
 	tableName := createTestTable(t, ctx, "", "(a INTEGER PRIMARY KEY, b TEXT, c REAL, d VARCHAR(255))")
 
 	// Create the table (with deferred cleanup), perform discovery, and verify
@@ -29,6 +25,11 @@ func TestDiscoverySimple(t *testing.T) {
 	verifyStream(t, "", catalog, tableName)
 }
 
+// verifyStream is a helper function which locates a particular stream by name in
+// the discovered catalog and then uses verifySnapshot on that. This is necessary
+// because we don't want to make assumptions about what other tables might be
+// present in the test database or what order they might be discovered in, we
+// just want to test that the specific table we created in our test looks good.
 func verifyStream(t *testing.T, suffix string, catalog *airbyte.Catalog, expectedStream string) {
 	t.Helper()
 	for _, stream := range catalog.Streams {

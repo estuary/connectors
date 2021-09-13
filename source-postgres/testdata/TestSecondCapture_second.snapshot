@@ -1,3 +1,4 @@
-{"stream":"test_secondcapture","data":{"_change_lsn":"SANITIZED","_change_type":"Insert","_ingested_at":"SANITIZED","data":"some","id":1002},"emitted_at":0,"namespace":"public"}
-{"stream":"test_secondcapture","data":{"_change_lsn":"SANITIZED","_change_type":"Insert","_ingested_at":"SANITIZED","data":"more","id":1000},"emitted_at":0,"namespace":"public"}
-{"stream":"test_secondcapture","data":{"_change_lsn":"SANITIZED","_change_type":"Insert","_ingested_at":"SANITIZED","data":"rows","id":1001},"emitted_at":0,"namespace":"public"}
+{"type":"RECORD","record":{"stream":"test_secondcapture","data":{"_change_type":"Insert","data":"some","id":1002},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_secondcapture","data":{"_change_type":"Insert","data":"more","id":1000},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_secondcapture","data":{"_change_type":"Insert","data":"rows","id":1001},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"test_secondcapture":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQQ="}]}}}}}
