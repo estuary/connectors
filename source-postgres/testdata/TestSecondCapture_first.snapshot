@@ -1,5 +1,8 @@
-{"stream":"test_secondcapture","data":{"_change_lsn":"SANITIZED","_change_type":"Insert","_ingested_at":"SANITIZED","data":"A","id":0},"emitted_at":0,"namespace":"public"}
-{"stream":"test_secondcapture","data":{"_change_lsn":"SANITIZED","_change_type":"Insert","_ingested_at":"SANITIZED","data":"bbb","id":1},"emitted_at":0,"namespace":"public"}
-{"stream":"test_secondcapture","data":{"_change_lsn":"SANITIZED","_change_type":"Insert","_ingested_at":"SANITIZED","data":"CDEFGHIJKLMNOP","id":2},"emitted_at":0,"namespace":"public"}
-{"stream":"test_secondcapture","data":{"_change_lsn":"SANITIZED","_change_type":"Insert","_ingested_at":"SANITIZED","data":"Four","id":3},"emitted_at":0,"namespace":"public"}
-{"stream":"test_secondcapture","data":{"_change_lsn":"SANITIZED","_change_type":"Insert","_ingested_at":"SANITIZED","data":"5","id":4},"emitted_at":0,"namespace":"public"}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"test_secondcapture":{"mode":"Scanning","scan_key":["id"]}}}}}
+{"type":"RECORD","record":{"stream":"test_secondcapture","data":{"_change_type":"Insert","data":"A","id":0},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_secondcapture","data":{"_change_type":"Insert","data":"bbb","id":1},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_secondcapture","data":{"_change_type":"Insert","data":"CDEFGHIJKLMNOP","id":2},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_secondcapture","data":{"_change_type":"Insert","data":"Four","id":3},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_secondcapture","data":{"_change_type":"Insert","data":"5","id":4},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"test_secondcapture":{"mode":"Scanning","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQQ="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"test_secondcapture":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQQ="}]}}}}}
