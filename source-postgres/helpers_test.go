@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/estuary/protocols/airbyte"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -24,21 +25,22 @@ var (
 	// TODO(wgd): Figure out if there's a better way to specify this. Maybe
 	// a flag with this as default value? How do flags work in `go test` again?
 	TestingConnectionURI = "postgres://flow:flow@localhost:5432/flow"
+	TestSlotName         = "flow_test_slot"
 	TestDefaultConfig    = Config{
 		ConnectionURI:   TestingConnectionURI,
-		SlotName:        "flow_slot",
+		SlotName:        TestSlotName,
 		PublicationName: "flow_publication",
 
 		// During automated tests we generally run each capture to "completion", and test
 		// replication by performing some updates and then starting a new capture from some
 		// appropriate state. Thus we're basically just waiting until PostgreSQL runs out
-		// of historical change events to send us, and 500ms ought to be plenty of wait
+		// of historical change events to send us, and 250ms ought to be plenty of wait
 		// time for that purpose.
 		//
 		// And the polling timeout directly adds to the runtime of every single capture
 		// performed by every single test, so we want to err on the side of keeping this
 		// low unless/until it causes provable flake.
-		PollTimeoutSeconds: 0.500,
+		PollTimeoutSeconds: 0.250,
 	}
 	TestDatabase  *pgx.Conn
 	TestChunkSize = 16
@@ -46,14 +48,29 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-
 	logrus.SetLevel(logrus.DebugLevel)
+	ctx := context.Background()
 
 	// Tweak some parameters to make things easier to test on a smaller scale
 	SnapshotChunkSize = TestChunkSize
 
+	// Open a connection to the database which will be used for creating and
+	// tearing down the replication slot.
+	replConnConfig, err := pgconn.ParseConfig(TestingConnectionURI)
+	if err != nil {
+		logrus.WithField("uri", TestingConnectionURI).WithField("err", err).Fatal("error parsing connection config")
+	}
+	replConnConfig.RuntimeParams["replication"] = "database"
+	replConn, err := pgconn.ConnectConfig(ctx, replConnConfig)
+	if err != nil {
+		logrus.WithField("err", err).Fatal("unable to connect to database")
+	}
+	replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, TestSlotName)).Close() // Ignore failures because it probably doesn't exist
+	if err := replConn.Exec(ctx, fmt.Sprintf(`CREATE_REPLICATION_SLOT %s LOGICAL pgoutput;`, TestSlotName)).Close(); err != nil {
+		logrus.WithField("err", err).Fatal("error creating replication slot")
+	}
+
 	// Reuse the same database connection for all test setup/teardown queries
-	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, TestingConnectionURI)
 	if err != nil {
 		log.Fatalf("error connecting to database: %v", err)
@@ -62,7 +79,11 @@ func TestMain(m *testing.M) {
 	defer conn.Close(ctx)
 	TestDatabase = conn
 
-	os.Exit(m.Run())
+	exitCode := m.Run()
+	if err := replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, TestSlotName)).Close(); err != nil {
+		logrus.WithField("err", err).Fatal("error cleaning up replication slot")
+	}
+	os.Exit(exitCode)
 }
 
 // createTestTable is a test helper for creating a new database table and returning the
