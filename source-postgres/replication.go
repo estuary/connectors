@@ -96,7 +96,8 @@ func StartReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		return nil, errors.Wrap(err, "unable to start replication")
 	}
 
-	stream.standbyStatusDeadline = time.Now().Add(standbyStatusInterval)
+	// Send one status update immediately on startup
+	stream.standbyStatusDeadline = time.Now()
 	return stream, nil
 }
 

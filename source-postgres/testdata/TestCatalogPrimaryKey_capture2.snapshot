@@ -1,0 +1,4 @@
+{"type":"RECORD","record":{"stream":"test_catalogprimarykey","data":{"_change_type":"Insert","fullname":"No Such State","population":1234,"state":"XX","year":1930},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_catalogprimarykey","data":{"_change_type":"Insert","fullname":"No Such State","population":12345,"state":"XX","year":1970},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_catalogprimarykey","data":{"_change_type":"Insert","fullname":"No Such State","population":123456,"state":"XX","year":1990},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"test_catalogprimarykey":{"mode":"Active","scan_key":["fullname","year"],"scan_ranges":[{"lsn":1234,"key":"Ald5b21pbmcAFgeA"}]}}}}}
