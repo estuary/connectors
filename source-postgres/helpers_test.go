@@ -22,56 +22,62 @@ import (
 )
 
 var (
-	// TODO(wgd): Figure out if there's a better way to specify this. Maybe
-	// a flag with this as default value? How do flags work in `go test` again?
-	TestingConnectionURI = "postgres://flow:flow@localhost:5432/flow"
-	TestSlotName         = "flow_test_slot"
-	TestDefaultConfig    = Config{
-		ConnectionURI:   TestingConnectionURI,
-		SlotName:        TestSlotName,
-		PublicationName: "flow_publication",
+	TestConnectionURI = flag.String("test_connection_uri",
+		"postgres://flow:flow@localhost:5432/flow",
+		"Connect to the specified database in tests")
+	TestReplicationSlot = flag.String("test_replication_slot",
+		"flow_test_slot",
+		"Use the specified replication slot name in tests")
+	TestPublicationName = flag.String("test_publication_name",
+		"flow_publication",
+		"Use the specified publication name in tests")
+	TestPollTimeoutSeconds = flag.Float64("test_poll_timeout_seconds",
+		0.250, "During test captures, wait at most this long for further replication events")
+)
 
-		// During automated tests we generally run each capture to "completion", and test
-		// replication by performing some updates and then starting a new capture from some
-		// appropriate state. Thus we're basically just waiting until PostgreSQL runs out
-		// of historical change events to send us, and 250ms ought to be plenty of wait
-		// time for that purpose.
-		//
-		// And the polling timeout directly adds to the runtime of every single capture
-		// performed by every single test, so we want to err on the side of keeping this
-		// low unless/until it causes provable flake.
-		PollTimeoutSeconds: 0.250,
-	}
-	TestDatabase  *pgx.Conn
+var (
+	TestDefaultConfig Config
+	TestDatabase      *pgx.Conn
+)
+
+const (
 	TestChunkSize = 16
 )
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	logrus.SetLevel(logrus.DebugLevel)
 	ctx := context.Background()
+
+	if testing.Verbose() {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
 
 	// Tweak some parameters to make things easier to test on a smaller scale
 	SnapshotChunkSize = TestChunkSize
 
 	// Open a connection to the database which will be used for creating and
 	// tearing down the replication slot.
-	replConnConfig, err := pgconn.ParseConfig(TestingConnectionURI)
+	replConnConfig, err := pgconn.ParseConfig(*TestConnectionURI)
 	if err != nil {
-		logrus.WithField("uri", TestingConnectionURI).WithField("err", err).Fatal("error parsing connection config")
+		logrus.WithField("uri", *TestConnectionURI).WithField("err", err).Fatal("error parsing connection config")
 	}
 	replConnConfig.RuntimeParams["replication"] = "database"
 	replConn, err := pgconn.ConnectConfig(ctx, replConnConfig)
 	if err != nil {
 		logrus.WithField("err", err).Fatal("unable to connect to database")
 	}
-	replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, TestSlotName)).Close() // Ignore failures because it probably doesn't exist
-	if err := replConn.Exec(ctx, fmt.Sprintf(`CREATE_REPLICATION_SLOT %s LOGICAL pgoutput;`, TestSlotName)).Close(); err != nil {
+	replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, *TestReplicationSlot)).Close() // Ignore failures because it probably doesn't exist
+	if err := replConn.Exec(ctx, fmt.Sprintf(`CREATE_REPLICATION_SLOT %s LOGICAL pgoutput;`, *TestReplicationSlot)).Close(); err != nil {
 		logrus.WithField("err", err).Fatal("error creating replication slot")
 	}
 
-	// Reuse the same database connection for all test setup/teardown queries
-	conn, err := pgx.Connect(ctx, TestingConnectionURI)
+	// Initialize test config and database connection
+	TestDefaultConfig.ConnectionURI = *TestConnectionURI
+	TestDefaultConfig.SlotName = *TestReplicationSlot
+	TestDefaultConfig.PublicationName = *TestPublicationName
+	TestDefaultConfig.PollTimeoutSeconds = *TestPollTimeoutSeconds
+
+	conn, err := pgx.Connect(ctx, *TestConnectionURI)
 	if err != nil {
 		log.Fatalf("error connecting to database: %v", err)
 		os.Exit(1)
@@ -80,7 +86,7 @@ func TestMain(m *testing.M) {
 	TestDatabase = conn
 
 	exitCode := m.Run()
-	if err := replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, TestSlotName)).Close(); err != nil {
+	if err := replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, *TestReplicationSlot)).Close(); err != nil {
 		logrus.WithField("err", err).Fatal("error cleaning up replication slot")
 	}
 	os.Exit(exitCode)
@@ -98,16 +104,23 @@ func createTestTable(t *testing.T, ctx context.Context, suffix string, tableDef 
 	}
 
 	logrus.WithField("table", tableName).Info("creating test table")
-
-	dbQuery(t, ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
-	dbQuery(t, ctx, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
-	t.Cleanup(func() { dbQuery(t, ctx, fmt.Sprintf(`DROP TABLE %s;`, tableName)) })
+	dbQueryInternal(t, ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
+	dbQueryInternal(t, ctx, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
+	t.Cleanup(func() {
+		logrus.WithField("table", tableName).Info("destroying test table")
+		dbQueryInternal(t, ctx, fmt.Sprintf(`DROP TABLE %s;`, tableName))
+	})
 	return tableName
 }
 
-// shortTestContext is a test helper for concisely creating a time-bounded context for running test logic
+// shortTestContext is a test helper which creates a time-bounded context for running test logic
 func shortTestContext(t *testing.T) context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	return longTestContext(t, 10*time.Second)
+}
+
+// longTestContext is a test helper which creates a time-bounded context for running test logic
+func longTestContext(t *testing.T, timeout time.Duration) context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	t.Cleanup(cancel)
 	return ctx
 }
@@ -127,7 +140,7 @@ func testCatalog(streams ...string) airbyte.ConfiguredCatalog {
 // into the specified database table. It supports strings and integers, however
 // integers are autodetected as "any element which can be parsed as an integer",
 // so the source dataset needs to be clean. For test data this should be fine.
-func dbLoadCSV(t *testing.T, ctx context.Context, table string, filename string) {
+func dbLoadCSV(t *testing.T, ctx context.Context, table string, filename string, limit int) {
 	t.Helper()
 	logrus.WithField("table", table).WithField("file", filename).Info("loading csv")
 	file, err := os.Open("testdata/" + filename)
@@ -138,7 +151,8 @@ func dbLoadCSV(t *testing.T, ctx context.Context, table string, filename string)
 
 	var dataset [][]interface{}
 	r := csv.NewReader(file)
-	for {
+	// If `limit` is positive, load at most `limit` rows
+	for count := 0; count < limit || limit <= 0; count++ {
 		row, err := r.Read()
 		if err == io.EOF {
 			break
@@ -159,8 +173,8 @@ func dbLoadCSV(t *testing.T, ctx context.Context, table string, filename string)
 		}
 		dataset = append(dataset, datarow)
 
-		// Insert in chunks of 16 rows at a time
-		if len(dataset) >= 4 {
+		// Insert in chunks of 64 rows at a time
+		if len(dataset) >= 64 {
 			dbInsert(t, ctx, table, dataset)
 			dataset = nil
 		}
@@ -183,9 +197,10 @@ func dbInsert(t *testing.T, ctx context.Context, table string, rows [][]interfac
 	if err != nil {
 		t.Fatalf("unable to begin transaction: %v", err)
 	}
+	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows), "first": rows[0]}).Info("inserting data")
 	query := fmt.Sprintf(`INSERT INTO %s VALUES %s`, table, argsTuple(len(rows[0])))
 	for _, row := range rows {
-		logrus.WithField("table", table).WithField("row", row).Info("inserting row")
+		logrus.WithField("table", table).WithField("row", row).Debug("inserting row")
 		if len(row) != len(rows[0]) {
 			t.Fatalf("incorrect number of values in row %q (expected %d)", row, len(rows[0]))
 		}
@@ -211,8 +226,11 @@ func argsTuple(argc int) string {
 // dbQuery is a test helper for executing arbitrary queries against TestDatabase
 func dbQuery(t *testing.T, ctx context.Context, query string, args ...interface{}) {
 	t.Helper()
+	logrus.WithField("query", query).WithField("args", args).Debug("executing query")
+	dbQueryInternal(t, ctx, query, args...)
+}
 
-	logrus.WithField("query", query).WithField("args", args).Info("executing query")
+func dbQueryInternal(t *testing.T, ctx context.Context, query string, args ...interface{}) {
 	rows, err := TestDatabase.Query(ctx, query, args...)
 	if err != nil {
 		t.Fatalf("unable to execute query: %v", err)
@@ -404,8 +422,23 @@ func verifySnapshot(t *testing.T, suffix string, actual string) {
 		t.Errorf("error writing new snapshot file %q: %v", newSnapshotFile, err)
 	}
 
-	// TODO(wgd): Maybe add logic to break up the expected and actual strings
-	// by lines and show the first mismatched line, so that test output actually
-	// indicates the problem in simple cases?
-	t.Fatalf("snapshot %q mismatch", snapshotFile)
+	// Locate the first non-matching line and log it
+	actualLines := strings.Split(actual, "\n")
+	snapshotLines := strings.Split(string(snapBytes), "\n")
+	for idx := 0; idx < len(snapshotLines) || idx < len(actualLines); idx++ {
+		var x, y string
+		if idx < len(snapshotLines) {
+			x = snapshotLines[idx]
+		}
+		if idx < len(actualLines) {
+			y = actualLines[idx]
+		}
+		if x != y {
+			t.Errorf("snapshot %q mismatch at line %d", snapshotFile, idx)
+			t.Errorf("old: %s", x)
+			t.Errorf("new: %s", y)
+			return
+		}
+	}
+	t.Errorf("snapshot %q mismatch at undetermined line", snapshotFile)
 }

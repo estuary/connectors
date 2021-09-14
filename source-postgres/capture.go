@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"strings"
 	"time"
 
@@ -97,7 +98,9 @@ func NewCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 
 func (c *Capture) Execute(ctx context.Context) error {
 	if c.Config.MaxLifespanSeconds != 0 {
-		limitedCtx, cancel := context.WithTimeout(ctx, time.Duration(c.Config.MaxLifespanSeconds*float64(time.Second)))
+		duration := time.Duration(c.Config.MaxLifespanSeconds * float64(time.Second))
+		logrus.WithField("duration", duration).Info("limiting connector lifespan")
+		limitedCtx, cancel := context.WithTimeout(ctx, duration)
 		defer cancel()
 		ctx = limitedCtx
 	}
@@ -122,6 +125,10 @@ func (c *Capture) Execute(ctx context.Context) error {
 	}
 
 	err := c.StreamChanges(ctx)
+	if errors.Is(err, context.DeadlineExceeded) && c.Config.MaxLifespanSeconds != 0 {
+		logrus.WithField("err", err).WithField("maxLifespan", c.Config.MaxLifespanSeconds).Info("maximum lifespan reached")
+		return nil
+	}
 	if errors.Is(err, context.Canceled) && !c.Catalog.Tail {
 		return nil
 	}
@@ -242,7 +249,7 @@ func (c *Capture) UpdateState(ctx context.Context) error {
 // connector might get killed and restarted from an intermediate state.
 func (c *Capture) ScanTables(ctx context.Context) error {
 	// Skip unnecessary setup work if there's no scan work pending anyway.
-	if !c.PendingScans() {
+	if len(c.PendingScans()) == 0 {
 		return nil
 	}
 
@@ -254,86 +261,93 @@ func (c *Capture) ScanTables(ctx context.Context) error {
 		return errors.Errorf("table snapshot (LSN=%q) is older than the current replication LSN (%q)", snapshot.TransactionLSN(), c.State.CurrentLSN)
 	}
 	defer snapshot.Close(ctx)
-	for c.PendingScans() {
-		if err := c.ScanNext(ctx, snapshot); err != nil {
+
+	pending := c.PendingScans()
+	logrus.WithField("tables", c.PendingScans()).WithField("scanLSN", snapshot.TransactionLSN()).Info("scanning tables")
+	for len(pending) > 0 {
+		if err := c.ScanNext(ctx, snapshot, pending[0]); err != nil {
 			return err
 		}
+		pending = c.PendingScans()
 	}
 	return nil
 }
 
-func (c *Capture) PendingScans() bool {
-	for _, tableState := range c.State.Streams {
+// PendingScans returns a list of all tables which still need scanning,
+// in sorted order. The sorting is important for test stability, because
+// when there are multiple tables in the "Scanning" state we need to
+// process them in a consistent order.
+func (c *Capture) PendingScans() []string {
+	var pending []string
+	for id, tableState := range c.State.Streams {
 		if tableState.Mode == ScanStateScanning {
-			return true
+			pending = append(pending, id)
 		}
 	}
-	return false
+	sort.Strings(pending)
+	return pending
 }
 
-func (c *Capture) ScanNext(ctx context.Context, snapshot *TableSnapshotStream) error {
-	// Find the first stream which is still in the "Scanning" state.
-	for streamName, tableState := range c.State.Streams {
-		if tableState.Mode != "Scanning" {
-			continue
-		}
+func (c *Capture) ScanNext(ctx context.Context, snapshot *TableSnapshotStream, streamName string) error {
+	tableState := c.State.Streams[streamName]
+	if tableState.Mode != ScanStateScanning {
+		return errors.Errorf("stream %q in state %q (expected %q)", streamName, tableState.Mode, ScanStateScanning)
+	}
 
-		// If this stream has no previously scanned range information, request the first
-		// chunk, then initialize the scanned ranges list and emit a state update.
-		if len(tableState.ScanRanges) == 0 {
-			// TODO(wgd): Fix handling of multiple Schemas
-			count, endKey, err := snapshot.ScanStart(ctx, DatabaseSchemaName, streamName, tableState.ScanKey, c.HandleChangeEvent)
-			if err != nil {
-				return errors.Wrap(err, "error processing snapshot events")
-			}
-			tableState.ScanRanges = []TableRange{{
-				ScannedLSN: snapshot.TransactionLSN(),
-				EndKey:     endKey,
-			}}
-
-			// If the initial scan returned zero rows then we proceed immediately
-			// to 'Active' for this table. Note that in this case the 'EndKey' of
-			// the range will be "", but that's okay because the `filteredLSN`
-			// check isn't going to examine the key anyway since there's just one
-			// scan range.
-			if count == 0 {
-				tableState.Mode = ScanStateActive
-			}
-			return c.EmitState(c.State)
-		}
-
-		// Otherwise if the last scanned range had a different LSN than the current snapshot,
-		// there must have been a restart in between. Create a new scan range, initialized
-		// to the zero-length range after the previous range.
-		//
-		// Whether or not this is the case, `lastRange` will end up referring to some range
-		// with the same `ScannedLSN` as our current transaction, which will be extended by
-		// reading further chunks from the table.
-		lastRange := &tableState.ScanRanges[len(tableState.ScanRanges)-1]
-		if lastRange.ScannedLSN != snapshot.TransactionLSN() {
-			tableState.ScanRanges = append(tableState.ScanRanges, TableRange{
-				ScannedLSN: snapshot.TransactionLSN(),
-				EndKey:     lastRange.EndKey,
-			})
-			lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
-		}
-
-		// This is the core operation where we spend most of our time when scanning
-		// table contents: reading the next chunk from the table and extending the
-		// endpoint of `lastRange`.
+	// If this stream has no previously scanned range information, request the first
+	// chunk, then initialize the scanned ranges list and emit a state update.
+	if len(tableState.ScanRanges) == 0 {
 		// TODO(wgd): Fix handling of multiple Schemas
-		count, nextKey, err := snapshot.ScanFrom(ctx, DatabaseSchemaName, streamName, tableState.ScanKey, lastRange.EndKey, c.HandleChangeEvent)
+		count, endKey, err := snapshot.ScanStart(ctx, DatabaseSchemaName, streamName, tableState.ScanKey, c.HandleChangeEvent)
 		if err != nil {
 			return errors.Wrap(err, "error processing snapshot events")
 		}
+		tableState.ScanRanges = []TableRange{{
+			ScannedLSN: snapshot.TransactionLSN(),
+			EndKey:     endKey,
+		}}
+
+		// If the initial scan returned zero rows then we proceed immediately
+		// to 'Active' for this table. Note that in this case the 'EndKey' of
+		// the range will be "", but that's okay because the `filteredLSN`
+		// check isn't going to examine the key anyway since there's just one
+		// scan range.
 		if count == 0 {
 			tableState.Mode = ScanStateActive
-		} else {
-			lastRange.EndKey = nextKey
 		}
 		return c.EmitState(c.State)
 	}
-	return errors.New("no scans pending")
+
+	// Otherwise if the last scanned range had a different LSN than the current snapshot,
+	// there must have been a restart in between. Create a new scan range, initialized
+	// to the zero-length range after the previous range.
+	//
+	// Whether or not this is the case, `lastRange` will end up referring to some range
+	// with the same `ScannedLSN` as our current transaction, which will be extended by
+	// reading further chunks from the table.
+	lastRange := &tableState.ScanRanges[len(tableState.ScanRanges)-1]
+	if lastRange.ScannedLSN != snapshot.TransactionLSN() {
+		tableState.ScanRanges = append(tableState.ScanRanges, TableRange{
+			ScannedLSN: snapshot.TransactionLSN(),
+			EndKey:     lastRange.EndKey,
+		})
+		lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
+	}
+
+	// This is the core operation where we spend most of our time when scanning
+	// table contents: reading the next chunk from the table and extending the
+	// endpoint of `lastRange`.
+	// TODO(wgd): Fix handling of multiple Schemas
+	count, nextKey, err := snapshot.ScanFrom(ctx, DatabaseSchemaName, streamName, tableState.ScanKey, lastRange.EndKey, c.HandleChangeEvent)
+	if err != nil {
+		return errors.Wrap(err, "error processing snapshot events")
+	}
+	if count == 0 {
+		tableState.Mode = ScanStateActive
+	} else {
+		lastRange.EndKey = nextKey
+	}
+	return c.EmitState(c.State)
 }
 
 // This is the "payoff" of all the setup work we did in `UpdateState` and `ScanTables`,
@@ -362,12 +376,9 @@ func (c *Capture) HandleReplicationEvent(evt *ChangeEvent) error {
 		c.watchdog.Reset(wdtDuration)
 	}
 
-	// TODO(wgd): The only thing the 'Commit' event is used for is to signal that
-	// we could emit a state update. Can this be done better?
-	//
-	// TODO(wgd): There will be a "Commit" event after every transaction, so if there
-	// are a bunch of independent single-row INSERTs we could end up emitting one state
-	// output per row added, which is too much. Add some rate-limiting to EmitState.
+	// TODO(wgd): There will be a "Commit" event after every transaction, so if the DB
+	// receives a bunch of single-row INSERTs we'll emit one state update per row added.
+	// Is this too much?
 	//
 	// TODO(wgd): At some point during replication event processing we should be far
 	// enough past the initial table scan that ideally we want to delete all the scan

@@ -37,13 +37,9 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// TODO(wgd): Figure out what sync modes are appropriate for this connector.
-// Is it even possible to say that a connector doesn't support full refresh?
-// If not, what are the semantics of performing a full refresh here?
 var spec = airbyte.Spec{
-	SupportsIncremental:           true,
-	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
-	ConnectionSpecification:       json.RawMessage(configSchema),
+	SupportsIncremental:     true,
+	ConnectionSpecification: json.RawMessage(configSchema),
 }
 
 const configSchema = `{
