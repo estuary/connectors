@@ -158,26 +158,28 @@ func (s *TableSnapshotStream) dispatchResults(ctx context.Context, namespace, ta
 		if err != nil {
 			return rowsProcessed, nil, errors.Wrap(err, "unable to encode row primary key")
 		}
+
+		// This is an opportunistic sanity-check of what should be an invariant.
+		// This check should only fail if PostgreSQL returns result rows in an order
+		// which does not match the lexicographical sort order of the encoded tuples.
+		//
+		// The failure mode that this is guarding against is very much a corner case:
+		//
+		//   + If the ordering of encoded tuples doesn't precisely match the equivalent
+		//     PostgreSQL `ORDER BY` ordering.
+		//   + ...and the scan of some particular table is interrupted and restarted
+		//     across multiple runs of this source connector.
+		//   + ...and there are concurrent modifications to the table, on rows which
+		//     fall in different "connector restarts" according to PostgreSQL and our
+		//     own tuple comparison.
+		//
+		// Then it is possible for these concurrent modifications to either be repeated
+		// (the replication event should have been filtered but wasn't) or omitted (the
+		// replication event was filtered when it shouldn't have been) once replication
+		// begins.
+		//
 		// TODO(wgd): Should this check be made optional or break-glass-able somehow?
 		if lastKey != nil && compareTuples(lastKey, rowKey) >= 0 {
-			// This is an opportunistic sanity-check of what should be an invariant.
-			// This check should only fail if PostgreSQL returns result rows in an order
-			// which does not match the lexicographical sort order of the encoded tuples.
-			//
-			// The failure mode that this is guarding against is very much a corner case:
-			//
-			//   + If the ordering of encoded tuples doesn't precisely match the equivalent
-			//     PostgreSQL `ORDER BY` ordering.
-			//   + ...and the scan of some particular table is interrupted and restarted
-			//     across multiple runs of this source connector.
-			//   + ...and there are concurrent modifications to the table, on rows which
-			//     fall in different "connector restarts" according to PostgreSQL and our
-			//     own tuple comparison.
-			//
-			// Then it is possible for these concurrent modifications to either be repeated
-			// (the replication event should have been filtered but wasn't) or omitted (the
-			// replication event was filtered when it shouldn't have been) once replication
-			// begins.
 			return rowsProcessed, nil, errors.Errorf("primary key ordering failure: prev=%q, next=%q", lastKey, rowKey)
 		}
 		lastKey = rowKey
