@@ -3,6 +3,10 @@ package main
 import (
 	"fmt"
 	"testing"
+	"time"
+
+	"github.com/jackc/pglogrepl"
+	"github.com/sirupsen/logrus"
 )
 
 // TestSimpleCapture initializes a DB table with a few rows, then runs a capture
@@ -84,7 +88,7 @@ func TestComplexDataset(t *testing.T) {
 	tableName := createTestTable(t, ctx, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
 	catalog, state := testCatalog(tableName), PersistentState{}
 
-	dbLoadCSV(t, ctx, tableName, "statepop.csv")
+	dbLoadCSV(t, ctx, tableName, "statepop.csv", 0)
 	states := verifiedCapture(t, ctx, &cfg, &catalog, &state, "init")
 	state = states[10] // Restart in between (1960, 'IA') and (1960, 'ID')
 
@@ -103,4 +107,78 @@ func TestComplexDataset(t *testing.T) {
 		{1990, "XX", "No Such State", 123456}, // Deleting/reinserting this row will be filtered since this portion of the table has yet to be scanned
 	})
 	verifiedCapture(t, ctx, &cfg, &catalog, &state, "restart2")
+}
+
+// TestMultipleStreams exercises captures with multiple stream configured, as
+// well as adding/removing/re-adding a stream.
+func TestMultipleStreams(t *testing.T) {
+	cfg, ctx, state := TestDefaultConfig, shortTestContext(t), PersistentState{}
+	table1 := createTestTable(t, ctx, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
+	table2 := createTestTable(t, ctx, "two", "(id INTEGER PRIMARY KEY, data TEXT)")
+	table3 := createTestTable(t, ctx, "three", "(id INTEGER PRIMARY KEY, data TEXT)")
+	dbInsert(t, ctx, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
+	dbInsert(t, ctx, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
+	dbInsert(t, ctx, table3, [][]interface{}{{6, "six"}, {7, "seven"}, {8, "eight"}})
+	catalog1 := testCatalog(table1)
+	catalog123 := testCatalog(table1, table2, table3)
+	catalog13 := testCatalog(table1, table3)
+	verifiedCapture(t, ctx, &cfg, &catalog1, &state, "capture1")   // Scan table1
+	verifiedCapture(t, ctx, &cfg, &catalog123, &state, "capture2") // Add table2 and table3
+	verifiedCapture(t, ctx, &cfg, &catalog13, &state, "capture3")  // Forget about table2
+	dbInsert(t, ctx, table1, [][]interface{}{{9, "nine"}})
+	dbInsert(t, ctx, table2, [][]interface{}{{10, "ten"}})
+	dbInsert(t, ctx, table3, [][]interface{}{{11, "eleven"}})
+	verifiedCapture(t, ctx, &cfg, &catalog13, &state, "capture4")  // Replicate changes from table1 and table3 only
+	verifiedCapture(t, ctx, &cfg, &catalog123, &state, "capture5") // Re-scan table2 including the new row
+}
+
+// TestCatalogPrimaryKey sets up a table with no primary key in the database
+// and instead specifies one in the catalog configuration.
+func TestCatalogPrimaryKey(t *testing.T) {
+	cfg, ctx, state := TestDefaultConfig, shortTestContext(t), PersistentState{}
+	table := createTestTable(t, ctx, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER)")
+	dbLoadCSV(t, ctx, table, "statepop.csv", 100)
+	catalog := testCatalog(table)
+	catalog.Streams[0].PrimaryKey = [][]string{{"fullname"}, {"year"}}
+	verifiedCapture(t, ctx, &cfg, &catalog, &state, "capture1")
+	dbInsert(t, ctx, table, [][]interface{}{
+		{1930, "XX", "No Such State", 1234},
+		{1970, "XX", "No Such State", 12345},
+		{1990, "XX", "No Such State", 123456},
+	})
+	verifiedCapture(t, ctx, &cfg, &catalog, &state, "capture2")
+}
+
+// TestCatalogPrimaryKeyOverride sets up a table with a primary key, but
+// then overrides that via the catalog configuration.
+func TestCatalogPrimaryKeyOverride(t *testing.T) {
+	cfg, ctx, state := TestDefaultConfig, shortTestContext(t), PersistentState{}
+	table := createTestTable(t, ctx, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
+	dbLoadCSV(t, ctx, table, "statepop.csv", 100)
+	catalog := testCatalog(table)
+	catalog.Streams[0].PrimaryKey = [][]string{{"fullname"}, {"year"}}
+	verifiedCapture(t, ctx, &cfg, &catalog, &state, "capture1")
+	dbInsert(t, ctx, table, [][]interface{}{
+		{1930, "XX", "No Such State", 1234},
+		{1970, "XX", "No Such State", 12345},
+		{1990, "XX", "No Such State", 123456},
+	})
+	verifiedCapture(t, ctx, &cfg, &catalog, &state, "capture2")
+}
+
+// TestIgnoredStreams checks that replicated changes are only reported
+// for tables which are configured in the catalog.
+func TestIgnoredStreams(t *testing.T) {
+	cfg, ctx, state := TestDefaultConfig, shortTestContext(t), PersistentState{}
+	table1 := createTestTable(t, ctx, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
+	table2 := createTestTable(t, ctx, "two", "(id INTEGER PRIMARY KEY, data TEXT)")
+	dbInsert(t, ctx, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
+	dbInsert(t, ctx, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
+	catalog := testCatalog(table1)
+	verifiedCapture(t, ctx, &cfg, &catalog, &state, "capture1") // Scan table1
+	dbInsert(t, ctx, table1, [][]interface{}{{6, "six"}})
+	dbInsert(t, ctx, table2, [][]interface{}{{7, "seven"}})
+	dbInsert(t, ctx, table1, [][]interface{}{{8, "eight"}})
+	dbInsert(t, ctx, table2, [][]interface{}{{9, "nine"}})
+	verifiedCapture(t, ctx, &cfg, &catalog, &state, "capture2") // Replicate table1 events, ignoring table2
 }

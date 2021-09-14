@@ -48,19 +48,12 @@ func SnapshotTable(ctx context.Context, conn *pgx.Conn) (*TableSnapshotStream, e
 }
 
 func (s *TableSnapshotStream) queryTransactionLSN(ctx context.Context) error {
-	// TODO(wgd): Using `pg_current_wal_lsn()` isn't technically correct, ideally
-	// there would be some query we could execute to get an LSN corresponding to
-	// the current transaction. But this will do until it becomes a problem or I
-	// can find something better.
-	//
-	// I'll note that this is why Netflix's "DBLog" uses a "Watermark Table"
-	// with a UUID for syncing up SELECT results with WAL entries, and say no
-	// more about it for now.
+	// TODO(wgd): Figure out once and for all whether using `pg_current_wal_lsn()`
+	// here to establish the "Scanned LSN" of a table is technically correct or not.
 	var txLSN pglogrepl.LSN
 	if err := s.transaction.QueryRow(ctx, `SELECT * FROM pg_current_wal_lsn();`).Scan(&txLSN); err != nil {
 		return errors.Wrap(err, "unable to query transaction LSN")
 	}
-	logrus.WithField("lsn", txLSN).Info("current WAL LSN at TX start")
 	s.txLSN = txLSN
 	return nil
 }
@@ -95,7 +88,8 @@ func (s *TableSnapshotStream) ScanStart(ctx context.Context, namespace, table st
 		"namespace":  namespace,
 		"table":      table,
 		"primaryKey": pkey,
-	}).Info("scanning from start")
+		"txLSN":      s.TransactionLSN(),
+	}).Info("starting table scan")
 
 	query := s.buildScanQuery(namespace, table, pkey, true)
 	logrus.WithField("query", query).Debug("executing query")
@@ -113,7 +107,7 @@ func (s *TableSnapshotStream) ScanFrom(ctx context.Context, namespace, table str
 		"table":      table,
 		"primaryKey": pkey,
 		"resumeKey":  base64.StdEncoding.EncodeToString(prevKey),
-	}).Info("scanning next chunk")
+	}).Debug("scanning next chunk")
 
 	args, err := unpackTuple(prevKey)
 	if err != nil {
@@ -177,8 +171,6 @@ func (s *TableSnapshotStream) dispatchResults(ctx context.Context, namespace, ta
 		// (the replication event should have been filtered but wasn't) or omitted (the
 		// replication event was filtered when it shouldn't have been) once replication
 		// begins.
-		//
-		// TODO(wgd): Should this check be made optional or break-glass-able somehow?
 		if lastKey != nil && compareTuples(lastKey, rowKey) >= 0 {
 			return rowsProcessed, nil, errors.Errorf("primary key ordering failure: prev=%q, next=%q", lastKey, rowKey)
 		}
