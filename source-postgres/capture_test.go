@@ -182,3 +182,58 @@ func TestIgnoredStreams(t *testing.T) {
 	dbInsert(t, ctx, table2, [][]interface{}{{9, "nine"}})
 	verifiedCapture(t, ctx, &cfg, &catalog, &state, "capture2") // Replicate table1 events, ignoring table2
 }
+
+// TestSlotLSNAdvances checks that the `restart_lsn` of a replication slot
+// has advanced after a connector restart.
+func TestSlotLSNAdvances(t *testing.T) {
+	cfg, ctx, state := TestDefaultConfig, longTestContext(t, 30*time.Second), PersistentState{}
+	table := createTestTable(t, ctx, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
+	catalog := testCatalog(table)
+
+	// Capture the current `restart_lsn` of the replication slot prior to our test
+	var beforeLSN pglogrepl.LSN
+	if err := TestDatabase.QueryRow(ctx, `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`, *TestReplicationSlot).Scan(&beforeLSN); err != nil {
+		logrus.WithField("slot", *TestReplicationSlot).WithField("err", err).Error("failed to query restart_lsn")
+	}
+
+	// Insert some data, note down a deadline 20s after that data was inserted, and
+	// get the initial table scan out of the way.
+	//
+	// PostgreSQL `BackgroundWriterMain()` will trigger `LogStandbySnapshot()` whenever
+	// "important records" have been inserted in the WAL and >15s have elapsed since
+	// the last such snapshot. We need this to happen because these snapshots include
+	// an `XLOG_RUNNING_XACTS` record, which is the trigger for the mechanism allowing
+	// a replication slot's `restart_lsn` to advance in response to StandbyStatusUpdate
+	// messages.
+	dbInsert(t, ctx, table, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
+	deadline := time.Now().Add(20 * time.Second)
+	verifiedCapture(t, ctx, &cfg, &catalog, &state, "capture1")
+
+	// Wait until we're confident a snapshot must have taken place, then create a
+	// few more change events. The next capture will advance 'CurrentLSN' in response
+	// to these 'Commit's.
+	logrus.Info("waiting so a standby snapshot can occur")
+	time.Sleep(time.Until(deadline))
+	dbInsert(t, ctx, table, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
+
+	// Perform two captures. The first one will receive all the change events up
+	// to this point and emit state updates advancing 'CurrentLSN'. The second
+	// capture will then treat the initial 'CurrentLSN' as "acknowledged" and
+	// relay it to the database in StandbyStatusUpdate messages. These status
+	// updates will interact with the XLOG_RUNNING_XACTS record in the WAL to
+	// actually advance the replication slot's `restart_lsn`.
+	cfg.PollTimeoutSeconds = 2
+	verifiedCapture(t, ctx, &cfg, &catalog, &state, "capture2")
+	verifiedCapture(t, ctx, &cfg, &catalog, &state, "capture3")
+
+	// Finally, check the `restart_lsn` of the replication slot and verify that
+	// it's more recent than it used to be.
+	var afterLSN pglogrepl.LSN
+	if err := TestDatabase.QueryRow(ctx, `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`, *TestReplicationSlot).Scan(&afterLSN); err != nil {
+		logrus.WithField("slot", *TestReplicationSlot).WithField("err", err).Error("failed to query restart_lsn")
+	}
+	logrus.WithField("before", beforeLSN).WithField("after", afterLSN).Info("done")
+	if afterLSN <= beforeLSN {
+		t.Errorf("slot %q restart LSN didn't advance (before=%q, after=%q)", *TestReplicationSlot, beforeLSN, afterLSN)
+	}
+}
