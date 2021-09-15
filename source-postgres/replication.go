@@ -318,6 +318,7 @@ func (s *ReplicationStream) receiveXLogData(ctx context.Context) (pglogrepl.XLog
 
 func (s *ReplicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 	commitLSN := pglogrepl.LSN(atomic.LoadUint64(&s.commitLSN))
+	logrus.WithField("commitLSN", commitLSN).Debug("sending Standby Status Update")
 	return pglogrepl.SendStandbyStatusUpdate(ctx, s.conn, pglogrepl.StandbyStatusUpdate{
 		WALWritePosition: commitLSN,
 	})
