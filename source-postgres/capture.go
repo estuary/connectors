@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"sort"
 	"strings"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/estuary/protocols/airbyte"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pglogrepl"
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -472,7 +475,47 @@ func (c *Capture) HandleChangeEvent(evt *ChangeEvent) error {
 	evt.Fields["_change_type"] = evt.Type
 	evt.Fields["_change_lsn"] = evt.LSN
 	evt.Fields["_ingested_at"] = time.Now().Unix()
+
+	for id, val := range evt.Fields {
+		translated, err := TranslateRecordField(val)
+		if err != nil {
+			logrus.WithField("val", val).Error("value translation error")
+			return errors.Wrap(err, "error translating field value")
+		}
+		evt.Fields[id] = translated
+	}
 	return c.EmitRecord(evt.Namespace, evt.Table, evt.Fields)
+}
+
+// TranslateRecordField "translates" a value from the PostgreSQL driver into
+// an appropriate JSON-encodable output format. As a concrete example, the
+// PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
+// marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
+// the `String()` method to get the usual "192.168.100.0/24" notation.
+func TranslateRecordField(val interface{}) (interface{}, error) {
+	switch x := val.(type) {
+	case *net.IPNet:
+		return x.String(), nil
+	case net.HardwareAddr:
+		return x.String(), nil
+	case [16]uint8: // UUIDs
+		s := new(strings.Builder)
+		for i := range x {
+			if i == 4 || i == 6 || i == 8 || i == 10 {
+				s.WriteString("-")
+			}
+			fmt.Fprintf(s, "%02x", x[i])
+		}
+		return s.String(), nil
+	}
+	if enc, ok := val.(pgtype.TextEncoder); ok {
+		bs, err := enc.EncodeText(nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		return string(bs), nil
+	}
+	return val, nil
 }
 
 func (c *Capture) EmitRecord(ns, stream string, data interface{}) error {

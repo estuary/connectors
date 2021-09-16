@@ -8,10 +8,6 @@ import (
 	"github.com/estuary/protocols/airbyte"
 )
 
-func TestTrivialPass(t *testing.T) {
-	t.Logf("Trivially Passing Test: %v", "Woo!")
-}
-
 func TestDiscoverySimple(t *testing.T) {
 	cfg, ctx := TestDefaultConfig, shortTestContext(t)
 	tableName := createTestTable(t, ctx, "", "(a INTEGER PRIMARY KEY, b TEXT, c REAL, d VARCHAR(255))")

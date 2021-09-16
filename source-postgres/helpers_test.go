@@ -102,8 +102,10 @@ func createTestTable(t *testing.T, ctx context.Context, suffix string, tableDef 
 	if suffix != "" {
 		tableName += "_" + suffix
 	}
+	tableName = strings.ReplaceAll(tableName, "/", "_")
+	tableName = strings.ReplaceAll(tableName, "=", "_")
 
-	logrus.WithField("table", tableName).Info("creating test table")
+	logrus.WithField("table", tableName).WithField("cols", tableDef).Info("creating test table")
 	dbQueryInternal(t, ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
 	dbQueryInternal(t, ctx, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
 	t.Cleanup(func() {
@@ -250,11 +252,8 @@ func dbQueryInternal(t *testing.T, ctx context.Context, query string, args ...in
 // emitted during the capture, and updates the `state` argument to the final one.
 func verifiedCapture(t *testing.T, ctx context.Context, cfg *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, suffix string) []PersistentState {
 	t.Helper()
-	result, states := performCapture(t, ctx, cfg, catalog, *state)
+	result, states := performCapture(t, ctx, cfg, catalog, state)
 	verifySnapshot(t, suffix, result)
-	if len(states) > 0 {
-		*state = states[len(states)-1]
-	}
 	return states
 }
 
@@ -263,7 +262,9 @@ func verifiedCapture(t *testing.T, ctx context.Context, cfg *Config, catalog *ai
 // holding all emitted records, plus a list of all state updates. The records string is
 // sanitized of "nondeterministic" data like timestamps and LSNs which will vary across
 // test runs, and so can be fed directly into verifySnapshot.
-func performCapture(t *testing.T, ctx context.Context, cfg *Config, catalog *airbyte.ConfiguredCatalog, state PersistentState) (string, []PersistentState) {
+//
+// As a side effect the input state is modified to the final result state.
+func performCapture(t *testing.T, ctx context.Context, cfg *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState) (string, []PersistentState) {
 	t.Helper()
 
 	// Use a JSON round-trip to deep-copy the state, so that the act of running a
@@ -287,7 +288,11 @@ func performCapture(t *testing.T, ctx context.Context, cfg *Config, catalog *air
 		t.Fatal(err)
 	}
 
-	return buf.Output()
+	result, states := buf.Output()
+	if len(states) > 0 {
+		*state = states[len(states)-1]
+	}
+	return result, states
 }
 
 // A CaptureOutputBuffer receives the stream of output messages from a
