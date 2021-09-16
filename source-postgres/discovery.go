@@ -29,7 +29,7 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 			"namespace":  table.TableSchema,
 			"table":      table.TableName,
 			"primaryKey": table.PrimaryKey,
-		}).Info("discovered table")
+		}).Debug("discovered table")
 
 		// TODO(wgd): Maybe generate the schema in a less hackish fashion
 		schema := `{"type":"object","properties":{`
@@ -37,6 +37,7 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 			if idx > 0 {
 				schema += ","
 			}
+
 			jsonType, ok := postgresTypeToJSON[column.DataType]
 			if !ok {
 				return nil, errors.Errorf("cannot translate PostgreSQL column type %q to JSON schema", column.DataType)
@@ -69,14 +70,58 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 	return catalog, err
 }
 
-// TODO(wgd): Revisit whether the PostgreSQL Schema -> JSON Spec translation for
-// column types can be done automatically, or at least flesh out the set of types
-// handled in this map.
 var postgresTypeToJSON = map[string]string{
-	"int4":    `{"type":"number"}`,
+	"bool": `{"type":"boolean"}`,
+
+	"int2": `{"type":"integer"}`,
+	"int4": `{"type":"integer"}`,
+	"int8": `{"type":"integer"}`,
+
+	// TODO(wgd): More systematic treatment of arrays?
+	"_int2":   `{"type":"string"}`,
+	"_int4":   `{"type":"string"}`,
+	"_int8":   `{"type":"string"}`,
+	"_float4": `{"type":"string"}`,
+	"_text":   `{"type":"string"}`,
+
+	"numeric": `{"type":"number"}`,
 	"float4":  `{"type":"number"}`,
+	"float8":  `{"type":"number"}`,
+
 	"varchar": `{"type":"string"}`,
+	"bpchar":  `{"type":"string"}`,
 	"text":    `{"type":"string"}`,
+	"bytea":   `{"type":"string","format":"base64"}`,
+	"xml":     `{"type":"string"}`,
+	"bit":     `{"type":"string"}`,
+	"varbit":  `{"type":"string"}`,
+
+	"json":     `{}`,
+	"jsonb":    `{}`,
+	"jsonpath": `{"type":"string"}`,
+
+	// Domain-Specific Types
+	"date":        `{"type":"string","format":"date-time"}`,
+	"timestamp":   `{"type":"string","format":"date-time"}`,
+	"timestamptz": `{"type":"string","format":"date-time"}`,
+	"time":        `{"type":"integer"}`,
+	"timetz":      `{"type":"string","format":"time"}`,
+	"interval":    `{"type":"string"}`,
+	"money":       `{"type":"string"}`,
+	"point":       `{"type":"string"}`,
+	"line":        `{"type":"string"}`,
+	"lseg":        `{"type":"string"}`,
+	"box":         `{"type":"string"}`,
+	"path":        `{"type":"string"}`,
+	"polygon":     `{"type":"string"}`,
+	"circle":      `{"type":"string"}`,
+	"inet":        `{"type":"string"}`,
+	"cidr":        `{"type":"string"}`,
+	"macaddr":     `{"type":"string"}`,
+	"macaddr8":    `{"type":"string"}`,
+	"tsvector":    `{"type":"string"}`,
+	"tsquery":     `{"type":"string"}`,
+	"uuid":        `{"type":"string","format":"uuid"}`,
 }
 
 type TableInfo struct {
