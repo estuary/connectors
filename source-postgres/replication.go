@@ -64,6 +64,12 @@ func StartReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		"slot":        stream.replSlot,
 	}).Info("starting replication")
 
+	// Create the publication and replication slot, ignoring the inevitable errors
+	// when they already exist. We could in theory add some extra logic to check,
+	// but why bother when PostgreSQL will already do what we need?
+	_ = conn.Exec(ctx, fmt.Sprintf(`CREATE PUBLICATION %s FOR ALL TABLES;`, stream.pubName)).Close()
+	_ = conn.Exec(ctx, fmt.Sprintf(`CREATE_REPLICATION_SLOT %s LOGICAL pgoutput;`, stream.replSlot)).Close()
+
 	if err := pglogrepl.StartReplication(ctx, stream.conn, stream.replSlot, stream.currentLSN, pglogrepl.StartReplicationOptions{
 		PluginArgs: []string{
 			`"proto_version" '1'`,
