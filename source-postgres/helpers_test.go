@@ -132,7 +132,7 @@ func testCatalog(streams ...string) airbyte.ConfiguredCatalog {
 	catalog := airbyte.ConfiguredCatalog{}
 	for _, s := range streams {
 		catalog.Streams = append(catalog.Streams, airbyte.ConfiguredStream{
-			Stream: airbyte.Stream{Name: s},
+			Stream: airbyte.Stream{Name: s, Namespace: "public"},
 		})
 	}
 	return catalog

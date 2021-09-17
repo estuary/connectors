@@ -19,11 +19,7 @@ import (
 )
 
 const (
-	// TODO(wgd): More principled handling of schemas throughout the code. Should
-	// it be possible to interact with tables from schemas other than "public"?
-	// If so, can we avoid making every stream be named "public.foo" in the
-	// simple cases?
-	DatabaseSchemaName = "public"
+	DefaultSchemaName = "public"
 )
 
 type PersistentState struct {
@@ -172,14 +168,14 @@ func (c *Capture) UpdateState(ctx context.Context) error {
 		// Table names coming from Postgres are always lowercase, so if we
 		// normalize the stream name to lowercase on the catalog->state
 		// transition then we can ignore the issue later on.
-		streamName := strings.ToLower(catalogStream.Stream.Name)
+		streamID := joinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
 
 		// In the catalog a primary key is an array of arrays of strings, but it's
 		// invalid for the individual key elements to not be unit-length (["foo"])
 		var catalogPrimaryKey []string
 		for _, col := range catalogStream.PrimaryKey {
 			if len(col) != 1 {
-				return errors.Errorf("stream %q: primary key element %q invalid", streamName, col)
+				return errors.Errorf("stream %q: primary key element %q invalid", streamID, col)
 			}
 			catalogPrimaryKey = append(catalogPrimaryKey, col[0])
 		}
@@ -187,15 +183,14 @@ func (c *Capture) UpdateState(ctx context.Context) error {
 		// If the `PrimaryKey` property is specified in the catalog then use that,
 		// otherwise use the "native" primary key of this table in the database.
 		// Print a warning if the two are not the same.
-		dbTableID := strings.ToLower(DatabaseSchemaName + "." + streamName)
-		primaryKey := dbPrimaryKeys[dbTableID]
+		primaryKey := dbPrimaryKeys[streamID]
 		if len(primaryKey) != 0 {
-			logrus.WithField("table", dbTableID).WithField("key", primaryKey).Debug("queried primary key")
+			logrus.WithField("table", streamID).WithField("key", primaryKey).Debug("queried primary key")
 		}
 		if len(catalogPrimaryKey) > 0 {
 			if strings.Join(primaryKey, ",") != strings.Join(catalogPrimaryKey, ",") {
 				logrus.WithFields(logrus.Fields{
-					"stream":      streamName,
+					"stream":      streamID,
 					"catalogKey":  catalogPrimaryKey,
 					"databaseKey": primaryKey,
 				}).Warn("primary key in catalog differs from database table")
@@ -203,36 +198,37 @@ func (c *Capture) UpdateState(ctx context.Context) error {
 			primaryKey = catalogPrimaryKey
 		}
 		if len(primaryKey) == 0 {
-			return errors.Errorf("stream %q: primary key unspecified in the catalog and no primary key found in database", streamName)
+			return errors.Errorf("stream %q: primary key unspecified in the catalog and no primary key found in database", streamID)
 		}
 
 		// See if the stream is already initialized. If it's not, then create it.
-		streamState, ok := c.State.Streams[streamName]
+		streamState, ok := c.State.Streams[streamID]
 		if !ok {
-			c.State.Streams[streamName] = &TableState{Mode: ScanStateScanning, ScanKey: primaryKey}
+			c.State.Streams[streamID] = &TableState{Mode: ScanStateScanning, ScanKey: primaryKey}
 			stateDirty = true
 			continue
 		}
 
 		if strings.Join(streamState.ScanKey, ",") != strings.Join(primaryKey, ",") {
-			return errors.Errorf("stream %q: primary key %q doesn't match initialized scan key %q", streamName, primaryKey, streamState.ScanKey)
+			return errors.Errorf("stream %q: primary key %q doesn't match initialized scan key %q", streamID, primaryKey, streamState.ScanKey)
 		}
 	}
 
 	// Likewise streams may be removed from the catalog, and we need to forget
 	// the corresponding state information.
-	for streamName := range c.State.Streams {
+	for streamID := range c.State.Streams {
 		// List membership checks are always a pain in Go, but that's all this loop is
 		streamExistsInCatalog := false
 		for _, catalogStream := range c.Catalog.Streams {
-			if streamName == strings.ToLower(catalogStream.Stream.Name) {
+			catalogStreamID := joinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
+			if streamID == catalogStreamID {
 				streamExistsInCatalog = true
 			}
 		}
 
 		if !streamExistsInCatalog {
-			logrus.WithField("stream", streamName).Info("stream removed from catalog")
-			delete(c.State.Streams, streamName)
+			logrus.WithField("stream", streamID).Info("stream removed from catalog")
+			delete(c.State.Streams, streamID)
 			stateDirty = true
 		}
 	}
@@ -245,6 +241,16 @@ func (c *Capture) UpdateState(ctx context.Context) error {
 	return nil
 }
 
+// joinStreamID combines a namespace and a stream name into a fully-qualified
+// stream (or table) identifier. Because it's possible for the namespace to be
+// unspecified, we default to "public" in that situation.
+func joinStreamID(namespace, stream string) string {
+	if namespace == "" {
+		namespace = DefaultSchemaName
+	}
+	return strings.ToLower(namespace + "." + stream)
+}
+
 // Whenever a stream is added to the catalog (including on first launch)
 // we have to scan the full contents of the table in the database and emit each
 // row as an "Insert" event. Because database tables can grow pretty huge, we do
@@ -252,26 +258,27 @@ func (c *Capture) UpdateState(ctx context.Context) error {
 // connector might get killed and restarted from an intermediate state.
 func (c *Capture) ScanTables(ctx context.Context) error {
 	// Skip unnecessary setup work if there's no scan work pending anyway.
-	if len(c.PendingScans()) == 0 {
+	pendingStreamIDs := c.PendingScans()
+	if len(pendingStreamIDs) == 0 {
 		return nil
 	}
 
-	snapshot, err := SnapshotTable(ctx, c.connScan)
+	// Take a snapshot of the database contents
+	snapshot, err := SnapshotDatabase(ctx, c.connScan)
 	if err != nil {
-		return errors.Wrap(err, "error creating table snapshot stream")
+		return errors.Wrap(err, "error creating database snapshot")
 	}
 	if snapshot.TransactionLSN() < c.State.CurrentLSN {
 		return errors.Errorf("table snapshot (LSN=%q) is older than the current replication LSN (%q)", snapshot.TransactionLSN(), c.State.CurrentLSN)
 	}
 	defer snapshot.Close(ctx)
 
-	pending := c.PendingScans()
+	// Scan each pending table within this snapshot
 	logrus.WithField("tables", c.PendingScans()).WithField("scanLSN", snapshot.TransactionLSN()).Info("scanning tables")
-	for len(pending) > 0 {
-		if err := c.ScanNext(ctx, snapshot, pending[0]); err != nil {
+	for _, pendingStreamID := range pendingStreamIDs {
+		if err := c.ScanTable(ctx, snapshot, pendingStreamID); err != nil {
 			return err
 		}
-		pending = c.PendingScans()
 	}
 	return nil
 }
@@ -291,66 +298,82 @@ func (c *Capture) PendingScans() []string {
 	return pending
 }
 
-func (c *Capture) ScanNext(ctx context.Context, snapshot *TableSnapshotStream, streamName string) error {
-	tableState := c.State.Streams[streamName]
+// ScanTable scans a particular table to completion, emitting intermediate
+// state updates along the way. If the connector is resumed from a partial
+// state, scanning resumes from where it left off.
+func (c *Capture) ScanTable(ctx context.Context, snapshot *DatabaseSnapshot, streamID string) error {
+	tableState := c.State.Streams[streamID]
 	if tableState.Mode != ScanStateScanning {
-		return errors.Errorf("stream %q in state %q (expected %q)", streamName, tableState.Mode, ScanStateScanning)
+		return errors.Errorf("stream %q in state %q (expected %q)", streamID, tableState.Mode, ScanStateScanning)
 	}
 
-	// If this stream has no previously scanned range information, request the first
-	// chunk, then initialize the scanned ranges list and emit a state update.
-	if len(tableState.ScanRanges) == 0 {
-		// TODO(wgd): Fix handling of multiple Schemas
-		count, endKey, err := snapshot.ScanStart(ctx, DatabaseSchemaName, streamName, tableState.ScanKey, c.HandleChangeEvent)
+	table := snapshot.Table(streamID, tableState.ScanKey)
+
+	// The table scanning process is implemented as a loop which keeps doing
+	// the next chunk of work until it's all done. This way we don't have to
+	// worry too much about how resuming works across connector restarts,
+	// because each iteration of this loop is basically independent except
+	// for the stream state it reads and modifies.
+	for tableState.Mode == ScanStateScanning {
+		// If this stream has no previously scanned range information, request the first
+		// chunk, then initialize the scanned ranges list and emit a state update.
+		if len(tableState.ScanRanges) == 0 {
+			count, endKey, err := table.ScanStart(ctx, c.HandleChangeEvent)
+			if err != nil {
+				return errors.Wrap(err, "error processing snapshot events")
+			}
+			tableState.ScanRanges = []TableRange{{
+				ScannedLSN: snapshot.TransactionLSN(),
+				EndKey:     endKey,
+			}}
+
+			// If the initial scan returned zero rows then we proceed immediately
+			// to 'Active' for this table. Note that in this case the 'EndKey' of
+			// the range will be "", but that's okay because the `filteredLSN`
+			// check isn't going to examine the key anyway since there's just one
+			// scan range.
+			if count == 0 {
+				tableState.Mode = ScanStateActive
+			}
+			if err := c.EmitState(c.State); err != nil {
+				return err
+			}
+			continue
+		}
+
+		// Otherwise if the last scanned range had a different LSN than the current snapshot,
+		// there must have been a restart in between. Create a new scan range, initialized
+		// to the zero-length range after the previous range.
+		//
+		// Whether or not this is the case, `lastRange` will end up referring to some range
+		// with the same `ScannedLSN` as our current transaction, which will be extended by
+		// reading further chunks from the table.
+		lastRange := &tableState.ScanRanges[len(tableState.ScanRanges)-1]
+		if lastRange.ScannedLSN != snapshot.TransactionLSN() {
+			tableState.ScanRanges = append(tableState.ScanRanges, TableRange{
+				ScannedLSN: snapshot.TransactionLSN(),
+				EndKey:     lastRange.EndKey,
+			})
+			lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
+		}
+
+		// This is the core operation where we spend most of our time when scanning
+		// table contents: reading the next chunk from the table and extending the
+		// endpoint of `lastRange`.
+		count, nextKey, err := table.ScanFrom(ctx, lastRange.EndKey, c.HandleChangeEvent)
 		if err != nil {
 			return errors.Wrap(err, "error processing snapshot events")
 		}
-		tableState.ScanRanges = []TableRange{{
-			ScannedLSN: snapshot.TransactionLSN(),
-			EndKey:     endKey,
-		}}
-
-		// If the initial scan returned zero rows then we proceed immediately
-		// to 'Active' for this table. Note that in this case the 'EndKey' of
-		// the range will be "", but that's okay because the `filteredLSN`
-		// check isn't going to examine the key anyway since there's just one
-		// scan range.
 		if count == 0 {
 			tableState.Mode = ScanStateActive
+		} else {
+			lastRange.EndKey = nextKey
 		}
-		return c.EmitState(c.State)
+		if err := c.EmitState(c.State); err != nil {
+			return err
+		}
 	}
-
-	// Otherwise if the last scanned range had a different LSN than the current snapshot,
-	// there must have been a restart in between. Create a new scan range, initialized
-	// to the zero-length range after the previous range.
-	//
-	// Whether or not this is the case, `lastRange` will end up referring to some range
-	// with the same `ScannedLSN` as our current transaction, which will be extended by
-	// reading further chunks from the table.
-	lastRange := &tableState.ScanRanges[len(tableState.ScanRanges)-1]
-	if lastRange.ScannedLSN != snapshot.TransactionLSN() {
-		tableState.ScanRanges = append(tableState.ScanRanges, TableRange{
-			ScannedLSN: snapshot.TransactionLSN(),
-			EndKey:     lastRange.EndKey,
-		})
-		lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
-	}
-
-	// This is the core operation where we spend most of our time when scanning
-	// table contents: reading the next chunk from the table and extending the
-	// endpoint of `lastRange`.
-	// TODO(wgd): Fix handling of multiple Schemas
-	count, nextKey, err := snapshot.ScanFrom(ctx, DatabaseSchemaName, streamName, tableState.ScanKey, lastRange.EndKey, c.HandleChangeEvent)
-	if err != nil {
-		return errors.Wrap(err, "error processing snapshot events")
-	}
-	if count == 0 {
-		tableState.Mode = ScanStateActive
-	} else {
-		lastRange.EndKey = nextKey
-	}
-	return c.EmitState(c.State)
+	return nil
 }
 
 // This is the "payoff" of all the setup work we did in `UpdateState` and `ScanTables`,
@@ -405,7 +428,8 @@ func (c *Capture) HandleReplicationEvent(evt *ChangeEvent) error {
 		"values":    evt.Fields,
 	}).Debug("replication change event")
 
-	tableState := c.State.Streams[evt.Table]
+	streamID := joinStreamID(evt.Namespace, evt.Table)
+	tableState := c.State.Streams[streamID]
 	if tableState == nil {
 		// If we're not tracking state by now, this table isn't in the catalog. Ignore it.
 		return nil
@@ -470,8 +494,6 @@ func (c *Capture) filteredLSN(tableState *TableState, fields map[string]interfac
 }
 
 func (c *Capture) HandleChangeEvent(evt *ChangeEvent) error {
-	// TODO(wgd): Should these field names and values aim for exact
-	// compatibility with Airbyte Postgres CDC operation?
 	evt.Fields["_change_type"] = evt.Type
 	evt.Fields["_change_lsn"] = evt.LSN
 	evt.Fields["_ingested_at"] = time.Now().Unix()
