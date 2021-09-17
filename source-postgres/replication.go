@@ -27,7 +27,9 @@ type ChangeEvent struct {
 
 // A ReplicationStream represents the process of receiving PostgreSQL
 // Logical Replication events, managing keepalives and status updates,
-// and translating changes into a more friendly representation.
+// and translating changes into a more friendly representation. There
+// is no built-in concurrency, so Process() must be called reasonably
+// soon after StartReplication() in order to not time out.
 type ReplicationStream struct {
 	replSlot   string
 	pubName    string
@@ -50,34 +52,10 @@ func StartReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		replSlot:   slot,
 		pubName:    publication,
 		currentLSN: startLSN,
-		// The "Commit LSN" is initialized to `startLSN` when the replication stream is created,
-		// and will never be updated after that. Why is that? It's because the Source Connector
-		// "API" we're using has very limited avenues for feedback from the data consumer to us.
-		//
-		// For context, `commitLSN` is the LSN that we send to PostgreSQL in `StandbyStatusUpdate`
-		// messages to tell the DB that we're done with the WAL up to a given point and will never
-		// request to restart streaming from an older point. So we have to update it *eventually*
-		// in order to avoid an unbounded space leak, but it's not really critical to update it
-		// frequently, and we can be pretty conservative about advancing it.
-		//
-		// The problem is that we don't have many guarantees about when our records and state
-		// updates will be durably committed by the consumer. At any moment our connector here
-		// might get killed and then re-launched with a state that we emitted hours ago, so
-		// without the consumer giving us an explicit acknowledgement we can't assume that it's
-		// safe to advance the `commitLSN` cursor. But there is no such ACK message, is there?
-		//
-		// Well, we actually do get one form of acknowledgement: we know that when the connector
-		// is restarted with a provided `state.json` to resume from, that state must have gotten
-		// committed by the consumer. So provided that the connector is periodically killed and
-		// restarted, we will periodically advance the `commitLSN` and thereby allow PostgreSQL
-		// to free older segments of the WAL.
-		//
-		// This hinges on connectors getting shut down and restarted every so often, which is a
-		// guarantee that should ideally be provided by the runtime anyway.
-		commitLSN: uint64(startLSN),
-		conn:      conn,
-		connInfo:  pgtype.NewConnInfo(),
-		relations: make(map[uint32]*pglogrepl.RelationMessage),
+		commitLSN:  uint64(startLSN),
+		conn:       conn,
+		connInfo:   pgtype.NewConnInfo(),
+		relations:  make(map[uint32]*pglogrepl.RelationMessage),
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -101,6 +79,12 @@ func StartReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 	return stream, nil
 }
 
+// Process receives logical replication messages from PostgreSQL and invokes
+// the provided handler on each change/commit event. Process also sends the
+// occasional 'Standby Status Update' message back to PostgreSQL to keep the
+// connection open and communicate the current "committed LSN".
+//
+// Process will only return if an error occurs or its context times out.
 func (s *ReplicationStream) Process(ctx context.Context, handler ChangeEventHandler) error {
 	for {
 		xld, err := s.receiveXLogData(ctx)
@@ -183,7 +167,7 @@ func (s *ReplicationStream) Process(ctx context.Context, handler ChangeEventHand
 			//
 			//   2. If your use-case can tolerate a completely different set of
 			//      tradeoffs you can use the Airbyte Postgres source connector
-			//      IN NON-CDC MODE.
+			//      in NON-CDC mode.
 			//
 			//      Note that in CDC mode that connector uses Debezium, which will choke
 			//      on these same edge cases, with the exception of TRUNCATE/TYPE/ORIGIN.
@@ -314,6 +298,35 @@ func (s *ReplicationStream) receiveXLogData(ctx context.Context) (pglogrepl.XLog
 			logrus.WithField("message", msg).Warn("unexpected message")
 		}
 	}
+}
+
+// CommitLSN informs the ReplicationStream that all messages up to the specified
+// LSN [1] have been persisted, and that a future restart will never need to return
+// to older portions of the transaction log. This fact will be communicated to the
+// database in a periodic status update, whereupon the replication slot's "Restart
+// LSN" may be advanced accordingly.
+//
+// TODO(wgd): At present this function is never called. That's because there is no
+// way for Flow to tell us that our output has been durably committed downstream,
+// and no reliable heuristic we could use either. For now the committed LSN only
+// "advances" by being set at startup. Due to how connector restarts work this
+// will actually kind of work, but at the cost of retaining more WAL data than
+// we actually need (until the connector restarts), and causing a "hiccup" of
+// replication latency when the restarted connector makes PostgreSQL go back
+// through all that extra buffered data before reaching new changes.
+//
+// [1] The handling of LSNs and replication slot advancement is complicated, but
+// luckily most of the complexity is handled within PostgreSQL. Just be aware that
+// we're not necessarily receiving messages in the literal order that they appear
+// in the WAL, and that PostgreSQL is doing a lot of Magic behind the scenes in
+// order to present the illusion that these changes occurred in order without any
+// interleaving between transactions.
+//
+// Thus you shouldn't expect that a specific "Committed LSN" value will necessarily
+// advance the "Restart LSN" to the same point, but so long as you ignore the details
+// things will work out in the end.
+func (s *ReplicationStream) CommitLSN(lsn pglogrepl.LSN) {
+	atomic.StoreUint64(&s.commitLSN, uint64(lsn))
 }
 
 func (s *ReplicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
