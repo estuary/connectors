@@ -11,15 +11,12 @@ Prebuild connector images should be available at `ghcr.io/estuary/source-postgre
 "Connector Development" for instructions to build locally.
 
 This connector operates via Logical Replication, so the source PostgreSQL instance
-will need to run with `wal_level=logical`, and will need to have a replication slot
-and publication defined. Unless overridden in `config.json` the slot/publication names
-will default to `flow_slot` and `flow_publication` respectively, and they can be
-created using:
-
-```bash
-psql "${POSTGRES_URI}" -c "SELECT pg_create_logical_replication_slot('flow_slot', 'pgoutput');"
-psql "${POSTGRES_URI}" -c "CREATE PUBLICATION flow_publication FOR ALL TABLES;"
-```
+will need to run with `wal_level=logical`. The connector will need a PostgreSQL
+[Replication Slot](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION-SLOTS)
+and [Publication](https://www.postgresql.org/docs/current/sql-createpublication.html),
+which will be automatically created if they don't already exist. Unless overridden in
+`config.json` the slot/publication names will default to `flow_slot` and `flow_publication`
+respectively.
 
 A minimal `config.json` consists solely of the database connection URI. Refer to the
 output of `docker run --rm -it ghcr.io/estuary/source-postgres spec` for a list of
@@ -54,13 +51,10 @@ key then it must be explicitly provided in the catalog.
 ## Connector Development
 
 Any meaningful connector development will require a test database to run
-against. To set this up, run the following commands:
+against. To set this up, run:
 
 ```bash
-cd source-postgres && docker-compose up
-export POSTGRES_URI='postgres://flow:flow@localhost:5432/flow'
-psql "${POSTGRES_URI}" -c "SELECT pg_create_logical_replication_slot('flow_slot', 'pgoutput');"
-psql "${POSTGRES_URI}" -c "CREATE PUBLICATION flow_publication FOR ALL TABLES;"
+docker-compose --file source-postgres/docker-compose.yaml up --detach postgres
 ```
 
 The connector has a reasonably thorough `go test` suite which assumes the existence of
@@ -74,7 +68,11 @@ docker build --network=host -f source-postgres/Dockerfile -t ghcr.io/estuary/sou
 You can also run the resulting connector image manually:
 
 ```bash
-docker run --rm -it --network=host -v <configsDir>:/cfg ghcr.io/estuary/source-postgres:dev read --config=/cfg/config.json --catalog=/cfg/catalog.json --state=/cfg/state.json
+docker run --rm -it --network=host -v <configsDir>:/cfg \
+  ghcr.io/estuary/source-postgres:dev read \
+  --config=/cfg/config.json \
+  --catalog=/cfg/catalog.json \
+  --state=/cfg/state.json
 ```
 
 However the connector is written entirely in Go and can also be built/tested/run via
