@@ -308,7 +308,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 	for _, b := range d.bindings {
 		if !b.load.hasKeys {
 			// Pass.
-		} else if err := b.load.stage.put(d.cfg); err != nil {
+		} else if err := b.load.stage.put(d.ctx, d.load.conn, d.cfg); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
 			subqueries = append(subqueries, b.load.sql)
@@ -376,7 +376,7 @@ func (d *transactor) Commit() error {
 	for _, b := range d.bindings {
 		if b.store.hasDocs {
 			// PUT staged keys to Snowflake in preparation for querying.
-			if err := b.store.stage.put(d.cfg); err != nil {
+			if err := b.store.stage.put(d.ctx, d.store.conn, d.cfg); err != nil {
 				return fmt.Errorf("load.stage(): %w", err)
 			}
 		}
@@ -399,7 +399,9 @@ func (d *transactor) Commit() error {
 			}
 			return
 		},
-	); err != nil {
+	); err != nil && strings.Contains(err.Error(), "timeout") {
+		return fmt.Errorf("fence.Update: %w  (ensure LOCK_TIMEOUT and STATEMENT_TIMEOUT_IN_SECONDS are at least ten minutes)", err)
+	} else if err != nil {
 		return fmt.Errorf("fence.Update: %w", err)
 	}
 
@@ -475,7 +477,12 @@ func newScratchFile(tempdir string) (*scratchFile, error) {
 	}, nil
 }
 
-func (f *scratchFile) put(cfg *config) error {
+// TODO(johnny): gosnowflake introduced support for PUT,
+// but it's currently broken due to:
+// https://github.com/snowflakedb/gosnowflake/issues/478
+// (... seriously?).
+// When it's not broken, then switch to it.
+func (f *scratchFile) put(ctx context.Context, conn *sql.Conn, cfg *config) error {
 	if err := f.bw.Flush(); err != nil {
 		return fmt.Errorf("scratch.Flush: %w", err)
 	}
@@ -484,6 +491,17 @@ func (f *scratchFile) put(cfg *config) error {
 		`PUT file://%s @flow_v1 AUTO_COMPRESS=FALSE SOURCE_COMPRESSION=NONE OVERWRITE=TRUE ;`,
 		f.file.Name(),
 	)
+
+	/*
+		// Use me instead of exec.Command when snowflakedb/gosnowflake#478 is resolved.
+		var rows, err = conn.QueryContext(ctx, query)
+		if err != nil {
+			return fmt.Errorf("PUT to stage: %w", err)
+		} else {
+			rows.Close()
+		}
+	*/
+
 	var cmd = exec.Command(
 		"snowsql",
 		fmt.Sprintf("--accountname=%s", cfg.Account),
