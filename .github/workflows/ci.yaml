@@ -122,8 +122,6 @@ jobs:
           file: ${{ matrix.connector }}/Dockerfile
           load: true
           tags: ghcr.io/estuary/${{ matrix.connector }}:test
-          cache-from: type=gha,scope=${{ github.ref }}-${{ matrix.connector }}-cache
-          cache-to: type=gha,scope=${{ github.ref }}-${{ matrix.connector }}-cache,mode=max
 
       - name: Start Dockerized test infrastructure
         if: matrix.connector == 'source-kafka'
