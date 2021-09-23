@@ -133,6 +133,7 @@ jobs:
         if: |
           contains('
             source-gcs
+            source-kafka
             source-kinesis
             source-s3
             ', matrix.connector)
