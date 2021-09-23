@@ -19,15 +19,19 @@ function bail() {
 test -n "$CONNECTOR" || bail "must specify CONNECTOR env variable"
 test -n "$VERSION" || bail "must specify VERSION env variable"
 
-FLOW_IMAGE="ghcr.io/estuary/flow:v0.1.0-406-gebef86c"
+# Always use the latest development image to verify the mutual integration
+# of connectors and the Flow runtime. Pull to bust a cached version.
+FLOW_IMAGE="ghcr.io/estuary/flow:dev"
+docker pull ${FLOW_IMAGE}
+
 # the connector image needs to be available to envsubst
 export CONNECTOR_IMAGE="ghcr.io/estuary/${CONNECTOR}:${VERSION}"
 
 function pollDevelop() {
     local catalog="$1"
     local directory="$2"
-    # run as root, not the flow user, since the user within the container needs to access the
-    # docker socket.
+    # Run as root, not the flow user, since the user within the container
+    # needs to access the docker socket.
     docker run --user 0 --rm \
         --mount type=bind,source=/tmp,target=/tmp \
         --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
