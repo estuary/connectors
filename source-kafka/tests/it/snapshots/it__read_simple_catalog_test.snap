@@ -15,22 +15,15 @@ expression: "&messages[last_ten]"
   type: RECORD
 - state:
     data:
-      - name: todo-list
-        offset:
+      todo-list:
+        "0":
           UpThrough: 35
-        partition: 0
-      - name: todo-list
-        offset:
+        "1":
           UpThrough: 59
-        partition: 1
-      - name: todo-list
-        offset:
+        "2":
           UpThrough: 59
-        partition: 2
-      - name: todo-list
-        offset:
+        "3":
           UpThrough: 39
-        partition: 3
   type: STATE
 - record:
     data:
@@ -44,22 +37,15 @@ expression: "&messages[last_ten]"
   type: RECORD
 - state:
     data:
-      - name: todo-list
-        offset:
+      todo-list:
+        "0":
           UpThrough: 36
-        partition: 0
-      - name: todo-list
-        offset:
+        "1":
           UpThrough: 59
-        partition: 1
-      - name: todo-list
-        offset:
+        "2":
           UpThrough: 59
-        partition: 2
-      - name: todo-list
-        offset:
+        "3":
           UpThrough: 39
-        partition: 3
   type: STATE
 - record:
     data:
@@ -73,22 +59,15 @@ expression: "&messages[last_ten]"
   type: RECORD
 - state:
     data:
-      - name: todo-list
-        offset:
+      todo-list:
+        "0":
           UpThrough: 37
-        partition: 0
-      - name: todo-list
-        offset:
+        "1":
           UpThrough: 59
-        partition: 1
-      - name: todo-list
-        offset:
+        "2":
           UpThrough: 59
-        partition: 2
-      - name: todo-list
-        offset:
+        "3":
           UpThrough: 39
-        partition: 3
   type: STATE
 - record:
     data:
@@ -102,22 +81,15 @@ expression: "&messages[last_ten]"
   type: RECORD
 - state:
     data:
-      - name: todo-list
-        offset:
+      todo-list:
+        "0":
           UpThrough: 38
-        partition: 0
-      - name: todo-list
-        offset:
+        "1":
           UpThrough: 59
-        partition: 1
-      - name: todo-list
-        offset:
+        "2":
           UpThrough: 59
-        partition: 2
-      - name: todo-list
-        offset:
+        "3":
           UpThrough: 39
-        partition: 3
   type: STATE
 - record:
     data:
@@ -131,21 +103,14 @@ expression: "&messages[last_ten]"
   type: RECORD
 - state:
     data:
-      - name: todo-list
-        offset:
+      todo-list:
+        "0":
           UpThrough: 39
-        partition: 0
-      - name: todo-list
-        offset:
+        "1":
           UpThrough: 59
-        partition: 1
-      - name: todo-list
-        offset:
+        "2":
           UpThrough: 59
-        partition: 2
-      - name: todo-list
-        offset:
+        "3":
           UpThrough: 39
-        partition: 3
   type: STATE
 

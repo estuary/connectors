@@ -20,9 +20,8 @@ impl HaltCheck {
         match self {
             HaltCheck::Neverending => false,
             HaltCheck::UntilWatermarks(watermarks) => watermarks
-                .0
                 .iter()
-                .all(|w| reached_latest_offset(w, latest_state)),
+                .all(|w| reached_latest_offset(&w, latest_state)),
         }
     }
 }

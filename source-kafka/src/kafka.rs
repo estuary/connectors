@@ -96,7 +96,7 @@ pub fn subscribe(
     topics: &state::TopicSet,
 ) -> Result<TopicPartitionList, Error> {
     let mut topic_partition_list = TopicPartitionList::new();
-    for topic in &topics.0 {
+    for topic in topics.iter() {
         topic_partition_list
             .add_partition_offset(&topic.name, topic.partition, topic.offset.next().into())
             .map_err(Error::Subscription)?;
@@ -115,7 +115,7 @@ pub fn high_watermarks(
 ) -> Result<state::TopicSet, Error> {
     let mut watermarks = state::TopicSet::default();
 
-    for topic in topics.0.iter() {
+    for topic in topics.iter() {
         // The low watermark represents the first message that can be read.
         // The high watermark is the "latest head" offset of the partition. This
         // is effectively the index of the next message to be read.
@@ -139,7 +139,7 @@ pub fn high_watermarks(
             state::Offset::UpThrough(high - 1)
         };
 
-        watermarks.add_new(state::Topic::new(&topic.name, topic.partition, offset));
+        watermarks.add_checkpoint(state::Topic::new(&topic.name, topic.partition, offset));
     }
 
     Ok(watermarks)
