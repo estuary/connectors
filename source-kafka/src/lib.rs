@@ -1,6 +1,5 @@
 extern crate serde_with;
 
-use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::io::Write;
 
@@ -70,10 +69,11 @@ impl connector::Connector for KafkaConnector {
 
             let (record, topic) = kafka::process_message(&msg)?;
 
+            let delta_state = airbyte::State::from(&topic);
             topic_states.add_checkpoint(topic);
 
             connector::write_message(output, record)?;
-            connector::write_message(output, airbyte::State::try_from(&topic_states)?)?;
+            connector::write_message(output, delta_state)?;
         }
 
         Ok(())

@@ -65,7 +65,7 @@ fn read_empty_catalog_test() {
 fn read_simple_catalog_test() {
     let mut stdout = mock_stdout();
     let config = local_config();
-    let catalog = local_catalog("todo-list", false, 0..=0xffffffff);
+    let catalog = local_catalog("todo-list", false, 0..=0x1fffffff);
 
     source_kafka::KafkaConnector::read(&mut stdout, config, catalog, None)
         .expect("read command to succeed");

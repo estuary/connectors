@@ -18,8 +18,6 @@ expression: parse_messages_from_output(&stdout)
       todo-list:
         "0":
           UpThrough: 38
-        "2":
-          UpThrough: 57
   type: STATE
 - record:
     data:
@@ -36,8 +34,6 @@ expression: parse_messages_from_output(&stdout)
       todo-list:
         "0":
           UpThrough: 39
-        "2":
-          UpThrough: 57
   type: STATE
 - record:
     data:
@@ -52,8 +48,6 @@ expression: parse_messages_from_output(&stdout)
 - state:
     data:
       todo-list:
-        "0":
-          UpThrough: 39
         "2":
           UpThrough: 58
   type: STATE
@@ -70,8 +64,6 @@ expression: parse_messages_from_output(&stdout)
 - state:
     data:
       todo-list:
-        "0":
-          UpThrough: 39
         "2":
           UpThrough: 59
   type: STATE
