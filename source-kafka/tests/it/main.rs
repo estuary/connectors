@@ -1,15 +1,17 @@
 use std::fs::File;
 use std::ops::RangeInclusive;
 
-use serde_json::Value;
 use source_kafka::catalog;
 use source_kafka::configuration;
 use source_kafka::connector::Connector;
 use source_kafka::connector::ConnectorConfig;
 use source_kafka::state;
-use support::{assert_valid_json, mock_stdout};
+use support::assert_valid_json;
+use support::mock_stdout;
 
-use crate::support::{assert_each_line_valid_json, assert_empty};
+use crate::support::assert_empty;
+use crate::support::parse_from_output;
+use crate::support::parse_messages_from_output;
 
 mod support;
 
@@ -19,7 +21,7 @@ fn spec_test() {
 
     source_kafka::KafkaConnector::spec(&mut stdout).expect("spec command to succeed");
 
-    assert_valid_json(&stdout);
+    insta::assert_yaml_snapshot!(parse_from_output(&stdout));
 }
 
 #[test]
@@ -29,7 +31,9 @@ fn check_test() {
 
     source_kafka::KafkaConnector::check(&mut stdout, config).expect("check command to succeed");
 
-    assert_valid_json(&stdout);
+    insta::assert_yaml_snapshot!(parse_from_output(&stdout), {
+        ".connectionStatus.message" => "{{ NUM_TOPICS_FOUND }}"
+    });
 }
 
 #[test]
@@ -40,6 +44,8 @@ fn discover_test() {
     source_kafka::KafkaConnector::discover(&mut stdout, config)
         .expect("discover command to succeed");
 
+    // This is tricky to snapshot. It detects any other topics within the
+    // connected Kafka, which will vary by dev machine.
     assert_valid_json(&stdout);
 }
 
@@ -64,37 +70,38 @@ fn read_simple_catalog_test() {
     source_kafka::KafkaConnector::read(&mut stdout, config, catalog, None)
         .expect("read command to succeed");
 
-    assert_each_line_valid_json(&stdout);
+    let messages = parse_messages_from_output(&stdout);
+    // Only look at the last 10 messages. Otherwise the snapshot file gets unwieldy.
+    let last_ten = (messages.len() - 10)..;
+    insta::assert_yaml_snapshot!(&messages[last_ten], {
+        "[].record.emitted_at" => "{{ UNIX_TIMESTAMP }}"
+    });
 }
 
 #[test]
 fn read_resume_from_state_test() {
     let mut stdout = mock_stdout();
     let config = local_config();
-    let catalog = local_catalog("todo-list", false, 0xd0000000..=0xffffffff);
+    let catalog = local_catalog("todo-list", false, 0x00000000..=0x4fffffff);
 
     let mut state = state::TopicSet::default();
     state.add_new(state::Topic::new(
         "todo-list",
-        3,
+        0,
+        state::Offset::UpThrough(37),
+    ));
+    state.add_new(state::Topic::new(
+        "todo-list",
+        2,
         state::Offset::UpThrough(37),
     ));
 
     source_kafka::KafkaConnector::read(&mut stdout, config, catalog, Some(state))
         .expect("read command to succeed");
 
-    let messages: Vec<Value> = std::str::from_utf8(&stdout)
-        .unwrap()
-        .lines()
-        .filter(|line| line.find("STATE").is_none())
-        .map(|doc| serde_json::from_str(doc).unwrap())
-        .collect();
-
-    eprintln!(
-        "{}",
-        serde_json::to_string_pretty(&messages.clone()).unwrap()
-    );
-    assert_eq!(2, messages.len());
+    insta::assert_yaml_snapshot!(parse_messages_from_output(&stdout), {
+        "[].record.emitted_at" => "{{ UNIX_TIMESTAMP }}"
+    });
 }
 
 fn local_config() -> configuration::Configuration {

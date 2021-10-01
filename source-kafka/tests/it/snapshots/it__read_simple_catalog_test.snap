@@ -1,0 +1,151 @@
+---
+source: tests/it/main.rs
+expression: "&messages[last_ten]"
+
+---
+- record:
+    data:
+      completed: true
+      id: 156
+      title: nam quia quia nulla repellat assumenda quibusdam sit nobis
+      userId: 8
+    emitted_at: "{{ UNIX_TIMESTAMP }}"
+    namespace: Partition 0
+    stream: todo-list
+  type: RECORD
+- state:
+    data:
+      - name: todo-list
+        offset:
+          UpThrough: 35
+        partition: 0
+      - name: todo-list
+        offset:
+          UpThrough: 59
+        partition: 1
+      - name: todo-list
+        offset:
+          UpThrough: 59
+        partition: 2
+      - name: todo-list
+        offset:
+          UpThrough: 39
+        partition: 3
+  type: STATE
+- record:
+    data:
+      completed: true
+      id: 157
+      title: dolorem veniam quisquam deserunt repellendus
+      userId: 8
+    emitted_at: "{{ UNIX_TIMESTAMP }}"
+    namespace: Partition 0
+    stream: todo-list
+  type: RECORD
+- state:
+    data:
+      - name: todo-list
+        offset:
+          UpThrough: 36
+        partition: 0
+      - name: todo-list
+        offset:
+          UpThrough: 59
+        partition: 1
+      - name: todo-list
+        offset:
+          UpThrough: 59
+        partition: 2
+      - name: todo-list
+        offset:
+          UpThrough: 39
+        partition: 3
+  type: STATE
+- record:
+    data:
+      completed: true
+      id: 158
+      title: debitis vitae delectus et harum accusamus aut deleniti a
+      userId: 8
+    emitted_at: "{{ UNIX_TIMESTAMP }}"
+    namespace: Partition 0
+    stream: todo-list
+  type: RECORD
+- state:
+    data:
+      - name: todo-list
+        offset:
+          UpThrough: 37
+        partition: 0
+      - name: todo-list
+        offset:
+          UpThrough: 59
+        partition: 1
+      - name: todo-list
+        offset:
+          UpThrough: 59
+        partition: 2
+      - name: todo-list
+        offset:
+          UpThrough: 39
+        partition: 3
+  type: STATE
+- record:
+    data:
+      completed: true
+      id: 159
+      title: debitis adipisci quibusdam aliquam sed dolore ea praesentium nobis
+      userId: 8
+    emitted_at: "{{ UNIX_TIMESTAMP }}"
+    namespace: Partition 0
+    stream: todo-list
+  type: RECORD
+- state:
+    data:
+      - name: todo-list
+        offset:
+          UpThrough: 38
+        partition: 0
+      - name: todo-list
+        offset:
+          UpThrough: 59
+        partition: 1
+      - name: todo-list
+        offset:
+          UpThrough: 59
+        partition: 2
+      - name: todo-list
+        offset:
+          UpThrough: 39
+        partition: 3
+  type: STATE
+- record:
+    data:
+      completed: false
+      id: 160
+      title: et praesentium aliquam est
+      userId: 8
+    emitted_at: "{{ UNIX_TIMESTAMP }}"
+    namespace: Partition 0
+    stream: todo-list
+  type: RECORD
+- state:
+    data:
+      - name: todo-list
+        offset:
+          UpThrough: 39
+        partition: 0
+      - name: todo-list
+        offset:
+          UpThrough: 59
+        partition: 1
+      - name: todo-list
+        offset:
+          UpThrough: 59
+        partition: 2
+      - name: todo-list
+        offset:
+          UpThrough: 39
+        partition: 3
+  type: STATE
+
