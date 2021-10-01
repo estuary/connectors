@@ -1,0 +1,10 @@
+---
+source: tests/it/main.rs
+expression: parse_from_output(&stdout)
+
+---
+connectionStatus:
+  message: "{{ NUM_TOPICS_FOUND }}"
+  status: SUCCEEDED
+type: CONNECTION_STATUS
+

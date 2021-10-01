@@ -1,0 +1,59 @@
+---
+source: tests/it/main.rs
+expression: parse_from_output(&stdout)
+
+---
+spec:
+  connectionSpecification:
+    $schema: "http://json-schema.org/draft-07/schema#"
+    definitions:
+      Authentication:
+        description: The information necessary to connect to Kafka.
+        properties:
+          mechanism:
+            $ref: "#/definitions/SaslMechanism"
+          password:
+            type: string
+          username:
+            type: string
+        required:
+          - mechanism
+          - password
+          - username
+        type: object
+      SaslMechanism:
+        description: "The SASL Mechanism describes _how_ to exchange and authenticate clients/servers. For secure communication, TLS is **required** for all supported mechanisms.\n\nFor more information about the Simple Authentication and Security Layer (SASL), see RFC 4422: https://datatracker.ietf.org/doc/html/rfc4422 For more information about Salted Challenge Response Authentication Mechanism (SCRAM), see RFC 7677. https://datatracker.ietf.org/doc/html/rfc7677"
+        enum:
+          - PLAIN
+          - SCRAM-SHA-256
+          - SCRAM-SHA-512
+        type: string
+      TlsSettings:
+        enum:
+          - system_certificates
+          - cleartext
+        type: string
+    properties:
+      authentication:
+        anyOf:
+          - $ref: "#/definitions/Authentication"
+          - type: "null"
+        description: "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments."
+      bootstrap_servers:
+        description: The initial servers in the Kafka cluster to initially connect to. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.
+        items:
+          type: string
+        type: array
+      tls:
+        allOf:
+          - $ref: "#/definitions/TlsSettings"
+        description: The TLS connection settings.
+    required:
+      - bootstrap_servers
+      - tls
+    title: Kafka Connector Configuration
+    type: object
+  supported_destination_sync_modes: []
+  supportsIncremental: true
+type: SPEC
+
