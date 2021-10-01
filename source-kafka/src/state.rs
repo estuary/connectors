@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 
 use rdkafka::message::BorrowedMessage;
 use rdkafka::metadata::Metadata;
@@ -17,7 +16,7 @@ pub enum Error {
     Format(#[from] serde_json::Error),
 
     #[error("failed to serialize state: {0:?}")]
-    Serialization(TopicSet, serde_json::Error),
+    Serialization(Topic, serde_json::Error),
 }
 
 /// Represents how far into a partition we've already consumed. The `Offset` value
@@ -106,6 +105,16 @@ impl Topic {
     }
 }
 
+impl From<&Topic> for airbyte::State {
+    fn from(topic: &Topic) -> Self {
+        airbyte::State::new(serde_json::json!({
+            (&topic.name): {
+                (topic.partition.to_string()): topic.offset
+            }
+        }))
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct TopicSet(pub BTreeMap<String, BTreeMap<i32, Offset>>);
 
@@ -173,20 +182,6 @@ impl TopicSet {
                 .iter()
                 .map(move |(partition, offset)| Topic::new(topic, *partition, *offset))
         })
-    }
-}
-
-impl TryFrom<&TopicSet> for airbyte::State {
-    type Error = Error;
-
-    fn try_from(topics: &TopicSet) -> Result<Self, Self::Error> {
-        let value = serde_json::to_value(topics).map_err(|e| {
-            // Include the Debug-able State along with the serde error
-            Error::Serialization(topics.clone(), e)
-        })?;
-        let state = airbyte::State::new(value);
-
-        Ok(state)
     }
 }
 
