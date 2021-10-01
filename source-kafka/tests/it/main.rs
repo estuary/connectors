@@ -85,15 +85,15 @@ fn read_resume_from_state_test() {
     let catalog = local_catalog("todo-list", false, 0x00000000..=0x4fffffff);
 
     let mut state = state::TopicSet::default();
-    state.add_new(state::Topic::new(
+    state.add_checkpoint(state::Topic::new(
         "todo-list",
         0,
         state::Offset::UpThrough(37),
     ));
-    state.add_new(state::Topic::new(
+    state.add_checkpoint(state::Topic::new(
         "todo-list",
         2,
-        state::Offset::UpThrough(37),
+        state::Offset::UpThrough(57),
     ));
 
     source_kafka::KafkaConnector::read(&mut stdout, config, catalog, Some(state))

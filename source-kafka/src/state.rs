@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
 use rdkafka::message::BorrowedMessage;
@@ -104,23 +105,24 @@ impl Topic {
         }
     }
 }
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct TopicSet(pub Vec<Topic>);
+pub struct TopicSet(pub BTreeMap<String, BTreeMap<i32, Offset>>);
 
 impl TopicSet {
-    pub fn add_new(&mut self, new_topic: Topic) {
-        match self.find_entry_mut(&new_topic.name, new_topic.partition) {
-            Some(_existing_topic) => (), // Do nothing
-            None => self.0.push(new_topic),
-        }
-    }
+    pub fn add_checkpoint(&mut self, new_topic: Topic) {
+        use std::collections::btree_map::Entry;
 
-    pub fn checkpoint(&mut self, updated_topic: &Topic) {
-        let mut topic = self
-            .find_entry_mut(&updated_topic.name, updated_topic.partition)
-            .expect("the topic must be configured before checkpointing");
-
-        topic.offset = updated_topic.offset;
+        match self.0.entry(new_topic.name) {
+            Entry::Vacant(entry) => {
+                let partitions: &mut BTreeMap<i32, Offset> = entry.insert(BTreeMap::default());
+                partitions.insert(new_topic.partition, new_topic.offset);
+            }
+            Entry::Occupied(mut entry) => {
+                let partitions = entry.get_mut();
+                partitions.insert(new_topic.partition, new_topic.offset);
+            }
+        };
     }
 
     /// Finds the union of the topics in:
@@ -144,7 +146,7 @@ impl TopicSet {
                             .offset_for(topic.name(), partition.id())
                             .unwrap_or(Offset::Start);
 
-                        reconciled.add_new(Topic::new(topic.name(), partition.id(), offset));
+                        reconciled.add_checkpoint(Topic::new(topic.name(), partition.id(), offset));
                     } else {
                         info!("Responsible for {}/{}: NO", topic.name(), partition.id());
                     }
@@ -160,19 +162,17 @@ impl TopicSet {
     }
 
     pub fn offset_for(&self, topic: &str, partition_id: i32) -> Option<Offset> {
-        self.find_entry(topic, partition_id).map(|t| t.offset)
+        self.0
+            .get(topic)
+            .and_then(|partitions| partitions.get(&partition_id).map(Clone::clone))
     }
 
-    fn find_entry(&self, topic: &str, partition: i32) -> Option<&Topic> {
-        self.0
-            .iter()
-            .find(|t| t.name == topic && t.partition == partition)
-    }
-
-    fn find_entry_mut(&mut self, topic: &str, partition: i32) -> Option<&mut Topic> {
-        self.0
-            .iter_mut()
-            .find(|t| t.name == topic && t.partition == partition)
+    pub fn iter(&self) -> impl Iterator<Item = Topic> + '_ {
+        self.0.iter().flat_map(|(topic, partitions)| {
+            partitions
+                .iter()
+                .map(move |(partition, offset)| Topic::new(topic, *partition, *offset))
+        })
     }
 }
 
@@ -203,13 +203,14 @@ impl connector::ConnectorConfig for TopicSet {
 #[cfg(test)]
 mod test {
     use super::*;
+    use connector::ConnectorConfig;
 
     #[test]
     fn merge_test() {
         let check_offsets = |topics: &TopicSet, foo0, foo1, bar0| {
-            assert_eq!(topics.0[0].offset, foo0);
-            assert_eq!(topics.0[1].offset, foo1);
-            assert_eq!(topics.0[2].offset, bar0);
+            assert_eq!(topics.0["foo"][&0], foo0);
+            assert_eq!(topics.0["foo"][&1], foo1);
+            assert_eq!(topics.0["bar"][&0], bar0);
         };
 
         let update_offset = |topic, new_offset| {
@@ -225,14 +226,14 @@ mod test {
         let foo1 = Topic::new("foo", 1, Offset::UpThrough(10));
         let bar0 = Topic::new("bar", 0, Offset::Start);
 
-        topics.0.push(foo0.clone());
-        topics.0.push(foo1.clone());
-        topics.0.push(bar0.clone());
+        topics.add_checkpoint(foo0.clone());
+        topics.add_checkpoint(foo1.clone());
+        topics.add_checkpoint(bar0.clone());
 
         check_offsets(&topics, Offset::Start, Offset::UpThrough(10), Offset::Start);
 
         let foo0 = update_offset(foo0, Offset::UpThrough(0));
-        topics.checkpoint(&foo0);
+        topics.add_checkpoint(foo0.clone());
         check_offsets(
             &topics,
             Offset::UpThrough(0),
@@ -241,7 +242,7 @@ mod test {
         );
 
         let foo0 = update_offset(foo0, Offset::UpThrough(1));
-        topics.checkpoint(&foo0);
+        topics.add_checkpoint(foo0);
         check_offsets(
             &topics,
             Offset::UpThrough(1),
@@ -250,7 +251,7 @@ mod test {
         );
 
         let foo1 = update_offset(foo1, Offset::UpThrough(11));
-        topics.checkpoint(&foo1);
+        topics.add_checkpoint(foo1);
         check_offsets(
             &topics,
             Offset::UpThrough(1),
@@ -261,21 +262,22 @@ mod test {
 
     #[test]
     fn parse_state_file_test() {
-        use connector::ConnectorConfig;
-
         let input = std::io::Cursor::new(
             r#"
-            [
                 {
-                    "name": "test",
-                    "partition": 0,
-                    "offset": {
-                        "UpThrough": 100
+                    "test": {
+                        "0": { "UpThrough": 100 }
                     }
                 }
-            ]
         "#,
         );
+
+        TopicSet::parse(input).expect("to parse");
+    }
+
+    #[test]
+    fn parse_empty_state_file_test() {
+        let input = std::io::Cursor::new("{}\n");
 
         TopicSet::parse(input).expect("to parse");
     }

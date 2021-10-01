@@ -70,7 +70,7 @@ impl connector::Connector for KafkaConnector {
 
             let (record, topic) = kafka::process_message(&msg)?;
 
-            topic_states.checkpoint(&topic);
+            topic_states.add_checkpoint(topic);
 
             connector::write_message(output, record)?;
             connector::write_message(output, airbyte::State::try_from(&topic_states)?)?;
