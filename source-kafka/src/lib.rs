@@ -16,7 +16,7 @@ pub struct KafkaConnector;
 impl connector::Connector for KafkaConnector {
     type Config = configuration::Configuration;
     type ConfiguredCatalog = catalog::ConfiguredCatalog;
-    type State = state::TopicSet;
+    type State = state::CheckpointSet;
 
     fn spec(output: &mut dyn Write) -> eyre::Result<()> {
         let message: airbyte::Spec<configuration::Configuration> = airbyte::Spec::new(true, vec![]);
@@ -52,25 +52,25 @@ impl connector::Connector for KafkaConnector {
         let consumer = kafka::consumer_from_config(&config)?;
         let metadata = kafka::fetch_metadata(&consumer)?;
 
-        let mut topic_states = state::TopicSet::reconcile_catalog_state(
+        let mut checkpoints = state::CheckpointSet::reconcile_catalog_state(
             &metadata,
             &catalog,
             &persisted_state.unwrap_or_default(),
         )?;
-        kafka::subscribe(&consumer, &topic_states)?;
-        let watermarks = kafka::high_watermarks(&consumer, &topic_states)?;
+        kafka::subscribe(&consumer, &checkpoints)?;
+        let watermarks = kafka::high_watermarks(&consumer, &checkpoints)?;
         let halt_check = halting::HaltCheck::new(&catalog, watermarks);
 
-        while !halt_check.should_halt(&topic_states) {
+        while !halt_check.should_halt(&checkpoints) {
             let msg = consumer
                 .poll(None)
                 .expect("Polling without a timeout should always produce a message")
                 .map_err(kafka::Error::Read)?;
 
-            let (record, topic) = kafka::process_message(&msg)?;
+            let (record, checkpoint) = kafka::process_message(&msg)?;
 
-            let delta_state = airbyte::State::from(&topic);
-            topic_states.add_checkpoint(topic);
+            let delta_state = airbyte::State::from(&checkpoint);
+            checkpoints.add(checkpoint);
 
             connector::write_message(output, record)?;
             connector::write_message(output, delta_state)?;

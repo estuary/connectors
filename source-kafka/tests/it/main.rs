@@ -84,13 +84,13 @@ fn read_resume_from_state_test() {
     let config = local_config();
     let catalog = local_catalog("todo-list", false, 0x00000000..=0x4fffffff);
 
-    let mut state = state::TopicSet::default();
-    state.add_checkpoint(state::Topic::new(
+    let mut state = state::CheckpointSet::default();
+    state.add(state::Checkpoint::new(
         "todo-list",
         0,
         state::Offset::UpThrough(37),
     ));
-    state.add_checkpoint(state::Topic::new(
+    state.add(state::Checkpoint::new(
         "todo-list",
         2,
         state::Offset::UpThrough(57),
