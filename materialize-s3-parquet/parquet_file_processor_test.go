@@ -59,7 +59,7 @@ type MockS3Uploader struct {
 	contents map[string][]TestData
 }
 
-func (u *MockS3Uploader) Upload(bucket, key, localFileName string) error {
+func (u *MockS3Uploader) Upload(bucket, key, localFileName string, contentType string) error {
 	fr, err := local.NewLocalFileReader(localFileName)
 	require.NoError(u.t, err)
 	defer fr.Close()
