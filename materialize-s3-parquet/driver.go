@@ -51,8 +51,6 @@ func (c config) Validate() error {
 type resource struct {
 	Bucket     string `json:"bucket"`
 	PathPrefix string `json:"pathPrefix"`
-	// The number of parallel go-routines spawned when writing to parquet files.
-	ParallelNumber int `json:"parallelNumber"`
 	// The method used for compressing data in parquet.
 	CompressionType string `json:"compressionType,omitempty"`
 }
@@ -77,10 +75,6 @@ func (r resource) Validate() error {
 		if _, ok := compressionTypeToCodec[r.CompressionType]; !ok {
 			return fmt.Errorf("invalid compressionType, expecting one of %v", reflect.ValueOf(compressionTypeToCodec).MapKeys())
 		}
-	}
-
-	if r.ParallelNumber <= 0 {
-		return fmt.Errorf("parallelNumber must be positive")
 	}
 
 	return nil

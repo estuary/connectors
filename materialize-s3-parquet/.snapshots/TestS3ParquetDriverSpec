@@ -1,0 +1,62 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$ref": "#/definitions/config",
+    "definitions": {
+      "config": {
+        "required": [
+          "awsAccessKeyId",
+          "awsSecretAccessKey",
+          "endpoint",
+          "region",
+          "uploadIntervalInSeconds"
+        ],
+        "properties": {
+          "awsAccessKeyId": {
+            "type": "string"
+          },
+          "awsSecretAccessKey": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "uploadIntervalInSeconds": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      }
+    }
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$ref": "#/definitions/resource",
+    "definitions": {
+      "resource": {
+        "required": [
+          "bucket",
+          "pathPrefix"
+        ],
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "pathPrefix": {
+            "type": "string"
+          },
+          "compressionType": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      }
+    }
+  },
+  "documentation_url": "https://docs.estuary.dev#FIXME"
+}

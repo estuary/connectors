@@ -265,9 +265,8 @@ func buildTestOpenRequest(numOfBindings int) *pm.TransactionRequest_Open {
 	for i := 0; i < numOfBindings; i++ {
 		resourceSpecJSON, _ := json.Marshal(
 			resource{
-				Bucket:         "test_bucket",
-				PathPrefix:     fmt.Sprintf("test_path_%d", i),
-				ParallelNumber: 4,
+				Bucket:     "test_bucket",
+				PathPrefix: fmt.Sprintf("test_path_%d", i),
 			},
 		)
 		var binding = &flow.MaterializationSpec_Binding{

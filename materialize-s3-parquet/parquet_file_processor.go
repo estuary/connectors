@@ -235,17 +235,16 @@ func NewParquetFileProcessor(
 		}
 
 		pqBindings = append(pqBindings, &pqBinding{
-			ctx:                    ctx,
-			S3Uploader:             S3Uploader,
-			bucket:                 res.Bucket,
-			s3PathPrefix:           s3PathPrefix,
-			pqDataConverter:        pqDataConverter,
-			pqWriter:               nil,
-			compressionCodec:       res.CompressionCodec(),
-			pqWriterParallelNumber: res.ParallelNumber,
-			localFile:              nil,
-			localPathPrefix:        localPathPrefix,
-			nextSeqNum:             nextSeqNum,
+			ctx:              ctx,
+			S3Uploader:       S3Uploader,
+			bucket:           res.Bucket,
+			s3PathPrefix:     s3PathPrefix,
+			pqDataConverter:  pqDataConverter,
+			pqWriter:         nil,
+			compressionCodec: res.CompressionCodec(),
+			localFile:        nil,
+			localPathPrefix:  localPathPrefix,
+			nextSeqNum:       nextSeqNum,
 		})
 	}
 
@@ -288,6 +287,9 @@ func (pfp *ParquetFileProcessor) nextSeqNumList() []int {
 	return nextSeqNumList
 }
 
+// TODO(jixiang) better understand the impact of ParallelNumber to the performance of the connector.
+const parquetWriterParallelNumber int64 = 4
+
 // A pqBinding is responsible for converting, storing, and uploading the materialization results from
 // a single binding of flow txns into the cloud.
 type pqBinding struct {
@@ -299,12 +301,11 @@ type pqBinding struct {
 	// For converting flow data of key/values into formats acceptable by the parquet file writer.
 	pqDataConverter *ParquetDataConverter
 	// For generating local parquet files.
-	pqWriter               *writer.ParquetWriter
-	pqWriterParallelNumber int
-	compressionCodec       parquet.CompressionCodec
-	localFile              source.ParquetFile
-	localPathPrefix        string
-	nextSeqNum             int
+	pqWriter         *writer.ParquetWriter
+	compressionCodec parquet.CompressionCodec
+	localFile        source.ParquetFile
+	localPathPrefix  string
+	nextSeqNum       int
 }
 
 // Stores the input data into local files.
@@ -323,7 +324,7 @@ func (b *pqBinding) Store(key tuple.Tuple, values tuple.Tuple) error {
 		} else if b.pqWriter, err = writer.NewParquetWriter(
 			b.localFile,
 			b.pqDataConverter.JSONFileSchema(),
-			int64(b.pqWriterParallelNumber)); err != nil {
+			parquetWriterParallelNumber); err != nil {
 			return fmt.Errorf("creating parquet writer: %w", err)
 		} else {
 			b.pqWriter.CompressionType = b.compressionCodec

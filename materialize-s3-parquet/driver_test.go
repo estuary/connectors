@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/benbjohnson/clock"
+	"github.com/bradleyjkemp/cupaloy"
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
 	"github.com/stretchr/testify/require"
@@ -46,7 +48,6 @@ func TestResource(t *testing.T) {
 	var validResource = resource{
 		Bucket:          "test_bucket",
 		PathPrefix:      "test_path_prefix",
-		ParallelNumber:  4,
 		CompressionType: "snappy",
 	}
 	require.NoError(t, validResource.Validate())
@@ -63,10 +64,6 @@ func TestResource(t *testing.T) {
 	var invalidCompressionType = validResource
 	invalidCompressionType.CompressionType = "random"
 	require.Error(t, invalidCompressionType.Validate(), "expected validation error")
-
-	var invalidParallelNumber = validResource
-	invalidParallelNumber.ParallelNumber = 0
-	require.Error(t, invalidParallelNumber.Validate(), "expected validation error")
 }
 
 func TestMarshalAndUnmarshalDriverCheckpointJson(t *testing.T) {
@@ -101,12 +98,11 @@ func TestMarshalAndUnmarshalDriverCheckpointJson(t *testing.T) {
 
 func TestS3ParquetDriverSpec(t *testing.T) {
 	var drv = new(driver)
-	var resp, err = drv.
-		Spec(context.Background(), &pm.SpecRequest{EndpointType: pf.EndpointType_S3})
-	require.NoError(t, err)
-	require.NotNil(t, resp.EndpointSpecSchemaJson)
-	require.NotNil(t, resp.ResourceSpecSchemaJson)
-	require.NotNil(t, resp.DocumentationUrl)
+	var resp, err1 = drv.Spec(context.Background(), &pm.SpecRequest{EndpointType: pf.EndpointType_S3})
+	require.NoError(t, err1)
+	var formatted, err2 = json.MarshalIndent(resp, "", "  ")
+	require.NoError(t, err2)
+	cupaloy.SnapshotT(t, formatted)
 }
 
 func TestTransactor(t *testing.T) {
