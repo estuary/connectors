@@ -27,251 +27,195 @@ type pqField interface {
 	Set(t tuple.TupleElement, fldToSet reflect.Value) error
 }
 
-func toInternalFieldName(s string) string {
-	return "I" + strings.ReplaceAll(base32.StdEncoding.EncodeToString([]byte(s)), "=", "_")
+// pqFiledBase provides the base functions to all pqFields.
+type pqFieldBase struct {
+	name        string
+	optional    bool
+	reflectType reflect.Type
+}
+
+func (p *pqFieldBase) getInternalFieldName() string {
+	return "I" + strings.ReplaceAll(base32.StdEncoding.EncodeToString([]byte(p.name)), "=", "_")
+}
+
+func (p *pqFieldBase) getRepetitionType() string {
+	if p.optional {
+		return "OPTIONAL"
+	}
+
+	return "REQUIRED"
+}
+
+func (p *pqFieldBase) getReflectType() reflect.Type {
+	if p.optional {
+		return reflect.PtrTo(p.reflectType)
+	}
+	return p.reflectType
+}
+
+func (p *pqFieldBase) getFieldToSet(fldToSet reflect.Value) reflect.Value {
+	if p.optional {
+		var pv = reflect.New(p.getReflectType().Elem())
+		fldToSet.Set(pv)
+		return pv.Elem()
+	}
+	return fldToSet
+}
+
+func (p *pqFieldBase) toStructField() reflect.StructField {
+	return reflect.StructField{
+		Name: p.getInternalFieldName(),
+		Type: p.getReflectType(),
+	}
+}
+
+func newPqFieldBase(name string, optional bool, reflectType reflect.Type) *pqFieldBase {
+	return &pqFieldBase{name: name, optional: optional, reflectType: reflectType}
 }
 
 // stringField implements the pqField interface for processing strings.
-type stringField struct{ name string }
+type stringField struct {
+	pqField
+	*pqFieldBase
+}
 
-func newStringField(name string) *stringField {
-	return &stringField{name: name}
+func newStringField(name string, optional bool) *stringField {
+	return &stringField{
+		pqFieldBase: newPqFieldBase(name, optional, reflect.TypeOf("")),
+	}
 }
 func (s *stringField) Tag() string {
-	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"}`, s.name, toInternalFieldName(s.name))
+	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=%s"}`,
+		s.name, s.pqFieldBase.getInternalFieldName(), s.pqFieldBase.getRepetitionType())
 }
 func (s *stringField) ToStructField() reflect.StructField {
-	return reflect.StructField{
-		Name: toInternalFieldName(s.name),
-		Type: reflect.TypeOf(""),
-	}
+	return s.pqFieldBase.toStructField()
 }
 func (s *stringField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
-	if v := reflect.ValueOf(t); v.Kind() == reflect.String {
-		fldToSet.SetString(v.String())
-	} else {
-		return fmt.Errorf("invalid string type (%s)", v.Kind().String())
-	}
-	return nil
-}
-
-// optionalStringField implements the pqField interface for processing optional strings declared as pointers.
-type optionalStringField struct{ name string }
-
-func newOptionalStringField(name string) *optionalStringField {
-	return &optionalStringField{name: name}
-}
-func (os *optionalStringField) Tag() string {
-	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"}`, os.name, toInternalFieldName(os.name))
-}
-func (os *optionalStringField) ToStructField() reflect.StructField {
-	return reflect.StructField{
-		Name: toInternalFieldName(os.name),
-		Type: reflect.PtrTo(reflect.TypeOf("")),
-	}
-}
-func (os *optionalStringField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
 	if t != nil {
-		if v := reflect.ValueOf(t); v.Kind() == reflect.String {
-			pv := reflect.New(fldToSet.Type().Elem())
-			pv.Elem().SetString(v.String())
-			fldToSet.Set(pv)
-			return nil
-		} else {
+		fldToSet = s.pqFieldBase.getFieldToSet(fldToSet)
+		if v := reflect.ValueOf(t); v.Kind() != reflect.String {
 			return fmt.Errorf("invalid string type (%s)", v.Kind().String())
+		} else {
+			fldToSet.SetString(v.String())
 		}
+	} else if !s.optional {
+		return fmt.Errorf("unexpected nil value to a non-optional string field")
 	}
 	return nil
 }
 
 // intField implements the pqField interface for processing integers.
-type intField struct{ name string }
+type intField struct {
+	pqField
+	*pqFieldBase
+}
 
-func newIntField(name string) *intField {
-	return &intField{name: name}
+func newIntField(name string, optional bool) *intField {
+	return &intField{
+		pqFieldBase: newPqFieldBase(name, optional, reflect.TypeOf(int64(0))),
+	}
 }
 func (i *intField) Tag() string {
-	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=INT64, repetitiontype=REQUIRED"}`, i.name, toInternalFieldName(i.name))
+	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=INT64, repetitiontype=%s"}`,
+		i.name, i.pqFieldBase.getInternalFieldName(), i.pqFieldBase.getRepetitionType())
 }
 func (i *intField) ToStructField() reflect.StructField {
-	return reflect.StructField{
-		Name: toInternalFieldName(i.name),
-		Type: reflect.TypeOf(int64(0)),
-	}
+	return i.pqFieldBase.toStructField()
 }
-func (i *intField) Set(t tuple.TupleElement, fldToSet reflect.Value) (err error) {
-	err = nil
-	switch v := reflect.ValueOf(t); v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		fldToSet.SetInt(v.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		fldToSet.SetInt(int64(v.Uint()))
-	default:
-		err = fmt.Errorf("invalid integer type (%s)", v.Kind().String())
-	}
-	return
-}
-
-// optionalIntField implements the pqField interface for processing optional integers declared as pointers.
-type optionalIntField struct{ name string }
-
-func newOptionalIntField(name string) *optionalIntField {
-	return &optionalIntField{name: name}
-}
-func (oi *optionalIntField) Tag() string {
-	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=INT64, repetitiontype=OPTIONAL"}`, oi.name, toInternalFieldName(oi.name))
-}
-func (oi *optionalIntField) ToStructField() reflect.StructField {
-	return reflect.StructField{
-		Name: toInternalFieldName(oi.name),
-		Type: reflect.PtrTo(reflect.TypeOf(int64(0))),
-	}
-}
-func (oi *optionalIntField) Set(t tuple.TupleElement, fldToSet reflect.Value) (err error) {
-	err = nil
+func (i *intField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
 	if t != nil {
-		pv := reflect.New(fldToSet.Type().Elem())
+		fldToSet = i.pqFieldBase.getFieldToSet(fldToSet)
 		switch v := reflect.ValueOf(t); v.Kind() {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			pv.Elem().SetInt(v.Int())
+			fldToSet.SetInt(v.Int())
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			pv.Elem().SetInt(int64(v.Uint()))
+			fldToSet.SetInt(int64(v.Uint()))
 		default:
-			err = fmt.Errorf("invalid integer type (%s)", v.Kind().String())
+			return fmt.Errorf("invalid integer type (%s)", v.Kind().String())
 		}
-
-		fldToSet.Set(pv)
+	} else if !i.optional {
+		return fmt.Errorf("unexpected nil value to a non-optional int field")
 	}
-	return
+	return nil
 }
 
 // floatField implements the pqField interface for processing floats/doubles.
-type floatField struct{ name string }
+type floatField struct {
+	pqField
+	*pqFieldBase
+}
 
-func newFloatField(name string) *floatField {
-	return &floatField{name: name}
+func newFloatField(name string, optional bool) *floatField {
+	return &floatField{
+		pqFieldBase: newPqFieldBase(name, optional, reflect.TypeOf(float64(0))),
+	}
 }
 func (f *floatField) Tag() string {
-	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=DOUBLE, repetitiontype=REQUIRED"}`, f.name, toInternalFieldName(f.name))
+	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=DOUBLE, repetitiontype=%s"}`,
+		f.name, f.pqFieldBase.getInternalFieldName(), f.pqFieldBase.getRepetitionType())
 }
 func (f *floatField) ToStructField() reflect.StructField {
-	return reflect.StructField{
-		Name: toInternalFieldName(f.name),
-		Type: reflect.TypeOf(float64(0)),
-	}
+	return f.pqFieldBase.toStructField()
 }
 func (f *floatField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
-	switch v := reflect.ValueOf(t); v.Kind() {
-	case reflect.Float32, reflect.Float64:
-		fldToSet.SetFloat(v.Float())
-		return nil
-	default:
-		return fmt.Errorf("invalid float type (%s)", v.Kind().String())
-	}
-}
-
-// optionalFloatField implements the pqField interface for processing optional floats/doubles declared as pointers.
-type optionalFloatField struct{ name string }
-
-func newOptionalFloatField(name string) *optionalFloatField {
-	return &optionalFloatField{name: name}
-}
-func (of *optionalFloatField) Tag() string {
-	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=DOUBLE, repetitiontype=OPTIONAL"}`, of.name, toInternalFieldName(of.name))
-}
-func (of *optionalFloatField) ToStructField() reflect.StructField {
-	return reflect.StructField{
-		Name: toInternalFieldName(of.name),
-		Type: reflect.PtrTo(reflect.TypeOf(float64(0))),
-	}
-}
-func (of *optionalFloatField) Set(t tuple.TupleElement, fldToSet reflect.Value) (err error) {
-	err = nil
 	if t != nil {
-		pv := reflect.New(fldToSet.Type().Elem())
-
+		fldToSet = f.pqFieldBase.getFieldToSet(fldToSet)
 		switch v := reflect.ValueOf(t); v.Kind() {
 		case reflect.Float32, reflect.Float64:
-			pv.Elem().SetFloat(v.Float())
+			fldToSet.SetFloat(v.Float())
+			return nil
 		default:
-			err = fmt.Errorf("invalid float type (%s)", v.Kind().String())
+			return fmt.Errorf("invalid float type (%s)", v.Kind().String())
 		}
-
-		fldToSet.Set(pv)
+	} else if !f.optional {
+		return fmt.Errorf("unexpected nil value to a non-optional float field")
 	}
-	return
+	return nil
 }
 
-// boolField implements the pqField interface for processing booleans.
-type boolField struct{ name string }
+type boolField struct {
+	pqField
+	*pqFieldBase
+}
 
-func newBoolField(name string) *boolField {
-	return &boolField{name: name}
+func newBoolField(name string, optional bool) *boolField {
+	return &boolField{
+		pqFieldBase: newPqFieldBase(name, optional, reflect.TypeOf(false)),
+	}
 }
 func (b *boolField) Tag() string {
-	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BOOLEAN, repetitiontype=REQUIRED"}`, b.name, toInternalFieldName(b.name))
+	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BOOLEAN, repetitiontype=%s"}`,
+		b.name, b.pqFieldBase.getInternalFieldName(), b.pqFieldBase.getRepetitionType())
 }
 func (b *boolField) ToStructField() reflect.StructField {
-	return reflect.StructField{
-		Name: toInternalFieldName(b.name),
-		Type: reflect.TypeOf(false),
-	}
+	return b.pqFieldBase.toStructField()
 }
 func (b *boolField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
-	if v := reflect.ValueOf(t); v.Kind() == reflect.Bool {
-		fldToSet.SetBool(v.Bool())
-		return nil
-	} else {
-		return fmt.Errorf("invalid bool type (%s)", v.Kind().String())
-	}
-}
-
-// optionalBoolField implements the pqField interface for processing optional booleans declared as pointers.
-type optionalBoolField struct{ name string }
-
-func newOptionalBoolField(name string) *optionalBoolField {
-	return &optionalBoolField{name: name}
-}
-func (ob *optionalBoolField) Tag() string {
-	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BOOLEAN, repetitiontype=OPTIONAL"}`, ob.name, toInternalFieldName(ob.name))
-}
-func (ob *optionalBoolField) ToStructField() reflect.StructField {
-	return reflect.StructField{
-		Name: toInternalFieldName(ob.name),
-		Type: reflect.PtrTo(reflect.TypeOf(false)),
-	}
-}
-func (ob *optionalBoolField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
 	if t != nil {
+		fldToSet = b.pqFieldBase.getFieldToSet(fldToSet)
 		if v := reflect.ValueOf(t); v.Kind() == reflect.Bool {
-			pv := reflect.New(fldToSet.Type().Elem())
-			pv.Elem().SetBool(v.Bool())
-			fldToSet.Set(pv)
+			fldToSet.SetBool(v.Bool())
+			return nil
 		} else {
 			return fmt.Errorf("invalid bool type (%s)", v.Kind().String())
 		}
+	} else if !b.optional {
+		return fmt.Errorf("unexpected nil value to a non-optional bool field")
 	}
 	return nil
 }
 
 func newPqField(fieldType string, name string, optional bool) (pqField, error) {
 	switch {
-	case fieldType == "string" && optional:
-		return newOptionalStringField(name), nil
-	case fieldType == "string" && !optional:
-		return newStringField(name), nil
-	case fieldType == "integer" && optional:
-		return newOptionalIntField(name), nil
-	case fieldType == "integer" && !optional:
-		return newIntField(name), nil
-	case fieldType == "number" && optional:
-		return newOptionalFloatField(name), nil
-	case fieldType == "number" && !optional:
-		return newFloatField(name), nil
-	case fieldType == "boolean" && optional:
-		return newOptionalBoolField(name), nil
-	case fieldType == "boolean" && !optional:
-		return newBoolField(name), nil
+	case fieldType == "string":
+		return newStringField(name, optional), nil
+	case fieldType == "integer":
+		return newIntField(name, optional), nil
+	case fieldType == "number":
+		return newFloatField(name, optional), nil
+	case fieldType == "boolean":
+		return newBoolField(name, optional), nil
 	default:
 		return nil, fmt.Errorf("field of unexpected type (%s)", fieldType)
 	}

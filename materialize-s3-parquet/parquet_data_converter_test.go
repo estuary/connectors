@@ -22,7 +22,7 @@ var stringTests = []test{
 }
 
 func TestStringField(t *testing.T) {
-	var fld = newStringField("teststr_name")
+	var fld = newStringField("teststr_name", false)
 	require.Equal(t, `{"Tag": "name=teststr_name, inname=IORSXG5DTORZF63TBNVSQ____, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"}`, fld.Tag())
 	var structField = fld.ToStructField()
 	require.Equal(t, "IORSXG5DTORZF63TBNVSQ____", structField.Name)
@@ -34,12 +34,16 @@ func TestStringField(t *testing.T) {
 		require.Equal(t, test.expected, v.Interface())
 	}
 
-	var actualError = fld.Set(tuple.TupleElement(1), reflect.New(structField.Type).Elem())
-	require.EqualError(t, actualError, "invalid string type (int)")
+	var v = reflect.New(structField.Type).Elem()
+	var err1 = fld.Set(nil, v)
+	require.EqualError(t, err1, "unexpected nil value to a non-optional string field")
+
+	var err2 = fld.Set(tuple.TupleElement(1), v)
+	require.EqualError(t, err2, "invalid string type (int)")
 }
 
 func TestOptionalStringField(t *testing.T) {
-	var fld = newOptionalStringField("test/str_name")
+	var fld = newStringField("test/str_name", true)
 	require.Equal(t, `{"Tag": "name=test/str_name, inname=IORSXG5BPON2HEX3OMFWWK___, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"}`, fld.Tag())
 	var structField = fld.ToStructField()
 	require.Equal(t, "IORSXG5BPON2HEX3OMFWWK___", structField.Name)
@@ -51,7 +55,11 @@ func TestOptionalStringField(t *testing.T) {
 		require.Equal(t, test.expected, v.Elem().Interface())
 	}
 
-	var actualError = fld.Set(tuple.TupleElement(1), reflect.New(structField.Type).Elem())
+	var v = reflect.New(structField.Type).Elem()
+	fld.Set(nil, v)
+	require.True(t, v.IsNil())
+
+	var actualError = fld.Set(tuple.TupleElement(1), v)
 	require.EqualError(t, actualError, "invalid string type (int)")
 }
 
@@ -63,7 +71,7 @@ var intTests = []test{
 }
 
 func TestIntField(t *testing.T) {
-	var fld = newIntField("test/int_name")
+	var fld = newIntField("test/int_name", false)
 	require.Equal(t, `{"Tag": "name=test/int_name, inname=IORSXG5BPNFXHIX3OMFWWK___, type=INT64, repetitiontype=REQUIRED"}`, fld.Tag())
 
 	var structField = fld.ToStructField()
@@ -76,12 +84,16 @@ func TestIntField(t *testing.T) {
 		require.Equal(t, test.expected, v.Interface())
 	}
 
-	var actualError = fld.Set(tuple.TupleElement("bad input"), reflect.New(structField.Type).Elem())
-	require.EqualError(t, actualError, "invalid integer type (string)")
+	var v = reflect.New(structField.Type).Elem()
+	var err1 = fld.Set(nil, v)
+	require.EqualError(t, err1, "unexpected nil value to a non-optional int field")
+
+	var err2 = fld.Set(tuple.TupleElement("bad input"), v)
+	require.EqualError(t, err2, "invalid integer type (string)")
 }
 
 func TestOptionalIntField(t *testing.T) {
-	var fld = newOptionalIntField("testint_name")
+	var fld = newIntField("testint_name", true)
 	require.Equal(t, `{"Tag": "name=testint_name, inname=IORSXG5DJNZ2F63TBNVSQ____, type=INT64, repetitiontype=OPTIONAL"}`, fld.Tag())
 
 	var structField = fld.ToStructField()
@@ -94,6 +106,10 @@ func TestOptionalIntField(t *testing.T) {
 		require.Equal(t, test.expected, v.Elem().Interface())
 	}
 
+	var v = reflect.New(structField.Type).Elem()
+	fld.Set(nil, v)
+	require.True(t, v.IsNil())
+
 	var actualError = fld.Set(tuple.TupleElement("bad input"), reflect.New(structField.Type).Elem())
 	require.EqualError(t, actualError, "invalid integer type (string)")
 }
@@ -104,7 +120,7 @@ var floatTests = []test{
 }
 
 func TestFloatField(t *testing.T) {
-	var fld = newFloatField("testfloat_name")
+	var fld = newFloatField("testfloat_name", false)
 	require.Equal(t, `{"Tag": "name=testfloat_name, inname=IORSXG5DGNRXWC5C7NZQW2ZI_, type=DOUBLE, repetitiontype=REQUIRED"}`, fld.Tag())
 
 	var structField = fld.ToStructField()
@@ -122,12 +138,16 @@ func TestFloatField(t *testing.T) {
 		}
 	}
 
-	var actualError = fld.Set(tuple.TupleElement(int(0)), reflect.New(structField.Type).Elem())
-	require.EqualError(t, actualError, "invalid float type (int)")
+	var v = reflect.New(structField.Type).Elem()
+	var err1 = fld.Set(nil, v)
+	require.EqualError(t, err1, "unexpected nil value to a non-optional float field")
+
+	var err2 = fld.Set(tuple.TupleElement(int(0)), v)
+	require.EqualError(t, err2, "invalid float type (int)")
 }
 
 func TestOptionalFloatField(t *testing.T) {
-	var fld = newOptionalFloatField("testfloat_name")
+	var fld = newFloatField("testfloat_name", true)
 	require.Equal(t, `{"Tag": "name=testfloat_name, inname=IORSXG5DGNRXWC5C7NZQW2ZI_, type=DOUBLE, repetitiontype=OPTIONAL"}`, fld.Tag())
 
 	var structField = fld.ToStructField()
@@ -145,6 +165,10 @@ func TestOptionalFloatField(t *testing.T) {
 		}
 	}
 
+	var v = reflect.New(structField.Type).Elem()
+	fld.Set(nil, v)
+	require.True(t, v.IsNil())
+
 	var actualError = fld.Set(tuple.TupleElement(int(0)), reflect.New(structField.Type).Elem())
 	require.EqualError(t, actualError, "invalid float type (int)")
 }
@@ -155,7 +179,7 @@ var boolTests = []test{
 }
 
 func TestBoolField(t *testing.T) {
-	var fld = newBoolField("testbool_name")
+	var fld = newBoolField("testbool_name", false)
 	require.Equal(t, `{"Tag": "name=testbool_name, inname=IORSXG5DCN5XWYX3OMFWWK___, type=BOOLEAN, repetitiontype=REQUIRED"}`, fld.Tag())
 
 	var structField = fld.ToStructField()
@@ -168,12 +192,16 @@ func TestBoolField(t *testing.T) {
 		require.Equal(t, test.expected, v.Interface())
 	}
 
-	var actualError = fld.Set(tuple.TupleElement(int(0)), reflect.New(structField.Type).Elem())
-	require.EqualError(t, actualError, "invalid bool type (int)")
+	var v = reflect.New(structField.Type).Elem()
+	var err1 = fld.Set(nil, v)
+	require.EqualError(t, err1, "unexpected nil value to a non-optional bool field")
+
+	var err2 = fld.Set(tuple.TupleElement(int(0)), v)
+	require.EqualError(t, err2, "invalid bool type (int)")
 }
 
 func TestOptionalBoolField(t *testing.T) {
-	var fld = newOptionalBoolField("testbool_name")
+	var fld = newBoolField("testbool_name", true)
 	require.Equal(t, `{"Tag": "name=testbool_name, inname=IORSXG5DCN5XWYX3OMFWWK___, type=BOOLEAN, repetitiontype=OPTIONAL"}`, fld.Tag())
 
 	var structField = fld.ToStructField()
@@ -185,6 +213,10 @@ func TestOptionalBoolField(t *testing.T) {
 		fld.Set(test.input, v)
 		require.Equal(t, test.expected, v.Elem().Interface())
 	}
+
+	var v = reflect.New(structField.Type).Elem()
+	fld.Set(nil, v)
+	require.True(t, v.IsNil())
 
 	var actualError = fld.Set(tuple.TupleElement(int(0)), reflect.New(structField.Type).Elem())
 	require.EqualError(t, actualError, "invalid bool type (int)")
@@ -289,7 +321,7 @@ func TestNewParquetDataConverter_allOptionalTypesWithNullValues(t *testing.T) {
 	actualValues := reflect.ValueOf(actual)
 
 	for i := 0; i < actualValues.NumField(); i++ {
-		require.True(t, actualValues.Field(0).IsNil())
+		require.True(t, actualValues.Field(i).IsNil())
 	}
 }
 
