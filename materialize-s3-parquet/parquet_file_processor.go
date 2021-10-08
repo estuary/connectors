@@ -47,7 +47,12 @@ type FileProcessorProxy struct {
 	ctx context.Context
 
 	fileProcessor FileProcessor
+
 	// A channel to manage the fileProcessor.
+	// Any goroutine except for the goroutine started by the `startServing` function should not
+	// have direct access to the fileProcessor. Instead, it should get the access to the fileProcessor
+	// via the fileProcessorCh channel, and return the fileProcessor to the channel after operations are done.
+	// If the fileProcessor is destroyed and no longer available, the fileProcessorCh channel will be closed.
 	fileProcessorCh chan FileProcessor
 
 	// A channel to signal the termination of service.
