@@ -11,7 +11,7 @@ import (
 )
 
 // A pqField represents a column in the parquet file that stores data in a projected field
-// from Flow data stream.
+// from a Flow data stream.
 type pqField interface {
 	// Returns a Tag string used for constructing the json representation of the parquet file schema.
 	// This is used when creating and intializing a parquet file.
@@ -22,8 +22,7 @@ type pqField interface {
 	// Returns the reflect description of the field in a go Struct.
 	// This is used for creating an object that holds the data to populate a row in parquet file.
 	ToStructField() reflect.StructField
-
-	// Converts the flow value `t` into the correct type in Go, and populates the corresponding field
+	// Converts a tupleElement from Flow into the correct type in Go, and populates the corresponding field
 	// in a Go struct specified by `fldToSet`.
 	Set(t tuple.TupleElement, fldToSet reflect.Value) error
 }

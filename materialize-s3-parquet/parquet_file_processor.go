@@ -37,7 +37,7 @@ type FileProcessor interface {
 }
 
 // FileProcessorProxy implements FileProcessor interface.
-// It proxies a file processor, with the following additional logic:
+// It proxies a file processor with the following additional logic:
 // a) It maintains a timer, which triggers the Commit() command on the proxied file processor
 //      if no interaction with the proxied file processor is observed for a given period of time.
 //      It makes sure that no local file remains in local without being uploaded to the cloud.
@@ -47,23 +47,23 @@ type FileProcessorProxy struct {
 	ctx context.Context
 
 	fileProcessor FileProcessor
-	// A channel to manage the fileProcessor
+	// A channel to manage the fileProcessor.
 	fileProcessorCh chan FileProcessor
 
-	// A channel to signal of service termination
+	// A channel to signal the termination of service.
 	stopServingCh chan struct{}
 
-	// A channel to deliver the last error inccurred during the proxy service.
+	// A channel to deliver the last error occurred during the proxy service.
 	errorCh chan error
 
-	// The time interval, during which if no commit is triggered from the transactor, the proxy will trigger one.
+	// The time interval, during which if no commit is triggered from the transactor, the proxy triggers one.
 	forceUploadInterval time.Duration
 	// The force upload is enabled only if there are calls to `Store` without a call to `Commit`.
 	forceUploadEnabled bool
 	timer              *clock.Timer
 }
 
-// NewFileProcessorProxy initializes an FileProcessorProxy.
+// NewFileProcessorProxy initializes a FileProcessorProxy.
 func NewFileProcessorProxy(
 	ctx context.Context,
 	fileProcessor FileProcessor,
@@ -179,7 +179,7 @@ func (fp *FileProcessorProxy) startServing() {
 				// Fallthrough intended
 			}
 		case <-fp.timer.C:
-			// No flow txn is received after forceUploadInterval expires. Force a Commit action to the cloud if needed.
+			// No Flow txn is received after forceUploadInterval expires. Force a Commit action to the cloud if needed.
 			fp.forceCommit()
 		}
 	}
@@ -337,7 +337,7 @@ func (b *pqBinding) Store(key tuple.Tuple, values tuple.Tuple) error {
 	return nil
 }
 
-// Uploads local files to cloud.
+// Uploads local files to the cloud.
 func (b *pqBinding) Commit() error {
 	if b.pqWriter != nil {
 		defer func() { b.pqWriter = nil }()
@@ -368,7 +368,7 @@ func (b *pqBinding) Commit() error {
 			case <-b.ctx.Done():
 				return b.ctx.Err()
 			case <-time.After(time.Duration(backoffInSec) * time.Second):
-				// Fallthrough.
+				// Fallthrough intended.
 			}
 
 			if backoffInSec < 16 {

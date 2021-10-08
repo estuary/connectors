@@ -270,8 +270,8 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	var fileProcessorProxy = NewFileProcessorProxy(
 		ctx,
 		fileProcessor,
-		// The time interval for the proxy to trigger an upload-to-cloud action is set to be twice as much as the interval of the driver.
-		// To make sure - as long as the files are uploaded on a reasonable schedule fro the driver, no upload is triggered by the proxy.
+		// The time interval for the proxy to trigger an upload-to-cloud action is set to be twice as long as the interval of the driver.
+		// To make sure - as long as the files are uploaded on a reasonable schedule from the driver, no upload is triggered by the proxy.
 		time.Duration(cfg.UploadIntervalInSeconds*2)*time.Second,
 		clock,
 	)
