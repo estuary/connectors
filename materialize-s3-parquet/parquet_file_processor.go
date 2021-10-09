@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -16,8 +17,8 @@ import (
 	"github.com/xitongsys/parquet-go-source/local"
 
 	"github.com/benbjohnson/clock"
-	// TODO revist this after https://issues.apache.org/jira/browse/ARROW-13986 is completed.
 
+	// TODO revisit this after https://issues.apache.org/jira/browse/ARROW-13986 is completed.
 	"github.com/xitongsys/parquet-go/parquet"
 	"github.com/xitongsys/parquet-go/source"
 	"github.com/xitongsys/parquet-go/writer"
@@ -38,22 +39,26 @@ type FileProcessor interface {
 
 // FileProcessorProxy implements FileProcessor interface.
 // It proxies a file processor with the following additional logic:
-// a) It maintains a timer, which triggers the Commit() command on the proxied file processor
-//      if no interaction with the proxied file processor is observed for a given period of time.
+// a) It maintains a ticker, which triggers the Commit() command on the proxied file processor
+//      if no Commit call to the proxied file processor is observed over a given period of time.
 //      It makes sure that no local file remains in local without being uploaded to the cloud.
-// b) It ensures the mutual exclusive access to the proxied file processor between the timer
+// b) It ensures the mutual exclusive access to the proxied file processor between the ticker
 //      and the transactor(via API calls to the proxy).
 type FileProcessorProxy struct {
 	ctx context.Context
-
+	// The proxied file processor.
 	fileProcessor FileProcessor
 
-	// A channel to manage the fileProcessor.
-	// Any goroutine except for the goroutine started by the `startServing` function should not
-	// have direct access to the fileProcessor. Instead, it should get the access to the fileProcessor
-	// via the fileProcessorCh channel, and return the fileProcessor to the channel after operations are done.
-	// If the fileProcessor is destroyed and no longer available, the fileProcessorCh channel will be closed.
-	fileProcessorCh chan FileProcessor
+	// The time interval, during which if no commit is triggered from the transactor, the proxy triggers one.
+	forceUploadInterval time.Duration
+
+	// A mutex to control mutual exclusive access to the proxied fileProcessor,
+	// and related states of hasLocalStagingData and mostRecentCommitTime
+	mu *sync.Mutex
+	// The force upload is enabled only if there are calls to `Store` without a call to `Commit`.
+	hasLocalStagingData bool
+	// The most recent time a Commit call is made.
+	mostRecentCommitTime time.Time
 
 	// A channel to signal the termination of service.
 	stopServingCh chan struct{}
@@ -61,11 +66,7 @@ type FileProcessorProxy struct {
 	// A channel to deliver the last error occurred during the proxy service.
 	errorCh chan error
 
-	// The time interval, during which if no commit is triggered from the transactor, the proxy triggers one.
-	forceUploadInterval time.Duration
-	// The force upload is enabled only if there are calls to `Store` without a call to `Commit`.
-	forceUploadEnabled bool
-	timer              *clock.Timer
+	clock clock.Clock
 }
 
 // NewFileProcessorProxy initializes a FileProcessorProxy.
@@ -75,21 +76,18 @@ func NewFileProcessorProxy(
 	forceUploadInterval time.Duration,
 	clock clock.Clock) *FileProcessorProxy {
 
-	// Expire immediately.
-	var timer = clock.Timer(0)
-
 	var fp = &FileProcessorProxy{
-		ctx:                 ctx,
-		fileProcessorCh:     make(chan FileProcessor),
-		fileProcessor:       fileProcessor,
-		stopServingCh:       make(chan struct{}),
-		errorCh:             make(chan error, 1),
-		forceUploadInterval: forceUploadInterval,
-		forceUploadEnabled:  false,
-		timer:               timer,
+		ctx:                  ctx,
+		fileProcessor:        fileProcessor,
+		forceUploadInterval:  forceUploadInterval,
+		mu:                   &sync.Mutex{},
+		hasLocalStagingData:  false,
+		mostRecentCommitTime: clock.Now(),
+		stopServingCh:        make(chan struct{}),
+		errorCh:              make(chan error, 1),
+		clock:                clock,
 	}
 
-	fp.stopTimer()
 	go fp.startServing()
 
 	return fp
@@ -97,26 +95,31 @@ func NewFileProcessorProxy(
 
 // Store implements the FileProcessor interface.
 func (fp *FileProcessorProxy) Store(binding int, key tuple.Tuple, values tuple.Tuple) error {
-	var fileProcessor = fp.acquireFileProcessor()
-	defer fp.returnFileProcessor(fileProcessor)
+	fp.mu.Lock()
+	defer fp.mu.Unlock()
 
-	if err := fileProcessor.Store(binding, key, values); err != nil {
+	if err := fp.fileProcessor.Store(binding, key, values); err != nil {
 		return fmt.Errorf("storing data: %w", err)
 	}
 
-	fp.forceUploadEnabled = true
+	fp.hasLocalStagingData = true
 	return nil
 }
 
 // Commit implements the FileProcessor interface.
 func (fp *FileProcessorProxy) Commit() (nextSeqNumList []int, e error) {
-	var fileProcessor = fp.acquireFileProcessor()
-	defer fp.returnFileProcessor(fileProcessor)
+	fp.mu.Lock()
+	defer fp.mu.Unlock()
+	defer func() { fp.mostRecentCommitTime = fp.clock.Now() }()
 
-	if nextSeqNumList, err := fileProcessor.Commit(); err != nil {
+	if !fp.hasLocalStagingData {
+		return
+	}
+
+	if nextSeqNumList, err := fp.fileProcessor.Commit(); err != nil {
 		return nil, fmt.Errorf("committing data: %w", err)
 	} else {
-		fp.forceUploadEnabled = false
+		fp.hasLocalStagingData = false
 		return nextSeqNumList, nil
 	}
 }
@@ -127,78 +130,36 @@ func (fp *FileProcessorProxy) Destroy() error {
 	return <-fp.errorCh
 }
 
-func (fp *FileProcessorProxy) acquireFileProcessor() FileProcessor {
-	if fp, ok := <-fp.fileProcessorCh; ok {
-		return fp
-	}
-	panic("trying to acquire file processor after it is destroyed.")
-}
-
-func (fp *FileProcessorProxy) returnFileProcessor(fileProcessor FileProcessor) {
-	if fileProcessor == nil {
-		panic("returning a file processor that is not acquired.")
-	}
-	fp.fileProcessorCh <- fileProcessor
-}
-
-func (fp *FileProcessorProxy) stopTimer() {
-	if !fp.timer.Stop() {
-		<-fp.timer.C
-	}
-}
-
 func (fp *FileProcessorProxy) startServing() {
-	var err error = nil
+	var ticker = fp.clock.Ticker(fp.forceUploadInterval)
 	defer func() {
-		fp.errorCh <- err
+		ticker.Stop()
+		fp.errorCh <- fp.fileProcessor.Destroy()
 	}()
-	defer func(f FileProcessor) {
-		err = f.Destroy()
-		close(fp.fileProcessorCh)
-	}(fp.fileProcessor)
 
 	for {
-		fp.timer.Reset(fp.forceUploadInterval)
 		select {
 		case <-fp.stopServingCh:
-			fp.stopTimer()
 			fp.forceCommit()
 			return
 		case <-fp.ctx.Done():
-			fp.stopTimer()
 			fp.forceCommit()
 			return
-		case fp.fileProcessorCh <- fp.fileProcessor:
-			fp.fileProcessor = nil
-			fp.stopTimer()
-			// Block until the file processor is returned.
-			select {
-			// For the first and second cases, some data might be missing in the cloud,
-			// b/c the client code is destroying the proxy when writing to the file processor, which
-			// prevents a force commit from the proxy.
-			case <-fp.stopServingCh:
-				return
-			case <-fp.ctx.Done():
-				return
-			case fp.fileProcessor = <-fp.fileProcessorCh:
-				// Fallthrough intended
+		case <-ticker.C:
+			var now = fp.clock.Now()
+			if now.Sub(fp.mostRecentCommitTime) >= fp.forceUploadInterval {
+				// No Flow txn is received after forceUploadInterval expires. Force a Commit action to the cloud if needed.
+				fp.forceCommit()
 			}
-		case <-fp.timer.C:
-			// No Flow txn is received after forceUploadInterval expires. Force a Commit action to the cloud if needed.
-			fp.forceCommit()
 		}
 	}
 }
 
 func (fp *FileProcessorProxy) forceCommit() {
-	if fp.forceUploadEnabled {
-		defer func() { fp.forceUploadEnabled = false }()
-		if _, err := fp.fileProcessor.Commit(); err != nil {
-			// TODO(jixiang): Consider returning the error via errorCh?
-			panic(fmt.Sprintf("failed to commit with error: %v", err))
-		}
+	if _, err := fp.Commit(); err != nil {
+		// TODO(jixiang): Consider returning the error via errorCh?
+		panic(fmt.Sprintf("failed to commit with error: %v", err))
 	}
-
 }
 
 // ParquetFileProcessor implements the FileProcessor interface.

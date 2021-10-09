@@ -87,7 +87,6 @@ func TestFileProcessorProxy_APIs(t *testing.T) {
 	var ctx = context.Background()
 
 	var mockFileProcessor = newMockFileProcessor([]int{1, 2, 3})
-	// Test returns fileProcessor before cancel.
 	var proxy = NewFileProcessorProxy(ctx, mockFileProcessor, time.Second*2, mockClock)
 	mockClock.Add(time.Second)
 
@@ -107,17 +106,14 @@ func TestFileProcessorProxy_cancelByCtx(t *testing.T) {
 	var mockFileProcessor = newMockFileProcessor(nil)
 	// acquireFileProcessor succeeds before cancel.
 	var proxy = NewFileProcessorProxy(ctx, mockFileProcessor, 2*time.Second, mockClock)
-	var fp = proxy.acquireFileProcessor()
-	require.NotNil(t, fp)
-	proxy.returnFileProcessor(fp)
 
+	require.Equal(t, 0, mockFileProcessor.DestroyTimes)
+	require.Equal(t, 0, mockFileProcessor.CommitTimes)
 	proxy.Store(0, tuple.Tuple{"key1"}, tuple.Tuple{"value1"})
 	cancel()
 	require.NoError(t, <-proxy.errorCh)
+	require.Equal(t, 1, mockFileProcessor.DestroyTimes)
 	require.Equal(t, 1, mockFileProcessor.CommitTimes)
-
-	// The fileProcessor is no longer available after cancel.
-	require.Panics(t, func() { proxy.acquireFileProcessor() })
 }
 
 func TestFileProcessorProxy_DestroyNoError(t *testing.T) {
@@ -126,17 +122,12 @@ func TestFileProcessorProxy_DestroyNoError(t *testing.T) {
 
 	// acquireFileProcessor succeeds before destroy.
 	var proxy = NewFileProcessorProxy(context.Background(), mockFileProcessor, 2*time.Second, mockClock)
-	var fp = proxy.acquireFileProcessor()
-	require.NotNil(t, fp)
-	proxy.returnFileProcessor(fp)
-
+	require.Equal(t, 0, mockFileProcessor.DestroyTimes)
+	require.Equal(t, 0, mockFileProcessor.CommitTimes)
 	proxy.Store(0, tuple.Tuple{"key1"}, tuple.Tuple{"value1"})
 	require.Nil(t, proxy.Destroy())
 	require.Equal(t, 1, mockFileProcessor.DestroyTimes)
 	require.Equal(t, 1, mockFileProcessor.CommitTimes)
-
-	// The fileProcessor is no longer avaliable after destroy.
-	require.Panics(t, func() { proxy.acquireFileProcessor() })
 }
 
 func TestFileProcessorProxy_DestroyWithError(t *testing.T) {
@@ -147,54 +138,8 @@ func TestFileProcessorProxy_DestroyWithError(t *testing.T) {
 	// acquireFileProcessor succeeds before destroy.
 	var proxy = NewFileProcessorProxy(context.Background(), mockFileProcessor, 2*time.Second, mockClock)
 
-	var fp = proxy.acquireFileProcessor()
-	require.NotNil(t, fp)
-	proxy.returnFileProcessor(fp)
-
 	var err = proxy.Destroy()
 	require.Equal(t, mockFileProcessor.DestroyError, err)
-
-	// The fileProcessor is no longer avaliable after destroy.
-	require.Panics(t, func() { proxy.acquireFileProcessor() })
-}
-
-func TestFileProcessorProxy_AcquireAndReturnProcessor(t *testing.T) {
-	var mockClock = clock.NewMock()
-	var ctx = context.Background()
-	var mockFileProcessor = newMockFileProcessor(nil)
-	var proxy = NewFileProcessorProxy(ctx, mockFileProcessor, 2*time.Second, mockClock)
-	mockClock.Add(time.Second)
-	defer func() { require.NoError(t, proxy.Destroy()) }()
-
-	// acquires the processor successfully.
-	var p = proxy.acquireFileProcessor().(*MockFileProcessor)
-	require.NotNil(t, p)
-
-	// Go-routine is blocked when trying acquire the processor again.
-	var tmpCh = make(chan struct{})
-	go func() {
-		var tmpFp = proxy.acquireFileProcessor()
-		defer proxy.returnFileProcessor(tmpFp)
-		close(tmpCh)
-	}()
-
-	select {
-	case <-tmpCh:
-		require.FailNow(t, "no file processor should be acquired before returning.")
-	case <-time.After(100 * time.Millisecond):
-		// Fallthrough expected
-	}
-
-	// returns the processor.
-	proxy.returnFileProcessor(p)
-	p = nil
-
-	// acquires the processor successfully again.
-	p = proxy.acquireFileProcessor().(*MockFileProcessor)
-	require.NotNil(t, p)
-
-	// returns the processor.
-	proxy.returnFileProcessor(p)
 }
 
 func TestFileProcessorProxy_TimerTriggered(t *testing.T) {
@@ -212,8 +157,6 @@ func TestFileProcessorProxy_TimerTriggered(t *testing.T) {
 
 	// Force commit is triggered after `Store` is called.
 	proxy.Store(0, tuple.Tuple{"key1"}, tuple.Tuple{"value1"})
-	// Make sure mockClock.Add is called after fp.timer.Reset(fp.forceUploadInterval).
-	time.Sleep(10 * time.Millisecond)
 	// Wait time is not enough.
 	mockClock.Add(3 * time.Second)
 	require.Equal(t, 0, mockFileProcessor.CommitTimes)
@@ -225,27 +168,27 @@ func TestFileProcessorProxy_TimerTriggered(t *testing.T) {
 	mockClock.Add(5 * time.Second)
 	require.Equal(t, 1, mockFileProcessor.CommitTimes)
 
-	// When the file processor is acquired, no force commit is triggered.
+	// It triggers again after `Store` is called and waited for enough long.
 	proxy.Store(0, tuple.Tuple{"key2"}, tuple.Tuple{"value2"})
-	p := proxy.acquireFileProcessor().(*MockFileProcessor)
-	// Make sure mockClock.Add is called after fp.timer.Reset(fp.forceUploadInterval).
-	time.Sleep(10 * time.Millisecond)
-
-	mockClock.Add(5 * time.Second)
-	require.Equal(t, 1, mockFileProcessor.CommitTimes)
-	mockClock.Add(5 * time.Second)
-	require.Equal(t, 1, mockFileProcessor.CommitTimes)
-
-	// The force commit resumes after processor is returned with enough waiting time.
-	proxy.returnFileProcessor(p)
-	// Make sure mockClock.Add is called after fp.timer.Reset(fp.forceUploadInterval).
-	time.Sleep(10 * time.Millisecond)
-
 	require.Equal(t, 1, mockFileProcessor.CommitTimes)
 	mockClock.Add(5 * time.Second)
 	require.Equal(t, 2, mockFileProcessor.CommitTimes)
 	mockClock.Add(5 * time.Second)
 	require.Equal(t, 2, mockFileProcessor.CommitTimes)
+
+	// It does not trigger `Commit` if not been waiting for long enough.
+	proxy.Store(0, tuple.Tuple{"key3"}, tuple.Tuple{"value3"})
+	mockClock.Add(4 * time.Second)
+	require.Equal(t, 2, mockFileProcessor.CommitTimes)
+
+	// After a commit call, it needs to wait for another 5 or more seconds for the next force commit.
+	proxy.Commit()
+	require.Equal(t, 3, mockFileProcessor.CommitTimes)
+	proxy.Store(0, tuple.Tuple{"key4"}, tuple.Tuple{"value4"})
+	mockClock.Add(4 * time.Second)
+	require.Equal(t, 3, mockFileProcessor.CommitTimes)
+	mockClock.Add(2 * time.Second)
+	require.Equal(t, 4, mockFileProcessor.CommitTimes)
 }
 
 func TestParquetFileProcessor_NoBinding(t *testing.T) {
