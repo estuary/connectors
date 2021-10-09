@@ -10,35 +10,60 @@ import (
 	pf "github.com/estuary/protocols/flow"
 )
 
-// A pqField represents a column in the parquet file that stores data in a projected field
-// from a Flow data stream.
-type pqField interface {
+// typeStrategy is an interface that provides functions with datatype-specific logic to process a column of parquet file.
+type typeStrategy interface {
 	// Returns a Tag string used for constructing the json representation of the parquet file schema.
 	// This is used when creating and intializing a parquet file.
 	// Refer to this for an example of Tag and schema.
 	// https://github.com/xitongsys/parquet-go/blob/master/example/json_schema.go#L36
-	Tag() string
+	tag(name, internalName, repetitionType string) string
 
-	// Returns the reflect description of the field in a go Struct.
-	// This is used for creating an object that holds the data to populate a row in parquet file.
-	ToStructField() reflect.StructField
+	// Returns the reflect Type of this field.
+	reflectType() reflect.Type
+
 	// Converts a tupleElement from Flow into the correct type in Go, and populates the corresponding field
 	// in a Go struct specified by `fldToSet`.
-	Set(t tuple.TupleElement, fldToSet reflect.Value) error
+	set(t tuple.TupleElement, fldToSet reflect.Value) error
 }
 
-// pqFiledBase provides the base functions to all pqFields.
-type pqFieldBase struct {
-	name        string
-	optional    bool
-	reflectType reflect.Type
+// A pqField represents a column in the parquet file that stores data in a projected field
+// from a Flow data stream.
+type pqField struct {
+	name     string
+	optional bool
+	// datatype-specific logics.
+	typeStrategy typeStrategy
 }
 
-func (p *pqFieldBase) getInternalFieldName() string {
+// Returns the reflect description of the field in a go Struct.
+// This is used for creating an object that holds the data to populate a row in parquet file.
+func (p *pqField) ToStructField() reflect.StructField {
+	return reflect.StructField{
+		Name: p.getInternalFieldName(),
+		Type: p.getReflectType(),
+	}
+}
+
+// Proxy to the strategy.
+func (p *pqField) Tag() string {
+	return p.typeStrategy.tag(p.name, p.getInternalFieldName(), p.getRepetitionType())
+}
+
+// Proxy to the strategy.
+func (p *pqField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
+	if t != nil {
+		return p.typeStrategy.set(t, p.getFieldToSet(fldToSet))
+	} else if !p.optional {
+		return fmt.Errorf("unexpected nil value to a non-optional field")
+	}
+	return nil
+}
+
+func (p *pqField) getInternalFieldName() string {
 	return "I" + strings.ReplaceAll(base32.StdEncoding.EncodeToString([]byte(p.name)), "=", "_")
 }
 
-func (p *pqFieldBase) getRepetitionType() string {
+func (p *pqField) getRepetitionType() string {
 	if p.optional {
 		return "OPTIONAL"
 	}
@@ -46,14 +71,14 @@ func (p *pqFieldBase) getRepetitionType() string {
 	return "REQUIRED"
 }
 
-func (p *pqFieldBase) getReflectType() reflect.Type {
+func (p *pqField) getReflectType() reflect.Type {
 	if p.optional {
-		return reflect.PtrTo(p.reflectType)
+		return reflect.PtrTo(p.typeStrategy.reflectType())
 	}
-	return p.reflectType
+	return p.typeStrategy.reflectType()
 }
 
-func (p *pqFieldBase) getFieldToSet(fldToSet reflect.Value) reflect.Value {
+func (p *pqField) getFieldToSet(fldToSet reflect.Value) reflect.Value {
 	if p.optional {
 		var pv = reflect.New(p.getReflectType().Elem())
 		fldToSet.Set(pv)
@@ -62,151 +87,116 @@ func (p *pqFieldBase) getFieldToSet(fldToSet reflect.Value) reflect.Value {
 	return fldToSet
 }
 
-func (p *pqFieldBase) toStructField() reflect.StructField {
-	return reflect.StructField{
-		Name: p.getInternalFieldName(),
-		Type: p.getReflectType(),
-	}
-}
+// stringStrategy implements the typeStrategy interface for strings.
+type stringStrategy struct{}
 
-func newPqFieldBase(name string, optional bool, reflectType reflect.Type) *pqFieldBase {
-	return &pqFieldBase{name: name, optional: optional, reflectType: reflectType}
-}
-
-// stringField implements the pqField interface for processing strings.
-type stringField struct {
-	pqField
-	*pqFieldBase
-}
-
-func newStringField(name string, optional bool) *stringField {
-	return &stringField{
-		pqFieldBase: newPqFieldBase(name, optional, reflect.TypeOf("")),
-	}
-}
-func (s *stringField) Tag() string {
+func (s *stringStrategy) tag(name, internalName, repetitionType string) string {
 	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=%s"}`,
-		s.name, s.pqFieldBase.getInternalFieldName(), s.pqFieldBase.getRepetitionType())
+		name, internalName, repetitionType)
 }
-func (s *stringField) ToStructField() reflect.StructField {
-	return s.pqFieldBase.toStructField()
+func (s *stringStrategy) reflectType() reflect.Type {
+	return reflect.TypeOf("")
 }
-func (s *stringField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
-	if t != nil {
-		fldToSet = s.pqFieldBase.getFieldToSet(fldToSet)
-		if v := reflect.ValueOf(t); v.Kind() != reflect.String {
-			return fmt.Errorf("invalid string type (%s)", v.Kind().String())
-		} else {
-			fldToSet.SetString(v.String())
-		}
-	} else if !s.optional {
-		return fmt.Errorf("unexpected nil value to a non-optional string field")
+func (s *stringStrategy) set(t tuple.TupleElement, fldToSet reflect.Value) error {
+	if v := reflect.ValueOf(t); v.Kind() != reflect.String {
+		return fmt.Errorf("invalid string type (%s)", v.Kind().String())
+	} else {
+		fldToSet.SetString(v.String())
 	}
 	return nil
 }
 
-// intField implements the pqField interface for processing integers.
-type intField struct {
-	pqField
-	*pqFieldBase
-}
-
-func newIntField(name string, optional bool) *intField {
-	return &intField{
-		pqFieldBase: newPqFieldBase(name, optional, reflect.TypeOf(int64(0))),
+func newStringField(name string, optional bool) *pqField {
+	return &pqField{
+		name:         name,
+		optional:     optional,
+		typeStrategy: &stringStrategy{},
 	}
 }
-func (i *intField) Tag() string {
+
+// intStrategy implements the typeStrategy interface for integers.
+type intStrategy struct{}
+
+func (i *intStrategy) tag(name, internalName, repetitionType string) string {
 	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=INT64, repetitiontype=%s"}`,
-		i.name, i.pqFieldBase.getInternalFieldName(), i.pqFieldBase.getRepetitionType())
+		name, internalName, repetitionType)
 }
-func (i *intField) ToStructField() reflect.StructField {
-	return i.pqFieldBase.toStructField()
+func (i *intStrategy) reflectType() reflect.Type {
+	return reflect.TypeOf(int64(0))
 }
-func (i *intField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
-	if t != nil {
-		fldToSet = i.pqFieldBase.getFieldToSet(fldToSet)
-		switch v := reflect.ValueOf(t); v.Kind() {
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			fldToSet.SetInt(v.Int())
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			fldToSet.SetInt(int64(v.Uint()))
-		default:
-			return fmt.Errorf("invalid integer type (%s)", v.Kind().String())
-		}
-	} else if !i.optional {
-		return fmt.Errorf("unexpected nil value to a non-optional int field")
+func (i *intStrategy) set(t tuple.TupleElement, fldToSet reflect.Value) error {
+	switch v := reflect.ValueOf(t); v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		fldToSet.SetInt(v.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		fldToSet.SetInt(int64(v.Uint()))
+	default:
+		return fmt.Errorf("invalid integer type (%s)", v.Kind().String())
 	}
 	return nil
 }
-
-// floatField implements the pqField interface for processing floats/doubles.
-type floatField struct {
-	pqField
-	*pqFieldBase
-}
-
-func newFloatField(name string, optional bool) *floatField {
-	return &floatField{
-		pqFieldBase: newPqFieldBase(name, optional, reflect.TypeOf(float64(0))),
+func newIntField(name string, optional bool) *pqField {
+	return &pqField{
+		name:         name,
+		optional:     optional,
+		typeStrategy: &intStrategy{},
 	}
 }
-func (f *floatField) Tag() string {
+
+// floatStrategy implements the typeStrategy interface for floats/doubles.
+type floatStrategy struct{}
+
+func (f *floatStrategy) tag(name, internalName, repetitionType string) string {
 	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=DOUBLE, repetitiontype=%s"}`,
-		f.name, f.pqFieldBase.getInternalFieldName(), f.pqFieldBase.getRepetitionType())
+		name, internalName, repetitionType)
 }
-func (f *floatField) ToStructField() reflect.StructField {
-	return f.pqFieldBase.toStructField()
+func (f *floatStrategy) reflectType() reflect.Type {
+	return reflect.TypeOf(float64(0))
 }
-func (f *floatField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
-	if t != nil {
-		fldToSet = f.pqFieldBase.getFieldToSet(fldToSet)
-		switch v := reflect.ValueOf(t); v.Kind() {
-		case reflect.Float32, reflect.Float64:
-			fldToSet.SetFloat(v.Float())
-			return nil
-		default:
-			return fmt.Errorf("invalid float type (%s)", v.Kind().String())
-		}
-	} else if !f.optional {
-		return fmt.Errorf("unexpected nil value to a non-optional float field")
-	}
-	return nil
-}
-
-type boolField struct {
-	pqField
-	*pqFieldBase
-}
-
-func newBoolField(name string, optional bool) *boolField {
-	return &boolField{
-		pqFieldBase: newPqFieldBase(name, optional, reflect.TypeOf(false)),
+func (f *floatStrategy) set(t tuple.TupleElement, fldToSet reflect.Value) error {
+	switch v := reflect.ValueOf(t); v.Kind() {
+	case reflect.Float32, reflect.Float64:
+		fldToSet.SetFloat(v.Float())
+		return nil
+	default:
+		return fmt.Errorf("invalid float type (%s)", v.Kind().String())
 	}
 }
-func (b *boolField) Tag() string {
+func newFloatField(name string, optional bool) *pqField {
+	return &pqField{
+		name:         name,
+		optional:     optional,
+		typeStrategy: &floatStrategy{},
+	}
+}
+
+// boolStrategy implements the typeStrategy interface for booleans.
+type boolStrategy struct{}
+
+func (b *boolStrategy) tag(name, internalName, repetitionType string) string {
 	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BOOLEAN, repetitiontype=%s"}`,
-		b.name, b.pqFieldBase.getInternalFieldName(), b.pqFieldBase.getRepetitionType())
+		name, internalName, repetitionType)
 }
-func (b *boolField) ToStructField() reflect.StructField {
-	return b.pqFieldBase.toStructField()
+func (b *boolStrategy) reflectType() reflect.Type {
+	return reflect.TypeOf(false)
 }
-func (b *boolField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
-	if t != nil {
-		fldToSet = b.pqFieldBase.getFieldToSet(fldToSet)
-		if v := reflect.ValueOf(t); v.Kind() == reflect.Bool {
-			fldToSet.SetBool(v.Bool())
-			return nil
-		} else {
-			return fmt.Errorf("invalid bool type (%s)", v.Kind().String())
-		}
-	} else if !b.optional {
-		return fmt.Errorf("unexpected nil value to a non-optional bool field")
+func (b *boolStrategy) set(t tuple.TupleElement, fldToSet reflect.Value) error {
+	if v := reflect.ValueOf(t); v.Kind() == reflect.Bool {
+		fldToSet.SetBool(v.Bool())
+		return nil
+	} else {
+		return fmt.Errorf("invalid bool type (%s)", v.Kind().String())
 	}
-	return nil
+}
+func newBoolField(name string, optional bool) *pqField {
+	return &pqField{
+		name:         name,
+		optional:     optional,
+		typeStrategy: &boolStrategy{},
+	}
 }
 
-func newPqField(fieldType string, name string, optional bool) (pqField, error) {
+func newPqField(fieldType string, name string, optional bool) (*pqField, error) {
 	switch {
 	case fieldType == "string":
 		return newStringField(name, optional), nil
@@ -223,7 +213,7 @@ func newPqField(fieldType string, name string, optional bool) (pqField, error) {
 
 // ParquetDataConverter converts the schema/data from Flow into formats accepted by the parquet file processor.
 type ParquetDataConverter struct {
-	pqFields     []pqField
+	pqFields     []*pqField
 	rowObjSchema reflect.Type
 }
 
@@ -232,7 +222,7 @@ func NewParquetDataConverter(binding *pf.MaterializationSpec_Binding) (*ParquetD
 	var fieldSelections = binding.FieldSelection
 	var allFields = make([]string, 0, len(fieldSelections.Keys)+len(fieldSelections.Values))
 	allFields = append(append(allFields, fieldSelections.Keys...), fieldSelections.Values...)
-	var pqFields = make([]pqField, 0, len(allFields))
+	var pqFields = make([]*pqField, 0, len(allFields))
 	var structFields = make([]reflect.StructField, 0, len(allFields))
 
 	for _, field := range allFields {

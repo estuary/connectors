@@ -36,7 +36,7 @@ func TestStringField(t *testing.T) {
 
 	var v = reflect.New(structField.Type).Elem()
 	var err1 = fld.Set(nil, v)
-	require.EqualError(t, err1, "unexpected nil value to a non-optional string field")
+	require.EqualError(t, err1, "unexpected nil value to a non-optional field")
 
 	var err2 = fld.Set(tuple.TupleElement(1), v)
 	require.EqualError(t, err2, "invalid string type (int)")
@@ -86,7 +86,7 @@ func TestIntField(t *testing.T) {
 
 	var v = reflect.New(structField.Type).Elem()
 	var err1 = fld.Set(nil, v)
-	require.EqualError(t, err1, "unexpected nil value to a non-optional int field")
+	require.EqualError(t, err1, "unexpected nil value to a non-optional field")
 
 	var err2 = fld.Set(tuple.TupleElement("bad input"), v)
 	require.EqualError(t, err2, "invalid integer type (string)")
@@ -140,7 +140,7 @@ func TestFloatField(t *testing.T) {
 
 	var v = reflect.New(structField.Type).Elem()
 	var err1 = fld.Set(nil, v)
-	require.EqualError(t, err1, "unexpected nil value to a non-optional float field")
+	require.EqualError(t, err1, "unexpected nil value to a non-optional field")
 
 	var err2 = fld.Set(tuple.TupleElement(int(0)), v)
 	require.EqualError(t, err2, "invalid float type (int)")
@@ -194,7 +194,7 @@ func TestBoolField(t *testing.T) {
 
 	var v = reflect.New(structField.Type).Elem()
 	var err1 = fld.Set(nil, v)
-	require.EqualError(t, err1, "unexpected nil value to a non-optional bool field")
+	require.EqualError(t, err1, "unexpected nil value to a non-optional field")
 
 	var err2 = fld.Set(tuple.TupleElement(int(0)), v)
 	require.EqualError(t, err2, "invalid bool type (int)")
