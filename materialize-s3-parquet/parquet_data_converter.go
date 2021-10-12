@@ -10,7 +10,7 @@ import (
 	pf "github.com/estuary/protocols/flow"
 )
 
-// typeStrategy is an interface that provides functions with datatype-specific logic to process a column of parquet file.
+// typeStrategy is an interface that provides functions with datatype-specific logic to process a column of a parquet file.
 type typeStrategy interface {
 	// Returns a Tag string used for constructing the json representation of the parquet file schema.
 	// This is used when creating and intializing a parquet file.
@@ -18,7 +18,7 @@ type typeStrategy interface {
 	// https://github.com/xitongsys/parquet-go/blob/master/example/json_schema.go#L36
 	tag(name, internalName, repetitionType string) string
 
-	// Returns the reflect Type of this field.
+	// Returns the Go reflect type of this field.
 	reflectType() reflect.Type
 
 	// Converts a tupleElement from Flow into the correct type in Go, and populates the corresponding field
@@ -26,8 +26,7 @@ type typeStrategy interface {
 	set(t tuple.TupleElement, fldToSet reflect.Value) error
 }
 
-// A pqField represents a column in the parquet file that stores data in a projected field
-// from a Flow data stream.
+// A pqField represents a column in the parquet file that stores data in a projected field from a Flow data stream.
 type pqField struct {
 	name     string
 	optional bool
@@ -35,7 +34,7 @@ type pqField struct {
 	typeStrategy typeStrategy
 }
 
-// Returns the reflect description of the field in a go Struct.
+// Returns the reflect description of the field in a Go struct.
 // This is used for creating an object that holds the data to populate a row in parquet file.
 func (p *pqField) ToStructField() reflect.StructField {
 	return reflect.StructField{
@@ -46,7 +45,11 @@ func (p *pqField) ToStructField() reflect.StructField {
 
 // Proxy to the strategy.
 func (p *pqField) Tag() string {
-	return p.typeStrategy.tag(p.name, p.getInternalFieldName(), p.getRepetitionType())
+	var repetitionType = "REQUIRED"
+	if p.optional {
+		repetitionType = "OPTIONAL"
+	}
+	return p.typeStrategy.tag(p.name, p.getInternalFieldName(), repetitionType)
 }
 
 // Proxy to the strategy.
@@ -61,14 +64,6 @@ func (p *pqField) Set(t tuple.TupleElement, fldToSet reflect.Value) error {
 
 func (p *pqField) getInternalFieldName() string {
 	return "I" + strings.ReplaceAll(base32.StdEncoding.EncodeToString([]byte(p.name)), "=", "_")
-}
-
-func (p *pqField) getRepetitionType() string {
-	if p.optional {
-		return "OPTIONAL"
-	}
-
-	return "REQUIRED"
 }
 
 func (p *pqField) getReflectType() reflect.Type {

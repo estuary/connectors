@@ -46,6 +46,7 @@ type FileProcessor interface {
 //      and the transactor(via API calls to the proxy).
 type FileProcessorProxy struct {
 	ctx context.Context
+
 	// The proxied file processor.
 	fileProcessor FileProcessor
 
