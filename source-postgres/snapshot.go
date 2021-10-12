@@ -8,24 +8,22 @@ import (
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-// A DatabaseSnapshot represents a long-running read transaction which
+// A databaseSnapshot represents a long-running read transaction which
 // can be used to query the contents of various tables.
-type DatabaseSnapshot struct {
-	Conn        *pgx.Conn
+type databaseSnapshot struct {
 	Transaction pgx.Tx
 	TxLSN       pglogrepl.LSN
 }
 
-// A TableSnapshot represents a consistent view of a single table in
+// A tableSnapshot represents a consistent view of a single table in
 // the database. A TableSnapshot cannot be closed because it's really
 // just a struct combining a DatabaseSnapshot with a specific table
 // name and scanning key.
-type TableSnapshot struct {
-	DB         *DatabaseSnapshot
+type tableSnapshot struct {
+	DB         *databaseSnapshot
 	SchemaName string
 	TableName  string
 	ScanKey    []string
@@ -33,12 +31,12 @@ type TableSnapshot struct {
 	scanFromQuery string
 }
 
-// This is a variable to facilitate testing (because if we had to fill up
-// a table with tens of thousands of rows to test chunking behavior it would
-// make tests a lot slower for no good reason).
-var SnapshotChunkSize = 4096
+// snapshotChunkSize controls how many rows will be read from the database in a
+// single query. In normal use it acts like a constant, it's just a variable here
+// so that it can be lowered in tests to exercise chunking behavior more easily.
+var snapshotChunkSize = 4096
 
-func SnapshotDatabase(ctx context.Context, conn *pgx.Conn) (*DatabaseSnapshot, error) {
+func snapshotDatabase(ctx context.Context, conn *pgx.Conn) (*databaseSnapshot, error) {
 	transaction, err := conn.BeginTx(ctx, pgx.TxOptions{
 		// We could probably get away with `RepeatableRead` isolation here, but
 		// I see no reason not to err on the side of getting the strongest
@@ -48,11 +46,9 @@ func SnapshotDatabase(ctx context.Context, conn *pgx.Conn) (*DatabaseSnapshot, e
 		AccessMode: pgx.ReadOnly,
 	})
 	if err != nil {
-		conn.Close(ctx)
-		return nil, errors.Wrap(err, "unable to begin transaction")
+		return nil, fmt.Errorf("unable to begin transaction: %w", err)
 	}
-	snapshot := &DatabaseSnapshot{
-		Conn:        conn,
+	snapshot := &databaseSnapshot{
 		Transaction: transaction,
 	}
 	// TODO(wgd): Empirically this function doesn't have a stable value during our read
@@ -62,21 +58,21 @@ func SnapshotDatabase(ctx context.Context, conn *pgx.Conn) (*DatabaseSnapshot, e
 	// stress test which could reveal problems.
 	if err := transaction.QueryRow(ctx, `SELECT * FROM pg_current_wal_lsn();`).Scan(&snapshot.TxLSN); err != nil {
 		snapshot.Close(ctx)
-		return nil, errors.Wrap(err, "unable to query transaction LSN")
+		return nil, fmt.Errorf("unable to query transaction LSN: %w", err)
 	}
 	return snapshot, nil
 }
 
-func (s *DatabaseSnapshot) TransactionLSN() pglogrepl.LSN {
+func (s *databaseSnapshot) TransactionLSN() pglogrepl.LSN {
 	return s.TxLSN
 }
 
-func (s *DatabaseSnapshot) Table(tableID string, scanKey []string) *TableSnapshot {
+func (s *databaseSnapshot) Table(tableID string, scanKey []string) *tableSnapshot {
 	// Split "public.foo" tableID into "public" schema and "foo" table name
 	parts := strings.SplitN(tableID, ".", 2)
 	schemaName, tableName := parts[0], parts[1]
 
-	return &TableSnapshot{
+	return &tableSnapshot{
 		DB:         s,
 		SchemaName: schemaName,
 		TableName:  tableName,
@@ -84,19 +80,15 @@ func (s *DatabaseSnapshot) Table(tableID string, scanKey []string) *TableSnapsho
 	}
 }
 
-func (s *DatabaseSnapshot) Close(ctx context.Context) error {
-	if err := s.Transaction.Rollback(ctx); err != nil {
-		s.Conn.Close(ctx)
-		return err
-	}
-	return s.Conn.Close(ctx)
+func (s *databaseSnapshot) Close(ctx context.Context) error {
+	return s.Transaction.Rollback(ctx)
 }
 
-func (s *TableSnapshot) TransactionLSN() pglogrepl.LSN {
+func (s *tableSnapshot) TransactionLSN() pglogrepl.LSN {
 	return s.DB.TransactionLSN()
 }
 
-func (s *TableSnapshot) buildScanQuery(start bool) string {
+func (s *tableSnapshot) buildScanQuery(start bool) string {
 	// We cache the query used in start=false cases (ScanFrom) to avoid
 	// redundantly building it over and over for no reason.
 	if !start && s.scanFromQuery != "" {
@@ -121,7 +113,7 @@ func (s *TableSnapshot) buildScanQuery(start bool) string {
 		fmt.Fprintf(query, " WHERE (%s) > (%s)", pkey, args)
 	}
 	fmt.Fprintf(query, " ORDER BY (%s)", pkey)
-	fmt.Fprintf(query, " LIMIT %d;", SnapshotChunkSize)
+	fmt.Fprintf(query, " LIMIT %d;", snapshotChunkSize)
 
 	// Cache where applicable and return
 	if !start {
@@ -131,7 +123,7 @@ func (s *TableSnapshot) buildScanQuery(start bool) string {
 	return query.String()
 }
 
-func (s *TableSnapshot) ScanStart(ctx context.Context, handler ChangeEventHandler) (int, []byte, error) {
+func (s *tableSnapshot) ScanStart(ctx context.Context, handler changeEventHandler) (int, []byte, error) {
 	logrus.WithFields(logrus.Fields{
 		"namespace":  s.SchemaName,
 		"table":      s.TableName,
@@ -141,15 +133,15 @@ func (s *TableSnapshot) ScanStart(ctx context.Context, handler ChangeEventHandle
 
 	query := s.buildScanQuery(true)
 	logrus.WithField("query", query).Debug("executing query")
-	rows, err := s.DB.Conn.Query(ctx, query)
+	rows, err := s.DB.Transaction.Query(ctx, query)
 	if err != nil {
-		return 0, nil, errors.Wrapf(err, "unable to execute query %q", query)
+		return 0, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
 	return s.dispatchResults(ctx, rows, handler)
 }
 
-func (s *TableSnapshot) ScanFrom(ctx context.Context, prevKey []byte, handler ChangeEventHandler) (int, []byte, error) {
+func (s *tableSnapshot) ScanFrom(ctx context.Context, prevKey []byte, handler changeEventHandler) (int, []byte, error) {
 	logrus.WithFields(logrus.Fields{
 		"namespace":  s.SchemaName,
 		"table":      s.TableName,
@@ -159,22 +151,22 @@ func (s *TableSnapshot) ScanFrom(ctx context.Context, prevKey []byte, handler Ch
 
 	args, err := unpackTuple(prevKey)
 	if err != nil {
-		return 0, nil, errors.Wrap(err, "error unpacking encoded tuple")
+		return 0, nil, fmt.Errorf("error unpacking encoded tuple: %w", err)
 	}
 	if len(args) != len(s.ScanKey) {
-		return 0, nil, errors.Errorf("expected %d primary-key values but got %d", len(s.ScanKey), len(args))
+		return 0, nil, fmt.Errorf("expected %d primary-key values but got %d", len(s.ScanKey), len(args))
 	}
 	query := s.buildScanQuery(false)
 	logrus.WithField("query", query).WithField("args", args).Debug("executing query")
-	rows, err := s.DB.Conn.Query(ctx, query, args...)
+	rows, err := s.DB.Transaction.Query(ctx, query, args...)
 	if err != nil {
-		return 0, prevKey, errors.Wrapf(err, "unable to execute query %q", query)
+		return 0, prevKey, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
 	return s.dispatchResults(ctx, rows, handler)
 }
 
-func (s *TableSnapshot) dispatchResults(ctx context.Context, rows pgx.Rows, handler ChangeEventHandler) (int, []byte, error) {
+func (s *tableSnapshot) dispatchResults(ctx context.Context, rows pgx.Rows, handler changeEventHandler) (int, []byte, error) {
 	cols := rows.FieldDescriptions()
 	var lastKey []byte
 	var rowsProcessed int
@@ -183,7 +175,7 @@ func (s *TableSnapshot) dispatchResults(ctx context.Context, rows pgx.Rows, hand
 		fields := make(map[string]interface{})
 		vals, err := rows.Values()
 		if err != nil {
-			return rowsProcessed, nil, errors.Wrap(err, "unable to get row values")
+			return rowsProcessed, nil, fmt.Errorf("unable to get row values: %w", err)
 		}
 		for idx, val := range vals {
 			colName := string(cols[idx].Name)
@@ -198,7 +190,7 @@ func (s *TableSnapshot) dispatchResults(ctx context.Context, rows pgx.Rows, hand
 		}
 		rowKey, err := packTuple(keyFields)
 		if err != nil {
-			return rowsProcessed, nil, errors.Wrap(err, "unable to encode row primary key")
+			return rowsProcessed, nil, fmt.Errorf("unable to encode row primary key: %w", err)
 		}
 
 		// This is an opportunistic sanity-check of what should be an invariant.
@@ -220,18 +212,18 @@ func (s *TableSnapshot) dispatchResults(ctx context.Context, rows pgx.Rows, hand
 		// replication event was filtered when it shouldn't have been) once replication
 		// begins.
 		if lastKey != nil && compareTuples(lastKey, rowKey) >= 0 {
-			return rowsProcessed, nil, errors.Errorf("primary key ordering failure: prev=%q, next=%q", lastKey, rowKey)
+			return rowsProcessed, nil, fmt.Errorf("primary key ordering failure: prev=%q, next=%q", lastKey, rowKey)
 		}
 		lastKey = rowKey
 
-		if err := handler(&ChangeEvent{
+		if err := handler(&changeEvent{
 			Type:      "Insert",
 			LSN:       s.TransactionLSN(),
 			Namespace: s.SchemaName,
 			Table:     s.TableName,
 			Fields:    fields,
 		}); err != nil {
-			return rowsProcessed, nil, errors.Wrap(err, "error handling change event")
+			return rowsProcessed, nil, fmt.Errorf("error handling change event: %w", err)
 		}
 		rowsProcessed++
 	}

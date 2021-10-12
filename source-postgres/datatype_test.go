@@ -108,7 +108,7 @@ func TestDatatypes(t *testing.T) {
 
 	for idx, tc := range datatypeTestcases {
 		t.Run(fmt.Sprintf("idx=%d", idx), func(t *testing.T) {
-			table := createTestTable(t, ctx, "", fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+			table := createTestTable(ctx, t, "", fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
 
 			// Perform discovery and verify that the generated JSON schema looks correct
 			t.Run("discovery", func(t *testing.T) {
@@ -140,14 +140,14 @@ func TestDatatypes(t *testing.T) {
 				catalog, state := testCatalog(table), PersistentState{}
 
 				t.Run("scan", func(t *testing.T) {
-					dbQuery(t, ctx, fmt.Sprintf(`INSERT INTO %s VALUES (1, %s);`, table, tc.ColumnValue))
-					output, _ := performCapture(t, ctx, &cfg, &catalog, &state)
+					dbQuery(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (1, %s);`, table, tc.ColumnValue))
+					output, _ := performCapture(ctx, t, &cfg, &catalog, &state)
 					verifyRoundTrip(t, output, tc.ColumnType, tc.ColumnValue, tc.OutputValue)
 				})
 
 				t.Run("replication", func(t *testing.T) {
-					dbQuery(t, ctx, fmt.Sprintf(`INSERT INTO %s VALUES (2, %s);`, table, tc.ColumnValue))
-					output, _ := performCapture(t, ctx, &cfg, &catalog, &state)
+					dbQuery(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (2, %s);`, table, tc.ColumnValue))
+					output, _ := performCapture(ctx, t, &cfg, &catalog, &state)
 					verifyRoundTrip(t, output, tc.ColumnType, tc.ColumnValue, tc.OutputValue)
 				})
 			})

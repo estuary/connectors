@@ -10,7 +10,7 @@ import (
 
 func TestDiscoverySimple(t *testing.T) {
 	cfg, ctx := TestDefaultConfig, shortTestContext(t)
-	tableName := createTestTable(t, ctx, "", "(a INTEGER PRIMARY KEY, b TEXT, c REAL, d VARCHAR(255))")
+	tableName := createTestTable(ctx, t, "", "(a INTEGER PRIMARY KEY, b TEXT, c REAL, d VARCHAR(255))")
 
 	// Create the table (with deferred cleanup), perform discovery, and verify
 	// that the stream as discovered matches the golden snapshot.
