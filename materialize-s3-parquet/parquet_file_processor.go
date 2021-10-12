@@ -257,7 +257,7 @@ func (pfp *ParquetFileProcessor) nextSeqNumList() []int {
 // TODO(jixiang) better understand the impact of ParallelNumber to the performance of the connector.
 const parquetWriterParallelNumber int64 = 4
 
-const pqContentType string = "binary/octet-stream"
+const pqContentType string = "application/octet-stream"
 
 // A pqBinding is responsible for converting, storing, and uploading the materialization results from
 // a single binding of flow txns into the cloud.
