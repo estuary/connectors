@@ -7,18 +7,19 @@ import (
 
 	"github.com/estuary/protocols/airbyte"
 	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
+// DiscoverCatalog queries the database and generates an Airbyte Catalog
+// describing the available tables and their columns.
 func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, error) {
 	conn, err := pgx.Connect(ctx, config.ConnectionURI)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to connect to database")
+		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
 	defer conn.Close(ctx)
 
-	tables, err := GetDatabaseTables(ctx, conn)
+	tables, err := getDatabaseTables(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,7 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 
 			jsonType, ok := postgresTypeToJSON[column.DataType]
 			if !ok {
-				return nil, errors.Errorf("cannot translate PostgreSQL column type %q to JSON schema", column.DataType)
+				return nil, fmt.Errorf("cannot translate PostgreSQL column type %q to JSON schema", column.DataType)
 			}
 			schema += fmt.Sprintf("%q:%s", column.ColumnName, jsonType)
 		}
@@ -124,14 +125,14 @@ var postgresTypeToJSON = map[string]string{
 	"uuid":        `{"type":"string","format":"uuid"}`,
 }
 
-type TableInfo struct {
+type tableInfo struct {
 	TableSchema string
 	TableName   string
-	Columns     []ColumnInfo
+	Columns     []columnInfo
 	PrimaryKey  []string
 }
 
-type ColumnInfo struct {
+type columnInfo struct {
 	TableSchema string
 	TableName   string
 	ColumnName  string
@@ -140,28 +141,28 @@ type ColumnInfo struct {
 	DataType    string
 }
 
-// GetDatabaseTables queries the database to produce a list of all tables
+// getDatabaseTables queries the database to produce a list of all tables
 // (with the exception of some internal system schemas) with information
 // about their column types and primary key.
-func GetDatabaseTables(ctx context.Context, conn *pgx.Conn) ([]TableInfo, error) {
+func getDatabaseTables(ctx context.Context, conn *pgx.Conn) ([]tableInfo, error) {
 	// Get lists of all columns and primary keys in the database
 	columns, err := getColumns(ctx, conn)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to list database columns")
+		return nil, fmt.Errorf("unable to list database columns: %w", err)
 	}
-	primaryKeys, err := GetPrimaryKeys(ctx, conn)
+	primaryKeys, err := getPrimaryKeys(ctx, conn)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to list database primary keys")
+		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
 	}
 
 	// Aggregate column and primary key information into TableInfo structs
 	// using a map from fully-qualified "<schema>.<name>" table names to
 	// the corresponding TableInfo.
-	tableMap := make(map[string]*TableInfo)
+	tableMap := make(map[string]*tableInfo)
 	for _, column := range columns {
 		id := column.TableSchema + "." + column.TableName
 		if _, ok := tableMap[id]; !ok {
-			tableMap[id] = &TableInfo{TableSchema: column.TableSchema, TableName: column.TableName}
+			tableMap[id] = &tableInfo{TableSchema: column.TableSchema, TableName: column.TableName}
 		}
 		tableMap[id].Columns = append(tableMap[id].Columns, column)
 	}
@@ -177,24 +178,24 @@ func GetDatabaseTables(ctx context.Context, conn *pgx.Conn) ([]TableInfo, error)
 
 	// Now that aggregation is complete, discard map keys and return
 	// just the list of TableInfo structs.
-	var tables []TableInfo
+	var tables []tableInfo
 	for _, info := range tableMap {
 		tables = append(tables, *info)
 	}
 	return tables, nil
 }
 
-const COLUMNS_QUERY = `
+const queryDiscoverColumns = `
   SELECT table_schema, table_name, ordinal_position, column_name, is_nullable::boolean, udt_name
   FROM information_schema.columns
   WHERE table_schema != 'pg_catalog' AND table_schema != 'information_schema'
         AND table_schema != 'pg_internal' AND table_schema != 'catalog_history'
   ORDER BY table_schema, table_name, ordinal_position;`
 
-func getColumns(ctx context.Context, conn *pgx.Conn) ([]ColumnInfo, error) {
-	var columns []ColumnInfo
-	var sc ColumnInfo
-	_, err := conn.QueryFunc(ctx, COLUMNS_QUERY, nil,
+func getColumns(ctx context.Context, conn *pgx.Conn) ([]columnInfo, error) {
+	var columns []columnInfo
+	var sc columnInfo
+	_, err := conn.QueryFunc(ctx, queryDiscoverColumns, nil,
 		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.ColumnIndex, &sc.ColumnName, &sc.IsNullable, &sc.DataType},
 		func(r pgx.QueryFuncRow) error {
 			columns = append(columns, sc)
@@ -205,7 +206,7 @@ func getColumns(ctx context.Context, conn *pgx.Conn) ([]ColumnInfo, error) {
 
 // Query copied from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with
 // the always-NULL `TABLE_CAT` column omitted.
-const PRIMARY_KEYS_QUERY = `
+const queryDiscoverPrimaryKeys = `
   SELECT result.TABLE_SCHEM, result.TABLE_NAME, result.COLUMN_NAME, result.KEY_SEQ
   FROM (
     SELECT n.nspname AS TABLE_SCHEM,
@@ -224,21 +225,21 @@ const PRIMARY_KEYS_QUERY = `
   ORDER BY result.table_name, result.pk_name, result.key_seq;
 `
 
-// GetPrimaryKeys queries the database to produce a map from table names to
+// getPrimaryKeys queries the database to produce a map from table names to
 // primary keys. Table names are fully qualified as "<schema>.<name>", and
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
-func GetPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, error) {
+func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, error) {
 	keys := make(map[string][]string)
 	var tableSchema, tableName, columnName string
 	var columnIndex int
-	_, err := conn.QueryFunc(ctx, PRIMARY_KEYS_QUERY, nil,
+	_, err := conn.QueryFunc(ctx, queryDiscoverPrimaryKeys, nil,
 		[]interface{}{&tableSchema, &tableName, &columnName, &columnIndex},
 		func(r pgx.QueryFuncRow) error {
 			id := fmt.Sprintf("%s.%s", tableSchema, tableName)
 			keys[id] = append(keys[id], columnName)
 			if columnIndex != len(keys[id]) {
-				return errors.Errorf("primary key column %q appears out of order (expected index %d, in context %q)", columnName, columnIndex, keys[id])
+				return fmt.Errorf("primary key column %q appears out of order (expected index %d, in context %q)", columnName, columnIndex, keys[id])
 			}
 			return nil
 		})

@@ -3,16 +3,18 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/estuary/protocols/airbyte"
-	"github.com/pkg/errors"
 )
 
 func main() {
 	airbyte.RunMain(spec, doCheck, doDiscover, doRead)
 }
 
+// Config tells the connector how to connect to the source database and can
+// optionally be used to customize some other parameters such as polling timeout.
 type Config struct {
 	ConnectionURI      string  `json:"connectionURI"`
 	SlotName           string  `json:"slot_name"`
@@ -21,9 +23,11 @@ type Config struct {
 	MaxLifespanSeconds float64 `json:"max_lifespan_seconds"`
 }
 
+// Validate checks that the configuration passes some basic sanity checks, and
+// fills in default values when optional parameters are unset.
 func (c *Config) Validate() error {
 	if c.ConnectionURI == "" {
-		return errors.New("Database Connection URI must be set")
+		return fmt.Errorf("Database Connection URI must be set")
 	}
 	if c.SlotName == "" {
 		c.SlotName = "flow_slot"
@@ -118,7 +122,7 @@ func doRead(args airbyte.ReadCmd) error {
 	state := &PersistentState{Streams: make(map[string]*TableState)}
 	if args.StateFile != "" {
 		if err := args.StateFile.Parse(state); err != nil {
-			return errors.Wrap(err, "unable to parse state file")
+			return fmt.Errorf("unable to parse state file: %w", err)
 		}
 	}
 
@@ -129,12 +133,8 @@ func doRead(args airbyte.ReadCmd) error {
 
 	catalog := new(airbyte.ConfiguredCatalog)
 	if err := args.CatalogFile.Parse(catalog); err != nil {
-		return errors.Wrap(err, "unable to parse catalog")
+		return fmt.Errorf("unable to parse catalog: %w", err)
 	}
 
-	capture, err := NewCapture(ctx, config, catalog, state, json.NewEncoder(os.Stdout))
-	if err != nil {
-		return err
-	}
-	return capture.Execute(ctx)
+	return RunCapture(ctx, config, catalog, state, json.NewEncoder(os.Stdout))
 }
