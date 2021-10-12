@@ -101,15 +101,15 @@ type messageOutput interface {
 // (if any) are met.
 func RunCapture(ctx context.Context, config *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, dest messageOutput) error {
 	if config.MaxLifespanSeconds != 0 {
-		duration := time.Duration(config.MaxLifespanSeconds * float64(time.Second))
+		var duration = time.Duration(config.MaxLifespanSeconds * float64(time.Second))
 		logrus.WithField("duration", duration).Info("limiting connector lifespan")
-		limitedCtx, cancel := context.WithTimeout(ctx, duration)
+		var limitedCtx, cancel = context.WithTimeout(ctx, duration)
 		defer cancel()
 		ctx = limitedCtx
 	}
 
 	// Normal database connection used for table scanning
-	connScan, err := pgx.Connect(ctx, config.ConnectionURI)
+	var connScan, err = pgx.Connect(ctx, config.ConnectionURI)
 	if err != nil {
 		return fmt.Errorf("unable to connect to database for table scan: %w", err)
 	}
@@ -126,7 +126,7 @@ func RunCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 		return fmt.Errorf("unable to connect to database for replication: %w", err)
 	}
 
-	c := &capture{
+	var c = &capture{
 		state:    state,
 		config:   config,
 		catalog:  catalog,
@@ -147,9 +147,9 @@ func RunCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 	// do this we create a cancellable context, and a watchdog timer which will
 	// perform said cancellation if `PollTimeout` elapses between resets.
 	if !c.catalog.Tail && c.config.PollTimeoutSeconds != 0 {
-		streamCtx, streamCancel := context.WithCancel(ctx)
+		var streamCtx, streamCancel = context.WithCancel(ctx)
 		defer streamCancel()
-		wdtDuration := time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
+		var wdtDuration = time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
 		c.watchdog = time.AfterFunc(wdtDuration, streamCancel)
 		ctx = streamCtx
 	}
@@ -166,7 +166,7 @@ func RunCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 }
 
 func (c *capture) updateState(ctx context.Context) error {
-	stateDirty := false
+	var stateDirty = false
 
 	// Create the Streams map if nil
 	if c.state.Streams == nil {
@@ -179,7 +179,7 @@ func (c *capture) updateState(ctx context.Context) error {
 	// Since change events which precede the table scan will be filtered out, this
 	// value doesn't need to be exact so long as it precedes the table scan.
 	if c.state.CurrentLSN == 0 {
-		sysident, err := pglogrepl.IdentifySystem(ctx, c.connRepl)
+		var sysident, err = pglogrepl.IdentifySystem(ctx, c.connRepl)
 		if err != nil {
 			return fmt.Errorf("unable to get current LSN from database: %w", err)
 		}
@@ -190,7 +190,7 @@ func (c *capture) updateState(ctx context.Context) error {
 	// Streams may be added to the catalog at various times. We need to
 	// initialize new state entries for these streams, and while we're at
 	// it this is a good time to sanity-check the primary key configuration.
-	dbPrimaryKeys, err := getPrimaryKeys(ctx, c.connScan)
+	var dbPrimaryKeys, err = getPrimaryKeys(ctx, c.connScan)
 	if err != nil {
 		return fmt.Errorf("error querying database about primary keys: %w", err)
 	}
@@ -199,7 +199,7 @@ func (c *capture) updateState(ctx context.Context) error {
 		// Table names coming from Postgres are always lowercase, so if we
 		// normalize the stream name to lowercase on the catalog->state
 		// transition then we can ignore the issue later on.
-		streamID := joinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
+		var streamID = joinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
 
 		// In the catalog a primary key is an array of arrays of strings, but in the
 		// case of Postgres each of those sub-arrays must be length-1 because we're
@@ -215,7 +215,7 @@ func (c *capture) updateState(ctx context.Context) error {
 		// If the `PrimaryKey` property is specified in the catalog then use that,
 		// otherwise use the "native" primary key of this table in the database.
 		// Print a warning if the two are not the same.
-		primaryKey := dbPrimaryKeys[streamID]
+		var primaryKey = dbPrimaryKeys[streamID]
 		if len(primaryKey) != 0 {
 			logrus.WithField("table", streamID).WithField("key", primaryKey).Debug("queried primary key")
 		}
@@ -234,7 +234,7 @@ func (c *capture) updateState(ctx context.Context) error {
 		}
 
 		// See if the stream is already initialized. If it's not, then create it.
-		streamState, ok := c.state.Streams[streamID]
+		var streamState, ok = c.state.Streams[streamID]
 		if !ok {
 			c.state.Streams[streamID] = &TableState{Mode: tableModeScanning, ScanKey: primaryKey}
 			stateDirty = true
@@ -250,9 +250,9 @@ func (c *capture) updateState(ctx context.Context) error {
 	// the corresponding state information.
 	for streamID := range c.state.Streams {
 		// List membership checks are always a pain in Go, but that's all this loop is
-		streamExistsInCatalog := false
+		var streamExistsInCatalog = false
 		for _, catalogStream := range c.catalog.Streams {
-			catalogStreamID := joinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
+			var catalogStreamID = joinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
 			if streamID == catalogStreamID {
 				streamExistsInCatalog = true
 			}
@@ -297,13 +297,13 @@ func joinStreamID(namespace, stream string) string {
 // able to pick back up where it left off.
 func (c *capture) scanTables(ctx context.Context) error {
 	// Skip unnecessary setup work if there's no scan work pending anyway.
-	pendingStreamIDs := c.pendingScans()
+	var pendingStreamIDs = c.pendingScans()
 	if len(pendingStreamIDs) == 0 {
 		return nil
 	}
 
 	// Take a snapshot of the database contents
-	snapshot, err := snapshotDatabase(ctx, c.connScan)
+	var snapshot, err = snapshotDatabase(ctx, c.connScan)
 	if err != nil {
 		return fmt.Errorf("error creating database snapshot: %w", err)
 	}
@@ -341,12 +341,12 @@ func (c *capture) pendingScans() []string {
 // state updates along the way. If the connector is resumed from a partial
 // state, scanning resumes from where it left off.
 func (c *capture) scanTable(ctx context.Context, snapshot *databaseSnapshot, streamID string) error {
-	tableState := c.state.Streams[streamID]
+	var tableState = c.state.Streams[streamID]
 	if tableState.Mode != tableModeScanning {
 		return fmt.Errorf("stream %q in state %q (expected %q)", streamID, tableState.Mode, tableModeScanning)
 	}
 
-	table := snapshot.Table(streamID, tableState.ScanKey)
+	var table = snapshot.Table(streamID, tableState.ScanKey)
 
 	// The table scanning process is implemented as a loop which keeps doing
 	// the next chunk of work until it's all done. This way we don't have to
@@ -357,7 +357,7 @@ func (c *capture) scanTable(ctx context.Context, snapshot *databaseSnapshot, str
 		// If this stream has no previously scanned range information, request the first
 		// chunk, then initialize the scanned ranges list and emit a state update.
 		if len(tableState.ScanRanges) == 0 {
-			count, endKey, err := table.ScanStart(ctx, c.handleChangeEvent)
+			var count, endKey, err = table.ScanStart(ctx, c.handleChangeEvent)
 			if err != nil {
 				return fmt.Errorf("error processing snapshot events: %w", err)
 			}
@@ -387,7 +387,7 @@ func (c *capture) scanTable(ctx context.Context, snapshot *databaseSnapshot, str
 		// Whether or not this is the case, `lastRange` will end up referring to some range
 		// with the same `ScannedLSN` as our current transaction, which will be extended by
 		// reading further chunks from the table.
-		lastRange := &tableState.ScanRanges[len(tableState.ScanRanges)-1]
+		var lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
 		if lastRange.ScannedLSN != snapshot.TransactionLSN() {
 			tableState.ScanRanges = append(tableState.ScanRanges, TableRange{
 				ScannedLSN: snapshot.TransactionLSN(),
@@ -399,7 +399,7 @@ func (c *capture) scanTable(ctx context.Context, snapshot *databaseSnapshot, str
 		// This is the core operation where we spend most of our time when scanning
 		// table contents: reading the next chunk from the table and extending the
 		// endpoint of `lastRange`.
-		count, nextKey, err := table.ScanFrom(ctx, lastRange.EndKey, c.handleChangeEvent)
+		var count, nextKey, err = table.ScanFrom(ctx, lastRange.EndKey, c.handleChangeEvent)
 		if err != nil {
 			return fmt.Errorf("error processing snapshot events: %w", err)
 		}
@@ -423,7 +423,7 @@ func (c *capture) scanTable(ctx context.Context, snapshot *databaseSnapshot, str
 // passed off to `c.HandleReplicationEvent` for further processing.
 func (c *capture) streamChanges(ctx context.Context) error {
 	// TODO(wgd): Perhaps merge startReplication and process() call?
-	stream, err := startReplication(ctx, c.connRepl, c.config.SlotName, c.config.PublicationName, c.state.CurrentLSN)
+	var stream, err = startReplication(ctx, c.connRepl, c.config.SlotName, c.config.PublicationName, c.state.CurrentLSN)
 	if err != nil {
 		return fmt.Errorf("unable to start replication stream: %w", err)
 	}
@@ -438,7 +438,7 @@ func (c *capture) streamChanges(ctx context.Context) error {
 func (c *capture) handleReplicationEvent(evt *changeEvent) error {
 	// When in non-tailing mode, reset the shutdown watchdog whenever an event happens.
 	if c.watchdog != nil {
-		wdtDuration := time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
+		var wdtDuration = time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
 		c.watchdog.Reset(wdtDuration)
 	}
 
@@ -468,8 +468,8 @@ func (c *capture) handleReplicationEvent(evt *changeEvent) error {
 		"values":    evt.Fields,
 	}).Debug("replication change event")
 
-	streamID := joinStreamID(evt.Namespace, evt.Table)
-	tableState := c.state.Streams[streamID]
+	var streamID = joinStreamID(evt.Namespace, evt.Table)
+	var tableState = c.state.Streams[streamID]
 	if tableState == nil {
 		// If we're not tracking state by now, this table isn't in the catalog. Ignore it.
 		return nil
@@ -479,7 +479,7 @@ func (c *capture) handleReplicationEvent(evt *changeEvent) error {
 	}
 
 	// Decide whether this event should be filtered out based on its LSN.
-	filter, err := c.filteredLSN(tableState, evt.Fields, evt.LSN)
+	var filter, err = c.filteredLSN(tableState, evt.Fields, evt.LSN)
 	if err != nil {
 		return fmt.Errorf("error in filter check: %w", err)
 	}
@@ -514,13 +514,13 @@ func (c *capture) filteredLSN(tableState *TableState, fields map[string]interfac
 		for _, keyName := range tableState.ScanKey {
 			keyElems = append(keyElems, fields[keyName])
 		}
-		keyBytes, err := packTuple(keyElems)
+		var keyBytes, err = packTuple(keyElems)
 		if err != nil {
 			return false, fmt.Errorf("error encoding primary key for comparison: %w", err)
 		}
 		for _, scanRange := range tableState.ScanRanges {
 			if compareTuples(keyBytes, scanRange.EndKey) < 0 {
-				isFiltered := lsn < scanRange.ScannedLSN
+				var isFiltered = lsn < scanRange.ScannedLSN
 				return isFiltered, nil
 			}
 		}
@@ -528,17 +528,16 @@ func (c *capture) filteredLSN(tableState *TableState, fields map[string]interfac
 
 	// If the key did not fall into any known scan range during the previous
 	// bit of code then conceptually it falls into the last range.
-	scannedLSN := tableState.ScanRanges[len(tableState.ScanRanges)-1].ScannedLSN
-	isFiltered := lsn < scannedLSN
+	var scannedLSN = tableState.ScanRanges[len(tableState.ScanRanges)-1].ScannedLSN
+	var isFiltered = lsn < scannedLSN
 	return isFiltered, nil
 }
 
 func (c *capture) handleChangeEvent(evt *changeEvent) error {
 	evt.Fields["_change_type"] = evt.Type
-	evt.Fields["_change_lsn"] = evt.LSN
 
 	for id, val := range evt.Fields {
-		translated, err := translateRecordField(val)
+		var translated, err = translateRecordField(val)
 		if err != nil {
 			logrus.WithField("val", val).Error("value translation error")
 			return fmt.Errorf("error translating field value: %w", err)
@@ -560,7 +559,7 @@ func translateRecordField(val interface{}) (interface{}, error) {
 	case net.HardwareAddr:
 		return x.String(), nil
 	case [16]uint8: // UUIDs
-		s := new(strings.Builder)
+		var s = new(strings.Builder)
 		for i := range x {
 			if i == 4 || i == 6 || i == 8 || i == 10 {
 				s.WriteString("-")
@@ -569,19 +568,19 @@ func translateRecordField(val interface{}) (interface{}, error) {
 		}
 		return s.String(), nil
 	}
+	if _, ok := val.(json.Marshaler); ok {
+		return val, nil
+	}
 	if enc, ok := val.(pgtype.TextEncoder); ok {
-		bs, err := enc.EncodeText(nil, nil)
-		if err != nil {
-			return nil, err
-		}
-		return string(bs), nil
+		var bs, err = enc.EncodeText(nil, nil)
+		return string(bs), err
 	}
 	return val, nil
 }
 
 func (c *capture) emitRecord(ns, stream string, data interface{}) error {
 	c.changesSinceLastCheckpoint++
-	rawData, err := json.Marshal(data)
+	var rawData, err = json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("error encoding record data: %w", err)
 	}
@@ -598,7 +597,7 @@ func (c *capture) emitRecord(ns, stream string, data interface{}) error {
 
 func (c *capture) emitState(state interface{}) error {
 	c.changesSinceLastCheckpoint = 0
-	rawState, err := json.Marshal(state)
+	var rawState, err = json.Marshal(state)
 	if err != nil {
 		return fmt.Errorf("error encoding state message: %w", err)
 	}

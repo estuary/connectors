@@ -13,9 +13,9 @@ import (
 // which should emit all rows during table-scanning, start replication, and then
 // shut down due to a lack of further events.
 func TestSimpleCapture(t *testing.T) {
-	cfg, ctx := TestDefaultConfig, shortTestContext(t)
-	tableName := createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	catalog, state := testCatalog(tableName), PersistentState{}
+	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
+	var tableName = createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var catalog, state = testCatalog(tableName), PersistentState{}
 
 	// Add data, perform capture, verify result
 	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
@@ -26,9 +26,9 @@ func TestSimpleCapture(t *testing.T) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts performed after the first capture.
 func TestReplicationInserts(t *testing.T) {
-	cfg, ctx := TestDefaultConfig, shortTestContext(t)
-	tableName := createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	catalog, state := testCatalog(tableName), PersistentState{}
+	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
+	var tableName = createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var catalog, state = testCatalog(tableName), PersistentState{}
 
 	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
@@ -40,9 +40,9 @@ func TestReplicationInserts(t *testing.T) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts and deletions performed after the first capture.
 func TestReplicationDeletes(t *testing.T) {
-	cfg, ctx := TestDefaultConfig, shortTestContext(t)
-	tableName := createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	catalog, state := testCatalog(tableName), PersistentState{}
+	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
+	var tableName = createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var catalog, state = testCatalog(tableName), PersistentState{}
 
 	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
@@ -55,9 +55,9 @@ func TestReplicationDeletes(t *testing.T) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts and row updates performed after the first capture.
 func TestReplicationUpdates(t *testing.T) {
-	cfg, ctx := TestDefaultConfig, shortTestContext(t)
-	tableName := createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	catalog, state := testCatalog(tableName), PersistentState{}
+	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
+	var tableName = createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var catalog, state = testCatalog(tableName), PersistentState{}
 
 	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}})
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
@@ -69,9 +69,9 @@ func TestReplicationUpdates(t *testing.T) {
 // TestEmptyTable leaves the table empty during the initial table snapshotting
 // and only adds data after replication has begun.
 func TestEmptyTable(t *testing.T) {
-	cfg, ctx := TestDefaultConfig, shortTestContext(t)
-	tableName := createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	catalog, state := testCatalog(tableName), PersistentState{}
+	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
+	var tableName = createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var catalog, state = testCatalog(tableName), PersistentState{}
 
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
 	dbInsert(ctx, t, tableName, [][]interface{}{{1002, "some"}, {1000, "more"}, {1001, "rows"}})
@@ -84,12 +84,12 @@ func TestEmptyTable(t *testing.T) {
 // "chunks", two connector restarts at different points in the initial table scan, and
 // some concurrent modifications to row ranges already-scanned and not-yet-scanned.
 func TestComplexDataset(t *testing.T) {
-	cfg, ctx := TestDefaultConfig, shortTestContext(t)
-	tableName := createTestTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
-	catalog, state := testCatalog(tableName), PersistentState{}
+	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
+	var tableName = createTestTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
+	var catalog, state = testCatalog(tableName), PersistentState{}
 
 	dbLoadCSV(ctx, t, tableName, "statepop.csv", 0)
-	states := verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
+	var states = verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
 	state = states[10] // Restart in between (1960, 'IA') and (1960, 'ID')
 
 	dbInsert(ctx, t, tableName, [][]interface{}{
@@ -112,16 +112,16 @@ func TestComplexDataset(t *testing.T) {
 // TestMultipleStreams exercises captures with multiple stream configured, as
 // well as adding/removing/re-adding a stream.
 func TestMultipleStreams(t *testing.T) {
-	cfg, ctx, state := TestDefaultConfig, shortTestContext(t), PersistentState{}
-	table1 := createTestTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
-	table2 := createTestTable(ctx, t, "two", "(id INTEGER PRIMARY KEY, data TEXT)")
-	table3 := createTestTable(ctx, t, "three", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cfg, ctx, state = TestDefaultConfig, shortTestContext(t), PersistentState{}
+	var table1 = createTestTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var table2 = createTestTable(ctx, t, "two", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var table3 = createTestTable(ctx, t, "three", "(id INTEGER PRIMARY KEY, data TEXT)")
 	dbInsert(ctx, t, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
 	dbInsert(ctx, t, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
 	dbInsert(ctx, t, table3, [][]interface{}{{6, "six"}, {7, "seven"}, {8, "eight"}})
-	catalog1 := testCatalog(table1)
-	catalog123 := testCatalog(table1, table2, table3)
-	catalog13 := testCatalog(table1, table3)
+	var catalog1 = testCatalog(table1)
+	var catalog123 = testCatalog(table1, table2, table3)
+	var catalog13 = testCatalog(table1, table3)
 	verifiedCapture(ctx, t, &cfg, &catalog1, &state, "capture1")   // Scan table1
 	verifiedCapture(ctx, t, &cfg, &catalog123, &state, "capture2") // Add table2 and table3
 	verifiedCapture(ctx, t, &cfg, &catalog13, &state, "capture3")  // Forget about table2
@@ -135,10 +135,10 @@ func TestMultipleStreams(t *testing.T) {
 // TestCatalogPrimaryKey sets up a table with no primary key in the database
 // and instead specifies one in the catalog configuration.
 func TestCatalogPrimaryKey(t *testing.T) {
-	cfg, ctx, state := TestDefaultConfig, shortTestContext(t), PersistentState{}
-	table := createTestTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER)")
+	var cfg, ctx, state = TestDefaultConfig, shortTestContext(t), PersistentState{}
+	var table = createTestTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER)")
 	dbLoadCSV(ctx, t, table, "statepop.csv", 100)
-	catalog := testCatalog(table)
+	var catalog = testCatalog(table)
 	catalog.Streams[0].PrimaryKey = [][]string{{"fullname"}, {"year"}}
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "capture1")
 	dbInsert(ctx, t, table, [][]interface{}{
@@ -152,10 +152,10 @@ func TestCatalogPrimaryKey(t *testing.T) {
 // TestCatalogPrimaryKeyOverride sets up a table with a primary key, but
 // then overrides that via the catalog configuration.
 func TestCatalogPrimaryKeyOverride(t *testing.T) {
-	cfg, ctx, state := TestDefaultConfig, shortTestContext(t), PersistentState{}
-	table := createTestTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
+	var cfg, ctx, state = TestDefaultConfig, shortTestContext(t), PersistentState{}
+	var table = createTestTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
 	dbLoadCSV(ctx, t, table, "statepop.csv", 100)
-	catalog := testCatalog(table)
+	var catalog = testCatalog(table)
 	catalog.Streams[0].PrimaryKey = [][]string{{"fullname"}, {"year"}}
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "capture1")
 	dbInsert(ctx, t, table, [][]interface{}{
@@ -169,12 +169,12 @@ func TestCatalogPrimaryKeyOverride(t *testing.T) {
 // TestIgnoredStreams checks that replicated changes are only reported
 // for tables which are configured in the catalog.
 func TestIgnoredStreams(t *testing.T) {
-	cfg, ctx, state := TestDefaultConfig, shortTestContext(t), PersistentState{}
-	table1 := createTestTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
-	table2 := createTestTable(ctx, t, "two", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cfg, ctx, state = TestDefaultConfig, shortTestContext(t), PersistentState{}
+	var table1 = createTestTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var table2 = createTestTable(ctx, t, "two", "(id INTEGER PRIMARY KEY, data TEXT)")
 	dbInsert(ctx, t, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
 	dbInsert(ctx, t, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
-	catalog := testCatalog(table1)
+	var catalog = testCatalog(table1)
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "capture1") // Scan table1
 	dbInsert(ctx, t, table1, [][]interface{}{{6, "six"}})
 	dbInsert(ctx, t, table2, [][]interface{}{{7, "seven"}})
@@ -186,9 +186,9 @@ func TestIgnoredStreams(t *testing.T) {
 // TestSlotLSNAdvances checks that the `restart_lsn` of a replication slot
 // has advanced after a connector restart.
 func TestSlotLSNAdvances(t *testing.T) {
-	cfg, ctx, state := TestDefaultConfig, longTestContext(t, 30*time.Second), PersistentState{}
-	table := createTestTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
-	catalog := testCatalog(table)
+	var cfg, ctx, state = TestDefaultConfig, longTestContext(t, 30*time.Second), PersistentState{}
+	var table = createTestTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var catalog = testCatalog(table)
 
 	// Capture the current `restart_lsn` of the replication slot prior to our test
 	var beforeLSN pglogrepl.LSN
@@ -206,7 +206,7 @@ func TestSlotLSNAdvances(t *testing.T) {
 	// a replication slot's `restart_lsn` to advance in response to StandbyStatusUpdate
 	// messages.
 	dbInsert(ctx, t, table, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
-	deadline := time.Now().Add(20 * time.Second)
+	var deadline = time.Now().Add(20 * time.Second)
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "capture1")
 
 	// Wait until we're confident a snapshot must have taken place, then create a

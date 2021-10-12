@@ -57,7 +57,7 @@ type replicationStream struct {
 const standbyStatusInterval = 10 * time.Second
 
 func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publication string, startLSN pglogrepl.LSN) (*replicationStream, error) {
-	stream := &replicationStream{
+	var stream = &replicationStream{
 		replSlot:   slot,
 		pubName:    publication,
 		currentLSN: startLSN,
@@ -113,8 +113,8 @@ func (s *replicationStream) process(ctx context.Context, handler changeEventHand
 			s.standbyStatusDeadline = time.Now().Add(standbyStatusInterval)
 		}
 
-		receiveCtx, cancelReceiveCtx := context.WithDeadline(ctx, s.standbyStatusDeadline)
-		msg, err := s.receiveMessage(receiveCtx)
+		var receiveCtx, cancelReceiveCtx = context.WithDeadline(ctx, s.standbyStatusDeadline)
+		var msg, err = s.receiveMessage(receiveCtx)
 		cancelReceiveCtx()
 		if pgconn.Timeout(err) {
 			continue
@@ -169,7 +169,7 @@ func (s *replicationStream) process(ctx context.Context, handler changeEventHand
 			if !s.inTransaction {
 				return fmt.Errorf("got COMMIT message without a transaction in progress")
 			}
-			evt := &changeEvent{
+			var evt = &changeEvent{
 				Type: "Commit",
 				LSN:  msg.TransactionEndLSN,
 			}
@@ -216,20 +216,20 @@ func (s *replicationStream) processChange(ctx context.Context, eventType string,
 		return fmt.Errorf("got %s message without a transaction in progress", eventType)
 	}
 
-	rel, ok := s.relations[relID]
+	var rel, ok = s.relations[relID]
 	if !ok {
 		return fmt.Errorf("unknown relation ID %d", relID)
 	}
 
-	fields := make(map[string]interface{})
+	var fields = make(map[string]interface{})
 	if tuple != nil {
 		for idx, col := range tuple.Columns {
-			colName := rel.Columns[idx].Name
+			var colName = rel.Columns[idx].Name
 			switch col.DataType {
 			case 'n':
 				fields[colName] = nil
 			case 't':
-				val, err := s.decodeTextColumnData(col.Data, rel.Columns[idx].DataType)
+				var val, err = s.decodeTextColumnData(col.Data, rel.Columns[idx].DataType)
 				if err != nil {
 					return fmt.Errorf("error decoding column data: %w", err)
 				}
@@ -240,7 +240,7 @@ func (s *replicationStream) processChange(ctx context.Context, eventType string,
 		}
 	}
 
-	evt := &changeEvent{
+	var evt = &changeEvent{
 		Type:      eventType,
 		LSN:       s.currentLSN,
 		Namespace: rel.Namespace,
@@ -275,7 +275,7 @@ func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (
 // occurs.
 func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.Message, error) {
 	for {
-		msg, err := s.conn.ReceiveMessage(ctx)
+		var msg, err = s.conn.ReceiveMessage(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -284,7 +284,7 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.Messa
 		case *pgproto3.CopyData:
 			switch msg.Data[0] {
 			case pglogrepl.PrimaryKeepaliveMessageByteID:
-				pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(msg.Data[1:])
+				var pkm, err = pglogrepl.ParsePrimaryKeepaliveMessage(msg.Data[1:])
 				if err != nil {
 					return nil, fmt.Errorf("error parsing keepalive: %w", err)
 				}
@@ -292,7 +292,7 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.Messa
 					s.standbyStatusDeadline = time.Now()
 				}
 			case pglogrepl.XLogDataByteID:
-				xld, err := pglogrepl.ParseXLogData(msg.Data[1:])
+				var xld, err = pglogrepl.ParseXLogData(msg.Data[1:])
 				if err != nil {
 					return nil, fmt.Errorf("error parsing XLogData: %w", err)
 				}
@@ -341,7 +341,7 @@ func (s *replicationStream) CommitLSN(lsn pglogrepl.LSN) {
 }
 
 func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
-	commitLSN := pglogrepl.LSN(atomic.LoadUint64(&s.commitLSN))
+	var commitLSN = pglogrepl.LSN(atomic.LoadUint64(&s.commitLSN))
 	logrus.WithField("commitLSN", commitLSN).Debug("sending Standby Status Update")
 	return pglogrepl.SendStandbyStatusUpdate(ctx, s.conn, pglogrepl.StandbyStatusUpdate{
 		WALWritePosition: commitLSN,

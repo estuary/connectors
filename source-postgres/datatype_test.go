@@ -45,7 +45,7 @@ var datatypeTestcases = []datatypeTestcase{
 	{`char(10)`, `{"type":"string"}`, `'foo'`, `"foo       "`},
 	{`char`, `{"type":"string"}`, `'f'`, `"f"`},
 	{`text`, `{"type":"string"}`, `'foo'`, `"foo"`},
-	{`bytea`, `{"type":"string","format":"base64"}`, `'\xDEADBEEF'`, `"3q2+7w=="`},
+	{`bytea`, `{"type":"string","contentEncoding":"base64"}`, `'\xDEADBEEF'`, `"3q2+7w=="`},
 	{`bit`, `{"type":"string"}`, `B'1'`, `"1"`},
 	{`bit(3)`, `{"type":"string"}`, `B'101'`, `"101"`},
 	{`bit varying`, `{"type":"string"}`, `B'1101'`, `"1101"`},
@@ -104,15 +104,15 @@ var datatypeTestcases = []datatypeTestcase{
 }
 
 func TestDatatypes(t *testing.T) {
-	cfg, ctx := TestDefaultConfig, context.Background()
+	var cfg, ctx = TestDefaultConfig, context.Background()
 
 	for idx, tc := range datatypeTestcases {
 		t.Run(fmt.Sprintf("idx=%d", idx), func(t *testing.T) {
-			table := createTestTable(ctx, t, "", fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+			var table = createTestTable(ctx, t, "", fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
 
 			// Perform discovery and verify that the generated JSON schema looks correct
 			t.Run("discovery", func(t *testing.T) {
-				discoveredCatalog, err := DiscoverCatalog(ctx, cfg)
+				var discoveredCatalog, err = DiscoverCatalog(ctx, cfg)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -127,7 +127,7 @@ func TestDatatypes(t *testing.T) {
 					t.Errorf("column type %q: no stream named %q discovered", tc.ColumnType, table)
 					return
 				}
-				expectedSchema := fmt.Sprintf(`{"type":"object","properties":{"a":{"type":"integer"},"b":%s}}`, tc.OutputType)
+				var expectedSchema = fmt.Sprintf(`{"properties":{"a":{"type":"integer"},"b":%s},"type":"object"}`, tc.OutputType)
 				if string(stream.JSONSchema) != expectedSchema {
 					t.Errorf("column type %q did not produce expected schema: %s", tc.ColumnType, expectedSchema)
 					t.Errorf("column type %q resulted in schema: %s", tc.ColumnType, stream.JSONSchema)
@@ -137,17 +137,17 @@ func TestDatatypes(t *testing.T) {
 
 			// Insert a test row and scan it back out, then do the same via replication
 			t.Run("roundtrip", func(t *testing.T) {
-				catalog, state := testCatalog(table), PersistentState{}
+				var catalog, state = testCatalog(table), PersistentState{}
 
 				t.Run("scan", func(t *testing.T) {
 					dbQuery(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (1, %s);`, table, tc.ColumnValue))
-					output, _ := performCapture(ctx, t, &cfg, &catalog, &state)
+					var output, _ = performCapture(ctx, t, &cfg, &catalog, &state)
 					verifyRoundTrip(t, output, tc.ColumnType, tc.ColumnValue, tc.OutputValue)
 				})
 
 				t.Run("replication", func(t *testing.T) {
 					dbQuery(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (2, %s);`, table, tc.ColumnValue))
-					output, _ := performCapture(ctx, t, &cfg, &catalog, &state)
+					var output, _ = performCapture(ctx, t, &cfg, &catalog, &state)
 					verifyRoundTrip(t, output, tc.ColumnType, tc.ColumnValue, tc.OutputValue)
 				})
 			})
