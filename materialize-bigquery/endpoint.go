@@ -12,7 +12,6 @@ import (
 	pm "github.com/estuary/protocols/materialize"
 	sqlDriver "github.com/estuary/protocols/materialize/sql"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/api/iterator"
 )
 
 // bigQueryOmitFromTransactionComment will be prepended to every statement such that the
@@ -20,7 +19,7 @@ import (
 // of a transaction.
 const bigQueryOmitFromTransactionComment = "--**bigQueryOmitFromTransaction**\n"
 
-// Endpoint is a BigQuery specific implementation of an estuary/protocols/materialize/sql.Endpoint
+// Endpoint is a BigQuery specific implementation of an estuary/protocols/materialize/sql.Endpoint.
 type Endpoint struct {
 	config *config
 	// Bigquery Client
@@ -63,18 +62,12 @@ func (e *Endpoint) LoadSpec(ctx context.Context, materialization pf.Materializat
 		return "", nil, fmt.Errorf("query: %w", err)
 	}
 
-	it, err := job.Read(ctx)
-	if err != nil {
-		return "", nil, fmt.Errorf("query read: %w", err)
-	}
-
 	var data struct {
 		Version string `bigquery:"version"`
 		SpecB64 string `bigquery:"spec"`
 	}
 
-	err = it.Next(&data)
-	if err == iterator.Done {
+	if err := e.fetchOne(ctx, job, &data); err == errNotFound {
 		log.WithFields(log.Fields{
 			"table": e.flowTables.Specs.Identifier,
 			"err":   err,
@@ -99,7 +92,7 @@ func (e *Endpoint) LoadSpec(ctx context.Context, materialization pf.Materializat
 // automatically excluded from transactions.
 func (e *Endpoint) ExecuteStatements(ctx context.Context, statements []string) error {
 
-	// Build a queue of statements than can be run in a transaction
+	// Build a queue of statements than can be run in a transaction.
 	var statementQueue []string
 	var runStatementQueue = func() error {
 		if len(statementQueue) == 0 {
@@ -113,7 +106,7 @@ func (e *Endpoint) ExecuteStatements(ctx context.Context, statements []string) e
 		}
 		script.WriteString("COMMIT TRANSACTION;")
 
-		log.WithField("sql", script.String()).Warn("executing transaction")
+		log.WithField("sql", script.String()).Debug("executing transaction")
 
 		// Execute the transaction.
 		_, err := e.query(ctx, script.String())
@@ -121,35 +114,36 @@ func (e *Endpoint) ExecuteStatements(ctx context.Context, statements []string) e
 			return fmt.Errorf("query: %v", err)
 		}
 
-		// Truncate the queue
+		// Truncate the queue.
 		statementQueue = statementQueue[:0]
 
 		return nil
 	}
 
+	// Loop through all statements requested to be run.
 	for _, statement := range statements {
 		// Does this statement contain the omit from transaction tag?
 		if strings.HasPrefix(statement, bigQueryOmitFromTransactionComment) {
 
-			// Process the statementQueue if anything is in there
+			// Process the statementQueue if anything is in there already.
 			if err := runStatementQueue(); err != nil {
 				return err
 			}
 
-			// Run the statement by itself
-			log.WithField("sql", statement).Warn("executing statement")
+			// Run the statement by itself.
+			log.WithField("sql", statement).Debug("executing statement")
 			_, err := e.query(ctx, statement)
 			if err != nil {
 				return fmt.Errorf("query: %v", err)
 			}
 
 		} else {
-			// It's safe to include inside of a transaction, append it to the queue
+			// It's safe to include inside of a transaction, append it to the queue.
 			statementQueue = append(statementQueue, statement)
 		}
 	}
 
-	// Process the statementQueue if anything is left
+	// Process the statementQueue if anything is remaining.
 	if err := runStatementQueue(); err != nil {
 		return err
 	}
@@ -203,7 +197,7 @@ func (e *Endpoint) CreateTableStatement(table *sqlDriver.Table) (string, error) 
 		}
 		builder.WriteString(resolved.SQLType)
 	}
-	// Close the create table paren
+	// Close the create table paren.
 	builder.WriteString(")")
 
 	// Create clustering keys based on table primary keys.
@@ -211,7 +205,7 @@ func (e *Endpoint) CreateTableStatement(table *sqlDriver.Table) (string, error) 
 	for _, column := range table.Columns {
 		if column.PrimaryKey {
 			pkIdentifiers = append(pkIdentifiers, column.Identifier)
-			// BigQuery only allows a maximum of 4 columns for clustering
+			// BigQuery only allows a maximum of 4 columns for clustering.
 			if len(pkIdentifiers) >= 4 {
 				break
 			}
@@ -298,7 +292,7 @@ func (ep *Endpoint) NewFence(ctx context.Context, materialization pf.Materializa
 		return nil, fmt.Errorf("query fence: %w", err)
 	}
 
-	// fetch and decode the fence information
+	// Fetch and decode the fence information.
 	var bqFence struct {
 		Fence      int64  `bigquery:"fence"`
 		Checkpoint string `bigquery:"checkpoint"`

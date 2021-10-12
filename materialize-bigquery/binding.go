@@ -29,7 +29,7 @@ type binding struct {
 		extDataConfig   *bigquery.ExternalDataConfig
 		mergeFile       *ExternalDataConnectionFile
 		sql             string
-		tempTableName   string
+		tempTableName   string // The name the external table we be referenced by
 	}
 }
 
@@ -61,21 +61,21 @@ func (bd *bindingDocument) Load(v []bigquery.Value, s bigquery.Schema) error {
 
 }
 
-// newBinding
-func (e *Endpoint) newBinding(bindingPos int, targetName string, spec *pf.MaterializationSpec_Binding) (*binding, error) {
+// newBinding generates the bindings for the spec to the BigQuery table.
+func newBinding(generator sqlDriver.Generator, bindingPos int, targetName string, spec *pf.MaterializationSpec_Binding) (*binding, error) {
 
 	var err error
 	var b = &binding{
 		name: targetName,
 	}
 
-	// Generate the table definition for this materialization
-	var tableDef = sqlDriver.TableForMaterialization(targetName, "", e.generator.IdentifierRenderer, spec)
+	// Generate the table definition for this materialization.
+	var tableDef = sqlDriver.TableForMaterialization(targetName, "", generator.IdentifierRenderer, spec)
 
-	// BINDING LOAD: Load is done via query against an external table with primary keys
+	// BINDING LOADS: Load is done via query against an external table with primary keys.
 
 	// QueryOnPrimaryKey will return the paramsConverter for the primary keys which is all we need here
-	_, b.load.paramsConverter, err = e.generator.QueryOnPrimaryKey(tableDef)
+	_, b.load.paramsConverter, err = generator.QueryOnPrimaryKey(tableDef)
 	if err != nil {
 		return nil, fmt.Errorf("building load params converter: %w", err)
 	}
@@ -87,12 +87,12 @@ func (e *Endpoint) newBinding(bindingPos int, targetName string, spec *pf.Materi
 		Schema:       make([]*bigquery.FieldSchema, 0),
 	}
 
-	var pkJoins []string // How to join the main table to the external table based on keys
+	var pkJoins []string // How to join the main table to the external table based on keys.
 
 	// We use the sqlDriver.NullableTypeMapping to handle null fields for defining schemas
 	// but when using bigquery it does not allow the NOT NULL suffix for external table
 	// columns. We need to get a reference to the base type mapper to leverage it's types.
-	baseTypeMapper := e.generator.TypeMappings.(sqlDriver.NullableTypeMapping).Inner
+	baseTypeMapper := generator.TypeMappings.(sqlDriver.NullableTypeMapping).Inner
 
 	// Build the query for loading values from bigquery by joining a google cloud storage file
 	// based table of primary keys against the database.
@@ -111,7 +111,6 @@ func (e *Endpoint) newBinding(bindingPos int, targetName string, spec *pf.Materi
 			Type:     bigquery.FieldType(colType.SQLType),
 		})
 
-		// JOIN constraints.
 		pkJoins = append(pkJoins, fmt.Sprintf("l.%s = r.%s", col.Identifier, col.Identifier))
 	}
 
@@ -131,21 +130,22 @@ func (e *Endpoint) newBinding(bindingPos int, targetName string, spec *pf.Materi
 		strings.Join(pkJoins, " AND "),
 	)
 
-	// BINDING STORE: Store is done via upserts using a merge query against an external table
+	// BINDING STORES: Store is done via upserts using a merge query against an external table.
 
-	// InsertStatement will return the paramsConverter for ALL the keys of the table
-	_, b.store.paramsConverter, err = e.generator.InsertStatement(tableDef)
+	// InsertStatement will return the paramsConverter for ALL the keys of the table.
+	_, b.store.paramsConverter, err = generator.InsertStatement(tableDef)
 	if err != nil {
 		return nil, fmt.Errorf("building load params converter: %w", err)
 	}
 
 	// External Data Config used by this binding. This will be a Google Cloud Storage file based table
-	// that can be used to load data into BigQuery
+	// that can be used to merge data into BigQuery.
 	b.store.extDataConfig = &bigquery.ExternalDataConfig{
 		SourceFormat: bigquery.JSON,
 		Schema:       make([]*bigquery.FieldSchema, 0),
 	}
 
+	// This builds the columns and strings required to upsert via a merge query.
 	var colIdentifiers, rColIdentifiers []string
 	for _, colName := range spec.FieldSelection.AllFields() {
 		var col = tableDef.GetColumn(colName)
@@ -166,7 +166,7 @@ func (e *Endpoint) newBinding(bindingPos int, targetName string, spec *pf.Materi
 		rColIdentifiers = append(rColIdentifiers, fmt.Sprintf("r.%s", col.Identifier))
 	}
 
-	// Updates for all columns minus the primary keys plus the document field
+	// Updates for all columns minus the primary keys plus the document field.
 	var lrUpdates []string
 	for _, colName := range append(spec.FieldSelection.Values, spec.FieldSelection.Document) {
 		var col = tableDef.GetColumn(colName)
@@ -176,7 +176,7 @@ func (e *Endpoint) newBinding(bindingPos int, targetName string, spec *pf.Materi
 	b.store.tempTableName = fmt.Sprintf("%s_store_%d", tempTableNamePrefix, bindingPos)
 
 	if spec.DeltaUpdates {
-		// Store everything (do not merge/upsert)
+		// Store everything (do not merge/upsert).
 		b.store.sql = fmt.Sprintf(`
 		INSERT INTO %s (%s)
 		SELECT %s FROM %s
@@ -187,7 +187,7 @@ func (e *Endpoint) newBinding(bindingPos int, targetName string, spec *pf.Materi
 			b.store.tempTableName,
 		)
 	} else {
-		// Perform merge query
+		// Perform merge query to update existing values.
 		b.store.sql = fmt.Sprintf(`
 		MERGE INTO %s AS l
 		USING %s AS r
