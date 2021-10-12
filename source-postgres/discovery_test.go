@@ -9,12 +9,12 @@ import (
 )
 
 func TestDiscoverySimple(t *testing.T) {
-	cfg, ctx := TestDefaultConfig, shortTestContext(t)
-	tableName := createTestTable(ctx, t, "", "(a INTEGER PRIMARY KEY, b TEXT, c REAL, d VARCHAR(255))")
+	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
+	var tableName = createTestTable(ctx, t, "", "(a INTEGER PRIMARY KEY, b TEXT, c REAL, d VARCHAR(255))")
 
 	// Create the table (with deferred cleanup), perform discovery, and verify
 	// that the stream as discovered matches the golden snapshot.
-	catalog, err := DiscoverCatalog(ctx, cfg)
+	var catalog, err = DiscoverCatalog(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func verifyStream(t *testing.T, suffix string, catalog *airbyte.Catalog, expecte
 		if !strings.EqualFold(stream.Name, expectedStream) {
 			continue
 		}
-		bs, err := json.Marshal(stream)
+		var bs, err = json.Marshal(stream)
 		if err != nil {
 			t.Fatalf("error marshalling stream %q: %v", expectedStream, err)
 		}

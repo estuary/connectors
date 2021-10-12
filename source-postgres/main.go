@@ -90,7 +90,7 @@ func doCheck(args airbyte.CheckCmd) error {
 	if err := args.ConfigFile.Parse(&config); err != nil {
 		return err
 	}
-	result := &airbyte.ConnectionStatus{Status: airbyte.StatusSucceeded}
+	var result = &airbyte.ConnectionStatus{Status: airbyte.StatusSucceeded}
 	if _, err := DiscoverCatalog(context.Background(), config); err != nil {
 		result.Status = airbyte.StatusFailed
 		result.Message = err.Error()
@@ -106,7 +106,7 @@ func doDiscover(args airbyte.DiscoverCmd) error {
 	if err := args.ConfigFile.Parse(&config); err != nil {
 		return err
 	}
-	catalog, err := DiscoverCatalog(context.Background(), config)
+	var catalog, err = DiscoverCatalog(context.Background(), config)
 	if err != nil {
 		return err
 	}
@@ -117,21 +117,21 @@ func doDiscover(args airbyte.DiscoverCmd) error {
 }
 
 func doRead(args airbyte.ReadCmd) error {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	state := &PersistentState{Streams: make(map[string]*TableState)}
+	var state = &PersistentState{Streams: make(map[string]*TableState)}
 	if args.StateFile != "" {
 		if err := args.StateFile.Parse(state); err != nil {
 			return fmt.Errorf("unable to parse state file: %w", err)
 		}
 	}
 
-	config := new(Config)
+	var config = new(Config)
 	if err := args.ConfigFile.Parse(config); err != nil {
 		return err
 	}
 
-	catalog := new(airbyte.ConfiguredCatalog)
+	var catalog = new(airbyte.ConfiguredCatalog)
 	if err := args.CatalogFile.Parse(catalog); err != nil {
 		return fmt.Errorf("unable to parse catalog: %w", err)
 	}

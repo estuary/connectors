@@ -41,7 +41,7 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	if testing.Verbose() {
 		logrus.SetLevel(logrus.DebugLevel)
@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 
 	// Open a connection to the database which will be used for creating and
 	// tearing down the replication slot.
-	replConnConfig, err := pgconn.ParseConfig(*TestConnectionURI)
+	var replConnConfig, err = pgconn.ParseConfig(*TestConnectionURI)
 	if err != nil {
 		logrus.WithField("uri", *TestConnectionURI).WithField("err", err).Fatal("error parsing connection config")
 	}
@@ -80,7 +80,7 @@ func TestMain(m *testing.M) {
 	defer conn.Close(ctx)
 	TestDatabase = conn
 
-	exitCode := m.Run()
+	var exitCode = m.Run()
 	if err := replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, *TestReplicationSlot)).Close(); err != nil {
 		logrus.WithField("err", err).Fatal("error cleaning up replication slot")
 	}
@@ -93,7 +93,7 @@ func TestMain(m *testing.M) {
 func createTestTable(ctx context.Context, t *testing.T, suffix string, tableDef string) string {
 	t.Helper()
 
-	tableName := "test_" + strings.TrimPrefix(t.Name(), "Test")
+	var tableName = "test_" + strings.TrimPrefix(t.Name(), "Test")
 	if suffix != "" {
 		tableName += "_" + suffix
 	}
@@ -117,14 +117,14 @@ func shortTestContext(t *testing.T) context.Context {
 
 // longTestContext is a test helper which creates a time-bounded context for running test logic
 func longTestContext(t *testing.T, timeout time.Duration) context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	var ctx, cancel = context.WithTimeout(context.Background(), timeout)
 	t.Cleanup(cancel)
 	return ctx
 }
 
 // testCatalog is a test helper for constructing a ConfiguredCatalog from stream names
 func testCatalog(streams ...string) airbyte.ConfiguredCatalog {
-	catalog := airbyte.ConfiguredCatalog{}
+	var catalog = airbyte.ConfiguredCatalog{}
 	for _, s := range streams {
 		catalog.Streams = append(catalog.Streams, airbyte.ConfiguredStream{
 			Stream: airbyte.Stream{Name: s, Namespace: "public"},
@@ -140,17 +140,17 @@ func testCatalog(streams ...string) airbyte.ConfiguredCatalog {
 func dbLoadCSV(ctx context.Context, t *testing.T, table string, filename string, limit int) {
 	t.Helper()
 	logrus.WithField("table", table).WithField("file", filename).Info("loading csv")
-	file, err := os.Open("testdata/" + filename)
+	var file, err = os.Open("testdata/" + filename)
 	if err != nil {
 		t.Fatalf("unable to open CSV file: %q", "testdata/"+filename)
 	}
 	defer file.Close()
 
 	var dataset [][]interface{}
-	r := csv.NewReader(file)
+	var r = csv.NewReader(file)
 	// If `limit` is positive, load at most `limit` rows
 	for count := 0; count < limit || limit <= 0; count++ {
-		row, err := r.Read()
+		var row, err = r.Read()
 		if err == io.EOF {
 			break
 		}
@@ -161,7 +161,7 @@ func dbLoadCSV(ctx context.Context, t *testing.T, table string, filename string,
 		var datarow []interface{}
 		for _, elemStr := range row {
 			// Convert elements to numbers where possible
-			numeric, err := strconv.ParseFloat(elemStr, 64)
+			var numeric, err = strconv.ParseFloat(elemStr, 64)
 			if err == nil {
 				datarow = append(datarow, numeric)
 			} else {
@@ -190,18 +190,18 @@ func dbInsert(ctx context.Context, t *testing.T, table string, rows [][]interfac
 	if len(rows) < 1 {
 		t.Fatalf("must insert at least one row")
 	}
-	tx, err := TestDatabase.BeginTx(ctx, pgx.TxOptions{})
+	var tx, err = TestDatabase.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		t.Fatalf("unable to begin transaction: %v", err)
 	}
 	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows), "first": rows[0]}).Info("inserting data")
-	query := fmt.Sprintf(`INSERT INTO %s VALUES %s`, table, argsTuple(len(rows[0])))
+	var query = fmt.Sprintf(`INSERT INTO %s VALUES %s`, table, argsTuple(len(rows[0])))
 	for _, row := range rows {
 		logrus.WithField("table", table).WithField("row", row).Debug("inserting row")
 		if len(row) != len(rows[0]) {
 			t.Fatalf("incorrect number of values in row %q (expected %d)", row, len(rows[0]))
 		}
-		results, err := tx.Query(ctx, query, row...)
+		var results, err = tx.Query(ctx, query, row...)
 		if err != nil {
 			t.Fatalf("unable to execute query: %v", err)
 		}
@@ -213,7 +213,7 @@ func dbInsert(ctx context.Context, t *testing.T, table string, rows [][]interfac
 }
 
 func argsTuple(argc int) string {
-	tuple := "($1"
+	var tuple = "($1"
 	for idx := 1; idx < argc; idx++ {
 		tuple += fmt.Sprintf(",$%d", idx+1)
 	}
@@ -228,13 +228,13 @@ func dbQuery(ctx context.Context, t *testing.T, query string, args ...interface{
 }
 
 func dbQueryInternal(ctx context.Context, t *testing.T, query string, args ...interface{}) {
-	rows, err := TestDatabase.Query(ctx, query, args...)
+	var rows, err = TestDatabase.Query(ctx, query, args...)
 	if err != nil {
 		t.Fatalf("unable to execute query: %v", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		vals, err := rows.Values()
+		var vals, err = rows.Values()
 		if err != nil {
 			t.Fatalf("error processing query result: %v", err)
 		}
@@ -247,7 +247,7 @@ func dbQueryInternal(ctx context.Context, t *testing.T, query string, args ...in
 // emitted during the capture, and updates the `state` argument to the final one.
 func verifiedCapture(ctx context.Context, t *testing.T, cfg *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, suffix string) []PersistentState {
 	t.Helper()
-	result, states := performCapture(ctx, t, cfg, catalog, state)
+	var result, states = performCapture(ctx, t, cfg, catalog, state)
 	verifySnapshot(t, suffix, result)
 	return states
 }
@@ -265,21 +265,21 @@ func performCapture(ctx context.Context, t *testing.T, cfg *Config, catalog *air
 	// Use a JSON round-trip to deep-copy the state, so that the act of running a
 	// capture can't modify the passed-in state argument, and thus we can treat
 	// the sequence of states as having value semantics within tests.
-	bs, err := json.Marshal(state)
+	var bs, err = json.Marshal(state)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cleanState := new(PersistentState)
+	var cleanState = new(PersistentState)
 	if err := json.Unmarshal(bs, cleanState); err != nil {
 		t.Fatal(err)
 	}
 
-	buf := new(CaptureOutputBuffer)
+	var buf = new(CaptureOutputBuffer)
 	if err := RunCapture(ctx, cfg, catalog, cleanState, buf); err != nil {
 		t.Fatal(err)
 	}
 
-	result, states := buf.Output()
+	var result, states = buf.Output()
 	if len(states) > 0 {
 		*state = states[len(states)-1]
 	}
@@ -295,7 +295,7 @@ type CaptureOutputBuffer struct {
 }
 
 func (buf *CaptureOutputBuffer) Encode(v interface{}) error {
-	msg, ok := v.(airbyte.Message)
+	var msg, ok = v.(airbyte.Message)
 	if !ok {
 		return fmt.Errorf("output message is not an airbyte.Message: %#v", v)
 	}
@@ -322,7 +322,7 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	buf.States = append(buf.States, state)
 
 	// Create a copy of the state with all LSNs set to '1234'
-	cleanState := PersistentState{CurrentLSN: 1234, Streams: make(map[string]*TableState)}
+	var cleanState = PersistentState{CurrentLSN: 1234, Streams: make(map[string]*TableState)}
 	for id, stream := range state.Streams {
 		var cleanRanges []TableRange
 		for _, scanRange := range stream.ScanRanges {
@@ -336,7 +336,7 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	}
 
 	// Encode and buffer
-	bs, err := json.Marshal(cleanState)
+	var bs, err = json.Marshal(cleanState)
 	if err != nil {
 		return fmt.Errorf("error encoding cleaned state: %w", err)
 	}
@@ -347,31 +347,19 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 }
 
 func (buf *CaptureOutputBuffer) bufferRecord(msg airbyte.Message) error {
-	// Parse record data and remove non-reproducible field "_change_lsn"
-	fields := make(map[string]interface{})
-	if err := json.Unmarshal(msg.Record.Data, &fields); err != nil {
-		return fmt.Errorf("error unmarshalling record data: %w", err)
-	}
-	delete(fields, "_change_lsn")
-
-	// Encode and buffer the resulting record
-	bs, err := json.Marshal(fields)
-	if err != nil {
-		return fmt.Errorf("error encoding cleaned record: %w", err)
-	}
 	return buf.bufferMessage(airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
 		Record: &airbyte.Record{
 			Namespace: msg.Record.Namespace,
 			Stream:    msg.Record.Stream,
 			EmittedAt: 1234, // Replaced because non-reproducible
-			Data:      json.RawMessage(bs),
+			Data:      msg.Record.Data,
 		},
 	})
 }
 
 func (buf *CaptureOutputBuffer) bufferMessage(msg airbyte.Message) error {
-	bs, err := json.Marshal(msg)
+	var bs, err = json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("error encoding sanitized message: %w", err)
 	}
@@ -393,14 +381,14 @@ func (buf *CaptureOutputBuffer) Output() (string, []PersistentState) {
 func verifySnapshot(t *testing.T, suffix string, actual string) {
 	t.Helper()
 
-	snapshotDir := "testdata"
-	snapshotFile := snapshotDir + "/" + t.Name()
+	var snapshotDir = "testdata"
+	var snapshotFile = snapshotDir + "/" + t.Name()
 	if suffix != "" {
 		snapshotFile += "_" + suffix
 	}
 	snapshotFile += ".snapshot"
 
-	snapBytes, err := os.ReadFile(snapshotFile)
+	var snapBytes, err = os.ReadFile(snapshotFile)
 	// Nonexistent snapshots aren't an error, because when adding a
 	// new test we'd like it to produce a "snapshot.new" file for us
 	// and the empty string won't match the expected result anyway.
@@ -412,14 +400,14 @@ func verifySnapshot(t *testing.T, suffix string, actual string) {
 		return
 	}
 
-	newSnapshotFile := snapshotFile + ".new"
+	var newSnapshotFile = snapshotFile + ".new"
 	if err := os.WriteFile(newSnapshotFile, []byte(actual), 0644); err != nil {
 		t.Errorf("error writing new snapshot file %q: %v", newSnapshotFile, err)
 	}
 
 	// Locate the first non-matching line and log it
-	actualLines := strings.Split(actual, "\n")
-	snapshotLines := strings.Split(string(snapBytes), "\n")
+	var actualLines = strings.Split(actual, "\n")
+	var snapshotLines = strings.Split(string(snapBytes), "\n")
 	for idx := 0; idx < len(snapshotLines) || idx < len(actualLines); idx++ {
 		var x, y string
 		if idx < len(snapshotLines) {

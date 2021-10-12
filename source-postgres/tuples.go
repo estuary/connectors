@@ -44,7 +44,7 @@ func packTuple(xs []interface{}) (bs []byte, err error) {
 }
 
 func unpackTuple(bs []byte) ([]interface{}, error) {
-	t, err := tuple.Unpack(bs)
+	var t, err = tuple.Unpack(bs)
 	if err != nil {
 		return nil, err
 	}
