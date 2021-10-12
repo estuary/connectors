@@ -17,7 +17,6 @@ import (
 	"github.com/estuary/protocols/airbyte"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,10 +39,6 @@ var (
 	TestDatabase      *pgx.Conn
 )
 
-const (
-	TestChunkSize = 16
-)
-
 func TestMain(m *testing.M) {
 	flag.Parse()
 	ctx := context.Background()
@@ -53,7 +48,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Tweak some parameters to make things easier to test on a smaller scale
-	SnapshotChunkSize = TestChunkSize
+	snapshotChunkSize = 16
 
 	// Open a connection to the database which will be used for creating and
 	// tearing down the replication slot.
@@ -95,7 +90,7 @@ func TestMain(m *testing.M) {
 // createTestTable is a test helper for creating a new database table and returning the
 // name of the new table. The table is named "test_<testName>", or "test_<testName>_<suffix>"
 // if the suffix is non-empty.
-func createTestTable(t *testing.T, ctx context.Context, suffix string, tableDef string) string {
+func createTestTable(ctx context.Context, t *testing.T, suffix string, tableDef string) string {
 	t.Helper()
 
 	tableName := "test_" + strings.TrimPrefix(t.Name(), "Test")
@@ -106,11 +101,11 @@ func createTestTable(t *testing.T, ctx context.Context, suffix string, tableDef 
 	tableName = strings.ReplaceAll(tableName, "=", "_")
 
 	logrus.WithField("table", tableName).WithField("cols", tableDef).Info("creating test table")
-	dbQueryInternal(t, ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
-	dbQueryInternal(t, ctx, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
+	dbQueryInternal(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
+	dbQueryInternal(ctx, t, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
 	t.Cleanup(func() {
 		logrus.WithField("table", tableName).Info("destroying test table")
-		dbQueryInternal(t, ctx, fmt.Sprintf(`DROP TABLE %s;`, tableName))
+		dbQueryInternal(ctx, t, fmt.Sprintf(`DROP TABLE %s;`, tableName))
 	})
 	return tableName
 }
@@ -142,7 +137,7 @@ func testCatalog(streams ...string) airbyte.ConfiguredCatalog {
 // into the specified database table. It supports strings and integers, however
 // integers are autodetected as "any element which can be parsed as an integer",
 // so the source dataset needs to be clean. For test data this should be fine.
-func dbLoadCSV(t *testing.T, ctx context.Context, table string, filename string, limit int) {
+func dbLoadCSV(ctx context.Context, t *testing.T, table string, filename string, limit int) {
 	t.Helper()
 	logrus.WithField("table", table).WithField("file", filename).Info("loading csv")
 	file, err := os.Open("testdata/" + filename)
@@ -177,19 +172,19 @@ func dbLoadCSV(t *testing.T, ctx context.Context, table string, filename string,
 
 		// Insert in chunks of 64 rows at a time
 		if len(dataset) >= 64 {
-			dbInsert(t, ctx, table, dataset)
+			dbInsert(ctx, t, table, dataset)
 			dataset = nil
 		}
 	}
 	// Perform one final insert for the remaining rows
 	if len(dataset) > 0 {
-		dbInsert(t, ctx, table, dataset)
+		dbInsert(ctx, t, table, dataset)
 	}
 }
 
 // dbInsert is a test helper for inserting multiple rows into TestDatabase
 // as a single transaction.
-func dbInsert(t *testing.T, ctx context.Context, table string, rows [][]interface{}) {
+func dbInsert(ctx context.Context, t *testing.T, table string, rows [][]interface{}) {
 	t.Helper()
 
 	if len(rows) < 1 {
@@ -226,13 +221,13 @@ func argsTuple(argc int) string {
 }
 
 // dbQuery is a test helper for executing arbitrary queries against TestDatabase
-func dbQuery(t *testing.T, ctx context.Context, query string, args ...interface{}) {
+func dbQuery(ctx context.Context, t *testing.T, query string, args ...interface{}) {
 	t.Helper()
 	logrus.WithField("query", query).WithField("args", args).Debug("executing query")
-	dbQueryInternal(t, ctx, query, args...)
+	dbQueryInternal(ctx, t, query, args...)
 }
 
-func dbQueryInternal(t *testing.T, ctx context.Context, query string, args ...interface{}) {
+func dbQueryInternal(ctx context.Context, t *testing.T, query string, args ...interface{}) {
 	rows, err := TestDatabase.Query(ctx, query, args...)
 	if err != nil {
 		t.Fatalf("unable to execute query: %v", err)
@@ -250,9 +245,9 @@ func dbQueryInternal(t *testing.T, ctx context.Context, query string, args ...in
 // verifiedCapture is a test helper which performs a database capture and automatically
 // verifies the result against a golden snapshot. It returns a list of all states
 // emitted during the capture, and updates the `state` argument to the final one.
-func verifiedCapture(t *testing.T, ctx context.Context, cfg *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, suffix string) []PersistentState {
+func verifiedCapture(ctx context.Context, t *testing.T, cfg *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, suffix string) []PersistentState {
 	t.Helper()
-	result, states := performCapture(t, ctx, cfg, catalog, state)
+	result, states := performCapture(ctx, t, cfg, catalog, state)
 	verifySnapshot(t, suffix, result)
 	return states
 }
@@ -264,7 +259,7 @@ func verifiedCapture(t *testing.T, ctx context.Context, cfg *Config, catalog *ai
 // test runs, and so can be fed directly into verifySnapshot.
 //
 // As a side effect the input state is modified to the final result state.
-func performCapture(t *testing.T, ctx context.Context, cfg *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState) (string, []PersistentState) {
+func performCapture(ctx context.Context, t *testing.T, cfg *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState) (string, []PersistentState) {
 	t.Helper()
 
 	// Use a JSON round-trip to deep-copy the state, so that the act of running a
@@ -280,11 +275,7 @@ func performCapture(t *testing.T, ctx context.Context, cfg *Config, catalog *air
 	}
 
 	buf := new(CaptureOutputBuffer)
-	capture, err := NewCapture(ctx, cfg, catalog, cleanState, buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := capture.Execute(ctx); err != nil {
+	if err := RunCapture(ctx, cfg, catalog, cleanState, buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -306,7 +297,7 @@ type CaptureOutputBuffer struct {
 func (buf *CaptureOutputBuffer) Encode(v interface{}) error {
 	msg, ok := v.(airbyte.Message)
 	if !ok {
-		return errors.Errorf("output message is not an airbyte.Message: %#v", v)
+		return fmt.Errorf("output message is not an airbyte.Message: %#v", v)
 	}
 
 	// Accumulate State updates in one list
@@ -316,7 +307,7 @@ func (buf *CaptureOutputBuffer) Encode(v interface{}) error {
 	if msg.Type == airbyte.MessageTypeRecord {
 		return buf.bufferRecord(msg)
 	}
-	return errors.Errorf("unhandled message type: %#v", msg.Type)
+	return fmt.Errorf("unhandled message type: %#v", msg.Type)
 }
 
 func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
@@ -326,7 +317,7 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	// pointer-identity in their 'Streams' map or `ScanRanges` lists.
 	var state PersistentState
 	if err := json.Unmarshal(msg.State.Data, &state); err != nil {
-		return errors.Wrap(err, "error unmarshaling to PersistentState")
+		return fmt.Errorf("error unmarshaling to PersistentState: %w", err)
 	}
 	buf.States = append(buf.States, state)
 
@@ -347,7 +338,7 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	// Encode and buffer
 	bs, err := json.Marshal(cleanState)
 	if err != nil {
-		return errors.Wrap(err, "error encoding cleaned state")
+		return fmt.Errorf("error encoding cleaned state: %w", err)
 	}
 	return buf.bufferMessage(airbyte.Message{
 		Type:  airbyte.MessageTypeState,
@@ -356,18 +347,17 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 }
 
 func (buf *CaptureOutputBuffer) bufferRecord(msg airbyte.Message) error {
-	// Parse record data and remove non-reproducible fields "_ingested_at" and "_change_lsn"
+	// Parse record data and remove non-reproducible field "_change_lsn"
 	fields := make(map[string]interface{})
 	if err := json.Unmarshal(msg.Record.Data, &fields); err != nil {
-		return errors.Wrap(err, "error unmarshalling record data")
+		return fmt.Errorf("error unmarshalling record data: %w", err)
 	}
-	delete(fields, "_ingested_at")
 	delete(fields, "_change_lsn")
 
 	// Encode and buffer the resulting record
 	bs, err := json.Marshal(fields)
 	if err != nil {
-		return errors.Wrap(err, "error encoding cleaned record")
+		return fmt.Errorf("error encoding cleaned record: %w", err)
 	}
 	return buf.bufferMessage(airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
@@ -383,7 +373,7 @@ func (buf *CaptureOutputBuffer) bufferRecord(msg airbyte.Message) error {
 func (buf *CaptureOutputBuffer) bufferMessage(msg airbyte.Message) error {
 	bs, err := json.Marshal(msg)
 	if err != nil {
-		return errors.Wrap(err, "error encoding sanitized message")
+		return fmt.Errorf("error encoding sanitized message: %w", err)
 	}
 	logrus.WithField("data", string(bs)).Debug("buffered message")
 	buf.Snapshot.Write(bs)

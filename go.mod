@@ -12,6 +12,9 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/uuid v1.3.0
 	github.com/jackc/pgconn v1.8.0
+	github.com/jackc/pglogrepl v0.0.0-20210731151948-9f1effd582c4
+	github.com/jackc/pgproto3/v2 v2.0.6
+	github.com/jackc/pgtype v1.6.2
 	github.com/jackc/pgx/v4 v4.10.1
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/sirupsen/logrus v1.8.1

@@ -2,9 +2,9 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/estuary/protocols/fdb/tuple"
-	"github.com/pkg/errors"
 )
 
 // We translate a list of column values (representing the primary key of a
@@ -34,7 +34,7 @@ func packTuple(xs []interface{}) (bs []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if errStr, ok := r.(string); ok {
-				err = errors.New(errStr)
+				err = fmt.Errorf("error serializing FDB tuple: %s", errStr)
 			} else {
 				panic(r)
 			}
