@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 	pm "github.com/estuary/protocols/materialize"
@@ -25,14 +24,12 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 
 	var err error
 
-	log.Warn("LOAD")
-
-	// Iterate through all of the Load requests being made
+	// Iterate through all of the Load requests being made.
 	for it.Next() {
 
 		var b = t.bindings[it.Binding]
 
-		// Check to see if we have a keyFile open already in gcs for this binding and if not, create one
+		// Check to see if we have a keyFile open already in gcs for this binding and if not, create one.
 		if b.load.keysFile == nil {
 			b.load.keysFile, err = t.ep.NewExternalDataConnectionFile(
 				t.ctx,
@@ -43,7 +40,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 				return fmt.Errorf("new external data connection file: %v", err)
 			}
 
-			// Clean up the temporary files when load complete (or we error out)
+			// Clean up the temporary files when load complete (or we error out).
 			defer func() {
 				if err := b.load.keysFile.Delete(t.ctx); err != nil {
 					log.Errorf("could not delete load keyfile: %v", err)
@@ -52,13 +49,13 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 			}()
 		}
 
-		// Convert our key tuple into a slice of values appropriate for the database
+		// Convert our key tuple into a slice of values appropriate for the database.
 		convertedKey, err := b.load.paramsConverter.Convert(it.Key)
 		if err != nil {
 			return fmt.Errorf("converting key: %w", err)
 		}
 
-		// Write our row of keys to the keyFile
+		// Write our row of keys to the keyFile.
 		if err = b.load.keysFile.WriteRow(convertedKey); err != nil {
 			return fmt.Errorf("writing normalized key to keyfile: %w", err)
 		}
@@ -68,23 +65,23 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 		return it.Err()
 	}
 
-	// Build the queries of all documents across all bindings that were requested
+	// Build the queries of all documents across all bindings that were requested.
 	var subqueries []string
-	// This is the map of external table references we will populate
+	// This is the map of external table references we will populate.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
 	for _, b := range t.bindings {
-		// If we have a data file for this round
+		// If we have a data file for this round.
 		if b.load.keysFile != nil {
 
-			// Flush and close the keyfile
+			// Flush and close the keyfile.
 			if err := b.load.keysFile.Close(); err != nil {
 				return fmt.Errorf("closing external data connection file: %w", err)
 			}
 
-			// Setup the tempTableName pointing to our cloud storage external table definition
+			// Setup the tempTableName pointing to our cloud storage external table definition.
 			edcTableDefs[b.load.tempTableName] = b.load.extDataConfig
 
-			// Append it to the document query list
+			// Append it to the document query list.
 			subqueries = append(subqueries, b.load.sql)
 		}
 	}
@@ -93,25 +90,24 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 		return nil // Nothing to load.
 	}
 
-	// Build the query across all tables
+	// Build the query across all tables.
 	query := t.ep.newQuery(strings.Join(subqueries, "\nUNION ALL\n") + ";")
-	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs
+	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
 	job, err := t.ep.runQuery(t.ctx, query)
 	if err != nil {
-		log.Warn(query.Q)
 		return fmt.Errorf("load query: %w", err)
 	}
 
-	// Fetch the bigquery iterator
+	// Fetch the bigquery iterator.
 	bqit, err := job.Read(t.ctx)
 	if err != nil {
 		return fmt.Errorf("load job read: %w", err)
 	}
 
-	// load documents
+	// Load documents.
 	for {
 
-		// fetch and decode from database
+		// Fetch and decode from database.
 		var bd bindingDocument
 		if err = bqit.Next(&bd); err == iterator.Done {
 			break
@@ -119,7 +115,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 			return fmt.Errorf("load row read: %w", err)
 		}
 
-		// load the document
+		// Load the document by sending it back into Flow.
 		if err = loaded(bd.Binding, bd.Document); err != nil {
 			return fmt.Errorf("load row loaded: %w", err)
 		}
@@ -130,8 +126,6 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 
 func (t *transactor) Prepare(prepare *pm.TransactionRequest_Prepare) (_ *pm.TransactionResponse_Prepared, err error) {
 
-	log.Warn("PREPARE")
-
 	// This is triggered to let you know that the loads have completed.
 	// It also tells us what checkpoint we are about to store.
 	t.fence.checkpoint = prepare.FlowCheckpoint
@@ -140,17 +134,12 @@ func (t *transactor) Prepare(prepare *pm.TransactionRequest_Prepare) (_ *pm.Tran
 
 func (t *transactor) Store(it *pm.StoreIterator) error {
 
-	start := time.Now()
-	log.Warn("STORE START")
-	var i int
-
+	// Iterate through all the new values to store.
 	var err error
-
-	// Iterate through all the new values to store
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 
-		// Check to see if we have a keyFile open already in gcs for this binding and if not, create one
+		// Check to see if we have a keyFile open already in gcs for this binding and if not, create one.
 		if b.store.mergeFile == nil {
 			b.store.mergeFile, err = t.ep.NewExternalDataConnectionFile(
 				t.ctx,
@@ -170,23 +159,18 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 		} else if err = b.store.mergeFile.WriteRow(converted); err != nil {
 			return fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
-		i++
-
 	}
-	log.Warnf("STORE COMPLETE: %d records %v", i, time.Since(start))
+
 	return nil
 }
 
 func (t *transactor) Commit() error {
 
-	start := time.Now()
-	log.Warn("COMMIT")
-
-	// Build the transaction
+	// Build the slice of transactions required for a commit.
 	var subqueries []string
-
 	var args []interface{}
 
+	// First we must validate the fence has not been modified.
 	subqueries = append(subqueries, fmt.Sprintf(`
 	DECLARE vCheckpoint STRING DEFAULT %s;
 	DECLARE vMaterialization STRING DEFAULT %s;
@@ -227,9 +211,9 @@ func (t *transactor) Commit() error {
 		t.fence.fence,
 	)
 
-	// This is the map of external table references we will populate
+	// This is the map of external table references we will populate. Loop through the bindings and
+	// append the SQL for that table.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
-
 	for _, b := range t.bindings {
 
 		if b.store.mergeFile != nil {
@@ -252,7 +236,7 @@ func (t *transactor) Commit() error {
 		}
 	}
 
-	// Complete the transaction and handle errors.
+	// Complete the transaction and return the appropriate error.
 	subqueries = append(subqueries, `
 	COMMIT TRANSACTION;
 
@@ -264,7 +248,7 @@ func (t *transactor) Commit() error {
 	END;
 	`)
 
-	// Build the query across all tables
+	// Build the bigquery query of the combined subqueries.
 	query := t.ep.newQuery(strings.Join(subqueries, "\n"), args...)
 	query.TableDefinitions = edcTableDefs // Tell the query where to get the external references in gcs.
 
@@ -287,14 +271,10 @@ func (t *transactor) Commit() error {
 		return fmt.Errorf("merge error: %s", queryStatus.Error)
 	}
 
-	log.Warnf("COMMIT COMPLETE: %v", time.Since(start))
-
 	return nil
 }
 
 func (t *transactor) Destroy() {
-
 	_ = t.ep.bigQueryClient.Close()
 	_ = t.ep.cloudStorageClient.Close()
-
 }

@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/googleapi"
+	"google.golang.org/api/iterator"
 )
 
 var (
@@ -68,7 +69,9 @@ func (ep *Endpoint) fetchOne(ctx context.Context, job *bigquery.Job, dest interf
 		return fmt.Errorf("read: %w", err)
 	}
 
-	if err = it.Next(dest); err != nil {
+	if err = it.Next(dest); err == iterator.Done {
+		return errNotFound
+	} else if err != nil {
 		return fmt.Errorf("next: %w", err)
 	}
 

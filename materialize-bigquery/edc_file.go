@@ -62,7 +62,7 @@ func (ep *Endpoint) NewExternalDataConnectionFile(ctx context.Context, file stri
 
 // WriteRow takes either a slice of interface{} witch a count that matches the *bigquery.ExternalDataConfig
 // this file was opened with a map[string]interface{} with just the columns that need to be set. (it must
-// also have the same fields as *bigquery.ExternalDataConfig)
+// also have the same fields as *bigquery.ExternalDataConfig).
 func (f *ExternalDataConnectionFile) WriteRow(rowi interface{}) error {
 
 	var v map[string]interface{}
@@ -102,11 +102,11 @@ func (f *ExternalDataConnectionFile) Close() error {
 
 // Delete removes the file.
 func (f *ExternalDataConnectionFile) Delete(ctx context.Context) error {
-	f.edc.SourceURIs = nil // Clear the SourceURIs so the next process can use it
+	f.edc.SourceURIs = nil // Clear the SourceURIs so the next process can use it.
 	return f.gcsObject.Delete(ctx)
 }
 
-// tmpFileName generates unique file names
+// tmpFileName generates unique file names.
 func tmpFileName() string {
 	tempUUID, err := uuid.NewUUID()
 	if err != nil {

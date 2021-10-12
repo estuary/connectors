@@ -22,8 +22,7 @@ func main() {
 	boilerplate.RunMain(newBigQueryDriver())
 }
 
-// config represents the endpoint configuration for bigquery.
-// It must match the one defined for the source specs (flow.yaml) in Rust.
+// Config represents the endpoint configuration for BigQuery.
 type config struct {
 	ProjectID       string `json:"project_id"`
 	Dataset         string `json:"dataset"`
@@ -106,7 +105,7 @@ func newBigQueryDriver() *sqlDriver.Driver {
 
 			var clientOpts []option.ClientOption
 
-			// Pick one of the credentials options. It's plausible you could use machine credentials.
+			// Pick one of the credentials options. It's plausible you could use machine credentials in which case neither option is present.
 			if parsed.CredentialsFile != "" {
 				clientOpts = append(clientOpts, option.WithCredentialsFile(parsed.CredentialsFile))
 			} else if len(parsed.CredentialsJSON) != 0 {
@@ -124,28 +123,24 @@ func newBigQueryDriver() *sqlDriver.Driver {
 				return nil, fmt.Errorf("creating cloud storage client: %w", err)
 			}
 
-			var endpoint = &Endpoint{
+			return &Endpoint{
 				config:             parsed,
 				bigQueryClient:     bigQueryClient,
 				cloudStorageClient: cloudStorageClient,
 				generator:          SQLGenerator(),
 				flowTables:         sqlDriver.DefaultFlowTables(parsed.Dataset + "."), // Prefix with dataset
-			}
-
-			return endpoint, nil
+			}, nil
 		},
 		NewTransactor: func(
 			ctx context.Context,
-			epi sqlDriver.Endpoint,
+			ep sqlDriver.Endpoint,
 			spec *pf.MaterializationSpec,
 			sdFence sqlDriver.Fence,
 			resources []sqlDriver.Resource,
 		) (_ pm.Transactor, err error) {
-
-			ep := epi.(*Endpoint)
 			var t = &transactor{
 				ctx:      ctx,
-				ep:       ep,
+				ep:       ep.(*Endpoint),
 				fence:    sdFence.(*fence),
 				bindings: make([]*binding, len(spec.Bindings)),
 			}
@@ -153,7 +148,7 @@ func newBigQueryDriver() *sqlDriver.Driver {
 			// Create the bindings for this transactor
 			for bindingPos, spec := range spec.Bindings {
 				var target = sqlDriver.ResourcePath(spec.ResourcePath).Join()
-				t.bindings[bindingPos], err = ep.newBinding(bindingPos, target, spec)
+				t.bindings[bindingPos], err = newBinding(t.ep.generator, bindingPos, target, spec)
 				if err != nil {
 					return nil, fmt.Errorf("%s: %w", target, err)
 				}

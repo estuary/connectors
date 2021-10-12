@@ -5,11 +5,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// StdFence is an installed barrier in a shared checkpoints table which prevents
+// fence is an installed barrier in a shared checkpoints table which prevents
 // other sessions from committing transactions under the fenced ID --
 // and prevents this Fence from committing where another session has in turn
-// fenced this instance off. This implementation of the Fence is for
-// *sql.DB compatable databases.
+// fenced this instance off.
 type fence struct {
 	// checkpoint associated with this Fence.
 	checkpoint []byte
@@ -23,7 +22,8 @@ type fence struct {
 	keyEnd   uint32
 }
 
-// LogEntry returns a log.Entry with pre-set fields that identify the Shard ID and Fence
+// LogEntry returns a log.Entry with pre-set fields that identify the Shard ID and Fence that is useful
+// for logging when multiple shards are working and determining the difference between thread logs.
 func (f *fence) LogEntry() *logrus.Entry {
 	return logrus.WithFields(logrus.Fields{
 		"materialization": f.materialization,
@@ -33,12 +33,12 @@ func (f *fence) LogEntry() *logrus.Entry {
 	})
 }
 
-// Checkpoint returns the current checkpoint for the fence
+// Checkpoint returns the current checkpoint for the fence.
 func (f *fence) Checkpoint() []byte {
 	return f.checkpoint
 }
 
-// SetCheckpoint sets the current checkpoint
+// SetCheckpoint sets the current checkpoint.
 func (f *fence) SetCheckpoint(checkpoint []byte) {
 	f.checkpoint = checkpoint
 }

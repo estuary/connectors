@@ -1,0 +1,56 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "required": [
+      "project_id",
+      "dataset",
+      "bucket",
+      "bucket_path"
+    ],
+    "properties": {
+      "project_id": {
+        "type": "string"
+      },
+      "dataset": {
+        "type": "string"
+      },
+      "region": {
+        "type": "string"
+      },
+      "bucket": {
+        "type": "string"
+      },
+      "bucket_path": {
+        "type": "string"
+      },
+      "credentials_file": {
+        "type": "string"
+      },
+      "credentials_json": {
+        "type": "string",
+        "media": {
+          "binaryEncoding": "base64"
+        }
+      }
+    },
+    "additionalProperties": false,
+    "type": "object"
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "required": [
+      "table"
+    ],
+    "properties": {
+      "table": {
+        "type": "string"
+      },
+      "delta_updates": {
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false,
+    "type": "object"
+  },
+  "documentation_url": "https://docs.estuary.dev/#FIXME"
+}
