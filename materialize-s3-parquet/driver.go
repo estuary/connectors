@@ -20,8 +20,8 @@ import (
 type config struct {
 	AWSAccessKeyID     string `json:"awsAccessKeyId"`
 	AWSSecretAccessKey string `json:"awsSecretAccessKey"`
-	Endpoint           string `json:"endpoint"`
-	Region             string `json:"region"`
+	Endpoint           string `json:"endpoint,omitempty" jsonschema:"oneof_required=endpoint"`
+	Region             string `json:"region,omitempty" jsonschema:"oneof_required=region"`
 	// The driver batches materialization results to local files first,
 	// and uploads the local files to cloud (S3) on a schedule specified by
 	// UploadIntervalInSeconds, which is the mimimal wait time (in seconds) between two

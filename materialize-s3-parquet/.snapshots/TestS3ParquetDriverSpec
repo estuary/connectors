@@ -7,8 +7,6 @@
         "required": [
           "awsAccessKeyId",
           "awsSecretAccessKey",
-          "endpoint",
-          "region",
           "uploadIntervalInSeconds"
         ],
         "properties": {
@@ -29,7 +27,21 @@
           }
         },
         "additionalProperties": false,
-        "type": "object"
+        "type": "object",
+        "oneOf": [
+          {
+            "required": [
+              "endpoint"
+            ],
+            "title": "endpoint"
+          },
+          {
+            "required": [
+              "region"
+            ],
+            "title": "region"
+          }
+        ]
       }
     }
   },

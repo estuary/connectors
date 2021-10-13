@@ -19,7 +19,7 @@ func TestConfig(t *testing.T) {
 	var validConfig = config{
 		AWSAccessKeyID:          "testKey",
 		AWSSecretAccessKey:      "testSecret",
-		Endpoint:                "http://localhost:1234",
+		Endpoint:                "",
 		Region:                  "us-east-1",
 		UploadIntervalInSeconds: 60,
 	}
@@ -28,7 +28,6 @@ func TestConfig(t *testing.T) {
 
 	var NoRegionOREndpoint = validConfig
 	NoRegionOREndpoint.Region = ""
-	NoRegionOREndpoint.Endpoint = ""
 	require.Error(t, NoRegionOREndpoint.Validate(), "expected validation error")
 
 	var missingAccessKey = validConfig
