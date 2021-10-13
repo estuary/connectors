@@ -13,16 +13,17 @@ import (
 
 // Uploader is the interface of the object responsible for uploading local files to the cloud.
 type Uploader interface {
-	Upload(bucket, key, localFileName string, contextType string) error
+	Upload(key, localFileName string, contextType string) error
 }
 
 // S3Uploader implements the Uploader interface for uploading files to S3.
 type S3Uploader struct {
+	bucket      string
 	uploaderImp *s3manager.Uploader
 }
 
 // Upload implements the S3Uploader interface.
-func (u *S3Uploader) Upload(bucket, key, localFileName string, contentType string) error {
+func (u *S3Uploader) Upload(key, localFileName string, contentType string) error {
 	f, err := os.Open(localFileName)
 	if err != nil {
 		return fmt.Errorf("opening local file: %w", err)
@@ -30,7 +31,7 @@ func (u *S3Uploader) Upload(bucket, key, localFileName string, contentType strin
 	defer f.Close()
 
 	upParams := &s3manager.UploadInput{
-		Bucket:      &bucket,
+		Bucket:      &u.bucket,
 		ContentType: &contentType,
 		Key:         &key,
 		Body:        f,
@@ -67,6 +68,7 @@ func NewS3Uploader(cfg config) (*S3Uploader, error) {
 	}
 
 	return &S3Uploader{
+		bucket:      cfg.Bucket,
 		uploaderImp: s3manager.NewUploaderWithClient(s3.New(awsSession)),
 	}, nil
 }

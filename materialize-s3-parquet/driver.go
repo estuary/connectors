@@ -20,6 +20,7 @@ import (
 type config struct {
 	AWSAccessKeyID     string `json:"awsAccessKeyId"`
 	AWSSecretAccessKey string `json:"awsSecretAccessKey"`
+	Bucket             string `json:"bucket"`
 	Endpoint           string `json:"endpoint,omitempty" jsonschema:"oneof_required=endpoint"`
 	Region             string `json:"region,omitempty" jsonschema:"oneof_required=region"`
 	// The driver batches materialization results to local files first,
@@ -33,6 +34,9 @@ type config struct {
 func (c config) Validate() error {
 	if c.Region == "" && c.Endpoint == "" {
 		return fmt.Errorf("must supply one of 'region' or 'endpoint'")
+	}
+	if c.Bucket == "" {
+		return fmt.Errorf("missing bucket")
 	}
 	if c.AWSAccessKeyID == "" && c.AWSSecretAccessKey != "" {
 		return fmt.Errorf("missing awsAccessKeyID")
@@ -49,7 +53,6 @@ func (c config) Validate() error {
 
 // resource specifies a materialization destinaion in S3, and the resulting parquet file configuration.
 type resource struct {
-	Bucket     string `json:"bucket"`
 	PathPrefix string `json:"pathPrefix"`
 	// The method used for compressing data in parquet.
 	CompressionType string `json:"compressionType,omitempty"`
@@ -64,9 +67,6 @@ var compressionTypeToCodec = map[string]parquet.CompressionCodec{
 }
 
 func (r resource) Validate() error {
-	if r.Bucket == "" {
-		return fmt.Errorf("bucket in a resource should not be None")
-	}
 	if r.PathPrefix == "" {
 		return fmt.Errorf("pathPrefix in a resource should not be None")
 	}
@@ -215,7 +215,7 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 			Constraints: constraints,
 			// Only delta updates are supported by file materializations.
 			DeltaUpdates: true,
-			ResourcePath: []string{res.Bucket, res.PathPrefix},
+			ResourcePath: []string{cfg.Bucket, res.PathPrefix},
 		})
 	}
 

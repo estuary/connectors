@@ -19,6 +19,7 @@ func TestConfig(t *testing.T) {
 	var validConfig = config{
 		AWSAccessKeyID:          "testKey",
 		AWSSecretAccessKey:      "testSecret",
+		Bucket:                  "testBucket",
 		Endpoint:                "",
 		Region:                  "us-east-1",
 		UploadIntervalInSeconds: 60,
@@ -29,6 +30,10 @@ func TestConfig(t *testing.T) {
 	var NoRegionOREndpoint = validConfig
 	NoRegionOREndpoint.Region = ""
 	require.Error(t, NoRegionOREndpoint.Validate(), "expected validation error")
+
+	var missingBucket = validConfig
+	missingBucket.Bucket = ""
+	require.Error(t, missingBucket.Validate(), "expected validation error")
 
 	var missingAccessKey = validConfig
 	missingAccessKey.AWSAccessKeyID = ""
@@ -45,16 +50,11 @@ func TestConfig(t *testing.T) {
 
 func TestResource(t *testing.T) {
 	var validResource = resource{
-		Bucket:          "test_bucket",
 		PathPrefix:      "test_path_prefix",
 		CompressionType: "snappy",
 	}
 	require.NoError(t, validResource.Validate())
 	require.Equal(t, parquet.CompressionCodec_SNAPPY, validResource.CompressionCodec())
-
-	var missingBucket = validResource
-	missingBucket.Bucket = ""
-	require.Error(t, missingBucket.Validate(), "expected validation error")
 
 	var missingPathPrefix = validResource
 	missingPathPrefix.PathPrefix = ""

@@ -204,7 +204,6 @@ func NewParquetFileProcessor(
 		pqBindings = append(pqBindings, &pqBinding{
 			ctx:              ctx,
 			S3Uploader:       S3Uploader,
-			bucket:           res.Bucket,
 			s3PathPrefix:     s3PathPrefix,
 			pqDataConverter:  pqDataConverter,
 			pqWriter:         nil,
@@ -265,7 +264,6 @@ type pqBinding struct {
 	ctx context.Context
 	// For uploading files to S3.
 	S3Uploader   Uploader
-	bucket       string
 	s3PathPrefix string
 	// For converting flow data of key/values into formats acceptable by the parquet file writer.
 	pqDataConverter *ParquetDataConverter
@@ -364,5 +362,5 @@ func (b *pqBinding) s3Path() string {
 }
 
 func (b *pqBinding) upload() error {
-	return b.S3Uploader.Upload(b.bucket, b.s3Path(), b.localFileName(), pqContentType)
+	return b.S3Uploader.Upload(b.s3Path(), b.localFileName(), pqContentType)
 }

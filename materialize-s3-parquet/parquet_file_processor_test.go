@@ -59,7 +59,7 @@ type MockS3Uploader struct {
 	contents map[string][]TestData
 }
 
-func (u *MockS3Uploader) Upload(bucket, key, localFileName string, contentType string) error {
+func (u *MockS3Uploader) Upload(key, localFileName string, contentType string) error {
 	fr, err := local.NewLocalFileReader(localFileName)
 	require.NoError(u.t, err)
 	defer fr.Close()
@@ -74,7 +74,7 @@ func (u *MockS3Uploader) Upload(bucket, key, localFileName string, contentType s
 	require.NoError(u.t, err)
 
 	// Instead of uploading to the cloud, MockS3Uploader records the uploaded contents in memory.
-	u.contents[fmt.Sprintf("s3://%s/%s", bucket, key)] = data
+	u.contents[fmt.Sprintf("s3://test_bucket/%s", key)] = data
 
 	return nil
 }
@@ -208,7 +208,6 @@ func buildTestOpenRequest(numOfBindings int) *pm.TransactionRequest_Open {
 	for i := 0; i < numOfBindings; i++ {
 		resourceSpecJSON, _ := json.Marshal(
 			resource{
-				Bucket:     "test_bucket",
 				PathPrefix: fmt.Sprintf("test_path_%d", i),
 			},
 		)
