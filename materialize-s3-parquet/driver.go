@@ -193,14 +193,13 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 			var constraint = new(pm.Constraint)
 			switch {
 			case projection.IsRootDocumentProjection():
-				// Document field is not required by this driver.
-				// However MaterializationSpec_Binding.Validate requires the document field to be present.
+				// TODO(jixiang) update MaterializationSpec_Binding.Validate and remove the required document field here.
 				constraint.Type = pm.Constraint_FIELD_REQUIRED
 				constraint.Reason = "The root document is needed."
 			case isComplexField:
-				// TODO(jixiang): support complex fields.
+				// TODO(jixiang): support Array and Object fields.
 				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
-				constraint.Reason = "Complex fields are not supported."
+				constraint.Reason = "Array and Object fields are not supported."
 			case projection.Inference.IsSingleType():
 				constraint.Type = pm.Constraint_FIELD_REQUIRED
 				constraint.Reason = "The projection has a single scalar type."
