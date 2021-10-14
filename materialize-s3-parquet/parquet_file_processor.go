@@ -55,7 +55,7 @@ type FileProcessorProxy struct {
 
 	// A mutex to control mutual exclusive access to the proxied fileProcessor,
 	// and related states of hasLocalStagingData and mostRecentCommitTime
-	mu *sync.Mutex
+	mu sync.Mutex
 	// The force upload is enabled only if there are calls to `Store` without a call to `Commit`.
 	hasLocalStagingData bool
 	// The most recent time a Commit call is made.
@@ -81,7 +81,6 @@ func NewFileProcessorProxy(
 		ctx:                  ctx,
 		fileProcessor:        fileProcessor,
 		forceUploadInterval:  forceUploadInterval,
-		mu:                   &sync.Mutex{},
 		hasLocalStagingData:  false,
 		mostRecentCommitTime: clock.Now(),
 		stopServingCh:        make(chan struct{}),
@@ -110,8 +109,10 @@ func (fp *FileProcessorProxy) Store(binding int, key tuple.Tuple, values tuple.T
 // Commit implements the FileProcessor interface.
 func (fp *FileProcessorProxy) Commit() (nextSeqNumList []int, e error) {
 	fp.mu.Lock()
-	defer fp.mu.Unlock()
-	defer func() { fp.mostRecentCommitTime = fp.clock.Now() }()
+	defer func() {
+		fp.mostRecentCommitTime = fp.clock.Now()
+		fp.mu.Unlock()
+	}()
 
 	if !fp.hasLocalStagingData {
 		return

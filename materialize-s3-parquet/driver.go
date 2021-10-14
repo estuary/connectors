@@ -105,8 +105,8 @@ func (dcp driverCheckpoint) Validate() error { return nil }
 
 // Creates a driver checkpoint, and encodes it into a json.RawMessage to populate the DriverCheckPointJson field in `prepared` response.
 func marshalDriverCheckpointJSON(flowCheckpoint []byte, nextSeqNumList []int) (json.RawMessage, error) {
-	if flowCheckpoint != nil && len(flowCheckpoint) == 0 {
-		panic("empty checkpoint received.")
+	if len(flowCheckpoint) == 0 {
+		panic("empty checkpoint received")
 	}
 
 	dcp := &driverCheckpoint{
@@ -124,9 +124,7 @@ func marshalDriverCheckpointJSON(flowCheckpoint []byte, nextSeqNumList []int) (j
 
 // Decodes a DriverCheckpointJson received from the Open txn request.
 func unmarshalDriverCheckpointJSON(raw json.RawMessage) (flowCheckpoint []byte, nextSeqNumList []int, err error) {
-	flowCheckpoint, nextSeqNumList, err = nil, nil, nil
-
-	if raw == nil {
+	if len(raw) == 0 {
 		return
 	}
 
@@ -136,12 +134,7 @@ func unmarshalDriverCheckpointJSON(raw json.RawMessage) (flowCheckpoint []byte, 
 	}
 
 	nextSeqNumList = parsed.NextSeqNumList
-	if flowCheckpoint, err = base64.StdEncoding.DecodeString(parsed.B64EncodedFlowCheckpoint); err != nil {
-		return
-	} else if flowCheckpoint != nil && len(flowCheckpoint) == 0 {
-		flowCheckpoint = nil
-	}
-
+	flowCheckpoint, err = base64.StdEncoding.DecodeString(parsed.B64EncodedFlowCheckpoint)
 	return
 }
 
@@ -149,12 +142,12 @@ func unmarshalDriverCheckpointJSON(raw json.RawMessage) (flowCheckpoint []byte, 
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
-	endpointSchema, err := jsonschema.Reflect(new(config)).MarshalJSON()
+	endpointSchema, err := jsonschema.Reflect(&config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
 
-	resourceSchema, err := jsonschema.Reflect(new(resource)).MarshalJSON()
+	resourceSchema, err := jsonschema.Reflect(&resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -190,7 +183,7 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 				}
 			}
 
-			var constraint = new(pm.Constraint)
+			var constraint = &pm.Constraint{}
 			switch {
 			case projection.IsRootDocumentProjection():
 				// TODO(jixiang) update MaterializationSpec_Binding.Validate and remove the required document field here.
@@ -285,7 +278,10 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return fmt.Errorf("sending Opened: %w", err)
 	}
 
-	var log = log.WithField("materialization", "s3parquet")
+	var log = log.WithField(
+		"materialization",
+		fmt.Sprintf("s3parquet-%d-%d", open.Open.KeyBegin, open.Open.KeyEnd),
+	)
 	return pm.RunTransactions(stream, transactor, log)
 }
 

@@ -77,8 +77,6 @@ func TestMarshalAndUnmarshalDriverCheckpointJson(t *testing.T) {
 		checkpoint     []byte
 		nextSeqNumList []int
 	}{
-		{nil, nil},
-		{nil, []int{0, 1}},
 		{[]byte("checkpoint_a"), nil},
 		{[]byte("checkpoint_b"), []int{}},
 		{[]byte("checkpoint_c"), []int{1, 1, 2, 3, 4}},
@@ -93,6 +91,7 @@ func TestMarshalAndUnmarshalDriverCheckpointJson(t *testing.T) {
 		require.Equal(t, test.checkpoint, checkpoint)
 		require.Equal(t, test.nextSeqNumList, nextSeqNumList)
 	}
+	require.Panics(t, func() { marshalDriverCheckpointJSON(nil, []int{}) })
 }
 
 func TestS3ParquetDriverSpec(t *testing.T) {
