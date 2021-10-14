@@ -278,7 +278,10 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return fmt.Errorf("sending Opened: %w", err)
 	}
 
-	var log = log.WithField("materialization", "s3parquet")
+	var log = log.WithField(
+		"materialization",
+		fmt.Sprintf("s3parquet-%d-%d", open.Open.KeyBegin, open.Open.KeyEnd),
+	)
 	return pm.RunTransactions(stream, transactor, log)
 }
 
