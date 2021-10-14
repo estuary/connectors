@@ -1,0 +1,4 @@
+{"type":"RECORD","record":{"stream":"test_ignoredstreams_one","data":{"_change_type":"Insert","data":"six","id":6},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_ignoredstreams_one":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQI="}]}}}}}
+{"type":"RECORD","record":{"stream":"test_ignoredstreams_one","data":{"_change_type":"Insert","data":"eight","id":8},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_ignoredstreams_one":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQI="}]}}}}}
