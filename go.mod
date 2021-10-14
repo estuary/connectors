@@ -12,6 +12,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.4 // indirect
 	github.com/benbjohnson/clock v1.1.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
+	github.com/brianvoe/gofakeit/v6 v6.9.0 // indirect
+	github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9 // indirect
 	github.com/estuary/protocols v0.0.0-20211006013521-9b8d02b54d19
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
