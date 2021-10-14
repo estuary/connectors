@@ -354,59 +354,35 @@ func (c *capture) scanTable(ctx context.Context, snapshot *databaseSnapshot, str
 	// because each iteration of this loop is basically independent except
 	// for the stream state it reads and modifies.
 	for tableState.Mode == tableModeScanning {
-		// If this stream has no previously scanned range information, request the first
-		// chunk, then initialize the scanned ranges list and emit a state update.
+		// Each chunk we scan from the table extends some scan range. When there are
+		// no ranges we create an empty placeholder. If the last range has a different
+		// `ScannedLSN` from the current snapshot then there's been a restart and we
+		// need to open a new range to use.
+		var lastRange *TableRange
 		if len(tableState.ScanRanges) == 0 {
-			var count, endKey, err = table.ScanStart(ctx, c.handleChangeEvent)
-			if err != nil {
-				return fmt.Errorf("error processing snapshot events: %w", err)
-			}
-			tableState.ScanRanges = []TableRange{{
-				ScannedLSN: snapshot.TransactionLSN(),
-				EndKey:     endKey,
-			}}
-
-			// If the initial scan returned zero rows then we proceed immediately
-			// to 'Active' for this table. Note that in this case the 'EndKey' of
-			// the range will be "", but that's okay because the `filteredLSN`
-			// check isn't going to examine the key anyway since there's just one
-			// scan range.
-			if count == 0 {
-				tableState.Mode = tableModeActive
-			}
-			if err := c.emitState(c.state); err != nil {
-				return err
-			}
-			continue
-		}
-
-		// Otherwise if the last scanned range had a different LSN than the current snapshot,
-		// there must have been a restart in between. Create a new scan range, initialized
-		// to the zero-length range after the previous range.
-		//
-		// Whether or not this is the case, `lastRange` will end up referring to some range
-		// with the same `ScannedLSN` as our current transaction, which will be extended by
-		// reading further chunks from the table.
-		var lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
-		if lastRange.ScannedLSN != snapshot.TransactionLSN() {
 			tableState.ScanRanges = append(tableState.ScanRanges, TableRange{
 				ScannedLSN: snapshot.TransactionLSN(),
+			})
+		}
+		lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
+		if lastRange.ScannedLSN != snapshot.TransactionLSN() {
+			tableState.ScanRanges = append(tableState.ScanRanges, TableRange{
 				EndKey:     lastRange.EndKey,
+				ScannedLSN: snapshot.TransactionLSN(),
 			})
 			lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
 		}
 
-		// This is the core operation where we spend most of our time when scanning
-		// table contents: reading the next chunk from the table and extending the
-		// endpoint of `lastRange`.
-		var count, nextKey, err = table.ScanFrom(ctx, lastRange.EndKey, c.handleChangeEvent)
+		// Fetch the next chunk from the table after the end key of the previous one,
+		// and extend the range as appropriate.
+		var count, endKey, err = table.ScanChunk(ctx, lastRange.EndKey, c.handleChangeEvent)
 		if err != nil {
 			return fmt.Errorf("error processing snapshot events: %w", err)
 		}
 		if count == 0 {
 			tableState.Mode = tableModeActive
 		} else {
-			lastRange.EndKey = nextKey
+			lastRange.EndKey = endKey
 		}
 		if err := c.emitState(c.state); err != nil {
 			return err

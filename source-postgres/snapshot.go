@@ -123,44 +123,40 @@ func (s *tableSnapshot) buildScanQuery(start bool) string {
 	return query.String()
 }
 
-func (s *tableSnapshot) ScanStart(ctx context.Context, handler changeEventHandler) (int, []byte, error) {
-	logrus.WithFields(logrus.Fields{
-		"namespace":  s.SchemaName,
-		"table":      s.TableName,
-		"primaryKey": s.ScanKey,
-		"txLSN":      s.TransactionLSN(),
-	}).Info("starting table scan")
-
-	var query = s.buildScanQuery(true)
-	logrus.WithField("query", query).Debug("executing query")
-	var rows, err = s.DB.Transaction.Query(ctx, query)
-	if err != nil {
-		return 0, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
+// ScanChunk requests a chunk of rows from the table snapshot, transforms each row into
+// an `Insert` change event and gives it to the provided handler. If `prevKey` is nil
+// the very first chunk of the table is scanned, otherwise it must contain the `lastKey`
+// of a previous chunk, and this chunk will begin immediately after that.
+func (s *tableSnapshot) ScanChunk(ctx context.Context, prevKey []byte, handler changeEventHandler) (count int, lastKey []byte, err error) {
+	var logFields = logrus.Fields{
+		"namespace": s.SchemaName,
+		"table":     s.TableName,
+		"scanKey":   s.ScanKey,
+		"prevKey":   base64.StdEncoding.EncodeToString(prevKey),
+		"txLSN":     s.TransactionLSN(),
 	}
-	defer rows.Close()
-	return s.dispatchResults(ctx, rows, handler)
-}
-
-func (s *tableSnapshot) ScanFrom(ctx context.Context, prevKey []byte, handler changeEventHandler) (int, []byte, error) {
-	logrus.WithFields(logrus.Fields{
-		"namespace":  s.SchemaName,
-		"table":      s.TableName,
-		"primaryKey": s.ScanKey,
-		"resumeKey":  base64.StdEncoding.EncodeToString(prevKey),
-	}).Debug("scanning next chunk")
-
-	var args, err = unpackTuple(prevKey)
-	if err != nil {
-		return 0, nil, fmt.Errorf("error unpacking encoded tuple: %w", err)
+	if prevKey == nil {
+		logrus.WithFields(logFields).Info("starting table scan")
+	} else {
+		logrus.WithFields(logFields).Debug("scanning next chunk")
 	}
-	if len(args) != len(s.ScanKey) {
-		return 0, nil, fmt.Errorf("expected %d primary-key values but got %d", len(s.ScanKey), len(args))
+
+	var query = s.buildScanQuery(prevKey == nil)
+	var args []interface{}
+	if prevKey != nil {
+		args, err = unpackTuple(prevKey)
+		if err != nil {
+			return 0, nil, fmt.Errorf("error unpacking encoded tuple: %w", err)
+		}
+		if len(args) != len(s.ScanKey) {
+			return 0, nil, fmt.Errorf("expected %d primary-key values but got %d", len(s.ScanKey), len(args))
+		}
 	}
-	var query = s.buildScanQuery(false)
+
 	logrus.WithField("query", query).WithField("args", args).Debug("executing query")
 	rows, err := s.DB.Transaction.Query(ctx, query, args...)
 	if err != nil {
-		return 0, prevKey, fmt.Errorf("unable to execute query %q: %w", query, err)
+		return 0, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
 	return s.dispatchResults(ctx, rows, handler)
