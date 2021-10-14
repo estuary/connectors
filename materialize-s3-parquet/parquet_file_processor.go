@@ -81,7 +81,6 @@ func NewFileProcessorProxy(
 		ctx:                  ctx,
 		fileProcessor:        fileProcessor,
 		forceUploadInterval:  forceUploadInterval,
-		mu:                   sync.Mutex{},
 		hasLocalStagingData:  false,
 		mostRecentCommitTime: clock.Now(),
 		stopServingCh:        make(chan struct{}),
