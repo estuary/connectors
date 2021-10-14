@@ -55,6 +55,7 @@ jobs:
           - source-hello-world
           - source-kafka
           - source-kinesis
+          - source-postgres
           - source-s3
           - materialize-postgres
           - materialize-snowflake
@@ -107,6 +108,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
 
+      - name: Start Test PostgreSQL Instance
+        if: matrix.connector == 'source-postgres'
+        run: |
+          docker-compose --file source-postgres/docker-compose.yaml up --detach postgres
+
       - name: Login to GitHub package docker registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | \
@@ -114,6 +120,9 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
+        with:
+          driver-opts: |
+            network=host
 
       - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v2
@@ -134,6 +143,7 @@ jobs:
           contains('
             source-gcs
             source-kinesis
+            source-postgres
             source-s3
             ', matrix.connector)
         env:
@@ -142,6 +152,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
           AWS_DEFAULT_OUTPUT: json
+          POSTGRES_CONNECTION_URI: "postgres://flow:flow@localhost:5432/flow"
         run: CONNECTOR=${{ matrix.connector }} VERSION=test ./tests/run.sh;
 
       - name: Push ${{ matrix.connector }} image
