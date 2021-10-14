@@ -1,0 +1,10 @@
+{ "id": 1, "str_field": "str1", "float_field": 1.1, "bool_field": false, "nullable_int": null, "array_int":[11, 12], "nested": {"id": "i1"}}
+{ "id": 2, "str_field": "str2", "float_field": 2.2, "bool_field": true , "nullable_int": 2   , "array_int":[21, 22], "nested": {"id": "i2"}} 
+{ "id": 3, "str_field": "str3", "float_field": 3.3, "bool_field": false, "nullable_int": null, "array_int":[31, 32], "nested": {"id": "i3"}} 
+{ "id": 4, "str_field": "str4", "float_field": 4.4, "bool_field": true , "nullable_int": 4   , "array_int":[41, 42], "nested": {"id": "i4"}} 
+{ "id": 5, "str_field": "str5", "float_field": 5.5, "bool_field": false, "nullable_int": null, "array_int":[51, 52], "nested": {"id": "i5"}} 
+{ "id": 6, "str_field": "str6", "float_field": 6.6, "bool_field": true , "nullable_int": 6   , "array_int":[61, 62], "nested": {"id": "i6"}} 
+{ "id": 7, "str_field": "str7", "float_field": 7.7, "bool_field": false, "nullable_int": null, "array_int":[71, 72], "nested": {"id": "i7"}} 
+{ "id": 8, "str_field": "str8", "float_field": 8.8, "bool_field": true , "nullable_int": 8   , "array_int":[81, 82], "nested": {"id": "i8"}} 
+{ "id": 9, "str_field": "str9", "float_field": 9.9, "bool_field": false, "nullable_int": null, "array_int":[91, 92], "nested": {"id": "i9"}} 
+{ "id": 10, "str_field": "str10", "float_field": 10.1, "bool_field": true , "nullable_int": 10   , "array_int":[1,   2], "nested": {"id": "i10"}}

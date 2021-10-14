@@ -1,0 +1,43 @@
+{
+  "collections": {
+    "${TEST_COLLECTION_SIMPLE}": {
+       "schema": {
+          "properties": {
+           "id": { "type": "integer" },
+           "canary": { "type": "string" }
+          },
+          "required": ["id", "canary"],
+          "type": "object"
+       },
+       "key": ["/id"]
+    },
+    "${TEST_COLLECTION_MULTIPLE_DATATYPES}": {
+       "schema": {
+       "properties": {
+           "id": { "type": "integer" },
+           "str_field": { "type": "string" },
+           "float_field": { "type": "number" },
+           "bool_field": {"type": "boolean"},
+           "nullable_int": {"type": ["null", "integer"]},
+           "array_int": {"type": "array", "items": {"type": "integer"}},
+           "nested": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}}
+          },
+          "required": ["id"],
+          "type": "object"
+       },
+       "key": ["/id"]
+    }
+  },
+
+  "materializations": {
+    "tests/${CONNECTOR}/materialize": {
+      "endpoint": {
+        "flowSink": {
+          "image": "${CONNECTOR_IMAGE}",
+          "config": "CONNECTOR_CONFIG_PLACEHOLDER"
+        }
+      },
+      "bindings": ${RESOURCES_CONFIG}
+    }
+  }
+}
