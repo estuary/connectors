@@ -17,6 +17,9 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/iancoleman/orderedmap v0.2.0 // indirect
 	github.com/jackc/pgconn v1.10.0
+	github.com/jackc/pglogrepl v0.0.0-20210731151948-9f1effd582c4
+	github.com/jackc/pgproto3/v2 v2.1.1
+	github.com/jackc/pgtype v1.8.1
 	github.com/jackc/pgx/v4 v4.13.0
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/klauspost/compress v1.13.6 // indirect
