@@ -33,7 +33,6 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/xitongsys/parquet-go v1.6.1
 	github.com/xitongsys/parquet-go-source v0.0.0-20211010230925-397910c5e371
-	go.gazette.dev/core v0.89.0 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/net v0.0.0-20211011170408-caeb26a5c8c0 // indirect
 	golang.org/x/oauth2 v0.0.0-20211005180243-6b3c2da341f1 // indirect
@@ -43,4 +42,5 @@ require (
 	google.golang.org/api v0.58.0
 	google.golang.org/genproto v0.0.0-20211011165927-a5fb3255271e // indirect
 	google.golang.org/grpc v1.41.0
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

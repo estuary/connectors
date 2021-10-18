@@ -1,8 +1,9 @@
-package mattest
+package matsim
 
 import (
 	"testing"
 
+	"github.com/estuary/connectors/flowsim/testcat"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
@@ -10,25 +11,21 @@ import (
 func TestTestCatalogMarshalYAML(t *testing.T) {
 
 	type schemaTest struct {
-		Key1    int     `yaml:"key1,required"`
-		Key2    bool    `yaml:"key2,required"`
-		Boolean bool    `yaml:"boolean"`
-		Integer int     `yaml:"integer"`
-		Number  float32 `yaml:"number"`
-		String  string  `yaml:"string"`
+		Key1        int     `flowsim:"key1,key"`
+		Key2        bool    `flowsim:"key2,key"`
+		Boolean     bool    `flowsim:"boolean"`
+		Integer     int     `flowsim:"integer"`
+		NumberField float32 `flowsim:"numberField"`
+		String      string  `flowsim:"string"`
 	}
-	schema := BuildSchema(schemaTest{})
 
-	c := TestCatalog{
-		Collections: map[string]Collection{
-			"coltest": {
-				Schema: schema,
-				Keys:   []string{"/key1", "/key2"},
-			},
+	c := testcat.TestCatalog{
+		Collections: map[string]testcat.Collection{
+			"coltest": testcat.BuildCollection(schemaTest{}),
 		},
-		Materializations: map[string]Materialization{
+		Materializations: map[string]testcat.Materialization{
 			"mattest": {
-				Endpoint: EndpointFlowSync{
+				Endpoint: testcat.EndpointFlowSync{
 					Image: "materialize-postgres:local",
 					Config: map[string]interface{}{
 						"host":     "127.0.0.1",
@@ -36,7 +33,7 @@ func TestTestCatalogMarshalYAML(t *testing.T) {
 						"password": "flow",
 					},
 				},
-				Bindings: []Binding{
+				Bindings: []testcat.Binding{
 					{
 						Source: "coltest",
 						Resource: map[string]interface{}{
@@ -64,7 +61,7 @@ collections:
      key2: { type: boolean }
      boolean: { type: boolean }
      integer: { type: integer }
-     number: { type: number }
+     numberField: { type: number }
      string: { type: string }
    required: [key1, key2]
   key: [/key1, /key2]
