@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"strings"
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
@@ -18,7 +17,6 @@ import (
 )
 
 func main() {
-	log.SetLevel(log.DebugLevel)
 	boilerplate.RunMain(newBigQueryDriver())
 }
 
@@ -46,8 +44,6 @@ func (c *config) Validate() error {
 	if c.Bucket == "" {
 		return fmt.Errorf("expected bucket")
 	}
-	// Makes sure the BucketPrefix doesn't start with or end with a /
-	c.BucketPath = strings.Trim(c.BucketPath, "/")
 	return nil
 }
 
@@ -84,8 +80,8 @@ func (c tableConfig) DeltaUpdates() bool {
 func newBigQueryDriver() *sqlDriver.Driver {
 	return &sqlDriver.Driver{
 		DocumentationURL: "https://docs.estuary.dev/#FIXME",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
+		EndpointSpecType: &config{},
+		ResourceSpecType: &tableConfig{},
 		NewResource: func(endpoint sqlDriver.Endpoint) sqlDriver.Resource {
 			return &tableConfig{base: endpoint.(*Endpoint).config}
 		},
@@ -109,7 +105,6 @@ func newBigQueryDriver() *sqlDriver.Driver {
 			if parsed.CredentialsFile != "" {
 				clientOpts = append(clientOpts, option.WithCredentialsFile(parsed.CredentialsFile))
 			} else if len(parsed.CredentialsJSON) != 0 {
-
 				clientOpts = append(clientOpts, option.WithCredentialsJSON(parsed.CredentialsJSON))
 			}
 

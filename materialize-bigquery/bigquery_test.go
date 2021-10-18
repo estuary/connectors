@@ -43,6 +43,18 @@ func TestQueryGeneration(t *testing.T) {
 			`+"VALUES (r.`key1`, r.`key2`, r.`boolean`, r.`integer`, r.`number`, r.`string`, r.`flow_document`)"+`
 		;`,
 		binding.store.sql)
+
+	// Enable delta mode binding and test again.
+	spec.Bindings[0].DeltaUpdates = true
+	binding, err = newBinding(generator, 123, "test", spec.Bindings[0])
+	require.Nil(t, err)
+
+	require.Equal(t, `
+		`+"INSERT INTO `test` (`key1`, `key2`, `boolean`, `integer`, `number`, `string`, `flow_document`)"+`
+		`+"SELECT `key1`, `key2`, `boolean`, `integer`, `number`, `string`, `flow_document` FROM flow_temp_store_123"+`
+		;`,
+		binding.store.sql)
+
 }
 
 func TestSpecification(t *testing.T) {

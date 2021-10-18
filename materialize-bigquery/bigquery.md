@@ -31,4 +31,5 @@ credentials_json - Base64 encoded string of the full service account file
 
 You should specify one of `credentials_file` or `credentials_json`. It will also leverage 
 the `GOOGLE_APPLICATION_CREDENTIALS` environment variable if provided which can point
-to a service account file.
+to a service account file. If multiple options are listed, tt will first try `credentials_file`
+followed by `credentials_json` and then any provided `GOOGLE_APPLICATION_CREDENTIALS`.

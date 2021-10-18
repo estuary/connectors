@@ -34,7 +34,7 @@ func (ep *Endpoint) NewExternalDataConnectionFile(ctx context.Context, file stri
 	filePath := path.Join(ep.config.BucketPath, file)
 
 	f := &ExternalDataConnectionFile{
-		URI:       fmt.Sprintf("gs://%s/%s", ep.config.Bucket, filePath),
+		URI:       "gs:/" + fmt.Sprintf("/%s/%s", ep.config.Bucket, filePath),
 		edc:       edc,
 		gcsObject: ep.cloudStorageClient.Bucket(ep.config.Bucket).Object(filePath),
 	}
@@ -60,9 +60,8 @@ func (ep *Endpoint) NewExternalDataConnectionFile(ctx context.Context, file stri
 
 }
 
-// WriteRow takes either a slice of interface{} witch a count that matches the *bigquery.ExternalDataConfig
-// this file was opened with a map[string]interface{} with just the columns that need to be set. (it must
-// also have the same fields as *bigquery.ExternalDataConfig).
+// WriteRow takes either a slice of interface{} or a map[string]interface{}. The fields must match
+// the *bigquery.ExternalDataConfig that this external file was opened with.
 func (f *ExternalDataConnectionFile) WriteRow(rowi interface{}) error {
 
 	var v map[string]interface{}
