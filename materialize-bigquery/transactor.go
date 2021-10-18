@@ -188,8 +188,8 @@ func (t *transactor) Commit() error {
 	SET curFence = (SELECT fence FROM `+t.ep.flowTables.Checkpoints.Identifier+` WHERE
 		materialization=vMaterialization AND key_begin=vKeyBegin AND key_end=vKeyEnd AND fence=vFence
 	);
-	-- If missing, force exception and rollback
-	IF curFence <> vFence THEN
+	-- If fence missing/changed, force exception and abort
+	IF curFence IS NULL THEN
 		RAISE USING MESSAGE = 'fence not found';
 	END IF;
 

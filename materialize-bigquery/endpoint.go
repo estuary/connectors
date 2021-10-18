@@ -144,11 +144,7 @@ func (e *Endpoint) ExecuteStatements(ctx context.Context, statements []string) e
 	}
 
 	// Process the statementQueue if anything is remaining.
-	if err := runStatementQueue(); err != nil {
-		return err
-	}
-
-	return nil
+	return runStatementQueue()
 
 }
 

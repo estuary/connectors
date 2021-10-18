@@ -60,6 +60,7 @@ jobs:
           - materialize-postgres
           - materialize-snowflake
           - materialize-webhook
+          - materialize-bigquery
 
     steps:
       - uses: actions/checkout@v2
