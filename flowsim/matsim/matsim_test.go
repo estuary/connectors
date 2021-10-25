@@ -2,6 +2,7 @@ package matsim
 
 import (
 	"testing"
+	"time"
 
 	"github.com/estuary/connectors/flowsim/testcat"
 	"github.com/stretchr/testify/require"
@@ -11,21 +12,25 @@ import (
 func TestTestCatalogMarshalYAML(t *testing.T) {
 
 	type schemaTest struct {
-		Key1        int     `flowsim:"key1,key"`
-		Key2        bool    `flowsim:"key2,key"`
-		Boolean     bool    `flowsim:"boolean"`
-		Integer     int     `flowsim:"integer"`
-		NumberField float32 `flowsim:"numberField"`
-		String      string  `flowsim:"string"`
+		Key1        int       `flowsim:"key1,key"`
+		Key2        bool      `flowsim:"key2,key"`
+		Boolean     bool      `flowsim:"boolean"`
+		Integer     int       `flowsim:"integer"`
+		NumberField float32   `flowsim:"numberField"`
+		String      string    `flowsim:"string"`
+		DateTime    time.Time `flowsim:"dateTime"`
 	}
 
+	var collection, err = testcat.BuildCollection(schemaTest{})
+	require.NoError(t, err)
+
 	c := testcat.TestCatalog{
-		Collections: map[string]testcat.Collection{
-			"coltest": testcat.BuildCollection(schemaTest{}),
+		Collections: map[string]testcat.TestCollection{
+			"coltest": collection,
 		},
-		Materializations: map[string]testcat.Materialization{
+		Materializations: map[string]testcat.TestMaterialization{
 			"mattest": {
-				Endpoint: testcat.EndpointFlowSync{
+				Endpoint: testcat.TestEndpointFlowSync{
 					Image: "materialize-postgres:local",
 					Config: map[string]interface{}{
 						"host":     "127.0.0.1",
@@ -63,6 +68,7 @@ collections:
      integer: { type: integer }
      numberField: { type: number }
      string: { type: string }
+     dateTime: { type: "string", format: "date-time" }
    required: [key1, key2]
   key: [/key1, /key2]
   

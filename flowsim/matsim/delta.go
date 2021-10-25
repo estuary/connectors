@@ -33,7 +33,11 @@ func (c *DeltaConfig) Execute(args []string) error {
 	}
 
 	// Build/Compile the TestCatalog into a Flow BuiltCatalog.
-	catalog, err := testcat.BuildCatalog(c.ctx, c.NewTestCatalog())
+	var testCatalog, err = c.NewTestCatalog()
+	if err != nil {
+		return fmt.Errorf("test catalog: %v", err)
+	}
+	catalog, err := testcat.BuildCatalog(c.ctx, testCatalog)
 	if err != nil {
 		return fmt.Errorf("build catalog: %v", err)
 	}

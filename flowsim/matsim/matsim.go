@@ -133,15 +133,21 @@ func (c *Config) ParseConfig() error {
 
 // NewTestCatalog returns a simple catalog with a single collection using the schema of your TestData
 // and a single materialization setup to use FlowSync with your materialization.
-func (c *Config) NewTestCatalog() *testcat.TestCatalog {
+func (c *Config) NewTestCatalog() (*testcat.TestCatalog, error) {
+
+	var collection, err = testcat.BuildCollection(c.newTestData())
+	if err != nil {
+		return nil, err
+	}
+
 	return &testcat.TestCatalog{
-		Collections: map[string]testcat.Collection{
+		Collections: map[string]testcat.TestCollection{
 			// Generate a collection using our test data type.
-			"coltest": testcat.BuildCollection(c.newTestData()),
+			"coltest": collection,
 		},
-		Materializations: map[string]testcat.Materialization{
+		Materializations: map[string]testcat.TestMaterialization{
 			"mattest": {
-				Endpoint: testcat.EndpointFlowSync{
+				Endpoint: testcat.TestEndpointFlowSync{
 					Image:  c.Image,
 					Config: c.mConfig,
 				},
@@ -153,7 +159,7 @@ func (c *Config) NewTestCatalog() *testcat.TestCatalog {
 				},
 			},
 		},
-	}
+	}, nil
 }
 
 // resolveYamlOrFile takes a string and tries to parse it as yaml or if it can't assumes it's a yaml file.

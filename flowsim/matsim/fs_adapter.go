@@ -20,6 +20,7 @@ import (
 // in-process contexts to minimize ser/de & memory copies. As such it
 // doesn't get to assume deep ownership of its requests, and must
 // proto.Clone() shared state before mutating it.
+// TODO: This logic should be combined with flow/go/materialize/driver/image/driver.go
 type flowSinkAdapter struct {
 	pm.DriverServer
 }
