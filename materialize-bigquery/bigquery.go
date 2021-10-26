@@ -177,6 +177,7 @@ func SQLGenerator() sqlDriver.Generator {
 			}
 		},
 	}
+
 	var typeMappings = sqlDriver.ColumnTypeMapper{
 		sqlDriver.ARRAY:   jsonMapper,
 		sqlDriver.BINARY:  sqlDriver.RawConstColumnType("BYTES"),
@@ -186,6 +187,9 @@ func SQLGenerator() sqlDriver.Generator {
 		sqlDriver.OBJECT:  jsonMapper,
 		sqlDriver.STRING: sqlDriver.StringTypeMapping{
 			Default: sqlDriver.RawConstColumnType("STRING"),
+			ByFormat: map[string]sqlDriver.TypeMapper{
+				"date-time": sqlDriver.RawConstColumnType("TIMESTAMP"),
+			},
 		},
 	}
 
