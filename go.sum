@@ -235,6 +235,8 @@ github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9 h1:icgSuIhq86Oyvy1P
 github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9/go.mod h1:YpPUNJtpRROmy/+sy82DRzq1PdB5bpJkyCXjxqCeRuM=
 github.com/estuary/protocols v0.0.0-20211006013521-9b8d02b54d19 h1:3R8n+MILPsx2+JFm/KE8Jq6AAeWJoj4Fu1j8hBeTBnE=
 github.com/estuary/protocols v0.0.0-20211006013521-9b8d02b54d19/go.mod h1:CcYehV5RxFk0tNW/K/9w08YvHuzhkEFARuomzDn4nhk=
+github.com/estuary/protocols v0.0.0-20211025173433-2196b4df4a94 h1:syyWIdHEFYtJyu98AgSTV1Qox/IIptajGl6ikvVdJDg=
+github.com/estuary/protocols v0.0.0-20211025173433-2196b4df4a94/go.mod h1:CcYehV5RxFk0tNW/K/9w08YvHuzhkEFARuomzDn4nhk=
 github.com/evanphx/json-patch v4.2.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.5.0/go.mod h1:G79N1coSVB93tBe7j6PhzjmR3/2VvlbKOFpnXhI9Bw4=
 github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c/go.mod h1:Yg+htXGokKKdzcwhuNDwVvN+uBxDGXJ7G/VN1d8fa64=

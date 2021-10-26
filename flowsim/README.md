@@ -54,7 +54,7 @@ that they all exist and contain the correct information.
 The options for the basic test are:
 
 * --loops - The number of load/prepare/store/commit loops to perform before verifying data.
-* --start - The number of documents loaded/stored will begin at 2^start (default=8) and double every loop.
+* --start - The number of documents loaded/stored will begin at this value (default=500) and double every loop.
 * --batch - The number of documents to send per request. (default=1000) When sending load/store requests 
             it is broken into batch number of documents per request.
 
@@ -65,10 +65,10 @@ against adapters running in delta mode. In this mode only store/prepare/commit r
 are sent to the connector. The options are exactly the same as the Basic  
 
 * --loops  - The number of prepare/store/commit loops to perform before verifying data.
-* --start  - The number of documents stored will begin at 2^start (default=8) and double every loop.
+* --start  - The number of documents loaded/stored will begin at this value (default=500) and double every loop.
 * --batch  - The number of documents to send per request. (default=1000) When sending store requests 
             it is broken into batch number of documents per request.
-* --output - The documents that are stored will be sent in newline delimeter JSON format to the file specified by output. 
+* --output - The documents that are stored will be sent in newline delimeted JSON format to the file specified by output. 
             If no file is specified the output will be sent to stdout. All data is sent once a commit is confirmed. 
 
 The idea behind this test is that it will drive your connector and also stream the output. You can then

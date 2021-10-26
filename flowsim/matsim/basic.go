@@ -18,7 +18,7 @@ import (
 type BasicConfig struct {
 	Config
 	Loops     int `long:"loops" default:"5" description:"Number of load/prepare/store/commit loops."`
-	StartPow  int `long:"start" default:"8" description:"Number of docs to start with in 2^start and each loop will double"`
+	Start     int `long:"start" default:"500" description:"Number of docs to start with and each loop will double"`
 	BatchSize int `long:"batch" default:"1000" description:"Batch size to split requests into."`
 }
 
@@ -87,7 +87,7 @@ func (c *BasicConfig) Execute(args []string) error {
 	for loop := 0; loop < c.Loops; loop++ {
 
 		// The number of documents we will parse this pass
-		docCount := 2 << (loop + c.StartPow)
+		docCount := (1 << loop) * c.Start
 
 		var passStart = time.Now()
 
