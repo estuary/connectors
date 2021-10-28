@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"sync"
 	"time"
@@ -69,7 +70,13 @@ func (c *DeltaConfig) Execute(args []string) error {
 	}
 	log.WithFields(log.Fields{"checkpoint": string(opened.Opened.FlowCheckpoint)}).Info("connection opened")
 
+	// The store will contain our documents for caching and comparison at the end.
+	var store = testdata.NewStore()
 	var commitWait sync.WaitGroup
+
+	// After a loop is committed, this channel will return committed items to the store.
+	var returnToStore = make(chan *testdata.Store, 1)
+	returnToStore <- testdata.NewStore() // preload with an empty store for the first loop.
 
 	start := time.Now()
 
@@ -113,18 +120,30 @@ func (c *DeltaConfig) Execute(args []string) error {
 		}
 		log.Infof("prepared: checkpoint: %s", string(prepared.DriverCheckpointJson))
 
-		// Generate documents to store.
-		var store = testdata.NewStore()
+		store.Push((<-returnToStore).Range()...)
+		// Build a passStore of documents to load and then store, some of them will exist and others won't.
+		var passStore = testdata.NewStore()
 		var exists []bool
+
 		for i := 0; i < docCount; i++ {
-			store.Push(c.newTestData())
-			exists = append(exists, false)
+			// If nothing is in the store or at random pick a get TestData to update in the batch.
+			if store.Len() == 0 || rand.Intn(2) == 0 {
+				item := c.newTestData()
+				passStore.Push(item)
+				exists = append(exists, false)
+			} else {
+				// Pop an element from the store to the batch to update.
+				item := store.Pop()
+				item.UpdateValues()
+				passStore.Push(item)
+				exists = append(exists, true)
+			}
 		}
 
 		storeStart := time.Now()
 
 		// Send the Store requests.
-		if err = SendStore(stream, store.Range(), exists, c.BatchSize); err != nil {
+		if err = SendStore(stream, passStore.Range(), exists, c.BatchSize); err != nil {
 			return fmt.Errorf("store error: %v", err)
 		}
 		log.Infof("store: duration: %v", time.Since(storeStart))
@@ -146,16 +165,23 @@ func (c *DeltaConfig) Execute(args []string) error {
 			}
 			log.Infof("committed: loop: %d duration: %v pass duration: %v", loop, time.Since(commitStart), time.Since(passStart))
 
-			// Once committed, encode to the output location
-			for _, item := range store.Range() {
-				outputEncoder.Encode(item)
-			}
-		}(loop, store)
+			// Once committed, return the cached/modified items back to the store. They will
+			// sit in this channel until the next loading cycle has completed.
+			returnToStore <- store
+		}(loop, passStore)
 
 	}
 
 	// Wait until the final commit has completed.
 	commitWait.Wait()
+
+	store.Push((<-returnToStore).Range()...)
+
+	// Once committed, encode to the output location
+	log.Warnf("Manual verification of test results required:")
+	for _, item := range store.Range() {
+		outputEncoder.Encode(item)
+	}
 
 	if err := stream.CloseSend(); err != nil {
 		return fmt.Errorf("close: %v", err)
