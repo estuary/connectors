@@ -1,6 +1,7 @@
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Scanning","scan_key":["id"]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Backfill","scan_key":["id"]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Backfill","scan_key":["id"]}}}}}
 {"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Insert","data":"A","id":0},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Insert","data":"bbb","id":1},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Insert","data":"CDEFGHIJKLMNOP","id":2},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Scanning","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQI="}]}}}}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQI="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Backfill","scan_key":["id"],"scanned":"FQI="}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Active","scan_key":["id"]}}}}}

@@ -321,19 +321,8 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	}
 	buf.States = append(buf.States, state)
 
-	// Create a copy of the state with all LSNs set to '1234'
-	var cleanState = PersistentState{CurrentLSN: 1234, Streams: make(map[string]*TableState)}
-	for id, stream := range state.Streams {
-		var cleanRanges []TableRange
-		for _, scanRange := range stream.ScanRanges {
-			cleanRanges = append(cleanRanges, TableRange{ScannedLSN: 1234, EndKey: scanRange.EndKey})
-		}
-		cleanState.Streams[id] = &TableState{
-			Mode:       stream.Mode,
-			ScanKey:    stream.ScanKey,
-			ScanRanges: cleanRanges,
-		}
-	}
+	// Sanitize state by rewriting the LSN to a constant
+	var cleanState = PersistentState{CurrentLSN: 1234, Streams: state.Streams}
 
 	// Encode and buffer
 	var bs, err = json.Marshal(cleanState)

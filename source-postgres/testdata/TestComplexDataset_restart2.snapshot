@@ -1,3 +1,25 @@
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Delete","fullname":null,"population":null,"state":"XX","year":1930},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Delete","fullname":null,"population":null,"state":"XX","year":1970},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"No Such State","population":1234,"state":"XX","year":1930},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"No Such State","population":12345,"state":"XX","year":1970},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"Fge8Ak1PAA=="}}}}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Mississippi","population":2525342,"state":"MS","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Montana","population":788752,"state":"MT","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"North Carolina","population":5898980,"state":"NC","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"North Dakota","population":654380,"state":"ND","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Nebraska","population":1572296,"state":"NE","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New Hampshire","population":924250,"state":"NH","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New Jersey","population":7376330,"state":"NJ","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New Mexico","population":1309400,"state":"NM","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Nevada","population":810215,"state":"NV","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New York","population":17566754,"state":"NY","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Ohio","population":10800650,"state":"OH","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Oklahoma","population":3040758,"state":"OK","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Oregon","population":2641218,"state":"OR","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Pennsylvania","population":11868305,"state":"PA","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Rhode Island","population":948773,"state":"RI","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"South Carolina","population":3134502,"state":"SC","year":1980},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"Fge8AlNDAA=="}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"South Dakota","population":690851,"state":"SD","year":1980},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Tennessee","population":4600252,"state":"TN","year":1980},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Texas","population":14338208,"state":"TX","year":1980},"emitted_at":1234,"namespace":"public"}}
@@ -14,7 +36,7 @@
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Arkansas","population":2678588,"state":"AR","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Arizona","population":5160586,"state":"AZ","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"California","population":33987977,"state":"CA","year":2000},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Scanning","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfQAkNBAA=="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"FgfQAkNBAA=="}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Colorado","population":4326921,"state":"CO","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Connecticut","population":3411777,"state":"CT","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"District of Columbia","population":572046,"state":"DC","year":2000},"emitted_at":1234,"namespace":"public"}}
@@ -31,7 +53,7 @@
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Louisiana","population":4471885,"state":"LA","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Massachusetts","population":6361104,"state":"MA","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Maryland","population":5311034,"state":"MD","year":2000},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Scanning","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfQAk1EAA=="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"FgfQAk1EAA=="}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Maine","population":1277072,"state":"ME","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Michigan","population":9952450,"state":"MI","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Minnesota","population":4933692,"state":"MN","year":2000},"emitted_at":1234,"namespace":"public"}}
@@ -48,7 +70,7 @@
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New York","population":19001780,"state":"NY","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Ohio","population":11363543,"state":"OH","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Oklahoma","population":3454365,"state":"OK","year":2000},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Scanning","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfQAk9LAA=="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"FgfQAk9LAA=="}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Oregon","population":3429708,"state":"OR","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Pennsylvania","population":12284173,"state":"PA","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Rhode Island","population":1050268,"state":"RI","year":2000},"emitted_at":1234,"namespace":"public"}}
@@ -65,7 +87,7 @@
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Wyoming","population":494300,"state":"WY","year":2000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Alaska","population":731158,"state":"AK","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Alabama","population":4921532,"state":"AL","year":2020},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Scanning","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfkAkFMAA=="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"FgfkAkFMAA=="}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Arkansas","population":3030522,"state":"AR","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Arizona","population":7421401,"state":"AZ","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"California","population":39368078,"state":"CA","year":2020},"emitted_at":1234,"namespace":"public"}}
@@ -82,7 +104,7 @@
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Indiana","population":6754953,"state":"IN","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Kansas","population":2913805,"state":"KS","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Kentucky","population":4477251,"state":"KY","year":2020},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Scanning","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfkAktZAA=="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"FgfkAktZAA=="}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Louisiana","population":4645318,"state":"LA","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Massachusetts","population":6893574,"state":"MA","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Maryland","population":6055802,"state":"MD","year":2020},"emitted_at":1234,"namespace":"public"}}
@@ -99,7 +121,7 @@
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New Jersey","population":8882371,"state":"NJ","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New Mexico","population":2106319,"state":"NM","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Nevada","population":3138259,"state":"NV","year":2020},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Scanning","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfkAk5WAA=="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"FgfkAk5WAA=="}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New York","population":19336776,"state":"NY","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Ohio","population":11693217,"state":"OH","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Oklahoma","population":3980783,"state":"OK","year":2020},"emitted_at":1234,"namespace":"public"}}
@@ -116,15 +138,7 @@
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Washington","population":7693612,"state":"WA","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Wisconsin","population":5832655,"state":"WI","year":2020},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"West Virginia","population":1784787,"state":"WV","year":2020},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Scanning","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfkAldWAA=="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"FgfkAldWAA=="}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Wyoming","population":582328,"state":"WY","year":2020},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Scanning","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfkAldZAA=="}]}}}}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Active","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfkAldZAA=="}]}}}}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"No Such State","population":1234,"state":"XX","year":1930},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Active","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfkAldZAA=="}]}}}}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Delete","fullname":null,"population":null,"state":"XX","year":1930},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Delete","fullname":null,"population":null,"state":"XX","year":1970},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Active","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfkAldZAA=="}]}}}}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"No Such State","population":1234,"state":"XX","year":1930},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"No Such State","population":12345,"state":"XX","year":1970},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Active","scan_key":["year","state"],"scan_ranges":[{"lsn":1234,"key":"FgeoAklBAA=="},{"lsn":1234,"key":"Fge8AlNDAA=="},{"lsn":1234,"key":"FgfkAldZAA=="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"FgfkAldZAA=="}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Active","scan_key":["year","state"]}}}}}

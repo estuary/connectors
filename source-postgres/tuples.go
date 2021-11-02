@@ -7,6 +7,16 @@ import (
 	"github.com/estuary/protocols/fdb/tuple"
 )
 
+// encodeRowKey extracts the appropriate key-fields by name from a map and encodes
+// them as a FoundationDB serialized tuple.
+func encodeRowKey(key []string, fields map[string]interface{}) ([]byte, error) {
+	var xs []interface{}
+	for _, elem := range key {
+		xs = append(xs, fields[elem])
+	}
+	return packTuple(xs)
+}
+
 // We translate a list of column values (representing the primary key of a
 // database row) into a list of bytes using the FoundationDB tuple encoding
 // package. This tuple encoding has the useful property that lexicographic

@@ -1,7 +1,7 @@
 {"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Insert","data":"some","id":1002},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Insert","data":"more","id":1000},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Insert","data":"rows","id":1001},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQI="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Active","scan_key":["id"]}}}}}
 {"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Update","data":"updated","id":1},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Update","data":"updated","id":1002},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQI="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Active","scan_key":["id"]}}}}}
