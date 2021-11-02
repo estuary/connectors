@@ -127,7 +127,7 @@ func (s *tableSnapshot) buildScanQuery(start bool) string {
 // an `Insert` change event and gives it to the provided handler. If `prevKey` is nil
 // the very first chunk of the table is scanned, otherwise it must contain the `lastKey`
 // of a previous chunk, and this chunk will begin immediately after that.
-func (s *tableSnapshot) ScanChunk(ctx context.Context, prevKey []byte, handler changeEventHandler) (count int, lastKey []byte, err error) {
+func (s *tableSnapshot) ScanChunk(ctx context.Context, prevKey []byte) ([]*changeEvent, error) {
 	var logFields = logrus.Fields{
 		"namespace": s.SchemaName,
 		"table":     s.TableName,
@@ -144,71 +144,46 @@ func (s *tableSnapshot) ScanChunk(ctx context.Context, prevKey []byte, handler c
 	var query = s.buildScanQuery(prevKey == nil)
 	var args []interface{}
 	if prevKey != nil {
+		var err error
 		args, err = unpackTuple(prevKey)
 		if err != nil {
-			return 0, nil, fmt.Errorf("error unpacking encoded tuple: %w", err)
+			return nil, fmt.Errorf("error unpacking encoded tuple: %w", err)
 		}
 		if len(args) != len(s.ScanKey) {
-			return 0, nil, fmt.Errorf("expected %d primary-key values but got %d", len(s.ScanKey), len(args))
+			return nil, fmt.Errorf("expected %d primary-key values but got %d", len(s.ScanKey), len(args))
 		}
 	}
 
 	logrus.WithField("query", query).WithField("args", args).Debug("executing query")
 	rows, err := s.DB.Transaction.Query(ctx, query, args...)
 	if err != nil {
-		return 0, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
+		return nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
-	return s.dispatchResults(ctx, rows, handler)
+	return s.processResults(ctx, rows)
 }
 
-func (s *tableSnapshot) dispatchResults(ctx context.Context, rows pgx.Rows, handler changeEventHandler) (int, []byte, error) {
+func (s *tableSnapshot) processResults(ctx context.Context, rows pgx.Rows) ([]*changeEvent, error) {
 	var cols = rows.FieldDescriptions()
-
-	// These allocations are reused across rows. This is safe because each row
-	// should replace every value every time.
-	var fields = make(map[string]interface{})
-	var keyFields = make([]interface{}, len(s.ScanKey))
-
-	var lastKey []byte
-	var rowsProcessed int
+	var evts []*changeEvent
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
 		var vals, err = rows.Values()
 		if err != nil {
-			return rowsProcessed, nil, fmt.Errorf("unable to get row values: %w", err)
+			return nil, fmt.Errorf("unable to get row values: %w", err)
 		}
+		var fields = make(map[string]interface{})
 		for idx := range cols {
 			fields[string(cols[idx].Name)] = vals[idx]
 		}
 
-		// Encode this row's primary key as a serialized tuple. We could get by with
-		// only encoding the final row key of each chunk, but we encode every row in
-		// order to check a very important invariant -- PostgreSQL row ordering must
-		// exactly match the comparison ordering of the encoded tuples in order for
-		// LSN filtering to work correctly during the transition to replication.
-		for idx, colName := range s.ScanKey {
-			keyFields[idx] = fields[colName]
-		}
-		rowKey, err := packTuple(keyFields)
-		if err != nil {
-			return rowsProcessed, nil, fmt.Errorf("unable to encode row primary key: %w", err)
-		}
-		if lastKey != nil && compareTuples(lastKey, rowKey) >= 0 {
-			return rowsProcessed, nil, fmt.Errorf("primary key ordering failure: prev=%q, next=%q", lastKey, rowKey)
-		}
-		lastKey = rowKey
-
-		if err := handler(&changeEvent{
+		evts = append(evts, &changeEvent{
 			Type:      "Insert",
 			LSN:       s.TransactionLSN(),
 			Namespace: s.SchemaName,
 			Table:     s.TableName,
 			Fields:    fields,
-		}); err != nil {
-			return rowsProcessed, nil, fmt.Errorf("error handling change event: %w", err)
-		}
-		rowsProcessed++
+		})
 	}
-	return rowsProcessed, lastKey, nil
+	return evts, nil
 }

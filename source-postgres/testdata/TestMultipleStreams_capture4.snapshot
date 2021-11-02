@@ -1,4 +1,4 @@
 {"type":"RECORD","record":{"stream":"test_multiplestreams_one","data":{"_change_type":"Insert","data":"nine","id":9},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_multiplestreams_one":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQI="}]},"public.test_multiplestreams_three":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQg="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_multiplestreams_one":{"mode":"Active","scan_key":["id"]},"public.test_multiplestreams_three":{"mode":"Active","scan_key":["id"]}}}}}
 {"type":"RECORD","record":{"stream":"test_multiplestreams_three","data":{"_change_type":"Insert","data":"eleven","id":11},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_multiplestreams_one":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQI="}]},"public.test_multiplestreams_three":{"mode":"Active","scan_key":["id"],"scan_ranges":[{"lsn":1234,"key":"FQg="}]}}}}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_multiplestreams_one":{"mode":"Active","scan_key":["id"]},"public.test_multiplestreams_three":{"mode":"Active","scan_key":["id"]}}}}}
