@@ -1,0 +1,20 @@
+[package]
+name = "schema-builder"
+version = "0.1.0"
+authors = ["Jixiang Jiang <jixiang@estuary.dev>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+json="*"
+serde = "~1"
+serde_json = "~1"
+thiserror = "*"
+url = "*"
+tracing = "*"
+tracing-subscriber = {version = "*", features = ["time", "json", "env-filter"]}
+
+doc = { git = "https://github.com/estuary/flow", version = "0.0.0"}
+flow_json = { git = "https://github.com/estuary/flow", version = "0.0.0", package="json"}
+#flow_json = { path OverrideFieldError= "../../flow/crates/json", version = "0.0.0", package="json"}
