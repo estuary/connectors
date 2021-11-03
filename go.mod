@@ -12,9 +12,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.4 // indirect
 	github.com/benbjohnson/clock v1.1.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
-	github.com/brianvoe/gofakeit/v6 v6.9.0 // indirect
-	github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9 // indirect
-	github.com/estuary/protocols v0.0.0-20211025173433-2196b4df4a94
+	github.com/brianvoe/gofakeit/v6 v6.9.0
+	github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9
+	github.com/estuary/protocols v0.0.0-20211101155752-67a17ffc7b5b
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/uuid v1.3.0
@@ -42,5 +42,5 @@ require (
 	google.golang.org/api v0.58.0
 	google.golang.org/genproto v0.0.0-20211011165927-a5fb3255271e // indirect
 	google.golang.org/grpc v1.41.0
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0
 )
