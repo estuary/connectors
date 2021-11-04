@@ -1,6 +1,7 @@
 package schemabuilder
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -45,35 +46,35 @@ const schemaJSON = `
 `
 
 func TestRunSchemaBuilder_NoOverrides(t *testing.T) {
-	result, e := RunSchemaBuilder(schemaURI, schemaJSON, []*FieldOverride{})
+	result, e := RunSchemaBuilder(schemaURI, json.RawMessage(schemaJSON), []FieldOverride{})
 	require.NoError(t, e)
 	cupaloy.SnapshotT(t, string(result))
 }
 
 func TestRunSchemaBuilder_WithOverrides(t *testing.T) {
-	var overrides = []*FieldOverride{
+	var overrides = []FieldOverride{
 		{Pointer: "/arr/one", EsType: ElasticFieldType{
 			FieldType: "date", DateSpec: DateSpec{Format: "test_format"}}},
 		{Pointer: "/bit", EsType: ElasticFieldType{
 			FieldType: "keyword", KeywordSpec: KeywordSpec{IgnoreAbove: 500, DualText: true}}},
 	}
 
-	result, e := RunSchemaBuilder(schemaURI, schemaJSON, overrides)
+	result, e := RunSchemaBuilder(schemaURI, json.RawMessage(schemaJSON), overrides)
 	require.NoError(t, e)
 	cupaloy.SnapshotT(t, string(result))
 }
 
 func TestRunSchemaBuilder_Errors(t *testing.T) {
-	_, e := RunSchemaBuilder("", "{}", []*FieldOverride{})
+	_, e := RunSchemaBuilder("", json.RawMessage("{}"), []FieldOverride{})
 	require.Contains(t, e.Error(), "Failed parsing schema_uri")
 
 	var corruptedSchema = "corrupted schema"
-	_, e = RunSchemaBuilder(schemaURI, corruptedSchema, []*FieldOverride{})
+	_, e = RunSchemaBuilder(schemaURI, json.RawMessage(corruptedSchema), []FieldOverride{})
 	require.Contains(t, e.Error(), "Failed generating elastic search schema based on input")
 
-	var badOverrides = []*FieldOverride{
+	var badOverrides = []FieldOverride{
 		{Pointer: "/arr/nonexisting_field", EsType: ElasticFieldType{FieldType: "text"}},
 	}
-	_, e = RunSchemaBuilder(schemaURI, schemaJSON, badOverrides)
+	_, e = RunSchemaBuilder(schemaURI, json.RawMessage(schemaJSON), badOverrides)
 	require.Contains(t, e.Error(), "pointer of a non-existing field")
 }

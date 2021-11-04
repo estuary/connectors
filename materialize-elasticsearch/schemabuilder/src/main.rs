@@ -3,6 +3,7 @@ pub mod elastic_search_schema_builder;
 pub mod errors;
 pub mod interface;
 
+use base64::decode;
 use std::io::{self};
 use std::process;
 
@@ -17,7 +18,9 @@ fn main() {
 
     let uri = Url::parse(&input.schema_uri).or_bail("Failed parsing schema_uri.");
 
-    let result = build_elastic_schema_with_overrides(uri, &input.schema_json, input.overrides)
+    let schema_json = decode(input.schema_json_base64).or_bail("Failed to decode schema_json");
+
+    let result = build_elastic_schema_with_overrides(uri, &schema_json, input.overrides)
         .or_bail("Failed generating elastic search schema based on input.");
 
     serde_json::to_writer(io::stdout(), &result.render())

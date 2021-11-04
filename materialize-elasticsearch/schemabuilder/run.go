@@ -2,6 +2,7 @@ package schemabuilder
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -28,11 +29,11 @@ type KeywordSpec struct {
 type ElasticFieldType struct {
 	// A snake_case string corresponding to a enum type of ESBasicType
 	// defined in src/elastic_search_data_types.rs
-	FieldType string
+	FieldType string `json:"field_type"`
 	// Effective if FieldType is "date"
-	DateSpec DateSpec
+	DateSpec DateSpec `json:"data_spec"`
 	// Effective if FieldType is "keyword"
-	KeywordSpec KeywordSpec
+	KeywordSpec KeywordSpec `json:"keyword_spec"`
 }
 
 func (e *ElasticFieldType) toMap() map[string]interface{} {
@@ -55,9 +56,9 @@ func (e *ElasticFieldType) toMap() map[string]interface{} {
 // and how it is overridden.
 type FieldOverride struct {
 	// A '/'-delimitated json pointer to the location of the overridden field.
-	Pointer string
+	Pointer string `json:"pointer"`
 	// The overriding type.
-	EsType ElasticFieldType
+	EsType ElasticFieldType `json:"es_type"`
 }
 
 func (f *FieldOverride) toMap() map[string]interface{} {
@@ -70,8 +71,8 @@ func (f *FieldOverride) toMap() map[string]interface{} {
 // RunSchemaBuilder is a wrapper in GO around rust schema-builder.
 func RunSchemaBuilder(
 	schemaURI string,
-	schemaJSON string,
-	overrides []*FieldOverride,
+	schemaJSON json.RawMessage,
+	overrides []FieldOverride,
 ) ([]byte, error) {
 	var cmd = exec.Command(ProgramName)
 
@@ -88,9 +89,9 @@ func RunSchemaBuilder(
 		overrideMap = append(overrideMap, override.toMap())
 	}
 	input, err := json.Marshal(map[string]interface{}{
-		"schema_uri":  schemaURI,
-		"schema_json": schemaJSON,
-		"overrides":   overrideMap,
+		"schema_uri":         schemaURI,
+		"schema_json_base64": base64.StdEncoding.EncodeToString(schemaJSON),
+		"overrides":          overrideMap,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal input: %w", err)

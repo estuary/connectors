@@ -4,6 +4,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Input {
     pub schema_uri: String,
-    pub schema_json: String,
+    pub schema_json_base64: String,
     pub overrides: Vec<ESTypeOverride>,
 }
