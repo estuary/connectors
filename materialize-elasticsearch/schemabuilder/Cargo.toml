@@ -9,13 +9,12 @@ edition = "2018"
 [dependencies]
 base64="*"
 json="*"
-serde = "~1"
-serde_json = "~1"
+serde = "*"
+serde_json = "*"
 thiserror = "*"
 url = "*"
 tracing = "*"
 tracing-subscriber = {version = "*", features = ["time", "json", "env-filter"]}
 
-doc = { git = "https://github.com/estuary/flow", version = "0.0.0"}
-flow_json = { git = "https://github.com/estuary/flow", version = "0.0.0", package="json"}
-#flow_json = { path OverrideFieldError= "../../flow/crates/json", version = "0.0.0", package="json"}
+doc = { git = "https://github.com/estuary/flow", rev="fb034de24cef28a0daacf6c7b79587a8cf90dd02"}
+flow_json = { git = "https://github.com/estuary/flow", rev="fb034de24cef28a0daacf6c7b79587a8cf90dd02", package="json"}
