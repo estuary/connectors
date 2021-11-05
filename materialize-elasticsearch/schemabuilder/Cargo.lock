@@ -72,7 +72,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "doc"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow?rev=fb034de24cef28a0daacf6c7b79587a8cf90dd02#fb034de24cef28a0daacf6c7b79587a8cf90dd02"
+source = "git+https://github.com/estuary/flow#fb034de24cef28a0daacf6c7b79587a8cf90dd02"
 dependencies = [
  "fancy-regex",
  "itertools",
@@ -179,7 +179,7 @@ checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
 [[package]]
 name = "json"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow?rev=fb034de24cef28a0daacf6c7b79587a8cf90dd02#fb034de24cef28a0daacf6c7b79587a8cf90dd02"
+source = "git+https://github.com/estuary/flow#fb034de24cef28a0daacf6c7b79587a8cf90dd02"
 dependencies = [
  "bitvec",
  "fancy-regex",
