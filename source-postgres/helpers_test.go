@@ -307,6 +307,9 @@ func (buf *CaptureOutputBuffer) Encode(v interface{}) error {
 	if msg.Type == airbyte.MessageTypeRecord {
 		return buf.bufferRecord(msg)
 	}
+	if msg.Type == airbyte.MessageTypeLog {
+		return nil // Ignore log messages when validating test output
+	}
 	return fmt.Errorf("unhandled message type: %#v", msg.Type)
 }
 
