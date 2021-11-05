@@ -190,9 +190,6 @@ func SQLGenerator() sqlDriver.Generator {
 			}
 		},
 	}
-	// This separate declaration should no longer be necessary after this PR lands:
-	// https://github.com/estuary/protocols/pull/13
-	var timestampMapping sqlDriver.TypeMapper = sqlDriver.RawConstColumnType("TIMESTAMP")
 	var typeMappings = sqlDriver.ColumnTypeMapper{
 		sqlDriver.ARRAY:   variantMapper,
 		sqlDriver.BINARY:  sqlDriver.RawConstColumnType("BINARY"),
@@ -202,8 +199,8 @@ func SQLGenerator() sqlDriver.Generator {
 		sqlDriver.OBJECT:  variantMapper,
 		sqlDriver.STRING: sqlDriver.StringTypeMapping{
 			Default: sqlDriver.RawConstColumnType("STRING"),
-			ByFormat: map[string]*sqlDriver.TypeMapper{
-				"date-time": &timestampMapping,
+			ByFormat: map[string]sqlDriver.TypeMapper{
+				"date-time": sqlDriver.RawConstColumnType("TIMESTAMP"),
 			},
 		},
 	}
