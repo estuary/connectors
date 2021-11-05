@@ -9,24 +9,21 @@ use std::collections::HashMap;
 
 pub const DEFAULT_IGNORE_ABOVE: u16 = 256;
 
-pub fn build_elastic_schema(
-    schema_uri: &url::Url,
-    schema_json: &[u8],
-) -> Result<ESFieldType, Error> {
+pub fn build_elastic_schema<'a, 'b>(
+    schema_uri: &'a url::Url,
+    schema_json: &'a [u8],
+) -> Result<ESFieldType, Error<'b>> {
     build_elastic_schema_with_overrides(schema_uri, schema_json, &[])
 }
 
-pub fn build_elastic_schema_with_overrides(
-    schema_uri: &url::Url,
-    schema_json: &[u8],
-    es_type_overrides: &[ESTypeOverride],
-) -> Result<ESFieldType, Error> {
-    let schema = match serde_json::from_slice(schema_json) {
-        Ok(v) => v,
-        Err(e) => return Err(Error::SchemaJsonParsing(e)),
-    };
-
+pub fn build_elastic_schema_with_overrides<'a, 'b>(
+    schema_uri: &'a url::Url,
+    schema_json: &'a [u8],
+    es_type_overrides: &'b [ESTypeOverride],
+) -> Result<ESFieldType, Error<'b>> {
+    let schema = serde_json::from_slice(schema_json)?;
     let schema = schema::build::build_schema::<Annotation>(schema_uri.clone(), &schema).unwrap();
+
     let mut index = IndexBuilder::new();
     index.add(&schema).unwrap();
     index.verify_references().unwrap();
@@ -41,16 +38,16 @@ pub fn build_elastic_schema_with_overrides(
 
     if let ESFieldType::Basic(_) = built {
         // TODO(jixiang): check if array and basic types are allowed in the root of elastic mapping defs.
-        return Err(Error::schema_error(
-            UNSUPPORTED_NON_ARRAY_OR_OBJECTS,
-            &shape,
-        ));
+        return Err(Error::UnSupportedError {
+            message: UNSUPPORTED_NON_ARRAY_OR_OBJECTS,
+            shape: Box::new(shape.clone()),
+        });
     }
 
     Ok(built)
 }
 
-fn build_from_shape(shape: &Shape) -> Result<ESFieldType, Error> {
+fn build_from_shape<'a, 'b>(shape: &'a Shape) -> Result<ESFieldType, Error<'b>> {
     let mut fields = Vec::new();
 
     if shape.type_.overlaps(types::OBJECT) {
@@ -80,27 +77,24 @@ fn build_from_shape(shape: &Shape) -> Result<ESFieldType, Error> {
     } else if fields.len() == 1 {
         Ok(fields.pop().unwrap())
     } else {
-        return Err(Error::schema_error(
-            UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
-            &shape,
-        ));
+        return Err(Error::UnSupportedError {
+            message: UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
+            shape: Box::new(shape.clone()),
+        });
     }
 }
 
-fn build_from_object(shape: &ObjShape) -> Result<ESFieldType, Error> {
+fn build_from_object<'a, 'b>(shape: &'a ObjShape) -> Result<ESFieldType, Error<'b>> {
     if !shape.additional.is_none() {
-        return Err(Error::schema_error(
-            UNSUPPORTED_OBJECT_ADDITIONAL_FIELDS,
-            shape,
-        ));
+        return Err(Error::UnSupportedError {
+            message: UNSUPPORTED_OBJECT_ADDITIONAL_FIELDS,
+            shape: Box::new(shape.clone()),
+        });
     }
 
     let mut es_properties = HashMap::new();
     for prop in &shape.properties {
-        match build_from_shape(&prop.shape) {
-            Ok(v) => es_properties.insert(prop.name.clone(), v),
-            Err(e) => return Err(e),
-        };
+        es_properties.insert(prop.name.clone(), build_from_shape(&prop.shape)?);
     }
 
     return Ok(ESFieldType::Object {
@@ -108,16 +102,19 @@ fn build_from_object(shape: &ObjShape) -> Result<ESFieldType, Error> {
     });
 }
 
-fn build_from_array(shape: &ArrayShape) -> Result<ESFieldType, Error> {
+fn build_from_array<'a, 'b>(shape: &ArrayShape) -> Result<ESFieldType, Error<'b>> {
     if !shape.tuple.is_empty() {
-        return Err(Error::schema_error(UNSUPPORTED_TUPLE, shape));
+        return Err(Error::UnSupportedError {
+            message: UNSUPPORTED_TUPLE,
+            shape: Box::new(shape.clone()),
+        });
     }
 
     return match &shape.additional {
-        None => Err(Error::schema_error(
-            UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
-            shape,
-        )),
+        None => Err(Error::UnSupportedError {
+            message: UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
+            shape: Box::new(shape.clone()),
+        }),
         // In Elastic search, the schema of an array is the same as the schema of its items.
         // https://www.elastic.co/guide/en/elasticsearch/reference/current/array.html
         Some(shape) => build_from_shape(shape),
@@ -134,8 +131,8 @@ mod tests {
 
     fn check_schema_error_error(actual_error: &Error, expected_error_message: &str) {
         assert!(matches!(actual_error, Error::UnSupportedError { .. }));
-        if let Error::UnSupportedError(actual_error_message) = actual_error {
-            assert!(actual_error_message.contains(expected_error_message))
+        if let Error::UnSupportedError { message, shape: _ } = actual_error {
+            assert!(message.contains(expected_error_message))
         }
     }
 
@@ -144,19 +141,21 @@ mod tests {
         schema_json: &[u8],
         expected_error_message: &str,
     ) {
-        let actual_error = build_elastic_schema_with_overrides(
-            &test_url(),
-            schema_json,
-            &[ESTypeOverride {
-                pointer: pointer.to_string(),
-                es_type: ESBasicType::Boolean,
-            }],
-        )
-        .unwrap_err();
+        let overrides = [ESTypeOverride {
+            pointer: pointer.to_string(),
+            es_type: ESBasicType::Boolean,
+        }];
+        let test_url = test_url();
+        let actual_error =
+            build_elastic_schema_with_overrides(&test_url, schema_json, &overrides).unwrap_err();
 
         assert!(matches!(actual_error, Error::OverridePointerError { .. }));
-        if let Error::OverridePointerError(actual_error_message) = actual_error {
-            assert!(actual_error_message.contains(expected_error_message));
+        if let Error::OverridePointerError {
+            message,
+            pointer: _,
+        } = actual_error
+        {
+            assert!(message.contains(expected_error_message));
         }
     }
 

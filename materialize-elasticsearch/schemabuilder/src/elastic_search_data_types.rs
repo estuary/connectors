@@ -94,7 +94,10 @@ impl ESFieldType {
     pub fn apply_type_override(mut self, es_override: &ESTypeOverride) -> Result<Self, Error> {
         let pointer = &es_override.pointer;
         if pointer.is_empty() {
-            return Err(Error::override_error(POINTER_EMPTY, &pointer));
+            return Err(Error::OverridePointerError {
+                message: POINTER_EMPTY,
+                pointer: pointer,
+            });
         }
 
         let mut cur_field = &mut self;
@@ -108,10 +111,10 @@ impl ESFieldType {
             cur_field = match cur_field {
                 Self::Object { properties } => {
                     if !properties.contains_key(&prop) {
-                        return Err(Error::override_error(
-                            &format!("{}: {}", POINTER_MISSING_FIELD, prop),
-                            &pointer,
-                        ));
+                        return Err(Error::OverridePointerError {
+                            message: POINTER_MISSING_FIELD,
+                            pointer: pointer,
+                        });
                     } else if prop_itr.peek() == None {
                         properties.insert(prop, ESFieldType::Basic(es_override.es_type.clone()));
                         return Ok(self);
@@ -119,7 +122,12 @@ impl ESFieldType {
                         properties.get_mut(&prop).unwrap()
                     }
                 }
-                _ => return Err(Error::override_error(POINTER_WRONG_FIELD_TYPE, &pointer)),
+                _ => {
+                    return Err(Error::OverridePointerError {
+                        message: POINTER_WRONG_FIELD_TYPE,
+                        pointer: pointer,
+                    })
+                }
             }
         }
         Ok(self)

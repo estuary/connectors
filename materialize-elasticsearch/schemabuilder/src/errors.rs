@@ -14,24 +14,17 @@ pub const POINTER_WRONG_FIELD_TYPE: &str =
     "non-leaf field on json path is a basic type (int, bool..)";
 
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
+pub enum Error<'a> {
     #[error("bad schema json")]
     SchemaJsonParsing(#[from] serde_json::Error),
-    #[error("unsupported Flow schema in elastic search, details: {0}")]
-    UnSupportedError(String),
-    #[error("unable to override elastic search schema, details: {0}")]
-    OverridePointerError(String),
-}
-
-impl Error {
-    pub fn schema_error(error_message: &str, debug_comp: &dyn fmt::Debug) -> Self {
-        Error::UnSupportedError(format!(
-            "{}. affected component {:?}",
-            error_message, debug_comp
-        ))
-    }
-
-    pub fn override_error(error_message: &str, pointer: &String) -> Self {
-        Error::OverridePointerError(format!("{}. Pointer:{}", error_message, pointer))
-    }
+    #[error("unsupported Flow schema in elastic search, details: {message}, shape: {shape:?}")]
+    UnSupportedError {
+        message: &'static str,
+        shape: Box<dyn fmt::Debug>,
+    },
+    #[error("unable to override elastic search schema, details: {message}, pointer: {pointer}")]
+    OverridePointerError {
+        message: &'static str,
+        pointer: &'a str,
+    },
 }
