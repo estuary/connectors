@@ -57,6 +57,7 @@ type TableState struct {
 const (
 	tableModeBackfill = "Backfill"
 	tableModeActive   = "Active"
+	tableModeIgnore   = "Ignore"
 )
 
 // capture encapsulates the entire process of capturing data from PostgreSQL with a particular
@@ -322,7 +323,6 @@ func (c *capture) streamChanges(ctx context.Context) error {
 	// state updates on every transaction commit.
 	for evt := range c.replStream.Events() {
 		if evt.Type == "Commit" {
-			logrus.WithFields(logrus.Fields{"lsn": evt.LSN, "xid": evt.XID}).Debug("replication commit event")
 			if c.changesSinceLastCheckpoint > 0 {
 				c.state.CurrentLSN = evt.LSN
 				if err := c.emitState(c.state); err != nil {
@@ -374,16 +374,17 @@ type backfillResults struct {
 }
 
 type backfillChunk struct {
-	scanKey []string
-	scanned []byte
-	rows    map[string]*changeEvent
+	scanKey  []string
+	scanned  []byte
+	complete bool // When true, indicates that this chunk *completes* the table, and thus has no precise endpoint
+	rows     map[string]*changeEvent
 }
 
 func (r *backfillResults) Complete(streamID string) bool {
 	if r == nil {
 		return false
 	}
-	return len(r.streams[streamID].rows) == 0
+	return r.streams[streamID].complete
 }
 
 func (r *backfillResults) Scanned(streamID string) []byte {
@@ -480,35 +481,46 @@ func (c *capture) streamToWatermark() error {
 			}
 		}
 
-		// Depending on the state of the relevant table (Backfill vs Active), and
-		// also on the backfill progress, either emit the event, patch it into a
-		// buffered result set, or ignore it.
+		// For each event we must decide whether to emit it, ignore it, or patch it
+		// into a buffered result set. We begin by handling the easy cases of a table
+		// which is ignored or fully active, and then follow that up with the range
+		// comparisons that decide on a per-row basis during backfills.
 		var tableState = c.state.Streams[streamID]
-		if tableState != nil && tableState.Mode == tableModeBackfill {
-			var rowKey, err = encodeRowKey(tableState.ScanKey, evt.Fields)
-			if err != nil {
-				return fmt.Errorf("error encoding row key: %w", err)
-			}
-			if compareTuples(rowKey, tableState.Scanned) <= 0 {
-				logrus.WithField("table", streamID).WithField("key", base64.StdEncoding.EncodeToString(rowKey)).Debug("emitting change")
-				if err := c.handleChangeEvent(evt); err != nil {
-					return fmt.Errorf("error handling replication event: %w", err)
-				}
-			} else if compareTuples(rowKey, c.results.Scanned(streamID)) <= 0 {
-				logrus.WithField("table", streamID).WithField("key", base64.StdEncoding.EncodeToString(rowKey)).Debug("patching change")
-				if err := c.results.Patch(evt); err != nil {
-					return fmt.Errorf("error patching buffered results: %w", err)
-				}
-			} else {
-				logrus.WithField("table", streamID).WithField("key", base64.StdEncoding.EncodeToString(rowKey)).Debug("filtered change")
-			}
-		} else if tableState != nil && tableState.Mode == tableModeActive {
+		if tableState == nil || tableState.Mode == tableModeIgnore {
+			logrus.WithField("table", streamID).Debug("ignoring change from inactive table")
+			c.emitLog(fmt.Sprintf("ignoring %q event: %v", evt.Type, evt.Fields))
+			continue
+		}
+		if tableState.Mode == tableModeActive {
 			logrus.WithField("table", streamID).Debug("emitting every change")
 			if err := c.handleChangeEvent(evt); err != nil {
 				return fmt.Errorf("error handling replication event: %w", err)
 			}
+			continue
+		}
+		if tableState.Mode != tableModeBackfill {
+			return fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
+		}
+
+		var rowKey, err = encodeRowKey(tableState.ScanKey, evt.Fields)
+		if err != nil {
+			return fmt.Errorf("error encoding row key: %w", err)
+		}
+
+		if compareTuples(rowKey, tableState.Scanned) <= 0 {
+			logrus.WithField("table", streamID).WithField("key", base64.StdEncoding.EncodeToString(rowKey)).Debug("emitting change")
+			if err := c.handleChangeEvent(evt); err != nil {
+				return fmt.Errorf("error handling replication event: %w", err)
+			}
+		} else if c.results.Complete(streamID) || compareTuples(rowKey, c.results.Scanned(streamID)) <= 0 {
+			logrus.WithField("table", streamID).WithField("key", base64.StdEncoding.EncodeToString(rowKey)).Debug("patching change")
+			if err := c.results.Patch(evt); err != nil {
+				return fmt.Errorf("error patching buffered results: %w", err)
+			}
+			c.emitLog(fmt.Sprintf("patching %q event: %v", evt.Type, evt.Fields))
 		} else {
-			logrus.WithField("table", streamID).Debug("ignoring change from inactive table")
+			c.emitLog(fmt.Sprintf("filtered %q event (rowKey=%q, scanned=%q, nextScanned=%q): %v", evt.Type, rowKey, tableState.Scanned, c.results.Scanned(streamID), evt.Fields))
+			logrus.WithField("table", streamID).WithField("key", base64.StdEncoding.EncodeToString(rowKey)).Debug("filtered change")
 		}
 	}
 	return nil
@@ -571,7 +583,13 @@ func (c *capture) backfillChunk(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error scanning table: %w", err)
 		}
+		if len(evts) == 0 {
+			chunk.scanned = nil
+			chunk.complete = true
+		}
 		for _, evt := range evts {
+			c.emitLog(fmt.Sprintf("buffered %q event: %v", evt.Type, evt.Fields))
+
 			var bs, err = encodeRowKey(chunk.scanKey, evt.Fields)
 			if err != nil {
 				return fmt.Errorf("error encoding row key: %w", err)
@@ -586,6 +604,7 @@ func (c *capture) backfillChunk(ctx context.Context) error {
 			chunk.rows[string(bs)] = evt
 			chunk.scanned = bs
 		}
+		logrus.WithField("prev", c.state.Streams[streamID].Scanned).WithField("next", chunk.scanned).WithField("table", streamID).Info("backfill chunk")
 	}
 
 	c.results = results
@@ -669,5 +688,27 @@ func (c *capture) emitState(state interface{}) error {
 	return c.encoder.Encode(airbyte.Message{
 		Type:  airbyte.MessageTypeState,
 		State: &airbyte.State{Data: json.RawMessage(rawState)},
+	})
+}
+
+func (c *capture) emitLog(msg interface{}) error {
+	var str string
+	switch msg := msg.(type) {
+	case string:
+		str = msg
+	default:
+		var bs, err = json.Marshal(msg)
+		if err != nil {
+			return fmt.Errorf("error marshalling log message: %w", err)
+		}
+		str = string(bs)
+	}
+
+	return c.encoder.Encode(airbyte.Message{
+		Type: airbyte.MessageTypeLog,
+		Log: &airbyte.Log{
+			Level:   airbyte.LogLevelDebug,
+			Message: str,
+		},
 	})
 }
