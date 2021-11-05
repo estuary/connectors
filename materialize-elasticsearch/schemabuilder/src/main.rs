@@ -13,6 +13,7 @@ use url::Url;
 
 fn main() {
     init_tracing();
+
     let input: Input = serde_json::from_reader(io::stdin())
         .or_bail("Failed parsing json data streamed in from stdin.");
 
@@ -20,7 +21,7 @@ fn main() {
 
     let schema_json = decode(input.schema_json_base64).or_bail("Failed to decode schema_json");
 
-    let result = build_elastic_schema_with_overrides(uri, &schema_json, input.overrides)
+    let result = build_elastic_schema_with_overrides(&uri, &schema_json, &input.overrides)
         .or_bail("Failed generating elastic search schema based on input.");
 
     serde_json::to_writer(io::stdout(), &result.render())

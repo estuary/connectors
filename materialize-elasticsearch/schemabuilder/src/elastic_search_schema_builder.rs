@@ -10,16 +10,16 @@ use std::collections::HashMap;
 pub const DEFAULT_IGNORE_ABOVE: u16 = 256;
 
 pub fn build_elastic_schema(
-    schema_uri: url::Url,
+    schema_uri: &url::Url,
     schema_json: &[u8],
 ) -> Result<ESFieldType, Error> {
-    build_elastic_schema_with_overrides(schema_uri, schema_json, Vec::new())
+    build_elastic_schema_with_overrides(schema_uri, schema_json, &[])
 }
 
 pub fn build_elastic_schema_with_overrides(
-    schema_uri: url::Url,
+    schema_uri: &url::Url,
     schema_json: &[u8],
-    es_type_overrides: Vec<ESTypeOverride>,
+    es_type_overrides: &[ESTypeOverride],
 ) -> Result<ESFieldType, Error> {
     let schema = match serde_json::from_slice(schema_json) {
         Ok(v) => v,
@@ -145,9 +145,9 @@ mod tests {
         expected_error_message: &str,
     ) {
         let actual_error = build_elastic_schema_with_overrides(
-            test_url(),
+            &test_url(),
             schema_json,
-            vec![ESTypeOverride {
+            &[ESTypeOverride {
                 pointer: pointer.to_string(),
                 es_type: ESBasicType::Boolean,
             }],
@@ -163,31 +163,31 @@ mod tests {
     #[test]
     fn test_build_elastic_search_schema_with_error() {
         assert!(matches!(
-            build_elastic_schema(test_url(), b"A bad json schema").unwrap_err(),
+            build_elastic_schema(&test_url(), b"A bad json schema").unwrap_err(),
             Error::SchemaJsonParsing { .. }
         ));
 
         let empty_schema_json = b" { } ";
         check_schema_error_error(
-            &build_elastic_schema(test_url(), empty_schema_json).unwrap_err(),
+            &build_elastic_schema(&test_url(), empty_schema_json).unwrap_err(),
             UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
         );
 
         let multiple_types_schema_json = br#"{"type": ["integer", "string"]}"#;
         check_schema_error_error(
-            &build_elastic_schema(test_url(), multiple_types_schema_json).unwrap_err(),
+            &build_elastic_schema(&test_url(), multiple_types_schema_json).unwrap_err(),
             UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
         );
 
         let int_schema_json = br#"{"type": "integer"}"#;
         check_schema_error_error(
-            &build_elastic_schema(test_url(), int_schema_json).unwrap_err(),
+            &build_elastic_schema(&test_url(), int_schema_json).unwrap_err(),
             UNSUPPORTED_NON_ARRAY_OR_OBJECTS,
         );
 
         let multiple_field_types_schema_json = br#" { "type": "object", "properties": { "mul_type": {"type": ["boolean", "integer"] } } }"#;
         check_schema_error_error(
-            &build_elastic_schema(test_url(), multiple_field_types_schema_json).unwrap_err(),
+            &build_elastic_schema(&test_url(), multiple_field_types_schema_json).unwrap_err(),
             UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
         );
 
@@ -195,20 +195,20 @@ mod tests {
           {"type": "object", "additionalProperties": {"type": "integer"}, "properties": {"int": {"type": "integer"}}}
         "#;
         check_schema_error_error(
-            &build_elastic_schema(test_url(), object_additional_field_schema_json).unwrap_err(),
+            &build_elastic_schema(&test_url(), object_additional_field_schema_json).unwrap_err(),
             UNSUPPORTED_OBJECT_ADDITIONAL_FIELDS,
         );
 
         let tuple_field_schema_json =
             br#"{"type": "array", "items": [{"type": "string"}, {"type": "integer"}]}"#;
         check_schema_error_error(
-            &build_elastic_schema(test_url(), tuple_field_schema_json).unwrap_err(),
+            &build_elastic_schema(&test_url(), tuple_field_schema_json).unwrap_err(),
             UNSUPPORTED_TUPLE,
         );
 
         let simple_array_schema_json = br#"{"type": "array", "items": {"type": "string"}}"#;
         check_schema_error_error(
-            &build_elastic_schema(test_url(), simple_array_schema_json).unwrap_err(),
+            &build_elastic_schema(&test_url(), simple_array_schema_json).unwrap_err(),
             UNSUPPORTED_NON_ARRAY_OR_OBJECTS,
         );
     }
@@ -237,7 +237,7 @@ mod tests {
         }
         "#;
 
-        let actual = build_elastic_schema(test_url(), schema_json)
+        let actual = build_elastic_schema(&test_url(), schema_json)
             .unwrap()
             .render();
         assert_eq!(
@@ -298,7 +298,7 @@ mod tests {
         }"#;
 
         let actual = build_elastic_schema(
-            url::Url::parse("test://example/int-string-len.schema").unwrap(),
+            &url::Url::parse("test://example/int-string-len.schema").unwrap(),
             schema_json,
         )
         .unwrap()
@@ -347,9 +347,9 @@ mod tests {
         );
 
         let actual = build_elastic_schema_with_overrides(
-            test_url(),
+            &test_url(),
             schema_json,
-            vec![
+            &[
                 ESTypeOverride {
                     pointer: "/str".to_string(),
                     es_type: ESBasicType::Date {

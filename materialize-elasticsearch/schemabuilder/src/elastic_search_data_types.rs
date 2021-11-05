@@ -4,7 +4,7 @@ use serde_json::{json, map, Value};
 use std::collections::HashMap;
 
 // The basic elastic search data types to represent data in Flow.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ESBasicType {
     Boolean,
@@ -16,7 +16,7 @@ pub enum ESBasicType {
     Text,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ESFieldType {
     Basic(ESBasicType),
     Object {
@@ -41,7 +41,7 @@ impl ESFieldType {
         match self {
             Self::Basic(b) => match b {
                 ESBasicType::Boolean => self.render_basic(&"boolean"),
-                ESBasicType::Date { format } => self.render_date(format),
+                ESBasicType::Date { format } => self.render_date(&format),
                 ESBasicType::Double => self.render_basic(&"double"),
                 ESBasicType::Keyword {
                     ignore_above,
@@ -74,10 +74,10 @@ impl ESFieldType {
         return rendered_keyword;
     }
 
-    fn render_date(&self, format: &String) -> Value {
+    fn render_date(&self, format: &str) -> Value {
         return json!({
             "type": "date",
-            "format": format.clone()
+            "format": format
         });
     }
 
@@ -91,7 +91,7 @@ impl ESFieldType {
 }
 
 impl ESFieldType {
-    pub fn apply_type_override(mut self, es_override: ESTypeOverride) -> Result<Self, Error> {
+    pub fn apply_type_override(mut self, es_override: &ESTypeOverride) -> Result<Self, Error> {
         let pointer = &es_override.pointer;
         if pointer.is_empty() {
             return Err(Error::override_error(POINTER_EMPTY, &pointer));
@@ -113,7 +113,7 @@ impl ESFieldType {
                             &pointer,
                         ));
                     } else if prop_itr.peek() == None {
-                        properties.insert(prop.clone(), ESFieldType::Basic(es_override.es_type));
+                        properties.insert(prop, ESFieldType::Basic(es_override.es_type.clone()));
                         return Ok(self);
                     } else {
                         properties.get_mut(&prop).unwrap()
