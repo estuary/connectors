@@ -21,7 +21,11 @@ test -n "$VERSION" || bail "must specify VERSION env variable"
 
 # Always use the latest development image to verify the mutual integration
 # of connectors and the Flow runtime. Pull to bust a cached version.
-FLOW_IMAGE="ghcr.io/estuary/flow:dev"
+#
+# TODO(johnny): Recent Flow changes have temporarily broken integration tests.
+# I'm pinning to a known-good older Flow build until we get an updated workflow in place.
+# FLOW_IMAGE="ghcr.io/estuary/flow:dev"
+FLOW_IMAGE="ghcr.io/estuary/flow:v0.1.0-481-gfb034de"
 docker pull ${FLOW_IMAGE}
 
 # the connector image needs to be available to envsubst
