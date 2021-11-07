@@ -311,6 +311,9 @@ type reader struct {
 }
 
 func (r *reader) sweep(ctx context.Context) error {
+	r.log("sweeping %s starting at %q, from %s through %s",
+		r.prefix, r.state.Path, r.state.MinBound, r.state.MaxBound)
+
 	var listing, err = r.store.List(ctx, Query{
 		Prefix:    r.prefix,
 		StartAt:   r.state.Path,
@@ -387,7 +390,7 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 		log.WithField("path", obj.Path).Debug("skipping path (after Read)")
 		return nil
 	}
-	r.log("processing file %q", obj.Path)
+	r.log("processing file %q modified at %s", obj.Path, obj.ModTime)
 
 	tmp, err := ioutil.TempFile("", "parser-config-*.json")
 	if err != nil {
