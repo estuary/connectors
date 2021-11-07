@@ -114,7 +114,12 @@ func (s *gcStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadC
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
-	obj.ModTime = r.Attrs.LastModified
+
+	// Note that bucket listings have sub-second granularity, but LastModified
+	// is rounded to seconds (and is thus often slightly before obj.ModTime).
+	if r.Attrs.LastModified.After(obj.ModTime) {
+		obj.ModTime = r.Attrs.LastModified
+	}
 
 	return r, obj, nil
 }
