@@ -6,10 +6,57 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
+
+// TODO(wgd): Define an interface with a `ScanTable(ctx, streamID, scanKey, prevKey)` and
+// a `WriteWatermark(ctx, table, slot)` method which serves as the "database backfill" API
+// that we'll have to implement for other databases.
+
+// scanTable fetches a chunk of rows from the specified table, resuming from the provided
+// `prevKey` if non-nil. This is the entrypoint to the database-specific portion of the
+// backfill process.
+func scanTable(ctx context.Context, conn *pgx.Conn, streamID string, scanKey []string, prevKey []byte) ([]*changeEvent, error) {
+	var snapshot, err = snapshotDatabase(ctx, conn)
+	if err != nil {
+		return nil, fmt.Errorf("error creating database snapshot: %w", err)
+	}
+	defer snapshot.Close(ctx)
+
+	evts, err := snapshot.Table(streamID, scanKey).ScanChunk(ctx, prevKey)
+	if err != nil {
+		return nil, fmt.Errorf("error scanning table: %w", err)
+	}
+
+	return evts, nil
+}
+
+// writeWatermark writes a new random UUID into the 'watermarks' table and returns the
+// UUID. This is also an entrypoint to the database-specific portion of the backfill.
+func writeWatermark(ctx context.Context, conn *pgx.Conn, table, slot string) (string, error) {
+	// Generate a watermark UUID
+	var wm = uuid.New().String()
+
+	var query = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", table)
+	rows, err := conn.Query(ctx, query)
+	if err != nil {
+		return "", fmt.Errorf("error creating watermarks table: %w", err)
+	}
+	rows.Close()
+
+	query = fmt.Sprintf(`INSERT INTO %s (slot, watermark) VALUES ($1,$2) ON CONFLICT (slot) DO UPDATE SET watermark = $2;`, table)
+	rows, err = conn.Query(ctx, query, slot, wm)
+	if err != nil {
+		return "", fmt.Errorf("error upserting new watermark for slot %q: %w", slot, err)
+	}
+	rows.Close()
+
+	logrus.WithField("watermark", wm).Info("wrote watermark")
+	return wm, nil
+}
 
 // A databaseSnapshot represents a long-running read transaction which
 // can be used to query the contents of various tables.
@@ -179,7 +226,6 @@ func (s *tableSnapshot) processResults(ctx context.Context, rows pgx.Rows) ([]*c
 
 		evts = append(evts, &changeEvent{
 			Type:      "Insert",
-			LSN:       s.TransactionLSN(),
 			Namespace: s.SchemaName,
 			Table:     s.TableName,
 			Fields:    fields,

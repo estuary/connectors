@@ -18,8 +18,6 @@ type changeEventHandler func(evt *changeEvent) error
 
 type changeEvent struct {
 	Type      string
-	XID       pgtype.XID
-	LSN       pglogrepl.LSN
 	Namespace string
 	Table     string
 	Fields    map[string]interface{}
@@ -33,7 +31,7 @@ type changeEvent struct {
 type replicationStream struct {
 	replSlot   string         // The name of the PostgreSQL replication slot to use
 	pubName    string         // The name of the PostgreSQL publication to use
-	currentLSN pglogrepl.LSN  // The LSN of the most currently received message
+	currentLSN uint64         // The TransactionEndLSN of the most currently received 'Commit' event, as an atomic uint64
 	commitLSN  uint64         // The most recently *committed* LSN, given to us by startReplication or the CommitLSN() method
 	conn       *pgconn.PgConn // The PostgreSQL replication connection
 
@@ -51,8 +49,7 @@ type replicationStream struct {
 	// and other information about the table structure at a particular moment.
 	relations map[uint32]*pglogrepl.RelationMessage
 
-	inTransaction  bool   // inTransaction is true when we're in between a BEGIN/COMMIT message pair.
-	transactionXID uint32 // transactionXID holds the XID of the current transaction when inTransaction is true.
+	inTransaction bool // inTransaction is true when we're in between a BEGIN/COMMIT message pair.
 
 	eventBuf *changeEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
 	events   chan *changeEvent // The channel to which replication events will be written
@@ -61,23 +58,33 @@ type replicationStream struct {
 const standbyStatusInterval = 10 * time.Second
 
 func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publication string, startLSN pglogrepl.LSN) (*replicationStream, error) {
-	var stream = &replicationStream{
-		replSlot:   slot,
-		pubName:    publication,
-		currentLSN: startLSN,
-		commitLSN:  uint64(startLSN),
-		conn:       conn,
-		connInfo:   pgtype.NewConnInfo(),
-		relations:  make(map[uint32]*pglogrepl.RelationMessage),
-		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
-		events: make(chan *changeEvent),
+	// If we don't have a valid `startLSN` from a previous capture, it gets initialized
+	// to the current WAL flush position obtained via the `IDENTIFY_SYSTEM` command.
+	if startLSN == 0 {
+		var sysident, err = pglogrepl.IdentifySystem(ctx, conn)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read WAL flush LSN from database: %w", err)
+		}
+		startLSN = sysident.XLogPos
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"startLSN":    stream.currentLSN,
-		"publication": stream.pubName,
-		"slot":        stream.replSlot,
+		"startLSN":    startLSN,
+		"publication": publication,
+		"slot":        slot,
 	}).Info("starting replication")
+
+	var stream = &replicationStream{
+		replSlot:  slot,
+		pubName:   publication,
+		commitLSN: uint64(startLSN),
+		conn:      conn,
+		connInfo:  pgtype.NewConnInfo(),
+		relations: make(map[uint32]*pglogrepl.RelationMessage),
+		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
+		events: make(chan *changeEvent),
+	}
+	atomic.StoreUint64(&stream.currentLSN, uint64(startLSN))
 
 	// Create the publication and replication slot, ignoring the inevitable errors
 	// when they already exist. We could in theory add some extra logic to check,
@@ -85,7 +92,7 @@ func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 	_ = conn.Exec(ctx, fmt.Sprintf(`CREATE PUBLICATION %s FOR ALL TABLES;`, stream.pubName)).Close()
 	_ = conn.Exec(ctx, fmt.Sprintf(`CREATE_REPLICATION_SLOT %s LOGICAL pgoutput;`, stream.replSlot)).Close()
 
-	if err := pglogrepl.StartReplication(ctx, stream.conn, stream.replSlot, stream.currentLSN, pglogrepl.StartReplicationOptions{
+	if err := pglogrepl.StartReplication(ctx, stream.conn, slot, startLSN, pglogrepl.StartReplicationOptions{
 		PluginArgs: []string{
 			`"proto_version" '1'`,
 			fmt.Sprintf(`"publication_names" '%s'`, stream.pubName),
@@ -108,6 +115,10 @@ func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 
 func (s *replicationStream) Events() <-chan *changeEvent {
 	return s.events
+}
+
+func (s *replicationStream) CurrentLSN() pglogrepl.LSN {
+	return pglogrepl.LSN(atomic.LoadUint64(&s.currentLSN))
 }
 
 // run is the main loop of the replicationStream which combines message
@@ -204,7 +215,6 @@ func (s *replicationStream) decodeMessage(msg pglogrepl.Message) (*changeEvent, 
 			return nil, fmt.Errorf("got BEGIN message while another transaction in progress")
 		}
 		s.inTransaction = true
-		s.transactionXID = msg.Xid
 		return nil, nil
 	case *pglogrepl.InsertMessage:
 		return s.decodeChangeEvent(msg.Type().String(), msg.Tuple, msg.RelationID)
@@ -217,13 +227,11 @@ func (s *replicationStream) decodeMessage(msg pglogrepl.Message) (*changeEvent, 
 			return nil, fmt.Errorf("got COMMIT message without a transaction in progress")
 		}
 		s.inTransaction = false
-		s.transactionXID = 0
+		atomic.StoreUint64(&s.currentLSN, uint64(msg.TransactionEndLSN))
 
 		var evt = &changeEvent{
 			Type: "Commit",
-			LSN:  msg.TransactionEndLSN,
 		}
-		evt.XID.Set(s.transactionXID)
 		return evt, nil
 	}
 
@@ -287,12 +295,10 @@ func (s *replicationStream) decodeChangeEvent(eventType string, tuple *pglogrepl
 
 	var evt = &changeEvent{
 		Type:      eventType,
-		LSN:       s.currentLSN,
 		Namespace: rel.Namespace,
 		Table:     rel.RelationName,
 		Fields:    fields,
 	}
-	evt.XID.Set(s.transactionXID)
 	return evt, nil
 }
 
@@ -338,7 +344,6 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.Messa
 				if err != nil {
 					return nil, fmt.Errorf("error parsing XLogData: %w", err)
 				}
-				s.currentLSN = xld.WALStart + pglogrepl.LSN(len(xld.WALData))
 				msg, err := pglogrepl.Parse(xld.WALData)
 				if err != nil {
 					return nil, fmt.Errorf("error parsing logical replication message: %w", err)
@@ -391,5 +396,6 @@ func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 }
 
 func (s *replicationStream) Close(ctx context.Context) error {
+	logrus.Debug("replication stream close requested")
 	return s.conn.Close(ctx)
 }

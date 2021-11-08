@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"github.com/estuary/protocols/airbyte"
-	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgtype"
@@ -37,6 +35,19 @@ type PersistentState struct {
 // detailed checks are performed by UpdateState.
 func (ps *PersistentState) Validate() error {
 	return nil
+}
+
+// pendingStreams returns the IDs of all streams which still need to be backfilled,
+// in sorted order for test stability.
+func (ps *PersistentState) pendingStreams() []string {
+	var pending []string
+	for id, tableState := range ps.Streams {
+		if tableState.Mode == tableModeBackfill {
+			pending = append(pending, id)
+		}
+	}
+	sort.Strings(pending)
+	return pending
 }
 
 // TableState represents the serializable/resumable state of a particular table's capture.
@@ -69,7 +80,6 @@ type capture struct {
 	encoder messageOutput              // The encoder to which records and state updates are written
 
 	connScan   *pgx.Conn          // The DB connection used for table scanning
-	connRepl   *pgconn.PgConn     // The DB connection used for replication streaming
 	replStream *replicationStream // The high-level replication stream abstraction
 	watchdog   *time.Timer        // If non-nil, the Reset() method will be invoked whenever a record is emitted
 
@@ -79,10 +89,6 @@ type capture struct {
 	// this could also be used to "coalesce" smaller transactions in the
 	// future.
 	changesSinceLastCheckpoint int
-
-	results   *backfillResults // The next chunk of buffered backfill scan results
-	watermark string           // The watermark, which is known to occur after the point in time at which `results` was captured
-
 }
 
 // messageOutput represents "the thing to which Capture writes records and state checkpoints".
@@ -106,12 +112,25 @@ func RunCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 		ctx = limitedCtx
 	}
 
+	// In non-tailing mode (which should only occur during development) we need
+	// to shut down after no further changes have been reported for a while. To
+	// do this we create a cancellable context, and a watchdog timer which will
+	// perform said cancellation if `PollTimeout` elapses between resets.
+	var watchdog *time.Timer
+	if !catalog.Tail && config.PollTimeoutSeconds != 0 {
+		var streamCtx, streamCancel = context.WithCancel(ctx)
+		defer streamCancel()
+		var wdtDuration = time.Duration(config.PollTimeoutSeconds * float64(time.Second))
+		watchdog = time.AfterFunc(wdtDuration, streamCancel)
+		ctx = streamCtx
+	}
+
 	// Normal database connection used for table scanning
 	var connScan, err = pgx.Connect(ctx, config.ConnectionURI)
 	if err != nil {
 		return fmt.Errorf("unable to connect to database for table scan: %w", err)
 	}
-	// TODO(wgd): Close this after merging NewCapture() and Execute()
+	defer connScan.Close(ctx)
 
 	// Replication database connection used for event streaming
 	replConnConfig, err := pgconn.ParseConfig(config.ConnectionURI)
@@ -123,40 +142,28 @@ func RunCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 	if err != nil {
 		return fmt.Errorf("unable to connect to database for replication: %w", err)
 	}
+	replStream, err := startReplication(ctx, connRepl, config.SlotName, config.PublicationName, state.CurrentLSN)
+	if err != nil {
+		return fmt.Errorf("unable to start replication stream: %w", err)
+	}
+	defer replStream.Close(ctx)
 
 	var c = &capture{
-		state:    state,
-		config:   config,
-		catalog:  catalog,
-		encoder:  dest,
-		connScan: connScan,
-		connRepl: connRepl,
+		state:      state,
+		config:     config,
+		catalog:    catalog,
+		encoder:    dest,
+		connScan:   connScan,
+		replStream: replStream,
+		watchdog:   watchdog,
 	}
 
 	if err := c.updateState(ctx); err != nil {
 		return fmt.Errorf("error updating capture state: %w", err)
 	}
 
-	// In non-tailing mode (which should only occur during development) we need
-	// to shut down after no further changes have been reported for a while. To
-	// do this we create a cancellable context, and a watchdog timer which will
-	// perform said cancellation if `PollTimeout` elapses between resets.
-	if !c.catalog.Tail && c.config.PollTimeoutSeconds != 0 {
-		var streamCtx, streamCancel = context.WithCancel(ctx)
-		defer streamCancel()
-		var wdtDuration = time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
-		c.watchdog = time.AfterFunc(wdtDuration, streamCancel)
-		ctx = streamCtx
-	}
-
-	replStream, err := startReplication(ctx, connRepl, config.SlotName, config.PublicationName, state.CurrentLSN)
-	if err != nil {
-		return fmt.Errorf("unable to start replication stream: %w", err)
-	}
-	defer replStream.Close(ctx)
-	c.replStream = replStream
-
 	err = c.streamChanges(ctx)
+	logrus.WithField("err", err).Debug("change streaming terminated")
 	if errors.Is(err, context.DeadlineExceeded) && c.config.MaxLifespanSeconds != 0 {
 		logrus.WithField("err", err).WithField("maxLifespan", c.config.MaxLifespanSeconds).Info("maximum lifespan reached")
 		return nil
@@ -176,18 +183,6 @@ func (c *capture) updateState(ctx context.Context) error {
 		stateDirty = true
 	}
 
-	// The first time the connector is run, we need to figure out the "Current LSN"
-	// from which we will start replication. On subsequent runs this comes from the
-	// resume state.
-	if c.state.CurrentLSN == 0 {
-		var sysident, err = pglogrepl.IdentifySystem(ctx, c.connRepl)
-		if err != nil {
-			return fmt.Errorf("unable to get current LSN from database: %w", err)
-		}
-		c.state.CurrentLSN = sysident.XLogPos
-		stateDirty = true
-	}
-
 	// Streams may be added to the catalog at various times. We need to
 	// initialize new state entries for these streams, and while we're at
 	// it this is a good time to sanity-check the primary key configuration.
@@ -197,9 +192,6 @@ func (c *capture) updateState(ctx context.Context) error {
 	}
 
 	for _, catalogStream := range c.catalog.Streams {
-		// Table names coming from Postgres are always lowercase, so if we
-		// normalize the stream name to lowercase on the catalog->state
-		// transition then we can ignore the issue later on.
 		var streamID = joinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
 
 		// In the catalog a primary key is an array of arrays of strings, but in the
@@ -274,57 +266,39 @@ func (c *capture) updateState(ctx context.Context) error {
 	return nil
 }
 
-// joinStreamID combines a namespace and a stream name into a fully-qualified
-// stream (or table) identifier. Because it's possible for the namespace to be
-// unspecified, we default to "public" in that situation.
-func joinStreamID(namespace, stream string) string {
-	if namespace == "" {
-		namespace = defaultSchemaName
-	}
-	return strings.ToLower(namespace + "." + stream)
-}
-
-// pendingStreams returns a list of all tables currently in `tableModeBackfill`,
-// in sorted order so that output is deterministic.
-func (c *capture) pendingStreams() []string {
-	var pending []string
-	for id, tableState := range c.state.Streams {
-		if tableState.Mode == tableModeBackfill {
-			pending = append(pending, id)
-		}
-	}
-	sort.Strings(pending)
-	return pending
-}
-
 // This is the main loop of the capture process, which interleaves replication event
 // streaming with backfill scan results as necessary.
 func (c *capture) streamChanges(ctx context.Context) error {
-	if c.pendingStreams() != nil {
-		var results *backfillResults
-		if err := c.writeWatermark(ctx); err != nil {
+	if c.state.pendingStreams() != nil {
+		var results *resultSet
+		var watermark, err = writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
+		if err != nil {
 			return fmt.Errorf("error writing dummy watermark: %w", err)
 		}
-		for c.pendingStreams() != nil {
-			if err := c.streamToWatermark(); err != nil {
+		for c.state.pendingStreams() != nil {
+			if err := c.streamToWatermark(watermark, results); err != nil {
 				return fmt.Errorf("error streaming until watermark: %w", err)
 			} else if err := c.emitBuffered(results); err != nil {
 				return fmt.Errorf("error emitting buffered results: %w", err)
-			} else if err := c.backfillChunk(ctx); err != nil {
+			}
+			results, err = c.backfillStreams(ctx, c.state.pendingStreams())
+			if err != nil {
 				return fmt.Errorf("error performing backfill: %w", err)
-			} else if err := c.writeWatermark(ctx); err != nil {
+			}
+			watermark, err = writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
+			if err != nil {
 				return fmt.Errorf("error writing next watermark: %w", err)
 			}
 		}
 	}
-	logrus.Debug("all streams fully active")
 
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
+	logrus.Info("all streams active")
 	for evt := range c.replStream.Events() {
 		if evt.Type == "Commit" {
 			if c.changesSinceLastCheckpoint > 0 {
-				c.state.CurrentLSN = evt.LSN
+				c.state.CurrentLSN = c.replStream.CurrentLSN()
 				if err := c.emitState(c.state); err != nil {
 					return fmt.Errorf("error emitting state update: %w", err)
 				}
@@ -342,157 +316,36 @@ func (c *capture) streamChanges(ctx context.Context) error {
 	return nil
 }
 
-func (c *capture) writeWatermark(ctx context.Context) error {
-	// Generate a watermark UUID
-	var wm = uuid.New().String()
-
-	// TODO(wgd): Make this configurable via config.json?
-	var table = "public.flow_watermarks"
-	// TODO(wgd): Is it a good idea to reuse the replication slot name for this purpose?
-	var slot = c.config.SlotName
-
-	rows, err := c.connScan.Query(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", table))
-	if err != nil {
-		return fmt.Errorf("error creating watermarks table: %w", err)
-	}
-	rows.Close()
-
-	var query = fmt.Sprintf(`INSERT INTO %s (slot, watermark) VALUES ($1,$2) ON CONFLICT (slot) DO UPDATE SET watermark = $2;`, table)
-	rows, err = c.connScan.Query(ctx, query, slot, wm)
-	if err != nil {
-		return fmt.Errorf("error upserting new watermark for slot %q: %w", slot, err)
-	}
-	rows.Close()
-
-	logrus.WithField("watermark", wm).Info("wrote watermark")
-	c.watermark = wm
-	return nil
-}
-
-type backfillResults struct {
-	streams map[string]*backfillChunk
-}
-
-type backfillChunk struct {
-	scanKey  []string
-	scanned  []byte
-	complete bool // When true, indicates that this chunk *completes* the table, and thus has no precise endpoint
-	rows     map[string]*changeEvent
-}
-
-func (r *backfillResults) Complete(streamID string) bool {
-	if r == nil {
-		return false
-	}
-	return r.streams[streamID].complete
-}
-
-func (r *backfillResults) Scanned(streamID string) []byte {
-	if r == nil {
-		return nil
-	}
-	return r.streams[streamID].scanned
-}
-
-func (r *backfillResults) Patch(evt *changeEvent) error {
-	if r == nil {
-		return nil
-	}
-	var streamID = joinStreamID(evt.Namespace, evt.Table)
-	var chunk, ok = r.streams[streamID]
-	if !ok {
-		return nil
-	}
-
-	var bs, err = encodeRowKey(chunk.scanKey, evt.Fields)
-	if err != nil {
-		return fmt.Errorf("error encoding patch key: %w", err)
-	}
-	var rowKey = string(bs)
-
-	// Apply the new change event to the buffered result set. Note that it's
-	// entirely possible to see a row inserted that already exists, or deleted
-	// when it doesn't exist. In fact resolving such situations is entirely
-	// the point of buffering and patching the results in the first place.
-	switch evt.Type {
-	case "Insert":
-		chunk.rows[rowKey] = evt
-	case "Update":
-		chunk.rows[rowKey] = &changeEvent{
-			Type:      "Insert",
-			XID:       evt.XID,
-			LSN:       evt.LSN,
-			Namespace: evt.Namespace,
-			Table:     evt.Table,
-			Fields:    evt.Fields,
-		}
-	case "Delete":
-		delete(chunk.rows, rowKey)
-	default:
-		return fmt.Errorf("patched invalid change type %q", evt.Type)
-	}
-	return nil
-}
-
-func (r *backfillResults) Changes(streamID string) []*changeEvent {
-	if r == nil {
-		return nil
-	}
-
-	// Sort row keys in order so that rows within a chunk will be
-	// emitted deterministically. This only really matters for testing,
-	// and it's in a relatively hot path here, so this might be low-
-	// hanging fruit for optimization if profiling suggests it's needed.
-	var keys []string
-	for key := range r.streams[streamID].rows {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	// Make a list of events in the sorted order
-	var evts []*changeEvent
-	for _, key := range keys {
-		evts = append(evts, r.streams[streamID].rows[key])
-	}
-	return evts
-}
-
-func (c *capture) streamToWatermark() error {
+func (c *capture) streamToWatermark(watermark string, results *resultSet) error {
 	var watermarkReached = false
 	for evt := range c.replStream.Events() {
-		// Stop processing replication events upon the watermark mutation's *Commit Event*
-		if evt.Type == "Commit" && watermarkReached {
-			c.state.CurrentLSN = evt.LSN
-			return nil
-		}
-		// Ignore all other commits
+		// Commit events update the current LSN and are otherwise ignored, except for the
+		// next Commit after the target watermark, which ends the loop.
 		if evt.Type == "Commit" {
+			c.state.CurrentLSN = c.replStream.CurrentLSN()
+			if watermarkReached {
+				return nil
+			}
 			continue
 		}
-		// Note when the expected watermark is finally observed
+
+		// Note when the expected watermark is finally observed. The subsequent Commit will exit the loop.
+		// TODO(wgd): Can we ensure/require that 'WatermarksTable' is always fully-qualified?
 		var streamID = joinStreamID(evt.Namespace, evt.Table)
-		// TODO(wgd): Make the watermarks table configurable
-		if streamID == "public.flow_watermarks" {
-			if evt.Fields["watermark"] == c.watermark {
-				logrus.WithField("watermark", c.watermark).Debug("reached watermark")
+		if streamID == c.config.WatermarksTable {
+			logrus.WithFields(logrus.Fields{"expected": watermark, "written": evt.Fields["watermark"]}).Debug("watermark write")
+			if evt.Fields["watermark"] == watermark {
 				watermarkReached = true
-			} else {
-				logrus.WithFields(logrus.Fields{"current": evt.Fields["watermark"], "awaiting": c.watermark}).Warn("skipping unexpected watermark")
 			}
 		}
 
-		// For each event we must decide whether to emit it, ignore it, or patch it
-		// into a buffered result set. We begin by handling the easy cases of a table
-		// which is ignored or fully active, and then follow that up with the range
-		// comparisons that decide on a per-row basis during backfills.
+		// Handle the easy cases: Events on ignored or fully-active tables.
 		var tableState = c.state.Streams[streamID]
 		if tableState == nil || tableState.Mode == tableModeIgnore {
-			logrus.WithField("table", streamID).Debug("ignoring change from inactive table")
-			c.emitLog(fmt.Sprintf("ignoring %q event: %v", evt.Type, evt.Fields))
+			logrus.WithFields(logrus.Fields{"stream": streamID, "type": evt.Type}).Debug("ignoring stream")
 			continue
 		}
 		if tableState.Mode == tableModeActive {
-			logrus.WithField("table", streamID).Debug("emitting every change")
 			if err := c.handleChangeEvent(evt); err != nil {
 				return fmt.Errorf("error handling replication event: %w", err)
 			}
@@ -502,50 +355,39 @@ func (c *capture) streamToWatermark() error {
 			return fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
 		}
 
+		// While a table is being backfilled, events occurring *before* the current scan point
+		// will be emitted, while events *after* that point will be patched (or ignored) into
+		// the buffered resultSet.
 		var rowKey, err = encodeRowKey(tableState.ScanKey, evt.Fields)
 		if err != nil {
 			return fmt.Errorf("error encoding row key: %w", err)
 		}
-
 		if compareTuples(rowKey, tableState.Scanned) <= 0 {
-			logrus.WithField("table", streamID).WithField("key", base64.StdEncoding.EncodeToString(rowKey)).Debug("emitting change")
 			if err := c.handleChangeEvent(evt); err != nil {
 				return fmt.Errorf("error handling replication event: %w", err)
 			}
-		} else if c.results.Complete(streamID) || compareTuples(rowKey, c.results.Scanned(streamID)) <= 0 {
-			logrus.WithField("table", streamID).WithField("key", base64.StdEncoding.EncodeToString(rowKey)).Debug("patching change")
-			if err := c.results.Patch(evt); err != nil {
-				return fmt.Errorf("error patching buffered results: %w", err)
-			}
-			c.emitLog(fmt.Sprintf("patching %q event: %v", evt.Type, evt.Fields))
-		} else {
-			c.emitLog(fmt.Sprintf("filtered %q event (rowKey=%q, scanned=%q, nextScanned=%q): %v", evt.Type, rowKey, tableState.Scanned, c.results.Scanned(streamID), evt.Fields))
-			logrus.WithField("table", streamID).WithField("key", base64.StdEncoding.EncodeToString(rowKey)).Debug("filtered change")
+		} else if err := results.Patch(streamID, evt); err != nil {
+			return fmt.Errorf("error patching resultset: %w", err)
 		}
 	}
 	return nil
 }
 
-func (c *capture) emitBuffered(results *backfillResults) error {
-	// If there are buffered results (which is not the case during the initial
-	// "dummy watermark" step which allows us to "catch up" to any new replication
-	// events occurring while the connector was offline), emit them and also
-	// update the table state accordingly.
-	if c.results != nil {
-		for _, streamID := range c.pendingStreams() {
-			var evts = c.results.Changes(streamID)
-			for _, evt := range evts {
-				if err := c.handleChangeEvent(evt); err != nil {
-					return fmt.Errorf("error handling backfill change: %w", err)
-				}
+func (c *capture) emitBuffered(results *resultSet) error {
+	// Emit any buffered results and update table states accordingly.
+	for _, streamID := range results.Streams() {
+		var evts = results.Changes(streamID)
+		for _, evt := range evts {
+			if err := c.handleChangeEvent(evt); err != nil {
+				return fmt.Errorf("error handling backfill change: %w", err)
 			}
+		}
 
-			if c.results.Complete(streamID) {
-				c.state.Streams[streamID].Mode = tableModeActive
-				c.state.Streams[streamID].Scanned = nil
-			} else {
-				c.state.Streams[streamID].Scanned = c.results.Scanned(streamID)
-			}
+		if results.Complete(streamID) {
+			c.state.Streams[streamID].Mode = tableModeActive
+			c.state.Streams[streamID].Scanned = nil
+		} else {
+			c.state.Streams[streamID].Scanned = results.Scanned(streamID)
 		}
 	}
 
@@ -555,76 +397,40 @@ func (c *capture) emitBuffered(results *backfillResults) error {
 	return c.emitState(c.state)
 }
 
-func (c *capture) backfillChunk(ctx context.Context) error {
-	var snapshot, err = snapshotDatabase(ctx, c.connScan)
-	if err != nil {
-		return fmt.Errorf("error creating database snapshot: %w", err)
-	}
-	defer snapshot.Close(ctx)
+func (c *capture) backfillStreams(ctx context.Context, streams []string) (*resultSet, error) {
+	var results = newResultSet()
 
 	// TODO(wgd): Add a sanity-check assertion that the current watermark value
-	// in the database matches the one we expect in the connector. It's unlikely,
-	// but if this is a thing that can actually happen in a given database we
-	// need to know about it.
+	// in the database matches the one we previously wrote? Maybe that's more effort
+	// than it's worth until we have other evidence of correctness violations though.
 
-	var results = &backfillResults{streams: make(map[string]*backfillChunk)}
-	for _, streamID := range c.pendingStreams() {
-		var chunk = &backfillChunk{
-			scanKey: c.state.Streams[streamID].ScanKey,
-			scanned: c.state.Streams[streamID].Scanned,
-			rows:    make(map[string]*changeEvent),
-		}
-		results.streams[streamID] = chunk
+	// TODO(wgd): We can dispatch these table reads concurrently with a WaitGroup
+	// for synchronization.
+	for _, streamID := range streams {
+		var streamState = c.state.Streams[streamID]
 
-		// Go actually fetch something
-		var table = snapshot.Table(streamID, chunk.scanKey)
-
-		var evts, err = table.ScanChunk(ctx, chunk.scanned)
+		// Fetch a chunk of entries from the specified stream
+		var evts, err = scanTable(ctx, c.connScan, streamID, streamState.ScanKey, streamState.Scanned)
 		if err != nil {
-			return fmt.Errorf("error scanning table: %w", err)
+			return nil, fmt.Errorf("error scanning table: %w", err)
 		}
-		if len(evts) == 0 {
-			chunk.scanned = nil
-			chunk.complete = true
-		}
-		for _, evt := range evts {
-			c.emitLog(fmt.Sprintf("buffered %q event: %v", evt.Type, evt.Fields))
 
-			var bs, err = encodeRowKey(chunk.scanKey, evt.Fields)
-			if err != nil {
-				return fmt.Errorf("error encoding row key: %w", err)
-			}
-			if chunk.scanned != nil && compareTuples(chunk.scanned, bs) >= 0 {
-				// It's important for correctness that the ordering of serialized primary keys matches
-				// the ordering that PostgreSQL uses. Since the results of `ScanChunk` are ordered by
-				// PostgreSQL and we already have to serialize all the keys for backfill result patching,
-				// we may as well opportunistically check that invariant here.
-				return fmt.Errorf("primary key ordering failure: prev=%q, next=%q", chunk.scanned, bs)
-			}
-			chunk.rows[string(bs)] = evt
-			chunk.scanned = bs
+		// Translate the resulting list of entries into a backfillChunk
+		if err := results.Buffer(streamID, streamState.ScanKey, evts); err != nil {
+			return nil, fmt.Errorf("error buffering scan results: %w", err)
 		}
-		logrus.WithField("prev", c.state.Streams[streamID].Scanned).WithField("next", chunk.scanned).WithField("table", streamID).Info("backfill chunk")
 	}
-
-	c.results = results
-	return nil
+	return results, nil
 }
 
 func (c *capture) handleChangeEvent(evt *changeEvent) error {
-	// When in non-tailing mode, reset the shutdown watchdog whenever an event happens.
-	if c.watchdog != nil {
-		var wdtDuration = time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
-		c.watchdog.Reset(wdtDuration)
-	}
-
 	evt.Fields["_change_type"] = evt.Type
 
 	for id, val := range evt.Fields {
 		var translated, err = translateRecordField(val)
 		if err != nil {
 			logrus.WithField("val", val).Error("value translation error")
-			return fmt.Errorf("error translating field value: %w", err)
+			return fmt.Errorf("error translating field %q value: %w", id, err)
 		}
 		evt.Fields[id] = translated
 	}
@@ -668,7 +474,7 @@ func (c *capture) emitRecord(ns, stream string, data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error encoding record data: %w", err)
 	}
-	return c.encoder.Encode(airbyte.Message{
+	return c.emit(airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
 		Record: &airbyte.Record{
 			Namespace: ns,
@@ -685,30 +491,28 @@ func (c *capture) emitState(state interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error encoding state message: %w", err)
 	}
-	return c.encoder.Encode(airbyte.Message{
+	return c.emit(airbyte.Message{
 		Type:  airbyte.MessageTypeState,
 		State: &airbyte.State{Data: json.RawMessage(rawState)},
 	})
 }
 
-func (c *capture) emitLog(msg interface{}) error {
-	var str string
-	switch msg := msg.(type) {
-	case string:
-		str = msg
-	default:
-		var bs, err = json.Marshal(msg)
-		if err != nil {
-			return fmt.Errorf("error marshalling log message: %w", err)
-		}
-		str = string(bs)
+func (c *capture) emit(msg interface{}) error {
+	// When in non-tailing mode, reset the shutdown watchdog whenever we emit useful progress.
+	if c.watchdog != nil {
+		var wdtDuration = time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
+		c.watchdog.Reset(wdtDuration)
 	}
 
-	return c.encoder.Encode(airbyte.Message{
-		Type: airbyte.MessageTypeLog,
-		Log: &airbyte.Log{
-			Level:   airbyte.LogLevelDebug,
-			Message: str,
-		},
-	})
+	return c.encoder.Encode(msg)
+}
+
+// joinStreamID combines a namespace and a stream name into a fully-qualified
+// stream (or table) identifier. Because it's possible for the namespace to be
+// unspecified, we default to "public" in that situation.
+func joinStreamID(namespace, stream string) string {
+	if namespace == "" {
+		namespace = defaultSchemaName
+	}
+	return strings.ToLower(namespace + "." + stream)
 }
