@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -71,11 +70,13 @@ func TestMain(m *testing.M) {
 	TestDefaultConfig.SlotName = *TestReplicationSlot
 	TestDefaultConfig.PublicationName = *TestPublicationName
 	TestDefaultConfig.PollTimeoutSeconds = *TestPollTimeoutSeconds
+	if err := TestDefaultConfig.Validate(); err != nil {
+		logrus.WithField("err", err).WithField("config", TestDefaultConfig).Fatal("error validating test config")
+	}
 
 	conn, err := pgx.Connect(ctx, *TestConnectionURI)
 	if err != nil {
-		log.Fatalf("error connecting to database: %v", err)
-		os.Exit(1)
+		logrus.WithField("err", err).Fatal("error connecting to database")
 	}
 	defer conn.Close(ctx)
 	TestDatabase = conn
@@ -355,7 +356,6 @@ func (buf *CaptureOutputBuffer) bufferMessage(msg airbyte.Message) error {
 	if err != nil {
 		return fmt.Errorf("error encoding sanitized message: %w", err)
 	}
-	logrus.WithField("data", string(bs)).Debug("buffered message")
 	buf.Snapshot.Write(bs)
 	buf.Snapshot.WriteByte('\n')
 	return nil

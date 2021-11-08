@@ -2,23 +2,6 @@
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Delete","fullname":null,"population":null,"state":"XX","year":1970},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"No Such State","population":1234,"state":"XX","year":1930},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"No Such State","population":12345,"state":"XX","year":1970},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"Fge8Ak1PAA=="}}}}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Mississippi","population":2525342,"state":"MS","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Montana","population":788752,"state":"MT","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"North Carolina","population":5898980,"state":"NC","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"North Dakota","population":654380,"state":"ND","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Nebraska","population":1572296,"state":"NE","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New Hampshire","population":924250,"state":"NH","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New Jersey","population":7376330,"state":"NJ","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New Mexico","population":1309400,"state":"NM","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Nevada","population":810215,"state":"NV","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"New York","population":17566754,"state":"NY","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Ohio","population":10800650,"state":"OH","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Oklahoma","population":3040758,"state":"OK","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Oregon","population":2641218,"state":"OR","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Pennsylvania","population":11868305,"state":"PA","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Rhode Island","population":948773,"state":"RI","year":1980},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"South Carolina","population":3134502,"state":"SC","year":1980},"emitted_at":1234,"namespace":"public"}}
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","scan_key":["year","state"],"scanned":"Fge8AlNDAA=="}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"South Dakota","population":690851,"state":"SD","year":1980},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Tennessee","population":4600252,"state":"TN","year":1980},"emitted_at":1234,"namespace":"public"}}
