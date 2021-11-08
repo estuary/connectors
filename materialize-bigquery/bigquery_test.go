@@ -2,22 +2,28 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/testsupport"
+	"github.com/estuary/protocols/catalog"
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
 
 func TestQueryGeneration(t *testing.T) {
-	var built = testsupport.BuildCatalog(t, "flow.yaml")
-	require.Empty(t, built.Errors)
+	var spec *pf.MaterializationSpec
+	require.NoError(t, testsupport.CatalogExtract(t, "testdata/flow.yaml",
+		func(db *sql.DB) error {
+			var err error
+			spec, err = catalog.LoadMaterialization(db, "test/sqlite")
+			return err
+		}))
 
 	generator := SQLGenerator()
-	var spec = &built.Materializations[0]
 	binding, err := newBinding(generator, 123, "test", spec.Bindings[0])
 	require.Nil(t, err)
 

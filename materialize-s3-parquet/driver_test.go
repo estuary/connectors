@@ -96,7 +96,7 @@ func TestMarshalAndUnmarshalDriverCheckpointJson(t *testing.T) {
 
 func TestS3ParquetDriverSpec(t *testing.T) {
 	var drv = new(driver)
-	var resp, err1 = drv.Spec(context.Background(), &pm.SpecRequest{EndpointType: pf.EndpointType_S3})
+	var resp, err1 = drv.Spec(context.Background(), &pm.SpecRequest{EndpointType: pf.EndpointType_FLOW_SINK})
 	require.NoError(t, err1)
 	var formatted, err2 = json.MarshalIndent(resp, "", "  ")
 	require.NoError(t, err2)
