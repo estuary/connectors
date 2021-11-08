@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const schemaURI = "test://example/int-string-len.schema"
 const schemaJSON = `
 	  { "$defs": {
                 "__flowInline1":{
@@ -29,7 +28,8 @@ const schemaJSON = `
                         "int": { "type": "integer" },
                         "str": { "type": "string" }
                     },
-                    "required": ["int", "str", "bit"], "type": "object"
+                    "required": ["int", "str", "bit"],
+                    "type": "object"
                 }
             },
             "$id": "test://example/int-string-len.schema",
@@ -46,7 +46,7 @@ const schemaJSON = `
 `
 
 func TestRunSchemaBuilder_NoOverrides(t *testing.T) {
-	result, e := RunSchemaBuilder(schemaURI, json.RawMessage(schemaJSON), []FieldOverride{})
+	result, e := RunSchemaBuilder(json.RawMessage(schemaJSON), []FieldOverride{})
 	require.NoError(t, e)
 	cupaloy.SnapshotT(t, string(result))
 }
@@ -59,22 +59,22 @@ func TestRunSchemaBuilder_WithOverrides(t *testing.T) {
 			FieldType: "keyword", KeywordSpec: KeywordSpec{IgnoreAbove: 500, DualText: true}}},
 	}
 
-	result, e := RunSchemaBuilder(schemaURI, json.RawMessage(schemaJSON), overrides)
+	result, e := RunSchemaBuilder(json.RawMessage(schemaJSON), overrides)
 	require.NoError(t, e)
 	cupaloy.SnapshotT(t, string(result))
 }
 
 func TestRunSchemaBuilder_Errors(t *testing.T) {
-	_, e := RunSchemaBuilder("", json.RawMessage("{}"), []FieldOverride{})
-	require.Contains(t, e.Error(), "Failed parsing schema_uri")
+	_, e := RunSchemaBuilder(json.RawMessage("{}"), []FieldOverride{})
+	require.Contains(t, e.Error(), "a valid $id field in the input json schema is missing.")
 
 	var corruptedSchema = "corrupted schema"
-	_, e = RunSchemaBuilder(schemaURI, json.RawMessage(corruptedSchema), []FieldOverride{})
+	_, e = RunSchemaBuilder(json.RawMessage(corruptedSchema), []FieldOverride{})
 	require.Contains(t, e.Error(), "Failed generating elastic search schema based on input")
 
 	var badOverrides = []FieldOverride{
 		{Pointer: "/arr/nonexisting_field", EsType: ElasticFieldType{FieldType: "text"}},
 	}
-	_, e = RunSchemaBuilder(schemaURI, json.RawMessage(schemaJSON), badOverrides)
+	_, e = RunSchemaBuilder(json.RawMessage(schemaJSON), badOverrides)
 	require.Contains(t, e.Error(), "pointer of a non-existing field")
 }

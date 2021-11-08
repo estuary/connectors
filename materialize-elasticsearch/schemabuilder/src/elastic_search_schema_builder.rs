@@ -3,33 +3,32 @@ use super::errors::*;
 
 use doc::inference::{ArrayShape, ObjShape, Shape};
 use doc::Annotation;
-use flow_json::schema::{self, index::IndexBuilder, types};
+use flow_json::schema::{self, index::IndexBuilder, keywords, types};
 use serde_json::json;
+use serde_json::Value::{self, Object};
 use std::collections::HashMap;
 
 pub const DEFAULT_IGNORE_ABOVE: u16 = 256;
 
-pub fn build_elastic_schema<'a, 'b>(
-    schema_uri: &'a url::Url,
-    schema_json: &'a [u8],
-) -> Result<ESFieldType, Error<'b>> {
-    build_elastic_schema_with_overrides(schema_uri, schema_json, &[])
+pub fn build_elastic_schema<'a, 'b>(schema_json: &'a [u8]) -> Result<ESFieldType, Error<'b>> {
+    build_elastic_schema_with_overrides(schema_json, &[])
 }
 
 pub fn build_elastic_schema_with_overrides<'a, 'b>(
-    schema_uri: &'a url::Url,
     schema_json: &'a [u8],
     es_type_overrides: &'b [ESTypeOverride],
 ) -> Result<ESFieldType, Error<'b>> {
-    let schema = serde_json::from_slice(schema_json)?;
-    let schema = schema::build::build_schema::<Annotation>(schema_uri.clone(), &schema).unwrap();
+    let schema: Value = serde_json::from_slice(schema_json)?;
+
+    let schema =
+        schema::build::build_schema::<Annotation>(get_schema_uri(schema.clone())?, &schema)
+            .unwrap();
 
     let mut index = IndexBuilder::new();
     index.add(&schema).unwrap();
     index.verify_references().unwrap();
     let index = index.into_index();
-
-    let shape = Shape::infer(index.must_fetch(&schema_uri).unwrap(), &index);
+    let shape = Shape::infer(&schema, &index);
 
     let mut built = build_from_shape(&shape)?;
     for es_override in es_type_overrides {
@@ -45,6 +44,17 @@ pub fn build_elastic_schema_with_overrides<'a, 'b>(
     }
 
     Ok(built)
+}
+
+fn get_schema_uri<'a>(schema: Value) -> Result<url::Url, Error<'a>> {
+    if let Object(obj) = schema {
+        if let Some(schema_uri_value) = obj.get(keywords::ID) {
+            if let Some(schema_uri) = schema_uri_value.as_str() {
+                return Ok(url::Url::parse(&schema_uri)?);
+            }
+        }
+    }
+    return Err(Error::MissingOrInvalidIdField());
 }
 
 fn build_from_shape<'a, 'b>(shape: &'a Shape) -> Result<ESFieldType, Error<'b>> {
@@ -125,10 +135,6 @@ fn build_from_array<'a, 'b>(shape: &ArrayShape) -> Result<ESFieldType, Error<'b>
 mod tests {
     use super::*;
 
-    fn test_url() -> url::Url {
-        url::Url::parse("http://test/dummy_schema").unwrap()
-    }
-
     fn check_schema_error_error(actual_error: &Error, expected_error_message: &str) {
         assert!(matches!(actual_error, Error::UnSupportedError { .. }));
         if let Error::UnSupportedError { message, shape: _ } = actual_error {
@@ -145,9 +151,8 @@ mod tests {
             pointer: pointer.to_string(),
             es_type: ESBasicType::Boolean,
         }];
-        let test_url = test_url();
         let actual_error =
-            build_elastic_schema_with_overrides(&test_url, schema_json, &overrides).unwrap_err();
+            build_elastic_schema_with_overrides(schema_json, &overrides).unwrap_err();
 
         assert!(matches!(actual_error, Error::OverridePointerError { .. }));
         if let Error::OverridePointerError {
@@ -162,52 +167,74 @@ mod tests {
     #[test]
     fn test_build_elastic_search_schema_with_error() {
         assert!(matches!(
-            build_elastic_schema(&test_url(), b"A bad json schema").unwrap_err(),
+            build_elastic_schema(b"A bad json schema").unwrap_err(),
             Error::SchemaJsonParsing { .. }
         ));
 
-        let empty_schema_json = b" { } ";
+        assert!(matches!(
+            build_elastic_schema(b"{}").unwrap_err(),
+            Error::MissingOrInvalidIdField { .. }
+        ));
+
+        assert!(matches!(
+            build_elastic_schema(br#"{"$id": null}"#).unwrap_err(),
+            Error::MissingOrInvalidIdField { .. }
+        ));
+
+        assert!(matches!(
+            build_elastic_schema(br#"{"$id": 123}"#).unwrap_err(),
+            Error::MissingOrInvalidIdField { .. }
+        ));
+
+        assert!(matches!(
+            build_elastic_schema(br#"{"$id": "123"}"#).unwrap_err(),
+            Error::UrlParsing { .. }
+        ));
+
+        let empty_schema_json = br#" { "$id": "https://test" } "#;
         check_schema_error_error(
-            &build_elastic_schema(&test_url(), empty_schema_json).unwrap_err(),
+            &build_elastic_schema(empty_schema_json).unwrap_err(),
             UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
         );
 
-        let multiple_types_schema_json = br#"{"type": ["integer", "string"]}"#;
+        let multiple_types_schema_json =
+            br#"{"$id": "https://test", "type": ["integer", "string"]}"#;
         check_schema_error_error(
-            &build_elastic_schema(&test_url(), multiple_types_schema_json).unwrap_err(),
+            &build_elastic_schema(multiple_types_schema_json).unwrap_err(),
             UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
         );
 
-        let int_schema_json = br#"{"type": "integer"}"#;
+        let int_schema_json = br#"{"$id": "https://test", "type": "integer"}"#;
         check_schema_error_error(
-            &build_elastic_schema(&test_url(), int_schema_json).unwrap_err(),
+            &build_elastic_schema(int_schema_json).unwrap_err(),
             UNSUPPORTED_NON_ARRAY_OR_OBJECTS,
         );
 
-        let multiple_field_types_schema_json = br#" { "type": "object", "properties": { "mul_type": {"type": ["boolean", "integer"] } } }"#;
+        let multiple_field_types_schema_json = br#" { "$id": "https://test", "type": "object", "properties": { "mul_type": {"type": ["boolean", "integer"] } } }"#;
         check_schema_error_error(
-            &build_elastic_schema(&test_url(), multiple_field_types_schema_json).unwrap_err(),
+            &build_elastic_schema(multiple_field_types_schema_json).unwrap_err(),
             UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
         );
 
         let object_additional_field_schema_json = br#"
-          {"type": "object", "additionalProperties": {"type": "integer"}, "properties": {"int": {"type": "integer"}}}
+          {"$id": "https://test", "type": "object", "additionalProperties": {"type": "integer"}, "properties": {"int": {"type": "integer"}}}
         "#;
         check_schema_error_error(
-            &build_elastic_schema(&test_url(), object_additional_field_schema_json).unwrap_err(),
+            &build_elastic_schema(object_additional_field_schema_json).unwrap_err(),
             UNSUPPORTED_OBJECT_ADDITIONAL_FIELDS,
         );
 
         let tuple_field_schema_json =
-            br#"{"type": "array", "items": [{"type": "string"}, {"type": "integer"}]}"#;
+            br#"{"$id": "https://test", "type": "array", "items": [{"type": "string"}, {"type": "integer"}]}"#;
         check_schema_error_error(
-            &build_elastic_schema(&test_url(), tuple_field_schema_json).unwrap_err(),
+            &build_elastic_schema(tuple_field_schema_json).unwrap_err(),
             UNSUPPORTED_TUPLE,
         );
 
-        let simple_array_schema_json = br#"{"type": "array", "items": {"type": "string"}}"#;
+        let simple_array_schema_json =
+            br#"{"$id": "https://test", "type": "array", "items": {"type": "string"}}"#;
         check_schema_error_error(
-            &build_elastic_schema(&test_url(), simple_array_schema_json).unwrap_err(),
+            &build_elastic_schema(simple_array_schema_json).unwrap_err(),
             UNSUPPORTED_NON_ARRAY_OR_OBJECTS,
         );
     }
@@ -216,6 +243,7 @@ mod tests {
     fn test_build_elastic_search_schema_all_types() {
         let schema_json = br#"
         {
+            "$id": "https://test",
             "properties":{
                 "str": {"type": "string"},
                 "str_or_null": {"type": ["string", "null"] },
@@ -236,12 +264,11 @@ mod tests {
         }
         "#;
 
-        let actual = build_elastic_schema(&test_url(), schema_json)
-            .unwrap()
-            .render();
+        let actual = build_elastic_schema(schema_json).unwrap().render();
         assert_eq!(
             actual,
-            json!({"properties": {
+            json!({
+                "properties": {
                     "array_of_ints": {"type": "long"},
                     "array_of_objs": {"properties": {"arr_field":{"type": "keyword", "ignore_above": 256}}},
                     "bool":{"type": "boolean"},
@@ -296,16 +323,11 @@ mod tests {
             "required":["len"]
         }"#;
 
-        let actual = build_elastic_schema(
-            &url::Url::parse("test://example/int-string-len.schema").unwrap(),
-            schema_json,
-        )
-        .unwrap()
-        .render();
+        let actual = build_elastic_schema(schema_json).unwrap().render();
 
         assert_eq!(
             actual,
-            json!({"properties": {
+            json!({ "properties": {
                     "arr":{
                         "properties": {
                           "one": {"type": "keyword", "ignore_above": 256},
@@ -325,6 +347,7 @@ mod tests {
     fn test_build_elastic_search_schema_with_override() {
         let schema_json = br#"
         {
+            "$id": "https://test",
             "properties":{
                 "str": {"type": "string"},
                 "enum": {"enum": [1,2,3]},
@@ -346,7 +369,6 @@ mod tests {
         );
 
         let actual = build_elastic_schema_with_overrides(
-            &test_url(),
             schema_json,
             &[
                 ESTypeOverride {
@@ -380,7 +402,7 @@ mod tests {
         .render();
         assert_eq!(
             actual,
-            json!({"properties": {
+            json!({ "properties": {
                     "array_of_ints": { "type": "boolean" },
                     "array_of_objs": { "properties": {"arr_field": {"type": "boolean"}}},
                     "enum": {"type": "boolean"},

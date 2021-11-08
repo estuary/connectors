@@ -70,7 +70,6 @@ func (f *FieldOverride) toMap() map[string]interface{} {
 
 // RunSchemaBuilder is a wrapper in GO around rust schema-builder.
 func RunSchemaBuilder(
-	schemaURI string,
 	schemaJSON json.RawMessage,
 	overrides []FieldOverride,
 ) ([]byte, error) {
@@ -89,7 +88,6 @@ func RunSchemaBuilder(
 		overrideMap = append(overrideMap, override.toMap())
 	}
 	input, err := json.Marshal(map[string]interface{}{
-		"schema_uri":         schemaURI,
 		"schema_json_base64": base64.StdEncoding.EncodeToString(schemaJSON),
 		"overrides":          overrideMap,
 	})

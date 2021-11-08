@@ -9,7 +9,6 @@ use std::process;
 
 use elastic_search_schema_builder::build_elastic_schema_with_overrides;
 use interface::Input;
-use url::Url;
 
 fn main() {
     init_tracing();
@@ -17,11 +16,9 @@ fn main() {
     let input: Input = serde_json::from_reader(io::stdin())
         .or_bail("Failed parsing json data streamed in from stdin.");
 
-    let uri = Url::parse(&input.schema_uri).or_bail("Failed parsing schema_uri.");
-
     let schema_json = decode(input.schema_json_base64).or_bail("Failed to decode schema_json");
 
-    let result = build_elastic_schema_with_overrides(&uri, &schema_json, &input.overrides)
+    let result = build_elastic_schema_with_overrides(&schema_json, &input.overrides)
         .or_bail("Failed generating elastic search schema based on input.");
 
     serde_json::to_writer(io::stdout(), &result.render())

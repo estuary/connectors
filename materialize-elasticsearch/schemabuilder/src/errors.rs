@@ -17,6 +17,10 @@ pub const POINTER_WRONG_FIELD_TYPE: &str =
 pub enum Error<'a> {
     #[error("bad schema json")]
     SchemaJsonParsing(#[from] serde_json::Error),
+    #[error("failed parsing schema_json.$id as a url.")]
+    UrlParsing(#[from] url::ParseError),
+    #[error("a valid $id field in the input json schema is missing.")]
+    MissingOrInvalidIdField(),
     #[error("unsupported Flow schema in elastic search, details: {message}, shape: {shape:?}")]
     UnSupportedError {
         message: &'static str,
