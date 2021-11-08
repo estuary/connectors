@@ -3,10 +3,12 @@
 # This script executes an end-to-end integration test of a flow catalog with a given connector.
 # The connector name is read from the CONNECTOR env variable, and the image tag is read from
 # VERSION. Both of those are required.
-# The tests will execute a connector-specific setup script, then run `flowctl develop --poll` with a
+# The tests will execute a connector-specific setup script, then run a flow data plane with a
 # generated catalog that uses the connector to capture some data.
 
-set -e
+# -e causes the script to exit on encountering an error
+# -m turns on job management, required for our use of `fg` below.
+set -em
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
@@ -19,55 +21,65 @@ function bail() {
 test -n "$CONNECTOR" || bail "must specify CONNECTOR env variable"
 test -n "$VERSION" || bail "must specify VERSION env variable"
 
-# Always use the latest development image to verify the mutual integration
-# of connectors and the Flow runtime. Pull to bust a cached version.
-#
-# TODO(johnny): Recent Flow changes have temporarily broken integration tests.
-# I'm pinning to a known-good older Flow build until we get an updated workflow in place.
-# FLOW_IMAGE="ghcr.io/estuary/flow:dev"
-FLOW_IMAGE="ghcr.io/estuary/flow:v0.1.0-481-gfb034de"
-docker pull ${FLOW_IMAGE}
-
-# the connector image needs to be available to envsubst
+# Connector image to use. Export to make it available to `envsubst`
 export CONNECTOR_IMAGE="ghcr.io/estuary/${CONNECTOR}:${VERSION}"
-
-function pollDevelop() {
-    local catalog="$1"
-    local directory="$2"
-    # Run as root, not the flow user, since the user within the container
-    # needs to access the docker socket.
-    docker run --user 0 --rm \
-        --mount type=bind,source=/tmp,target=/tmp \
-        --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-        --mount type=bind,source=`pwd`,target=/home/flow/project \
-        --network=host \
-        "${FLOW_IMAGE}" \
-        flowctl develop --poll --source "$catalog" --directory "$directory" \
-        || bail "flowctl develop failed"
-    echo -e "\nfinished polling"
-}
-
-export -f pollDevelop
-
-test_dir=".build/tests/${CONNECTOR}"
-catalog="${test_dir}/test.flow.yaml"
-sqlite_path="${test_dir}/materialization.db"
-actual="${test_dir}/actual_test_results.txt"
-
-# Ensure we start with an empty dir, since the flowctl_develop directory will go here.
-# Unfortunately, we can't just delete it, since the flowctl container is running as root, and so
-# all the files it creates will be owned by root. This isn't an issue in CI, since this directory
-# won't exist as long as we do a clean checkout, but for local runs, I'd rather error out than to
-# run 'sudo rm'.
-if [[ -d "${test_dir}" ]]; then
-    bail "The test directory must not already exist prior to a test run. Consider deleting $test_dir if running manually"
-fi
-mkdir -p "$test_dir"
-
 echo "testing connector: '$CONNECTOR'"
-# First step is to get the spec from the connector and ensure it's valid json
-docker run --rm "$CONNECTOR_IMAGE" spec | jq -cM || bail "failed to validate spec"
 
+# Directory under which the test runs.
+TESTDIR=".build/tests/${CONNECTOR}"
+# Post-templating catalog source processed by the test.
+CATALOG_SOURCE="${TESTDIR}/test.flow.yaml"
+# SQLite database into which the test is expected to materialize.
+OUTPUT_DB="${TESTDIR}/materialization.db"
+# Actual materialization output scraped from ${OUTPUT_DB}.
+ACTUAL="${TESTDIR}/actual_test_results.txt"
+
+# Ensure we start with an empty dir, since temporary data plane files will go here.
+# For now we explicitly require that the user remove it.
+if [[ -d "${TESTDIR}" ]]; then
+    bail "The test directory must not already exist prior to a test run. Consider deleting $TESTDIR if running manually"
+fi
+mkdir -p "${TESTDIR}"
+
+# Map to an absolute directory.
+export TESTDIR=$(realpath ${TESTDIR})
+# `flowctl` commands look for a BUILDS_ROOT environment variable which roots
+# build databases known to the data plane.
+export BUILDS_ROOT="file://${TESTDIR}/"
+# `flowctl` commands which interact with the data plane look for *_ADDRESS
+# variables, which are created by the temp-data-plane we're about to start.
+export BROKER_ADDRESS=unix://localhost${TESTDIR}/gazette.sock
+export CONSUMER_ADDRESS=unix://localhost${TESTDIR}/consumer.sock
+
+# Always use the latest development image to verify the mutual integration
+# of connectors and the Flow runtime. Pull to bust a cached version,
+# and copy out binaries we'll need for this test.
+FLOW_IMAGE="ghcr.io/estuary/flow:dev"
+docker pull ${FLOW_IMAGE}
+FLOW_CONTAINER=$(docker create $FLOW_IMAGE)
+docker cp ${FLOW_CONTAINER}:/usr/local/bin/flowctl ${TESTDIR}/flowctl
+docker cp ${FLOW_CONTAINER}:/usr/local/bin/etcd ${TESTDIR}/etcd
+docker cp ${FLOW_CONTAINER}:/usr/local/bin/gazette ${TESTDIR}/gazette
+docker rm ${FLOW_CONTAINER}
+
+# Start an empty local data plane within our TESTDIR as a background job.
+# --poll so that connectors are polled rather than continuously tailed.
+# --sigterm to verify we cleanly tear down the test catalog (otherwise it hangs).
+# --tempdir to use our known TESTDIR rather than creating a new temporary directory.
+# --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
+${TESTDIR}/flowctl temp-data-plane \
+    --log.level info \
+    --poll \
+    --sigterm \
+    --tempdir ${TESTDIR} \
+    --unix-sockets \
+    &
+DATA_PLANE_PID=$!
+
+# Get the spec from the connector and ensure it's valid json.
+docker run --rm "${CONNECTOR_IMAGE}" spec | jq -cM || bail "failed to validate spec"
+
+# Execute test-specific setup steps.
 echo -e "\nexecuting setup"
 source "tests/${CONNECTOR}/setup.sh" || bail "${CONNECTOR}/setup.sh failed"
 if [[ -z "$RESOURCE" ]]; then
@@ -78,24 +90,24 @@ if [[ -z "$CONNECTOR_CONFIG" ]]; then
 fi
 trap ./tests/${CONNECTOR}/cleanup.sh EXIT
 
-cat tests/template.flow.yaml | envsubst > "$catalog"
-pollDevelop "$catalog" "$test_dir"
+# Generate the test-specific catalog source.
+cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
 
-sqlite3 -header "$sqlite_path" "select id, canary from test_results;" > "$actual"
-# diff will exit 1 if files are different
-diff --suppress-common-lines --side-by-side "$actual" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"
+# Build the catalog.
+${TESTDIR}/flowctl api build --directory ${TESTDIR} --build-id test-build-id --source ${CATALOG_SOURCE} --ts-package || bail "Build failed."
+# Activate the catalog.
+${TESTDIR}/flowctl api activate --build-id test-build-id --all --log.level info || bail "Activate failed."
+# Wait for a data-flow pass to finish.
+${TESTDIR}/flowctl api await --build-id test-build-id --log.level info || bail "Await failed."
+# Read out materialization results.
+sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
+# Clean up the activated catalog.
+${TESTDIR}/flowctl api delete --build-id test-build-id --all --log.level info || bail "Delete failed."
+# Signal the data plane, and wait for it to exit.
+kill -s SIGTERM ${DATA_PLANE_PID}
+fg %1
 
-# This second run is commented out because there's a flowctl bug that causes fragments to not be
-# persisted on shutdown. This should be re-enabled once that's fixed.
-# delete all the data in the test_results table so that we can assert that the connector doesn't add
-# any more on a subsequent invocation.
-#sqlite3 "$sqlite_path" "delete from test_results;"
-
-#pollDevelop "$catalog" "$test_dir"
-
-#num_rows="$(sqlite3 "$sqlite_path" 'select count(*) from test_results;')"
-#if [[ "$num_rows" != "0" ]]; then
-#    bail expected test_results to be empty on subsequent run, but got $num_rows rows
-#fi
+# Verify actual vs expected results. `diff` will exit 1 if files are different
+diff --suppress-common-lines --side-by-side "${ACTUAL}" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"
 
 echo "Test Passed"

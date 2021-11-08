@@ -1,19 +1,26 @@
 package main
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/estuary/connectors/testsupport"
+	"github.com/estuary/protocols/catalog"
+	pf "github.com/estuary/protocols/flow"
 	sqlDriver "github.com/estuary/protocols/materialize/sql"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSQLGeneration(t *testing.T) {
-	var built = testsupport.BuildCatalog(t, "flow.yaml")
-	require.Empty(t, built.Errors)
+	var spec *pf.MaterializationSpec
+	require.NoError(t, testsupport.CatalogExtract(t, "testdata/flow.yaml",
+		func(db *sql.DB) error {
+			var err error
+			spec, err = catalog.LoadMaterialization(db, "test/sqlite")
+			return err
+		}))
 
 	var gen = sqlDriver.PostgresSQLGenerator()
-	var spec = &built.Materializations[0]
 	var table = sqlDriver.TableForMaterialization("test_table", "", gen.IdentifierRenderer, spec.Bindings[0])
 
 	keyCreate, keyInsert, keyJoin, err := buildSQL(&gen, 123, table, spec.Bindings[0].FieldSelection)
