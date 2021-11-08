@@ -14,7 +14,7 @@ pub const POINTER_WRONG_FIELD_TYPE: &str =
     "non-leaf field on json path is a basic type (int, bool..)";
 
 #[derive(thiserror::Error, Debug)]
-pub enum Error<'a> {
+pub enum Error {
     #[error("bad schema json")]
     SchemaJsonParsing(#[from] serde_json::Error),
     #[error("failed parsing schema_json.$id as a url.")]
@@ -29,6 +29,6 @@ pub enum Error<'a> {
     #[error("unable to override elastic search schema, details: {message}, pointer: {pointer}")]
     OverridePointerError {
         message: &'static str,
-        pointer: &'a str,
+        pointer: String,
     },
 }

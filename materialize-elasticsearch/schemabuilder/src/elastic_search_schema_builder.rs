@@ -10,18 +10,18 @@ use std::collections::HashMap;
 
 pub const DEFAULT_IGNORE_ABOVE: u16 = 256;
 
-pub fn build_elastic_schema<'a, 'b>(schema_json: &'a [u8]) -> Result<ESFieldType, Error<'b>> {
+pub fn build_elastic_schema(schema_json: &[u8]) -> Result<ESFieldType, Error> {
     build_elastic_schema_with_overrides(schema_json, &[])
 }
 
-pub fn build_elastic_schema_with_overrides<'a, 'b>(
-    schema_json: &'a [u8],
-    es_type_overrides: &'b [ESTypeOverride],
-) -> Result<ESFieldType, Error<'b>> {
+pub fn build_elastic_schema_with_overrides(
+    schema_json: &[u8],
+    es_type_overrides: &[ESTypeOverride],
+) -> Result<ESFieldType, Error> {
     let schema: Value = serde_json::from_slice(schema_json)?;
 
     let schema =
-        schema::build::build_schema::<Annotation>(get_schema_uri(schema.clone())?, &schema)
+        schema::build::build_schema::<Annotation>(get_schema_uri(&schema.clone())?, &schema)
             .unwrap();
 
     let mut index = IndexBuilder::new();
@@ -46,7 +46,7 @@ pub fn build_elastic_schema_with_overrides<'a, 'b>(
     Ok(built)
 }
 
-fn get_schema_uri<'a>(schema: Value) -> Result<url::Url, Error<'a>> {
+fn get_schema_uri(schema: &Value) -> Result<url::Url, Error> {
     if let Object(obj) = schema {
         if let Some(schema_uri_value) = obj.get(keywords::ID) {
             if let Some(schema_uri) = schema_uri_value.as_str() {
@@ -57,7 +57,7 @@ fn get_schema_uri<'a>(schema: Value) -> Result<url::Url, Error<'a>> {
     return Err(Error::MissingOrInvalidIdField());
 }
 
-fn build_from_shape<'a, 'b>(shape: &'a Shape) -> Result<ESFieldType, Error<'b>> {
+fn build_from_shape(shape: &Shape) -> Result<ESFieldType, Error> {
     let mut fields = Vec::new();
 
     if shape.type_.overlaps(types::OBJECT) {
@@ -94,7 +94,7 @@ fn build_from_shape<'a, 'b>(shape: &'a Shape) -> Result<ESFieldType, Error<'b>> 
     }
 }
 
-fn build_from_object<'a, 'b>(shape: &'a ObjShape) -> Result<ESFieldType, Error<'b>> {
+fn build_from_object(shape: &ObjShape) -> Result<ESFieldType, Error> {
     if !shape.additional.is_none() {
         return Err(Error::UnSupportedError {
             message: UNSUPPORTED_OBJECT_ADDITIONAL_FIELDS,
@@ -112,7 +112,7 @@ fn build_from_object<'a, 'b>(shape: &'a ObjShape) -> Result<ESFieldType, Error<'
     });
 }
 
-fn build_from_array<'a, 'b>(shape: &ArrayShape) -> Result<ESFieldType, Error<'b>> {
+fn build_from_array(shape: &ArrayShape) -> Result<ESFieldType, Error> {
     if !shape.tuple.is_empty() {
         return Err(Error::UnSupportedError {
             message: UNSUPPORTED_TUPLE,
