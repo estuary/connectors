@@ -35,9 +35,9 @@ OUTPUT_DB="${TESTDIR}/materialization.db"
 ACTUAL="${TESTDIR}/actual_test_results.txt"
 
 # Ensure we start with an empty dir, since temporary data plane files will go here.
-# For now we explicitly require that the user remove it.
+# Remove it, if it exists already.
 if [[ -d "${TESTDIR}" ]]; then
-    bail "The test directory must not already exist prior to a test run. Consider deleting $TESTDIR if running manually"
+    rm -r ${TESTDIR}
 fi
 mkdir -p "${TESTDIR}"
 
@@ -75,6 +75,8 @@ ${TESTDIR}/flowctl temp-data-plane \
     --unix-sockets \
     &
 DATA_PLANE_PID=$!
+# Arrange to stop the data plane on exit.
+trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID}" EXIT
 
 # Get the spec from the connector and ensure it's valid json.
 docker run --rm "${CONNECTOR_IMAGE}" spec | jq -cM || bail "failed to validate spec"
@@ -103,9 +105,6 @@ ${TESTDIR}/flowctl api await --build-id test-build-id --log.level info || bail "
 sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
 # Clean up the activated catalog.
 ${TESTDIR}/flowctl api delete --build-id test-build-id --all --log.level info || bail "Delete failed."
-# Signal the data plane, and wait for it to exit.
-kill -s SIGTERM ${DATA_PLANE_PID}
-fg %1
 
 # Verify actual vs expected results. `diff` will exit 1 if files are different
 diff --suppress-common-lines --side-by-side "${ACTUAL}" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"
