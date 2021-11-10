@@ -6,10 +6,57 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
+
+// TODO(wgd): Define an interface with a `ScanTableChunk(ctx, streamID, keyColumns, resumeKey)` and
+// a `WriteWatermark(ctx, table, slot)` method which serves as the "database backfill" API
+// that we'll have to implement for other databases.
+
+// scanTableChunk fetches a chunk of rows from the specified table, resuming from the provided
+// `resumeKey` if non-nil. This is the entrypoint to the database-specific portion of the
+// backfill process.
+func scanTableChunk(ctx context.Context, conn *pgx.Conn, streamID string, keyColumns []string, resumeKey []byte) ([]*changeEvent, error) {
+	var snapshot, err = snapshotDatabase(ctx, conn)
+	if err != nil {
+		return nil, fmt.Errorf("error creating database snapshot: %w", err)
+	}
+	defer snapshot.Close(ctx)
+
+	events, err := snapshot.Table(streamID, keyColumns).ScanChunk(ctx, resumeKey)
+	if err != nil {
+		return nil, fmt.Errorf("error scanning table: %w", err)
+	}
+
+	return events, nil
+}
+
+// writeWatermark writes a new random UUID into the 'watermarks' table and returns the
+// UUID. This is also an entrypoint to the database-specific portion of the backfill.
+func writeWatermark(ctx context.Context, conn *pgx.Conn, table, slot string) (string, error) {
+	// Generate a watermark UUID
+	var wm = uuid.New().String()
+
+	var query = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", table)
+	rows, err := conn.Query(ctx, query)
+	if err != nil {
+		return "", fmt.Errorf("error creating watermarks table: %w", err)
+	}
+	rows.Close()
+
+	query = fmt.Sprintf(`INSERT INTO %s (slot, watermark) VALUES ($1,$2) ON CONFLICT (slot) DO UPDATE SET watermark = $2;`, table)
+	rows, err = conn.Query(ctx, query, slot, wm)
+	if err != nil {
+		return "", fmt.Errorf("error upserting new watermark for slot %q: %w", slot, err)
+	}
+	rows.Close()
+
+	logrus.WithField("watermark", wm).Info("wrote watermark")
+	return wm, nil
+}
 
 // A databaseSnapshot represents a long-running read transaction which
 // can be used to query the contents of various tables.
@@ -26,7 +73,7 @@ type tableSnapshot struct {
 	DB         *databaseSnapshot
 	SchemaName string
 	TableName  string
-	ScanKey    []string
+	KeyColumns []string
 
 	scanFromQuery string
 }
@@ -67,7 +114,7 @@ func (s *databaseSnapshot) TransactionLSN() pglogrepl.LSN {
 	return s.TxLSN
 }
 
-func (s *databaseSnapshot) Table(tableID string, scanKey []string) *tableSnapshot {
+func (s *databaseSnapshot) Table(tableID string, keyColumns []string) *tableSnapshot {
 	// Split "public.foo" tableID into "public" schema and "foo" table name
 	var parts = strings.SplitN(tableID, ".", 2)
 	var schemaName, tableName = parts[0], parts[1]
@@ -76,7 +123,7 @@ func (s *databaseSnapshot) Table(tableID string, scanKey []string) *tableSnapsho
 		DB:         s,
 		SchemaName: schemaName,
 		TableName:  tableName,
-		ScanKey:    scanKey,
+		KeyColumns: keyColumns,
 	}
 }
 
@@ -97,7 +144,7 @@ func (s *tableSnapshot) buildScanQuery(start bool) string {
 
 	// Construct strings like `(foo, bar, baz)` and `($1, $2, $3)` for use in the query
 	var pkey, args string
-	for idx, colName := range s.ScanKey {
+	for idx, colName := range s.KeyColumns {
 		if idx > 0 {
 			pkey += ", "
 			args += ", "
@@ -124,91 +171,65 @@ func (s *tableSnapshot) buildScanQuery(start bool) string {
 }
 
 // ScanChunk requests a chunk of rows from the table snapshot, transforms each row into
-// an `Insert` change event and gives it to the provided handler. If `prevKey` is nil
-// the very first chunk of the table is scanned, otherwise it must contain the `lastKey`
-// of a previous chunk, and this chunk will begin immediately after that.
-func (s *tableSnapshot) ScanChunk(ctx context.Context, prevKey []byte, handler changeEventHandler) (count int, lastKey []byte, err error) {
+// an `Insert` change event and gives it to the provided handler. If `resumeKey` is nil
+// the very first chunk of the table is scanned, otherwise it must contain the final
+// key from a previous chunk, and this chunk will begin immediately after that.
+func (s *tableSnapshot) ScanChunk(ctx context.Context, resumeKey []byte) ([]*changeEvent, error) {
 	var logFields = logrus.Fields{
-		"namespace": s.SchemaName,
-		"table":     s.TableName,
-		"scanKey":   s.ScanKey,
-		"prevKey":   base64.StdEncoding.EncodeToString(prevKey),
-		"txLSN":     s.TransactionLSN(),
+		"namespace":  s.SchemaName,
+		"table":      s.TableName,
+		"keyColumns": s.KeyColumns,
+		"resumeKey":  base64.StdEncoding.EncodeToString(resumeKey),
+		"txLSN":      s.TransactionLSN(),
 	}
-	if prevKey == nil {
+	if resumeKey == nil {
 		logrus.WithFields(logFields).Info("starting table scan")
 	} else {
 		logrus.WithFields(logFields).Debug("scanning next chunk")
 	}
 
-	var query = s.buildScanQuery(prevKey == nil)
+	var query = s.buildScanQuery(resumeKey == nil)
 	var args []interface{}
-	if prevKey != nil {
-		args, err = unpackTuple(prevKey)
+	if resumeKey != nil {
+		var err error
+		args, err = unpackTuple(resumeKey)
 		if err != nil {
-			return 0, nil, fmt.Errorf("error unpacking encoded tuple: %w", err)
+			return nil, fmt.Errorf("error unpacking encoded tuple: %w", err)
 		}
-		if len(args) != len(s.ScanKey) {
-			return 0, nil, fmt.Errorf("expected %d primary-key values but got %d", len(s.ScanKey), len(args))
+		if len(args) != len(s.KeyColumns) {
+			return nil, fmt.Errorf("expected %d primary-key values but got %d", len(s.KeyColumns), len(args))
 		}
 	}
 
 	logrus.WithField("query", query).WithField("args", args).Debug("executing query")
 	rows, err := s.DB.Transaction.Query(ctx, query, args...)
 	if err != nil {
-		return 0, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
+		return nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
-	return s.dispatchResults(ctx, rows, handler)
+	return s.processResults(ctx, rows)
 }
 
-func (s *tableSnapshot) dispatchResults(ctx context.Context, rows pgx.Rows, handler changeEventHandler) (int, []byte, error) {
+func (s *tableSnapshot) processResults(ctx context.Context, rows pgx.Rows) ([]*changeEvent, error) {
 	var cols = rows.FieldDescriptions()
-
-	// These allocations are reused across rows. This is safe because each row
-	// should replace every value every time.
-	var fields = make(map[string]interface{})
-	var keyFields = make([]interface{}, len(s.ScanKey))
-
-	var lastKey []byte
-	var rowsProcessed int
+	var events []*changeEvent
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
 		var vals, err = rows.Values()
 		if err != nil {
-			return rowsProcessed, nil, fmt.Errorf("unable to get row values: %w", err)
+			return nil, fmt.Errorf("unable to get row values: %w", err)
 		}
+		var fields = make(map[string]interface{})
 		for idx := range cols {
 			fields[string(cols[idx].Name)] = vals[idx]
 		}
 
-		// Encode this row's primary key as a serialized tuple. We could get by with
-		// only encoding the final row key of each chunk, but we encode every row in
-		// order to check a very important invariant -- PostgreSQL row ordering must
-		// exactly match the comparison ordering of the encoded tuples in order for
-		// LSN filtering to work correctly during the transition to replication.
-		for idx, colName := range s.ScanKey {
-			keyFields[idx] = fields[colName]
-		}
-		rowKey, err := packTuple(keyFields)
-		if err != nil {
-			return rowsProcessed, nil, fmt.Errorf("unable to encode row primary key: %w", err)
-		}
-		if lastKey != nil && compareTuples(lastKey, rowKey) >= 0 {
-			return rowsProcessed, nil, fmt.Errorf("primary key ordering failure: prev=%q, next=%q", lastKey, rowKey)
-		}
-		lastKey = rowKey
-
-		if err := handler(&changeEvent{
+		events = append(events, &changeEvent{
 			Type:      "Insert",
-			LSN:       s.TransactionLSN(),
 			Namespace: s.SchemaName,
 			Table:     s.TableName,
 			Fields:    fields,
-		}); err != nil {
-			return rowsProcessed, nil, fmt.Errorf("error handling change event: %w", err)
-		}
-		rowsProcessed++
+		})
 	}
-	return rowsProcessed, lastKey, nil
+	return events, nil
 }

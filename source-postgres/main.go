@@ -19,6 +19,7 @@ type Config struct {
 	ConnectionURI      string  `json:"connectionURI"`
 	SlotName           string  `json:"slot_name"`
 	PublicationName    string  `json:"publication_name"`
+	WatermarksTable    string  `json:"watermarks_table"`
 	PollTimeoutSeconds float64 `json:"poll_timeout_seconds"`
 	MaxLifespanSeconds float64 `json:"max_lifespan_seconds"`
 }
@@ -34,6 +35,9 @@ func (c *Config) Validate() error {
 	}
 	if c.PublicationName == "" {
 		c.PublicationName = "flow_publication"
+	}
+	if c.WatermarksTable == "" {
+		c.WatermarksTable = "public.flow_watermarks"
 	}
 	if c.PollTimeoutSeconds == 0 {
 		c.PollTimeoutSeconds = 10
@@ -68,6 +72,12 @@ const configSchema = `{
 			"title":       "Publication Name",
 			"description": "The name of the PostgreSQL publication to replicate from",
 			"default":     "flow_publication"
+		},
+		"watermarks_table": {
+			"type":        "string",
+			"title":       "Watermarks Table",
+			"description": "The name of the table used for watermark writes during backfills",
+			"default":     "public.flow_watermarks"
 		},
 		"poll_timeout_seconds": {
 			"type":        "number",
