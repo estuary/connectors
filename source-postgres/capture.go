@@ -37,37 +37,39 @@ func (ps *PersistentState) Validate() error {
 	return nil
 }
 
+// pendingStreams returns the IDs of all streams which still need to be backfilled,
+// in sorted order for test stability.
+func (ps *PersistentState) pendingStreams() []string {
+	var pending []string
+	for id, tableState := range ps.Streams {
+		if tableState.Mode == tableModeBackfill {
+			pending = append(pending, id)
+		}
+	}
+	sort.Strings(pending)
+	return pending
+}
+
 // TableState represents the serializable/resumable state of a particular table's capture.
 // It is mostly concerned with the "backfill" scanning process and the transition from that
 // to logical replication.
 type TableState struct {
-	// Mode is either TableModeScanning during the backfill scanning process
-	// or TableModeActive once replication resumes.
+	// Mode is either "Backfill" during the backfill scanning process
+	// or "Active" once the backfill is complete.
 	Mode string `json:"mode"`
-	// ScanKey is the "primary key" used for ordering/chunking the backfill scan.
-	ScanKey []string `json:"scan_key"`
-	// ScanRanges represents the portion of the table which has been scanned, and
-	// at what point in time each chunk was scanned.
-	ScanRanges []TableRange `json:"scan_ranges,omitempty"`
+	// KeyColumns is the "primary key" used for ordering/chunking the backfill scan.
+	KeyColumns []string `json:"key_columns,omitempty"`
+	// Scanned is a FoundationDB-serialized tuple representing the KeyColumns
+	// values of the last row which has been backfilled. Replication events will
+	// only be emitted for rows <= this value while backfilling is in progress.
+	Scanned []byte `json:"scanned,omitempty"`
 }
 
 const (
-	tableModeScanning = "Scanning"
+	tableModeBackfill = "Backfill"
 	tableModeActive   = "Active"
+	tableModeIgnore   = "Ignore"
 )
-
-// TableRange represents a specific chunk of some table's rows, which implicitly begins after the
-// previous TableRange (see TableState) and continues up to EndKey (inclusive).
-type TableRange struct {
-	// ScannedLSN represents the point in time at which this chunk of the table was scanned,
-	// and is used to make the scanning-to-replication transition seamless.
-	ScannedLSN pglogrepl.LSN `json:"lsn"`
-
-	// EndKey contains a FoundationDB-serialized tuple representing the ScanKey column values
-	// of the final row in this Table Range. Each TableRange implicitly begins after the previous
-	// one in the list (see TableState) and continues up through EndKey (inclusive).
-	EndKey []byte `json:"key,omitempty"`
-}
 
 // capture encapsulates the entire process of capturing data from PostgreSQL with a particular
 // configuration/catalog/state and emitting records and state updates to some messageOutput.
@@ -77,9 +79,9 @@ type capture struct {
 	catalog *airbyte.ConfiguredCatalog // The catalog read from `catalog.json`
 	encoder messageOutput              // The encoder to which records and state updates are written
 
-	connScan *pgx.Conn      // The DB connection used for table scanning
-	connRepl *pgconn.PgConn // The DB connection used for replication streaming
-	watchdog *time.Timer    // If non-nil, the Reset() method will be invoked whenever a replication event is received
+	connScan   *pgx.Conn          // The DB connection used for table scanning
+	replStream *replicationStream // The high-level replication stream abstraction
+	watchdog   *time.Timer        // If non-nil, the Reset() method will be invoked whenever a record is emitted
 
 	// We keep a count of change events since the last state checkpoint was
 	// emitted. Currently this is only used to suppress "empty" commit messages
@@ -100,6 +102,8 @@ type messageOutput interface {
 // connections, scanning tables, and then streaming replication events until shutdown conditions
 // (if any) are met.
 func RunCapture(ctx context.Context, config *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, dest messageOutput) error {
+	logrus.WithField("uri", config.ConnectionURI).WithField("slot", config.SlotName).Info("starting capture")
+
 	if config.MaxLifespanSeconds != 0 {
 		var duration = time.Duration(config.MaxLifespanSeconds * float64(time.Second))
 		logrus.WithField("duration", duration).Info("limiting connector lifespan")
@@ -108,12 +112,25 @@ func RunCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 		ctx = limitedCtx
 	}
 
+	// In non-tailing mode (which should only occur during development) we need
+	// to shut down after no further changes have been reported for a while. To
+	// do this we create a cancellable context, and a watchdog timer which will
+	// perform said cancellation if `PollTimeout` elapses between resets.
+	var watchdog *time.Timer
+	if !catalog.Tail && config.PollTimeoutSeconds != 0 {
+		var streamCtx, streamCancel = context.WithCancel(ctx)
+		defer streamCancel()
+		var wdtDuration = time.Duration(config.PollTimeoutSeconds * float64(time.Second))
+		watchdog = time.AfterFunc(wdtDuration, streamCancel)
+		ctx = streamCtx
+	}
+
 	// Normal database connection used for table scanning
 	var connScan, err = pgx.Connect(ctx, config.ConnectionURI)
 	if err != nil {
 		return fmt.Errorf("unable to connect to database for table scan: %w", err)
 	}
-	// TODO(wgd): Close this after merging NewCapture() and Execute()
+	defer connScan.Close(ctx)
 
 	// Replication database connection used for event streaming
 	replConnConfig, err := pgconn.ParseConfig(config.ConnectionURI)
@@ -125,36 +142,28 @@ func RunCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 	if err != nil {
 		return fmt.Errorf("unable to connect to database for replication: %w", err)
 	}
+	replStream, err := startReplication(ctx, connRepl, config.SlotName, config.PublicationName, state.CurrentLSN)
+	if err != nil {
+		return fmt.Errorf("unable to start replication stream: %w", err)
+	}
+	defer replStream.Close(ctx)
 
 	var c = &capture{
-		state:    state,
-		config:   config,
-		catalog:  catalog,
-		encoder:  dest,
-		connScan: connScan,
-		connRepl: connRepl,
+		state:      state,
+		config:     config,
+		catalog:    catalog,
+		encoder:    dest,
+		connScan:   connScan,
+		replStream: replStream,
+		watchdog:   watchdog,
 	}
 
 	if err := c.updateState(ctx); err != nil {
 		return fmt.Errorf("error updating capture state: %w", err)
 	}
-	if err := c.scanTables(ctx); err != nil {
-		return fmt.Errorf("error scanning table contents: %w", err)
-	}
-
-	// In non-tailing mode (which should only occur during development) we need
-	// to shut down after no further changes have been reported for a while. To
-	// do this we create a cancellable context, and a watchdog timer which will
-	// perform said cancellation if `PollTimeout` elapses between resets.
-	if !c.catalog.Tail && c.config.PollTimeoutSeconds != 0 {
-		var streamCtx, streamCancel = context.WithCancel(ctx)
-		defer streamCancel()
-		var wdtDuration = time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
-		c.watchdog = time.AfterFunc(wdtDuration, streamCancel)
-		ctx = streamCtx
-	}
 
 	err = c.streamChanges(ctx)
+	logrus.WithField("err", err).Debug("stopped streaming changes")
 	if errors.Is(err, context.DeadlineExceeded) && c.config.MaxLifespanSeconds != 0 {
 		logrus.WithField("err", err).WithField("maxLifespan", c.config.MaxLifespanSeconds).Info("maximum lifespan reached")
 		return nil
@@ -174,19 +183,6 @@ func (c *capture) updateState(ctx context.Context) error {
 		stateDirty = true
 	}
 
-	// The first time the connector is run, we need to figure out the "Current LSN"
-	// from which we will start replication after all table-scanning work is done.
-	// Since change events which precede the table scan will be filtered out, this
-	// value doesn't need to be exact so long as it precedes the table scan.
-	if c.state.CurrentLSN == 0 {
-		var sysident, err = pglogrepl.IdentifySystem(ctx, c.connRepl)
-		if err != nil {
-			return fmt.Errorf("unable to get current LSN from database: %w", err)
-		}
-		c.state.CurrentLSN = sysident.XLogPos
-		stateDirty = true
-	}
-
 	// Streams may be added to the catalog at various times. We need to
 	// initialize new state entries for these streams, and while we're at
 	// it this is a good time to sanity-check the primary key configuration.
@@ -196,9 +192,6 @@ func (c *capture) updateState(ctx context.Context) error {
 	}
 
 	for _, catalogStream := range c.catalog.Streams {
-		// Table names coming from Postgres are always lowercase, so if we
-		// normalize the stream name to lowercase on the catalog->state
-		// transition then we can ignore the issue later on.
 		var streamID = joinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
 
 		// In the catalog a primary key is an array of arrays of strings, but in the
@@ -236,13 +229,13 @@ func (c *capture) updateState(ctx context.Context) error {
 		// See if the stream is already initialized. If it's not, then create it.
 		var streamState, ok = c.state.Streams[streamID]
 		if !ok {
-			c.state.Streams[streamID] = &TableState{Mode: tableModeScanning, ScanKey: primaryKey}
+			c.state.Streams[streamID] = &TableState{Mode: tableModeBackfill, KeyColumns: primaryKey}
 			stateDirty = true
 			continue
 		}
 
-		if strings.Join(streamState.ScanKey, ",") != strings.Join(primaryKey, ",") {
-			return fmt.Errorf("stream %q: primary key %q doesn't match initialized scan key %q", streamID, primaryKey, streamState.ScanKey)
+		if strings.Join(streamState.KeyColumns, ",") != strings.Join(primaryKey, ",") {
+			return fmt.Errorf("stream %q: primary key %q doesn't match initialized scan key %q", streamID, primaryKey, streamState.KeyColumns)
 		}
 	}
 
@@ -273,254 +266,163 @@ func (c *capture) updateState(ctx context.Context) error {
 	return nil
 }
 
-// joinStreamID combines a namespace and a stream name into a fully-qualified
-// stream (or table) identifier. Because it's possible for the namespace to be
-// unspecified, we default to "public" in that situation.
-func joinStreamID(namespace, stream string) string {
-	if namespace == "" {
-		namespace = defaultSchemaName
-	}
-	return strings.ToLower(namespace + "." + stream)
-}
-
-// scanTables uses SELECT queries to emit the initial contents of a table as
-// INSERT events prior to replication streaming.
-//
-// Whenever a table is added to the catalog (including on first launch) we
-// have to backfill the preexisting contents before resuming replication. This
-// is done by issuing SELECT queries to read all of the data, and emitting each
-// result row as an "Insert" event.
-//
-// Because database tables can grow pretty huge, this scanning is performed in
-// chunks, with state checkpoints emitted periodically. The connector may be
-// killed and restarted at one of these intermediate states, and needs to be
-// able to pick back up where it left off.
-func (c *capture) scanTables(ctx context.Context) error {
-	// Skip unnecessary setup work if there's no scan work pending anyway.
-	var pendingStreamIDs = c.pendingScans()
-	if len(pendingStreamIDs) == 0 {
-		return nil
-	}
-
-	// Take a snapshot of the database contents
-	var snapshot, err = snapshotDatabase(ctx, c.connScan)
-	if err != nil {
-		return fmt.Errorf("error creating database snapshot: %w", err)
-	}
-	if snapshot.TransactionLSN() < c.state.CurrentLSN {
-		return fmt.Errorf("table snapshot (LSN=%q) is older than the current replication LSN (%q)", snapshot.TransactionLSN(), c.state.CurrentLSN)
-	}
-	defer snapshot.Close(ctx)
-
-	// Scan each pending table within this snapshot
-	logrus.WithField("tables", c.pendingScans()).WithField("scanLSN", snapshot.TransactionLSN()).Info("scanning tables")
-	for _, pendingStreamID := range pendingStreamIDs {
-		if err := c.scanTable(ctx, snapshot, pendingStreamID); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// pendingScans returns a list of all tables which still need scanning,
-// in sorted order. The sorting is important for test stability, because
-// when there are multiple tables in the "Scanning" state we need to
-// process them in a consistent order.
-func (c *capture) pendingScans() []string {
-	var pending []string
-	for id, tableState := range c.state.Streams {
-		if tableState.Mode == tableModeScanning {
-			pending = append(pending, id)
-		}
-	}
-	sort.Strings(pending)
-	return pending
-}
-
-// scanTable scans a particular table to completion, emitting intermediate
-// state updates along the way. If the connector is resumed from a partial
-// state, scanning resumes from where it left off.
-func (c *capture) scanTable(ctx context.Context, snapshot *databaseSnapshot, streamID string) error {
-	var tableState = c.state.Streams[streamID]
-	if tableState.Mode != tableModeScanning {
-		return fmt.Errorf("stream %q in state %q (expected %q)", streamID, tableState.Mode, tableModeScanning)
-	}
-
-	var table = snapshot.Table(streamID, tableState.ScanKey)
-
-	// The table scanning process is implemented as a loop which keeps doing
-	// the next chunk of work until it's all done. This way we don't have to
-	// worry too much about how resuming works across connector restarts,
-	// because each iteration of this loop is basically independent except
-	// for the stream state it reads and modifies.
-	for tableState.Mode == tableModeScanning {
-		// Each chunk we scan from the table extends some scan range. When there are
-		// no ranges we create an empty placeholder. If the last range has a different
-		// `ScannedLSN` from the current snapshot then there's been a restart and we
-		// need to open a new range to use.
-		var lastRange *TableRange
-		if len(tableState.ScanRanges) == 0 {
-			tableState.ScanRanges = append(tableState.ScanRanges, TableRange{
-				ScannedLSN: snapshot.TransactionLSN(),
-			})
-		}
-		lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
-		if lastRange.ScannedLSN != snapshot.TransactionLSN() {
-			tableState.ScanRanges = append(tableState.ScanRanges, TableRange{
-				EndKey:     lastRange.EndKey,
-				ScannedLSN: snapshot.TransactionLSN(),
-			})
-			lastRange = &tableState.ScanRanges[len(tableState.ScanRanges)-1]
-		}
-
-		// Fetch the next chunk from the table after the end key of the previous one,
-		// and extend the range as appropriate.
-		var count, endKey, err = table.ScanChunk(ctx, lastRange.EndKey, c.handleChangeEvent)
-		if err != nil {
-			return fmt.Errorf("error processing snapshot events: %w", err)
-		}
-		if count == 0 {
-			tableState.Mode = tableModeActive
-		} else {
-			lastRange.EndKey = endKey
-		}
-		if err := c.emitState(c.state); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// This is the "payoff" of all the setup work we did in `UpdateState` and `ScanTables`,
-// in that once we reach this state we'll sit here indefinitely, awaiting change events
-// from PostgreSQL via logical replication and relaying these changes downstream ASAP.
-//
-// Each time we receive a replication event from PostgreSQL it will be decoded and then
-// passed off to `c.HandleReplicationEvent` for further processing.
+// This is the main loop of the capture process, which interleaves replication event
+// streaming with backfill scan results as necessary.
 func (c *capture) streamChanges(ctx context.Context) error {
-	// TODO(wgd): Perhaps merge startReplication and process() call?
-	var stream, err = startReplication(ctx, c.connRepl, c.config.SlotName, c.config.PublicationName, c.state.CurrentLSN)
-	if err != nil {
-		return fmt.Errorf("unable to start replication stream: %w", err)
-	}
-	defer stream.Close(ctx)
-	if err := stream.process(ctx, c.handleReplicationEvent); err != nil {
-		return fmt.Errorf("error processing replication events: %w", err)
-	}
-	logrus.Warnf("replication streaming terminated without error")
-	return nil
-}
-
-func (c *capture) handleReplicationEvent(evt *changeEvent) error {
-	// When in non-tailing mode, reset the shutdown watchdog whenever an event happens.
-	if c.watchdog != nil {
-		var wdtDuration = time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
-		c.watchdog.Reset(wdtDuration)
-	}
-
-	// TODO(wgd): There will be a "Commit" event after every transaction, so if the DB
-	// receives a bunch of single-row INSERTs we'll emit one state update per row added.
-	// Is this too much?
-	//
-	// TODO(wgd): At some point during replication event processing we should be far
-	// enough past the initial table scan that ideally we want to delete all the scan
-	// ranges and drop into the fast-path of not doing any range comparison. Is there
-	// ever a point where we can definitively say "Yes, we're fully caught up now"?
-	if evt.Type == "Commit" {
-		logrus.WithFields(logrus.Fields{"lsn": evt.LSN, "xid": evt.XID}).Debug("replication commit event")
-		if c.changesSinceLastCheckpoint > 0 {
-			c.state.CurrentLSN = evt.LSN
-			return c.emitState(c.state)
-		}
-		return nil
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"type":      evt.Type,
-		"xid":       evt.XID,
-		"lsn":       evt.LSN,
-		"namespace": evt.Namespace,
-		"table":     evt.Table,
-		"values":    evt.Fields,
-	}).Debug("replication change event")
-
-	var streamID = joinStreamID(evt.Namespace, evt.Table)
-	var tableState = c.state.Streams[streamID]
-	if tableState == nil {
-		// If we're not tracking state by now, this table isn't in the catalog. Ignore it.
-		return nil
-	}
-	if tableState.Mode != tableModeActive {
-		return fmt.Errorf("invalid state %#v for table %q", tableState, evt.Table)
-	}
-
-	// Decide whether this event should be filtered out based on its LSN.
-	var filter, err = c.filteredLSN(tableState, evt.Fields, evt.LSN)
-	if err != nil {
-		return fmt.Errorf("error in filter check: %w", err)
-	}
-	if filter {
-		logrus.WithFields(logrus.Fields{
-			"type":      evt.Type,
-			"xid":       evt.XID,
-			"lsn":       evt.LSN,
-			"namespace": evt.Namespace,
-			"table":     evt.Table,
-			"values":    evt.Fields,
-		}).Debug("filtered change")
-		return nil
-	}
-	return c.handleChangeEvent(evt)
-}
-
-func (c *capture) filteredLSN(tableState *TableState, fields map[string]interface{}, lsn pglogrepl.LSN) (bool, error) {
-	// If the table is "Active" but has no scan ranges then we won't filter any
-	// events. Ideally, once we've gone well past the timeframe of the initial
-	// table scan, we can discard all the scan range LSN tracking information
-	// and fall into this fast-path.
-	if len(tableState.ScanRanges) == 0 {
-		return false, nil
-	}
-
-	// If there's only one scan range we can skip the entire encoding and
-	// key comparison process and just use its `ScannedLSN` for all rows.
-	if len(tableState.ScanRanges) > 1 {
-		// Otherwise we have to actually implement generic primary key comparison
-		var keyElems []interface{}
-		for _, keyName := range tableState.ScanKey {
-			keyElems = append(keyElems, fields[keyName])
-		}
-		var keyBytes, err = packTuple(keyElems)
+	if c.state.pendingStreams() != nil {
+		var results *resultSet
+		var watermark, err = writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
 		if err != nil {
-			return false, fmt.Errorf("error encoding primary key for comparison: %w", err)
+			return fmt.Errorf("error writing dummy watermark: %w", err)
 		}
-		for _, scanRange := range tableState.ScanRanges {
-			if compareTuples(keyBytes, scanRange.EndKey) < 0 {
-				var isFiltered = lsn < scanRange.ScannedLSN
-				return isFiltered, nil
+		for c.state.pendingStreams() != nil {
+			if err := c.streamToWatermark(watermark, results); err != nil {
+				return fmt.Errorf("error streaming until watermark: %w", err)
+			} else if err := c.emitBuffered(results); err != nil {
+				return fmt.Errorf("error emitting buffered results: %w", err)
+			}
+			results, err = c.backfillStreams(ctx, c.state.pendingStreams())
+			if err != nil {
+				return fmt.Errorf("error performing backfill: %w", err)
+			}
+			watermark, err = writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
+			if err != nil {
+				return fmt.Errorf("error writing next watermark: %w", err)
 			}
 		}
 	}
 
-	// If the key did not fall into any known scan range during the previous
-	// bit of code then conceptually it falls into the last range.
-	var scannedLSN = tableState.ScanRanges[len(tableState.ScanRanges)-1].ScannedLSN
-	var isFiltered = lsn < scannedLSN
-	return isFiltered, nil
+	// Once there is no more backfilling to do, just stream changes forever and emit
+	// state updates on every transaction commit.
+	logrus.Info("all streams active")
+	return c.streamToWatermark("nonexistent-watermark", nil)
 }
 
-func (c *capture) handleChangeEvent(evt *changeEvent) error {
-	evt.Fields["_change_type"] = evt.Type
+func (c *capture) streamToWatermark(watermark string, results *resultSet) error {
+	var watermarkReached = false
+	for event := range c.replStream.Events() {
+		// Commit events update the current LSN and trigger a state update. If this is
+		// the commit after the target watermark, it ends the loop and then emitBuffered
+		// will emit the state update after all buffered rows.
+		if event.Type == "Commit" {
+			c.state.CurrentLSN = event.LSN
+			if watermarkReached {
+				return nil
+			}
+			if c.changesSinceLastCheckpoint > 0 {
+				if err := c.emitState(c.state); err != nil {
+					return fmt.Errorf("error emitting state update: %w", err)
+				}
+			}
+			continue
+		}
 
-	for id, val := range evt.Fields {
+		// Note when the expected watermark is finally observed. The subsequent Commit will exit the loop.
+		// TODO(wgd): Can we ensure/require that 'WatermarksTable' is always fully-qualified?
+		var streamID = joinStreamID(event.Namespace, event.Table)
+		if streamID == c.config.WatermarksTable {
+			logrus.WithFields(logrus.Fields{"expected": watermark, "written": event.Fields["watermark"]}).Debug("watermark write")
+			if event.Fields["watermark"] == watermark {
+				watermarkReached = true
+			}
+		}
+
+		// Handle the easy cases: Events on ignored or fully-active tables.
+		var tableState = c.state.Streams[streamID]
+		if tableState == nil || tableState.Mode == tableModeIgnore {
+			logrus.WithFields(logrus.Fields{"stream": streamID, "type": event.Type}).Debug("ignoring stream")
+			continue
+		}
+		if tableState.Mode == tableModeActive {
+			if err := c.handleChangeEvent(event); err != nil {
+				return fmt.Errorf("error handling replication event: %w", err)
+			}
+			continue
+		}
+		if tableState.Mode != tableModeBackfill {
+			return fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
+		}
+
+		// While a table is being backfilled, events occurring *before* the current scan point
+		// will be emitted, while events *after* that point will be patched (or ignored) into
+		// the buffered resultSet.
+		var rowKey, err = encodeRowKey(tableState.KeyColumns, event.Fields)
+		if err != nil {
+			return fmt.Errorf("error encoding row key: %w", err)
+		}
+		if compareTuples(rowKey, tableState.Scanned) <= 0 {
+			if err := c.handleChangeEvent(event); err != nil {
+				return fmt.Errorf("error handling replication event: %w", err)
+			}
+		} else if err := results.Patch(streamID, event); err != nil {
+			return fmt.Errorf("error patching resultset: %w", err)
+		}
+	}
+	return nil
+}
+
+func (c *capture) emitBuffered(results *resultSet) error {
+	// Emit any buffered results and update table states accordingly.
+	for _, streamID := range results.Streams() {
+		var events = results.Changes(streamID)
+		for _, event := range events {
+			if err := c.handleChangeEvent(event); err != nil {
+				return fmt.Errorf("error handling backfill change: %w", err)
+			}
+		}
+
+		if results.Complete(streamID) {
+			c.state.Streams[streamID].Mode = tableModeActive
+			c.state.Streams[streamID].Scanned = nil
+		} else {
+			c.state.Streams[streamID].Scanned = results.Scanned(streamID)
+		}
+	}
+
+	// Emit a new state update. The global `CurrentLSN` has been advanced by the
+	// watermark commit event, and the individual stream `Scanned` tracking for
+	// each stream has been advanced just above.
+	return c.emitState(c.state)
+}
+
+func (c *capture) backfillStreams(ctx context.Context, streams []string) (*resultSet, error) {
+	var results = newResultSet()
+
+	// TODO(wgd): Add a sanity-check assertion that the current watermark value
+	// in the database matches the one we previously wrote? Maybe that's more effort
+	// than it's worth until we have other evidence of correctness violations though.
+
+	// TODO(wgd): We can dispatch these table reads concurrently with a WaitGroup
+	// for synchronization.
+	for _, streamID := range streams {
+		var streamState = c.state.Streams[streamID]
+
+		// Fetch a chunk of entries from the specified stream
+		var events, err = scanTableChunk(ctx, c.connScan, streamID, streamState.KeyColumns, streamState.Scanned)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning table: %w", err)
+		}
+
+		// Translate the resulting list of entries into a backfillChunk
+		if err := results.Buffer(streamID, streamState.KeyColumns, events); err != nil {
+			return nil, fmt.Errorf("error buffering scan results: %w", err)
+		}
+	}
+	return results, nil
+}
+
+func (c *capture) handleChangeEvent(event *changeEvent) error {
+	event.Fields["_change_type"] = event.Type
+
+	for id, val := range event.Fields {
 		var translated, err = translateRecordField(val)
 		if err != nil {
 			logrus.WithField("val", val).Error("value translation error")
-			return fmt.Errorf("error translating field value: %w", err)
+			return fmt.Errorf("error translating field %q value: %w", id, err)
 		}
-		evt.Fields[id] = translated
+		event.Fields[id] = translated
 	}
-	return c.emitRecord(evt.Namespace, evt.Table, evt.Fields)
+	return c.emitRecord(event.Namespace, event.Table, event.Fields)
 }
 
 // TranslateRecordField "translates" a value from the PostgreSQL driver into
@@ -560,7 +462,7 @@ func (c *capture) emitRecord(ns, stream string, data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error encoding record data: %w", err)
 	}
-	return c.encoder.Encode(airbyte.Message{
+	return c.emit(airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
 		Record: &airbyte.Record{
 			Namespace: ns,
@@ -577,8 +479,28 @@ func (c *capture) emitState(state interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error encoding state message: %w", err)
 	}
-	return c.encoder.Encode(airbyte.Message{
+	return c.emit(airbyte.Message{
 		Type:  airbyte.MessageTypeState,
 		State: &airbyte.State{Data: json.RawMessage(rawState)},
 	})
+}
+
+func (c *capture) emit(msg interface{}) error {
+	// When in non-tailing mode, reset the shutdown watchdog whenever we emit useful progress.
+	if c.watchdog != nil {
+		var wdtDuration = time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
+		c.watchdog.Reset(wdtDuration)
+	}
+
+	return c.encoder.Encode(msg)
+}
+
+// joinStreamID combines a namespace and a stream name into a fully-qualified
+// stream (or table) identifier. Because it's possible for the namespace to be
+// unspecified, we default to "public" in that situation.
+func joinStreamID(namespace, stream string) string {
+	if namespace == "" {
+		namespace = defaultSchemaName
+	}
+	return strings.ToLower(namespace + "." + stream)
 }

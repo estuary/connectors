@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -49,6 +48,7 @@ func TestMain(m *testing.M) {
 
 	// Tweak some parameters to make things easier to test on a smaller scale
 	snapshotChunkSize = 16
+	replicationBufferSize = 0
 
 	// Open a connection to the database which will be used for creating and
 	// tearing down the replication slot.
@@ -71,11 +71,13 @@ func TestMain(m *testing.M) {
 	TestDefaultConfig.SlotName = *TestReplicationSlot
 	TestDefaultConfig.PublicationName = *TestPublicationName
 	TestDefaultConfig.PollTimeoutSeconds = *TestPollTimeoutSeconds
+	if err := TestDefaultConfig.Validate(); err != nil {
+		logrus.WithField("err", err).WithField("config", TestDefaultConfig).Fatal("error validating test config")
+	}
 
 	conn, err := pgx.Connect(ctx, *TestConnectionURI)
 	if err != nil {
-		log.Fatalf("error connecting to database: %v", err)
-		os.Exit(1)
+		logrus.WithField("err", err).Fatal("error connecting to database")
 	}
 	defer conn.Close(ctx)
 	TestDatabase = conn
@@ -307,6 +309,9 @@ func (buf *CaptureOutputBuffer) Encode(v interface{}) error {
 	if msg.Type == airbyte.MessageTypeRecord {
 		return buf.bufferRecord(msg)
 	}
+	if msg.Type == airbyte.MessageTypeLog {
+		return nil // Ignore log messages when validating test output
+	}
 	return fmt.Errorf("unhandled message type: %#v", msg.Type)
 }
 
@@ -321,19 +326,8 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	}
 	buf.States = append(buf.States, state)
 
-	// Create a copy of the state with all LSNs set to '1234'
-	var cleanState = PersistentState{CurrentLSN: 1234, Streams: make(map[string]*TableState)}
-	for id, stream := range state.Streams {
-		var cleanRanges []TableRange
-		for _, scanRange := range stream.ScanRanges {
-			cleanRanges = append(cleanRanges, TableRange{ScannedLSN: 1234, EndKey: scanRange.EndKey})
-		}
-		cleanState.Streams[id] = &TableState{
-			Mode:       stream.Mode,
-			ScanKey:    stream.ScanKey,
-			ScanRanges: cleanRanges,
-		}
-	}
+	// Sanitize state by rewriting the LSN to a constant
+	var cleanState = PersistentState{CurrentLSN: 1234, Streams: state.Streams}
 
 	// Encode and buffer
 	var bs, err = json.Marshal(cleanState)
@@ -363,7 +357,6 @@ func (buf *CaptureOutputBuffer) bufferMessage(msg airbyte.Message) error {
 	if err != nil {
 		return fmt.Errorf("error encoding sanitized message: %w", err)
 	}
-	logrus.WithField("data", string(bs)).Debug("buffered message")
 	buf.Snapshot.Write(bs)
 	buf.Snapshot.WriteByte('\n')
 	return nil
