@@ -1,3 +1,4 @@
+use serde_json::Value;
 use std::fmt;
 
 pub const UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES: &str =
@@ -26,9 +27,10 @@ pub enum Error {
         message: &'static str,
         shape: Box<dyn fmt::Debug>,
     },
-    #[error("unable to override elastic search schema, details: {message}, pointer: {pointer}")]
+    #[error("unable to override elastic search schema, details: {message}, overriding_schema: {overriding_schema}, pointer: {pointer}")]
     OverridePointerError {
         message: &'static str,
+        overriding_schema: Value,
         pointer: String,
     },
 }

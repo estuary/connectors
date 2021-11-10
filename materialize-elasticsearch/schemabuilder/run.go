@@ -57,7 +57,7 @@ func (e *ElasticFieldType) toMap() map[string]interface{} {
 type FieldOverride struct {
 	// A '/'-delimitated json pointer to the location of the overridden field.
 	Pointer string `json:"pointer"`
-	// The overriding type.
+	// The overriding elastic search data type of the field.
 	EsType ElasticFieldType `json:"es_type"`
 }
 

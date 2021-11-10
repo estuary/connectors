@@ -96,6 +96,7 @@ impl ESFieldType {
         if pointer.is_empty() {
             return Err(Error::OverridePointerError {
                 message: POINTER_EMPTY,
+                overriding_schema: self.render(),
                 pointer: pointer.clone(),
             });
         }
@@ -113,6 +114,7 @@ impl ESFieldType {
                     if !properties.contains_key(&prop) {
                         return Err(Error::OverridePointerError {
                             message: POINTER_MISSING_FIELD,
+                            overriding_schema: self.render(),
                             pointer: pointer.clone(),
                         });
                     } else if prop_itr.peek() == None {
@@ -125,6 +127,7 @@ impl ESFieldType {
                 _ => {
                     return Err(Error::OverridePointerError {
                         message: POINTER_WRONG_FIELD_TYPE,
+                        overriding_schema: self.render(),
                         pointer: pointer.clone(),
                     })
                 }

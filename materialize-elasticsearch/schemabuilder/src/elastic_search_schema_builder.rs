@@ -157,6 +157,7 @@ mod tests {
         assert!(matches!(actual_error, Error::OverridePointerError { .. }));
         if let Error::OverridePointerError {
             message,
+            overriding_schema: _,
             pointer: _,
         } = actual_error
         {
