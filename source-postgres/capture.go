@@ -295,36 +295,24 @@ func (c *capture) streamChanges(ctx context.Context) error {
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
 	logrus.Info("all streams active")
-	for event := range c.replStream.Events() {
-		if event.Type == "Commit" {
-			if c.changesSinceLastCheckpoint > 0 {
-				c.state.CurrentLSN = event.LSN
-				if err := c.emitState(c.state); err != nil {
-					return fmt.Errorf("error emitting state update: %w", err)
-				}
-			}
-			continue
-		}
-
-		var tableState = c.state.Streams[joinStreamID(event.Namespace, event.Table)]
-		if tableState != nil && tableState.Mode == tableModeActive {
-			if err := c.handleChangeEvent(event); err != nil {
-				return fmt.Errorf("error handling replication event: %w", err)
-			}
-		}
-	}
-	return nil
+	return c.streamToWatermark("nonexistent-watermark", nil)
 }
 
 func (c *capture) streamToWatermark(watermark string, results *resultSet) error {
 	var watermarkReached = false
 	for event := range c.replStream.Events() {
-		// Commit events update the current LSN and are otherwise ignored, except for the
-		// next Commit after the target watermark, which ends the loop.
+		// Commit events update the current LSN and trigger a state update. If this is
+		// the commit after the target watermark, it ends the loop and then emitBuffered
+		// will emit the state update after all buffered rows.
 		if event.Type == "Commit" {
 			c.state.CurrentLSN = event.LSN
 			if watermarkReached {
 				return nil
+			}
+			if c.changesSinceLastCheckpoint > 0 {
+				if err := c.emitState(c.state); err != nil {
+					return fmt.Errorf("error emitting state update: %w", err)
+				}
 			}
 			continue
 		}
