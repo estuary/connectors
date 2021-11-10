@@ -3,7 +3,7 @@ use super::errors::*;
 
 use doc::inference::{ArrayShape, ObjShape, Shape};
 use doc::Annotation;
-use flow_json::schema::{self, index::IndexBuilder, keywords, types};
+use json::schema::{self, index::IndexBuilder, keywords, types};
 use serde_json::json;
 use serde_json::Value::{self, Object};
 use std::collections::HashMap;

@@ -8,7 +8,6 @@ edition = "2018"
 
 [dependencies]
 base64="*"
-json="*"
 serde = "*"
 serde_json = "*"
 thiserror = "*"
@@ -17,4 +16,4 @@ tracing-subscriber = {version = "*", features = ["time", "json", "env-filter"]}
 url = "*"
 
 doc = { git = "https://github.com/estuary/flow" }
-flow_json = { git = "https://github.com/estuary/flow", package="json"}
+json = { git = "https://github.com/estuary/flow", package="json"}
