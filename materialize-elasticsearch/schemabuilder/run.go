@@ -31,9 +31,9 @@ type ElasticFieldType struct {
 	// defined in src/elastic_search_data_types.rs
 	FieldType string `json:"field_type"`
 	// Effective if FieldType is "date"
-	DateSpec DateSpec `json:"data_spec"`
+	DateSpec DateSpec `json:"date_spec,omitempty"`
 	// Effective if FieldType is "keyword"
-	KeywordSpec KeywordSpec `json:"keyword_spec"`
+	KeywordSpec KeywordSpec `json:"keyword_spec,omitempty"`
 }
 
 func (e *ElasticFieldType) toMap() map[string]interface{} {
