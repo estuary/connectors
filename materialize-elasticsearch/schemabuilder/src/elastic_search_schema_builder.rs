@@ -37,13 +37,13 @@ pub fn build_elastic_schema_with_overrides(
 
     if let ESFieldType::Basic(_) = built {
         // TODO(jixiang): check if array and basic types are allowed in the root of elastic mapping defs.
-        return Err(Error::UnSupportedError {
+        Err(Error::UnSupportedError {
             message: UNSUPPORTED_NON_ARRAY_OR_OBJECTS,
             shape: Box::new(shape.clone()),
-        });
+        })
+    } else {
+        Ok(built)
     }
-
-    Ok(built)
 }
 
 fn get_schema_uri(schema: &Value) -> Result<url::Url, Error> {
@@ -54,7 +54,7 @@ fn get_schema_uri(schema: &Value) -> Result<url::Url, Error> {
             }
         }
     }
-    return Err(Error::MissingOrInvalidIdField());
+    Err(Error::MissingOrInvalidIdField())
 }
 
 fn build_from_shape(shape: &Shape) -> Result<ESFieldType, Error> {
@@ -87,10 +87,10 @@ fn build_from_shape(shape: &Shape) -> Result<ESFieldType, Error> {
     } else if fields.len() == 1 {
         Ok(fields.pop().unwrap())
     } else {
-        return Err(Error::UnSupportedError {
+        Err(Error::UnSupportedError {
             message: UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
             shape: Box::new(shape.clone()),
-        });
+        })
     }
 }
 
@@ -107,28 +107,28 @@ fn build_from_object(shape: &ObjShape) -> Result<ESFieldType, Error> {
         es_properties.insert(prop.name.clone(), build_from_shape(&prop.shape)?);
     }
 
-    return Ok(ESFieldType::Object {
+    Ok(ESFieldType::Object {
         properties: es_properties,
-    });
+    })
 }
 
 fn build_from_array(shape: &ArrayShape) -> Result<ESFieldType, Error> {
     if !shape.tuple.is_empty() {
-        return Err(Error::UnSupportedError {
+        Err(Error::UnSupportedError {
             message: UNSUPPORTED_TUPLE,
             shape: Box::new(shape.clone()),
-        });
+        })
+    } else {
+        match &shape.additional {
+            None => Err(Error::UnSupportedError {
+                message: UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
+                shape: Box::new(shape.clone()),
+            }),
+            // In Elastic search, the schema of an array is the same as the schema of its items.
+            // https://www.elastic.co/guide/en/elasticsearch/reference/current/array.html
+            Some(shape) => build_from_shape(shape),
+        }
     }
-
-    return match &shape.additional {
-        None => Err(Error::UnSupportedError {
-            message: UNSUPPORTED_MULTIPLE_OR_UNSPECIFIED_TYPES,
-            shape: Box::new(shape.clone()),
-        }),
-        // In Elastic search, the schema of an array is the same as the schema of its items.
-        // https://www.elastic.co/guide/en/elasticsearch/reference/current/array.html
-        Some(shape) => build_from_shape(shape),
-    };
 }
 
 #[cfg(test)]
