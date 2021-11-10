@@ -21,8 +21,7 @@ pub fn build_elastic_schema_with_overrides(
     let schema: Value = serde_json::from_slice(schema_json)?;
 
     let schema =
-        schema::build::build_schema::<Annotation>(get_schema_uri(&schema.clone())?, &schema)
-            .unwrap();
+        schema::build::build_schema::<Annotation>(get_schema_uri(&schema)?, &schema).unwrap();
 
     let mut index = IndexBuilder::new();
     index.add(&schema).unwrap();
