@@ -102,11 +102,11 @@ func createTestTable(ctx context.Context, t *testing.T, suffix string, tableDef 
 	tableName = strings.ReplaceAll(tableName, "/", "_")
 	tableName = strings.ReplaceAll(tableName, "=", "_")
 
-	logrus.WithField("table", tableName).WithField("cols", tableDef).Info("creating test table")
+	logrus.WithField("table", tableName).WithField("cols", tableDef).Debug("creating test table")
 	dbQueryInternal(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
 	dbQueryInternal(ctx, t, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
 	t.Cleanup(func() {
-		logrus.WithField("table", tableName).Info("destroying test table")
+		logrus.WithField("table", tableName).Debug("destroying test table")
 		dbQueryInternal(ctx, t, fmt.Sprintf(`DROP TABLE %s;`, tableName))
 	})
 	return tableName
@@ -196,10 +196,10 @@ func dbInsert(ctx context.Context, t *testing.T, table string, rows [][]interfac
 	if err != nil {
 		t.Fatalf("unable to begin transaction: %v", err)
 	}
-	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows), "first": rows[0]}).Info("inserting data")
+	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows), "first": rows[0]}).Debug("inserting data")
 	var query = fmt.Sprintf(`INSERT INTO %s VALUES %s`, table, argsTuple(len(rows[0])))
 	for _, row := range rows {
-		logrus.WithField("table", table).WithField("row", row).Debug("inserting row")
+		logrus.WithField("table", table).WithField("row", row).Trace("inserting row")
 		if len(row) != len(rows[0]) {
 			t.Fatalf("incorrect number of values in row %q (expected %d)", row, len(rows[0]))
 		}

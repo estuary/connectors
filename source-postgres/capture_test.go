@@ -186,6 +186,10 @@ func TestIgnoredStreams(t *testing.T) {
 // TestSlotLSNAdvances checks that the `restart_lsn` of a replication slot
 // has advanced after a connector restart.
 func TestSlotLSNAdvances(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	var cfg, ctx, state = TestDefaultConfig, longTestContext(t, 30*time.Second), PersistentState{}
 	var table = createTestTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var catalog = testCatalog(table)

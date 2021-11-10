@@ -106,6 +106,10 @@ var datatypeTestcases = []datatypeTestcase{
 }
 
 func TestDatatypes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	var cfg, ctx = TestDefaultConfig, context.Background()
 
 	for idx, tc := range datatypeTestcases {
