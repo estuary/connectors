@@ -21,8 +21,16 @@ type DateSpec struct {
 type KeywordSpec struct {
 	//https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-above.html
 	IgnoreAbove int `json:"ignore_above"`
+}
+
+// TextSpec configures a text field for elastic search schema.
+type TextSpec struct {
 	// Whether or not to specify the field as text/keyword dual field.
-	DualText bool `json:"dual_text"`
+	DualKeyword bool `json:"dual_keyword"`
+
+	// https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-above.html
+	// effective only if DualKeyword is enabled.
+	KeywordIgnoreAbove int `json:"keyword_ignore_above"`
 }
 
 // ElasticFieldType specifies the type to override the field with.
@@ -34,6 +42,8 @@ type ElasticFieldType struct {
 	DateSpec DateSpec `json:"date_spec,omitempty"`
 	// Effective if FieldType is "keyword"
 	KeywordSpec KeywordSpec `json:"keyword_spec,omitempty"`
+	// Effective if FieldType is "text"
+	TextSpec TextSpec `json:"text_spec,omitempty"`
 }
 
 // MarshalJSON provides customized marshalJSON of ElasticFieldType
@@ -45,11 +55,21 @@ func (e ElasticFieldType) MarshalJSON() ([]byte, error) {
 		spec = e.DateSpec
 	case "keyword":
 		spec = e.KeywordSpec
+	case "text":
+		spec = e.TextSpec
 	default:
 		spec = nil
 	}
 
-	m[e.FieldType] = spec
+	m["type"] = e.FieldType
+	if spec != nil {
+		if specJson, err := json.Marshal(spec); err != nil {
+			return nil, err
+		} else if err = json.Unmarshal(specJson, &m); err != nil {
+			return nil, err
+		}
+	}
+
 	return json.Marshal(m)
 }
 

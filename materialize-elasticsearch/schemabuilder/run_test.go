@@ -46,9 +46,10 @@ const schemaJSON = `
 `
 
 func TestRunSchemaBuilder_NoOverrides(t *testing.T) {
-	result, e := RunSchemaBuilder(json.RawMessage(schemaJSON), []FieldOverride{})
-	require.NoError(t, e)
-	cupaloy.SnapshotT(t, string(result))
+	result, err := RunSchemaBuilder(json.RawMessage(schemaJSON), []FieldOverride{})
+	require.NoError(t, err)
+
+	cupaloy.SnapshotT(t, result)
 }
 
 func TestRunSchemaBuilder_WithOverrides(t *testing.T) {
@@ -60,11 +61,17 @@ func TestRunSchemaBuilder_WithOverrides(t *testing.T) {
 
 	var keywordFieldOverride FieldOverride
 	require.NoError(t, json.Unmarshal(
-		[]byte(`{"pointer": "/bit", "es_type": {"field_type": "keyword", "keyword_spec": {"ignore_above": 500, "dual_text": true}}}`),
+		[]byte(`{"pointer": "/bit", "es_type": {"field_type": "text", "text_spec": {"dual_keyword": true, "keyword_ignore_above": 500}}}`),
 		&keywordFieldOverride),
 	)
 
-	var overrides = []FieldOverride{dateFieldOverride, keywordFieldOverride}
+	var textFieldOverride FieldOverride
+	require.NoError(t, json.Unmarshal(
+		[]byte(`{"pointer": "/int", "es_type": {"field_type": "keyword", "keyword_spec": {"ignore_above": 400}}}`),
+		&textFieldOverride),
+	)
+
+	var overrides = []FieldOverride{dateFieldOverride, keywordFieldOverride, textFieldOverride}
 
 	result, e := RunSchemaBuilder(json.RawMessage(schemaJSON), overrides)
 	require.NoError(t, e)

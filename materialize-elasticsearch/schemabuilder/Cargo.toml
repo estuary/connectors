@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 base64="*"
+indexmap= { version = "*", features = ["serde"]}
 serde = "*"
 serde_json = "*"
 thiserror = "*"

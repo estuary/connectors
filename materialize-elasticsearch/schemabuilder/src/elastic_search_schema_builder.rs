@@ -3,10 +3,10 @@ use super::errors::*;
 
 use doc::inference::{ArrayShape, ObjShape, Shape};
 use doc::Annotation;
+use indexmap::IndexMap;
 use json::schema::{self, index::IndexBuilder, keywords, types};
 use serde_json::json;
 use serde_json::Value::{self, Object};
-use std::collections::HashMap;
 
 pub const DEFAULT_IGNORE_ABOVE: u16 = 256;
 
@@ -74,10 +74,9 @@ fn build_from_shape(shape: &Shape) -> Result<ESFieldType, Error> {
         fields.push(ESFieldType::Basic(ESBasicType::Long));
     }
     if shape.type_.overlaps(types::STRING) {
-        // TODO(jixiang): should dual_text be turned on by default?
+        // TODO(jixiang): should use text with dual_keyword by default?
         fields.push(ESFieldType::Basic(ESBasicType::Keyword {
             ignore_above: DEFAULT_IGNORE_ABOVE,
-            dual_text: false,
         }));
     }
 
@@ -101,7 +100,7 @@ fn build_from_object(shape: &ObjShape) -> Result<ESFieldType, Error> {
         });
     }
 
-    let mut es_properties = HashMap::new();
+    let mut es_properties = IndexMap::new();
     for prop in &shape.properties {
         es_properties.insert(prop.name.clone(), build_from_shape(&prop.shape)?);
     }
@@ -391,9 +390,9 @@ mod tests {
                 },
                 ESTypeOverride {
                     pointer: "/nested/nested_field".to_string(),
-                    es_type: ESBasicType::Keyword {
-                        ignore_above: 300,
-                        dual_text: true,
+                    es_type: ESBasicType::Text {
+                        dual_keyword: true,
+                        keyword_ignore_above: 300,
                     },
                 },
             ],

@@ -1,7 +1,7 @@
 use super::errors::*;
-use serde::ser::SerializeStruct;
+use indexmap::IndexMap;
+use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::HashMap;
 
 // The basic elastic search data types to represent data in Flow.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -15,11 +15,14 @@ pub enum ESBasicType {
     #[serde(serialize_with = "serialize_keyword")]
     Keyword {
         ignore_above: u16,
-        dual_text: bool,
     }, // refer to the comments of KeywordSpec in ../run.go for details.
     Long,
     Null,
-    Text,
+    #[serde(serialize_with = "serialize_text")]
+    Text {
+        dual_keyword: bool,
+        keyword_ignore_above: u16, // effective if dual_keyword is true.
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -27,7 +30,7 @@ pub enum ESBasicType {
 pub enum ESFieldType {
     Basic(ESBasicType),
     Object {
-        properties: HashMap<String, ESFieldType>,
+        properties: IndexMap<String, ESFieldType>,
     },
 }
 
@@ -90,54 +93,35 @@ impl ESFieldType {
     }
 }
 
-struct RenderingKeyword {
-    ignore_above: u16,
-}
-impl Serialize for RenderingKeyword {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
-    {
-        let mut serialized = serializer.serialize_struct("RenderingKeyword", 2)?;
-        serialized.serialize_field("type", "keyword")?;
-        serialized.serialize_field("ignore_above", &self.ignore_above)?;
-        serialized.end()
-    }
+fn serialize_keyword<S>(ignore_above: &u16, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut serialized = serializer.serialize_map(Some(1))?;
+    serialized.serialize_entry("ignore_above", ignore_above)?;
+    serialized.end()
 }
 
-struct RenderingText {
-    fields: HashMap<String, RenderingKeyword>,
-}
-impl Serialize for RenderingText {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut serialized = serializer.serialize_struct("RenderingText", 2)?;
-        serialized.serialize_field("type", "text")?;
-        serialized.serialize_field("fields", &self.fields)?;
-        serialized.end()
-    }
-}
-
-fn serialize_keyword<S>(
-    ignore_above: &u16,
-    dual_text: &bool,
+fn serialize_text<S>(
+    dual_keyword: &bool,
+    keyword_ignore_above: &u16,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    let keyword = RenderingKeyword {
-        ignore_above: *ignore_above,
-    };
-    if *dual_text {
-        let mut fields: HashMap<String, RenderingKeyword> = HashMap::new();
-        fields.entry("keyword".to_string()).or_insert(keyword);
+    if *dual_keyword {
+        let mut fields: IndexMap<String, ESBasicType> = IndexMap::new();
+        fields
+            .entry("keyword".to_string())
+            .or_insert(ESBasicType::Keyword {
+                ignore_above: *keyword_ignore_above,
+            });
 
-        let text = RenderingText { fields: fields };
-        text.serialize(serializer)
+        let mut serialized = serializer.serialize_map(Some(1))?;
+        serialized.serialize_entry("fields", &fields)?;
+        serialized.end()
     } else {
-        keyword.serialize(serializer)
+        serializer.serialize_none()
     }
 }
