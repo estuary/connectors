@@ -36,7 +36,8 @@ type ElasticFieldType struct {
 	KeywordSpec KeywordSpec `json:"keyword_spec,omitempty"`
 }
 
-func (e *ElasticFieldType) toMap() map[string]interface{} {
+// MarshalJSON provides customized marshalJSON of ElasticFieldType
+func (e ElasticFieldType) MarshalJSON() ([]byte, error) {
 	var m = make(map[string]interface{})
 	var spec interface{}
 	switch e.FieldType {
@@ -49,7 +50,7 @@ func (e *ElasticFieldType) toMap() map[string]interface{} {
 	}
 
 	m[e.FieldType] = spec
-	return m
+	return json.Marshal(m)
 }
 
 // FieldOverride specifies which field in the resulting elastic search schema
@@ -61,11 +62,22 @@ type FieldOverride struct {
 	EsType ElasticFieldType `json:"es_type"`
 }
 
-func (f *FieldOverride) toMap() map[string]interface{} {
-	return map[string]interface{}{
-		"pointer": f.Pointer,
-		"es_type": f.EsType.toMap(),
+// Input provides the input data for schema builder.
+type Input struct {
+	SchemaJSON []byte
+	overrides  []FieldOverride
+}
+
+// MarshalJSON provides customized marshalJSON of Input
+func (s Input) MarshalJSON() ([]byte, error) {
+	var output = struct {
+		SchemaJSONBase64 string          `json:"schema_json_base64"`
+		Overrides        []FieldOverride `json:"overrides"`
+	}{
+		SchemaJSONBase64: base64.StdEncoding.EncodeToString(s.SchemaJSON),
+		Overrides:        s.overrides,
 	}
+	return json.Marshal(output)
 }
 
 // RunSchemaBuilder is a wrapper in GO around rust schema-builder.
@@ -83,13 +95,9 @@ func RunSchemaBuilder(
 		return nil, fmt.Errorf("getting stdin pipeline: %w", err)
 	}
 
-	var overrideMap = make([](map[string]interface{}), 0, len(overrides))
-	for _, override := range overrides {
-		overrideMap = append(overrideMap, override.toMap())
-	}
-	input, err := json.Marshal(map[string]interface{}{
-		"schema_json_base64": base64.StdEncoding.EncodeToString(schemaJSON),
-		"overrides":          overrideMap,
+	input, err := json.Marshal(Input{
+		SchemaJSON: schemaJSON,
+		overrides:  overrides,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal input: %w", err)

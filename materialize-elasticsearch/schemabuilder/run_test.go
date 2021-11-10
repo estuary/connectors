@@ -52,12 +52,19 @@ func TestRunSchemaBuilder_NoOverrides(t *testing.T) {
 }
 
 func TestRunSchemaBuilder_WithOverrides(t *testing.T) {
-	var overrides = []FieldOverride{
-		{Pointer: "/arr/one", EsType: ElasticFieldType{
-			FieldType: "date", DateSpec: DateSpec{Format: "test_format"}}},
-		{Pointer: "/bit", EsType: ElasticFieldType{
-			FieldType: "keyword", KeywordSpec: KeywordSpec{IgnoreAbove: 500, DualText: true}}},
-	}
+	var dateFieldOverride FieldOverride
+	require.NoError(t, json.Unmarshal(
+		[]byte(`{"pointer": "/arr/one", "es_type": {"field_type": "date", "date_spec": {"format": "test_format"}}}`),
+		&dateFieldOverride),
+	)
+
+	var keywordFieldOverride FieldOverride
+	require.NoError(t, json.Unmarshal(
+		[]byte(`{"pointer": "/bit", "es_type": {"field_type": "keyword", "keyword_spec": {"ignore_above": 500, "dual_text": true}}}`),
+		&keywordFieldOverride),
+	)
+
+	var overrides = []FieldOverride{dateFieldOverride, keywordFieldOverride}
 
 	result, e := RunSchemaBuilder(json.RawMessage(schemaJSON), overrides)
 	require.NoError(t, e)
