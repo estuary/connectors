@@ -12,7 +12,6 @@ pub enum ESBasicType {
         format: String,
     }, // refer to the comments of DateSpec in ../run.go for details.
     Double,
-    #[serde(serialize_with = "serialize_keyword")]
     Keyword {
         ignore_above: u16,
     }, // refer to the comments of KeywordSpec in ../run.go for details.
@@ -92,15 +91,6 @@ impl ESFieldType {
         }
         Ok(self)
     }
-}
-
-fn serialize_keyword<S>(ignore_above: &u16, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut serialized = serializer.serialize_map(Some(1))?;
-    serialized.serialize_entry("ignore_above", ignore_above)?;
-    serialized.end()
 }
 
 fn serialize_text<S>(
