@@ -1,22 +1,29 @@
 use super::errors::*;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, map, Value};
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
 // The basic elastic search data types to represent data in Flow.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", tag = "type")]
 pub enum ESBasicType {
     Boolean,
-    Date { format: String }, // refer to the comments of DateSpec in ../run.go for details.
+    Date {
+        format: String,
+    }, // refer to the comments of DateSpec in ../run.go for details.
     Double,
-    Keyword { ignore_above: u16, dual_text: bool }, // refer to the comments of KeywordSpec in ../run.go for details.
+    #[serde(serialize_with = "serialize_keyword")]
+    Keyword {
+        ignore_above: u16,
+        dual_text: bool,
+    }, // refer to the comments of KeywordSpec in ../run.go for details.
     Long,
     Null,
     Text,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum ESFieldType {
     Basic(ESBasicType),
     Object {
@@ -37,66 +44,12 @@ pub struct ESTypeOverride {
 }
 
 impl ESFieldType {
-    pub fn render(&self) -> Value {
-        match self {
-            Self::Basic(b) => match b {
-                ESBasicType::Boolean => self.render_basic(&"boolean"),
-                ESBasicType::Date { format } => self.render_date(&format),
-                ESBasicType::Double => self.render_basic(&"double"),
-                ESBasicType::Keyword {
-                    ignore_above,
-                    dual_text,
-                } => self.render_keyword(*ignore_above, *dual_text),
-                ESBasicType::Long => self.render_basic(&"long"),
-                ESBasicType::Null => Value::Null,
-                ESBasicType::Text => self.render_basic(&"text"),
-            },
-            Self::Object { properties } => self.render_object(properties),
-        }
-    }
-
-    fn render_basic(&self, type_name: &str) -> Value {
-        return json!({ "type": type_name });
-    }
-
-    fn render_keyword(&self, ignore_above: u16, dual_text: bool) -> Value {
-        let rendered_keyword = json!({
-            "type": "keyword",
-            "ignore_above": ignore_above
-        });
-
-        if dual_text {
-            return json!({
-                "type": "text",
-                "fields": {"keyword": rendered_keyword}
-            });
-        }
-        return rendered_keyword;
-    }
-
-    fn render_date(&self, format: &str) -> Value {
-        return json!({
-            "type": "date",
-            "format": format
-        });
-    }
-
-    fn render_object(&self, properties: &HashMap<String, ESFieldType>) -> Value {
-        let mut field_map = map::Map::new();
-        for (k, v) in properties.iter() {
-            field_map.insert(k.clone(), v.render());
-        }
-        return json!({ "properties": field_map });
-    }
-}
-
-impl ESFieldType {
     pub fn apply_type_override(mut self, es_override: &ESTypeOverride) -> Result<Self, Error> {
         let pointer = &es_override.pointer;
         if pointer.is_empty() {
             return Err(Error::OverridePointerError {
                 message: POINTER_EMPTY,
-                overriding_schema: self.render(),
+                overriding_schema: serde_json::to_value(&self).unwrap(),
                 pointer: pointer.clone(),
             });
         }
@@ -114,7 +67,7 @@ impl ESFieldType {
                     if !properties.contains_key(&prop) {
                         return Err(Error::OverridePointerError {
                             message: POINTER_MISSING_FIELD,
-                            overriding_schema: self.render(),
+                            overriding_schema: serde_json::to_value(&self).unwrap(),
                             pointer: pointer.clone(),
                         });
                     } else if prop_itr.peek() == None {
@@ -127,12 +80,64 @@ impl ESFieldType {
                 _ => {
                     return Err(Error::OverridePointerError {
                         message: POINTER_WRONG_FIELD_TYPE,
-                        overriding_schema: self.render(),
+                        overriding_schema: serde_json::to_value(&self).unwrap(),
                         pointer: pointer.clone(),
                     })
                 }
             }
         }
         Ok(self)
+    }
+}
+
+struct RenderingKeyword {
+    ignore_above: u16,
+}
+impl Serialize for RenderingKeyword {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let mut serialized = serializer.serialize_struct("RenderingKeyword", 2)?;
+        serialized.serialize_field("type", "keyword")?;
+        serialized.serialize_field("ignore_above", &self.ignore_above)?;
+        serialized.end()
+    }
+}
+
+struct RenderingText {
+    fields: HashMap<String, RenderingKeyword>,
+}
+impl Serialize for RenderingText {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut serialized = serializer.serialize_struct("RenderingText", 2)?;
+        serialized.serialize_field("type", "text")?;
+        serialized.serialize_field("fields", &self.fields)?;
+        serialized.end()
+    }
+}
+
+fn serialize_keyword<S>(
+    ignore_above: &u16,
+    dual_text: &bool,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let keyword = RenderingKeyword {
+        ignore_above: *ignore_above,
+    };
+    if *dual_text {
+        let mut fields: HashMap<String, RenderingKeyword> = HashMap::new();
+        fields.entry("keyword".to_string()).or_insert(keyword);
+
+        let text = RenderingText { fields: fields };
+        text.serialize(serializer)
+    } else {
+        keyword.serialize(serializer)
     }
 }

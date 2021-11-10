@@ -21,8 +21,7 @@ fn main() {
     let result = build_elastic_schema_with_overrides(&schema_json, &input.overrides)
         .or_bail("Failed generating elastic search schema based on input.");
 
-    serde_json::to_writer(io::stdout(), &result.render())
-        .or_bail("Failed generating output to stdout.")
+    serde_json::to_writer(io::stdout(), &result).or_bail("Failed generating output to stdout.")
 }
 
 // TODO: Extract the common logic to a separate crate shared by connectors?

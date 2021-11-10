@@ -265,9 +265,9 @@ mod tests {
         }
         "#;
 
-        let actual = build_elastic_schema(schema_json).unwrap().render();
+        let actual = build_elastic_schema(schema_json).unwrap();
         assert_eq!(
-            actual,
+            serde_json::to_value(&actual).unwrap(),
             json!({
                 "properties": {
                     "array_of_ints": {"type": "long"},
@@ -324,10 +324,10 @@ mod tests {
             "required":["len"]
         }"#;
 
-        let actual = build_elastic_schema(schema_json).unwrap().render();
+        let actual = build_elastic_schema(schema_json).unwrap();
 
         assert_eq!(
-            actual,
+            serde_json::to_value(&actual).unwrap(),
             json!({ "properties": {
                     "arr":{
                         "properties": {
@@ -399,10 +399,9 @@ mod tests {
                 },
             ],
         )
-        .unwrap()
-        .render();
+        .unwrap();
         assert_eq!(
-            actual,
+            serde_json::to_value(&actual).unwrap(),
             json!({ "properties": {
                     "array_of_ints": { "type": "boolean" },
                     "array_of_objs": { "properties": {"arr_field": {"type": "boolean"}}},
