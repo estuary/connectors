@@ -98,7 +98,7 @@ func TestComplexDataset(t *testing.T) {
 		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
 	})
 	states = verifiedCapture(ctx, t, &cfg, &catalog, &state, "restart1")
-	state = states[5] // Restart in between (1980, 'SD') and (1980, 'TN')
+	state = states[6] // Restart in between (1980, 'SD') and (1980, 'TN')
 
 	dbQuery(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))
 	dbInsert(ctx, t, tableName, [][]interface{}{
