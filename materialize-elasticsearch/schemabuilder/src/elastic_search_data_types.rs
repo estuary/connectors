@@ -52,7 +52,7 @@ impl ESFieldType {
         if pointer.is_empty() {
             return Err(Error::OverridePointerError {
                 message: POINTER_EMPTY,
-                overriding_schema: serde_json::to_value(&self).unwrap(),
+                overriding_schema: serde_json::to_value(&self)?,
                 pointer: pointer.clone(),
             });
         }
@@ -70,20 +70,21 @@ impl ESFieldType {
                     if !properties.contains_key(&prop) {
                         return Err(Error::OverridePointerError {
                             message: POINTER_MISSING_FIELD,
-                            overriding_schema: serde_json::to_value(&self).unwrap(),
+                            overriding_schema: serde_json::to_value(&self)?,
                             pointer: pointer.clone(),
                         });
                     } else if prop_itr.peek() == None {
                         properties.insert(prop, ESFieldType::Basic(es_override.es_type.clone()));
                         return Ok(self);
                     } else {
+                        // prop is ensured to exist in properties.
                         properties.get_mut(&prop).unwrap()
                     }
                 }
                 _ => {
                     return Err(Error::OverridePointerError {
                         message: POINTER_WRONG_FIELD_TYPE,
-                        overriding_schema: serde_json::to_value(&self).unwrap(),
+                        overriding_schema: serde_json::to_value(&self)?,
                         pointer: pointer.clone(),
                     })
                 }

@@ -22,6 +22,8 @@ pub enum Error {
     UrlParsing(#[from] url::ParseError),
     #[error("a valid $id field in the input json schema is missing.")]
     MissingOrInvalidIdField(),
+    #[error("failed indexing schema")]
+    IndexError(#[from] json::schema::index::Error),
     #[error("unsupported Flow schema in elastic search, details: {message}, shape: {shape:?}")]
     UnSupportedError {
         message: &'static str,

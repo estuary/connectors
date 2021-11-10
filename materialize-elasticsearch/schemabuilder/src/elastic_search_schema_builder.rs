@@ -24,8 +24,8 @@ pub fn build_elastic_schema_with_overrides(
         schema::build::build_schema::<Annotation>(get_schema_uri(&schema)?, &schema).unwrap();
 
     let mut index = IndexBuilder::new();
-    index.add(&schema).unwrap();
-    index.verify_references().unwrap();
+    index.add(&schema)?;
+    index.verify_references()?;
     let index = index.into_index();
     let shape = Shape::infer(&schema, &index);
 
@@ -83,6 +83,7 @@ fn build_from_shape(shape: &Shape) -> Result<ESFieldType, Error> {
     if fields.is_empty() {
         Ok(ESFieldType::Basic(ESBasicType::Null))
     } else if fields.len() == 1 {
+        // pop will not return None b/c len = 1.
         Ok(fields.pop().unwrap())
     } else {
         Err(Error::UnSupportedError {
