@@ -76,7 +76,7 @@ const configSchema = `{
 		"watermarks_table": {
 			"type":        "string",
 			"title":       "Watermarks Table",
-			"description": "The name of the table used for 'watermark' writes during backfilling",
+			"description": "The name of the table used for watermark writes during backfills",
 			"default":     "public.flow_watermarks"
 		},
 		"poll_timeout_seconds": {

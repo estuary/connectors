@@ -16,10 +16,10 @@ type resultSet struct {
 }
 
 type backfillChunk struct {
-	rows     map[string]*changeEvent
-	scanKey  []string
-	scanned  []byte
-	complete bool // When true, indicates that this chunk *completes* the table, and thus has no precise endpoint
+	rows       map[string]*changeEvent // A map from the encoded primary key of a row to the 'Insert' event for that row
+	keyColumns []string                // The names of the primary key columns used for this table, in order
+	scanned    []byte                  // The encoded primary key of the greatest row in the chunk (or nil when complete=true)
+	complete   bool                    // When true, indicates that this chunk *completes* the table, and thus has no precise endpoint
 }
 
 func newResultSet() *resultSet {
@@ -29,15 +29,15 @@ func newResultSet() *resultSet {
 // Buffer appends new "Insert" events to the buffered range for the specified stream. An
 // empty list of events indicates that the stream is completed, and thus the *range* of the
 // buffer now extends to infinity.
-func (r *resultSet) Buffer(streamID string, scanKey []string, evts []*changeEvent) error {
+func (r *resultSet) Buffer(streamID string, keyColumns []string, events []*changeEvent) error {
 	var chunk, ok = r.streams[streamID]
 	if !ok {
-		chunk = &backfillChunk{scanKey: scanKey, rows: make(map[string]*changeEvent)}
+		chunk = &backfillChunk{keyColumns: keyColumns, rows: make(map[string]*changeEvent)}
 		r.streams[streamID] = chunk
 	}
 
 	// Buffering an empty set of rows means we've reached the end of this table
-	if len(evts) == 0 {
+	if len(events) == 0 {
 		logrus.WithField("stream", streamID).Debug("buffered final (empty) chunk")
 		chunk.scanned = nil
 		chunk.complete = true
@@ -45,8 +45,8 @@ func (r *resultSet) Buffer(streamID string, scanKey []string, evts []*changeEven
 	}
 
 	// Otherwise add thew new row to the `rows` map and update `scanned`
-	for _, evt := range evts {
-		var bs, err = encodeRowKey(chunk.scanKey, evt.Fields)
+	for _, event := range events {
+		var bs, err = encodeRowKey(chunk.keyColumns, event.Fields)
 		if err != nil {
 			return fmt.Errorf("error encoding row key: %w", err)
 		}
@@ -56,12 +56,12 @@ func (r *resultSet) Buffer(streamID string, scanKey []string, evts []*changeEven
 			// key this is a good place to opportunistically check that invariant.
 			return fmt.Errorf("primary key ordering failure: prev=%q, next=%q", chunk.scanned, bs)
 		}
-		chunk.rows[string(bs)] = evt
+		chunk.rows[string(bs)] = event
 		chunk.scanned = bs
 		if logrus.IsLevelEnabled(logrus.DebugLevel) {
 			logrus.WithFields(logrus.Fields{
 				"stream":   streamID,
-				"type":     evt.Type,
+				"type":     event.Type,
 				"rowKey":   base64.StdEncoding.EncodeToString(bs),
 				"chunkEnd": base64.StdEncoding.EncodeToString(chunk.scanned),
 			}).Debug("buffered scan result")
@@ -102,7 +102,7 @@ func (r *resultSet) Scanned(streamID string) []byte {
 // Patch modifies the buffered results to include the effect of the provided
 // changeEvent. This may simply mean ignoring the event, if it occured on a
 // table which is not in the resultSet or for a row which is not yet included.
-func (r *resultSet) Patch(streamID string, evt *changeEvent) error {
+func (r *resultSet) Patch(streamID string, event *changeEvent) error {
 	// If a particular table is not represented in the backfill result-set then
 	// patching its changes is a no-op.
 	if r == nil {
@@ -113,7 +113,7 @@ func (r *resultSet) Patch(streamID string, evt *changeEvent) error {
 		return nil
 	}
 
-	var bs, err = encodeRowKey(chunk.scanKey, evt.Fields)
+	var bs, err = encodeRowKey(chunk.keyColumns, event.Fields)
 	if err != nil {
 		return fmt.Errorf("error encoding patch key: %w", err)
 	}
@@ -125,7 +125,7 @@ func (r *resultSet) Patch(streamID string, evt *changeEvent) error {
 		if logrus.IsLevelEnabled(logrus.DebugLevel) {
 			logrus.WithFields(logrus.Fields{
 				"stream":   streamID,
-				"type":     evt.Type,
+				"type":     event.Type,
 				"rowKey":   base64.StdEncoding.EncodeToString([]byte(rowKey)),
 				"chunkEnd": base64.StdEncoding.EncodeToString(chunk.scanned),
 			}).Debug("filtering change")
@@ -138,20 +138,20 @@ func (r *resultSet) Patch(streamID string, evt *changeEvent) error {
 	// that already exists, and updates/deletions of nonexistent rows), because
 	// the whole point of buffering and patching the result-set is to resolve
 	// all such inconsistencies by the time the next watermark is reached.
-	switch evt.Type {
+	switch event.Type {
 	case "Insert":
-		chunk.rows[rowKey] = evt
+		chunk.rows[rowKey] = event
 	case "Update":
 		chunk.rows[rowKey] = &changeEvent{
 			Type:      "Insert",
-			Namespace: evt.Namespace,
-			Table:     evt.Table,
-			Fields:    evt.Fields,
+			Namespace: event.Namespace,
+			Table:     event.Table,
+			Fields:    event.Fields,
 		}
 	case "Delete":
 		delete(chunk.rows, rowKey)
 	default:
-		return fmt.Errorf("patched invalid change type %q", evt.Type)
+		return fmt.Errorf("patched invalid change type %q", event.Type)
 	}
 	return nil
 }
@@ -174,9 +174,9 @@ func (r *resultSet) Changes(streamID string) []*changeEvent {
 	sort.Strings(keys)
 
 	// Make a list of events in the sorted order
-	var evts []*changeEvent
+	var events []*changeEvent
 	for _, key := range keys {
-		evts = append(evts, r.streams[streamID].rows[key])
+		events = append(events, r.streams[streamID].rows[key])
 	}
-	return evts
+	return events
 }

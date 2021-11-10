@@ -12,26 +12,26 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TODO(wgd): Define an interface with a `ScanTable(ctx, streamID, scanKey, prevKey)` and
+// TODO(wgd): Define an interface with a `ScanTableChunk(ctx, streamID, keyColumns, resumeKey)` and
 // a `WriteWatermark(ctx, table, slot)` method which serves as the "database backfill" API
 // that we'll have to implement for other databases.
 
-// scanTable fetches a chunk of rows from the specified table, resuming from the provided
-// `prevKey` if non-nil. This is the entrypoint to the database-specific portion of the
+// scanTableChunk fetches a chunk of rows from the specified table, resuming from the provided
+// `resumeKey` if non-nil. This is the entrypoint to the database-specific portion of the
 // backfill process.
-func scanTable(ctx context.Context, conn *pgx.Conn, streamID string, scanKey []string, prevKey []byte) ([]*changeEvent, error) {
+func scanTableChunk(ctx context.Context, conn *pgx.Conn, streamID string, keyColumns []string, resumeKey []byte) ([]*changeEvent, error) {
 	var snapshot, err = snapshotDatabase(ctx, conn)
 	if err != nil {
 		return nil, fmt.Errorf("error creating database snapshot: %w", err)
 	}
 	defer snapshot.Close(ctx)
 
-	evts, err := snapshot.Table(streamID, scanKey).ScanChunk(ctx, prevKey)
+	events, err := snapshot.Table(streamID, keyColumns).ScanChunk(ctx, resumeKey)
 	if err != nil {
 		return nil, fmt.Errorf("error scanning table: %w", err)
 	}
 
-	return evts, nil
+	return events, nil
 }
 
 // writeWatermark writes a new random UUID into the 'watermarks' table and returns the
@@ -73,7 +73,7 @@ type tableSnapshot struct {
 	DB         *databaseSnapshot
 	SchemaName string
 	TableName  string
-	ScanKey    []string
+	KeyColumns []string
 
 	scanFromQuery string
 }
@@ -114,7 +114,7 @@ func (s *databaseSnapshot) TransactionLSN() pglogrepl.LSN {
 	return s.TxLSN
 }
 
-func (s *databaseSnapshot) Table(tableID string, scanKey []string) *tableSnapshot {
+func (s *databaseSnapshot) Table(tableID string, keyColumns []string) *tableSnapshot {
 	// Split "public.foo" tableID into "public" schema and "foo" table name
 	var parts = strings.SplitN(tableID, ".", 2)
 	var schemaName, tableName = parts[0], parts[1]
@@ -123,7 +123,7 @@ func (s *databaseSnapshot) Table(tableID string, scanKey []string) *tableSnapsho
 		DB:         s,
 		SchemaName: schemaName,
 		TableName:  tableName,
-		ScanKey:    scanKey,
+		KeyColumns: keyColumns,
 	}
 }
 
@@ -144,7 +144,7 @@ func (s *tableSnapshot) buildScanQuery(start bool) string {
 
 	// Construct strings like `(foo, bar, baz)` and `($1, $2, $3)` for use in the query
 	var pkey, args string
-	for idx, colName := range s.ScanKey {
+	for idx, colName := range s.KeyColumns {
 		if idx > 0 {
 			pkey += ", "
 			args += ", "
@@ -171,33 +171,33 @@ func (s *tableSnapshot) buildScanQuery(start bool) string {
 }
 
 // ScanChunk requests a chunk of rows from the table snapshot, transforms each row into
-// an `Insert` change event and gives it to the provided handler. If `prevKey` is nil
-// the very first chunk of the table is scanned, otherwise it must contain the `lastKey`
-// of a previous chunk, and this chunk will begin immediately after that.
-func (s *tableSnapshot) ScanChunk(ctx context.Context, prevKey []byte) ([]*changeEvent, error) {
+// an `Insert` change event and gives it to the provided handler. If `resumeKey` is nil
+// the very first chunk of the table is scanned, otherwise it must contain the final
+// key from a previous chunk, and this chunk will begin immediately after that.
+func (s *tableSnapshot) ScanChunk(ctx context.Context, resumeKey []byte) ([]*changeEvent, error) {
 	var logFields = logrus.Fields{
-		"namespace": s.SchemaName,
-		"table":     s.TableName,
-		"scanKey":   s.ScanKey,
-		"prevKey":   base64.StdEncoding.EncodeToString(prevKey),
-		"txLSN":     s.TransactionLSN(),
+		"namespace":  s.SchemaName,
+		"table":      s.TableName,
+		"keyColumns": s.KeyColumns,
+		"resumeKey":  base64.StdEncoding.EncodeToString(resumeKey),
+		"txLSN":      s.TransactionLSN(),
 	}
-	if prevKey == nil {
+	if resumeKey == nil {
 		logrus.WithFields(logFields).Info("starting table scan")
 	} else {
 		logrus.WithFields(logFields).Debug("scanning next chunk")
 	}
 
-	var query = s.buildScanQuery(prevKey == nil)
+	var query = s.buildScanQuery(resumeKey == nil)
 	var args []interface{}
-	if prevKey != nil {
+	if resumeKey != nil {
 		var err error
-		args, err = unpackTuple(prevKey)
+		args, err = unpackTuple(resumeKey)
 		if err != nil {
 			return nil, fmt.Errorf("error unpacking encoded tuple: %w", err)
 		}
-		if len(args) != len(s.ScanKey) {
-			return nil, fmt.Errorf("expected %d primary-key values but got %d", len(s.ScanKey), len(args))
+		if len(args) != len(s.KeyColumns) {
+			return nil, fmt.Errorf("expected %d primary-key values but got %d", len(s.KeyColumns), len(args))
 		}
 	}
 
@@ -212,7 +212,7 @@ func (s *tableSnapshot) ScanChunk(ctx context.Context, prevKey []byte) ([]*chang
 
 func (s *tableSnapshot) processResults(ctx context.Context, rows pgx.Rows) ([]*changeEvent, error) {
 	var cols = rows.FieldDescriptions()
-	var evts []*changeEvent
+	var events []*changeEvent
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
 		var vals, err = rows.Values()
@@ -224,12 +224,12 @@ func (s *tableSnapshot) processResults(ctx context.Context, rows pgx.Rows) ([]*c
 			fields[string(cols[idx].Name)] = vals[idx]
 		}
 
-		evts = append(evts, &changeEvent{
+		events = append(events, &changeEvent{
 			Type:      "Insert",
 			Namespace: s.SchemaName,
 			Table:     s.TableName,
 			Fields:    fields,
 		})
 	}
-	return evts, nil
+	return events, nil
 }

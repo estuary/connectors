@@ -57,9 +57,9 @@ type TableState struct {
 	// Mode is either "Backfill" during the backfill scanning process
 	// or "Active" once the backfill is complete.
 	Mode string `json:"mode"`
-	// ScanKey is the "primary key" used for ordering/chunking the backfill scan.
-	ScanKey []string `json:"scan_key,omitempty"`
-	// Scanned is a FoundationDB-serialized tuple representing the ScanKey column
+	// KeyColumns is the "primary key" used for ordering/chunking the backfill scan.
+	KeyColumns []string `json:"key_columns,omitempty"`
+	// Scanned is a FoundationDB-serialized tuple representing the KeyColumns
 	// values of the last row which has been backfilled. Replication events will
 	// only be emitted for rows <= this value while backfilling is in progress.
 	Scanned []byte `json:"scanned,omitempty"`
@@ -163,7 +163,7 @@ func RunCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 	}
 
 	err = c.streamChanges(ctx)
-	logrus.WithField("err", err).Debug("change streaming terminated")
+	logrus.WithField("err", err).Debug("stopped streaming changes")
 	if errors.Is(err, context.DeadlineExceeded) && c.config.MaxLifespanSeconds != 0 {
 		logrus.WithField("err", err).WithField("maxLifespan", c.config.MaxLifespanSeconds).Info("maximum lifespan reached")
 		return nil
@@ -229,13 +229,13 @@ func (c *capture) updateState(ctx context.Context) error {
 		// See if the stream is already initialized. If it's not, then create it.
 		var streamState, ok = c.state.Streams[streamID]
 		if !ok {
-			c.state.Streams[streamID] = &TableState{Mode: tableModeBackfill, ScanKey: primaryKey}
+			c.state.Streams[streamID] = &TableState{Mode: tableModeBackfill, KeyColumns: primaryKey}
 			stateDirty = true
 			continue
 		}
 
-		if strings.Join(streamState.ScanKey, ",") != strings.Join(primaryKey, ",") {
-			return fmt.Errorf("stream %q: primary key %q doesn't match initialized scan key %q", streamID, primaryKey, streamState.ScanKey)
+		if strings.Join(streamState.KeyColumns, ",") != strings.Join(primaryKey, ",") {
+			return fmt.Errorf("stream %q: primary key %q doesn't match initialized scan key %q", streamID, primaryKey, streamState.KeyColumns)
 		}
 	}
 
@@ -295,10 +295,10 @@ func (c *capture) streamChanges(ctx context.Context) error {
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
 	logrus.Info("all streams active")
-	for evt := range c.replStream.Events() {
-		if evt.Type == "Commit" {
+	for event := range c.replStream.Events() {
+		if event.Type == "Commit" {
 			if c.changesSinceLastCheckpoint > 0 {
-				c.state.CurrentLSN = c.replStream.CurrentLSN()
+				c.state.CurrentLSN = event.LSN
 				if err := c.emitState(c.state); err != nil {
 					return fmt.Errorf("error emitting state update: %w", err)
 				}
@@ -306,9 +306,9 @@ func (c *capture) streamChanges(ctx context.Context) error {
 			continue
 		}
 
-		var tableState = c.state.Streams[joinStreamID(evt.Namespace, evt.Table)]
+		var tableState = c.state.Streams[joinStreamID(event.Namespace, event.Table)]
 		if tableState != nil && tableState.Mode == tableModeActive {
-			if err := c.handleChangeEvent(evt); err != nil {
+			if err := c.handleChangeEvent(event); err != nil {
 				return fmt.Errorf("error handling replication event: %w", err)
 			}
 		}
@@ -318,11 +318,11 @@ func (c *capture) streamChanges(ctx context.Context) error {
 
 func (c *capture) streamToWatermark(watermark string, results *resultSet) error {
 	var watermarkReached = false
-	for evt := range c.replStream.Events() {
+	for event := range c.replStream.Events() {
 		// Commit events update the current LSN and are otherwise ignored, except for the
 		// next Commit after the target watermark, which ends the loop.
-		if evt.Type == "Commit" {
-			c.state.CurrentLSN = c.replStream.CurrentLSN()
+		if event.Type == "Commit" {
+			c.state.CurrentLSN = event.LSN
 			if watermarkReached {
 				return nil
 			}
@@ -331,10 +331,10 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 
 		// Note when the expected watermark is finally observed. The subsequent Commit will exit the loop.
 		// TODO(wgd): Can we ensure/require that 'WatermarksTable' is always fully-qualified?
-		var streamID = joinStreamID(evt.Namespace, evt.Table)
+		var streamID = joinStreamID(event.Namespace, event.Table)
 		if streamID == c.config.WatermarksTable {
-			logrus.WithFields(logrus.Fields{"expected": watermark, "written": evt.Fields["watermark"]}).Debug("watermark write")
-			if evt.Fields["watermark"] == watermark {
+			logrus.WithFields(logrus.Fields{"expected": watermark, "written": event.Fields["watermark"]}).Debug("watermark write")
+			if event.Fields["watermark"] == watermark {
 				watermarkReached = true
 			}
 		}
@@ -342,11 +342,11 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 		// Handle the easy cases: Events on ignored or fully-active tables.
 		var tableState = c.state.Streams[streamID]
 		if tableState == nil || tableState.Mode == tableModeIgnore {
-			logrus.WithFields(logrus.Fields{"stream": streamID, "type": evt.Type}).Debug("ignoring stream")
+			logrus.WithFields(logrus.Fields{"stream": streamID, "type": event.Type}).Debug("ignoring stream")
 			continue
 		}
 		if tableState.Mode == tableModeActive {
-			if err := c.handleChangeEvent(evt); err != nil {
+			if err := c.handleChangeEvent(event); err != nil {
 				return fmt.Errorf("error handling replication event: %w", err)
 			}
 			continue
@@ -358,15 +358,15 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 		// While a table is being backfilled, events occurring *before* the current scan point
 		// will be emitted, while events *after* that point will be patched (or ignored) into
 		// the buffered resultSet.
-		var rowKey, err = encodeRowKey(tableState.ScanKey, evt.Fields)
+		var rowKey, err = encodeRowKey(tableState.KeyColumns, event.Fields)
 		if err != nil {
 			return fmt.Errorf("error encoding row key: %w", err)
 		}
 		if compareTuples(rowKey, tableState.Scanned) <= 0 {
-			if err := c.handleChangeEvent(evt); err != nil {
+			if err := c.handleChangeEvent(event); err != nil {
 				return fmt.Errorf("error handling replication event: %w", err)
 			}
-		} else if err := results.Patch(streamID, evt); err != nil {
+		} else if err := results.Patch(streamID, event); err != nil {
 			return fmt.Errorf("error patching resultset: %w", err)
 		}
 	}
@@ -376,9 +376,9 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 func (c *capture) emitBuffered(results *resultSet) error {
 	// Emit any buffered results and update table states accordingly.
 	for _, streamID := range results.Streams() {
-		var evts = results.Changes(streamID)
-		for _, evt := range evts {
-			if err := c.handleChangeEvent(evt); err != nil {
+		var events = results.Changes(streamID)
+		for _, event := range events {
+			if err := c.handleChangeEvent(event); err != nil {
 				return fmt.Errorf("error handling backfill change: %w", err)
 			}
 		}
@@ -410,31 +410,31 @@ func (c *capture) backfillStreams(ctx context.Context, streams []string) (*resul
 		var streamState = c.state.Streams[streamID]
 
 		// Fetch a chunk of entries from the specified stream
-		var evts, err = scanTable(ctx, c.connScan, streamID, streamState.ScanKey, streamState.Scanned)
+		var events, err = scanTableChunk(ctx, c.connScan, streamID, streamState.KeyColumns, streamState.Scanned)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning table: %w", err)
 		}
 
 		// Translate the resulting list of entries into a backfillChunk
-		if err := results.Buffer(streamID, streamState.ScanKey, evts); err != nil {
+		if err := results.Buffer(streamID, streamState.KeyColumns, events); err != nil {
 			return nil, fmt.Errorf("error buffering scan results: %w", err)
 		}
 	}
 	return results, nil
 }
 
-func (c *capture) handleChangeEvent(evt *changeEvent) error {
-	evt.Fields["_change_type"] = evt.Type
+func (c *capture) handleChangeEvent(event *changeEvent) error {
+	event.Fields["_change_type"] = event.Type
 
-	for id, val := range evt.Fields {
+	for id, val := range event.Fields {
 		var translated, err = translateRecordField(val)
 		if err != nil {
 			logrus.WithField("val", val).Error("value translation error")
 			return fmt.Errorf("error translating field %q value: %w", id, err)
 		}
-		evt.Fields[id] = translated
+		event.Fields[id] = translated
 	}
-	return c.emitRecord(evt.Namespace, evt.Table, evt.Fields)
+	return c.emitRecord(event.Namespace, event.Table, event.Fields)
 }
 
 // TranslateRecordField "translates" a value from the PostgreSQL driver into

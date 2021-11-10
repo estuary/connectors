@@ -14,10 +14,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type changeEventHandler func(evt *changeEvent) error
+type changeEventHandler func(event *changeEvent) error
 
 type changeEvent struct {
 	Type      string
+	LSN       pglogrepl.LSN // Only set for "Commit" events
 	Namespace string
 	Table     string
 	Fields    map[string]interface{}
@@ -29,11 +30,10 @@ type changeEvent struct {
 // is no built-in concurrency, so Process() must be called reasonably
 // soon after StartReplication() in order to not time out.
 type replicationStream struct {
-	replSlot   string         // The name of the PostgreSQL replication slot to use
-	pubName    string         // The name of the PostgreSQL publication to use
-	currentLSN uint64         // The TransactionEndLSN of the most currently received 'Commit' event, as an atomic uint64
-	commitLSN  uint64         // The most recently *committed* LSN, given to us by startReplication or the CommitLSN() method
-	conn       *pgconn.PgConn // The PostgreSQL replication connection
+	replSlot  string         // The name of the PostgreSQL replication slot to use
+	pubName   string         // The name of the PostgreSQL publication to use
+	commitLSN uint64         // The most recently *committed* LSN, given to us by startReplication or the CommitLSN() method
+	conn      *pgconn.PgConn // The PostgreSQL replication connection
 
 	// standbyStatusDeadline is the time at which we need to stop receiving
 	// replication messages and go send a Standby Status Update message to
@@ -56,6 +56,12 @@ type replicationStream struct {
 }
 
 const standbyStatusInterval = 10 * time.Second
+
+// replicationBufferSize controls how many change events can be buffered in the
+// replicationStream before it stops receiving further events from PostgreSQL.
+// In normal use it's a constant, it's just a variable so that tests are more
+// likely to exercise blocking sends and backpressure.
+var replicationBufferSize = 1024
 
 func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publication string, startLSN pglogrepl.LSN) (*replicationStream, error) {
 	// If we don't have a valid `startLSN` from a previous capture, it gets initialized
@@ -82,9 +88,8 @@ func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		connInfo:  pgtype.NewConnInfo(),
 		relations: make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
-		events: make(chan *changeEvent),
+		events: make(chan *changeEvent, replicationBufferSize),
 	}
-	atomic.StoreUint64(&stream.currentLSN, uint64(startLSN))
 
 	// Create the publication and replication slot, ignoring the inevitable errors
 	// when they already exist. We could in theory add some extra logic to check,
@@ -115,10 +120,6 @@ func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 
 func (s *replicationStream) Events() <-chan *changeEvent {
 	return s.events
-}
-
-func (s *replicationStream) CurrentLSN() pglogrepl.LSN {
-	return pglogrepl.LSN(atomic.LoadUint64(&s.currentLSN))
 }
 
 // run is the main loop of the replicationStream which combines message
@@ -176,11 +177,11 @@ func (s *replicationStream) relayMessages(ctx context.Context) error {
 
 		// Once a message arrives, decode it and buffer the result until the next
 		// time this function is invoked.
-		evt, err := s.decodeMessage(msg)
+		event, err := s.decodeMessage(msg)
 		if err != nil {
 			return fmt.Errorf("error decoding message: %w", err)
 		}
-		s.eventBuf = evt
+		s.eventBuf = event
 	}
 }
 
@@ -227,12 +228,12 @@ func (s *replicationStream) decodeMessage(msg pglogrepl.Message) (*changeEvent, 
 			return nil, fmt.Errorf("got COMMIT message without a transaction in progress")
 		}
 		s.inTransaction = false
-		atomic.StoreUint64(&s.currentLSN, uint64(msg.TransactionEndLSN))
 
-		var evt = &changeEvent{
+		var event = &changeEvent{
 			Type: "Commit",
+			LSN:  msg.TransactionEndLSN,
 		}
-		return evt, nil
+		return event, nil
 	}
 
 	// Unhandled messages are considered a fatal error. There are a bunch of
@@ -293,13 +294,13 @@ func (s *replicationStream) decodeChangeEvent(eventType string, tuple *pglogrepl
 		}
 	}
 
-	var evt = &changeEvent{
+	var event = &changeEvent{
 		Type:      eventType,
 		Namespace: rel.Namespace,
 		Table:     rel.RelationName,
 		Fields:    fields,
 	}
-	return evt, nil
+	return event, nil
 }
 
 func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (interface{}, error) {
