@@ -52,6 +52,13 @@ func TestRunSchemaBuilder_NoOverrides(t *testing.T) {
 	cupaloy.SnapshotT(t, result)
 }
 
+func TestRunSchemaBuilder_NullOverrides(t *testing.T) {
+	result, err := RunSchemaBuilder(json.RawMessage(schemaJSON), nil)
+	require.NoError(t, err)
+
+	cupaloy.SnapshotT(t, result)
+}
+
 func TestRunSchemaBuilder_WithOverrides(t *testing.T) {
 	var dateFieldOverride FieldOverride
 	require.NoError(t, json.Unmarshal(

@@ -218,6 +218,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 		}
 
 		for _, doc := range docs {
+			//log.Info(fmt.Sprintf("loaded doc: %+v", string(doc)))
 			if err = loaded(bindingNum, doc); err != nil {
 				return fmt.Errorf("callback: %w", err)
 			}
@@ -233,6 +234,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 			// No need to load for delta updates.
 			continue
 		}
+		//log.Info(fmt.Sprintf("request loading: %+v", it.Key))
 		b.loadingIds = append(b.loadingIds, documentID(it.Key))
 		if len(b.loadingIds) == LOAD_BY_ID_BATCH_SIZE {
 			if err := load(it.Binding, b); err != nil {
