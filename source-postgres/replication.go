@@ -78,7 +78,7 @@ func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		"startLSN":    startLSN,
 		"publication": publication,
 		"slot":        slot,
-	}).Info("starting replication")
+	}).Debug("starting replication")
 
 	var stream = &replicationStream{
 		replSlot:  slot,
