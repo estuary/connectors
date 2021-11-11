@@ -1,0 +1,29 @@
+# Build Stage
+################################################################################
+FROM golang:1.17-bullseye as builder
+
+WORKDIR /builder
+
+# Download & compile dependencies early. Doing this separately allows for layer
+# caching opportunities when no dependencies are updated.
+COPY go.* ./
+RUN go mod download
+
+# Build the connector projects we depend on.
+COPY materialize-boilerplate ./materialize-boilerplate
+COPY materialize-elasticsearch ./materialize-elasticsearch
+
+# Copy schema-builder for testing.
+COPY materialize-elasticsearch/schemabuilder/schema-builder /builder/schema-builder
+
+ENV PATH="/builder:$PATH"
+# Test and build the connector.
+RUN go test  -tags nozstd -v ./materialize-elasticsearch/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-elasticsearch
+
+# Avoid running the connector as root.
+# USER nonroot:nonroot
+
+
+# TODO(jixiang) re-enable multi-step build.
+ENTRYPOINT ["/builder/connector"]
