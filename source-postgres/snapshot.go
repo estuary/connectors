@@ -54,7 +54,7 @@ func writeWatermark(ctx context.Context, conn *pgx.Conn, table, slot string) (st
 	}
 	rows.Close()
 
-	logrus.WithField("watermark", wm).Info("wrote watermark")
+	logrus.WithField("watermark", wm).Debug("wrote watermark")
 	return wm, nil
 }
 
@@ -182,11 +182,7 @@ func (s *tableSnapshot) ScanChunk(ctx context.Context, resumeKey []byte) ([]*cha
 		"resumeKey":  base64.StdEncoding.EncodeToString(resumeKey),
 		"txLSN":      s.TransactionLSN(),
 	}
-	if resumeKey == nil {
-		logrus.WithFields(logFields).Info("starting table scan")
-	} else {
-		logrus.WithFields(logFields).Debug("scanning next chunk")
-	}
+	logrus.WithFields(logFields).Debug("scanning table chunk")
 
 	var query = s.buildScanQuery(resumeKey == nil)
 	var args []interface{}
