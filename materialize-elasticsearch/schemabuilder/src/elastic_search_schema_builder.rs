@@ -20,8 +20,7 @@ pub fn build_elastic_schema_with_overrides(
 ) -> Result<ESFieldType, Error> {
     let schema: Value = serde_json::from_slice(schema_json)?;
 
-    let schema =
-        schema::build::build_schema::<Annotation>(get_schema_uri(&schema)?, &schema).unwrap();
+    let schema = schema::build::build_schema::<Annotation>(get_schema_uri(&schema)?, &schema)?;
 
     let mut index = IndexBuilder::new();
     index.add(&schema)?;
