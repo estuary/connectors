@@ -19,70 +19,72 @@ type datatypeTestcase struct {
 
 var datatypeTestcases = []datatypeTestcase{
 	// Basic Boolean/Numeric/Text Types
-	{`boolean`, `{"type":"boolean"}`, `false`, `false`},
-	{`boolean`, `{"type":"boolean"}`, `'yes'`, `true`},
-	{`integer`, `{"type":"integer"}`, `123`, `123`},
-	{`smallint`, `{"type":"integer"}`, `123`, `123`},
-	{`bigint`, `{"type":"integer"}`, `123`, `123`},
-	{`serial`, `{"type":"integer"}`, `123`, `123`},
-	{`smallserial`, `{"type":"integer"}`, `123`, `123`},
-	{`bigserial`, `{"type":"integer"}`, `123`, `123`},
-	{`real`, `{"type":"number"}`, `123.456`, `123.456`},
-	{`double precision`, `{"type":"number"}`, `123.456`, `123.456`},
+	{`boolean`, `{"anyOf":[{"type":"boolean"},{"type":"null"}]}`, `false`, `false`},
+	{`boolean`, `{"anyOf":[{"type":"boolean"},{"type":"null"}]}`, `'yes'`, `true`},
+	{`integer`, `{"anyOf":[{"type":"integer"},{"type":"null"}]}`, `123`, `123`},
+	{`integer`, `{"anyOf":[{"type":"integer"},{"type":"null"}]}`, `null`, `null`},
+	{`integer not null`, `{"type":"integer"}`, `123`, `123`},
+	{`smallint`, `{"anyOf":[{"type":"integer"},{"type":"null"}]}`, `123`, `123`},
+	{`bigint`, `{"anyOf":[{"type":"integer"},{"type":"null"}]}`, `123`, `123`},
+	{`serial`, `{"type":"integer"}`, `123`, `123`},      // non-nullable
+	{`smallserial`, `{"type":"integer"}`, `123`, `123`}, // non-nullable
+	{`bigserial`, `{"type":"integer"}`, `123`, `123`},   // non-nullable
+	{`real`, `{"anyOf":[{"type":"number"},{"type":"null"}]}`, `123.456`, `123.456`},
+	{`double precision`, `{"anyOf":[{"type":"number"},{"type":"null"}]}`, `123.456`, `123.456`},
 
 	// TODO(wgd): The 'decimal' and 'numeric' types are generally used because precision
 	// and accuracy actually matter. I'm leery of just casting these to a float, so for
 	// now I'm letting the `pgtype.Numeric.EncodeText()` implementation turn them into a
 	// string. Revisit whether this is correct behavior at some point.
-	{`decimal`, `{"type":"number"}`, `123.456`, `"123456e-3"`},
-	{`numeric`, `{"type":"number"}`, `123.456`, `"123456e-3"`},
-	{`numeric(4,2)`, `{"type":"number"}`, `12.34`, `"1234e-2"`},
+	{`decimal`, `{"anyOf":[{"type":"number"},{"type":"null"}]}`, `123.456`, `"123456e-3"`},
+	{`numeric`, `{"anyOf":[{"type":"number"},{"type":"null"}]}`, `123.456`, `"123456e-3"`},
+	{`numeric(4,2)`, `{"anyOf":[{"type":"number"},{"type":"null"}]}`, `12.34`, `"1234e-2"`},
 
-	{`character varying(10)`, `{"type":"string"}`, `'foo'`, `"foo"`},
-	{`varchar(10)`, `{"type":"string"}`, `'foo'`, `"foo"`},
-	{`varchar`, `{"type":"string"}`, `'foo'`, `"foo"`},
-	{`character(10)`, `{"type":"string"}`, `'foo'`, `"foo       "`},
-	{`char(10)`, `{"type":"string"}`, `'foo'`, `"foo       "`},
-	{`char`, `{"type":"string"}`, `'f'`, `"f"`},
-	{`text`, `{"type":"string"}`, `'foo'`, `"foo"`},
-	{`bytea`, `{"type":"string","contentEncoding":"base64"}`, `'\xDEADBEEF'`, `"3q2+7w=="`},
-	{`bit`, `{"type":"string"}`, `B'1'`, `"1"`},
-	{`bit(3)`, `{"type":"string"}`, `B'101'`, `"101"`},
-	{`bit varying`, `{"type":"string"}`, `B'1101'`, `"1101"`},
-	{`bit varying(5)`, `{"type":"string"}`, `B'10111'`, `"10111"`},
+	{`character varying(10)`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'foo'`, `"foo"`},
+	{`varchar(10)`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'foo'`, `"foo"`},
+	{`varchar`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'foo'`, `"foo"`},
+	{`character(10)`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'foo'`, `"foo       "`},
+	{`char(10)`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'foo'`, `"foo       "`},
+	{`char`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'f'`, `"f"`},
+	{`text`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'foo'`, `"foo"`},
+	{`bytea`, `{"anyOf":[{"type":"string","contentEncoding":"base64"},{"type":"null"}]}`, `'\xDEADBEEF'`, `"3q2+7w=="`},
+	{`bit`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `B'1'`, `"1"`},
+	{`bit(3)`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `B'101'`, `"101"`},
+	{`bit varying`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `B'1101'`, `"1101"`},
+	{`bit varying(5)`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `B'10111'`, `"10111"`},
 
 	// Domain-Specific Data Types
-	{`money`, `{"type":"string"}`, `123.45`, `"$123.45"`},
-	{`money`, `{"type":"string"}`, `'$123.45'`, `"$123.45"`},
-	{`date`, `{"type":"string","format":"date-time"}`, `'January 8, 1999'`, `"1999-01-08T00:00:00Z"`},
-	{`timestamp`, `{"type":"string","format":"date-time"}`, `'January 8, 1999'`, `"1999-01-08T00:00:00Z"`},
-	{`timestamp without time zone`, `{"type":"string","format":"date-time"}`, `'January 8, 1999'`, `"1999-01-08T00:00:00Z"`},
+	{`money`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `123.45`, `"$123.45"`},
+	{`money`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'$123.45'`, `"$123.45"`},
+	{`date`, `{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]}`, `'January 8, 1999'`, `"1999-01-08T00:00:00Z"`},
+	{`timestamp`, `{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]}`, `'January 8, 1999'`, `"1999-01-08T00:00:00Z"`},
+	{`timestamp without time zone`, `{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}]}`, `'January 8, 1999'`, `"1999-01-08T00:00:00Z"`},
 	// TODO(wgd): The 'timestamp with time zone' type produces inconsistent results between
 	// table scanning and replication events. They're both valid timestamps, but they differ.
-	//{`timestamp with time zone`, `{"type":"string","format":"date-time"}`, `'January 8, 1999'`, `"1999-01-07T16:00:00-08:00"`},
-	{`time`, `{"type":"integer"}`, `'04:05:06 PST'`, `14706000000`},
-	{`time without time zone`, `{"type":"integer"}`, `'04:05:06 PST'`, `14706000000`},
-	{`time with time zone`, `{"type":"string","format":"time"}`, `'04:05:06 PST'`, `"04:05:06-08"`},
-	{`interval`, `{"type":"string"}`, `'2 months 1 day 5 minutes 6 seconds'`, `"2 mon 1 day 00:05:06.000000"`},
+	//{`timestamp with time zone`, `{"anyOf":[{"type":"string","format":"date-time"}`, `'January 8, 1999'`, `"1999-01-07T16:00:00-08:00"`},
+	{`time`, `{"anyOf":[{"type":"integer"},{"type":"null"}]}`, `'04:05:06 PST'`, `14706000000`},
+	{`time without time zone`, `{"anyOf":[{"type":"integer"},{"type":"null"}]}`, `'04:05:06 PST'`, `14706000000`},
+	{`time with time zone`, `{"anyOf":[{"type":"string","format":"time"},{"type":"null"}]}`, `'04:05:06 PST'`, `"04:05:06-08"`},
+	{`interval`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'2 months 1 day 5 minutes 6 seconds'`, `"2 mon 1 day 00:05:06.000000"`},
 
-	{`point`, `{"type":"string"}`, `'(1, 2)'`, `"(1,2)"`},
-	{`line`, `{"type":"string"}`, `'{1, 2, 3}'`, `"{1,2,3}"`},
-	{`lseg`, `{"type":"string"}`, `'[(1, 2), (3, 4)]'`, `"(1,2),(3,4)"`},
-	{`box`, `{"type":"string"}`, `'((1, 2), (3, 4))'`, `"(3,4),(1,2)"`},
-	{`path`, `{"type":"string"}`, `'[(1, 2), (3, 4), (5, 6)]'`, `"[(1,2),(3,4),(5,6)]"`},
-	{`polygon`, `{"type":"string"}`, `'((0, 0), (0, 1), (1, 0))'`, `"((0,0),(0,1),(1,0))"`},
-	{`circle`, `{"type":"string"}`, `'((1, 2), 3)'`, `"\u003c(1,2),3\u003e"`},
+	{`point`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'(1, 2)'`, `"(1,2)"`},
+	{`line`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'{1, 2, 3}'`, `"{1,2,3}"`},
+	{`lseg`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'[(1, 2), (3, 4)]'`, `"(1,2),(3,4)"`},
+	{`box`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'((1, 2), (3, 4))'`, `"(3,4),(1,2)"`},
+	{`path`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'[(1, 2), (3, 4), (5, 6)]'`, `"[(1,2),(3,4),(5,6)]"`},
+	{`polygon`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'((0, 0), (0, 1), (1, 0))'`, `"((0,0),(0,1),(1,0))"`},
+	{`circle`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'((1, 2), 3)'`, `"\u003c(1,2),3\u003e"`},
 
-	{`inet`, `{"type":"string"}`, `'192.168.100.0/24'`, `"192.168.100.0/24"`},
-	{`inet`, `{"type":"string"}`, `'2001:4f8:3:ba::/64'`, `"2001:4f8:3:ba::/64"`},
-	{`cidr`, `{"type":"string"}`, `'192.168.100.0/24'`, `"192.168.100.0/24"`},
-	{`cidr`, `{"type":"string"}`, `'2001:4f8:3:ba::/64'`, `"2001:4f8:3:ba::/64"`},
-	{`macaddr`, `{"type":"string"}`, `'08:00:2b:01:02:03'`, `"08:00:2b:01:02:03"`},
-	{`macaddr8`, `{"type":"string"}`, `'08-00-2b-01-02-03-04-05'`, `"08:00:2b:01:02:03:04:05"`},
-	{`uuid`, `{"type":"string","format":"uuid"}`, `'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'`, `"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"`},
+	{`inet`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'192.168.100.0/24'`, `"192.168.100.0/24"`},
+	{`inet`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'2001:4f8:3:ba::/64'`, `"2001:4f8:3:ba::/64"`},
+	{`cidr`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'192.168.100.0/24'`, `"192.168.100.0/24"`},
+	{`cidr`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'2001:4f8:3:ba::/64'`, `"2001:4f8:3:ba::/64"`},
+	{`macaddr`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'08:00:2b:01:02:03'`, `"08:00:2b:01:02:03"`},
+	{`macaddr8`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'08-00-2b-01-02-03-04-05'`, `"08:00:2b:01:02:03:04:05"`},
+	{`uuid`, `{"anyOf":[{"type":"string","format":"uuid"},{"type":"null"}]}`, `'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'`, `"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"`},
 
-	{`tsvector`, `{"type":"string"}`, `'a fat cat'`, `"'a' 'cat' 'fat'"`},
-	{`tsquery`, `{"type":"string"}`, `'fat & cat'`, `"'fat' \u0026 'cat'"`},
+	{`tsvector`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'a fat cat'`, `"'a' 'cat' 'fat'"`},
+	{`tsquery`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'fat & cat'`, `"'fat' \u0026 'cat'"`},
 
 	// TODO(wgd): JSON values read by pgx/pgtype are currently unmarshalled (by the `pgtype.JSON.Get()` method)
 	// into an `interface{}`, which means that the un-normalized JSON text coming from PostgreSQL is getting
@@ -91,14 +93,14 @@ var datatypeTestcases = []datatypeTestcase{
 	// possibly want to try and fix this for `json` at some point?
 	{`json`, `{}`, `'{"type": "test", "data": 123}'`, `{"data":123,"type":"test"}`},
 	{`jsonb`, `{}`, `'{"type": "test", "data": 123}'`, `{"data":123,"type":"test"}`},
-	{`jsonpath`, `{"type":"string"}`, `'$foo'`, `"$\"foo\""`},
-	{`xml`, `{"type":"string"}`, `'<foo>bar &gt; baz</foo>'`, `"\u003cfoo\u003ebar \u0026gt; baz\u003c/foo\u003e"`},
+	{`jsonpath`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'$foo'`, `"$\"foo\""`},
+	{`xml`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'<foo>bar &gt; baz</foo>'`, `"\u003cfoo\u003ebar \u0026gt; baz\u003c/foo\u003e"`},
 
 	// TODO(wgd): Should arrays be strings or should we decode them?
-	{`integer[3][3]`, `{"type":"string"}`, `'{{1,2,3},{4,5,6},{7,8,9}}'`, `"{{1,2,3},{4,5,6},{7,8,9}}"`},
-	{`smallint[3][3]`, `{"type":"string"}`, `'{{1,2,3},{4,5,6},{7,8,9}}'`, `"{{1,2,3},{4,5,6},{7,8,9}}"`},
-	{`real[][]`, `{"type":"string"}`, `'{{1,2,3},{4,5,6},{7,8,9}}'`, `"{{1,2,3},{4,5,6},{7,8,9}}"`},
-	{`text[]`, `{"type":"string"}`, `'{"foo", "bar", "baz"}'`, `"{foo,bar,baz}"`},
+	{`integer[3][3]`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'{{1,2,3},{4,5,6},{7,8,9}}'`, `"{{1,2,3},{4,5,6},{7,8,9}}"`},
+	{`smallint[3][3]`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'{{1,2,3},{4,5,6},{7,8,9}}'`, `"{{1,2,3},{4,5,6},{7,8,9}}"`},
+	{`real[][]`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'{{1,2,3},{4,5,6},{7,8,9}}'`, `"{{1,2,3},{4,5,6},{7,8,9}}"`},
+	{`text[]`, `{"anyOf":[{"type":"string"},{"type":"null"}]}`, `'{"foo", "bar", "baz"}'`, `"{foo,bar,baz}"`},
 
 	// TODO(wgd): Add enumeration test case?
 }
@@ -107,7 +109,7 @@ func TestDatatypes(t *testing.T) {
 	var cfg, ctx = TestDefaultConfig, context.Background()
 
 	for idx, tc := range datatypeTestcases {
-		t.Run(fmt.Sprintf("idx=%d", idx), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d_%s", idx, sanitizeName(tc.ColumnType)), func(t *testing.T) {
 			var table = createTestTable(ctx, t, "", fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
 
 			// Perform discovery and verify that the generated JSON schema looks correct
@@ -187,4 +189,21 @@ func verifyRoundTrip(t *testing.T, output string, colType, colValue, expectedVal
 	if string(record.Data.Value) != expectedValue {
 		t.Errorf("result mismatch for type %q: input %q, got %q, expected %q", colType, colValue, string(record.Data.Value), expectedValue)
 	}
+}
+
+func sanitizeName(name string) string {
+	var xs = []byte(name)
+	for i := range xs {
+		if '0' <= xs[i] && xs[i] <= '9' {
+			continue
+		}
+		if 'a' <= xs[i] && xs[i] <= 'z' {
+			continue
+		}
+		if 'A' <= xs[i] && xs[i] <= 'Z' {
+			continue
+		}
+		xs[i] = '_'
+	}
+	return strings.TrimRight(string(xs), "_")
 }

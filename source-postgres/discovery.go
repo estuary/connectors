@@ -38,6 +38,9 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 			if !ok {
 				return nil, fmt.Errorf("cannot translate PostgreSQL column type %q to JSON schema", column.DataType)
 			}
+			if column.IsNullable && jsonType != "{}" {
+				jsonType = fmt.Sprintf(`{"anyOf":[%s,{"type":"null"}]}`, jsonType)
+			}
 			fields[column.Name] = json.RawMessage(jsonType)
 		}
 		var schema, err = json.Marshal(map[string]interface{}{
