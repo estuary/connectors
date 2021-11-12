@@ -127,7 +127,7 @@ func TestDatatypes(t *testing.T) {
 					t.Errorf("column type %q: no stream named %q discovered", tc.ColumnType, table)
 					return
 				}
-				var expectedSchema = fmt.Sprintf(`{"properties":{"a":{"type":"integer"},"b":%s},"type":"object"}`, tc.OutputType)
+				var expectedSchema = fmt.Sprintf(`{"properties":{"a":{"type":"integer"},"b":%s},"required":["a"],"type":"object"}`, tc.OutputType)
 				if string(stream.JSONSchema) != expectedSchema {
 					t.Errorf("column type %q did not produce expected schema: %s", tc.ColumnType, expectedSchema)
 					t.Errorf("column type %q resulted in schema: %s", tc.ColumnType, stream.JSONSchema)

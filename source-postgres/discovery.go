@@ -40,7 +40,11 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 			}
 			fields[column.Name] = json.RawMessage(jsonType)
 		}
-		var schema, err = json.Marshal(map[string]interface{}{"type": "object", "properties": fields})
+		var schema, err = json.Marshal(map[string]interface{}{
+			"type":       "object",
+			"required":   table.PrimaryKey,
+			"properties": fields,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("error marshalling schema JSON: %w", err)
 		}
