@@ -119,7 +119,7 @@ func TestComplexDataset(t *testing.T) {
 
 	dbLoadCSV(ctx, t, tableName, "statepop.csv", 0)
 	var states = verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
-	state = states[11] // Restart in between (1960, 'IA') and (1960, 'ID')
+	state = states[10] // Restart in between (1960, 'IA') and (1960, 'ID')
 
 	dbInsert(ctx, t, tableName, [][]interface{}{
 		{1930, "XX", "No Such State", 1234},   // An insert prior to the first restart, which will be reported once replication begins
@@ -213,13 +213,13 @@ func TestIgnoredStreams(t *testing.T) {
 }
 
 // TestSlotLSNAdvances checks that the `restart_lsn` of a replication slot
-// has advanced after a connector restart.
+// eventually advances in response to connector restarts.
 func TestSlotLSNAdvances(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
 
-	var cfg, ctx, state = TestDefaultConfig, longTestContext(t, 30*time.Second), PersistentState{}
+	var cfg, ctx, state = TestDefaultConfig, longTestContext(t, 60*time.Second), PersistentState{}
 	var table = createTestTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var catalog = testCatalog(table)
 
@@ -229,8 +229,8 @@ func TestSlotLSNAdvances(t *testing.T) {
 		logrus.WithField("slot", *TestReplicationSlot).WithField("err", err).Error("failed to query restart_lsn")
 	}
 
-	// Insert some data, note down a deadline 20s after that data was inserted, and
-	// get the initial table scan out of the way.
+	// Insert some data, get the initial table scan out of the way, and wait long enough
+	// that the database must have written a new snapshot.
 	//
 	// PostgreSQL `BackgroundWriterMain()` will trigger `LogStandbySnapshot()` whenever
 	// "important records" have been inserted in the WAL and >15s have elapsed since
@@ -239,34 +239,26 @@ func TestSlotLSNAdvances(t *testing.T) {
 	// a replication slot's `restart_lsn` to advance in response to StandbyStatusUpdate
 	// messages.
 	dbInsert(ctx, t, table, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
-	var deadline = time.Now().Add(20 * time.Second)
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "capture1")
-
-	// Wait until we're confident a snapshot must have taken place, then create a
-	// few more change events. The next capture will advance 'CurrentLSN' in response
-	// to these 'Commit's.
 	logrus.Info("waiting so a standby snapshot can occur")
-	time.Sleep(time.Until(deadline))
-	dbInsert(ctx, t, table, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
+	time.Sleep(20 * time.Second)
 
-	// Perform two captures. The first one will receive all the change events up
-	// to this point and emit state updates advancing 'CurrentLSN'. The second
-	// capture will then treat the initial 'CurrentLSN' as "acknowledged" and
-	// relay it to the database in StandbyStatusUpdate messages. These status
-	// updates will interact with the XLOG_RUNNING_XACTS record in the WAL to
-	// actually advance the replication slot's `restart_lsn`.
-	cfg.PollTimeoutSeconds = 2
-	verifiedCapture(ctx, t, &cfg, &catalog, &state, "capture2")
-	verifiedCapture(ctx, t, &cfg, &catalog, &state, "capture3")
+	// Perform a capture and then check if `restart_lsn` has advanced. If not,
+	// keep trying until it does or the retry count is hit.
+	const retryCount = 50
+	for iter := 0; iter < retryCount; iter++ {
+		verifiedCapture(ctx, t, &cfg, &catalog, &state, "captureN")
 
-	// Finally, check the `restart_lsn` of the replication slot and verify that
-	// it's more recent than it used to be.
-	var afterLSN pglogrepl.LSN
-	if err := TestDatabase.QueryRow(ctx, `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`, *TestReplicationSlot).Scan(&afterLSN); err != nil {
-		logrus.WithField("slot", *TestReplicationSlot).WithField("err", err).Error("failed to query restart_lsn")
+		var afterLSN pglogrepl.LSN
+		if err := TestDatabase.QueryRow(ctx, `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`, *TestReplicationSlot).Scan(&afterLSN); err != nil {
+			logrus.WithField("slot", *TestReplicationSlot).WithField("err", err).Error("failed to query restart_lsn")
+		}
+		logrus.WithFields(logrus.Fields{"iter": iter, "before": beforeLSN, "after": afterLSN}).Info("checking slot LSN")
+		if afterLSN > beforeLSN {
+			return
+		}
+
+		time.Sleep(200 * time.Millisecond)
 	}
-	logrus.WithField("before", beforeLSN).WithField("after", afterLSN).Info("done")
-	if afterLSN <= beforeLSN {
-		t.Errorf("slot %q restart LSN didn't advance (before=%q, after=%q)", *TestReplicationSlot, beforeLSN, afterLSN)
-	}
+	t.Errorf("slot %q restart LSN failed to advance after %d retries", *TestReplicationSlot, retryCount)
 }

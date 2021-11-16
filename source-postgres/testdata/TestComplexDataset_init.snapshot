@@ -1,5 +1,4 @@
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","key_columns":["year","state"]}}}}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","key_columns":["year","state"]}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Alabama","population":1830000,"state":"AL","year":1900},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Arkansas","population":1314000,"state":"AR","year":1900},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Arizona","population":124000,"state":"AZ","year":1900},"emitted_at":1234,"namespace":"public"}}
