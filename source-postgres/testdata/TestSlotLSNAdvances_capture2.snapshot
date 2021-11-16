@@ -1,4 +1,0 @@
-{"type":"RECORD","record":{"stream":"test_slotlsnadvances_one","data":{"_change_type":"Insert","data":"three","id":3},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_slotlsnadvances_one","data":{"_change_type":"Insert","data":"four","id":4},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_slotlsnadvances_one","data":{"_change_type":"Insert","data":"five","id":5},"emitted_at":1234,"namespace":"public"}}
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_slotlsnadvances_one":{"mode":"Active","key_columns":["id"]}}}}}

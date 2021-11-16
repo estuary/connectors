@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -81,14 +80,6 @@ type capture struct {
 
 	connScan   *pgx.Conn          // The DB connection used for table scanning
 	replStream *replicationStream // The high-level replication stream abstraction
-	watchdog   *time.Timer        // If non-nil, the Reset() method will be invoked whenever a record is emitted
-
-	// We keep a count of change events since the last state checkpoint was
-	// emitted. Currently this is only used to suppress "empty" commit messages
-	// from triggering a state update (which improves test stability), but
-	// this could also be used to "coalesce" smaller transactions in the
-	// future.
-	changesSinceLastCheckpoint int
 }
 
 // messageOutput represents "the thing to which Capture writes records and state checkpoints".
@@ -103,27 +94,6 @@ type messageOutput interface {
 // (if any) are met.
 func RunCapture(ctx context.Context, config *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, dest messageOutput) error {
 	logrus.WithField("uri", config.ConnectionURI).WithField("slot", config.SlotName).Info("starting capture")
-
-	if config.MaxLifespanSeconds != 0 {
-		var duration = time.Duration(config.MaxLifespanSeconds * float64(time.Second))
-		logrus.WithField("duration", duration).Info("limiting connector lifespan")
-		var limitedCtx, cancel = context.WithTimeout(ctx, duration)
-		defer cancel()
-		ctx = limitedCtx
-	}
-
-	// In non-tailing mode (which should only occur during development) we need
-	// to shut down after no further changes have been reported for a while. To
-	// do this we create a cancellable context, and a watchdog timer which will
-	// perform said cancellation if `PollTimeout` elapses between resets.
-	var watchdog *time.Timer
-	if !catalog.Tail && config.PollTimeoutSeconds != 0 {
-		var streamCtx, streamCancel = context.WithCancel(ctx)
-		defer streamCancel()
-		var wdtDuration = time.Duration(config.PollTimeoutSeconds * float64(time.Second))
-		watchdog = time.AfterFunc(wdtDuration, streamCancel)
-		ctx = streamCtx
-	}
 
 	// Normal database connection used for table scanning
 	var connScan, err = pgx.Connect(ctx, config.ConnectionURI)
@@ -155,23 +125,13 @@ func RunCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 		encoder:    dest,
 		connScan:   connScan,
 		replStream: replStream,
-		watchdog:   watchdog,
 	}
 
 	if err := c.updateState(ctx); err != nil {
 		return fmt.Errorf("error updating capture state: %w", err)
 	}
 
-	err = c.streamChanges(ctx)
-	logrus.WithField("err", err).Debug("stopped streaming changes")
-	if errors.Is(err, context.DeadlineExceeded) && c.config.MaxLifespanSeconds != 0 {
-		logrus.WithField("err", err).WithField("maxLifespan", c.config.MaxLifespanSeconds).Info("maximum lifespan reached")
-		return nil
-	}
-	if errors.Is(err, context.Canceled) && !c.catalog.Tail {
-		return nil
-	}
-	return err
+	return c.streamChanges(ctx)
 }
 
 func (c *capture) updateState(ctx context.Context) error {
@@ -289,6 +249,13 @@ func (c *capture) streamChanges(ctx context.Context) error {
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
 	var targetWatermark = "nonexistent-watermark"
+	if !c.catalog.Tail {
+		var watermark, err = writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
+		if err != nil {
+			return fmt.Errorf("error writing poll watermark: %w", err)
+		}
+		targetWatermark = watermark
+	}
 	logrus.WithField("tail", c.catalog.Tail).WithField("watermark", targetWatermark).Info("streaming until watermark")
 	return c.streamToWatermark(targetWatermark, nil)
 }
@@ -297,17 +264,14 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 	var watermarkReached = false
 	for event := range c.replStream.Events() {
 		// Commit events update the current LSN and trigger a state update. If this is
-		// the commit after the target watermark, it ends the loop and then emitBuffered
-		// will emit the state update after all buffered rows.
+		// the commit after the target watermark, it also ends the loop.
 		if event.Type == "Commit" {
 			c.state.CurrentLSN = event.LSN
+			if err := c.emitState(c.state); err != nil {
+				return fmt.Errorf("error emitting state update: %w", err)
+			}
 			if watermarkReached {
 				return nil
-			}
-			if c.changesSinceLastCheckpoint > 0 {
-				if err := c.emitState(c.state); err != nil {
-					return fmt.Errorf("error emitting state update: %w", err)
-				}
 			}
 			continue
 		}
@@ -452,7 +416,6 @@ func translateRecordField(val interface{}) (interface{}, error) {
 }
 
 func (c *capture) emitRecord(ns, stream string, data interface{}) error {
-	c.changesSinceLastCheckpoint++
 	var rawData, err = json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("error encoding record data: %w", err)
@@ -469,7 +432,6 @@ func (c *capture) emitRecord(ns, stream string, data interface{}) error {
 }
 
 func (c *capture) emitState(state interface{}) error {
-	c.changesSinceLastCheckpoint = 0
 	var rawState, err = json.Marshal(state)
 	if err != nil {
 		return fmt.Errorf("error encoding state message: %w", err)
@@ -481,12 +443,6 @@ func (c *capture) emitState(state interface{}) error {
 }
 
 func (c *capture) emit(msg interface{}) error {
-	// When in non-tailing mode, reset the shutdown watchdog whenever we emit useful progress.
-	if c.watchdog != nil {
-		var wdtDuration = time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
-		c.watchdog.Reset(wdtDuration)
-	}
-
 	return c.encoder.Encode(msg)
 }
 

@@ -70,7 +70,6 @@ func TestMain(m *testing.M) {
 	TestDefaultConfig.ConnectionURI = *TestConnectionURI
 	TestDefaultConfig.SlotName = *TestReplicationSlot
 	TestDefaultConfig.PublicationName = *TestPublicationName
-	TestDefaultConfig.PollTimeoutSeconds = *TestPollTimeoutSeconds
 	if err := TestDefaultConfig.Validate(); err != nil {
 		logrus.WithField("err", err).WithField("config", TestDefaultConfig).Fatal("error validating test config")
 	}
@@ -292,8 +291,9 @@ func performCapture(ctx context.Context, t *testing.T, cfg *Config, catalog *air
 // Capture instance, recording State updates in one list and Records
 // in another.
 type CaptureOutputBuffer struct {
-	States   []PersistentState
-	Snapshot strings.Builder
+	States    []PersistentState
+	Snapshot  strings.Builder
+	lastState string
 }
 
 func (buf *CaptureOutputBuffer) Encode(v interface{}) error {
@@ -320,20 +320,30 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	// that because we're unmarshalling each state update from JSON we
 	// can rely on the states being independent and not sharing any
 	// pointer-identity in their 'Streams' map or `ScanRanges` lists.
-	var state PersistentState
-	if err := json.Unmarshal(msg.State.Data, &state); err != nil {
+	var originalState PersistentState
+	if err := json.Unmarshal(msg.State.Data, &originalState); err != nil {
 		return fmt.Errorf("error unmarshaling to PersistentState: %w", err)
 	}
-	buf.States = append(buf.States, state)
 
-	// Sanitize state by rewriting the LSN to a constant
-	var cleanState = PersistentState{CurrentLSN: 1234, Streams: state.Streams}
-
-	// Encode and buffer
+	// Sanitize state by rewriting the LSN to a constant, then encode
+	// back into new bytes.
+	var cleanState = PersistentState{CurrentLSN: 1234, Streams: originalState.Streams}
 	var bs, err = json.Marshal(cleanState)
 	if err != nil {
 		return fmt.Errorf("error encoding cleaned state: %w", err)
 	}
+
+	// Suppress identical (after sanitizing LSN) successive state updates.
+	// This improves test stability in the presence of unexpected 'Commit'
+	// events (typically on other tables not subject to the current test).
+	if string(bs) == buf.lastState {
+		return nil
+	}
+	buf.lastState = string(bs)
+
+	// Buffer the original state for later resuming, and append the sanitized
+	// state to the output buffer.
+	buf.States = append(buf.States, originalState)
 	return buf.bufferMessage(airbyte.Message{
 		Type:  airbyte.MessageTypeState,
 		State: &airbyte.State{Data: json.RawMessage(bs)},
@@ -341,6 +351,7 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 }
 
 func (buf *CaptureOutputBuffer) bufferRecord(msg airbyte.Message) error {
+	buf.lastState = ""
 	return buf.bufferMessage(airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
 		Record: &airbyte.Record{
