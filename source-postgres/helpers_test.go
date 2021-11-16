@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Tweak some parameters to make things easier to test on a smaller scale
-	snapshotChunkSize = 16
+	backfillChunkSize = 16
 	replicationBufferSize = 0
 
 	// Open a connection to the database which will be used for creating and

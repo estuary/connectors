@@ -95,7 +95,7 @@ func TestReplicationUpdates(t *testing.T) {
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "")
 }
 
-// TestEmptyTable leaves the table empty during the initial table snapshotting
+// TestEmptyTable leaves the table empty during the initial table backfill
 // and only adds data after replication has begun.
 func TestEmptyTable(t *testing.T) {
 	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
