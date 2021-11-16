@@ -12,6 +12,7 @@ import (
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
+	log "github.com/sirupsen/logrus"
 )
 
 type ElasticSearch struct {
@@ -46,6 +47,9 @@ func (es *ElasticSearch) CreateIndex(index string, schemaJSON json.RawMessage) e
 			return fmt.Errorf("unmarshal mappingJSON: %w", err)
 		}
 
+		// Disable dynamic mapping.
+		schema["dynamic"] = false
+
 		body, err := json.Marshal(map[string]interface{}{"mappings": schema})
 		if err != nil {
 			return fmt.Errorf("marshal mappings: %w", err)
@@ -73,6 +77,9 @@ func (es *ElasticSearch) Commit(items []*esutil.BulkIndexerItem) error {
 	}
 	var bi, err = esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Client: es.client,
+		OnError: func(_ context.Context, err error) {
+			log.Error(err)
+		},
 		//NumWorkers:    r.config.NumWorkers,
 		//FlushBytes:    r.config.FlushBytes,
 		FlushInterval: time.Hour, // Disable automatic flushing
