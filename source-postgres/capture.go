@@ -269,26 +269,20 @@ func (c *capture) updateState(ctx context.Context) error {
 // This is the main loop of the capture process, which interleaves replication event
 // streaming with backfill scan results as necessary.
 func (c *capture) streamChanges(ctx context.Context) error {
-	if c.state.pendingStreams() != nil {
-		var results *resultSet
-		var watermark, err = writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
+	var results *resultSet
+	for c.state.pendingStreams() != nil {
+		watermark, err := writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
 		if err != nil {
-			return fmt.Errorf("error writing dummy watermark: %w", err)
+			return fmt.Errorf("error writing next watermark: %w", err)
 		}
-		for c.state.pendingStreams() != nil {
-			if err := c.streamToWatermark(watermark, results); err != nil {
-				return fmt.Errorf("error streaming until watermark: %w", err)
-			} else if err := c.emitBuffered(results); err != nil {
-				return fmt.Errorf("error emitting buffered results: %w", err)
-			}
-			results, err = c.backfillStreams(ctx, c.state.pendingStreams())
-			if err != nil {
-				return fmt.Errorf("error performing backfill: %w", err)
-			}
-			watermark, err = writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
-			if err != nil {
-				return fmt.Errorf("error writing next watermark: %w", err)
-			}
+		if err := c.streamToWatermark(watermark, results); err != nil {
+			return fmt.Errorf("error streaming until watermark: %w", err)
+		} else if err := c.emitBuffered(results); err != nil {
+			return fmt.Errorf("error emitting buffered results: %w", err)
+		}
+		results, err = c.backfillStreams(ctx, c.state.pendingStreams())
+		if err != nil {
+			return fmt.Errorf("error performing backfill: %w", err)
 		}
 	}
 
