@@ -13,6 +13,7 @@ pub enum ESBasicType {
     }, // refer to the comments of DateSpec in ../run.go for details.
     Double,
     GeoPoint, // refer to https://www.elastic.co/guide/en/elasticsearch/reference/current/geo-point.html to see the format of geo_point data.
+    GeoShape, // refer to https://www.elastic.co/guide/en/elasticsearch/reference/current/geo-shape.html to see the format of geo_shape data.
     Keyword {
         ignore_above: u16,
     }, // refer to the comments of KeywordSpec in ../run.go for details.

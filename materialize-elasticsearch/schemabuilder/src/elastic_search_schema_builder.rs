@@ -9,6 +9,7 @@ use serde_json::json;
 use serde_json::Value;
 
 pub const DEFAULT_IGNORE_ABOVE: u16 = 256;
+// TODO(jixiang) replace the bundle url with https://estuary.dev/api/collections/<name>/<build-id>/schema for managed services.
 pub const FAKE_BUNDLE_URL: &str = "https://fake-bundle-schema.estuary.io";
 
 pub fn build_elastic_schema(schema_json: &[u8]) -> Result<ESFieldType, Error> {
