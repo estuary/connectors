@@ -218,7 +218,6 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 		}
 
 		for _, doc := range docs {
-			//log.Info(fmt.Sprintf("loaded doc: %+v", string(doc)))
 			if err = loaded(bindingNum, doc); err != nil {
 				return fmt.Errorf("callback: %w", err)
 			}
@@ -259,25 +258,32 @@ func (t *transactor) Prepare(req *pm.TransactionRequest_Prepare) (*pm.Transactio
 }
 
 func (t *transactor) Store(it *pm.StoreIterator) error {
+	var lastErr error = nil
 	for it.Next() {
 		var item = &esutil.BulkIndexerItem{
 			Index:      t.bindings[it.Binding].index,
 			DocumentID: documentID(it.Key),
 			Action:     "index",
 			Body:       bytes.NewReader(it.RawJSON),
+			OnFailure: func(_ context.Context, _ esutil.BulkIndexerItem, r esutil.BulkIndexerResponseItem, e error) {
+				log.Error(fmt.Sprintf("failed with response: %+v, error: %v", r, e))
+				lastErr = fmt.Errorf("store items: %+v, %w", r, e)
+			},
 		}
 
 		t.bulkIndexerItems = append(t.bulkIndexerItems, item)
 	}
-	return nil
+
+	return lastErr
 }
 
 func (t *transactor) Commit() error {
 	defer func() { t.bulkIndexerItems = t.bulkIndexerItems[:0] }()
 	for _, b := range t.bindings {
-		t.elasticSearch.Flush(b.index)
+		if err := t.elasticSearch.Flush(b.index); err != nil {
+			return fmt.Errorf("commit: %w", err)
+		}
 	}
-
 	return t.elasticSearch.Commit(t.bulkIndexerItems)
 }
 

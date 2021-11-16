@@ -78,7 +78,7 @@ func (es *ElasticSearch) Commit(items []*esutil.BulkIndexerItem) error {
 	var bi, err = esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Client: es.client,
 		OnError: func(_ context.Context, err error) {
-			log.Error(err)
+			log.Error(fmt.Sprintf("indexer: %v", err))
 		},
 		//NumWorkers:    r.config.NumWorkers,
 		//FlushBytes:    r.config.FlushBytes,
@@ -143,7 +143,7 @@ func (es *ElasticSearch) Flush(index string) error {
 		es.client.Indices.Flush.WithIndex(index),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("flush: response %+v, err: %w", resp, err)
 	}
 	defer resp.Body.Close()
 
