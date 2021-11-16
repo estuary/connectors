@@ -29,7 +29,7 @@ func scanTableChunk(ctx context.Context, conn *pgx.Conn, streamID string, keyCol
 	var parts = strings.SplitN(streamID, ".", 2)
 	var schemaName, tableName = parts[0], parts[1]
 
-	// Build and execute a query to fetch the next `snapshotChunkSize` rows from the database
+	// Build and execute a query to fetch the next `backfillChunkSize` rows from the database
 	var query = buildScanQuery(resumeKey == nil, keyColumns, schemaName, tableName)
 	var args []interface{}
 	if resumeKey != nil {
@@ -97,10 +97,10 @@ func writeWatermark(ctx context.Context, conn *pgx.Conn, table, slot string) (st
 	return wm, nil
 }
 
-// snapshotChunkSize controls how many rows will be read from the database in a
+// backfillChunkSize controls how many rows will be read from the database in a
 // single query. In normal use it acts like a constant, it's just a variable here
 // so that it can be lowered in tests to exercise chunking behavior more easily.
-var snapshotChunkSize = 4096
+var backfillChunkSize = 4096
 
 func buildScanQuery(start bool, keyColumns []string, schemaName, tableName string) string {
 	// Construct strings like `(foo, bar, baz)` and `($1, $2, $3)` for use in the query
@@ -121,6 +121,6 @@ func buildScanQuery(start bool, keyColumns []string, schemaName, tableName strin
 		fmt.Fprintf(query, " WHERE (%s) > (%s)", pkey, args)
 	}
 	fmt.Fprintf(query, " ORDER BY (%s)", pkey)
-	fmt.Fprintf(query, " LIMIT %d;", snapshotChunkSize)
+	fmt.Fprintf(query, " LIMIT %d;", backfillChunkSize)
 	return query.String()
 }
