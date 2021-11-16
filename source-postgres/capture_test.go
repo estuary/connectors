@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -20,6 +21,34 @@ func TestSimpleCapture(t *testing.T) {
 	// Add data, perform capture, verify result
 	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "")
+}
+
+// TestTailing performs a capture in 'tail' mode, which is how it actually runs
+// under Flow outside of development tests. This means that after the initial
+// backfilling completes, the capture will run indefinitely without writing
+// any more watermarks.
+func TestTailing(t *testing.T) {
+	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
+	var tableName = createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var catalog, state = testCatalog(tableName), PersistentState{}
+	catalog.Tail = true
+
+	// Initial data which must be backfilled
+	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {10, "bbb"}, {20, "CDEFGHIJKLMNOP"}, {30, "Four"}, {40, "5"}})
+
+	// Run the capture
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	go verifiedCapture(captureCtx, t, &cfg, &catalog, &state, "")
+	time.Sleep(1 * time.Second)
+
+	// Some more changes occurring after the backfill completes
+	dbInsert(ctx, t, tableName, [][]interface{}{{5, "asdf"}, {100, "lots"}})
+	dbQuery(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 20;", tableName))
+	dbQuery(ctx, t, fmt.Sprintf("UPDATE %s SET data = 'updated' WHERE id = 30;", tableName))
+
+	// Let the capture catch up and then terminate it
+	time.Sleep(1 * time.Second)
+	cancelCapture()
 }
 
 // TestReplicationInserts runs two captures, where the first will perform the
