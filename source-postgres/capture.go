@@ -294,8 +294,9 @@ func (c *capture) streamChanges(ctx context.Context) error {
 
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
-	logrus.Info("all streams active")
-	return c.streamToWatermark("nonexistent-watermark", nil)
+	var targetWatermark = "nonexistent-watermark"
+	logrus.WithField("tail", c.catalog.Tail).WithField("watermark", targetWatermark).Info("streaming until watermark")
+	return c.streamToWatermark(targetWatermark, nil)
 }
 
 func (c *capture) streamToWatermark(watermark string, results *resultSet) error {
