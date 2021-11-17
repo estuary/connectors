@@ -22,6 +22,8 @@ const LOAD_BY_ID_BATCH_SIZE = 1000
 
 type config struct {
 	Endpoint string `json:"endpoint"`
+	Username string `json: "username"`
+	Password string `json: "password"`
 }
 
 func (c config) Validate() error {
@@ -113,7 +115,7 @@ func (driver) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyRespons
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = NewElasticSearch(ctx, cfg.Endpoint)
+	var elasticSearch, err = NewElasticSearch(ctx, cfg.Endpoint, cfg.Username, cfg.Password)
 	if err != nil {
 		return nil, fmt.Errorf("creating elasticSearch: %w", err)
 	}
@@ -158,7 +160,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 
 	var ctx = stream.Context()
 	var elasticSearch *ElasticSearch
-	elasticSearch, err = NewElasticSearch(ctx, cfg.Endpoint)
+	elasticSearch, err = NewElasticSearch(ctx, cfg.Endpoint, cfg.Username, cfg.Password)
 	if err != nil {
 		return fmt.Errorf("creating elastic search client: %w", err)
 	}
@@ -230,8 +232,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 		if b.deltaUpdates {
-			// No need to load for delta updates.
-			continue
+			panic("Load should not be called for delta updates!")
 		}
 		//log.Info(fmt.Sprintf("request loading: %+v", it.Key))
 		b.loadingIds = append(b.loadingIds, documentID(it.Key))
