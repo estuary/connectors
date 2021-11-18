@@ -207,11 +207,11 @@ func cleanup(config config, workspaceName string, collectionName string) {
 }
 
 func randWorkspace() string {
-	return fmt.Sprintf("workspace-%s", RandString(10))
+	return fmt.Sprintf("automated-tests-%s", RandString(6))
 }
 
 func randCollection() string {
-	return fmt.Sprintf("collection-%s", RandString(10))
+	return fmt.Sprintf("c-%s", RandString(6))
 }
 
 func fetchApiKey() string {
