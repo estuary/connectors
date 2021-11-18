@@ -186,42 +186,24 @@ func TestRocksetDriverApply(t *testing.T) {
 	defer cleanup(config, workspaceName, collectionName)
 
 	response, err := driver.Apply(context.Background(), &applyReq)
-	log.Printf("Applied: %s", response.ActionDescription)
 
 	require.NoError(t, err)
 	require.Contains(t, response.ActionDescription, fmt.Sprintf("created %s collection", collectionName))
+	log.Printf("Applied: %s", response.ActionDescription)
 }
 
 func cleanup(config config, workspaceName string, collectionName string) {
 	ctx := context.Background()
 	client, err := NewClient(config.ApiKey, false)
 	if err != nil {
-		log.Fatalf("failed to create client to cleanup resources: %s/%s", workspaceName, collectionName)
-	}
-	{
-		ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-		defer cancel()
-
-		if err := client.DestroyCollection(ctx, workspaceName, collectionName); err != nil {
-			log.Fatalf("failed to cleanup collection: %s/%s", workspaceName, collectionName)
-		}
+		log.Fatalf("initializing client: %s", err.Error())
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-
-	for {
-		if err := client.DestroyWorkspace(ctx, workspaceName); err == nil {
-			return
-		}
-
-		select {
-		case <-ctx.Done():
-			log.Fatalf("failed to cleanup workspace: %s", workspaceName)
-		default:
-			time.Sleep(time.Millisecond * 100)
-		}
+	if err := client.DestroyCollection(ctx, workspaceName, collectionName); err != nil {
+		log.Fatalf("failed to cleanup collection: %s/%s: %s", workspaceName, collectionName, err.Error())
 	}
+
+	client.DestroyWorkspace(ctx, workspaceName)
 }
 
 func randWorkspace() string {
