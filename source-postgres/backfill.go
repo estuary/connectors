@@ -42,7 +42,7 @@ func scanTableChunk(ctx context.Context, conn *pgx.Conn, streamID string, keyCol
 			return nil, fmt.Errorf("expected %d primary-key values but got %d", len(keyColumns), len(args))
 		}
 	}
-	logrus.WithField("query", query).WithField("args", args).Debug("executing query")
+	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 	rows, err := conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute query %q: %w", query, err)

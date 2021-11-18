@@ -226,7 +226,7 @@ func TestSlotLSNAdvances(t *testing.T) {
 	// Capture the current `restart_lsn` of the replication slot prior to our test
 	var beforeLSN pglogrepl.LSN
 	if err := TestDatabase.QueryRow(ctx, `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`, *TestReplicationSlot).Scan(&beforeLSN); err != nil {
-		logrus.WithField("slot", *TestReplicationSlot).WithField("err", err).Error("failed to query restart_lsn")
+		logrus.WithFields(logrus.Fields{"slot": *TestReplicationSlot, "err": err}).Error("failed to query restart_lsn")
 	}
 
 	// Insert some data, get the initial table scan out of the way, and wait long enough
@@ -251,7 +251,7 @@ func TestSlotLSNAdvances(t *testing.T) {
 
 		var afterLSN pglogrepl.LSN
 		if err := TestDatabase.QueryRow(ctx, `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`, *TestReplicationSlot).Scan(&afterLSN); err != nil {
-			logrus.WithField("slot", *TestReplicationSlot).WithField("err", err).Error("failed to query restart_lsn")
+			logrus.WithFields(logrus.Fields{"slot": *TestReplicationSlot, "err": err}).Error("failed to query restart_lsn")
 		}
 		logrus.WithFields(logrus.Fields{"iter": iter, "before": beforeLSN, "after": afterLSN}).Info("checking slot LSN")
 		if afterLSN > beforeLSN {
