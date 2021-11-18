@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	cloud.google.com/go/bigquery v1.24.0
-	cloud.google.com/go/storage v1.18.0
+	cloud.google.com/go/storage v1.18.2
 	github.com/alecthomas/jsonschema v0.0.0-20210920000243-787cd8204a0d
 	github.com/apache/arrow/go/arrow v0.0.0-20211012085237-157d48ccd47a // indirect
 	github.com/apache/thrift v0.15.0 // indirect
@@ -35,14 +35,12 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/xitongsys/parquet-go v1.6.1
 	github.com/xitongsys/parquet-go-source v0.0.0-20211010230925-397910c5e371
+	go.gazette.dev/core v0.89.1-0.20211102012207-3059932fee87
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/net v0.0.0-20211011170408-caeb26a5c8c0 // indirect
-	golang.org/x/oauth2 v0.0.0-20211005180243-6b3c2da341f1 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211007075335-d3039528d8ac // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
-	google.golang.org/api v0.58.0
-	google.golang.org/genproto v0.0.0-20211011165927-a5fb3255271e // indirect
+	google.golang.org/api v0.60.0
 	google.golang.org/grpc v1.41.0
 	gopkg.in/yaml.v2 v2.4.0
 )
