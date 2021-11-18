@@ -143,18 +143,9 @@ func (t *transactor) storeAdditionOperation(b *binding, key *tuple.Tuple, values
 	// Add the non-keys to the document.
 	for i, value := range *values {
 		var propName = b.spec.FieldSelection.Values[i]
-		inference := b.spec.Collection.GetProjection(propName).Inference
 
-		if containsString(inference.Types, "object") {
-			if inference.IsSingleType() {
-				// TODO: casting the tuple to a string isn't the right way of doing this.
-				// Currently this results in the following error:
-				// json: error calling MarshalJSON for type json.RawMessage: invalid character 's' looking for beginning of value
-				document[propName] = json.RawMessage(value.(string))
-			} else {
-				// TODO: enforce this at constraint gathering time?
-				return fmt.Errorf("cannot store document with fields which may or may not be an object: %s may be %v", propName, &inference.Types)
-			}
+		if raw, ok := value.([]byte); ok {
+			document[propName] = json.RawMessage(raw)
 		} else {
 			document[propName] = value
 		}
@@ -216,13 +207,4 @@ func commitCollection(t *transactor, b *binding) error {
 func logElapsedTime(start time.Time, msg string) {
 	elapsed := time.Since(start)
 	log.Infof("%s,%f", msg, elapsed.Seconds())
-}
-
-func containsString(list []string, target string) bool {
-	for _, item := range list {
-		if item == target {
-			return true
-		}
-	}
-	return false
 }
