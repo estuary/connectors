@@ -10,6 +10,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/estuary/connectors/flowsim/testcat"
 	"github.com/estuary/connectors/flowsim/testdata"
+	"github.com/estuary/flow/go/flow/ops"
 	"github.com/estuary/flow/go/materialize/driver/image"
 	pm "github.com/estuary/protocols/materialize"
 	"github.com/jessevdk/go-flags"
@@ -109,7 +110,7 @@ func (c *Config) ParseConfig() error {
 	if c.driverServer == nil {
 		// If driverServer is nil it means we were invoked as a command and should initialize
 		// the FlowSink driver and expect an image.
-		c.driverServer = image.NewDriver(c.Network)
+		c.driverServer = image.NewDriver(c.Network, ops.StdLogger())
 	} else {
 		// If the driverServer is already initialized, it means we are being called from a
 		// connector. We need to wrap it in a FlowSinkAdapter to ensure configuration for the
@@ -158,6 +159,9 @@ func (c *Config) NewTestCatalog() (*testcat.TestCatalog, error) {
 					},
 				},
 			},
+		},
+		StorageMappings: map[string]testcat.TestStores{
+			"": {Stores: []testcat.TestStore{{Bucket: "example", Provider: "S3"}}},
 		},
 	}, nil
 }
