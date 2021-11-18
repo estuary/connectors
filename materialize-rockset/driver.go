@@ -224,7 +224,6 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 	}
 
 	if err = stream.Send(&pm.TransactionResponse{
-		// TODO: should I be doing anything with this FlowCheckpoint? I don't *think* that's appropriate for Rockset...
 		Opened: &pm.TransactionResponse_Opened{FlowCheckpoint: nil},
 	}); err != nil {
 		return fmt.Errorf("sending Opened: %w", err)
