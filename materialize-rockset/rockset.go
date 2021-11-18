@@ -3,6 +3,7 @@ package materialize_rockset
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // Only creates the named collection if it does not already exist.
@@ -19,7 +20,8 @@ func createNewWorkspace(ctx context.Context, client *client, workspace string) (
 }
 
 func getWorkspace(ctx context.Context, client *client, workspace string) (*Workspace, error) {
-	if res, err := client.GetWorkspace(ctx, workspace); err == ErrNotFound {
+	res, err := client.GetWorkspace(ctx, workspace)
+	if se, ok := err.(*StatusError); ok && se.NotFound() {
 		// Everything worked, but this workspace does not exist.
 		return nil, nil
 	} else if err != nil {
@@ -47,14 +49,13 @@ func createNewCollection(ctx context.Context, client *client, workspace string, 
 		return nil, nil
 	} else {
 		// This collection does not exist within Rockset yet, so we should create it.
-
-		// TODO: Try fetching the collection until it exists. Rockset isn't quite ready as soon as this API call returns.
 		return createCollection(ctx, client, workspace, collection)
 	}
 }
 
 func getCollection(ctx context.Context, client *client, workspace string, collection string) (*Collection, error) {
-	if res, err := client.GetCollection(ctx, workspace, collection); err == ErrNotFound {
+	res, err := client.GetCollection(ctx, workspace, collection)
+	if se, ok := err.(*StatusError); ok && se.NotFound() {
 		// Everything worked, but this collection does not exist.
 		return nil, nil
 	} else if err != nil {
@@ -66,9 +67,28 @@ func getCollection(ctx context.Context, client *client, workspace string, collec
 
 func createCollection(ctx context.Context, client *client, workspace string, collectionName string) (*Collection, error) {
 	collection := CreateCollection{Name: collectionName}
-	if res, err := client.CreateCollection(ctx, workspace, &collection); err != nil {
+	_, err := client.CreateCollection(ctx, workspace, &collection)
+	if err != nil {
 		return nil, fmt.Errorf("failed to create collection `%s`: %w", collectionName, err)
-	} else {
-		return res, nil
+	}
+
+	time.Sleep(time.Second * 2)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*3)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("timed out waiting for collection `%s/%s` to be created: %w", workspace, collection.Name, err)
+		default:
+			if col, err := client.GetCollection(ctx, workspace, collection.Name); err != nil {
+				return nil, fmt.Errorf("fetching collection `%s/%s` while waiting for it to be created: %w", workspace, collection.Name, err)
+			} else if col.Status != "READY" {
+				// Not ready yet, so wait a couple of seconds then we'll try again.
+				time.Sleep(time.Second * 2)
+			} else {
+				return col, nil
+			}
+		}
 	}
 }
