@@ -16,12 +16,10 @@ func main() {
 // Config tells the connector how to connect to the source database and can
 // optionally be used to customize some other parameters such as polling timeout.
 type Config struct {
-	ConnectionURI      string  `json:"connectionURI"`
-	SlotName           string  `json:"slot_name"`
-	PublicationName    string  `json:"publication_name"`
-	WatermarksTable    string  `json:"watermarks_table"`
-	PollTimeoutSeconds float64 `json:"poll_timeout_seconds"`
-	MaxLifespanSeconds float64 `json:"max_lifespan_seconds"`
+	ConnectionURI   string `json:"connectionURI"`
+	SlotName        string `json:"slot_name"`
+	PublicationName string `json:"publication_name"`
+	WatermarksTable string `json:"watermarks_table"`
 }
 
 // Validate checks that the configuration passes some basic sanity checks, and
@@ -38,9 +36,6 @@ func (c *Config) Validate() error {
 	}
 	if c.WatermarksTable == "" {
 		c.WatermarksTable = "public.flow_watermarks"
-	}
-	if c.PollTimeoutSeconds == 0 {
-		c.PollTimeoutSeconds = 10
 	}
 	return nil
 }
@@ -78,18 +73,6 @@ const configSchema = `{
 			"title":       "Watermarks Table",
 			"description": "The name of the table used for watermark writes during backfills",
 			"default":     "public.flow_watermarks"
-		},
-		"poll_timeout_seconds": {
-			"type":        "number",
-			"title":       "Poll Timeout (seconds)",
-			"description": "When tail=false, controls how long to sit idle before shutting down",
-			"default":     10
-		},
-		"max_lifespan_seconds": {
-			"type":        "number",
-			"title":       "Maximum Connector Lifespan (seconds)",
-			"description": "When nonzero, imposes a maximum runtime after which to unconditionally shut down",
-			"default":     0
 		}
 	},
 	"required": [ "connectionURI" ]
