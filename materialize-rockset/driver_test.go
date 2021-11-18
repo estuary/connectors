@@ -120,7 +120,7 @@ func TestRocksetDriverValidate(t *testing.T) {
 
 	var binding = response.Bindings[0]
 	require.Len(t, binding.Constraints, 2)
-	require.Equal(t, binding.ResourcePath, []string{"testing", "widgets"})
+	require.Equal(t, binding.ResourcePath, []string{"testing", "widgets", "1000"})
 	require.True(t, binding.DeltaUpdates)
 }
 

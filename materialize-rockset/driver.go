@@ -48,8 +48,9 @@ func configFromJson(json json.RawMessage) (*config, error) {
 }
 
 type resource struct {
-	Workspace  string `json:"workspace,omitempty"`
-	Collection string `json:"collection,omitempty"`
+	Workspace    string `json:"workspace,omitempty"`
+	Collection   string `json:"collection,omitempty"`
+	MaxBatchSize int    `json:"maxBatchSize,omitempty"`
 }
 
 func (r *resource) Validate() error {
@@ -69,8 +70,23 @@ func (r *resource) Validate() error {
 	if err := validateRocksetName("collection", r.Collection); err != nil {
 		return err
 	}
+	if r.MaxBatchSize == 0 {
+		r.MaxBatchSize = 1000
+	}
 
 	return nil
+}
+
+func resourceFromJson(serialized *json.RawMessage) (*resource, error) {
+	var res *resource
+
+	if err := json.Unmarshal(*serialized, &res); err != nil {
+		return nil, fmt.Errorf("parsing resource config: %w -- %s", err, *serialized)
+	} else if err = res.Validate(); err != nil {
+		return nil, fmt.Errorf("resource invalid: %w", err)
+	}
+
+	return res, nil
 }
 
 func validateRocksetName(field string, value string) error {
@@ -120,11 +136,9 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 
 	var bindings = []*pm.ValidateResponse_Binding{}
 	for _, binding := range req.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
-		} else if err = res.Validate(); err != nil {
-			return nil, fmt.Errorf("resource invalid: %w", err)
+		res, err := resourceFromJson(&binding.ResourceSpecJson)
+		if err != nil {
+			return nil, err
 		}
 
 		var constraints = make(map[string]*pm.Constraint)
@@ -142,7 +156,7 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 
 		bindings = append(bindings, &pm.ValidateResponse_Binding{
 			Constraints:  constraints,
-			ResourcePath: []string{res.Workspace, res.Collection},
+			ResourcePath: []string{res.Workspace, res.Collection, fmt.Sprintf("%v", res.MaxBatchSize)},
 			DeltaUpdates: true,
 		})
 	}
@@ -164,17 +178,19 @@ func (d *rocksetDriver) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.Ap
 	}
 
 	actionLog := []string{}
-	for _, binding := range req.Materialization.Bindings {
-		workspace := binding.ResourcePath[0]
-		collection := binding.ResourcePath[1]
+	for i, binding := range req.Materialization.Bindings {
+		res, err := resourceFromJson(&binding.ResourceSpecJson)
+		if err != nil {
+			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
+		}
 
-		if createdWorkspace, err := createNewWorkspace(ctx, client, workspace); err != nil {
+		if createdWorkspace, err := createNewWorkspace(ctx, client, res.Workspace); err != nil {
 			return nil, err
 		} else if createdWorkspace != nil {
 			actionLog = append(actionLog, fmt.Sprintf("created %s workspace", createdWorkspace.Name))
 		}
 
-		if createdCollection, err := createNewCollection(ctx, client, workspace, collection); err != nil {
+		if createdCollection, err := createNewCollection(ctx, client, res.Workspace, res.Collection); err != nil {
 			return nil, err
 		} else if createdCollection != nil {
 			actionLog = append(actionLog, fmt.Sprintf("created %s collection", createdCollection.Name))
@@ -208,12 +224,12 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 	}
 
 	var bindings = make([]*binding, 0, len(open.Open.Materialization.Bindings))
-	for _, spec := range open.Open.Materialization.Bindings {
-		bindings = append(bindings, &binding{
-			spec:       spec,
-			operations: make(map[int][]json.RawMessage),
-		})
-
+	for i, spec := range open.Open.Materialization.Bindings {
+		res, err := resourceFromJson(&spec.ResourceSpecJson)
+		if err != nil {
+			return fmt.Errorf("building resource for binding %v: %w", i, err)
+		}
+		bindings = append(bindings, NewBinding(spec, res))
 	}
 
 	transactor := transactor{

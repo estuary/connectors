@@ -5,13 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/estuary/protocols/fdb/tuple"
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 // Rockset has several API endpoints for manipulating documents. We need to
@@ -27,16 +27,39 @@ const (
 
 // A binding represents the relationship between a single Flow Collection and a single Rockset Collection.
 type binding struct {
-	spec       *pf.MaterializationSpec_Binding
-	operations map[operation][]json.RawMessage
+	spec *pf.MaterializationSpec_Binding
+	// User-facing configuration settings for this binding.
+	res *resource
+	// Serialized documents yet to be upserted into the Rockset Collection.
+	pendingUpserts *DocumentBuffer
+	// Serialized documents yet to be deleted from the Rockset Collection.
+	pendingDeletions *DocumentBuffer
+}
+
+func NewBinding(spec *pf.MaterializationSpec_Binding, res *resource) *binding {
+	return &binding{
+		spec:             spec,
+		res:              res,
+		pendingUpserts:   NewDocumentBuffer(),
+		pendingDeletions: NewDocumentBuffer(),
+	}
 }
 
 func (b *binding) rocksetWorkspace() string {
-	return b.spec.ResourcePath[0]
+	return b.res.Workspace
 }
 
 func (b *binding) rocksetCollection() string {
-	return b.spec.ResourcePath[1]
+	return b.res.Collection
+}
+
+// Calculates how many concurrent goroutines will be used to make API calls while remaining under the resources's maxBatchSize.
+func (b *binding) concurrencyFactor(numDocuments int) int {
+	if numDocuments < b.res.MaxBatchSize {
+		return 1
+	} else {
+		return numDocuments / b.res.MaxBatchSize
+	}
 }
 
 type transactor struct {
@@ -60,11 +83,6 @@ func (t *transactor) Prepare(req *pm.TransactionRequest_Prepare) (*pm.Transactio
 
 // pm.Transactor
 func (t *transactor) Store(it *pm.StoreIterator) error {
-	// TODO: Use operations as a stack, rather than discarding the entire buffer and reinitializing here.
-	for _, b := range t.bindings {
-		b.operations = make(map[int][]json.RawMessage)
-	}
-
 	for it.Next() {
 		select {
 		case <-t.ctx.Done():
@@ -107,18 +125,18 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 
 // pm.Transactor
 func (t *transactor) Commit() error {
-	var wait sync.WaitGroup
+	group, ctx := errgroup.WithContext(t.ctx)
 
-	for _, b := range t.bindings {
-		wait.Add(1)
-
-		go func(b *binding) {
-			defer wait.Done()
-			commitCollection(t, b)
-		}(b)
+	for _, binding := range t.bindings {
+		b := binding
+		group.Go(func() error {
+			return commitCollection(ctx, t, b)
+		})
 	}
 
-	wait.Wait()
+	if err := group.Wait(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
 
 	return nil
 }
@@ -156,7 +174,7 @@ func (t *transactor) storeAdditionOperation(b *binding, key *tuple.Tuple, values
 		return fmt.Errorf("failed to serialize the addition document: %w", err)
 	}
 
-	b.operations[opDocumentAdd] = append(b.operations[opDocumentAdd], jsonDoc)
+	b.pendingUpserts.Push(jsonDoc)
 
 	return nil
 }
@@ -170,35 +188,60 @@ func (t *transactor) storeDeletionOperation(b *binding, key *tuple.Tuple) error 
 		return fmt.Errorf("failed to serialize the deletion document: %w", err)
 	}
 
-	b.operations[opDocumentDelete] = append(b.operations[opDocumentDelete], jsonDoc)
+	b.pendingDeletions.Push(jsonDoc)
 
 	return nil
 }
 
-func commitCollection(t *transactor, b *binding) error {
+func commitCollection(ctx context.Context, t *transactor, b *binding) error {
 	select {
-	case <-t.ctx.Done():
+	case <-ctx.Done():
 		return fmt.Errorf("transactor context cancelled")
 	default:
 		// Keep going!
 	}
 
-	var documents []json.RawMessage
+	totalUpserts := b.pendingUpserts.Len()
+	totalDeletions := b.pendingDeletions.Len()
+	defer logElapsedTime(time.Now(), fmt.Sprintf("commit completed: %d documents added %d documents deleted", totalUpserts, totalDeletions))
 
-	defer logElapsedTime(time.Now(), fmt.Sprintf("commit completed: %d documents added, %d documents deleted", len(b.operations[opDocumentAdd]), len(b.operations[opDocumentDelete])))
+	err := fanOut(ctx, b.pendingUpserts, b.concurrencyFactor(b.pendingUpserts.Len()), func(ctx context.Context, documents []json.RawMessage) error {
+		return t.client.AddDocuments(ctx, b.rocksetWorkspace(), b.rocksetCollection(), documents)
+	})
 
-	documents = b.operations[opDocumentAdd]
-	if len(documents) > 0 {
-		if err := t.client.AddDocuments(t.ctx, b.rocksetWorkspace(), b.rocksetCollection(), documents); err != nil {
-			return err
-		}
+	if err != nil {
+		return fmt.Errorf("committing upserts: %w", err)
 	}
 
-	documents = b.operations[opDocumentDelete]
-	if len(documents) > 0 {
-		if err := t.client.DeleteDocuments(t.ctx, b.rocksetWorkspace(), b.rocksetCollection(), documents); err != nil {
-			return err
-		}
+	err = fanOut(ctx, b.pendingDeletions, b.concurrencyFactor(b.pendingDeletions.Len()), func(ctx context.Context, documents []json.RawMessage) error {
+		return t.client.DeleteDocuments(ctx, b.rocksetWorkspace(), b.rocksetCollection(), documents)
+	})
+
+	if err != nil {
+		return fmt.Errorf("committing deletions: %w", err)
+	}
+
+	return nil
+}
+
+func fanOut(ctx context.Context, buf *DocumentBuffer, concurrencyFactor int, callback func(ctx context.Context, documents []json.RawMessage) error) error {
+	if buf.Len() == 0 {
+		return nil
+	}
+
+	defer buf.Clear()
+	group, ctx := errgroup.WithContext(ctx)
+
+	for i, documents := range buf.SplitN(concurrencyFactor) {
+		docs := documents
+		log.Infof("sending request %v: %v documents", i, len(docs))
+
+		group.Go(func() error {
+			return callback(ctx, docs)
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return fmt.Errorf("request fan out: %w", err)
 	}
 
 	return nil
