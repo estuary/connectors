@@ -14,6 +14,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Rockset has several API endpoints for manipulating documents. We need to
+// determine the action for each document and include it in the requests we make
+// to that endpoint.
 type operation = int
 
 const (
@@ -22,6 +25,7 @@ const (
 	opDocumentDelete
 )
 
+// A binding represents the relationship between a single Flow Collection and a single Rockset Collection.
 type binding struct {
 	spec       *pf.MaterializationSpec_Binding
 	operations map[operation][]json.RawMessage
@@ -36,6 +40,7 @@ func (b *binding) rocksetCollection() string {
 }
 
 type transactor struct {
+	// TODO: ctx will be removed when the protocol updates land.
 	ctx      context.Context
 	config   *config
 	client   *client
@@ -44,8 +49,7 @@ type transactor struct {
 
 // pm.Transactor
 func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	// Nothing to load
-	return nil
+	panic("Rockset is not transactional - Load should never be called")
 }
 
 // pm.Transactor
