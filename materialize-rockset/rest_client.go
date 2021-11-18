@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -30,10 +31,22 @@ type client struct {
 
 var ErrNotFound = errors.New("not found")
 
+type StatusError struct {
+	statusCode int
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("unexpected http status: %d", e.statusCode)
+}
+
+func (e *StatusError) NotFound() bool {
+	return e.statusCode == 404
+}
+
 func NewClient(apiKey string, verboseLogging bool) (*client, error) {
 	baseURL, err := url.Parse(baseUrl)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse rockset url: %w", err)
+		return nil, fmt.Errorf("parsing rockset url: %w", err)
 	}
 	// Create a client
 	c := &client{
@@ -51,7 +64,7 @@ func NewClient(apiKey string, verboseLogging bool) (*client, error) {
 }
 
 // makeRequest allows full control of the API request
-func (c *client) makeRequest(ctx context.Context, method string, urlStr string, body []byte) (*http.Response, error) {
+func (c *client) makeRequest(ctx context.Context, method string, urlStr string, rawBody interface{}, outBody interface{}) (*http.Response, error) {
 	// Build the full url
 	rel, err := url.Parse(urlStr)
 	if err != nil {
@@ -59,63 +72,69 @@ func (c *client) makeRequest(ctx context.Context, method string, urlStr string, 
 	}
 	apiURL := c.baseURL.ResolveReference(rel)
 
-	var contentLength = len(body)
-
 	var req *http.Request
 
 	// Setup the reader for the request
-	if body != nil {
+	if rawBody != nil {
+		body, merr := json.Marshal(rawBody)
+		if merr != nil {
+			return nil, fmt.Errorf("marshalling request body: %w", err)
+		}
+
 		reader := bytes.NewReader(body)
 		req, err = http.NewRequest(method, apiURL.String(), reader)
 	} else {
 		req, err = http.NewRequest(method, apiURL.String(), nil)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("could not setup request: %v", err)
+		return nil, fmt.Errorf("creating http.Request: %w", err)
 	}
 	req = req.WithContext(ctx)
 
 	// Headers
 	req.Header.Add("Accept", headerAccept)
 	req.Header.Add("Authorization", c.apiKey)
-	req.Header.Add("Content-Length", fmt.Sprintf("%d", contentLength))
 	req.Header.Add("Content-Type", headerContentType)
-	req.Header.Add("User-Agent", headerUserAgent)
 
-	// Debug dump
 	if c.dumpRequest {
 		requestDump, err := httputil.DumpRequest(req, false)
 		if err == nil {
-			log.Printf("request: %v", string(requestDump))
+			log.Infof("request: %v", string(requestDump))
 		}
 	}
 
-	// Do the request
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request error: %w", err)
+		return nil, fmt.Errorf("executing request: %w", err)
 	}
 
-	// Debug dump
 	if c.dumpRequest && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
-		responseDump, err := httputil.DumpResponse(resp, true)
+		responseDump, err := httputil.DumpResponse(resp, false)
 		if err == nil {
-			log.Printf("response: %v", string(responseDump))
+			log.Infof("response: %v", string(responseDump))
 		}
 	}
 
-	return resp, err
+	if outBody != nil {
+		defer resp.Body.Close()
+		err = json.NewDecoder(resp.Body).Decode(outBody)
+		if err != nil {
+			return nil, fmt.Errorf("decoding response: %w", err)
+		}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, &StatusError{statusCode: resp.StatusCode}
+	}
+
+	return resp, nil
 }
 
 // CheckConnection checks the API client is functioning
 func (c *client) CheckConnection(ctx context.Context) error {
-	resp, err := c.makeRequest(ctx, http.MethodGet, validateEndpoint, nil)
+	_, err := c.makeRequest(ctx, http.MethodGet, validateEndpoint, nil, nil)
 	if err != nil {
-		return fmt.Errorf("could not connect to rockset: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("could not validate connection to rockset. status: %d", resp.StatusCode)
+		return fmt.Errorf("making request: %w", err)
 	}
 	return nil
 }
@@ -138,60 +157,31 @@ type CreateWorkspace struct {
 }
 
 func (c *client) GetWorkspace(ctx context.Context, name string) (*Workspace, error) {
-	url := fmt.Sprintf("/v1/orgs/self/ws/%s", name)
-	resp, err := c.makeRequest(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not make request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	} else if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request failed status %d", resp.StatusCode)
-	}
 	var data workspaceWrapper
-	err = json.NewDecoder(resp.Body).Decode(&data)
+	url := fmt.Sprintf("/v1/orgs/self/ws/%s", name)
+	_, err := c.makeRequest(ctx, http.MethodGet, url, nil, &data)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode response: %w", err)
+		return nil, err
 	}
+
 	return &data.Data, nil
 }
 
 // CreateWorkspace
 func (c *client) CreateWorkspace(ctx context.Context, workspace *CreateWorkspace) (*Workspace, error) {
-	body, err := json.Marshal(workspace)
-	if err != nil {
-		return nil, fmt.Errorf("marshal: %v", err)
-	}
-	url := "/v1/orgs/self/ws"
-	resp, err := c.makeRequest(ctx, http.MethodPost, url, body)
-	if err != nil {
-		return nil, fmt.Errorf("could not make request: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request failed status %d", resp.StatusCode)
-	}
 	var data workspaceWrapper
-	err = json.NewDecoder(resp.Body).Decode(&data)
+	url := "/v1/orgs/self/ws"
+	_, err := c.makeRequest(ctx, http.MethodPost, url, workspace, &data)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode response: %v", err)
+		return nil, err
 	}
-	log.Printf("successfully created workspace")
 	return &data.Data, nil
 }
 
 func (c *client) DestroyWorkspace(ctx context.Context, workspace string) error {
 	url := fmt.Sprintf("/v1/orgs/self/ws/%s", workspace)
-	resp, err := c.makeRequest(ctx, http.MethodDelete, url, nil)
-	if err != nil {
-		return fmt.Errorf("could not make request: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed status %d", resp.StatusCode)
-	}
-	return nil
+	_, err := c.makeRequest(ctx, http.MethodDelete, url, nil, nil)
+	return err
 }
 
 type collectionWrapper struct {
@@ -214,59 +204,51 @@ type CreateCollection struct {
 
 // GetCollection
 func (c *client) GetCollection(ctx context.Context, workspace string, collection string) (*Collection, error) {
-	url := fmt.Sprintf("/v1/orgs/self/ws/%s/collections/%s", workspace, collection)
-	resp, err := c.makeRequest(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not make request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	} else if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request failed status %d", resp.StatusCode)
-	}
 	var data collectionWrapper
-	err = json.NewDecoder(resp.Body).Decode(&data)
+	url := fmt.Sprintf("/v1/orgs/self/ws/%s/collections/%s", workspace, collection)
+	_, err := c.makeRequest(ctx, http.MethodGet, url, nil, &data)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode response: %w", err)
+		return nil, err
 	}
 	return &data.Data, nil
 }
 
 // CreateCollection
 func (c *client) CreateCollection(ctx context.Context, workspace string, collection *CreateCollection) (*Collection, error) {
-	body, err := json.Marshal(collection)
-	if err != nil {
-		return nil, fmt.Errorf("marshal: %v", err)
-	}
-	url := fmt.Sprintf("/v1/orgs/self/ws/%s/collections", workspace)
-	resp, err := c.makeRequest(ctx, http.MethodPost, url, body)
-	if err != nil {
-		return nil, fmt.Errorf("could not make request: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request failed status %d", resp.StatusCode)
-	}
 	var data collectionWrapper
-	err = json.NewDecoder(resp.Body).Decode(&data)
+	url := fmt.Sprintf("/v1/orgs/self/ws/%s/collections", workspace)
+	_, err := c.makeRequest(ctx, http.MethodPost, url, collection, &data)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode response: %v", err)
+		return nil, err
 	}
 	return &data.Data, nil
 }
 
 func (c *client) DestroyCollection(ctx context.Context, workspace string, collection string) error {
 	url := fmt.Sprintf("/v1/orgs/self/ws/%s/collections/%s", workspace, collection)
-	resp, err := c.makeRequest(ctx, http.MethodDelete, url, nil)
+	_, err := c.makeRequest(ctx, http.MethodDelete, url, nil, nil)
 	if err != nil {
-		return fmt.Errorf("could not make request: %v", err)
+		return err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed status %d", resp.StatusCode)
+
+	time.Sleep(time.Second * 2)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for collection `%s/%s` to be deleted: %w", workspace, collection, err)
+		default:
+			_, err := c.GetCollection(ctx, workspace, collection)
+			if se, ok := err.(*StatusError); ok && se.NotFound() {
+				return nil
+			} else {
+				// Not deleted yet, so wait a couple of seconds then we'll try again.
+				time.Sleep(time.Second * 2)
+			}
+		}
 	}
-	return nil
 }
 
 type docsWrapper struct {
@@ -274,33 +256,19 @@ type docsWrapper struct {
 }
 
 func (c *client) AddDocuments(ctx context.Context, workspace string, collection string, documents []json.RawMessage) error {
-	body, err := json.Marshal(docsWrapper{Data: documents})
-	if err != nil {
-		return fmt.Errorf("marshal: %v", err)
-	}
 	url := fmt.Sprintf("/v1/orgs/self/ws/%s/collections/%s/docs", workspace, collection)
-	resp, err := c.makeRequest(ctx, http.MethodPost, url, body)
+	_, err := c.makeRequest(ctx, http.MethodPost, url, docsWrapper{Data: documents}, nil)
 	if err != nil {
-		return fmt.Errorf("could not make request: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed status %d", resp.StatusCode)
+		return err
 	}
 	return nil
 }
 
 func (c *client) DeleteDocuments(ctx context.Context, workspace string, collection string, documents []json.RawMessage) error {
-	body, err := json.Marshal(docsWrapper{Data: documents})
-	if err != nil {
-		return fmt.Errorf("marshal: %v", err)
-	}
 	url := fmt.Sprintf("/v1/orgs/self/ws/%s/collections/%s/docs", workspace, collection)
-	resp, err := c.makeRequest(ctx, http.MethodDelete, url, body)
+	_, err := c.makeRequest(ctx, http.MethodDelete, url, docsWrapper{Data: documents}, nil)
 	if err != nil {
-		return fmt.Errorf("could not make request: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed status %d", resp.StatusCode)
+		return err
 	}
 	return nil
 }
