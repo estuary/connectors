@@ -12,6 +12,7 @@ import (
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
 	"github.com/stretchr/testify/require"
+	pb "go.gazette.dev/core/broker/protocol"
 )
 
 func TestRocksetConfig(t *testing.T) {
@@ -36,7 +37,7 @@ func TestRocksetResource(t *testing.T) {
 func TestRocksetDriverSpec(t *testing.T) {
 	var driver = new(rocksetDriver)
 	// This isn't the right Endpoint type, but this is just a test.
-	var specReq = pm.SpecRequest{EndpointType: pf.EndpointType_S3}
+	var specReq = pm.SpecRequest{}
 	var response, err = driver.Spec(context.Background(), &specReq)
 
 	require.NoError(t, err)
@@ -86,6 +87,15 @@ func TestRocksetDriverValidate(t *testing.T) {
 		SchemaUri:   "file:///schema.local",
 		KeyPtrs:     []string{"/id"},
 		Projections: projections,
+		PartitionTemplate: &pf.JournalSpec{
+			Name:        "widgets",
+			Replication: 1,
+			LabelSet:    pf.LabelSet{},
+			Fragment: pb.JournalSpec_Fragment{
+				Length:           2048,
+				CompressionCodec: pb.CompressionCodec_GZIP,
+				RefreshInterval:  time.Hour * 2,
+			}},
 	}
 	fieldConfigJson := make(map[string]json.RawMessage)
 
@@ -99,7 +109,6 @@ func TestRocksetDriverValidate(t *testing.T) {
 
 	var validateReq = pm.ValidateRequest{
 		Materialization:  "just-a-test",
-		EndpointType:     pf.EndpointType_S3,
 		EndpointSpecJson: endpointSpecJson,
 		Bindings:         bindings,
 	}
@@ -167,7 +176,6 @@ func TestRocksetDriverApply(t *testing.T) {
 	var applyReq = pm.ApplyRequest{
 		Materialization: &pf.MaterializationSpec{
 			Materialization:  pf.Materialization(collectionName),
-			EndpointType:     pf.EndpointType_S3,
 			EndpointSpecJson: endpointSpecJson,
 			Bindings:         bindings,
 		},
