@@ -20,8 +20,8 @@ import (
 type operation = int
 
 const (
-	opNotFound    = -1
-	opDocumentAdd = iota
+	opNotFound       = -1
+	opDocumentUpsert = iota
 	opDocumentDelete
 )
 
@@ -95,19 +95,27 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 
 		var op operation = opNotFound
 		if t.config.ChangeIndicator == "" {
-			op = opDocumentAdd
+			op = opDocumentUpsert
 		} else {
-			// TODO: use ChangeIndicator pointer to find the operation type
-
-			// Sending an "AddDocument" request for a document which already
-			// exists will result in the previous document being completely
-			// overwritten. Since the CdcEvents contain the full document, this
-			// is the exact desired behavior.
-			op = opDocumentAdd
+			changeType := findStringField(b, &it.Key, &it.Values, t.config.ChangeIndicator)
+			switch changeType {
+			case "Insert":
+				op = opDocumentUpsert
+			case "Update":
+				// Sending an "AddDocument" request for a document which already
+				// exists will result in the previous document being completely
+				// overwritten. Since the CdcEvents contain the full document, this
+				// is the exact desired behavior.
+				op = opDocumentUpsert
+			case "Delete":
+				op = opDocumentDelete
+			default:
+				return fmt.Errorf("unrecognized change indicator field value: %s=`%s`", t.config.ChangeIndicator, changeType)
+			}
 		}
 
-		if op == opDocumentAdd {
-			if err := t.storeAdditionOperation(b, &it.Key, &it.Values); err != nil {
+		if op == opDocumentUpsert {
+			if err := t.storeUpsertOperations(b, &it.Key, &it.Values); err != nil {
 				return err
 			}
 
@@ -146,14 +154,35 @@ func (t *transactor) Destroy() {
 	// Nothing to clean up
 }
 
-func (t *transactor) storeAdditionOperation(b *binding, key *tuple.Tuple, values *tuple.Tuple) error {
+func findStringField(b *binding, keys *tuple.Tuple, values *tuple.Tuple, targetFieldName string) string {
+	// Look for the field in the document's keys.
+	for i, value := range *keys {
+		var propName = b.spec.FieldSelection.Keys[i]
+		if v, ok := value.(string); ok && propName == targetFieldName {
+			return v
+		}
+	}
+
+	// Look for the field in the document's other values.
+	for i, value := range *values {
+		var propName = b.spec.FieldSelection.Values[i]
+		if v, ok := value.(string); ok && propName == targetFieldName {
+			return v
+		}
+	}
+
+	// Not found
+	return ""
+}
+
+func (t *transactor) storeUpsertOperations(b *binding, keys *tuple.Tuple, values *tuple.Tuple) error {
 	var document = make(map[string]interface{})
 
 	// Add the `_id` field to the document. This is required by Rockset.
-	document["_id"] = base64.RawStdEncoding.EncodeToString(key.Pack())
+	document["_id"] = base64.RawStdEncoding.EncodeToString(keys.Pack())
 
 	// Add the keys to the document.
-	for i, value := range *key {
+	for i, value := range *keys {
 		var propName = b.spec.FieldSelection.Keys[i]
 		document[propName] = value
 	}
