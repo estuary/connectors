@@ -20,7 +20,7 @@ type config struct {
 	ApiKey string `json:"api_key"`
 	// Enable verbose logging of the HTTP calls to the Rockset API.
 	HttpLogging bool `json:"http_logging"`
-	// JSON pointer to the field in the document where CDC change types are located.
+	// Field name which contains CDC change types are located. Values should be one of `["Insert", "Update", "Delete"]`
 	ChangeIndicator string `json:"change_indicator"`
 }
 
