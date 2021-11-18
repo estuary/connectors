@@ -68,8 +68,9 @@ jobs:
           - materialize-bigquery
           - materialize-elasticsearch
           - materialize-postgres
-          - materialize-snowflake
+          - materialize-rockset
           - materialize-s3-parquet
+          - materialize-snowflake
           - materialize-webhook
 
     steps:
@@ -144,6 +145,8 @@ jobs:
           file: ${{ matrix.connector }}/Dockerfile
           load: true
           tags: ghcr.io/estuary/${{ matrix.connector }}:test
+          secrets: |
+            "rockset_api_key=${{ secrets.ROCKSET_API_KEY }}"
 
       - name: Start Dockerized test infrastructure
         if: matrix.connector == 'source-kafka'
@@ -166,7 +169,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
           AWS_DEFAULT_OUTPUT: json
-
+          ROCKSET_API_KEY: ${{ secrets.ROCKSET_API_KEY }}
           # Compare to: https://www.postgresql.org/docs/current/libpq-envars.html
           PGDATABASE: flow
           PGHOST: localhost
