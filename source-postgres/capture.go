@@ -93,7 +93,10 @@ type messageOutput interface {
 // connections, scanning tables, and then streaming replication events until shutdown conditions
 // (if any) are met.
 func RunCapture(ctx context.Context, config *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, dest messageOutput) error {
-	logrus.WithField("uri", config.ConnectionURI).WithField("slot", config.SlotName).Info("starting capture")
+	logrus.WithFields(logrus.Fields{
+		"uri":  config.ConnectionURI,
+		"slot": config.SlotName,
+	}).Info("starting capture")
 
 	// Normal database connection used for table scanning
 	var connScan, err = pgx.Connect(ctx, config.ConnectionURI)
@@ -170,7 +173,10 @@ func (c *capture) updateState(ctx context.Context) error {
 		// Print a warning if the two are not the same.
 		var primaryKey = dbPrimaryKeys[streamID]
 		if len(primaryKey) != 0 {
-			logrus.WithField("table", streamID).WithField("key", primaryKey).Debug("queried primary key")
+			logrus.WithFields(logrus.Fields{
+				"table": streamID,
+				"key":   primaryKey,
+			}).Debug("queried primary key")
 		}
 		if len(catalogPrimaryKey) != 0 {
 			if strings.Join(primaryKey, ",") != strings.Join(catalogPrimaryKey, ",") {
@@ -256,7 +262,10 @@ func (c *capture) streamChanges(ctx context.Context) error {
 		}
 		targetWatermark = watermark
 	}
-	logrus.WithField("tail", c.catalog.Tail).WithField("watermark", targetWatermark).Info("streaming until watermark")
+	logrus.WithFields(logrus.Fields{
+		"tail":      c.catalog.Tail,
+		"watermark": targetWatermark,
+	}).Info("streaming until watermark")
 	return c.streamToWatermark(targetWatermark, nil)
 }
 

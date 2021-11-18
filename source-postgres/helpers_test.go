@@ -54,7 +54,7 @@ func TestMain(m *testing.M) {
 	// tearing down the replication slot.
 	var replConnConfig, err = pgconn.ParseConfig(*TestConnectionURI)
 	if err != nil {
-		logrus.WithField("uri", *TestConnectionURI).WithField("err", err).Fatal("error parsing connection config")
+		logrus.WithFields(logrus.Fields{"uri": *TestConnectionURI, "err": err}).Fatal("error parsing connection config")
 	}
 	replConnConfig.RuntimeParams["replication"] = "database"
 	replConn, err := pgconn.ConnectConfig(ctx, replConnConfig)
@@ -71,7 +71,7 @@ func TestMain(m *testing.M) {
 	TestDefaultConfig.SlotName = *TestReplicationSlot
 	TestDefaultConfig.PublicationName = *TestPublicationName
 	if err := TestDefaultConfig.Validate(); err != nil {
-		logrus.WithField("err", err).WithField("config", TestDefaultConfig).Fatal("error validating test config")
+		logrus.WithFields(logrus.Fields{"err": err, "config": TestDefaultConfig}).Fatal("error validating test config")
 	}
 
 	conn, err := pgx.Connect(ctx, *TestConnectionURI)
@@ -101,7 +101,7 @@ func createTestTable(ctx context.Context, t *testing.T, suffix string, tableDef 
 	tableName = strings.ReplaceAll(tableName, "/", "_")
 	tableName = strings.ReplaceAll(tableName, "=", "_")
 
-	logrus.WithField("table", tableName).WithField("cols", tableDef).Debug("creating test table")
+	logrus.WithFields(logrus.Fields{"table": tableName, "cols": tableDef}).Debug("creating test table")
 	dbQueryInternal(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
 	dbQueryInternal(ctx, t, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
 	t.Cleanup(func() {
@@ -140,7 +140,7 @@ func testCatalog(streams ...string) airbyte.ConfiguredCatalog {
 // so the source dataset needs to be clean. For test data this should be fine.
 func dbLoadCSV(ctx context.Context, t *testing.T, table string, filename string, limit int) {
 	t.Helper()
-	logrus.WithField("table", table).WithField("file", filename).Info("loading csv")
+	logrus.WithFields(logrus.Fields{"table": table, "file": filename}).Info("loading csv")
 	var file, err = os.Open("testdata/" + filename)
 	if err != nil {
 		t.Fatalf("unable to open CSV file: %q", "testdata/"+filename)
@@ -198,7 +198,7 @@ func dbInsert(ctx context.Context, t *testing.T, table string, rows [][]interfac
 	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows), "first": rows[0]}).Debug("inserting data")
 	var query = fmt.Sprintf(`INSERT INTO %s VALUES %s`, table, argsTuple(len(rows[0])))
 	for _, row := range rows {
-		logrus.WithField("table", table).WithField("row", row).Trace("inserting row")
+		logrus.WithFields(logrus.Fields{"table": table, "row": row}).Trace("inserting row")
 		if len(row) != len(rows[0]) {
 			t.Fatalf("incorrect number of values in row %q (expected %d)", row, len(rows[0]))
 		}
@@ -224,7 +224,7 @@ func argsTuple(argc int) string {
 // dbQuery is a test helper for executing arbitrary queries against TestDatabase
 func dbQuery(ctx context.Context, t *testing.T, query string, args ...interface{}) {
 	t.Helper()
-	logrus.WithField("query", query).WithField("args", args).Debug("executing query")
+	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 	dbQueryInternal(ctx, t, query, args...)
 }
 

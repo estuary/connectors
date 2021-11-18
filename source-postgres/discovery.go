@@ -180,7 +180,7 @@ func getDatabaseTables(ctx context.Context, conn *pgx.Conn) ([]tableInfo, error)
 		if _, ok := tableMap[id]; !ok {
 			continue
 		}
-		logrus.WithField("table", id).WithField("key", key).Debug("queried primary key")
+		logrus.WithFields(logrus.Fields{"table": id, "key": key}).Debug("queried primary key")
 		tableMap[id].PrimaryKey = key
 	}
 
