@@ -1,5 +1,5 @@
-{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"No Such State","population":1234,"state":"XX","year":1930},"emitted_at":1234,"namespace":"public"}}
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","key_columns":["year","state"],"scanned":"FgeoAklBAA=="}}}}}
+{"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"No Such State","population":1234,"state":"XX","year":1930},"emitted_at":1234,"namespace":"public"}}
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_complexdataset":{"mode":"Backfill","key_columns":["year","state"],"scanned":"FgeoAklBAA=="}}}}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Idaho","population":671000,"state":"ID","year":1960},"emitted_at":1234,"namespace":"public"}}
 {"type":"RECORD","record":{"stream":"test_complexdataset","data":{"_change_type":"Insert","fullname":"Illinois","population":10086000,"state":"IL","year":1960},"emitted_at":1234,"namespace":"public"}}

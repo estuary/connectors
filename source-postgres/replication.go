@@ -53,6 +53,8 @@ type replicationStream struct {
 
 	eventBuf *changeEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
 	events   chan *changeEvent // The channel to which replication events will be written
+
+	cancel context.CancelFunc // Cancel function for the replication goroutine's context
 }
 
 const standbyStatusInterval = 10 * time.Second
@@ -78,7 +80,7 @@ func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		"startLSN":    startLSN,
 		"publication": publication,
 		"slot":        slot,
-	}).Info("starting replication")
+	}).Debug("starting replication")
 
 	var stream = &replicationStream{
 		replSlot:  slot,
@@ -107,13 +109,15 @@ func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		return nil, fmt.Errorf("unable to start replication: %w", err)
 	}
 
-	go func(ctx context.Context) {
-		var err = stream.run(ctx)
-		close(stream.events)
-		if err != nil && !errors.Is(err, context.Canceled) {
+	var streamCtx, streamCancel = context.WithCancel(ctx)
+	stream.cancel = streamCancel
+	go func() {
+		defer close(stream.events)
+		defer stream.conn.Close(ctx)
+		if err := stream.run(streamCtx); err != nil && !errors.Is(err, context.Canceled) {
 			logrus.WithField("err", err).Fatal("replication stream error")
 		}
-	}(ctx)
+	}()
 
 	return stream, nil
 }
@@ -398,5 +402,6 @@ func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 
 func (s *replicationStream) Close(ctx context.Context) error {
 	logrus.Debug("replication stream close requested")
-	return s.conn.Close(ctx)
+	s.cancel()
+	return nil
 }
