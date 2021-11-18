@@ -39,13 +39,13 @@ func (c *BasicConfig) Execute(args []string) error {
 	if err != nil {
 		return fmt.Errorf("test catalog: %v", err)
 	}
-	catalog, err := testcat.BuildCatalog(c.ctx, testCatalog)
+	materializationSpecs, err := testcat.BuildMaterializationSpecs(c.ctx, testCatalog)
 	if err != nil {
-		return fmt.Errorf("build catalog: %v", err)
+		return fmt.Errorf("build materialization specs: %v", err)
 	}
 
 	// There will only be one materialization for this test.
-	materialization := &catalog.Materializations[0]
+	materialization := materializationSpecs[0]
 
 	// Perform the connector setup (spec, validate, apply) and open the transactions stream.
 	stream, err := SetupConnectorOpenTransactions(c.ctx, materialization, materialize.AdaptServerToClient(c.driverServer), false)

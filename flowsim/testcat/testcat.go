@@ -2,6 +2,7 @@ package testcat
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -19,12 +20,22 @@ import (
 type TestCatalog struct {
 	Collections      map[string]TestCollection      `yaml:"collections"`
 	Materializations map[string]TestMaterialization `yaml:"materializations"`
+	StorageMappings  map[string]TestStores          `yaml:"storageMappings"`
 }
 
 // Collection is a Collection representation.
 type TestCollection struct {
 	Keys   []string `yaml:"key,omitempty"`
 	Schema TestSchema
+}
+
+type TestStores struct {
+	Stores []TestStore `yaml:"stores"`
+}
+
+type TestStore struct {
+	Bucket   string `yaml:"bucket"`
+	Provider string `yaml:"provider"`
 }
 
 // TestType represents one or more types
@@ -118,13 +129,14 @@ func (ep TestEndpointFlowSync) MarshalYAML() (interface{}, error) {
 	}, nil
 }
 
-// BuildCatalog invokes `flowctl check` to build the named |source| catalog and returns it.
-// It converts the materialization to SQLite to not require docker container to exist.
-// Once complete it puts back the original materialization without the connector config and
-// resource config as the output of the Validate request on the real connector returns those.
-// The config and resource config must be put back after making the real Validate request.
-func BuildCatalog(ctx context.Context, tc *TestCatalog) (*catalog.BuiltCatalog, error) {
-
+// BuildMaterializationSpecs invokes `flowctl check` to build the named |source|
+// catalog and returns its MaterializationSpecs.  It converts the
+// materialization to SQLite to not require docker container to exist.  Once
+// complete it puts back the original materialization without the connector
+// config and resource config as the output of the Validate request on the real
+// connector returns those.  The config and resource config must be put back
+// after making the real Validate request.
+func BuildMaterializationSpecs(ctx context.Context, tc *TestCatalog) ([]*flow.MaterializationSpec, error) {
 	// Store the original materializations.
 	var materializations = tc.Materializations
 
@@ -169,8 +181,10 @@ func BuildCatalog(ctx context.Context, tc *TestCatalog) (*catalog.BuiltCatalog, 
 		return nil, fmt.Errorf("close file: %w", err)
 	}
 
+	const buildId string = "built-catalog"
+
 	// Invoke flowctl to compile the catalog.
-	var cmd = exec.Command("flowctl", "check", "--directory", workdir, "--source", file.Name())
+	var cmd = exec.Command("flowctl", "api", "build", "--directory", workdir, "--source", file.Name(), "--build-id", buildId)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if err = cmd.Run(); err != nil {
 		logrus.Error("dumping catalog")
@@ -179,13 +193,21 @@ func BuildCatalog(ctx context.Context, tc *TestCatalog) (*catalog.BuiltCatalog, 
 		return nil, fmt.Errorf("running flowctl check: %w", err)
 	}
 
-	built, err := catalog.LoadFromSQLite(filepath.Join(workdir, "catalog.db"))
+	var builtMaterializations []*flow.MaterializationSpec
+	err = catalog.Extract(filepath.Join(workdir, buildId), func(db *sql.DB) error {
+		if builtMaterializations, err = catalog.LoadAllMaterializations(db); err != nil {
+			return fmt.Errorf("loading testcatalog materializations: %w", err)
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("load catalog: %w", err)
+		return nil, fmt.Errorf("extracting catalog entities: %w", err)
 	}
 
 	// Put the original materialization components back in the built catalog.
-	for i, builtMaterialization := range built.Materializations {
+	for i, builtMaterialization := range builtMaterializations {
 		var materialization = materializations[string(builtMaterialization.Materialization)]
 
 		// Replace the EndpointType type and EndpointSpecJson with the original.
@@ -214,9 +236,9 @@ func BuildCatalog(ctx context.Context, tc *TestCatalog) (*catalog.BuiltCatalog, 
 			// This shouldn't happen, but throw an error if it could not match up the built binding with the original.
 			return nil, fmt.Errorf("could not find original binding for binding %#vs", builtBinding)
 		}
-		built.Materializations[i] = builtMaterialization
+		builtMaterializations[i] = builtMaterialization
 	}
 
-	return built, nil
+	return builtMaterializations, nil
 
 }
