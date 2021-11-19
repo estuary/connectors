@@ -142,22 +142,21 @@ func newSnowflakeDriver() *sqlDriver.Driver {
 		) (_ pm.Transactor, err error) {
 			var ep = epi.(*sqlDriver.StdEndpoint)
 			var d = &transactor{
-				ctx: ctx,
 				cfg: ep.Config().(*config),
 				gen: ep.Generator(),
 			}
 			d.store.fence = fence.(*sqlDriver.StdFence)
 
 			// Establish connections.
-			if d.load.conn, err = ep.DB().Conn(d.ctx); err != nil {
+			if d.load.conn, err = ep.DB().Conn(ctx); err != nil {
 				return nil, fmt.Errorf("load DB.Conn: %w", err)
 			}
-			if d.store.conn, err = ep.DB().Conn(d.ctx); err != nil {
+			if d.store.conn, err = ep.DB().Conn(ctx); err != nil {
 				return nil, fmt.Errorf("store DB.Conn: %w", err)
 			}
 
 			// Create stage for file-based transfers.
-			if _, err = d.load.conn.ExecContext(d.ctx, createStageSQL); err != nil {
+			if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
 				return nil, fmt.Errorf("creating transfer stage : %w", err)
 			}
 
@@ -219,7 +218,6 @@ func SQLGenerator() sqlDriver.Generator {
 }
 
 type transactor struct {
-	ctx context.Context
 	cfg *config
 	gen *sqlDriver.Generator
 
@@ -284,7 +282,9 @@ func (t *transactor) addBinding(targetName string, spec *pf.MaterializationSpec_
 	return nil
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+	var ctx = it.Context()
+
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -304,7 +304,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 	for _, b := range d.bindings {
 		if !b.load.hasKeys {
 			// Pass.
-		} else if err := b.load.stage.put(d.ctx, d.load.conn, d.cfg); err != nil {
+		} else if err := b.load.stage.put(ctx, d.load.conn, d.cfg); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
 			subqueries = append(subqueries, b.load.sql)
@@ -319,7 +319,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 
 	// Issue a join of the target table and (now staged) load keys,
 	// and send results to the |loaded| callback.
-	rows, err := d.load.conn.QueryContext(d.ctx, loadAllSQL)
+	rows, err := d.load.conn.QueryContext(ctx, loadAllSQL)
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
@@ -342,10 +342,9 @@ func (d *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 	return nil
 }
 
-func (d *transactor) Prepare(prepare *pm.TransactionRequest_Prepare) (_ *pm.TransactionResponse_Prepared, err error) {
+func (d *transactor) Prepare(_ context.Context, prepare pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	d.store.fence.SetCheckpoint(prepare.FlowCheckpoint)
-
-	return &pm.TransactionResponse_Prepared{}, nil
+	return pf.DriverCheckpoint{}, nil
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) error {
@@ -368,25 +367,25 @@ func (d *transactor) Store(it *pm.StoreIterator) error {
 	return nil
 }
 
-func (d *transactor) Commit() error {
+func (d *transactor) Commit(ctx context.Context) error {
 	for _, b := range d.bindings {
 		if b.store.hasDocs {
 			// PUT staged keys to Snowflake in preparation for querying.
-			if err := b.store.stage.put(d.ctx, d.store.conn, d.cfg); err != nil {
+			if err := b.store.stage.put(ctx, d.store.conn, d.cfg); err != nil {
 				return fmt.Errorf("load.stage(): %w", err)
 			}
 		}
 	}
 
 	// Start a transaction for our Store phase.
-	var txn, err = d.store.conn.BeginTx(d.ctx, nil)
+	var txn, err = d.store.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("conn.BeginTx: %w", err)
 	}
 	defer txn.Rollback()
 
 	// Apply the client's prepared checkpoint to our fence.
-	if err = d.store.fence.Update(d.ctx,
+	if err = d.store.fence.Update(ctx,
 		func(ctx context.Context, sql string, arguments ...interface{}) (rowsAffected int64, _ error) {
 			if result, err := txn.ExecContext(ctx, sql, arguments...); err != nil {
 				return 0, fmt.Errorf("txn.Exec: %w", err)
@@ -406,12 +405,12 @@ func (d *transactor) Commit() error {
 			// No table update required
 		} else if !b.store.mustMerge {
 			// We can issue a faster COPY INTO the target table.
-			if _, err = d.store.conn.ExecContext(d.ctx, b.store.copySQL); err != nil {
+			if _, err = d.store.conn.ExecContext(ctx, b.store.copySQL); err != nil {
 				return fmt.Errorf("copying Store documents: %w", err)
 			}
 		} else {
 			// We must MERGE into the target table.
-			if _, err = d.store.conn.ExecContext(d.ctx, b.store.mergeSQL); err != nil {
+			if _, err = d.store.conn.ExecContext(ctx, b.store.mergeSQL); err != nil {
 				return fmt.Errorf("merging Store documents: %w", err)
 			}
 		}
@@ -425,6 +424,11 @@ func (d *transactor) Commit() error {
 		return fmt.Errorf("txn.Commit: %w", err)
 	}
 
+	return nil
+}
+
+// Acknowledge is a no-op.
+func (d *transactor) Acknowledge(context.Context) error {
 	return nil
 }
 
