@@ -14,7 +14,7 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/brianvoe/gofakeit/v6 v6.9.0
 	github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9
-	github.com/estuary/protocols v0.0.0-20211105203634-81d6f579c28e
+	github.com/estuary/protocols v0.0.0-20211119175122-9f177976bb52
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/uuid v1.3.0
