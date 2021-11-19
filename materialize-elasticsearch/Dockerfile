@@ -14,16 +14,26 @@ COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-elasticsearch ./materialize-elasticsearch
 
 # Copy schema-builder for testing.
-COPY materialize-elasticsearch/schemabuilder/schema-builder /builder/schema-builder
+COPY materialize-elasticsearch/schemabuilder/schema-builder ./schema-builder
 
 ENV PATH="/builder:$PATH"
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-elasticsearch/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-elasticsearch
 
-# Avoid running the connector as root.
-# USER nonroot:nonroot
+# Runtime Stage
+################################################################################
+FROM gcr.io/distroless/base-debian11
 
+WORKDIR /connector
+ENV PATH="/connector:$PATH"
+
+# Bring in the compiled connector artifact from the builder.
+COPY --from=builder /builder/connector /connector/connector
+COPY --from=builder /builder/schema-builder /connector/schema-builder
+
+# Avoid running the connector as root.
+USER nonroot:nonroot
 
 # TODO(jixiang) re-enable multi-step build.
-ENTRYPOINT ["/builder/connector"]
+ENTRYPOINT ["/connector/connector"]
