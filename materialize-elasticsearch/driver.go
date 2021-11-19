@@ -297,7 +297,7 @@ func (t *transactor) Commit() error {
 	log.Debug(fmt.Sprintf("Commit started. Commiting %d items", len(t.bulkIndexerItems)))
 	defer func() { t.bulkIndexerItems = t.bulkIndexerItems[:0] }()
 
-	if err := t.elasticSearch.Commit(t.bulkIndexerItems); err != nil {
+	if err := t.elasticSearch.Commit(t.ctx, t.bulkIndexerItems); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
 

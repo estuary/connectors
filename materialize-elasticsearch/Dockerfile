@@ -31,9 +31,9 @@ ENV PATH="/connector:$PATH"
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector /connector/connector
 COPY --from=builder /builder/schema-builder /connector/schema-builder
+COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-# TODO(jixiang) re-enable multi-step build.
 ENTRYPOINT ["/connector/connector"]

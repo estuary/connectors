@@ -17,7 +17,6 @@ import (
 )
 
 type ElasticSearch struct {
-	ctx    context.Context
 	client *elasticsearch.Client
 }
 
@@ -33,7 +32,7 @@ func NewElasticSearch(ctx context.Context, endpoint string, username string, pas
 		return nil, fmt.Errorf("creating client: %w", err)
 	}
 
-	return &ElasticSearch{ctx: ctx, client: client}, nil
+	return &ElasticSearch{client: client}, nil
 }
 
 func (es *ElasticSearch) CreateIndex(index string, schemaJSON json.RawMessage) error {
@@ -110,7 +109,7 @@ func (es *ElasticSearch) checkIndexMapping(index string, schema map[string]inter
 	return nil
 }
 
-func (es *ElasticSearch) Commit(items []*esutil.BulkIndexerItem) error {
+func (es *ElasticSearch) Commit(ctx context.Context, items []*esutil.BulkIndexerItem) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -128,12 +127,12 @@ func (es *ElasticSearch) Commit(items []*esutil.BulkIndexerItem) error {
 	}
 
 	for _, item := range items {
-		if err = bi.Add(es.ctx, *item); err != nil {
+		if err = bi.Add(ctx, *item); err != nil {
 			return fmt.Errorf("adding item: %w", err)
 		}
 	}
 
-	return bi.Close(es.ctx)
+	return bi.Close(ctx)
 }
 
 func (es *ElasticSearch) SearchByIds(index string, ids []string) ([]json.RawMessage, error) {
