@@ -18,15 +18,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const LOAD_BY_ID_BATCH_SIZE = 1000
-
 type config struct {
 	Endpoint string `json:"endpoint"`
-	Username string `json: "username"`
-	Password string `json: "password"`
+	Username string `json: "username,omitempty"`
+	Password string `json: "password,omitempty"`
 }
 
 func (c config) Validate() error {
+	if c.Endpoint == "" {
+		return fmt.Errorf("missing Endpoint")
+	}
 	return nil
 }
 
@@ -37,6 +38,9 @@ type resource struct {
 }
 
 func (r resource) Validate() error {
+	if r.Index == "" {
+		return fmt.Errorf("missing Index")
+	}
 	return nil
 }
 
@@ -146,6 +150,7 @@ func (driver) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyRespons
 
 // Transactions implements the DriverServer interface.
 func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
+
 	var open, err = stream.Recv()
 	if err != nil {
 		return fmt.Errorf("read Open: %w", err)
@@ -175,7 +180,6 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 			&binding{
 				index:        res.Index,
 				deltaUpdates: res.DeltaUpdates,
-				loadingIds:   make([]string, 0, LOAD_BY_ID_BATCH_SIZE),
 			})
 	}
 
@@ -202,7 +206,6 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 type binding struct {
 	index        string
 	deltaUpdates bool
-	loadingIds   []string
 }
 
 type transactor struct {
@@ -212,42 +215,47 @@ type transactor struct {
 	bulkIndexerItems []*esutil.BulkIndexerItem
 }
 
+const loadByIdBatchSize = 1000
+
 func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	var load = func(bindingNum int, b *binding) error {
-		var docs, err = t.elasticSearch.SearchByIds(b.index, b.loadingIds)
+	var loadingIds = make([]string, 0, loadByIdBatchSize)
+
+	var loadBinding = func(binding int) error {
+		var b = t.bindings[binding]
+		var docs, err = t.elasticSearch.SearchByIds(b.index, loadingIds)
 		if err != nil {
 			return err
 		}
 
+		log.Debug(fmt.Sprintf("loaded num of docs: %d", len(docs)))
 		for _, doc := range docs {
-			if err = loaded(bindingNum, doc); err != nil {
+			if err = loaded(binding, doc); err != nil {
 				return fmt.Errorf("callback: %w", err)
 			}
 		}
 
-		b.loadingIds = b.loadingIds[:0]
 		return nil
 	}
 
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 		if b.deltaUpdates {
-			panic("Load should not be called for delta updates!")
+			panic("Load should not be called for delta updates.")
 		}
-		//log.Info(fmt.Sprintf("request loading: %+v", it.Key))
-		b.loadingIds = append(b.loadingIds, documentID(it.Key))
-		if len(b.loadingIds) == LOAD_BY_ID_BATCH_SIZE {
-			if err := load(it.Binding, b); err != nil {
+		loadingIds = append(loadingIds, documentId(it.Key))
+		if len(loadingIds) == loadByIdBatchSize {
+			if err := loadBinding(it.Binding); err != nil {
 				return fmt.Errorf("load by ids: %w", err)
 			}
 		}
 	}
 
-	for i, b := range t.bindings {
-		if err := load(i, b); err != nil {
+	for b := 0; b < len(t.bindings); b++ {
+		if err := loadBinding(b); err != nil {
 			return fmt.Errorf("load by ids: %w", err)
 		}
 	}
+
 	return nil
 }
 
@@ -259,12 +267,19 @@ func (t *transactor) Prepare(req *pm.TransactionRequest_Prepare) (*pm.Transactio
 }
 
 func (t *transactor) Store(it *pm.StoreIterator) error {
+	log.Debug("Store started.")
 	var lastErr error = nil
 	for it.Next() {
+		var b = t.bindings[it.Binding]
+		var action, docId = "create", ""
+		if !b.deltaUpdates {
+			action, docId = "index", documentId(it.Key)
+		}
+
 		var item = &esutil.BulkIndexerItem{
 			Index:      t.bindings[it.Binding].index,
-			DocumentID: documentID(it.Key),
-			Action:     "index",
+			Action:     action,
+			DocumentID: docId,
 			Body:       bytes.NewReader(it.RawJSON),
 			OnFailure: func(_ context.Context, _ esutil.BulkIndexerItem, r esutil.BulkIndexerResponseItem, e error) {
 				log.Error(fmt.Sprintf("failed with response: %+v, error: %v", r, e))
@@ -279,23 +294,25 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 }
 
 func (t *transactor) Commit() error {
+	log.Debug(fmt.Sprintf("Commit started. Commiting %d items", len(t.bulkIndexerItems)))
 	defer func() { t.bulkIndexerItems = t.bulkIndexerItems[:0] }()
+
+	if err := t.elasticSearch.Commit(t.bulkIndexerItems); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
 	for _, b := range t.bindings {
 		if err := t.elasticSearch.Flush(b.index); err != nil {
-			return fmt.Errorf("commit: %w", err)
+			return fmt.Errorf("commit flush: %w", err)
 		}
 	}
-	return t.elasticSearch.Commit(t.bulkIndexerItems)
+	return nil
 }
 
-func documentID(tuple tuple.Tuple) string {
+func documentId(tuple tuple.Tuple) string {
 	return base64.RawStdEncoding.EncodeToString(tuple.Pack())
 }
 
 func (t *transactor) Destroy() {}
 
 func main() { boilerplate.RunMain(new(driver)) }
-
-//func main() {
-//	matsim.Run(context.Background(), new(driver), nil)
-//}
