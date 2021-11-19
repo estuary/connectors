@@ -214,8 +214,14 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 	return &pm.ValidateResponse{Bindings: out}, nil
 }
 
-// Apply is a no-op.
-func (driver) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+// ApplyUpsert is a no-op.
+func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+	return &pm.ApplyResponse{}, nil
+}
+
+// ApplyDelete is a no-op.
+// TODO(johnny): Should this remove data ?
+func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
 	return &pm.ApplyResponse{}, nil
 }
 
@@ -263,7 +269,6 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	)
 
 	var transactor = &transactor{
-		ctx:                  ctx,
 		clock:                clock,
 		fileProcessor:        fileProcessorProxy,
 		driverCheckpointJSON: open.Open.DriverCheckpointJson,
@@ -287,7 +292,6 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 
 // transactor implements the Transactor interface.
 type transactor struct {
-	ctx                  context.Context
 	clock                clock.Clock
 	fileProcessor        FileProcessor
 	driverCheckpointJSON json.RawMessage
@@ -296,13 +300,13 @@ type transactor struct {
 	lastUploadTime       time.Time
 }
 
-func (t *transactor) Load(_ *pm.LoadIterator, _ <-chan struct{}, _ func(int, json.RawMessage) error) error {
+func (t *transactor) Load(_ *pm.LoadIterator, _, _ <-chan struct{}, _ func(int, json.RawMessage) error) error {
 	panic("Load should never be called for materialize-s3-parquet.Driver")
 }
 
-func (t *transactor) Prepare(req *pm.TransactionRequest_Prepare) (*pm.TransactionResponse_Prepared, error) {
+func (t *transactor) Prepare(_ context.Context, req pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	t.flowCheckpoint = req.FlowCheckpoint
-	return &pm.TransactionResponse_Prepared{DriverCheckpointJson: t.driverCheckpointJSON}, nil
+	return pf.DriverCheckpoint{DriverCheckpointJson: t.driverCheckpointJSON}, nil
 }
 
 func (t *transactor) Store(it *pm.StoreIterator) error {
@@ -314,7 +318,7 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 	return nil
 }
 
-func (t *transactor) Commit() error {
+func (t *transactor) Commit(context.Context) error {
 	var now = t.clock.Now()
 	if now.Sub(t.lastUploadTime) >= t.uploadInterval {
 		// Uploads the local file to cloud.
@@ -329,6 +333,10 @@ func (t *transactor) Commit() error {
 		t.lastUploadTime = now
 	}
 
+	return nil
+}
+
+func (t *transactor) Acknowledge(context.Context) error {
 	return nil
 }
 

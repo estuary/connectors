@@ -114,7 +114,6 @@ func newPostgresDriver() pm.DriverServer {
 		) (_ pm.Transactor, err error) {
 			var ep = epi.(*sqlDriver.StdEndpoint)
 			var d = &transactor{
-				ctx: ctx,
 				gen: ep.Generator(),
 			}
 			d.store.fence = fence.(*sqlDriver.StdFence)
@@ -129,7 +128,7 @@ func newPostgresDriver() pm.DriverServer {
 
 			for _, spec := range spec.Bindings {
 				var target = sqlDriver.ResourcePath(spec.ResourcePath).Join()
-				if err = d.addBinding(spec); err != nil {
+				if err = d.addBinding(ctx, spec); err != nil {
 					return nil, fmt.Errorf("%s: %w", target, err)
 				}
 			}
@@ -141,7 +140,7 @@ func newPostgresDriver() pm.DriverServer {
 			}
 			var loadAllSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 
-			d.load.stmt, err = d.load.conn.Prepare(d.ctx, "load-join-all", loadAllSQL)
+			d.load.stmt, err = d.load.conn.Prepare(ctx, "load-join-all", loadAllSQL)
 			if err != nil {
 				return nil, fmt.Errorf("conn.PrepareContext(%s): %w", loadAllSQL, err)
 			}
@@ -152,7 +151,6 @@ func newPostgresDriver() pm.DriverServer {
 }
 
 type transactor struct {
-	ctx context.Context
 	gen *sqlDriver.Generator
 
 	// Variables exclusively used by Load.
@@ -198,7 +196,7 @@ type binding struct {
 	}
 }
 
-func (t *transactor) addBinding(spec *pf.MaterializationSpec_Binding) error {
+func (t *transactor) addBinding(ctx context.Context, spec *pf.MaterializationSpec_Binding) error {
 	var err error
 	var bind = new(binding)
 	var index = len(t.bindings)
@@ -230,7 +228,7 @@ func (t *transactor) addBinding(spec *pf.MaterializationSpec_Binding) error {
 	}
 
 	// Create a binding-scoped temporary table for staged keys to load.
-	if _, err = t.load.conn.Exec(t.ctx, keyCreateSQL); err != nil {
+	if _, err = t.load.conn.Exec(ctx, keyCreateSQL); err != nil {
 		return fmt.Errorf("Exec(%s): %w", keyCreateSQL, err)
 	}
 	// Prepare query statements.
@@ -265,7 +263,7 @@ func (t *transactor) addBinding(spec *pf.MaterializationSpec_Binding) error {
 			&bind.store.update.stmt,
 		},
 	} {
-		*s.stmt, err = s.conn.Prepare(t.ctx, s.name, s.sql)
+		*s.stmt, err = s.conn.Prepare(ctx, s.name, s.sql)
 		if err != nil {
 			return fmt.Errorf("conn.PrepareContext(%s): %w", s.sql, err)
 		}
@@ -275,14 +273,16 @@ func (t *transactor) addBinding(spec *pf.MaterializationSpec_Binding) error {
 	return nil
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+	var ctx = it.Context()
+
 	// Use a read-only "load" transaction, which will automatically
 	// truncate the temporary key staging tables on commit.
-	var txn, err = d.load.conn.BeginTx(d.ctx, pgx.TxOptions{})
+	var txn, err = d.load.conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("DB.BeginTx: %w", err)
 	}
-	defer txn.Rollback(d.ctx)
+	defer txn.Rollback(ctx)
 
 	var batch pgx.Batch
 	for it.Next() {
@@ -298,7 +298,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 		return it.Err()
 	}
 
-	var results = txn.SendBatch(d.ctx, &batch)
+	var results = txn.SendBatch(ctx, &batch)
 	for i := 0; i != batch.Len(); i++ {
 		if _, err := results.Exec(); err != nil {
 			return fmt.Errorf("load at index %d: %w", i, err)
@@ -310,7 +310,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
-	rows, err := txn.Query(d.ctx, d.load.stmt.Name)
+	rows, err := txn.Query(ctx, d.load.stmt.Name)
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
@@ -328,18 +328,18 @@ func (d *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(in
 	}
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("querying Loads: %w", err)
-	} else if err = txn.Commit(d.ctx); err != nil {
+	} else if err = txn.Commit(ctx); err != nil {
 		return fmt.Errorf("commiting Load transaction: %w", err)
 	}
 
 	return nil
 }
 
-func (d *transactor) Prepare(prepare *pm.TransactionRequest_Prepare) (_ *pm.TransactionResponse_Prepared, err error) {
+func (d *transactor) Prepare(_ context.Context, prepare pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	d.store.fence.SetCheckpoint(prepare.FlowCheckpoint)
 	d.store.batch = new(pgx.Batch)
 
-	return &pm.TransactionResponse_Prepared{}, nil
+	return pf.DriverCheckpoint{}, nil
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) error {
@@ -365,14 +365,14 @@ func (d *transactor) Store(it *pm.StoreIterator) error {
 	return nil
 }
 
-func (d *transactor) Commit() error {
-	var txn, err = d.store.conn.BeginTx(d.ctx, pgx.TxOptions{})
+func (d *transactor) Commit(ctx context.Context) error {
+	var txn, err = d.store.conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("conn.BeginTx: %w", err)
 	}
-	defer txn.Rollback(d.ctx)
+	defer txn.Rollback(ctx)
 
-	err = d.store.fence.Update(d.ctx,
+	err = d.store.fence.Update(ctx,
 		func(ctx context.Context, sql string, args ...interface{}) (int64, error) {
 			// Add the update to the fence as the last statement in the batch
 			var docs = d.store.batch.Len()
@@ -401,16 +401,20 @@ func (d *transactor) Commit() error {
 		return err
 	}
 
-	if err := txn.Commit(d.ctx); err != nil {
+	if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing Store transaction: %w", err)
 	}
 
 	return nil
 }
 
+func (d *transactor) Acknowledge(context.Context) error {
+	return nil
+}
+
 func (d *transactor) Destroy() {
-	d.load.conn.Close(d.ctx)
-	d.store.conn.Close(d.ctx)
+	d.load.conn.Close(context.Background())
+	d.store.conn.Close(context.Background())
 }
 
 // buildSQL builds SQL statements use for PostgreSQL materializations.

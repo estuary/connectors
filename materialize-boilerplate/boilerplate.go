@@ -33,8 +33,10 @@ func RunMain(srv pm.DriverServer) {
 		"Write the connector specification to stdout, then exit", &specCmd{cmd})
 	parser.AddCommand("validate", "Validate a materialization",
 		"Validate a proposed ValidateRequest read from stdin", &validateCmd{cmd})
-	parser.AddCommand("apply", "Apply a materialization",
-		"Apply a proposed ApplyRequest read from stdin", &applyCmd{cmd})
+	parser.AddCommand("apply-upsert", "Apply an insert or update of a materialization",
+		"Apply a proposed insert or update ApplyRequest read from stdin", &applyUpsertCmd{cmd})
+	parser.AddCommand("apply-delete", "Apply a deletion of a materialization",
+		"Apply a proposed delete ApplyRequest read from stdin", &applyDeleteCmd{cmd})
 	parser.AddCommand("transactions", "Run materialization transactions",
 		"Run a stream of transactions read from stdin", &transactionsCmd{cmd})
 
@@ -105,7 +107,8 @@ func (c *cmdCommon) readMsg(m protoValidator) error {
 
 type specCmd struct{ cmdCommon }
 type validateCmd struct{ cmdCommon }
-type applyCmd struct{ cmdCommon }
+type applyUpsertCmd struct{ cmdCommon }
+type applyDeleteCmd struct{ cmdCommon }
 type transactionsCmd struct{ cmdCommon }
 
 func (c specCmd) Execute(args []string) error {
@@ -134,12 +137,26 @@ func (c validateCmd) Execute(args []string) error {
 	return nil
 }
 
-func (c applyCmd) Execute(args []string) error {
+func (c applyUpsertCmd) Execute(args []string) error {
 	var req pm.ApplyRequest
 
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
-	} else if resp, err := c.srv.Apply(c.ctx, &req); err != nil {
+	} else if resp, err := c.srv.ApplyUpsert(c.ctx, &req); err != nil {
+		return err
+	} else if err = c.w.WriteMsg(resp); err != nil {
+		return fmt.Errorf("writing response: %w", err)
+	}
+
+	return nil
+}
+
+func (c applyDeleteCmd) Execute(args []string) error {
+	var req pm.ApplyRequest
+
+	if err := c.readMsg(&req); err != nil {
+		return fmt.Errorf("reading request: %w", err)
+	} else if resp, err := c.srv.ApplyDelete(c.ctx, &req); err != nil {
 		return err
 	} else if err = c.w.WriteMsg(resp); err != nil {
 		return fmt.Errorf("writing response: %w", err)
