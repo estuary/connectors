@@ -303,6 +303,7 @@ func (t *transactor) Commit() error {
 	}
 
 	for _, b := range t.bindings {
+		// Using Flush instead of Refresh to make sure the data are persisted.
 		if err := t.elasticSearch.Flush(b.index); err != nil {
 			return fmt.Errorf("commit flush: %w", err)
 		}

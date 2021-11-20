@@ -66,6 +66,7 @@ func (es *ElasticSearch) CreateIndex(index string, schemaJSON json.RawMessage) e
 	createResp, err := es.client.Indices.Create(
 		index,
 		es.client.Indices.Create.WithBody(bytes.NewReader(body)),
+		es.client.Indices.Create.WithWaitForActiveShards("all"),
 	)
 	defer createResp.Body.Close()
 	if err = es.parseErrorResp(err, createResp); err != nil {
@@ -119,6 +120,7 @@ func (es *ElasticSearch) Commit(ctx context.Context, items []*esutil.BulkIndexer
 		OnError: func(_ context.Context, err error) {
 			log.Error(fmt.Sprintf("indexer: %v", err))
 		},
+		WaitForActiveShards: "all",
 		// Disable automatic flushing, which is triggered by bi.Close call.
 		FlushInterval: 100 * time.Hour,
 	})
