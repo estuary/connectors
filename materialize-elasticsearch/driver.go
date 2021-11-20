@@ -217,9 +217,10 @@ type transactor struct {
 
 const loadByIdBatchSize = 1000
 
-func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *pm.LoadIterator, commitCh <-chan struct{}, loaded func(int, json.RawMessage) error) error {
 	var loadingIds = make([]string, 0, loadByIdBatchSize)
 
+	<-commitCh
 	var loadBinding = func(binding int) error {
 		var b = t.bindings[binding]
 		var docs, err = t.elasticSearch.SearchByIds(b.index, loadingIds)
