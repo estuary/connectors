@@ -14,7 +14,7 @@ COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-elasticsearch ./materialize-elasticsearch
 
 # Copy schema-builder binary.
-COPY materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder ./schema-builder
+COPY rust-binary/schema-builder ./schema-builder
 
 ENV PATH="/builder:$PATH"
 # Test and build the connector.

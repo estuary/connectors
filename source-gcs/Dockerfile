@@ -31,7 +31,7 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 # Grab the statically-built parser cli.
-COPY parser/target/x86_64-unknown-linux-musl/release/parser ./parser
+COPY rust-binary/parser ./parser
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./connector

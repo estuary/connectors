@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, jj/mat-es-2]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -34,27 +34,23 @@ jobs:
             materialize-elasticsearch/schemabuilder/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Test Parser
-        run: cargo test --manifest-path=parser/Cargo.toml --locked
+      - name: Test Rust Apps
+        run: |
+          cargo test --manifest-path=parser/Cargo.toml --locked
+          cargo test --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked
 
-      - name: Build Parser
-        run: cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
+      - name: Build Rust Apps
+        run: |
+          cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
+          cargo build --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
 
-      - uses: actions/upload-artifact@v1
+      - name: Upload Rust Apps
+        uses: actions/upload-artifact@v2
         with:
-          name: parser_binary
-          path: parser/target/x86_64-unknown-linux-musl/release/parser
-
-      - name: Test Materialize ElasticSearch Schema Builder
-        run: cargo test --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked
-
-      - name: Build Materialize ElasticSearch Schema Builder
-        run: cargo build --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
-
-      - uses: actions/upload-artifact@v1
-        with:
-          name: schemabuilder_binary
-          path: materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
+          name: rust_binary
+          path: |
+            parser/target/x86_64-unknown-linux-musl/release/parser
+            materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
 
   build_connectors:
     needs: build_rust_releases
@@ -86,16 +82,14 @@ jobs:
           TAG=$(echo $GITHUB_SHA | head -c7)
           echo ::set-output name=tag::${TAG}
 
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
-          name: rust binary
-          path: parser/target/x86_64-unknown-linux-musl/release/
+          name: rust_binary
+          path: rust-binary/
 
       # Downloaded artifacts lose their prior permission settings
       - name: Adjust rust binary permissions
-        run: |
-          chmod +x parser/target/x86_64-unknown-linux-musl/release/parser
-          chmod +x materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
+        run: chmod +x rust-binary/*
 
       - name: Install kafkactl
         if: matrix.connector == 'source-kafka'
