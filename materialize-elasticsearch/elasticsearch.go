@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	elasticsearch "github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/elastic/go-elasticsearch/v8/esutil"
+	elasticsearch "github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v7/esutil"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -51,7 +51,7 @@ func (es *ElasticSearch) CreateIndex(index string, schemaJSON json.RawMessage) e
 		// The index exists, make sure it is the same as requested.
 		return es.checkIndexMapping(index, schema)
 	} else if resp.StatusCode != 404 {
-		return fmt.Errorf("create index response invalid status code %d", resp.StatusCode)
+		return fmt.Errorf("index exists: invalid response status code %d", resp.StatusCode)
 	}
 
 	// The index does not exist, create a new one.

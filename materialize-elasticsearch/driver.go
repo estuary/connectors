@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/jsonschema"
-	"github.com/elastic/go-elasticsearch/v8/esutil"
+	"github.com/elastic/go-elasticsearch/v7/esutil"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-elasticsearch/schemabuilder"
 	"github.com/estuary/protocols/fdb/tuple"
