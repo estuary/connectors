@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, jj/mat-es-2]
   pull_request:
     branches: [main]
 
@@ -39,7 +39,12 @@ jobs:
 
       - name: Build Parser
         run: cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
- 
+
+      - uses: actions/upload-artifact@v1
+        with:
+          name: parser_binary
+          path: parser/target/x86_64-unknown-linux-musl/release/parser
+
       - name: Test Materialize ElasticSearch Schema Builder
         run: cargo test --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked
 
@@ -48,13 +53,11 @@ jobs:
 
       - uses: actions/upload-artifact@v1
         with:
-          name: rust binaries
-          path: |
-            parser/target/x86_64-unknown-linux-musl/release/parser
-            materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
+          name: schemabuilder_binary
+          path: materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
 
   build_connectors:
-    needs: build_parser
+    needs: build_rust_releases
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
