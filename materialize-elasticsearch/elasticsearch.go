@@ -43,7 +43,8 @@ func (es *ElasticSearch) CreateIndex(index string, schemaJSON json.RawMessage) e
 	}
 
 	resp, err := es.client.Indices.Exists([]string{index})
-	defer resp.Body.Close()
+	defer closeResponse(resp)
+
 	if err != nil {
 		return fmt.Errorf("index exists check error: %w", err)
 	} else if resp.StatusCode == 200 {
@@ -66,9 +67,9 @@ func (es *ElasticSearch) CreateIndex(index string, schemaJSON json.RawMessage) e
 	createResp, err := es.client.Indices.Create(
 		index,
 		es.client.Indices.Create.WithBody(bytes.NewReader(body)),
-		es.client.Indices.Create.WithWaitForActiveShards("all"),
+		//es.client.Indices.Create.WithWaitForActiveShards("all"),
 	)
-	defer createResp.Body.Close()
+	defer closeResponse(createResp)
 	if err = es.parseErrorResp(err, createResp); err != nil {
 		return fmt.Errorf("create indices: %w", err)
 	}
@@ -80,7 +81,7 @@ func (es *ElasticSearch) checkIndexMapping(index string, schema map[string]inter
 	var resp, err = es.client.Indices.GetMapping(
 		es.client.Indices.GetMapping.WithIndex(index),
 	)
-	defer resp.Body.Close()
+	defer closeResponse(resp)
 	if err = es.parseErrorResp(err, resp); err != nil {
 		return fmt.Errorf("get index mapping: %w", err)
 	}
@@ -120,7 +121,7 @@ func (es *ElasticSearch) Commit(ctx context.Context, items []*esutil.BulkIndexer
 		OnError: func(_ context.Context, err error) {
 			log.Error(fmt.Sprintf("indexer: %v", err))
 		},
-		WaitForActiveShards: "all",
+		//WaitForActiveShards: "all",
 		// Disable automatic flushing, which is triggered by bi.Close call.
 		FlushInterval: 100 * time.Hour,
 	})
@@ -147,7 +148,7 @@ func (es *ElasticSearch) SearchByIds(index string, ids []string) ([]json.RawMess
 		es.client.Search.WithBody(es.buildIDQuery(ids)),
 		es.client.Search.WithSize(len(ids)),
 	)
-	defer resp.Body.Close()
+	defer closeResponse(resp)
 	if err = es.parseErrorResp(err, resp); err != nil {
 		return nil, fmt.Errorf("search by ids: %w", err)
 	}
@@ -176,7 +177,7 @@ func (es *ElasticSearch) Flush(index string) error {
 	var resp, err = es.client.Indices.Flush(
 		es.client.Indices.Flush.WithIndex(index),
 	)
-	defer resp.Body.Close()
+	defer closeResponse(resp)
 	if err = es.parseErrorResp(err, resp); err != nil {
 		return fmt.Errorf("flush: %w", err)
 	}
@@ -214,4 +215,10 @@ func (es *ElasticSearch) buildIDQuery(ids []string) io.Reader {
 	}`, strings.Join(quotedIds, ","))
 
 	return strings.NewReader(queryBody)
+}
+
+func closeResponse(response *esapi.Response) {
+	if response != nil && response.Body != nil {
+		response.Body.Close()
+	}
 }
