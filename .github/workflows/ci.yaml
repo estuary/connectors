@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  build_parser:
+  build_rust_releases:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -31,6 +31,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             parser/target/
+            materialize-elasticsearch/schemabuilder/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test Parser
@@ -38,11 +39,19 @@ jobs:
 
       - name: Build Parser
         run: cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
+ 
+      - name: Test Materialize ElasticSearch Schema Builder
+        run: cargo test --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked
+
+      - name: Build Materialize ElasticSearch Schema Builder
+        run: cargo build --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
 
       - uses: actions/upload-artifact@v1
         with:
-          name: parser_binary
-          path: parser/target/x86_64-unknown-linux-musl/release/parser
+          name: rust binaries
+          path: |
+            parser/target/x86_64-unknown-linux-musl/release/parser
+            materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
 
   build_connectors:
     needs: build_parser
@@ -57,10 +66,11 @@ jobs:
           - source-kinesis
           - source-postgres
           - source-s3
+          - materialize-bigquery
+          - materialize-elasticsearch
           - materialize-postgres
           - materialize-snowflake
           - materialize-webhook
-          - materialize-bigquery
 
     steps:
       - uses: actions/checkout@v2
@@ -75,12 +85,14 @@ jobs:
 
       - uses: actions/download-artifact@v1
         with:
-          name: parser_binary
+          name: rust binary
           path: parser/target/x86_64-unknown-linux-musl/release/
 
       # Downloaded artifacts lose their prior permission settings
-      - name: Adjust parser permissions
-        run: chmod +x parser/target/x86_64-unknown-linux-musl/release/parser
+      - name: Adjust rust binary permissions
+        run: |
+          chmod +x parser/target/x86_64-unknown-linux-musl/release/parser
+          chmod +x materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
 
       - name: Install kafkactl
         if: matrix.connector == 'source-kafka'

@@ -13,8 +13,8 @@ RUN go mod download
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-elasticsearch ./materialize-elasticsearch
 
-# Copy schema-builder for testing.
-COPY materialize-elasticsearch/schemabuilder/schema-builder ./schema-builder
+# Copy schema-builder binary.
+COPY materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder ./schema-builder
 
 ENV PATH="/builder:$PATH"
 # Test and build the connector.

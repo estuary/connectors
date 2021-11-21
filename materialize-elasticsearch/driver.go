@@ -221,6 +221,7 @@ type transactor struct {
 const loadByIdBatchSize = 1000
 
 func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+	log.Debug("Load started")
 	var loadingIdsByBinding = map[int][]string{}
 
 	for it.Next() {
@@ -252,6 +253,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struc
 }
 
 func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
+	log.Debug("Prepare Started.")
 	if len(t.bulkIndexerItems) != 0 {
 		panic("non-empty bulkIndexerItems") // Invariant: previous call is finished.
 	}
