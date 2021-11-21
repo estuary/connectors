@@ -15,6 +15,7 @@ import (
 	"github.com/estuary/protocols/fdb/tuple"
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
+	"github.com/meirf/gopart"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -110,7 +111,7 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 	return &pm.ValidateResponse{Bindings: out}, nil
 }
 
-func (driver) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -119,7 +120,7 @@ func (driver) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyRespons
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = NewElasticSearch(ctx, cfg.Endpoint, cfg.Username, cfg.Password)
+	var elasticSearch, err = NewElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
 	if err != nil {
 		return nil, fmt.Errorf("creating elasticSearch: %w", err)
 	}
@@ -148,6 +149,11 @@ func (driver) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyRespons
 	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("created indices: ", strings.Join(indices, ","))}, nil
 }
 
+// ApplyDelete is a no-op.
+func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+	return &pm.ApplyResponse{}, nil
+}
+
 // Transactions implements the DriverServer interface.
 func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 
@@ -163,9 +169,8 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var ctx = stream.Context()
 	var elasticSearch *ElasticSearch
-	elasticSearch, err = NewElasticSearch(ctx, cfg.Endpoint, cfg.Username, cfg.Password)
+	elasticSearch, err = NewElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
 	if err != nil {
 		return fmt.Errorf("creating elastic search client: %w", err)
 	}
@@ -184,7 +189,6 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	}
 
 	var transactor = &transactor{
-		ctx:              ctx,
 		elasticSearch:    elasticSearch,
 		bindings:         bindings,
 		bulkIndexerItems: []*esutil.BulkIndexerItem{},
@@ -209,7 +213,6 @@ type binding struct {
 }
 
 type transactor struct {
-	ctx              context.Context
 	elasticSearch    *ElasticSearch
 	bindings         []*binding
 	bulkIndexerItems []*esutil.BulkIndexerItem
@@ -217,54 +220,42 @@ type transactor struct {
 
 const loadByIdBatchSize = 1000
 
-func (t *transactor) Load(it *pm.LoadIterator, commitCh <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	var loadingIds = make([]string, 0, loadByIdBatchSize)
-
-	<-commitCh
-	var loadBinding = func(binding int) error {
-		var b = t.bindings[binding]
-		var docs, err = t.elasticSearch.SearchByIds(b.index, loadingIds)
-		if err != nil {
-			return err
-		}
-
-		log.Debug(fmt.Sprintf("loaded num of docs: %d", len(docs)))
-		for _, doc := range docs {
-			if err = loaded(binding, doc); err != nil {
-				return fmt.Errorf("callback: %w", err)
-			}
-		}
-
-		return nil
-	}
+func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+	var loadingIdsByBinding = map[int][]string{}
 
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 		if b.deltaUpdates {
 			panic("Load should not be called for delta updates.")
 		}
-		loadingIds = append(loadingIds, documentId(it.Key))
-		if len(loadingIds) == loadByIdBatchSize {
-			if err := loadBinding(it.Binding); err != nil {
-				return fmt.Errorf("load by ids: %w", err)
-			}
-		}
+		loadingIdsByBinding[it.Binding] = append(loadingIdsByBinding[it.Binding], documentId(it.Key))
 	}
 
-	for b := 0; b < len(t.bindings); b++ {
-		if err := loadBinding(b); err != nil {
-			return fmt.Errorf("load by ids: %w", err)
+	for binding, ids := range loadingIdsByBinding {
+		var b = t.bindings[binding]
+		for idxRange := range gopart.Partition(len(ids), loadByIdBatchSize) {
+			var docs, err = t.elasticSearch.SearchByIds(b.index, ids[idxRange.Low:idxRange.High])
+			if err != nil {
+				return fmt.Errorf("Load docs by ids: %w", err)
+			}
+
+			log.Debug(fmt.Sprintf("loaded num of docs: %d", len(docs)))
+			for _, doc := range docs {
+				if err = loaded(binding, doc); err != nil {
+					return fmt.Errorf("callback: %w", err)
+				}
+			}
 		}
 	}
 
 	return nil
 }
 
-func (t *transactor) Prepare(req *pm.TransactionRequest_Prepare) (*pm.TransactionResponse_Prepared, error) {
+func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	if len(t.bulkIndexerItems) != 0 {
 		panic("non-empty bulkIndexerItems") // Invariant: previous call is finished.
 	}
-	return &pm.TransactionResponse_Prepared{}, nil
+	return pf.DriverCheckpoint{}, nil
 }
 
 func (t *transactor) Store(it *pm.StoreIterator) error {
@@ -294,11 +285,11 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 	return lastErr
 }
 
-func (t *transactor) Commit() error {
+func (t *transactor) Commit(ctx context.Context) error {
 	log.Debug(fmt.Sprintf("Commit started. Commiting %d items", len(t.bulkIndexerItems)))
 	defer func() { t.bulkIndexerItems = t.bulkIndexerItems[:0] }()
 
-	if err := t.elasticSearch.Commit(t.ctx, t.bulkIndexerItems); err != nil {
+	if err := t.elasticSearch.Commit(ctx, t.bulkIndexerItems); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
 
@@ -308,6 +299,10 @@ func (t *transactor) Commit() error {
 			return fmt.Errorf("commit flush: %w", err)
 		}
 	}
+	return nil
+}
+
+func (t *transactor) Acknowledge(context.Context) error {
 	return nil
 }
 

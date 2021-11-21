@@ -20,7 +20,7 @@ type ElasticSearch struct {
 	client *elasticsearch.Client
 }
 
-func NewElasticSearch(ctx context.Context, endpoint string, username string, password string) (*ElasticSearch, error) {
+func NewElasticSearch(endpoint string, username string, password string) (*ElasticSearch, error) {
 	var client, err = elasticsearch.NewClient(
 		elasticsearch.Config{
 			Addresses: []string{endpoint},
