@@ -85,11 +85,13 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: rust_binary
-          path: rust-binary/
 
       # Downloaded artifacts lose their prior permission settings
       - name: Adjust rust binary permissions
-        run: chmod +x rust-binary/*
+        run: |
+          chmod +x \
+          parser/target/x86_64-unknown-linux-musl/release/parser \
+          materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
 
       - name: Install kafkactl
         if: matrix.connector == 'source-kafka'
