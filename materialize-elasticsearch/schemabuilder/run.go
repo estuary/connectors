@@ -90,12 +90,16 @@ type Input struct {
 
 // MarshalJSON provides customized marshalJSON of Input
 func (s Input) MarshalJSON() ([]byte, error) {
+	var overrides = s.overrides
+	if overrides == nil {
+		overrides = []FieldOverride{}
+	}
 	var output = struct {
 		SchemaJSONBase64 string          `json:"schema_json_base64"`
 		Overrides        []FieldOverride `json:"overrides"`
 	}{
 		SchemaJSONBase64: base64.StdEncoding.EncodeToString(s.SchemaJSON),
-		Overrides:        s.overrides,
+		Overrides:        overrides,
 	}
 	return json.Marshal(output)
 }
