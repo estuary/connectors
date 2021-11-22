@@ -13,6 +13,7 @@ require (
 	github.com/benbjohnson/clock v1.1.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/brianvoe/gofakeit/v6 v6.9.0
+	github.com/elastic/go-elasticsearch/v7 v7.15.2-0.20211104170009-caf202868441
 	github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9
 	github.com/estuary/protocols v0.0.0-20211129055338-9259b2dca80a
 	github.com/gogo/protobuf v1.3.2
@@ -27,6 +28,7 @@ require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/prometheus/common v0.31.1 // indirect
 	github.com/sirupsen/logrus v1.8.1
