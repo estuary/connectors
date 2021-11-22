@@ -156,7 +156,6 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 
 // Transactions implements the DriverServer interface.
 func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
-
 	var open, err = stream.Recv()
 	if err != nil {
 		return fmt.Errorf("read Open: %w", err)
@@ -221,7 +220,6 @@ type transactor struct {
 const loadByIdBatchSize = 1000
 
 func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	log.Debug("Load started")
 	var loadingIdsByBinding = map[int][]string{}
 
 	for it.Next() {
@@ -240,7 +238,6 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struc
 				return fmt.Errorf("Load docs by ids: %w", err)
 			}
 
-			log.Debug(fmt.Sprintf("loaded num of docs: %d", len(docs)))
 			for _, doc := range docs {
 				if err = loaded(binding, doc); err != nil {
 					return fmt.Errorf("callback: %w", err)
@@ -253,7 +250,6 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struc
 }
 
 func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	log.Debug("Prepare Started.")
 	if len(t.bulkIndexerItems) != 0 {
 		panic("non-empty bulkIndexerItems") // Invariant: previous call is finished.
 	}
@@ -261,7 +257,6 @@ func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare)
 }
 
 func (t *transactor) Store(it *pm.StoreIterator) error {
-	log.Debug("Store started.")
 	var lastErr error = nil
 	for it.Next() {
 		var b = t.bindings[it.Binding]
@@ -288,7 +283,6 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 }
 
 func (t *transactor) Commit(ctx context.Context) error {
-	log.Debug(fmt.Sprintf("Commit started. Commiting %d items", len(t.bulkIndexerItems)))
 	defer func() { t.bulkIndexerItems = t.bulkIndexerItems[:0] }()
 
 	if err := t.elasticSearch.Commit(ctx, t.bulkIndexerItems); err != nil {

@@ -5,18 +5,16 @@
     "definitions": {
       "config": {
         "required": [
-          "endpoint",
-          "Username",
-          "Password"
+          "endpoint"
         ],
         "properties": {
           "endpoint": {
             "type": "string"
           },
-          "Username": {
+          "username": {
             "type": "string"
           },
-          "Password": {
+          "password": {
             "type": "string"
           }
         },

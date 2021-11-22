@@ -38,6 +38,9 @@ func NewElasticSearch(endpoint string, username string, password string) (*Elast
 	return &ElasticSearch{client: client}, nil
 }
 
+// CreateIndex creates a new es index and sets its mappings to be schemaJSON.
+// If an index with the same already exists, and the schema(mappings) of the existing index is inconsistent with
+// the new mappings indicated by schemaJSON, the function returns an error.
 func (es *ElasticSearch) CreateIndex(index string, schemaJSON json.RawMessage) error {
 	var schema = make(map[string]interface{})
 	var err = json.Unmarshal(schemaJSON, &schema)
@@ -47,7 +50,6 @@ func (es *ElasticSearch) CreateIndex(index string, schemaJSON json.RawMessage) e
 
 	resp, err := es.client.Indices.Exists([]string{index})
 	defer closeResponse(resp)
-
 	if err != nil {
 		return fmt.Errorf("index exists check error: %w", err)
 	} else if resp.StatusCode == 200 {
@@ -90,6 +92,7 @@ func (es *ElasticSearch) Commit(ctx context.Context, items []*esutil.BulkIndexer
 		OnError: func(_ context.Context, err error) {
 			log.Error(fmt.Sprintf("indexer: %v", err))
 		},
+		// Makes sure the changes are propgated to all shards.
 		WaitForActiveShards: "all",
 		// Disable automatic flushing, which is triggered by bi.Close call.
 		FlushInterval: 100 * time.Hour,
@@ -173,11 +176,9 @@ func (es *ElasticSearch) checkIndexMapping(index string, schema map[string]inter
 		return fmt.Errorf("check index mapping decode: %w", err)
 	}
 
-	var a map[string]interface{}
+	var a = map[string]interface{}{}
 	if m, exist := r[index]; exist {
 		a = m.Mappings.Properties
-	} else {
-		a = map[string]interface{}{}
 	}
 
 	var b = schema["properties"]
