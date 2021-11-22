@@ -69,6 +69,7 @@ jobs:
           - materialize-elasticsearch
           - materialize-postgres
           - materialize-snowflake
+          - materialize-s3-parquet
           - materialize-webhook
 
     steps:
