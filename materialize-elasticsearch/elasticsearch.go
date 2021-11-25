@@ -41,7 +41,7 @@ func NewElasticSearch(endpoint string, username string, password string) (*Elast
 // CreateIndex creates a new es index and sets its mappings to be schemaJSON.
 // If an index with the same already exists, and the schema(mappings) of the existing index is inconsistent with
 // the new mappings indicated by schemaJSON, the function returns an error.
-func (es *ElasticSearch) CreateIndex(index string, schemaJSON json.RawMessage) error {
+func (es *ElasticSearch) CreateIndex(index string, numOfShards int, numOfReplicas int, schemaJSON json.RawMessage) error {
 	var schema = make(map[string]interface{})
 	var err = json.Unmarshal(schemaJSON, &schema)
 	if err != nil {
@@ -64,10 +64,24 @@ func (es *ElasticSearch) CreateIndex(index string, schemaJSON json.RawMessage) e
 	// Disable dynamic mapping.
 	schema["dynamic"] = false
 
-	body, err := json.Marshal(map[string]interface{}{"mappings": schema})
+	var settings struct {
+		Index struct {
+			NumOfShards   int `json:"number_of_shards"`
+			NumOfReplicas int `json:"number_of_replicas"`
+		} `json:"index"`
+	}
+	settings.Index.NumOfShards = numOfShards
+	settings.Index.NumOfReplicas = numOfReplicas
+
+	body, err := json.Marshal(map[string]interface{}{
+		"mappings": schema,
+		"settings": settings,
+	})
 	if err != nil {
 		return fmt.Errorf("create index marshal mappings: %w", err)
 	}
+
+	log.Info(string(body))
 
 	createResp, err := es.client.Indices.Create(
 		index,

@@ -127,6 +127,12 @@
               "$ref": "#/definitions/FieldOverride"
             },
             "type": "array"
+          },
+          "number_of_shards": {
+            "type": "integer"
+          },
+          "number_of_replicas": {
+            "type": "integer"
           }
         },
         "additionalProperties": false,

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	sb "github.com/estuary/connectors/materialize-elasticsearch/schemabuilder"
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
 	"github.com/stretchr/testify/require"
@@ -27,21 +26,35 @@ func TestConfig(t *testing.T) {
 }
 
 func TestResource(t *testing.T) {
-	var validResource = resource{
-		Index:        "testIndex",
-		DeltaUpdates: true,
-		FieldOverides: []sb.FieldOverride{
+	var validResourceA resource
+	pf.UnmarshalStrict(json.RawMessage(`{
+		"index":        "testIndex",
+		"delta_updates": true,
+		"field_overides": [
 			{
-				Pointer: "/test_pointer",
-				EsType:  sb.ElasticFieldType{FieldType: "test_field_type"},
-			},
-		},
-	}
-	require.NoError(t, validResource.Validate())
+				"pointer": "/test_pointer",
+				"esType":  {"field_type": "test_field_type"}
+			}
+		]
+	}`), &validResourceA)
+	require.NoError(t, validResourceA.Validate())
+	require.Equal(t, 0, validResourceA.GetNumOfReplicas())
+	require.Equal(t, 1, validResourceA.GetNumOfShards())
 
-	var missingIndex = validResource
+	var missingIndex = validResourceA
 	missingIndex.Index = ""
 	require.Error(t, missingIndex.Validate(), "expected validation error")
+
+	var validResourceB resource
+	pf.UnmarshalStrict(json.RawMessage(`{
+		"index":        "testIndex",
+		"delta_updates": true,
+		"number_of_shards": 3,
+		"number_of_replicas": 4
+	}`), &validResourceB)
+	require.NoError(t, validResourceB.Validate())
+	require.Equal(t, 3, validResourceB.GetNumOfShards())
+	require.Equal(t, 4, validResourceB.GetNumOfReplicas())
 }
 
 func TestDriverSpec(t *testing.T) {

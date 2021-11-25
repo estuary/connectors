@@ -36,6 +36,14 @@ type resource struct {
 	Index         string                        `json:"index"`
 	DeltaUpdates  bool                          `json:"delta_updates"`
 	FieldOverides []schemabuilder.FieldOverride `json:"field_overrides"`
+
+	// The number of shards and replicas of the ElasticSearch index.
+	// By default they are set to be a single shard without replicas.
+	// For single-node clusters, make sure the number_of_replicas is 0, b/c the
+	// elastic search needs to allocate replicas on different nodes.
+	// Access the following two fields via getters.
+	NumOfShards   *int `json:"number_of_shards,omitempty"`
+	NumOfReplicas *int `json:"number_of_replicas,omitempty"`
 }
 
 func (r resource) Validate() error {
@@ -43,6 +51,20 @@ func (r resource) Validate() error {
 		return fmt.Errorf("missing Index")
 	}
 	return nil
+}
+
+func (r resource) GetNumOfShards() int {
+	if r.NumOfShards == nil {
+		return 1
+	}
+	return *r.NumOfShards
+}
+
+func (r resource) GetNumOfReplicas() int {
+	if r.NumOfReplicas == nil {
+		return 0
+	}
+	return *r.NumOfReplicas
 }
 
 // driver implements the DriverServer interface.
@@ -140,7 +162,7 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 			return nil, fmt.Errorf("building elastic search schema: %w", err)
 		}
 
-		if err = elasticSearch.CreateIndex(res.Index, elasticSearchSchema); err != nil {
+		if err = elasticSearch.CreateIndex(res.Index, res.GetNumOfShards(), res.GetNumOfReplicas(), elasticSearchSchema); err != nil {
 			return nil, fmt.Errorf("creating elastic search index: %w", err)
 		}
 		indices = append(indices, res.Index)
