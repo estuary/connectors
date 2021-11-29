@@ -71,14 +71,14 @@ type transactor struct {
 }
 
 // pm.Transactor
-func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *pm.LoadIterator, priorCommittedCh <-chan struct{}, priorAcknowledgedCh <-chan struct{}, loaded func(binding int, doc json.RawMessage) error) error {
 	panic("Rockset is not transactional - Load should never be called")
 }
 
 // pm.Transactor
-func (t *transactor) Prepare(req *pm.TransactionRequest_Prepare) (*pm.TransactionResponse_Prepared, error) {
+func (t *transactor) Prepare(ctx context.Context, msg pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	// Nothing to prepare
-	return &pm.TransactionResponse_Prepared{}, nil
+	return pf.DriverCheckpoint{}, nil
 }
 
 // pm.Transactor
@@ -132,8 +132,8 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 }
 
 // pm.Transactor
-func (t *transactor) Commit() error {
-	group, ctx := errgroup.WithContext(t.ctx)
+func (t *transactor) Commit(ctx context.Context) error {
+	group, ctx := errgroup.WithContext(ctx)
 
 	for _, binding := range t.bindings {
 		b := binding
@@ -146,6 +146,11 @@ func (t *transactor) Commit() error {
 		return fmt.Errorf("commit: %w", err)
 	}
 
+	return nil
+}
+
+func (t *transactor) Acknowledge(context.Context) error {
+	// Nothing to do during acknowledgement
 	return nil
 }
 

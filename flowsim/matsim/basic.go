@@ -9,7 +9,6 @@ import (
 
 	"github.com/estuary/connectors/flowsim/testcat"
 	"github.com/estuary/connectors/flowsim/testdata"
-	"github.com/estuary/flow/go/materialize"
 	pm "github.com/estuary/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 )
@@ -48,7 +47,7 @@ func (c *BasicConfig) Execute(args []string) error {
 	materialization := materializationSpecs[0]
 
 	// Perform the connector setup (spec, validate, apply) and open the transactions stream.
-	stream, err := SetupConnectorOpenTransactions(c.ctx, materialization, materialize.AdaptServerToClient(c.driverServer), false)
+	stream, err := SetupConnectorOpenTransactions(c.ctx, materialization, pm.AdaptServerToClient(c.driverServer), false)
 	if err != nil {
 		return fmt.Errorf("setup connector: %v", err)
 	}
@@ -118,6 +117,9 @@ func (c *BasicConfig) Execute(args []string) error {
 
 		// Wait until previous commit has completed if it's still running.
 		commitWait.Wait()
+		if err := Acknowledge(stream); err != nil {
+			return err
+		}
 
 		// Previously committed passStore is now available to put into the store again as the commit on it is complete.
 		store.Push((<-returnToStore).Range()...)
