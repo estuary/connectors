@@ -166,7 +166,7 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 }
 
 // pm.DriverServer interface.
-func (d *rocksetDriver) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
 	config, err := configFromJson(req.Materialization.EndpointSpecJson)
 	if err != nil {
 		return nil, err
@@ -202,6 +202,11 @@ func (d *rocksetDriver) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.Ap
 	}
 
 	return response, nil
+}
+
+func (d *rocksetDriver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+	// TODO: delete Rockset resources now that we can clean this up as part of the real protocol.
+	return nil, nil
 }
 
 // pm.DriverServer interface.

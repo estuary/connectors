@@ -11,7 +11,6 @@ import (
 
 	"github.com/estuary/connectors/flowsim/testcat"
 	"github.com/estuary/connectors/flowsim/testdata"
-	"github.com/estuary/flow/go/materialize"
 	pm "github.com/estuary/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 )
@@ -47,7 +46,7 @@ func (c *DeltaConfig) Execute(args []string) error {
 	materialization := materializationSpecs[0]
 
 	// Perform the setup and open the transactions stream
-	stream, err := SetupConnectorOpenTransactions(c.ctx, materialization, materialize.AdaptServerToClient(c.driverServer), true)
+	stream, err := SetupConnectorOpenTransactions(c.ctx, materialization, pm.AdaptServerToClient(c.driverServer), true)
 	if err != nil {
 		return err
 	}
@@ -96,7 +95,6 @@ func (c *DeltaConfig) Execute(args []string) error {
 
 	// Main prepare/store/commit loop.
 	for loop := 0; loop < c.Loops; loop++ {
-
 		// The number of documents we will store this pass.
 		docCount := (1 << loop) * c.Start
 
@@ -104,6 +102,9 @@ func (c *DeltaConfig) Execute(args []string) error {
 
 		// Wait until previous commit has completed if it's still running.
 		commitWait.Wait()
+		if err := Acknowledge(stream); err != nil {
+			return err
+		}
 
 		// Write the Prepared request with the checkpoint information.
 		var checkpoint = fmt.Sprintf(`"checkpoint loop %d"`, loop)
@@ -170,7 +171,6 @@ func (c *DeltaConfig) Execute(args []string) error {
 			// sit in this channel until the next loading cycle has completed.
 			returnToStore <- store
 		}(loop, passStore)
-
 	}
 
 	// Wait until the final commit has completed.
@@ -191,5 +191,4 @@ func (c *DeltaConfig) Execute(args []string) error {
 	log.Infof("validation completed: duration: %v", time.Since(start))
 
 	return nil
-
 }

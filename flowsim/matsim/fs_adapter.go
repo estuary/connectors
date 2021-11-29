@@ -56,7 +56,7 @@ func (fsa flowSinkAdapter) Validate(ctx context.Context, req *pm.ValidateRequest
 }
 
 // Apply applies the configuration.
-func (fsa flowSinkAdapter) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+func (fsa flowSinkAdapter) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
 	var source = new(image.EndpointSpec)
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
@@ -67,7 +67,11 @@ func (fsa flowSinkAdapter) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm
 	req.Materialization = proto.Clone(req.Materialization).(*pf.MaterializationSpec)
 	req.Materialization.EndpointSpecJson = source.Config
 
-	return fsa.DriverServer.Apply(ctx, req)
+	return fsa.DriverServer.ApplyUpsert(ctx, req)
+}
+
+func (fsa flowSinkAdapter) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+	panic("ApplyDelete not adapted")
 }
 
 // Transactions implements the DriverServer interface.

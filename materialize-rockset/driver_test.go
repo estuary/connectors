@@ -185,7 +185,7 @@ func TestRocksetDriverApply(t *testing.T) {
 
 	defer cleanup(config, workspaceName, collectionName)
 
-	response, err := driver.Apply(context.Background(), &applyReq)
+	response, err := driver.ApplyUpsert(context.Background(), &applyReq)
 
 	require.NoError(t, err)
 	require.Contains(t, response.ActionDescription, fmt.Sprintf("created %s collection", collectionName))
