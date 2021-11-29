@@ -135,7 +135,6 @@ func (c *Config) ParseConfig() error {
 // NewTestCatalog returns a simple catalog with a single collection using the schema of your TestData
 // and a single materialization setup to use FlowSync with your materialization.
 func (c *Config) NewTestCatalog() (*testcat.TestCatalog, error) {
-
 	var collection, err = testcat.BuildCollection(c.newTestData())
 	if err != nil {
 		return nil, err
@@ -168,7 +167,6 @@ func (c *Config) NewTestCatalog() (*testcat.TestCatalog, error) {
 
 // resolveYamlOrFile takes a string and tries to parse it as yaml or if it can't assumes it's a yaml file.
 func resolveYamlOrFile(in string) (testcat.ConfigMap, error) {
-
 	var out = make(testcat.ConfigMap)
 	if err := yaml.Unmarshal([]byte(in), &out); err == nil {
 		return out, nil

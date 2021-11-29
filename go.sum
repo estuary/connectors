@@ -235,6 +235,8 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0 h1:EQciDnbrYxy13PgWoY8AqoxGiPrp
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9 h1:icgSuIhq86Oyvy1PtuS7woTkb0v+eTdGGqutp5k/VMU=
 github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9/go.mod h1:YpPUNJtpRROmy/+sy82DRzq1PdB5bpJkyCXjxqCeRuM=
+github.com/estuary/flow v0.1.1-0.20211207135900-65dc2d2b030a h1:gyG0HF6DU3Fyr7O1ZGa3WHlK0mNcFkkEaEz8zcfDpfk=
+github.com/estuary/flow v0.1.1-0.20211207135900-65dc2d2b030a/go.mod h1:+sYnmqlBjmvd57tTUa35ViG74uwsUZ6r8XWFIacHW8g=
 github.com/estuary/protocols v0.0.0-20211006013521-9b8d02b54d19/go.mod h1:CcYehV5RxFk0tNW/K/9w08YvHuzhkEFARuomzDn4nhk=
 github.com/estuary/protocols v0.0.0-20211129055338-9259b2dca80a h1:2S/0GAvLKkayZmRTMjIr9uSpJSPYsrqPaKJ4hE1fRr4=
 github.com/estuary/protocols v0.0.0-20211129055338-9259b2dca80a/go.mod h1:HvGdE/2z4CCCn+XcjMujL3AQ2Skc/KKz6ds42UJnwc8=
@@ -958,6 +960,8 @@ golang.org/x/sys v0.0.0-20210908233432-aa78b53d3365/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20210917161153-d61c044b1678/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359 h1:2B5p2L5IfGiD7+b9BOoRMC6DgObAVZV+Fsp050NqXik=
 golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.0.0-20211124211545-fe61309f8881 h1:TyHqChC80pFkXWraUUf6RuB5IqFdQieMLwwCJokV2pc=
+golang.org/x/sys v0.0.0-20211124211545-fe61309f8881/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20201117132131-f5c789dd3221/go.mod h1:Nr5EML6q2oocZ2LXRh80K7BxOlk5/8JxuGnuhpl+muw=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=

@@ -72,7 +72,7 @@ func SetupConnectorOpenTransactions(ctx context.Context, materialization *pf.Mat
 	}
 
 	// Apply the materialization.
-	respApply, err := client.Apply(ctx, &pm.ApplyRequest{
+	respApply, err := client.ApplyUpsert(ctx, &pm.ApplyRequest{
 		Materialization: materialization,
 		Version:         "1.0",
 		DryRun:          false,
@@ -141,9 +141,37 @@ func SendPrepare(stream pm.Driver_TransactionsClient, checkpoint []byte) error {
 	})
 }
 
+func SendAcknowledge(stream pm.Driver_TransactionsClient) error {
+	return stream.Send(&pm.TransactionRequest{
+		Acknowledge: &pm.TransactionRequest_Acknowledge{},
+	})
+}
+
+func AwaitAcknowledged(stream pm.Driver_TransactionsClient) error {
+	acked, err := stream.Recv()
+	if err != nil {
+		return fmt.Errorf("reading Acknowledged: %w", err)
+	} else if acked.Acknowledged == nil {
+		return fmt.Errorf("expected Acknowledged, got %#v", acked.String())
+	}
+
+	return nil
+}
+
+func Acknowledge(stream pm.Driver_TransactionsClient) error {
+	if err := SendAcknowledge(stream); err != nil {
+		return fmt.Errorf("sending Acknowledge: %w", err)
+	}
+
+	if err := AwaitAcknowledged(stream); err != nil {
+		return fmt.Errorf("awaiting Acknowledged: %w", err)
+	}
+
+	return nil
+}
+
 // SendStore sends store requests in blocks of batchSize with all the specified items.
 func SendStore(stream pm.Driver_TransactionsClient, items []testdata.TestData, exists []bool, batchSize int) error {
-
 	if len(items) != len(exists) {
 		return errors.New("length of items does not match length of exists")
 	}
@@ -210,15 +238,14 @@ func AwaitCommitted(stream pm.Driver_TransactionsClient) error {
 	committed, err := stream.Recv()
 	if err != nil {
 		return err
-	} else if committed.Committed == nil {
+	} else if committed.DriverCommitted == nil {
 		return fmt.Errorf("unexpected message: %#v", committed)
 	}
 	return nil
 }
 
-// HandleLoadedPrepared reads messages and passes loaded message to the passed function and returns the prepared message once received.
-func HandleLoadedPrepared(stream pm.Driver_TransactionsClient, f func(*pm.TransactionResponse_Loaded) error) (*pm.TransactionResponse_Prepared, error) {
-
+// HandleLoadedPrepared reads messages and passes loaded message to the passed function and returns the checkpoint once received.
+func HandleLoadedPrepared(stream pm.Driver_TransactionsClient, f func(*pm.TransactionResponse_Loaded) error) (*pf.DriverCheckpoint, error) {
 	for {
 		next, err := stream.Recv()
 		if err != nil {

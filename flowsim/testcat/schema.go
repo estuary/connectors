@@ -71,7 +71,7 @@ func BuildSchema(in interface{}) (TestSchema, []string, error) {
 			fieldName := structKey.Tag.Get("flowsim")
 			tagOptions := []string{}
 			if fieldName == "" {
-				fieldName = structKey.Name
+				fieldName = structKey.Tag.Get("json")
 			} else {
 				// Get the field name and tagOptions.
 				if idx := strings.Index(fieldName, ","); idx != -1 {

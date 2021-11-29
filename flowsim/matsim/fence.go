@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/flowsim/testcat"
-	"github.com/estuary/flow/go/materialize"
+	"github.com/estuary/protocols/materialize"
 	pm "github.com/estuary/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 )
@@ -62,7 +62,7 @@ func (c *FenceConfig) Execute(args []string) error {
 	}
 
 	// Perform the connector setup (spec, validate, apply) and open the second, overlapping transactions stream.
-	stream2, err := SetupConnectorOpenTransactions(c.ctx, materialization, materialize.AdaptServerToClient(c.driverServer), false)
+	stream2, err := SetupConnectorOpenTransactions(c.ctx, materialization, pm.AdaptServerToClient(c.driverServer), false)
 	if err != nil {
 		return err
 	}
