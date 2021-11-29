@@ -229,8 +229,8 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7
 github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9 h1:icgSuIhq86Oyvy1PtuS7woTkb0v+eTdGGqutp5k/VMU=
 github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9/go.mod h1:YpPUNJtpRROmy/+sy82DRzq1PdB5bpJkyCXjxqCeRuM=
 github.com/estuary/protocols v0.0.0-20211006013521-9b8d02b54d19/go.mod h1:CcYehV5RxFk0tNW/K/9w08YvHuzhkEFARuomzDn4nhk=
-github.com/estuary/protocols v0.0.0-20211128180626-3140b8a4a86c h1:5eekI0ND4WNpDB1IrF1m+pTL9CI2ysaEKQFXdOw7e7k=
-github.com/estuary/protocols v0.0.0-20211128180626-3140b8a4a86c/go.mod h1:HvGdE/2z4CCCn+XcjMujL3AQ2Skc/KKz6ds42UJnwc8=
+github.com/estuary/protocols v0.0.0-20211129055338-9259b2dca80a h1:2S/0GAvLKkayZmRTMjIr9uSpJSPYsrqPaKJ4hE1fRr4=
+github.com/estuary/protocols v0.0.0-20211129055338-9259b2dca80a/go.mod h1:HvGdE/2z4CCCn+XcjMujL3AQ2Skc/KKz6ds42UJnwc8=
 github.com/evanphx/json-patch v4.2.0+incompatible h1:fUDGZCv/7iAN7u0puUVhvKCcsR6vRfwrJatElLBEf0I=
 github.com/evanphx/json-patch v4.2.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.5.0 h1:bAmFiUJ+o0o2B4OiTFeE3MqCOtyo+jjPP9iZ0VRxYUc=
