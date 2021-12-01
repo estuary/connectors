@@ -30,6 +30,7 @@ func TestResource(t *testing.T) {
 	pf.UnmarshalStrict(json.RawMessage(`{
 		"index":        "testIndex",
 		"delta_updates": true,
+		"number_of_shards": 1,
 		"field_overides": [
 			{
 				"pointer": "/test_pointer",
@@ -38,12 +39,16 @@ func TestResource(t *testing.T) {
 		]
 	}`), &validResourceA)
 	require.NoError(t, validResourceA.Validate())
-	require.Equal(t, 0, validResourceA.GetNumOfReplicas())
-	require.Equal(t, 1, validResourceA.GetNumOfShards())
+	require.Equal(t, 1, validResourceA.NumOfShards)
+	require.Equal(t, 0, validResourceA.NumOfReplicas)
 
 	var missingIndex = validResourceA
 	missingIndex.Index = ""
 	require.Error(t, missingIndex.Validate(), "expected validation error")
+
+	var invalidShards = validResourceA
+	invalidShards.NumOfShards = 0
+	require.Error(t, invalidShards.Validate(), "expected validation error")
 
 	var validResourceB resource
 	pf.UnmarshalStrict(json.RawMessage(`{
@@ -53,8 +58,8 @@ func TestResource(t *testing.T) {
 		"number_of_replicas": 4
 	}`), &validResourceB)
 	require.NoError(t, validResourceB.Validate())
-	require.Equal(t, 3, validResourceB.GetNumOfShards())
-	require.Equal(t, 4, validResourceB.GetNumOfReplicas())
+	require.Equal(t, 3, validResourceB.NumOfShards)
+	require.Equal(t, 4, validResourceB.NumOfReplicas)
 }
 
 func TestDriverSpec(t *testing.T) {
