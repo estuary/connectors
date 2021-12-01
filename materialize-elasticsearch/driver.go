@@ -104,11 +104,12 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 			var constraint = &pm.Constraint{}
 			switch {
 			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Constraint_FIELD_REQUIRED
-				constraint.Reason = "The root document is needed."
+			case projection.IsPrimaryKey:
+				constraint.Type = pm.Constraint_LOCATION_REQUIRED
+				constraint.Reason = "The root document and primary key fields are needed."
 			default:
-				constraint.Type = pm.Constraint_FIELD_OPTIONAL
-				constraint.Reason = "Non root document fields are not required."
+				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
+				constraint.Reason = "Non-root document fields and non-primary key fields are not needed."
 			}
 			constraints[projection.Field] = constraint
 		}
@@ -210,10 +211,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return fmt.Errorf("sending Opened: %w", err)
 	}
 
-	var log = log.WithField(
-		"materialization",
-		fmt.Sprintf("mat-elasticsearch-%d-%d", open.Open.KeyBegin, open.Open.KeyEnd),
-	)
+	var log = log.WithField("materialization", "elasticsearch")
 	return pm.RunTransactions(stream, transactor, log)
 }
 
