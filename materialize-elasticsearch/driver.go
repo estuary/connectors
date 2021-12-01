@@ -15,7 +15,6 @@ import (
 	"github.com/estuary/protocols/fdb/tuple"
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
-	"github.com/meirf/gopart"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -132,7 +131,7 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = NewElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
+	var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
 	if err != nil {
 		return nil, fmt.Errorf("creating elasticSearch: %w", err)
 	}
@@ -181,7 +180,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	}
 
 	var elasticSearch *ElasticSearch
-	elasticSearch, err = NewElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
+	elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
 	if err != nil {
 		return fmt.Errorf("creating elastic search client: %w", err)
 	}
@@ -232,17 +231,18 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struc
 	var loadingIdsByBinding = map[int][]string{}
 
 	for it.Next() {
-		var b = t.bindings[it.Binding]
-		if b.deltaUpdates {
-			panic("Load should not be called for delta updates.")
-		}
 		loadingIdsByBinding[it.Binding] = append(loadingIdsByBinding[it.Binding], documentId(it.Key))
 	}
 
 	for binding, ids := range loadingIdsByBinding {
 		var b = t.bindings[binding]
-		for idxRange := range gopart.Partition(len(ids), loadByIdBatchSize) {
-			var docs, err = t.elasticSearch.SearchByIds(b.index, ids[idxRange.Low:idxRange.High])
+		for start := 0; start < len(ids); start += loadByIdBatchSize {
+			var stop = start + loadByIdBatchSize
+			if stop > len(ids) {
+				stop = len(ids)
+			}
+
+			var docs, err = t.elasticSearch.SearchByIds(b.index, ids[start:stop])
 			if err != nil {
 				return fmt.Errorf("Load docs by ids: %w", err)
 			}
@@ -266,7 +266,6 @@ func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare)
 }
 
 func (t *transactor) Store(it *pm.StoreIterator) error {
-	var lastErr error = nil
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 		var action, docId = "create", ""
@@ -280,19 +279,17 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 			DocumentID: docId,
 			Body:       bytes.NewReader(it.RawJSON),
 			OnFailure: func(_ context.Context, _ esutil.BulkIndexerItem, r esutil.BulkIndexerResponseItem, e error) {
-				log.Error(fmt.Sprintf("failed with response: %+v, error: %v", r, e))
-				lastErr = fmt.Errorf("store items: %+v, %w", r, e)
+				log.WithFields(log.Fields{"error": e, "response": r}).Error("failed to store documents")
 			},
 		}
 
 		t.bulkIndexerItems = append(t.bulkIndexerItems, item)
 	}
 
-	return lastErr
+	return nil
 }
 
 func (t *transactor) Commit(ctx context.Context) error {
-	defer func() { t.bulkIndexerItems = t.bulkIndexerItems[:0] }()
 
 	if err := t.elasticSearch.Commit(ctx, t.bulkIndexerItems); err != nil {
 		return fmt.Errorf("commit: %w", err)
@@ -300,10 +297,15 @@ func (t *transactor) Commit(ctx context.Context) error {
 
 	for _, b := range t.bindings {
 		// Using Flush instead of Refresh to make sure the data are persisted.
+		// (Although both operations ensure the data in ElasticSearch available for search,
+		//  Refresh guarentees the data are persisted to disk. For details see
+		// https://qbox.io/blog/refresh-flush-operations-elasticsearch-guide/)
 		if err := t.elasticSearch.Flush(b.index); err != nil {
 			return fmt.Errorf("commit flush: %w", err)
 		}
 	}
+
+	t.bulkIndexerItems = t.bulkIndexerItems[:0]
 	return nil
 }
 
