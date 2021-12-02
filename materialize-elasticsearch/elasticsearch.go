@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,13 @@ import (
 // ElasticSearch provides APIs for interacting with ElasticSearch service.
 type ElasticSearch struct {
 	client *elasticsearch.Client
+}
+
+type IndexSettings struct {
+	Index struct {
+		NumOfShards   string `json:"number_of_shards,omitempty"`
+		NumOfReplicas string `json:"number_of_replicas"`
+	} `json:"index"`
 }
 
 func newElasticSearch(endpoint string, username string, password string) (*ElasticSearch, error) {
@@ -38,40 +46,86 @@ func newElasticSearch(endpoint string, username string, password string) (*Elast
 	return &ElasticSearch{client: client}, nil
 }
 
-// CreateIndex creates a new es index and sets its mappings to be schemaJSON.
-// If an index with the same already exists, and the schema(mappings) of the existing index is inconsistent with
-// the new mappings indicated by schemaJSON, the function returns an error.
-func (es *ElasticSearch) CreateIndex(index string, numOfShards int, numOfReplicas int, schemaJSON json.RawMessage) error {
+// DeleteIndex deletes a list of indices.
+func (es *ElasticSearch) DeleteIndices(indices []string) error {
+	resp, err := es.client.Indices.Delete(
+		indices,
+		es.client.Indices.Delete.WithIgnoreUnavailable(true),
+	)
+	defer closeResponse(resp)
+	if err = es.parseErrorResp(err, resp); err != nil {
+		return fmt.Errorf("delete indices: %w", err)
+	}
+
+	return nil
+}
+
+// CreateIndex creates a new es index and sets its mappings to be schemaJSON,
+// if the index does not exist. Otherwise,
+// 1. if the new index has a different mapping (or num_of_shards spec) from the existing index,
+//    the API stops with an error, b/c the mapping and num_of_shards cannot be changed after creation.
+// 2. if the new index has a different num_of_replica spec from the existing index,
+//    the API resets the setting to match the new.
+func (es *ElasticSearch) CreateIndex(index string, numOfShards int, numOfReplicas int, schemaJSON json.RawMessage, dryRun bool) error {
 	var schema = make(map[string]interface{})
 	var err = json.Unmarshal(schemaJSON, &schema)
 	if err != nil {
 		return fmt.Errorf("unmarshal schemaJSON: %w", err)
 	}
 
+	var numOfShardsStr = strconv.Itoa(numOfShards)
+	var numOfReplicasStr = strconv.Itoa(numOfReplicas)
+
 	resp, err := es.client.Indices.Exists([]string{index})
 	defer closeResponse(resp)
 	if err != nil {
 		return fmt.Errorf("index exists check error: %w", err)
 	} else if resp.StatusCode == 200 {
-		// The index exists, make sure it is the same as requested.
-		return es.checkIndexMapping(index, schema)
+		// The index exists, make sure it is compatible to the requested.
+		if mappingErr := es.checkIndexMapping(index, schema); mappingErr != nil {
+			// If inconsistent schema of the index is detected, user needs to decide
+			// either removing the existing index or renaming the new index. As mapping cannot
+			// be modified after creation.
+			return fmt.Errorf("check index mapping: %w", mappingErr)
+		} else if settings, settingErr := es.getIndexSettings(index); settingErr != nil {
+			return fmt.Errorf("get index setting: %w", settingErr)
+		} else if settings.Index.NumOfShards != numOfShardsStr {
+			// Same as a schema, the number of shards cannot be changed after creation.
+			return fmt.Errorf(
+				"%s: expected number of shards (%d) is inconsistent with the existing number of shards (%s). Try 1) change the number of shard in spec, 2) rename the index or 3) use `flowctl api delete` to delete the existing index.",
+				index, numOfShards, settings.Index.NumOfShards,
+			)
+		} else if settings.Index.NumOfReplicas != numOfReplicasStr {
+			if dryRun {
+				return nil
+			}
+			// Number of replicas is allowed to be adjusted.
+			log.WithFields(log.Fields{
+				"index":                     index,
+				"requested num_of_replicas": numOfReplicas,
+				"existing num_of_replicas":  settings.Index.NumOfReplicas,
+			}).Info("expected number of replicas is inconsistent with the existing. Updating...")
+
+			var inputSetting IndexSettings
+			inputSetting.Index.NumOfReplicas = numOfReplicasStr
+			return es.updateIndexSettings(index, &inputSetting)
+		}
+		return nil
 	} else if resp.StatusCode != 404 {
 		return fmt.Errorf("index exists: invalid response status code %d", resp.StatusCode)
 	}
 
 	// The index does not exist, create a new one.
+	if dryRun {
+		return nil
+	}
 
 	// Disable dynamic mapping.
 	schema["dynamic"] = false
 
-	var settings struct {
-		Index struct {
-			NumOfShards   int `json:"number_of_shards"`
-			NumOfReplicas int `json:"number_of_replicas"`
-		} `json:"index"`
-	}
-	settings.Index.NumOfShards = numOfShards
-	settings.Index.NumOfReplicas = numOfReplicas
+	var settings IndexSettings
+	settings.Index.NumOfShards = numOfShardsStr
+	settings.Index.NumOfReplicas = numOfReplicasStr
 
 	body, err := json.Marshal(map[string]interface{}{
 		"mappings": schema,
@@ -80,8 +134,6 @@ func (es *ElasticSearch) CreateIndex(index string, numOfShards int, numOfReplica
 	if err != nil {
 		return fmt.Errorf("create index marshal mappings: %w", err)
 	}
-
-	log.Info(string(body))
 
 	createResp, err := es.client.Indices.Create(
 		index,
@@ -96,19 +148,33 @@ func (es *ElasticSearch) CreateIndex(index string, numOfShards int, numOfReplica
 	return nil
 }
 
+// Commit performs the bulk operations specified by the input items.
+// Note: the OnFailure callback of the `items` will be overridden by the function.
 func (es *ElasticSearch) Commit(ctx context.Context, items []*esutil.BulkIndexerItem) error {
 	if len(items) == 0 {
 		return nil
 	}
 
+	// lastError records the most recent error ocurred during the processing of the bulk items.
+	// There are three sources of errors.
+	// 1. errors related to a single create/index operation specified by a bulk item.
+	// 2. errors related to a bulk operation performed by the workers. (A bulk operation performs one or more single operations in one request.)
+	// 3. errors related to context cancel / timeout.
+	//
+	// errors of type 1 are collected by the OnFailure callback on the bulk item.
+	// errors of types 2 and 3 are collected by the OnError callback of the bulk indexer.
+	var lastError error
 	var bi, err = esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Client: es.client,
 		OnError: func(_ context.Context, err error) {
-			log.Error(fmt.Sprintf("indexer: %v", err))
+			if err != nil {
+				log.WithFields(log.Fields{"error": err}).Error("bulk index error")
+				lastError = fmt.Errorf("bulk index error: %w", err)
+			}
 		},
 		// Makes sure the changes are propgated to all shards.
 		WaitForActiveShards: "all",
-		// Disable automatic flushing, which is triggered by bi.Close call.
+		// Disable automatic flushing, instead, use bi.Close to trigger a flush.
 		FlushInterval: 100 * time.Hour,
 	})
 	if err != nil {
@@ -116,12 +182,22 @@ func (es *ElasticSearch) Commit(ctx context.Context, items []*esutil.BulkIndexer
 	}
 
 	for _, item := range items {
+		item.OnFailure = func(_ context.Context, _ esutil.BulkIndexerItem, r esutil.BulkIndexerResponseItem, e error) {
+			log.WithFields(log.Fields{"error": e, "response": r}).Error("index item failure")
+			lastError = fmt.Errorf("index item failure, resp: %v, error: %w", r, e)
+		}
+
 		if err = bi.Add(ctx, *item); err != nil {
 			return fmt.Errorf("adding item: %w", err)
 		}
 	}
 
-	return bi.Close(ctx)
+	bi.Close(ctx)
+	if lastError != nil {
+		return fmt.Errorf("bulk commit: %w", lastError)
+	}
+
+	return nil
 }
 
 func (es *ElasticSearch) SearchByIds(index string, ids []string) ([]json.RawMessage, error) {
@@ -198,9 +274,47 @@ func (es *ElasticSearch) checkIndexMapping(index string, schema map[string]inter
 	var b = schema["properties"]
 
 	if !reflect.DeepEqual(a, b) {
-		return fmt.Errorf("schema inconsistent. existing: %v, new: %v", a, b)
+		return fmt.Errorf("schema inconsistent. Try rename the index, or use `flowctl api delete` to delete the existing index and restart. Details: existing: %v, new: %v", a, b)
 	}
 	return nil
+}
+
+func (es *ElasticSearch) updateIndexSettings(index string, settings *IndexSettings) error {
+	var body, err = json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("marshal index setting: %w", err)
+	}
+
+	resp, err := es.client.Indices.PutSettings(
+		bytes.NewReader(body),
+		es.client.Indices.PutSettings.WithIndex(index),
+	)
+	defer closeResponse(resp)
+	if err = es.parseErrorResp(err, resp); err != nil {
+		return fmt.Errorf("update index setting: %w", err)
+	}
+	return nil
+}
+
+func (es *ElasticSearch) getIndexSettings(index string) (*IndexSettings, error) {
+	var resp, err = es.client.Indices.GetSettings(
+		es.client.Indices.GetSettings.WithIndex(index),
+	)
+	defer closeResponse(resp)
+	if err = es.parseErrorResp(err, resp); err != nil {
+		return nil, fmt.Errorf("get index settings: %w", err)
+	}
+
+	var r = map[string]struct {
+		Settings *IndexSettings `json:"settings"`
+	}{}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return nil, fmt.Errorf("get index setting decode: %w", err)
+	}
+	if m, exist := r[index]; exist {
+		return m.Settings, nil
+	}
+	return nil, fmt.Errorf("missing index settings: %s", index)
 }
 
 func (es *ElasticSearch) parseErrorResp(err error, resp *esapi.Response) error {

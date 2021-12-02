@@ -39,7 +39,7 @@ type resource struct {
 	// The number of shards in ElasticSearch index. Must set to be greater than 0.
 	NumOfShards int `json:"number_of_shards,omitempty"`
 	// The number of replicas in ElasticSearch index. If not set, default to be 0.
-	// For single-node clusters, make sure the this field is 0, b/c the
+	// For single-node clusters, make sure this field is 0, b/c the
 	// Elastic search needs to allocate replicas on different nodes.
 	NumOfReplicas int `json:"number_of_replicas,omitempty"`
 }
@@ -82,6 +82,11 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
+	var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
+	if err != nil {
+		return nil, fmt.Errorf("creating elasticSearch: %w", err)
+	}
+
 	var out []*pm.ValidateResponse_Binding
 	for _, binding := range req.Bindings {
 		var res resource
@@ -90,11 +95,14 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		}
 
 		// Make sure the specified resource is valid to build
-		if _, err := schemabuilder.RunSchemaBuilder(
+		if schema, err := schemabuilder.RunSchemaBuilder(
 			binding.Collection.SchemaJson,
 			res.FieldOverides,
 		); err != nil {
 			return nil, fmt.Errorf("building elastic search schema: %w", err)
+		} else if err = elasticSearch.CreateIndex(res.Index, res.NumOfShards, res.NumOfReplicas, schema, true); err != nil {
+			// Dry run the index creation to make sure the specifications of the index are consistent with the existing one, if any.
+			return nil, fmt.Errorf("validate elastic search index: %w", err)
 		}
 
 		var constraints = make(map[string]*pm.Constraint)
@@ -143,26 +151,49 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		var elasticSearchSchema, err = schemabuilder.RunSchemaBuilder(
+		if elasticSearchSchema, err := schemabuilder.RunSchemaBuilder(
 			binding.Collection.SchemaJson,
 			res.FieldOverides,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, fmt.Errorf("building elastic search schema: %w", err)
-		}
-
-		if err = elasticSearch.CreateIndex(res.Index, res.NumOfShards, res.NumOfReplicas, elasticSearchSchema); err != nil {
+		} else if err = elasticSearch.CreateIndex(res.Index, res.NumOfShards, res.NumOfReplicas, elasticSearchSchema, false); err != nil {
 			return nil, fmt.Errorf("creating elastic search index: %w", err)
 		}
+
 		indices = append(indices, res.Index)
 	}
 
 	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("created indices: ", strings.Join(indices, ","))}, nil
 }
 
-// ApplyDelete is a no-op.
 func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	return &pm.ApplyResponse{}, nil
+	if err := req.Validate(); err != nil {
+		return nil, fmt.Errorf("validating request: %w", err)
+	}
+
+	var cfg config
+	if err := pf.UnmarshalStrict(req.Materialization.EndpointSpecJson, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
+
+	var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
+	if err != nil {
+		return nil, fmt.Errorf("creating elasticSearch: %w", err)
+	}
+
+	var indices []string
+	for _, binding := range req.Materialization.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+			return nil, fmt.Errorf("parsing resource config: %w", err)
+		}
+		indices = append(indices, res.Index)
+	}
+	if err = elasticSearch.DeleteIndices(indices); err != nil {
+		return nil, fmt.Errorf("deleting elastic search index: %w", err)
+	}
+
+	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("deleted indices: ", strings.Join(indices, ","))}, nil
 }
 
 // Transactions implements the DriverServer interface.
@@ -278,9 +309,6 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 			Action:     action,
 			DocumentID: docId,
 			Body:       bytes.NewReader(it.RawJSON),
-			OnFailure: func(_ context.Context, _ esutil.BulkIndexerItem, r esutil.BulkIndexerResponseItem, e error) {
-				log.WithFields(log.Fields{"error": e, "response": r}).Error("failed to store documents")
-			},
 		}
 
 		t.bulkIndexerItems = append(t.bulkIndexerItems, item)
@@ -290,15 +318,14 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 }
 
 func (t *transactor) Commit(ctx context.Context) error {
-
 	if err := t.elasticSearch.Commit(ctx, t.bulkIndexerItems); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
 
 	for _, b := range t.bindings {
 		// Using Flush instead of Refresh to make sure the data are persisted.
-		// (Although both operations ensure the data in ElasticSearch available for search,
-		//  Refresh guarentees the data are persisted to disk. For details see
+		// Although both operations ensure the data in ElasticSearch available for search,
+		// Flush guarantees the data are persisted to disk. For details see
 		// https://qbox.io/blog/refresh-flush-operations-elasticsearch-guide/)
 		if err := t.elasticSearch.Flush(b.index); err != nil {
 			return fmt.Errorf("commit flush: %w", err)
