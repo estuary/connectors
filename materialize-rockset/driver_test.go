@@ -19,7 +19,7 @@ func TestRocksetConfig(t *testing.T) {
 	var invalid = config{}
 	require.NotNil(t, invalid.Validate())
 
-	var valid = config{ApiKey: fetchApiKey()}
+	var valid = config{ApiKey: fetchApiKey(), MaxConcurrentRequests: 1}
 	require.Nil(t, valid.Validate())
 }
 
@@ -48,7 +48,7 @@ func TestRocksetDriverSpec(t *testing.T) {
 
 func TestRocksetDriverValidate(t *testing.T) {
 	driver := new(rocksetDriver)
-	config := config{ApiKey: fetchApiKey()}
+	config := config{ApiKey: fetchApiKey(), MaxConcurrentRequests: 1}
 	var endpointSpecJson []byte
 
 	endpointSpecJson, err := json.Marshal(config)
@@ -129,7 +129,7 @@ func TestRocksetDriverApply(t *testing.T) {
 	collectionName := randCollection()
 
 	driver := new(rocksetDriver)
-	config := config{ApiKey: fetchApiKey()}
+	config := config{ApiKey: fetchApiKey(), MaxConcurrentRequests: 1}
 
 	var endpointSpecJson []byte
 	endpointSpecJson, err := json.Marshal(config)
