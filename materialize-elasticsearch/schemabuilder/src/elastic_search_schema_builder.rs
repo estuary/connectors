@@ -20,8 +20,8 @@ pub fn build_elastic_schema_with_overrides(
     schema_json: &[u8],
     es_type_overrides: &[ESTypeOverride],
 ) -> Result<ESFieldType, Error> {
-    // parse should not fail on the hard-coded url.
-    let schema_uri = url::Url::parse(FAKE_BUNDLE_URL).unwrap();
+    let schema_uri =
+        url::Url::parse(FAKE_BUNDLE_URL).expect("parse should not fail on hard-coded url");
 
     let schema: Value = serde_json::from_slice(schema_json)?;
     let schema = schema::build::build_schema::<Annotation>(schema_uri, &schema)?;

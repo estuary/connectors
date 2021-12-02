@@ -28,7 +28,6 @@ require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
-	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/prometheus/common v0.31.1 // indirect
 	github.com/sirupsen/logrus v1.8.1
