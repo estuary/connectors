@@ -22,6 +22,8 @@ type config struct {
 	HttpLogging bool `json:"http_logging"`
 	// Field name which contains CDC change types are located. Values should be one of `["Insert", "Update", "Delete"]`
 	ChangeIndicator string `json:"change_indicator"`
+	// The upper limit on how many concurrent requests will be sent to Rockset.
+	MaxConcurrentRequests int `json:"max_concurrent_requests" jsonschema:"default=1"`
 }
 
 func (c *config) Validate() error {
@@ -33,6 +35,11 @@ func (c *config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+
+	if c.MaxConcurrentRequests < 1 {
+		return fmt.Errorf("max_concurrent_requests must be a positive integer. got: %v", c.MaxConcurrentRequests)
+	}
+
 	return nil
 }
 

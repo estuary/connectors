@@ -237,51 +237,91 @@ func commitCollection(ctx context.Context, t *transactor, b *binding) error {
 
 	totalUpserts := b.pendingUpserts.Len()
 	totalDeletions := b.pendingDeletions.Len()
+
 	defer logElapsedTime(time.Now(), fmt.Sprintf("commit completed: %d documents added %d documents deleted", totalUpserts, totalDeletions))
 
-	err := fanOut(ctx, b.pendingUpserts, b.concurrencyFactor(b.pendingUpserts.Len()), func(ctx context.Context, documents []json.RawMessage) error {
-		return t.client.AddDocuments(ctx, b.rocksetWorkspace(), b.rocksetCollection(), documents)
+	numWorkers := workerPoolSize(t.config.MaxConcurrentRequests, totalUpserts+totalDeletions, b.res.MaxBatchSize)
+	workQueue, errors := newWorkerPool(ctx, numWorkers, func(ctx context.Context, j job, worker int) error {
+		switch j.op {
+		case opDocumentUpsert:
+			return t.client.AddDocuments(ctx, b.rocksetWorkspace(), b.rocksetCollection(), j.data)
+		case opDocumentDelete:
+			return t.client.DeleteDocuments(ctx, b.rocksetWorkspace(), b.rocksetCollection(), j.data)
+		default:
+			return fmt.Errorf("unrecognized operation type: %v", j.op)
+		}
 	})
 
-	if err != nil {
-		return fmt.Errorf("committing upserts: %w", err)
-	}
+	go func() {
+		defer close(workQueue)
 
-	err = fanOut(ctx, b.pendingDeletions, b.concurrencyFactor(b.pendingDeletions.Len()), func(ctx context.Context, documents []json.RawMessage) error {
-		return t.client.DeleteDocuments(ctx, b.rocksetWorkspace(), b.rocksetCollection(), documents)
-	})
+		for _, batch := range b.pendingUpserts.SplitN(numWorkers) {
+			if len(batch) > 0 {
+				workQueue <- job{op: opDocumentUpsert, data: batch}
+			}
+		}
+		for _, batch := range b.pendingDeletions.SplitN(numWorkers) {
+			if len(batch) > 0 {
+				workQueue <- job{op: opDocumentDelete, data: batch}
+			}
+		}
+	}()
+
+	err := errors.Wait()
+	b.pendingUpserts.Clear()
+	b.pendingDeletions.Clear()
 
 	if err != nil {
-		return fmt.Errorf("committing deletions: %w", err)
+		return fmt.Errorf("committing documents to rockset: %w", err)
 	}
 
 	return nil
 }
 
-func fanOut(ctx context.Context, buf *DocumentBuffer, concurrencyFactor int, callback func(ctx context.Context, documents []json.RawMessage) error) error {
-	if buf.Len() == 0 {
-		return nil
-	}
+type job struct {
+	op   operation
+	data []json.RawMessage
+}
 
-	defer buf.Clear()
+func workerPoolSize(maxConcurrency int, totalOperations int, maxBatchSize int) int {
+	return clamp(1, maxConcurrency, totalOperations/maxBatchSize)
+}
+
+func newWorkerPool(ctx context.Context, poolSize int, doWork func(context.Context, job, int) error) (chan<- job, *errgroup.Group) {
+	jobs := make(chan job, poolSize)
 	group, ctx := errgroup.WithContext(ctx)
 
-	for i, documents := range buf.SplitN(concurrencyFactor) {
-		docs := documents
-		log.Infof("sending request %v: %v documents", i, len(docs))
-
+	for i := 0; i < poolSize; i++ {
+		i := i
 		group.Go(func() error {
-			return callback(ctx, docs)
+			for job := range jobs {
+				if err := doWork(ctx, job, i); err != nil {
+					return err
+				}
+			}
+
+			return nil
 		})
 	}
-	if err := group.Wait(); err != nil {
-		return fmt.Errorf("request fan out: %w", err)
-	}
 
-	return nil
+	return jobs, group
 }
 
 func logElapsedTime(start time.Time, msg string) {
 	elapsed := time.Since(start)
 	log.Infof("%s,%f", msg, elapsed.Seconds())
+}
+
+func clamp(min int, max int, n int) int {
+	if max <= min {
+		panic("max must be larger than min")
+	}
+
+	if n > max {
+		return max
+	} else if n < min {
+		return min
+	} else {
+		return n
+	}
 }
