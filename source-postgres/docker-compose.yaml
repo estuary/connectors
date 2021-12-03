@@ -2,11 +2,16 @@ version: "3.7"
 
 services:
   postgres:
+    restart: always
     image: 'postgres:latest'
     command: ["postgres", "-c", "wal_level=logical"]
-    volumes: ["postgres_data:/var/lib/postgresql/data"]
     environment: {"POSTGRES_DB": "flow", "POSTGRES_USER": "flow", "POSTGRES_PASSWORD": "flow"}
     network_mode: "host"
+    volumes:
+      - type: bind
+        source: ./docker-entrypoint-initdb.d/init-user-db.sh
+        target: /docker-entrypoint-initdb.d/init-user-db.sh
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
   postgres_data: {}
