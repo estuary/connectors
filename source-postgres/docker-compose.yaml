@@ -2,7 +2,6 @@ version: "3.7"
 
 services:
   postgres:
-    restart: always
     image: 'postgres:latest'
     command: ["postgres", "-c", "wal_level=logical"]
     environment: {"POSTGRES_DB": "flow", "POSTGRES_USER": "flow", "POSTGRES_PASSWORD": "flow"}
