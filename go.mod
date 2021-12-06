@@ -13,6 +13,7 @@ require (
 	github.com/benbjohnson/clock v1.1.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/brianvoe/gofakeit/v6 v6.9.0
+	github.com/elastic/go-elasticsearch/v7 v7.15.2-0.20211104170009-caf202868441
 	github.com/estuary/flow v0.1.1-0.20211014150201-5fb28e9026f9
 	github.com/estuary/protocols v0.0.0-20211129055338-9259b2dca80a
 	github.com/gogo/protobuf v1.3.2

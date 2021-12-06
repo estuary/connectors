@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  build_parser:
+  build_rust_releases:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -31,21 +31,29 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             parser/target/
+            materialize-elasticsearch/schemabuilder/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Test Parser
-        run: cargo test --manifest-path=parser/Cargo.toml --locked
+      - name: Test Rust Apps
+        run: |
+          cargo test --manifest-path=parser/Cargo.toml --locked
+          cargo test --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked
 
-      - name: Build Parser
-        run: cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
+      - name: Build Rust Apps
+        run: |
+          cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
+          cargo build --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
 
-      - uses: actions/upload-artifact@v1
+      - name: Upload Rust Apps
+        uses: actions/upload-artifact@v2
         with:
-          name: parser_binary
-          path: parser/target/x86_64-unknown-linux-musl/release/parser
+          name: rust_binary
+          path: |
+            parser/target/x86_64-unknown-linux-musl/release/parser
+            materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
 
   build_connectors:
-    needs: build_parser
+    needs: build_rust_releases
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
@@ -57,10 +65,12 @@ jobs:
           - source-kinesis
           - source-postgres
           - source-s3
+          - materialize-bigquery
+          - materialize-elasticsearch
           - materialize-postgres
           - materialize-snowflake
+          - materialize-s3-parquet
           - materialize-webhook
-          - materialize-bigquery
 
     steps:
       - uses: actions/checkout@v2
@@ -73,14 +83,16 @@ jobs:
           TAG=$(echo $GITHUB_SHA | head -c7)
           echo ::set-output name=tag::${TAG}
 
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
-          name: parser_binary
-          path: parser/target/x86_64-unknown-linux-musl/release/
+          name: rust_binary
 
       # Downloaded artifacts lose their prior permission settings
-      - name: Adjust parser permissions
-        run: chmod +x parser/target/x86_64-unknown-linux-musl/release/parser
+      - name: Adjust rust binary permissions
+        run: |
+          chmod +x \
+          parser/target/x86_64-unknown-linux-musl/release/parser \
+          materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
 
       - name: Install kafkactl
         if: matrix.connector == 'source-kafka'
