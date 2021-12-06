@@ -129,7 +129,8 @@
             "type": "array"
           },
           "number_of_shards": {
-            "type": "integer"
+            "type": "integer",
+            "default": 1
           },
           "number_of_replicas": {
             "type": "integer"

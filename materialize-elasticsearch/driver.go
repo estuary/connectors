@@ -37,9 +37,9 @@ type resource struct {
 	FieldOverides []schemabuilder.FieldOverride `json:"field_overrides"`
 
 	// The number of shards in ElasticSearch index. Must set to be greater than 0.
-	NumOfShards int `json:"number_of_shards,omitempty"`
+	NumOfShards int `json:"number_of_shards,omitempty" jsonschema:"default=1"`
 	// The number of replicas in ElasticSearch index. If not set, default to be 0.
-	// For single-node clusters, make sure this field is 0, b/c the
+	// For single-node clusters, make sure this field is 0, because the
 	// Elastic search needs to allocate replicas on different nodes.
 	NumOfReplicas int `json:"number_of_replicas,omitempty"`
 }
@@ -189,10 +189,14 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		}
 		indices = append(indices, res.Index)
 	}
+
+	if req.DryRun {
+		return &pm.ApplyResponse{ActionDescription: fmt.Sprint("to delete indices: ", strings.Join(indices, ","))}, nil
+	}
+
 	if err = elasticSearch.DeleteIndices(indices); err != nil {
 		return nil, fmt.Errorf("deleting elastic search index: %w", err)
 	}
-
 	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("deleted indices: ", strings.Join(indices, ","))}, nil
 }
 

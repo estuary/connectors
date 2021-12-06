@@ -63,7 +63,7 @@ func (es *ElasticSearch) DeleteIndices(indices []string) error {
 // CreateIndex creates a new es index and sets its mappings to be schemaJSON,
 // if the index does not exist. Otherwise,
 // 1. if the new index has a different mapping (or num_of_shards spec) from the existing index,
-//    the API stops with an error, b/c the mapping and num_of_shards cannot be changed after creation.
+//    the API stops with an error, because the mapping and num_of_shards cannot be changed after creation.
 // 2. if the new index has a different num_of_replica spec from the existing index,
 //    the API resets the setting to match the new.
 func (es *ElasticSearch) CreateIndex(index string, numOfShards int, numOfReplicas int, schemaJSON json.RawMessage, dryRun bool) error {
