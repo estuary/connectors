@@ -1,22 +1,31 @@
 #!/bin/bash
 set -e
-if [ $# -ne 2 ] 
+
+if [ $# -ne 1 ]
 then
-    echo "execution using: $0 <tmp-dir> <test-output-jsonl-dir>"
+    echo "execution using: $0 <test-output-jsonl-dir>"
     exit 1
 fi
 
-tmp_dir="$1"
-test_output_jsonl_dir="$2"
+# The relative path to ${TEST_DIR} to store final results.
+result_dir="$1"
+
+# Wait until all the data has been uploaded to s3.
+sleep 5
+
+# The path of dir relative to ${TEST_DIR} for storing temp files.
+tmp_dir=tmp
+mkdir -p "$(realpath "${TEST_DIR}"/${tmp_dir})"
+
 
 # Sync data to local.
-aws s3 sync s3://"${TEST_BUCKET}" "${tmp_dir}" \
+aws s3 sync s3://"${TEST_BUCKET}" "${TEST_DIR}/${tmp_dir}" \
     || bail "syncing data from s3 failed"
 
 # Read all the pq data as jsonl output.
 function exportParquetToJson() {
-    local pq_path=$1
-    local jsonl_path=$2
+    local pq_path="${TEST_DIR}"/"$1"
+    local jsonl_path="${TEST_DIR}"/"$2"
 
     # Sort the files by names, in the order of
     # xx_0.pq, xx_1.pq, ... xx_9.pq, xx_10.pq, xx_11.pq, ...   
@@ -35,7 +44,7 @@ function exportParquetToJson() {
 }
 
 exportParquetToJson "${tmp_dir}/${TEST_PATH_PREFIX_SIMPLE}" "${tmp_dir}/simple.jsonl"
-combineResults "${TEST_COLLECTION_SIMPLE}" "${tmp_dir}/simple.jsonl" "${test_output_jsonl_dir}/simple.jsonl"
+combineResults "${TEST_COLLECTION_SIMPLE}" "${tmp_dir}/simple.jsonl" "${result_dir}/simple.jsonl"
 
 exportParquetToJson "${tmp_dir}/${TEST_PATH_PREFIX_MULTIPLE_DATATYPES}"  "${tmp_dir}/multiple_datatypes.jsonl"
-combineResults "${TEST_COLLECTION_MULTIPLE_DATATYPES}" "${tmp_dir}/multiple_datatypes.jsonl" "${test_output_jsonl_dir}/multiple_datatypes.jsonl"
+combineResults "${TEST_COLLECTION_MULTIPLE_DATATYPES}" "${tmp_dir}/multiple_datatypes.jsonl" "${result_dir}/multiple_datatypes.jsonl"

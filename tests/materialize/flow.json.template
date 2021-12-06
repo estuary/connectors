@@ -29,6 +29,16 @@
     }
   },
 
+  "captures": {
+    "${PUSH_CAPTURE_NAME}" : {
+      "endpoint": { "ingest": {} },
+      "bindings": [
+        { "target": "${TEST_COLLECTION_SIMPLE}", "resource": { "name": "${TEST_COLLECTION_SIMPLE}" } },
+        { "target": "${TEST_COLLECTION_MULTIPLE_DATATYPES}", "resource": { "name": "${TEST_COLLECTION_MULTIPLE_DATATYPES}" } },
+      ]
+    },
+  },
+
   "materializations": {
     "tests/${CONNECTOR}/materialize": {
       "endpoint": {
@@ -38,6 +48,14 @@
         }
       },
       "bindings": ${RESOURCES_CONFIG}
+    }
+  },
+
+  "storageMappings": {
+    "": {
+      "stores": [
+        { "provider": "S3", "bucket": "a-bucket" }
+      ]
     }
   }
 }
