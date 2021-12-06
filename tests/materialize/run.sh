@@ -41,7 +41,7 @@ CONNECTOR_TEST_SCRIPTS_DIR="${TEST_SCRIPTS_DIR}/${CONNECTOR}"
 # A directory for hosting temp files generated during the test executions.
 export TEST_DIR="$(mktemp -d -t "${CONNECTOR}"-XXXXXX)"
 
-# Broker and consumer addresses of Flow services.
+# Broker and onsumer addresses of Flow services.
 export BROKER_ADDRESS=localhost:8080
 export CONSUMER_ADDRESS=localhost:9000
 
@@ -59,17 +59,21 @@ export PUSH_CAPTURE_NAME=test/ingest
 # They are used by the connector-specific script of `ingest-data.sh`.
 # 1. the names of prepared flow collections.
 export TEST_COLLECTION_SIMPLE="tests/${CONNECTOR}/simple"
+export TEST_COLLECTION_DUPLICATED_KEYS="tests/${CONNECTOR}/duplicated-keys"
 export TEST_COLLECTION_MULTIPLE_DATATYPES="tests/${CONNECTOR}/multiple-datatypes"
 
 # 2. the paths of test datasets that matches the test collections.
 # - a dataset that matches the schema of TEST_COLLECTION_SIMPLE.
 export DATASET_SIMPLE="${ROOT_DIR}/tests/materialize/datasets/simple.jsonl"
+# - a dataset that matches the schema of TEST_COLLECTION_DUPLICATED_KEYS.
+export DATASET_DUPLICATED_KEYS="${ROOT_DIR}/tests/materialize/datasets/duplicated-keys.jsonl"
 # - a dataset that matches the schema of TEST_COLLECTION_MULTIPLE_DATATYPES.
 export DATASET_MULTIPLE_DATATYPES="${ROOT_DIR}/tests/materialize/datasets/multiple-datatypes.jsonl"
 
 # 3. the binding number of datasets in the push capture.
 export BINDING_NUM_SIMPLE=0
-export BINDING_NUM_MULTIPLE_DATATYPES=1
+export BINDING_NUM_DUPLICATED_KEYS=1
+export BINDING_NUM_MULTIPLE_DATATYPES=2
 
 # Util function to run flowctl command via docker.
 function runFlowctl() {
@@ -84,6 +88,7 @@ function runFlowctl() {
     local test_scripts_dir_target=/home/flow/scripts
     # Run as root, not the flow user, since the user within the container needs to access the
     # docker socket.
+
     docker run ${detached:+"$detached"} \
         --name "${FLOW_CONTAINER_NAME_PREFIX}-${script}-${EPOCHREALTIME}" \
         --user 0  \
@@ -94,7 +99,7 @@ function runFlowctl() {
         --env CONSUMER_ADDRESS=http://${CONSUMER_ADDRESS} \
         --env TEST_DIR=${test_dir_target} \
         --env BUILDS_ROOT="file://${test_dir_target}/build/" \
-        --env BUILD_ID=run-test-${CONNECTOR} \
+        --env BUILD_ID=run-test-"${CONNECTOR}" \
         --env CATALOG \
         --network=host \
         "${FLOW_IMAGE}" \
@@ -122,7 +127,7 @@ function cleanup() {
     runFlowctl delete.sh "" false || true
 
     source "${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" || true
-    for name in $(docker ps -a -f name=${FLOW_CONTAINER_NAME_PREFIX} -q); do
+    for name in $(docker ps -a -f name="${FLOW_CONTAINER_NAME_PREFIX}" -q); do
         docker rm -f "${name}"
     done
 }
@@ -140,8 +145,9 @@ if [[ -z "${RESOURCES_CONFIG}" ]]; then
 fi
 
 echo -e "\ngenerating catalog"
+escaped_connector_config=$(echo "${CONNECTOR_CONFIG}" | sed 's/\//\\\//g')
 envsubst < ${ROOT_DIR}/tests/materialize/flow.json.template | yq eval -P | \
-sed "s/CONNECTOR_CONFIG_PLACEHOLDER/${CONNECTOR_CONFIG}/g" \
+sed "s/CONNECTOR_CONFIG_PLACEHOLDER/${escaped_connector_config}/g" \
 > "${TEST_DIR}/${CATALOG}" || bail "generating ${CATALOG} failed."
 
 echo -e "\nstarting temp data plane"

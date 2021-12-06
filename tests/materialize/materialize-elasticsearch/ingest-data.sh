@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
-
-# Pushing data to the capture.
+# Push data to the capture.
 go run ${DATA_INGEST_SCRIPT_PATH} \
   --server_address=${CONSUMER_ADDRESS} \
   --capture=${PUSH_CAPTURE_NAME} \

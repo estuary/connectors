@@ -6,19 +6,23 @@ export TEST_ES_INDEX_DUPLICATED_KEYS_DELTA="index-duplicated-keys-delta"
 export TEST_ES_INDEX_DUPLICATED_KEYS_NON_DELTA="index-duplicated-keys-non-delta"
 export TEST_ES_INDEX_MULTIPLE_DATA_TYPES="index-multiple-data-types"
 
-# local elasticsearch docker container name.
-export TEST_ES_CONTAINER_NAME=test-es
+# local elasticsearch container name.
+export TEST_ES_CONTAINER_NAME=test-elastic-search
 
 # Endpoint to access elastic search.
 export TEST_ES_ENDPOINT=http://localhost:9200
 
 # start local elasticsearch.
 function startElasticsearch() {
-    docker run -d --rm --name "${TEST_ES_CONTAINER_NAME}" --network=host --env "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:7.15.2
-    
+    docker run -d \
+      --rm \
+      --name "${TEST_ES_CONTAINER_NAME}" \
+      --env "discovery.type=single-node" \
+      --network=host \
+      docker.elastic.co/elasticsearch/elasticsearch:7.15.2
     for i in {1..20}; do
         # Wait until the elastic search is ready for serving.
-        if curl -o /dev/null -s -I -f ${TEST_ES_ENDPOINT}; then
+        if curl -o /dev/null -s -I -f "${TEST_ES_ENDPOINT}";  then
             echo "elastic server started successfully."
             return 0
         fi

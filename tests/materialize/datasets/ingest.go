@@ -61,7 +61,7 @@ func (p *pushRpc) Open(captureName string) error {
 func (p *pushRpc) SendDocuments(dataFilePath string, bindingNum int) error {
 	var file, err = os.Open(dataFilePath)
 	if err != nil {
-		return fmt.Errorf("open file: %w", err)
+		return fmt.Errorf("open file %s: %w", dataFilePath, err)
 	}
 	var scanner = bufio.NewScanner(file)
 	scanner.Split(bufio.ScanLines)
