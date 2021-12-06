@@ -86,7 +86,7 @@ func (es *ElasticSearch) CreateIndex(index string, numOfShards int, numOfReplica
 			// If inconsistent schema of the index is detected, user needs to decide
 			// either removing the existing index or renaming the new index. As a mapping cannot
 			// be modified after creation.
-			return fmt.Errorf("check index mapping: %w", mappingErr)
+			return mappingErr
 		} else if settings, settingErr := es.getIndexSettings(index); settingErr != nil {
 			return fmt.Errorf("get index setting: %w", settingErr)
 		} else if settings.Index.NumOfShards != numOfShardsStr {
