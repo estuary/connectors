@@ -84,7 +84,7 @@ func (es *ElasticSearch) CreateIndex(index string, numOfShards int, numOfReplica
 		// The index exists, make sure it is compatible to the requested.
 		if mappingErr := es.checkIndexMapping(index, schema); mappingErr != nil {
 			// If inconsistent schema of the index is detected, user needs to decide
-			// either removing the existing index or renaming the new index. As mapping cannot
+			// either removing the existing index or renaming the new index. As a mapping cannot
 			// be modified after creation.
 			return fmt.Errorf("check index mapping: %w", mappingErr)
 		} else if settings, settingErr := es.getIndexSettings(index); settingErr != nil {
@@ -92,7 +92,7 @@ func (es *ElasticSearch) CreateIndex(index string, numOfShards int, numOfReplica
 		} else if settings.Index.NumOfShards != numOfShardsStr {
 			// Same as a schema, the number of shards cannot be changed after creation.
 			return fmt.Errorf(
-				"%s: expected number of shards (%d) is inconsistent with the existing number of shards (%s). Try 1) change the number of shard in spec, 2) rename the index or 3) use `flowctl api delete` to delete the existing index.",
+				"%s: expected number of shards (%d) is inconsistent with the existing number of shards (%s). Try one of the followings: 1) change the number of shard in spec, 2) rename the index, or 3) delete the existing index.",
 				index, numOfShards, settings.Index.NumOfShards,
 			)
 		} else if settings.Index.NumOfReplicas != numOfReplicasStr {
@@ -274,7 +274,7 @@ func (es *ElasticSearch) checkIndexMapping(index string, schema map[string]inter
 	var b = schema["properties"]
 
 	if !reflect.DeepEqual(a, b) {
-		return fmt.Errorf("schema inconsistent. Try rename the index, or use `flowctl api delete` to delete the existing index and restart. Details: existing: %v, new: %v", a, b)
+		return fmt.Errorf("schema inconsistent. Try rename the index, or delete the existing index and restart. Details: existing: %v, new: %v", a, b)
 	}
 	return nil
 }
