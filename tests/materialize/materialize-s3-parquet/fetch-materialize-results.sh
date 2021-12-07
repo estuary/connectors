@@ -10,18 +10,17 @@ fi
 # The relative path to ${TEST_DIR} to store final results.
 result_dir="$1"
 
-# Wait until all the data has been uploaded to s3.
+# Wait long enough to have all the data uploaded to s3.
 sleep 5
 
-# The path of dir relative to ${TEST_DIR} for storing temp files.
+# The dir relative to ${TEST_DIR} for storing temp files.
 tmp_dir=tmp
 mkdir -p "$(realpath "${TEST_DIR}"/${tmp_dir})"
 
 # Sync data to local.
-aws s3 sync s3://"${TEST_BUCKET}" "${TEST_DIR}/${tmp_dir}/" --endpoint-url "${LOCALSTACK_ENDPOINT}" \
+aws s3 sync s3://"${TEST_BUCKET}" "${TEST_DIR}/${tmp_dir}/" --endpoint-url "${LOCALSTACK_S3_ENDPOINT}" \
     || bail "syncing data from s3 failed"
 
-find "${TEST_DIR}/${tmp_dir}"
 # Read all the pq data as jsonl output.
 function exportParquetToJson() {
     local pq_path="${TEST_DIR}"/"$1"
@@ -36,7 +35,7 @@ function exportParquetToJson() {
     fi
 
     for pq_file in ${pq_files}; do
-        docker run --rm -it -v "${pq_path}":/data \
+        docker run --rm -v "${pq_path}":/data \
            nathanhowell/parquet-tools cat -json /data/"${pq_file}" >> "${jsonl_path}" \
            || bail "generating jsonl failed"
  

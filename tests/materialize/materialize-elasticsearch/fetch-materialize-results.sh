@@ -10,6 +10,7 @@ fi
 # The relative path to ${TEST_DIR} to store final results.
 result_dir="$1"
 
+# Wait for enough long to have data available for fetching.
 sleep 2
 
 # Read all docs from elastic search indices to jsonl output.

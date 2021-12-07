@@ -36,11 +36,7 @@ type resource struct {
 	DeltaUpdates  bool                          `json:"delta_updates"`
 	FieldOverides []schemabuilder.FieldOverride `json:"field_overrides"`
 
-	// The number of shards in ElasticSearch index. Must set to be greater than 0.
-	NumOfShards int `json:"number_of_shards,omitempty" jsonschema:"default=1"`
-	// The number of replicas in ElasticSearch index. If not set, default to be 0.
-	// For single-node clusters, make sure this field is 0, because the
-	// Elastic search needs to allocate replicas on different nodes.
+	NumOfShards   int `json:"number_of_shards,omitempty" jsonschema:"default=1"`
 	NumOfReplicas int `json:"number_of_replicas,omitempty"`
 }
 
@@ -53,6 +49,21 @@ func (r resource) Validate() error {
 		return fmt.Errorf("number_of_shards is missing or non-positive")
 	}
 	return nil
+}
+
+func (resource) GetFieldDocString(fieldName string) string {
+	switch fieldName {
+	case "Index":
+		return "Name of the ElasticSearch index to store the materialization results."
+	case "NumOfShards":
+		return "The number of shards in ElasticSearch index. Must set to be greater than 0."
+	case "NumOfReplicas":
+		return "The number of replicas in ElasticSearch index. If not set, default to be 0. " +
+			"For single-node clusters, make sure this field is 0, because the " +
+			"Elastic search needs to allocate replicas on different nodes."
+	default:
+		return ""
+	}
 }
 
 // driver implements the DriverServer interface.

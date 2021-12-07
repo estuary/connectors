@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# This script builds and activates the test catalog.
 set -e
 
-echo "start build-and-activate.sh"
+echo "building and activating the testing catalog via build-and-activate.sh"
 
 flowctl api build \
   --directory "${TEST_DIR}"/build \

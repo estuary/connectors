@@ -151,7 +151,7 @@ jobs:
          docker-compose --file infra/docker-compose.yaml up --detach zookeeper
          docker-compose --file infra/docker-compose.yaml up --detach kafka
 
-      - name: source connector ${{ matrix.connector }} integration tests
+      - name: Source connector ${{ matrix.connector }} integration tests
         if: |
           contains('
             source-gcs
@@ -169,7 +169,7 @@ jobs:
           POSTGRES_CONNECTION_URI: "postgres://flow:flow@localhost:5432/flow"
         run: CONNECTOR=${{ matrix.connector }} VERSION=test ./tests/run.sh;
 
-      - name: materialize connector ${{ matrix.connector }} integration tests
+      - name: Materialization connector ${{ matrix.connector }} integration tests
         if: |
           contains('
             materialize-elasticsearch

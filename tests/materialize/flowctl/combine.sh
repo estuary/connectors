@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# This script runs inside Flow docker container to start a temp docker container.
 
 set -e
-echo "start combine.sh"
+echo "combining results via combine.sh"
 
 IFS=" " read -r -a args <<< "$1"
 if [[ ${#args[@]} -ne 3 ]]; then
