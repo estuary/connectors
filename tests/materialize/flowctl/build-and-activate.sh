@@ -5,7 +5,6 @@ set -e
 
 echo "start build-and-activate.sh"
 
-
 flowctl api build \
   --directory "${TEST_DIR}"/build \
   --build-id "${BUILD_ID}" \

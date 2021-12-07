@@ -95,9 +95,9 @@ function runFlowctl() {
         --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
         --mount type=bind,source="${TEST_SCRIPTS_DIR}",target=${test_scripts_dir_target} \
         --mount type=bind,source="${TEST_DIR}",target=${test_dir_target} \
-        --env BROKER_ADDRESS=http://${BROKER_ADDRESS} \
-        --env CONSUMER_ADDRESS=http://${CONSUMER_ADDRESS} \
-        --env TEST_DIR=${test_dir_target} \
+        --env BROKER_ADDRESS="http://${BROKER_ADDRESS}" \
+        --env CONSUMER_ADDRESS="http://${CONSUMER_ADDRESS}" \
+        --env TEST_DIR="${test_dir_target}" \
         --env BUILDS_ROOT="file://${test_dir_target}/build/" \
         --env BUILD_ID=run-test-"${CONNECTOR}" \
         --env CATALOG \

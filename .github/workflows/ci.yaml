@@ -151,7 +151,7 @@ jobs:
          docker-compose --file infra/docker-compose.yaml up --detach zookeeper
          docker-compose --file infra/docker-compose.yaml up --detach kafka
 
-      - name: ${{ matrix.connector }} integration tests
+      - name: source connector ${{ matrix.connector }} integration tests
         if: |
           contains('
             source-gcs
@@ -168,6 +168,14 @@ jobs:
           AWS_DEFAULT_OUTPUT: json
           POSTGRES_CONNECTION_URI: "postgres://flow:flow@localhost:5432/flow"
         run: CONNECTOR=${{ matrix.connector }} VERSION=test ./tests/run.sh;
+
+      - name: materialize connector ${{ matrix.connector }} integration tests
+        if: |
+          contains('
+            materialize-elasticsearch
+            materialize-s3-parquet
+            ', matrix.connector)
+        run: CONNECTOR=${{ matrix.connector }} VERSION=test tests/materialize/run.sh;
 
       - name: Push ${{ matrix.connector }} image
         uses: docker/build-push-action@v2

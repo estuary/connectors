@@ -17,11 +17,11 @@ sleep 5
 tmp_dir=tmp
 mkdir -p "$(realpath "${TEST_DIR}"/${tmp_dir})"
 
-
 # Sync data to local.
-aws s3 sync s3://"${TEST_BUCKET}" "${TEST_DIR}/${tmp_dir}" \
+aws s3 sync s3://"${TEST_BUCKET}" "${TEST_DIR}/${tmp_dir}/" --endpoint-url "${LOCALSTACK_ENDPOINT}" \
     || bail "syncing data from s3 failed"
 
+find "${TEST_DIR}/${tmp_dir}"
 # Read all the pq data as jsonl output.
 function exportParquetToJson() {
     local pq_path="${TEST_DIR}"/"$1"
