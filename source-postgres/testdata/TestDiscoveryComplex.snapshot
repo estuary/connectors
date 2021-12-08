@@ -1,0 +1,51 @@
+{
+  "name": "test_discoverycomplex",
+  "json_schema": {
+    "properties": {
+      "Bounded Text": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "doc": {},
+      "doc/bin": {},
+      "foo": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "This is a text field!"
+      },
+      "k1": {
+        "type": "integer",
+        "description": "I think this is a key ?"
+      },
+      "k2": {
+        "type": "string"
+      },
+      "real_": {
+        "type": "number"
+      }
+    },
+    "required": [
+      "k2",
+      "k1"
+    ],
+    "type": "object"
+  },
+  "supported_sync_modes": [
+    "incremental",
+    "full_refresh"
+  ],
+  "source_defined_cursor": true,
+  "source_defined_primary_key": [
+    [
+      "k2"
+    ],
+    [
+      "k1"
+    ]
+  ],
+  "namespace": "public"
+}

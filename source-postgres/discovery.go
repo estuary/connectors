@@ -38,12 +38,34 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 			if !ok {
 				return nil, fmt.Errorf("cannot translate PostgreSQL column type %q to JSON schema", column.DataType)
 			}
-			if column.IsNullable && jsonType != "{}" {
-				jsonType = fmt.Sprintf(`{"anyOf":[%s,{"type":"null"}]}`, jsonType)
+
+			if jsonType.type_ != "" {
+				// If nullable, use `type: [$type_, "null"]` form.
+				// Otherwise, use `type: $type_`.
+				if column.IsNullable {
+					jsonType.RawType, err = json.Marshal([]string{jsonType.type_, "null"})
+				} else {
+					jsonType.RawType, err = json.Marshal(jsonType.type_)
+				}
+				if err != nil {
+					panic(err)
+				}
 			}
-			fields[column.Name] = json.RawMessage(jsonType)
+
+			// Pass-through a postgres column description.
+			if column.Description != nil {
+				jsonType.Description = *column.Description
+			}
+
+			var out, err = json.Marshal(jsonType)
+			if err != nil {
+				panic(err)
+			}
+
+			fields[column.Name] = out
 		}
-		var schema, err = json.Marshal(map[string]interface{}{
+
+		var record, err = json.Marshal(map[string]interface{}{
 			"type":       "object",
 			"required":   table.PrimaryKey,
 			"properties": fields,
@@ -52,11 +74,14 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 			return nil, fmt.Errorf("error marshalling schema JSON: %w", err)
 		}
 
+		// TODO(johnny): |record| is *part* of a schema, but needs to be embedded
+		// within a schema describing the overall Debezium wrapper.
+
 		logrus.WithFields(logrus.Fields{
 			"table":     table.Name,
 			"namespace": table.Schema,
 			"columns":   table.Columns,
-			"schema":    string(schema),
+			"schema":    string(record),
 		}).Debug("translated table schema")
 
 		var sourceDefinedPrimaryKey [][]string
@@ -67,7 +92,7 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 		catalog.Streams = append(catalog.Streams, airbyte.Stream{
 			Name:                    table.Name,
 			Namespace:               table.Schema,
-			JSONSchema:              json.RawMessage(schema),
+			JSONSchema:              json.RawMessage(record),
 			SupportedSyncModes:      airbyte.AllSyncModes,
 			SourceDefinedCursor:     true,
 			SourceDefinedPrimaryKey: sourceDefinedPrimaryKey,
@@ -76,58 +101,64 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 	return catalog, err
 }
 
-var postgresTypeToJSON = map[string]string{
-	"bool": `{"type":"boolean"}`,
+var postgresTypeToJSON = map[string]struct {
+	type_           string
+	RawType         json.RawMessage `json:"type,omitempty"`
+	ContentEncoding string          `json:"contentEncoding,omitempty"`
+	Format          string          `json:"format,omitempty"`
+	Description     string          `json:"description,omitempty"`
+}{
+	"bool": {type_: "boolean"},
 
-	"int2": `{"type":"integer"}`,
-	"int4": `{"type":"integer"}`,
-	"int8": `{"type":"integer"}`,
+	"int2": {type_: "integer"},
+	"int4": {type_: "integer"},
+	"int8": {type_: "integer"},
 
 	// TODO(wgd): More systematic treatment of arrays?
-	"_int2":   `{"type":"string"}`,
-	"_int4":   `{"type":"string"}`,
-	"_int8":   `{"type":"string"}`,
-	"_float4": `{"type":"string"}`,
-	"_text":   `{"type":"string"}`,
+	"_int2":   {type_: "string"},
+	"_int4":   {type_: "string"},
+	"_int8":   {type_: "string"},
+	"_float4": {type_: "string"},
+	"_text":   {type_: "string"},
 
-	"numeric": `{"type":"number"}`,
-	"float4":  `{"type":"number"}`,
-	"float8":  `{"type":"number"}`,
+	"numeric": {type_: "number"},
+	"float4":  {type_: "number"},
+	"float8":  {type_: "number"},
 
-	"varchar": `{"type":"string"}`,
-	"bpchar":  `{"type":"string"}`,
-	"text":    `{"type":"string"}`,
-	"bytea":   `{"type":"string","contentEncoding":"base64"}`,
-	"xml":     `{"type":"string"}`,
-	"bit":     `{"type":"string"}`,
-	"varbit":  `{"type":"string"}`,
+	"varchar": {type_: "string"},
+	"bpchar":  {type_: "string"},
+	"text":    {type_: "string"},
+	"bytea":   {type_: "string", ContentEncoding: "base64"},
+	"xml":     {type_: "string"},
+	"bit":     {type_: "string"},
+	"varbit":  {type_: "string"},
 
-	"json":     `{}`,
-	"jsonb":    `{}`,
-	"jsonpath": `{"type":"string"}`,
+	"json":     {},
+	"jsonb":    {},
+	"jsonpath": {type_: "string"},
 
 	// Domain-Specific Types
-	"date":        `{"type":"string","format":"date-time"}`,
-	"timestamp":   `{"type":"string","format":"date-time"}`,
-	"timestamptz": `{"type":"string","format":"date-time"}`,
-	"time":        `{"type":"integer"}`,
-	"timetz":      `{"type":"string","format":"time"}`,
-	"interval":    `{"type":"string"}`,
-	"money":       `{"type":"string"}`,
-	"point":       `{"type":"string"}`,
-	"line":        `{"type":"string"}`,
-	"lseg":        `{"type":"string"}`,
-	"box":         `{"type":"string"}`,
-	"path":        `{"type":"string"}`,
-	"polygon":     `{"type":"string"}`,
-	"circle":      `{"type":"string"}`,
-	"inet":        `{"type":"string"}`,
-	"cidr":        `{"type":"string"}`,
-	"macaddr":     `{"type":"string"}`,
-	"macaddr8":    `{"type":"string"}`,
-	"tsvector":    `{"type":"string"}`,
-	"tsquery":     `{"type":"string"}`,
-	"uuid":        `{"type":"string","format":"uuid"}`,
+	"date":        {type_: "string", Format: "date-time"},
+	"timestamp":   {type_: "string", Format: "date-time"},
+	"timestamptz": {type_: "string", Format: "date-time"},
+	"time":        {type_: "integer"},
+	"timetz":      {type_: "string", Format: "time"},
+	"interval":    {type_: "string"},
+	"money":       {type_: "string"},
+	"point":       {type_: "string"},
+	"line":        {type_: "string"},
+	"lseg":        {type_: "string"},
+	"box":         {type_: "string"},
+	"path":        {type_: "string"},
+	"polygon":     {type_: "string"},
+	"circle":      {type_: "string"},
+	"inet":        {type_: "string"},
+	"cidr":        {type_: "string"},
+	"macaddr":     {type_: "string"},
+	"macaddr8":    {type_: "string"},
+	"tsvector":    {type_: "string"},
+	"tsquery":     {type_: "string"},
+	"uuid":        {type_: "string", Format: "uuid"},
 }
 
 // tableInfo represents all relevant knowledge about a PostgreSQL table.
@@ -141,12 +172,13 @@ type tableInfo struct {
 // columnInfo represents a specific column of a specific table in PostgreSQL,
 // along with some information about its type.
 type columnInfo struct {
-	Name        string // The name of the column.
-	Index       int    // The ordinal position of this column in a row.
-	TableName   string // The name of the table to which this column belongs.
-	TableSchema string // The schema of the table to which this column belongs.
-	IsNullable  bool   // True if the column can contain nulls.
-	DataType    string // The PostgreSQL type name of this column.
+	Name        string  // The name of the column.
+	Index       int     // The ordinal position of this column in a row.
+	TableName   string  // The name of the table to which this column belongs.
+	TableSchema string  // The schema of the table to which this column belongs.
+	IsNullable  bool    // True if the column can contain nulls.
+	DataType    string  // The PostgreSQL type name of this column.
+	Description *string // Stored PostgreSQL description of the column, if any.
 }
 
 // getDatabaseTables queries the database to produce a list of all tables
@@ -194,17 +226,34 @@ func getDatabaseTables(ctx context.Context, conn *pgx.Conn) ([]tableInfo, error)
 }
 
 const queryDiscoverColumns = `
-  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable::boolean, udt_name
+  SELECT
+		table_schema,
+		table_name,
+		ordinal_position,
+		column_name,
+		is_nullable::boolean,
+		udt_name,
+		pg_catalog.col_description(
+			format('%s.%s',table_schema,table_name)::regclass::oid,
+			ordinal_position
+		) AS column_description
   FROM information_schema.columns
-  WHERE table_schema != 'pg_catalog' AND table_schema != 'information_schema'
-        AND table_schema != 'pg_internal' AND table_schema != 'catalog_history'
-  ORDER BY table_schema, table_name, ordinal_position;`
+  WHERE
+		table_schema != 'pg_catalog' AND
+		table_schema != 'information_schema' AND
+		table_schema != 'pg_internal' AND
+		table_schema != 'catalog_history'
+  ORDER BY
+		table_schema,
+		table_name,
+		ordinal_position
+	;`
 
 func getColumns(ctx context.Context, conn *pgx.Conn) ([]columnInfo, error) {
 	var columns []columnInfo
 	var sc columnInfo
 	var _, err = conn.QueryFunc(ctx, queryDiscoverColumns, nil,
-		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType},
+		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType, &sc.Description},
 		func(r pgx.QueryFuncRow) error {
 			columns = append(columns, sc)
 			return nil
