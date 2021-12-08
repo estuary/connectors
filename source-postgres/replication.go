@@ -80,10 +80,10 @@ type postgresSource struct {
 }
 
 type changeEvent struct {
-	Operation ChangeOp               `json:"op"`
-	Source    postgresSource         `json:"source"`
-	Before    map[string]interface{} `json:"before,omitempty"`
-	After     map[string]interface{} `json:"after,omitempty"`
+	Operation ChangeOp
+	Source    postgresSource
+	Before    map[string]interface{}
+	After     map[string]interface{}
 }
 
 // keyFields returns suitable fields for extracting the event primary key.

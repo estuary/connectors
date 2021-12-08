@@ -1,6 +1,6 @@
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_slotlsnadvances_one":{"mode":"Backfill","key_columns":["id"]}}}}}
-{"type":"RECORD","record":{"stream":"test_slotlsnadvances_one","data":{"after":{"data":"zero","id":0},"op":"c"},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_slotlsnadvances_one","data":{"after":{"data":"one","id":1},"op":"c"},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_slotlsnadvances_one","data":{"after":{"data":"two","id":2},"op":"c"},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_slotlsnadvances_one","data":{"_meta":{"op":"c","source":{"connector":"source-postgres","schema":"public","table":"test_slotlsnadvances_one","snapshot":true}},"data":"zero","id":0},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_slotlsnadvances_one","data":{"_meta":{"op":"c","source":{"connector":"source-postgres","schema":"public","table":"test_slotlsnadvances_one","snapshot":true}},"data":"one","id":1},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_slotlsnadvances_one","data":{"_meta":{"op":"c","source":{"connector":"source-postgres","schema":"public","table":"test_slotlsnadvances_one","snapshot":true}},"data":"two","id":2},"emitted_at":1234,"namespace":"public"}}
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_slotlsnadvances_one":{"mode":"Backfill","key_columns":["id"],"scanned":"FQI="}}}}}
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_slotlsnadvances_one":{"mode":"Active","key_columns":["id"]}}}}}

@@ -388,12 +388,52 @@ func (c *capture) backfillStreams(ctx context.Context, streams []string) (*resul
 }
 
 func (c *capture) handleChangeEvent(event *changeEvent) error {
-	if err := translateRecordFields(event.Before); err != nil {
-		return fmt.Errorf("'before' field: %w", err)
-	} else if err := translateRecordFields(event.After); err != nil {
-		return fmt.Errorf("'after' field: %w", err)
+	var out map[string]interface{}
+
+	var meta = struct {
+		Operation ChangeOp               `json:"op"`
+		Source    *postgresSource        `json:"source"`
+		Before    map[string]interface{} `json:"before,omitempty"`
+	}{
+		Operation: event.Operation,
+		Source:    &event.Source,
+		Before:    nil,
 	}
-	return c.emitRecord(event.Source.Schema, event.Source.Table, event)
+
+	switch event.Operation {
+	case InsertOp:
+		if err := translateRecordFields(event.After); err != nil {
+			return fmt.Errorf("'after' of insert: %w", err)
+		}
+		out = event.After // Before is never used.
+	case UpdateOp:
+		if err := translateRecordFields(event.Before); err != nil {
+			return fmt.Errorf("'before' of update: %w", err)
+		} else if err := translateRecordFields(event.After); err != nil {
+			return fmt.Errorf("'after' of update: %w", err)
+		}
+		meta.Before, out = event.Before, event.After
+	case DeleteOp:
+		if err := translateRecordFields(event.Before); err != nil {
+			return fmt.Errorf("'before' of delete: %w", err)
+		}
+		out = event.Before // After is never used.
+	}
+	out["_meta"] = &meta
+
+	var rawData, err = json.Marshal(out)
+	if err != nil {
+		return fmt.Errorf("error encoding record data: %w", err)
+	}
+	return c.emit(airbyte.Message{
+		Type: airbyte.MessageTypeRecord,
+		Record: &airbyte.Record{
+			Namespace: event.Source.Schema,
+			Stream:    event.Source.Table,
+			EmittedAt: time.Now().UnixNano() / int64(time.Millisecond),
+			Data:      json.RawMessage(rawData),
+		},
+	})
 }
 
 func translateRecordFields(f map[string]interface{}) error {
@@ -440,22 +480,6 @@ func translateRecordField(val interface{}) (interface{}, error) {
 		return string(bs), err
 	}
 	return val, nil
-}
-
-func (c *capture) emitRecord(ns, stream string, data interface{}) error {
-	var rawData, err = json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("error encoding record data: %w", err)
-	}
-	return c.emit(airbyte.Message{
-		Type: airbyte.MessageTypeRecord,
-		Record: &airbyte.Record{
-			Namespace: ns,
-			Stream:    stream,
-			EmittedAt: time.Now().UnixNano() / int64(time.Millisecond),
-			Data:      json.RawMessage(rawData),
-		},
-	})
 }
 
 func (c *capture) emitState(state interface{}) error {

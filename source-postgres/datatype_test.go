@@ -165,9 +165,7 @@ func TestDatatypes(t *testing.T) {
 type datatypeTestRecord struct {
 	Stream string `json:"stream"`
 	Data   struct {
-		After struct {
-			Value json.RawMessage `json:"b"`
-		} `json:"after"`
+		Value json.RawMessage `json:"b"`
 	} `json:"data"`
 }
 
@@ -193,9 +191,9 @@ func verifyRoundTrip(t *testing.T, output string, colType, colValue, expectedVal
 		return
 	}
 
-	if string(record.Data.After.Value) != expectedValue {
+	if string(record.Data.Value) != expectedValue {
 		t.Errorf("result mismatch for type %q: input %q, got %q, expected %q", colType, colValue,
-			string(record.Data.After.Value), expectedValue)
+			string(record.Data.Value), expectedValue)
 	}
 }
 
