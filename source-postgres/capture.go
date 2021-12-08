@@ -272,10 +272,10 @@ func (c *capture) streamChanges(ctx context.Context) error {
 func (c *capture) streamToWatermark(watermark string, results *resultSet) error {
 	var watermarkReached = false
 	for event := range c.replStream.Events() {
-		// Commit events update the current LSN and trigger a state update. If this is
-		// the commit after the target watermark, it also ends the loop.
-		if event.Type == "Commit" {
-			c.state.CurrentLSN = event.LSN
+		// Flush events update the checkpointed LSN and trigger a state update.
+		// If this is the commit after the target watermark, it also ends the loop.
+		if event.Operation == FlushOp {
+			c.state.CurrentLSN = event.Source.EventLSN
 			if err := c.emitState(c.state); err != nil {
 				return fmt.Errorf("error emitting state update: %w", err)
 			}
@@ -287,10 +287,15 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 
 		// Note when the expected watermark is finally observed. The subsequent Commit will exit the loop.
 		// TODO(wgd): Can we ensure/require that 'WatermarksTable' is always fully-qualified?
-		var streamID = joinStreamID(event.Namespace, event.Table)
-		if streamID == c.config.WatermarksTable {
-			logrus.WithFields(logrus.Fields{"expected": watermark, "written": event.Fields["watermark"]}).Debug("watermark write")
-			if event.Fields["watermark"] == watermark {
+		var streamID = joinStreamID(event.Source.Schema, event.Source.Table)
+		if streamID == c.config.WatermarksTable && event.Operation != DeleteOp {
+			var actual = event.After["watermark"]
+			logrus.WithFields(logrus.Fields{
+				"expected": watermark,
+				"actual":   actual,
+			}).Debug("watermark write")
+
+			if actual == watermark {
 				watermarkReached = true
 			}
 		}
@@ -298,7 +303,10 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 		// Handle the easy cases: Events on ignored or fully-active tables.
 		var tableState = c.state.Streams[streamID]
 		if tableState == nil || tableState.Mode == tableModeIgnore {
-			logrus.WithFields(logrus.Fields{"stream": streamID, "type": event.Type}).Debug("ignoring stream")
+			logrus.WithFields(logrus.Fields{
+				"stream": streamID,
+				"op":     event.Operation,
+			}).Debug("ignoring stream")
 			continue
 		}
 		if tableState.Mode == tableModeActive {
@@ -314,7 +322,7 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 		// While a table is being backfilled, events occurring *before* the current scan point
 		// will be emitted, while events *after* that point will be patched (or ignored) into
 		// the buffered resultSet.
-		var rowKey, err = encodeRowKey(tableState.KeyColumns, event.Fields)
+		var rowKey, err = encodeRowKey(tableState.KeyColumns, event.keyFields())
 		if err != nil {
 			return fmt.Errorf("error encoding row key: %w", err)
 		}
@@ -380,21 +388,31 @@ func (c *capture) backfillStreams(ctx context.Context, streams []string) (*resul
 }
 
 func (c *capture) handleChangeEvent(event *changeEvent) error {
-	event.Fields["_change_type"] = event.Type
-
-	for id, val := range event.Fields {
-		var translated, err = translateRecordField(val)
-		if err != nil {
-			logrus.WithField("val", val).Error("value translation error")
-			return fmt.Errorf("error translating field %q value: %w", id, err)
-		}
-		event.Fields[id] = translated
+	if err := translateRecordFields(event.Before); err != nil {
+		return fmt.Errorf("'before' field: %w", err)
+	} else if err := translateRecordFields(event.After); err != nil {
+		return fmt.Errorf("'after' field: %w", err)
 	}
-	return c.emitRecord(event.Namespace, event.Table, event.Fields)
+	return c.emitRecord(event.Source.Schema, event.Source.Table, event)
 }
 
-// TranslateRecordField "translates" a value from the PostgreSQL driver into
-// an appropriate JSON-encodable output format. As a concrete example, the
+func translateRecordFields(f map[string]interface{}) error {
+	if f == nil {
+		return nil
+	}
+
+	for id, val := range f {
+		var translated, err = translateRecordField(val)
+		if err != nil {
+			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
+		}
+		f[id] = translated
+	}
+	return nil
+}
+
+// translateRecordField "translates" a value from the PostgreSQL driver into
+// an appropriate JSON-encodeable output format. As a concrete example, the
 // PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.

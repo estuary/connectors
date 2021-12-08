@@ -1,5 +1,5 @@
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_multiplestreams_one":{"mode":"Active","key_columns":["id"]},"public.test_multiplestreams_three":{"mode":"Active","key_columns":["id"]}}}}}
-{"type":"RECORD","record":{"stream":"test_multiplestreams_one","data":{"_change_type":"Insert","data":"nine","id":9},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_multiplestreams_one","data":{"after":{"data":"nine","id":9},"op":"c"},"emitted_at":1234,"namespace":"public"}}
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_multiplestreams_one":{"mode":"Active","key_columns":["id"]},"public.test_multiplestreams_three":{"mode":"Active","key_columns":["id"]}}}}}
-{"type":"RECORD","record":{"stream":"test_multiplestreams_three","data":{"_change_type":"Insert","data":"eleven","id":11},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_multiplestreams_three","data":{"after":{"data":"eleven","id":11},"op":"c"},"emitted_at":1234,"namespace":"public"}}
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_multiplestreams_one":{"mode":"Active","key_columns":["id"]},"public.test_multiplestreams_three":{"mode":"Active","key_columns":["id"]}}}}}

@@ -64,10 +64,24 @@ func scanTableChunk(ctx context.Context, conn *pgx.Conn, streamID string, keyCol
 		}
 
 		events = append(events, &changeEvent{
-			Type:      "Insert",
-			Namespace: schemaName,
-			Table:     tableName,
-			Fields:    fields,
+			Operation: InsertOp,
+			Source: postgresSource{
+				SourceCommon: SourceCommon{
+					Connector: "source-postgres",
+					Database:  "", // TODO(johnny).
+					Millis:    0,
+					Name:      "", // TODO(johnny).
+					Schema:    schemaName,
+					Snapshot:  true,
+					Table:     tableName,
+					TxID:      0,
+					Version:   "", // TODO(johnny).
+				},
+				EventLSN: 0,
+				Sequence: "",
+			},
+			Before: nil,
+			After:  fields,
 		})
 	}
 	return events, nil
