@@ -75,8 +75,16 @@ func TestReplicationDeletes(t *testing.T) {
 
 	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
+
+	// Default REPLICA IDENTITY logs only the old primary key.
 	dbInsert(ctx, t, tableName, [][]interface{}{{1002, "some"}, {1000, "more"}, {1001, "rows"}})
 	dbQuery(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 1 OR id = 1002;", tableName))
+
+	// Increase to REPLICA IDENTITY FULL, and repeat. Expect to see complete deleted tuples logged.
+	dbInsert(ctx, t, tableName, [][]interface{}{{1003, "even"}, {1004, "moar"}, {1005, "rows!!"}})
+	dbQuery(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
+	dbQuery(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 3 OR id >= 1004;", tableName))
+
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "")
 }
 
@@ -90,8 +98,15 @@ func TestReplicationUpdates(t *testing.T) {
 
 	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}})
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
+
+	// Default REPLICA IDENTITY logs only the old primary key.
 	dbInsert(ctx, t, tableName, [][]interface{}{{1002, "some"}, {1000, "more"}, {1001, "rows"}})
 	dbQuery(ctx, t, fmt.Sprintf("UPDATE %s SET data = 'updated' WHERE id = 1 OR id = 1002;", tableName))
+
+	// Increase to REPLICA IDENTITY FULL. Expect to see complete old tuples logged.
+	dbQuery(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
+	dbQuery(ctx, t, fmt.Sprintf("UPDATE %s SET data = 'updated again' WHERE id <= 1 OR id = 1000;", tableName))
+
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "")
 }
 
@@ -135,6 +150,15 @@ func TestComplexDataset(t *testing.T) {
 		{1970, "XX", "No Such State", 12345},  // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
 		{1990, "XX", "No Such State", 123456}, // Deleting/reinserting this row will be filtered since this portion of the table has yet to be scanned
 	})
+
+	dbQuery(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
+
+	// We've scanned through (1980, 'IA'), and will see updates for N% states at that date or before,
+	// and creations for N% state records after that date which reflect the update.
+	dbQuery(ctx, t, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY');", tableName))
+	// We'll see a deletion since this row has already been scanned through.
+	dbQuery(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX' AND year = 1970;", tableName))
+
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "restart2")
 }
 

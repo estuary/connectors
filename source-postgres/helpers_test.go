@@ -352,6 +352,18 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 
 func (buf *CaptureOutputBuffer) bufferRecord(msg airbyte.Message) error {
 	buf.lastState = ""
+
+	var event map[string]json.RawMessage
+	var err = json.Unmarshal(msg.Record.Data, &event)
+	if err != nil {
+		return err
+	}
+	delete(event, "source") // Source cannot be reproduced across tests.
+
+	if msg.Record.Data, err = json.Marshal(&event); err != nil {
+		return err
+	}
+
 	return buf.bufferMessage(airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
 		Record: &airbyte.Record{
@@ -404,11 +416,6 @@ func verifySnapshot(t *testing.T, suffix string, actual string) {
 		return
 	}
 
-	var newSnapshotFile = snapshotFile + ".new"
-	if err := os.WriteFile(newSnapshotFile, []byte(actual), 0644); err != nil {
-		t.Errorf("error writing new snapshot file %q: %v", newSnapshotFile, err)
-	}
-
 	// Locate the first non-matching line and log it
 	var actualLines = strings.Split(actual, "\n")
 	var snapshotLines = strings.Split(string(snapBytes), "\n")
@@ -424,8 +431,19 @@ func verifySnapshot(t *testing.T, suffix string, actual string) {
 			t.Errorf("snapshot %q mismatch at line %d", snapshotFile, idx)
 			t.Errorf("old: %s", x)
 			t.Errorf("new: %s", y)
-			return
+			break
 		}
 	}
-	t.Errorf("snapshot %q mismatch at undetermined line", snapshotFile)
+	if !t.Failed() {
+		t.Errorf("snapshot %q mismatch at undetermined line", snapshotFile)
+	}
+
+	// Replicate cupaloy's use of an environment variable to update snapshots in-place.
+	var newSnapshotFile = snapshotFile
+	if os.Getenv("UPDATE_SNAPSHOTS") != "1" {
+		newSnapshotFile += ".new"
+	}
+	if err := os.WriteFile(newSnapshotFile, []byte(actual), 0644); err != nil {
+		t.Errorf("error writing new snapshot file %q: %v", newSnapshotFile, err)
+	}
 }
