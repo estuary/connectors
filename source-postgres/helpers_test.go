@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/estuary/protocols/airbyte"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
@@ -359,14 +360,18 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 func (buf *CaptureOutputBuffer) bufferRecord(msg airbyte.Message) error {
 	buf.lastState = ""
 
-	var event map[string]json.RawMessage
-	var err = json.Unmarshal(msg.Record.Data, &event)
-	if err != nil {
-		return err
-	}
-	delete(event, "source") // Source cannot be reproduced across tests.
-
-	if msg.Record.Data, err = json.Marshal(&event); err != nil {
+	// Blank fields which are not reproducible across tests.
+	var err error
+	if msg.Record.Data, err = jsonpatch.MergePatch(msg.Record.Data, []byte(`{
+		"_meta": {
+			"source": {
+				"lsn": null,
+				"sequence": null,
+				"ts_ms": null,
+				"txId": null
+			}
+		}
+	}`)); err != nil {
 		return err
 	}
 
