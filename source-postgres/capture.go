@@ -275,7 +275,7 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 		// Flush events update the checkpointed LSN and trigger a state update.
 		// If this is the commit after the target watermark, it also ends the loop.
 		if event.Operation == FlushOp {
-			c.state.CurrentLSN = event.Source.EventLSN
+			c.state.CurrentLSN = event.Source.Location[0]
 			if err := c.emitState(c.state); err != nil {
 				return fmt.Errorf("error emitting state update: %w", err)
 			}

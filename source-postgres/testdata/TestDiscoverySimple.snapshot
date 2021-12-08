@@ -1,30 +1,103 @@
 {
   "name": "test_discoverysimple",
   "json_schema": {
-    "properties": {
-      "a": {
-        "type": "integer"
+    "allOf": [
+      {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op",
+              "source"
+            ],
+            "type": "object",
+            "properties": {
+              "before": {
+                "$ref": "#PublicTest_discoverysimple",
+                "description": "Record state immediately before this change was applied."
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "required": [
+                  "schema",
+                  "table"
+                ],
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp"
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table snapshot"
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "type": "array",
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object"
+              }
+            }
+          }
+        }
       },
-      "b": {
-        "type": [
-          "string",
-          "null"
-        ]
-      },
-      "c": {
-        "type": "number"
-      },
-      "d": {
-        "type": [
-          "string",
-          "null"
-        ]
+      {
+        "$ref": "#PublicTest_discoverysimple"
       }
-    },
-    "required": [
-      "a"
     ],
-    "type": "object"
+    "definitions": {
+      "PublicTest_discoverysimple": {
+        "required": [
+          "a"
+        ],
+        "type": "object",
+        "$anchor": "PublicTest_discoverysimple",
+        "properties": {
+          "a": {
+            "type": "integer"
+          },
+          "b": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "c": {
+            "type": "number"
+          },
+          "d": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
   },
   "supported_sync_modes": [
     "incremental",

@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/protocols/airbyte"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
@@ -24,6 +25,13 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 		return nil, err
 	}
 
+	// Shared schema of the embedded "source" property.
+	var sourceSchema = (&jsonschema.Reflector{
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}).Reflect(&postgresSource{}).Type
+	sourceSchema.Version = ""
+
 	var catalog = new(airbyte.Catalog)
 	for _, table := range tables {
 		logrus.WithFields(logrus.Fields{
@@ -32,44 +40,71 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 			"primaryKey": table.PrimaryKey,
 		}).Debug("discovered table")
 
-		var fields = make(map[string]json.RawMessage)
+		// The anchor by which we'll reference the table schema.
+		var anchor = strings.Title(table.Schema) + strings.Title(table.Name)
+
+		// Build `properties` schemas for each table column.
+		var properties = make(map[string]*jsonschema.Type)
 		for _, column := range table.Columns {
-			var jsonType, ok = postgresTypeToJSON[column.DataType]
+			var colSchema, ok = postgresTypeToJSON[column.DataType]
 			if !ok {
 				return nil, fmt.Errorf("cannot translate PostgreSQL column type %q to JSON schema", column.DataType)
 			}
-
-			if jsonType.type_ != "" {
-				// If nullable, use `type: [$type_, "null"]` form.
-				// Otherwise, use `type: $type_`.
-				if column.IsNullable {
-					jsonType.RawType, err = json.Marshal([]string{jsonType.type_, "null"})
-				} else {
-					jsonType.RawType, err = json.Marshal(jsonType.type_)
-				}
-				if err != nil {
-					panic(err)
-				}
-			}
+			colSchema.nullable = column.IsNullable
 
 			// Pass-through a postgres column description.
 			if column.Description != nil {
-				jsonType.Description = *column.Description
+				colSchema.description = *column.Description
 			}
-
-			var out, err = json.Marshal(jsonType)
-			if err != nil {
-				panic(err)
-			}
-
-			fields[column.Name] = out
+			properties[column.Name] = colSchema.toType()
 		}
 
-		var record, err = json.Marshal(map[string]interface{}{
-			"type":       "object",
-			"required":   table.PrimaryKey,
-			"properties": fields,
-		})
+		// Schema.Properties is a weird OrderedMap thing, which doesn't allow for inline
+		// literal construction. Instead, use the Schema.Extras mechanism with "properties"
+		// to generate the properties keyword with an inline map.
+		var schema = jsonschema.Schema{
+			Definitions: jsonschema.Definitions{
+				anchor: &jsonschema.Type{
+					Type: "object",
+					Extras: map[string]interface{}{
+						"$anchor":    anchor,
+						"properties": properties,
+					},
+					Required: table.PrimaryKey,
+				},
+			},
+			Type: &jsonschema.Type{
+				AllOf: []*jsonschema.Type{
+					{
+						Extras: map[string]interface{}{
+							"properties": map[string]*jsonschema.Type{
+								"_meta": {
+									Type: "object",
+									Extras: map[string]interface{}{
+										"properties": map[string]*jsonschema.Type{
+											"op": {
+												Enum:        []interface{}{"c", "d", "u"},
+												Description: "Change operation type: 'c' Insert, 'u' Update, 'd' Delete.",
+											},
+											"source": sourceSchema,
+											"before": {
+												Ref:         "#" + anchor,
+												Description: "Record state immediately before this change was applied.",
+											},
+										},
+									},
+									Required: []string{"op", "source"},
+								},
+							},
+						},
+						Required: []string{"_meta"},
+					},
+					{Ref: "#" + anchor},
+				},
+			},
+		}
+
+		var rawSchema, err = schema.MarshalJSON()
 		if err != nil {
 			return nil, fmt.Errorf("error marshalling schema JSON: %w", err)
 		}
@@ -81,7 +116,7 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 			"table":     table.Name,
 			"namespace": table.Schema,
 			"columns":   table.Columns,
-			"schema":    string(record),
+			"schema":    string(rawSchema),
 		}).Debug("translated table schema")
 
 		var sourceDefinedPrimaryKey [][]string
@@ -92,7 +127,7 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 		catalog.Streams = append(catalog.Streams, airbyte.Stream{
 			Name:                    table.Name,
 			Namespace:               table.Schema,
-			JSONSchema:              json.RawMessage(record),
+			JSONSchema:              rawSchema,
 			SupportedSyncModes:      airbyte.AllSyncModes,
 			SourceDefinedCursor:     true,
 			SourceDefinedPrimaryKey: sourceDefinedPrimaryKey,
@@ -101,13 +136,36 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 	return catalog, err
 }
 
-var postgresTypeToJSON = map[string]struct {
+type columnSchema struct {
+	contentEncoding string
+	description     string
+	format          string
+	nullable        bool
 	type_           string
-	RawType         json.RawMessage `json:"type,omitempty"`
-	ContentEncoding string          `json:"contentEncoding,omitempty"`
-	Format          string          `json:"format,omitempty"`
-	Description     string          `json:"description,omitempty"`
-}{
+}
+
+func (s columnSchema) toType() *jsonschema.Type {
+	var out = &jsonschema.Type{
+		Format:      s.format,
+		Description: s.description,
+		Extras:      make(map[string]interface{}),
+	}
+
+	if s.contentEncoding != "" {
+		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.
+	}
+
+	if s.type_ == "" {
+		// No type constraint.
+	} else if s.nullable {
+		out.Extras["type"] = []string{s.type_, "null"} // Use variadic form.
+	} else {
+		out.Type = s.type_
+	}
+	return out
+}
+
+var postgresTypeToJSON = map[string]columnSchema{
 	"bool": {type_: "boolean"},
 
 	"int2": {type_: "integer"},
@@ -128,7 +186,7 @@ var postgresTypeToJSON = map[string]struct {
 	"varchar": {type_: "string"},
 	"bpchar":  {type_: "string"},
 	"text":    {type_: "string"},
-	"bytea":   {type_: "string", ContentEncoding: "base64"},
+	"bytea":   {type_: "string", contentEncoding: "base64"},
 	"xml":     {type_: "string"},
 	"bit":     {type_: "string"},
 	"varbit":  {type_: "string"},
@@ -138,11 +196,11 @@ var postgresTypeToJSON = map[string]struct {
 	"jsonpath": {type_: "string"},
 
 	// Domain-Specific Types
-	"date":        {type_: "string", Format: "date-time"},
-	"timestamp":   {type_: "string", Format: "date-time"},
-	"timestamptz": {type_: "string", Format: "date-time"},
+	"date":        {type_: "string", format: "date-time"},
+	"timestamp":   {type_: "string", format: "date-time"},
+	"timestamptz": {type_: "string", format: "date-time"},
 	"time":        {type_: "integer"},
-	"timetz":      {type_: "string", Format: "time"},
+	"timetz":      {type_: "string", format: "time"},
 	"interval":    {type_: "string"},
 	"money":       {type_: "string"},
 	"point":       {type_: "string"},
@@ -158,7 +216,7 @@ var postgresTypeToJSON = map[string]struct {
 	"macaddr8":    {type_: "string"},
 	"tsvector":    {type_: "string"},
 	"tsquery":     {type_: "string"},
-	"uuid":        {type_: "string", Format: "uuid"},
+	"uuid":        {type_: "string", format: "uuid"},
 }
 
 // tableInfo represents all relevant knowledge about a PostgreSQL table.

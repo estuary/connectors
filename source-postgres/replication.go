@@ -31,52 +31,49 @@ const (
 	FlushOp ChangeOp = "x"
 )
 
-// SourceCommon is Debezium-compatible source metadata for data capture events.
-// See Debezium docs at:
+// SourceCommon is common source metadata for data capture events.
+// It's a subset of the corresponding Debezium message definition.
+// Our design goal is a high signal-to-noise representation which can be
+// trivially converted to a Debezium equivalent if desired. See:
 // 	https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-create-events
-// See also how materialize deserializes Debezium envelopes:
-// 	https://github.com/MaterializeInc/materialize/blob/4fca6f51338b0da9a44dd3a75a5a4a5da37a9733/src/interchange/src/avro/envelope_debezium.rs#L275
 // TODO(johnny): Factor into a shared package.
 type SourceCommon struct {
-	// Version string for this connector. Example: "v1.2.3".
-	Version string `json:"version,omitempty"`
-	// Connector name. Example: "source-postgres".
-	Connector string `json:"connector"`
-	// Name of this capture (?). Example: "acmeCo/cdc-from-postgres".
-	// The Debezium connectors use strings like "PostgreSQL_server",
-	// and it's expected that this string composes with Schema and
-	// Table to produce an identifier under which an Avro schema is
-	// registered with a schema registry, like
-	// "PostgreSQL_server.inventory.customers.Value".
-	Name string `json:"name,omitempty"`
-	// Unix milliseconds at which this record was recorded in the WAL.
-	Millis int64 `json:"ts_ms,omitempty"`
-	// Database is the logical database name.
-	Database string `json:"db,omitempty"`
-	// Schema is the logical database schema.
-	Schema string `json:"schema"`
-	// Table is the table name, within the database and schema.
-	Table string `json:"table"`
-	// TxID is an identifier which monotonically increases with
-	// each transaction, and defines its event boundaries.
+	Millis   int64  `json:"ts_ms,omitempty" jsonschema:"description=Unix timestamp, in millis, at which this event was recorded by the database."`
+	Schema   string `json:"schema" jsonschema:"description=Database schema of the event."`
+	Snapshot bool   `json:"snapshot,omitempty" jsonschema:"description=Snapshot is true if the record was produced from an initial table snapshot, and false or unset if produced from the replication log."`
+	Table    string `json:"table" jsonschema:"description=Database table of the event."`
+
+	// Fields which are part of the generalized Debezium representation
+	// but are not included here:
+	// * `version` string of the connector.
+	// * `connector` is the connector name.
+	// * `database` is the logical database name.
+	// * `name` string of the capture. Debezium connectors use strings like
+	//   "PostgreSQL_server", and it's expected that this string composes with
+	//   `schema` and `table` to produce an identifier under which an Avro schema is
+	//   registered within a schema registry, like "PostgreSQL_server.inventory.customers.Value".
 	//
-	// COMPATIBILITY: Debezium defines "txId" only within the PostgreSQL
-	// connector, but we generalize it to all implemented connectors.
-	TxID uint64 `json:"txId,omitempty"`
-	// Snapshot distinguishes events emitted from a backfill,
-	// versus ongoing reads of the replication log.
-	Snapshot bool `json:"snapshot,omitempty"`
+	// All of `version`, `connector`, and `database` are defined by the catalog specification
+	// and are available through logs. They seem noisy and low-signal here.
 }
 
+// postgresSource is source metadata for data capture events.
+//
+// For more nuance on LSN vs Last LSN vs Final LSN, see:
+//  https://github.com/postgres/postgres/blob/a8fd13cab0ba815e9925dc9676e6309f699b5f72/src/include/replication/reorderbuffer.h#L260-L280
+// See also how Materialize deserializes Postgres Debezium envelopes:
+// 	https://github.com/MaterializeInc/materialize/blob/4fca6f51338b0da9a44dd3a75a5a4a5da37a9733/src/interchange/src/avro/envelope_debezium.rs#L275
 type postgresSource struct {
-	// Sequence is a string-serialized JSON array which embeds a lexicographic
-	// ordering of all events. Its contents are database-dependent.
-	// For PostgreSQL, it models: [last-committed-LSN, current-LSN].
-	Sequence string `json:"sequence,omitempty"`
-	// LSN is the log sequence number of the current record event.
-	EventLSN pglogrepl.LSN `json:"lsn,omitempty"`
-
 	SourceCommon
+
+	Location [3]pglogrepl.LSN `json:"loc,omitempty" jsonschema:"description=Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"`
+
+	// Fields which are part of the Debezium Postgres representation but are not included here:
+	// * `lsn` is the log sequence number of this event. It's equal to loc[1].
+	// * `sequence` is a string-serialized JSON array which embeds a lexicographic
+	//    ordering of all events. It's equal to [loc[0], loc[1]].
+	// * `txId` is an opaque monotonic transaction identifier,
+	//   and defines its event boundaries. It can be set as loc[2].
 }
 
 type changeEvent struct {
@@ -313,7 +310,9 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 
 		var event = &changeEvent{
 			Operation: FlushOp,
-			Source:    postgresSource{EventLSN: s.lastTxnEndLSN},
+			Source: postgresSource{
+				Location: [3]pglogrepl.LSN{s.lastTxnEndLSN, 0, 0},
+			},
 		}
 		return event, nil
 	}
@@ -375,19 +374,13 @@ func (s *replicationStream) decodeChangeEvent(
 	var event = &changeEvent{
 		Operation: op,
 		Source: postgresSource{
-			Sequence: fmt.Sprintf("\"[%d,%d]\"", s.lastTxnEndLSN, lsn),
-			EventLSN: lsn,
 			SourceCommon: SourceCommon{
-				Connector: "source-postgres",
-				Database:  "", // TODO(johnny).
-				Millis:    s.nextTxnMillis,
-				Name:      "", // TODO(johnny).
-				Schema:    rel.Namespace,
-				Snapshot:  false,
-				Table:     rel.RelationName,
-				TxID:      uint64(s.nextTxnFinalLSN),
-				Version:   "", // TODO(johnny).
+				Millis:   s.nextTxnMillis,
+				Schema:   rel.Namespace,
+				Snapshot: false,
+				Table:    rel.RelationName,
 			},
+			Location: [3]pglogrepl.LSN{s.lastTxnEndLSN, lsn, s.nextTxnFinalLSN},
 		},
 		Before: bf,
 		After:  af,
