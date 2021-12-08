@@ -44,9 +44,9 @@ func (r *resultSet) Buffer(streamID string, keyColumns []string, events []*chang
 		return nil
 	}
 
-	// Otherwise add thew new row to the `rows` map and update `scanned`
+	// Otherwise add the new row to the `rows` map and update `scanned`.
 	for _, event := range events {
-		var bs, err = encodeRowKey(chunk.keyColumns, event.Fields)
+		var bs, err = encodeRowKey(chunk.keyColumns, event.After)
 		if err != nil {
 			return fmt.Errorf("error encoding row key: %w", err)
 		}
@@ -61,7 +61,7 @@ func (r *resultSet) Buffer(streamID string, keyColumns []string, events []*chang
 		if logrus.IsLevelEnabled(logrus.DebugLevel) {
 			logrus.WithFields(logrus.Fields{
 				"stream":   streamID,
-				"type":     event.Type,
+				"op":       event.Operation,
 				"rowKey":   base64.StdEncoding.EncodeToString(bs),
 				"chunkEnd": base64.StdEncoding.EncodeToString(chunk.scanned),
 			}).Debug("buffered scan result")
@@ -113,7 +113,7 @@ func (r *resultSet) Patch(streamID string, event *changeEvent) error {
 		return nil
 	}
 
-	var bs, err = encodeRowKey(chunk.keyColumns, event.Fields)
+	var bs, err = encodeRowKey(chunk.keyColumns, event.keyFields())
 	if err != nil {
 		return fmt.Errorf("error encoding patch key: %w", err)
 	}
@@ -125,7 +125,7 @@ func (r *resultSet) Patch(streamID string, event *changeEvent) error {
 		if logrus.IsLevelEnabled(logrus.DebugLevel) {
 			logrus.WithFields(logrus.Fields{
 				"stream":   streamID,
-				"type":     event.Type,
+				"type":     event.Operation,
 				"rowKey":   base64.StdEncoding.EncodeToString([]byte(rowKey)),
 				"chunkEnd": base64.StdEncoding.EncodeToString(chunk.scanned),
 			}).Debug("filtering change")
@@ -138,20 +138,20 @@ func (r *resultSet) Patch(streamID string, event *changeEvent) error {
 	// that already exists, and updates/deletions of nonexistent rows), because
 	// the whole point of buffering and patching the result-set is to resolve
 	// all such inconsistencies by the time the next watermark is reached.
-	switch event.Type {
-	case "Insert":
+	switch event.Operation {
+	case InsertOp:
 		chunk.rows[rowKey] = event
-	case "Update":
+	case UpdateOp:
 		chunk.rows[rowKey] = &changeEvent{
-			Type:      "Insert",
-			Namespace: event.Namespace,
-			Table:     event.Table,
-			Fields:    event.Fields,
+			Operation: InsertOp,
+			Source:    event.Source,
+			Before:    nil,
+			After:     event.After,
 		}
-	case "Delete":
+	case DeleteOp:
 		delete(chunk.rows, rowKey)
 	default:
-		return fmt.Errorf("patched invalid change type %q", event.Type)
+		return fmt.Errorf("patched invalid change type %q", event.Operation)
 	}
 	return nil
 }

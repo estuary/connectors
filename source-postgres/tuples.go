@@ -10,9 +10,9 @@ import (
 // encodeRowKey extracts the appropriate key-fields by name from a map and encodes
 // them as a FoundationDB serialized tuple.
 func encodeRowKey(key []string, fields map[string]interface{}) ([]byte, error) {
-	var xs []interface{}
-	for _, elem := range key {
-		xs = append(xs, fields[elem])
+	var xs = make([]interface{}, len(key))
+	for i, elem := range key {
+		xs[i] = fields[elem]
 	}
 	return packTuple(xs)
 }
