@@ -1,38 +1,111 @@
 {
   "name": "test_discoverycomplex",
   "json_schema": {
-    "properties": {
-      "Bounded Text": {
-        "type": [
-          "string",
-          "null"
-        ]
-      },
-      "doc": {},
-      "doc/bin": {},
-      "foo": {
-        "type": [
-          "string",
-          "null"
+    "allOf": [
+      {
+        "required": [
+          "_meta"
         ],
-        "description": "This is a text field!"
+        "properties": {
+          "_meta": {
+            "required": [
+              "op",
+              "source"
+            ],
+            "type": "object",
+            "properties": {
+              "before": {
+                "$ref": "#PublicTest_discoverycomplex",
+                "description": "Record state immediately before this change was applied."
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "required": [
+                  "schema",
+                  "table"
+                ],
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp"
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table snapshot"
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "type": "array",
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object"
+              }
+            }
+          }
+        }
       },
-      "k1": {
-        "type": "integer",
-        "description": "I think this is a key ?"
-      },
-      "k2": {
-        "type": "string"
-      },
-      "real_": {
-        "type": "number"
+      {
+        "$ref": "#PublicTest_discoverycomplex"
       }
-    },
-    "required": [
-      "k2",
-      "k1"
     ],
-    "type": "object"
+    "definitions": {
+      "PublicTest_discoverycomplex": {
+        "required": [
+          "k2",
+          "k1"
+        ],
+        "type": "object",
+        "$anchor": "PublicTest_discoverycomplex",
+        "properties": {
+          "Bounded Text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "doc": {},
+          "doc/bin": {},
+          "foo": {
+            "description": "This is a text field!",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "k1": {
+            "type": "integer",
+            "description": "I think this is a key ?"
+          },
+          "k2": {
+            "type": "string"
+          },
+          "real_": {
+            "type": "number"
+          }
+        }
+      }
+    }
   },
   "supported_sync_modes": [
     "incremental",

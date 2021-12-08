@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
@@ -67,18 +68,12 @@ func scanTableChunk(ctx context.Context, conn *pgx.Conn, streamID string, keyCol
 			Operation: InsertOp,
 			Source: postgresSource{
 				SourceCommon: SourceCommon{
-					Connector: "source-postgres",
-					Database:  "", // TODO(johnny).
-					Millis:    0,
-					Name:      "", // TODO(johnny).
-					Schema:    schemaName,
-					Snapshot:  true,
-					Table:     tableName,
-					TxID:      0,
-					Version:   "", // TODO(johnny).
+					Millis:   0, // Not known.
+					Schema:   schemaName,
+					Snapshot: true,
+					Table:    tableName,
 				},
-				EventLSN: 0,
-				Sequence: "",
+				Location: [3]pglogrepl.LSN{},
 			},
 			Before: nil,
 			After:  fields,
