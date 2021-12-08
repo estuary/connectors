@@ -13,7 +13,7 @@ import (
 // DiscoverCatalog queries the database and generates an Airbyte Catalog
 // describing the available tables and their columns.
 func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, error) {
-	var conn, err = pgx.Connect(ctx, config.ConnectionURI)
+	var conn, err = pgx.Connect(ctx, config.ToURI())
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
