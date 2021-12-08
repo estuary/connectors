@@ -365,10 +365,8 @@ func (buf *CaptureOutputBuffer) bufferRecord(msg airbyte.Message) error {
 	if msg.Record.Data, err = jsonpatch.MergePatch(msg.Record.Data, []byte(`{
 		"_meta": {
 			"source": {
-				"lsn": null,
-				"sequence": null,
-				"ts_ms": null,
-				"txId": null
+				"loc": null,
+				"ts_ms": null
 			}
 		}
 	}`)); err != nil {

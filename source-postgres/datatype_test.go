@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/estuary/protocols/airbyte"
+	"github.com/stretchr/testify/require"
 )
 
 type datatypeTestcase struct {
@@ -120,9 +121,8 @@ func TestDatatypes(t *testing.T) {
 			// Perform discovery and verify that the generated JSON schema looks correct
 			t.Run("discovery", func(t *testing.T) {
 				var discoveredCatalog, err = DiscoverCatalog(ctx, cfg)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
+
 				var stream *airbyte.Stream
 				for idx := range discoveredCatalog.Streams {
 					if strings.EqualFold(discoveredCatalog.Streams[idx].Name, table) {
@@ -134,11 +134,20 @@ func TestDatatypes(t *testing.T) {
 					t.Errorf("column type %q: no stream named %q discovered", tc.ColumnType, table)
 					return
 				}
-				var expectedSchema = fmt.Sprintf(`{"properties":{"a":{"type":"integer"},"b":%s},"required":["a"],"type":"object"}`, tc.OutputType)
-				if string(stream.JSONSchema) != expectedSchema {
-					t.Errorf("column type %q did not produce expected schema: %s", tc.ColumnType, expectedSchema)
-					t.Errorf("column type %q resulted in schema: %s", tc.ColumnType, stream.JSONSchema)
-					return
+
+				var skimmed = struct {
+					Definitions map[string]struct {
+						Properties map[string]json.RawMessage
+					}
+				}{}
+				require.NoError(t, json.Unmarshal(stream.JSONSchema, &skimmed))
+				require.Len(t, skimmed.Definitions, 1)
+
+				for _, tbl := range skimmed.Definitions {
+					var expectParsed, actualParsed interface{}
+					require.NoError(t, json.Unmarshal([]byte(tc.OutputType), &expectParsed))
+					require.NoError(t, json.Unmarshal(tbl.Properties["b"], &actualParsed))
+					require.Equal(t, expectParsed, actualParsed)
 				}
 			})
 
