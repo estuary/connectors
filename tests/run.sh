@@ -90,7 +90,7 @@ fi
 if [[ -z "$CONNECTOR_CONFIG" ]]; then
     bail "setup did not set CONNECTOR_CONFIG"
 fi
-trap ./tests/${CONNECTOR}/cleanup.sh EXIT
+trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${CONNECTOR}/cleanup.sh" EXIT
 
 # Generate the test-specific catalog source.
 cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
