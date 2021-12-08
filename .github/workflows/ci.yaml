@@ -148,8 +148,8 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: matrix.connector == 'source-kafka'
         run: |
-         docker-compose --file infra/docker-compose.yaml up --detach zookeeper
-         docker-compose --file infra/docker-compose.yaml up --detach kafka
+          docker-compose --file infra/docker-compose.yaml up --detach zookeeper
+          docker-compose --file infra/docker-compose.yaml up --detach kafka
 
       - name: ${{ matrix.connector }} integration tests
         if: |
@@ -166,7 +166,14 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
           AWS_DEFAULT_OUTPUT: json
-          POSTGRES_CONNECTION_URI: "postgres://flow:flow@localhost:5432/flow"
+
+          # Compare to: https://www.postgresql.org/docs/current/libpq-envars.html
+          PGDATABASE: flow
+          PGHOST: localhost
+          PGPASSWORD: flow
+          PGPORT: 5432
+          PGUSER: flow
+
         run: CONNECTOR=${{ matrix.connector }} VERSION=test ./tests/run.sh;
 
       - name: Push ${{ matrix.connector }} image
