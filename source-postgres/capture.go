@@ -94,19 +94,19 @@ type messageOutput interface {
 // (if any) are met.
 func RunCapture(ctx context.Context, config *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, dest messageOutput) error {
 	logrus.WithFields(logrus.Fields{
-		"uri":  config.ConnectionURI,
+		"uri":  config.ToURI(),
 		"slot": config.SlotName,
 	}).Info("starting capture")
 
 	// Normal database connection used for table scanning
-	var connScan, err = pgx.Connect(ctx, config.ConnectionURI)
+	var connScan, err = pgx.Connect(ctx, config.ToURI())
 	if err != nil {
 		return fmt.Errorf("unable to connect to database for table scan: %w", err)
 	}
 	defer connScan.Close(ctx)
 
 	// Replication database connection used for event streaming
-	replConnConfig, err := pgconn.ParseConfig(config.ConnectionURI)
+	replConnConfig, err := pgconn.ParseConfig(config.ToURI())
 	if err != nil {
 		return err
 	}
