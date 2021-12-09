@@ -14,6 +14,8 @@ go run ${DATA_INGEST_SCRIPT_PATH} \
   --binding_num=${BINDING_NUM_MULTIPLE_DATATYPES} \
   --data_file_path=${DATASET_MULTIPLE_DATATYPES}
 
+# Wait long enough so that the temp data in the local caches are all committed to S3.
+# Following data will be stored in a new local file.
 sleep 5
 go run ${DATA_INGEST_SCRIPT_PATH} \
   --server_address=${CONSUMER_ADDRESS} \
