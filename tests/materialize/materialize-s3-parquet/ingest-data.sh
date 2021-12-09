@@ -1,16 +1,24 @@
 #!/bin/bash
 set -e
 
-# Sending corresponding data to the websockets.
-websocat --protocol json/v1 "${WEBSOCKET_URL_SIMPLE}" < "${DATASET_SIMPLE}"
+# Pushing data to the capture.
+go run ${DATA_INGEST_SCRIPT_PATH} \
+  --server_address=${CONSUMER_ADDRESS} \
+  --capture=${PUSH_CAPTURE_NAME} \
+  --binding_num=${BINDING_NUM_SIMPLE} \
+  --data_file_path=${DATASET_SIMPLE}
 
-pv --line-mode --quiet --rate-limit 1 < "${DATASET_MULTIPLE_DATATYPES}" \
-      | websocat --protocol json/v1 "${WEBSOCKET_URL_MULTIPLE_DATATYPES}"
+go run ${DATA_INGEST_SCRIPT_PATH} \
+  --server_address=${CONSUMER_ADDRESS} \
+  --capture=${PUSH_CAPTURE_NAME} \
+  --binding_num=${BINDING_NUM_MULTIPLE_DATATYPES} \
+  --data_file_path=${DATASET_MULTIPLE_DATATYPES}
 
+# Wait long enough so that the temp data in the local caches are all committed to S3.
+# Following data will be stored in a new local file.
 sleep 5
-
-websocat --protocol json/v1 "${WEBSOCKET_URL_SIMPLE}" < "${DATASET_SIMPLE}" 
-
-# Wait long enough to allow all the data to be committed to the cloud.
-sleep 5
-
+go run ${DATA_INGEST_SCRIPT_PATH} \
+  --server_address=${CONSUMER_ADDRESS} \
+  --capture=${PUSH_CAPTURE_NAME} \
+  --binding_num=${BINDING_NUM_SIMPLE} \
+  --data_file_path=${DATASET_SIMPLE}
