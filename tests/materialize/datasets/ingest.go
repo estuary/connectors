@@ -72,6 +72,10 @@ func (p *pushRpc) SendDocuments(dataFilePath string, bindingNum int) error {
 		docs = append(docs, arena.Add(scanner.Bytes()))
 	}
 
+	if err := scanner.Err(); err != nil {
+		fmt.Errorf("scan input: %w", err)
+	}
+
 	return p.rpc.Send(&capture.PushRequest{
 		Documents: &capture.Documents{
 			Binding:  uint32(bindingNum),
