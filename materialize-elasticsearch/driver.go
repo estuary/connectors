@@ -51,6 +51,7 @@ func (r resource) Validate() error {
 	return nil
 }
 
+// GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface.
 func (resource) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Index":

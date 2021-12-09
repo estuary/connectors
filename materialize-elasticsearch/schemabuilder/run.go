@@ -16,6 +16,7 @@ type DateSpec struct {
 	Format string `json:"format"`
 }
 
+// GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface.
 func (DateSpec) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Format":
@@ -31,6 +32,7 @@ type KeywordSpec struct {
 	IgnoreAbove int `json:"ignore_above"`
 }
 
+// GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface.
 func (KeywordSpec) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "IgnoreAbove":
@@ -47,6 +49,7 @@ type TextSpec struct {
 	KeywordIgnoreAbove int  `json:"keyword_ignore_above"`
 }
 
+// GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface.
 func (TextSpec) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "DualKeyword":
@@ -71,6 +74,7 @@ type ElasticFieldType struct {
 	TextSpec    TextSpec    `json:"text_spec,omitempty"`
 }
 
+// GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface.
 func (ElasticFieldType) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "FieldType":
@@ -123,6 +127,7 @@ type FieldOverride struct {
 	EsType  ElasticFieldType `json:"es_type"`
 }
 
+// GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface.
 func (FieldOverride) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Pointer":
