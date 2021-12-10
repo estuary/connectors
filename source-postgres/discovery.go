@@ -84,7 +84,7 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 										"properties": map[string]*jsonschema.Type{
 											"op": {
 												Enum:        []interface{}{"c", "d", "u"},
-												Description: "Change operation type: 'c' Insert, 'u' Update, 'd' Delete.",
+												Description: "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
 											},
 											"source": sourceSchema,
 											"before": {
@@ -108,9 +108,6 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 		if err != nil {
 			return nil, fmt.Errorf("error marshalling schema JSON: %w", err)
 		}
-
-		// TODO(johnny): |record| is *part* of a schema, but needs to be embedded
-		// within a schema describing the overall Debezium wrapper.
 
 		logrus.WithFields(logrus.Fields{
 			"table":     table.Name,
