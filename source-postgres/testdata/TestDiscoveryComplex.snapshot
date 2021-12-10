@@ -24,7 +24,7 @@
                   "d",
                   "u"
                 ],
-                "description": "Change operation type: 'c' Insert, 'u' Update, 'd' Delete."
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
               },
               "source": {
                 "required": [
@@ -34,15 +34,15 @@
                 "properties": {
                   "ts_ms": {
                     "type": "integer",
-                    "description": "Unix timestamp"
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
                   },
                   "schema": {
                     "type": "string",
-                    "description": "Database schema of the event."
+                    "description": "Database schema (namespace) of the event."
                   },
                   "snapshot": {
                     "type": "boolean",
-                    "description": "Snapshot is true if the record was produced from an initial table snapshot"
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
                   },
                   "table": {
                     "type": "string",
