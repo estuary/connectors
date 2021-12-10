@@ -38,10 +38,15 @@ const (
 // 	https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-create-events
 // TODO(johnny): Factor into a shared package.
 type SourceCommon struct {
-	Millis   int64  `json:"ts_ms,omitempty" jsonschema:"description=Unix timestamp, in millis, at which this event was recorded by the database."`
-	Schema   string `json:"schema" jsonschema:"description=Database schema of the event."`
-	Snapshot bool   `json:"snapshot,omitempty" jsonschema:"description=Snapshot is true if the record was produced from an initial table snapshot, and false or unset if produced from the replication log."`
+	Millis   int64  `json:"ts_ms,omitempty" jsonschema:"description=Unix timestamp (in millis) at which this event was recorded by the database."`
+	Schema   string `json:"schema" jsonschema:"description=Database schema (namespace) of the event."`
+	Snapshot bool   `json:"snapshot,omitempty" jsonschema:"description=Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."`
 	Table    string `json:"table" jsonschema:"description=Database table of the event."`
+
+	// Implementor's note: `snapshot` is a mildly contentious name, because it
+	// could imply involvement of a database snapshot that is not, in fact, used.
+	// A better term might be "backfill", but this is an established term in the
+	// CDC ecosystem and it's water under the bridge now.
 
 	// Fields which are part of the generalized Debezium representation
 	// but are not included here:
@@ -66,6 +71,8 @@ type SourceCommon struct {
 type postgresSource struct {
 	SourceCommon
 
+	// This is a compact array to reduce noise in generated JSON outputs,
+	// and because a lexicographic ordering is also a correct event ordering.
 	Location [3]pglogrepl.LSN `json:"loc,omitempty" jsonschema:"description=Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"`
 
 	// Fields which are part of the Debezium Postgres representation but are not included here:
@@ -75,6 +82,13 @@ type postgresSource struct {
 	// * `txId` is an opaque monotonic transaction identifier,
 	//   and defines its event boundaries. It can be set as loc[2].
 }
+
+// Named constants for the LSN locations within a postgresSource.Location.
+const (
+	pgLocLastCommitEndLSN = 0 // Index of last Commit.EndLSN in postgresSource.Location.
+	pgLocEventLSN         = 1 // Index of this event LSN in postgresSource.Location.
+	pgLocBeginFinalLSN    = 2 // Index of current Begin.FinalLSN in postgresSource.Location.
+)
 
 type changeEvent struct {
 	Operation ChangeOp
@@ -311,7 +325,7 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		var event = &changeEvent{
 			Operation: FlushOp,
 			Source: postgresSource{
-				Location: [3]pglogrepl.LSN{s.lastTxnEndLSN, 0, 0},
+				Location: [3]pglogrepl.LSN{s.lastTxnEndLSN, lsn, 0},
 			},
 		}
 		return event, nil
