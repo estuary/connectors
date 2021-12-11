@@ -7,7 +7,7 @@ then
     exit 1
 fi
 
-# The relative path to ${TEST_DIR} to store final results.
+# The relative path to ${TESTDIR} to store final results.
 result_dir="$1"
 
 # Wait for enough long to have data available for fetching.
@@ -24,6 +24,6 @@ function exportIndexToJsonl() {
     > "${jsonl_path}"
 }
 
-exportIndexToJsonl "${TEST_ES_INDEX_DUPLICATED_KEYS_DELTA}" id "${TEST_DIR}/${result_dir}/duplicated-keys-delta.jsonl"
-exportIndexToJsonl "${TEST_ES_INDEX_DUPLICATED_KEYS_NON_DELTA}" id "${TEST_DIR}/${result_dir}/duplicated-keys-non-delta.jsonl"
-exportIndexToJsonl "${TEST_ES_INDEX_MULTIPLE_DATA_TYPES}" id "${TEST_DIR}/${result_dir}/multiple-data-types.jsonl"
+exportIndexToJsonl "${TEST_ES_INDEX_DUPLICATED_KEYS_DELTA}" id "${TESTDIR}/${result_dir}/duplicated-keys-delta.jsonl"
+exportIndexToJsonl "${TEST_ES_INDEX_DUPLICATED_KEYS_NON_DELTA}" id "${TESTDIR}/${result_dir}/duplicated-keys-non-delta.jsonl"
+exportIndexToJsonl "${TEST_ES_INDEX_MULTIPLE_DATA_TYPES}" id "${TESTDIR}/${result_dir}/multiple-data-types.jsonl"

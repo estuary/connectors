@@ -7,24 +7,24 @@ then
     exit 1
 fi
 
-# The relative path to ${TEST_DIR} to store final results.
+# The relative path to ${TESTDIR} to store final results.
 result_dir="$1"
 
 # Wait long enough to have all the data uploaded to s3.
 sleep 5
 
-# The dir relative to ${TEST_DIR} for storing temp files.
+# The dir relative to ${TESTDIR} for storing temp files.
 tmp_dir=tmp
-mkdir -p "$(realpath "${TEST_DIR}"/${tmp_dir})"
+mkdir -p "$(realpath "${TESTDIR}"/${tmp_dir})"
 
 # Sync data to local.
-aws s3 sync s3://"${TEST_BUCKET}" "${TEST_DIR}/${tmp_dir}/" --endpoint-url "${LOCALSTACK_S3_ENDPOINT}" \
+aws s3 sync s3://"${TEST_BUCKET}" "${TESTDIR}/${tmp_dir}/" --endpoint-url "${LOCALSTACK_S3_ENDPOINT}" \
     || bail "syncing data from s3 failed"
 
 # Read all the pq data as jsonl output.
 function exportParquetToJson() {
-    local pq_path="${TEST_DIR}"/"$1"
-    local jsonl_path="${TEST_DIR}"/"$2"
+    local pq_path="${TESTDIR}"/"$1"
+    local jsonl_path="${TESTDIR}"/"$2"
 
     # Sort the files by name, which should also correspond to the order in which
     # they were written.  We output paths relative to pq_path, and then set the

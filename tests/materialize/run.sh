@@ -1,25 +1,35 @@
 #!/bin/bash
 
-set -e
+set -em
 
-# Flow image / container name used in testing.
-FLOW_IMAGE="ghcr.io/estuary/flow:dev"
-# Prefix of the containers running flowctl via Flow image.
-FLOW_CONTAINER_NAME_PREFIX=flowctl-${CONNECTOR}
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
 
-# The docker image of the connector to be tested.
-# The connector image needs to be available to envsubst.
+
+function bail() {
+   echo "$@" 1>&2
+   echo "Test failed."
+   exit 1
+}
+
+test -n "$CONNECTOR" || bail "must specify CONNECTOR env variable"
+test -n "$VERSION" || bail "must specify VERSION env variable"
+
+# The dir of materialize tests.
+TEST_SCRIPTS_DIR="${ROOT_DIR}/tests/materialize"
+
+# Post-templating catalog source processed by the test.
+CATALOG="${TEST_SCRIPTS_DIR}/materialize-test.flow.yaml"
+
+# The dir containing test scripts of the connector.
+CONNECTOR_TEST_SCRIPTS_DIR="${TEST_SCRIPTS_DIR}/${CONNECTOR}"
+
+# Connector image to use. Export to make it available to `envsubst`
 export CONNECTOR_IMAGE="ghcr.io/estuary/${CONNECTOR}:${VERSION}"
+echo "testing connector: '$CONNECTOR'"
 
 function bail() {
     echo "$@" 1>&2
-    # Output logs for debugging if the execution fails for any reason.
-    for name in $(docker ps -a -f name=${FLOW_CONTAINER_NAME_PREFIX} -q); do
-        echo -e "\nlogs from container ${name}"
-        docker logs "${name}"
-    done
-
-    echo "test failed..."
     exit 1
 }
 export -f bail
@@ -27,30 +37,29 @@ export -f bail
 test -n "${CONNECTOR}" || bail "must specify CONNECTOR env variable"
 test -n "${VERSION}" || bail "must specify VERSION env variable"
 
-# The directory of the connectors github repo.
-ROOT_DIR="$(git rev-parse --show-toplevel)"
+# Directory under which the test runs.
+TESTDIR=".build/tests/${CONNECTOR}"
 
-# The dir of materialize tests.
-TEST_SCRIPTS_DIR="${ROOT_DIR}/tests/materialize"
+# Ensure we start with an empty dir, since temporary data plane files will go here.
+# Remove it, if it exists already.
+if [[ -d "${TESTDIR}" ]]; then
+    rm -r ${TESTDIR}
+fi
+mkdir -p "${TESTDIR}"
 
-# The dir containing test scripts of the connector.
-CONNECTOR_TEST_SCRIPTS_DIR="${TEST_SCRIPTS_DIR}/${CONNECTOR}"
-
-# Export envvars to be shared by all scripts.
-
-# A directory for hosting temp files generated during the test executions.
-export TEST_DIR="$(mktemp -d -t "${CONNECTOR}"-XXXXXX)"
-
-# Broker and onsumer addresses of Flow services.
-export BROKER_ADDRESS=localhost:8080
-export CONSUMER_ADDRESS=localhost:9000
+# Map to an absolute directory.
+export TESTDIR=$(realpath ${TESTDIR})
+# `flowctl` commands look for a BUILDS_ROOT environment variable which roots
+# build databases known to the data plane.
+export BUILDS_ROOT="file://${TESTDIR}/"
+# `flowctl` commands which interact with the data plane look for *_ADDRESS
+# variables, which are created by the temp-data-plane we're about to start.
+export BROKER_ADDRESS=unix://localhost${TESTDIR}/gazette.sock
+export CONSUMER_ADDRESS=unix://localhost${TESTDIR}/consumer.sock
 
 # The path to the data ingestion go script.
 export DATA_INGEST_SCRIPT_PATH="${TEST_SCRIPTS_DIR}/datasets/ingest.go"
-
-# The file name of catalog specification.
-# The file is located in ${TEST_DIR}
-export CATALOG="materialize-test.flow.yaml"
+export DATA_INGEST_ENDPOINT=unix://${TESTDIR}/consumer.sock
 
 # The name of the test capture for pushing data into collections.
 export PUSH_CAPTURE_NAME=test/ingest
@@ -75,39 +84,6 @@ export BINDING_NUM_SIMPLE=0
 export BINDING_NUM_DUPLICATED_KEYS=1
 export BINDING_NUM_MULTIPLE_DATATYPES=2
 
-# Util function to run flowctl command via docker.
-function runFlowctl() {
-    local script="$1"
-    local args=$2
-    local detached
-    if [[ "$3" == true ]]; then
-      detached="-d"
-    fi
-
-    local test_dir_target=/home/flow/tests/temp
-    local test_scripts_dir_target=/home/flow/scripts
-    # Run as root, not the flow user, since the user within the container needs to access the
-    # docker socket.
-
-    docker run ${detached:+"$detached"} \
-        --name "${FLOW_CONTAINER_NAME_PREFIX}-${script}-${EPOCHREALTIME}" \
-        --user 0  \
-        --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-        --mount type=bind,source="${TEST_SCRIPTS_DIR}",target=${test_scripts_dir_target} \
-        --mount type=bind,source="${TEST_DIR}",target=${test_dir_target} \
-        --env BROKER_ADDRESS="http://${BROKER_ADDRESS}" \
-        --env CONSUMER_ADDRESS="http://${CONSUMER_ADDRESS}" \
-        --env TEST_DIR="${test_dir_target}" \
-        --env BUILDS_ROOT="file://${test_dir_target}/build/" \
-        --env BUILD_ID=run-test-"${CONNECTOR}" \
-        --env CATALOG \
-        --network=host \
-        "${FLOW_IMAGE}" \
-        "${test_scripts_dir_target}/flowctl/${script}" \
-        "${args}" \
-        >/dev/null 2>&1
-}
-
 # Util function for running the `flowctl combine` to combine the results.
 function combineResults() {
     # The collection name specified in the catalog.
@@ -116,22 +92,33 @@ function combineResults() {
     local input_file_name="$2"
     # The output jsonl file of the combined results.
     local output_file_name="$3"
-    runFlowctl "combine.sh" "${collection} ${input_file_name} ${output_file_name}" false || bail "combine results failed."
+    ${TESTDIR}/flowctl combine \
+      --collection "${collection}" \
+      --source "file://${CATALOG}" \
+      < "${TESTDIR}/${input_file_name}" \
+      > "${TESTDIR}/${output_file_name}" \
+      || bail "combine results failed."
 }
 # Export the function to be avialble to connector-specific testing scripts.
 export -f combineResults
 
-function cleanup() {
-    echo -e "\nexecuting cleanup"
+FLOW_IMAGE="ghcr.io/estuary/flow:dev"
+docker pull ${FLOW_IMAGE}
+FLOW_CONTAINER=$(docker create $FLOW_IMAGE)
+docker cp ${FLOW_CONTAINER}:/usr/local/bin/flowctl ${TESTDIR}/flowctl
+docker cp ${FLOW_CONTAINER}:/usr/local/bin/etcd ${TESTDIR}/etcd
+docker cp ${FLOW_CONTAINER}:/usr/local/bin/gazette ${TESTDIR}/gazette
+docker rm ${FLOW_CONTAINER}
 
-    runFlowctl delete.sh "" false || true
+${TESTDIR}/flowctl temp-data-plane \
+    --log.level info \
+    --tempdir ${TESTDIR} \
+    --unix-sockets \
+    &
+DATA_PLANE_PID=$!
 
-    source "${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" || true
-    for name in $(docker ps -a -f name="${FLOW_CONTAINER_NAME_PREFIX}" -q); do
-        docker rm -f "${name}"
-    done
-}
-trap cleanup EXIT
+# Arrange to stop the data plane and cleanup on exit.
+trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" EXIT
 
 echo -e "\nexecuting setup"
 source "${CONNECTOR_TEST_SCRIPTS_DIR}/setup.sh" || bail "setup failed"
@@ -148,20 +135,22 @@ echo -e "\ngenerating catalog"
 escaped_connector_config=$(echo "${CONNECTOR_CONFIG}" | sed 's/\//\\\//g')
 envsubst < ${ROOT_DIR}/tests/materialize/flow.json.template | yq eval -P | \
 sed "s/CONNECTOR_CONFIG_PLACEHOLDER/${escaped_connector_config}/g" \
-> "${TEST_DIR}/${CATALOG}" || bail "generating ${CATALOG} failed."
+> "${CATALOG}" || bail "generating ${CATALOG} failed."
 
-echo -e "\nstarting temp data plane"
-runFlowctl temp-data-plane.sh "" true || bail "starting temp data plane."
-
-echo -e "\nbuilding and activating test catalog"
-runFlowctl build-and-activate.sh "" false || bail "building and activating test catalog failed."
+echo -e "\nbuilding test catalog"
+${TESTDIR}/flowctl api build --directory ${TESTDIR} --build-id test-build-id --source ${CATALOG} --ts-package || bail "Build failed."
+echo -e "\nactivating test catalog"
+${TESTDIR}/flowctl api activate --build-id test-build-id --all --log.level info || bail "Activate failed."
 
 echo -e "\nexecuting ingest-data"
 source "${CONNECTOR_TEST_SCRIPTS_DIR}/ingest-data.sh" || bail "ingest data failed."
 
-# The relative path to ${TEST_DIR} for storing result files.
+echo -e "\nwait catalog to finish."
+${TESTDIR}/flowctl api await --build-id test-build-id --log.level info || bail "Await failed."
+
+# The relative path to ${TESTDIR} for storing result files.
 result_dir=result_jsonl
-mkdir -p "$(realpath "${TEST_DIR}"/"${result_dir}")"
+mkdir -p "$(realpath "${TESTDIR}"/"${result_dir}")"
 
 echo -e "\nexecuting fetch-materialize-results"
 source "${CONNECTOR_TEST_SCRIPTS_DIR}/fetch-materialize-results.sh" ${result_dir}\
@@ -174,13 +163,13 @@ EXPECTED_DIR="${CONNECTOR_TEST_SCRIPTS_DIR}/expected/"
 # Make sure all expected files has their corresponding files in the actual output directory.
 for f in "${EXPECTED_DIR}"/*; do
     filename="$(basename "${f}")"
-    if [[ ! -f "${TEST_DIR}/${result_dir}/${filename}" ]]; then
+    if [[ ! -f "${TESTDIR}/${result_dir}/${filename}" ]]; then
         bail "expected file ${result_dir}/${filename} is missing in the actual output."
     fi
 done
 
 # Make sure all files in the actual output directory are same as expected.
-for f in "${TEST_DIR}/${result_dir}"/*; do
+for f in "${TESTDIR}/${result_dir}"/*; do
     expected="${EXPECTED_DIR}/$(basename "${f}")"
     if [[ ! -f ${expected} ]]; then
         bail "${f} in the actual output is not expected."

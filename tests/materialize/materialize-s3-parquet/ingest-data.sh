@@ -3,13 +3,13 @@ set -e
 
 # Pushing data to the capture.
 go run ${DATA_INGEST_SCRIPT_PATH} \
-  --server_address=${CONSUMER_ADDRESS} \
+  --server_address=${DATA_INGEST_ENDPOINT} \
   --capture=${PUSH_CAPTURE_NAME} \
   --binding_num=${BINDING_NUM_SIMPLE} \
   --data_file_path=${DATASET_SIMPLE}
 
 go run ${DATA_INGEST_SCRIPT_PATH} \
-  --server_address=${CONSUMER_ADDRESS} \
+  --server_address=${DATA_INGEST_ENDPOINT} \
   --capture=${PUSH_CAPTURE_NAME} \
   --binding_num=${BINDING_NUM_MULTIPLE_DATATYPES} \
   --data_file_path=${DATASET_MULTIPLE_DATATYPES}
@@ -18,7 +18,7 @@ go run ${DATA_INGEST_SCRIPT_PATH} \
 # Following data will be stored in a new local file.
 sleep 5
 go run ${DATA_INGEST_SCRIPT_PATH} \
-  --server_address=${CONSUMER_ADDRESS} \
+  --server_address=${DATA_INGEST_ENDPOINT} \
   --capture=${PUSH_CAPTURE_NAME} \
   --binding_num=${BINDING_NUM_SIMPLE} \
   --data_file_path=${DATASET_SIMPLE}
