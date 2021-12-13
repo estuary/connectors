@@ -2,49 +2,52 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/jackc/pglogrepl"
-	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
 
-// TODO(wgd): Define an interface with a `ScanTableChunk(ctx, streamID, keyColumns, resumeKey)` and
-// a `WriteWatermark(ctx, table, slot)` method which serves as the "database backfill" API
-// that we'll have to implement for other databases.
+// WriteWatermark writes the provided string into the 'watermarks' table.
+func (db *postgresDatabase) WriteWatermark(ctx context.Context, watermark string) error {
+	logrus.WithField("watermark", watermark).Debug("writing watermark")
 
-// scanTableChunk fetches a chunk of rows from the specified table, resuming from the provided
-// `resumeKey` if non-nil. This is the entrypoint to the database-specific portion of the
-// backfill process.
-func scanTableChunk(ctx context.Context, conn *pgx.Conn, streamID string, keyColumns []string, resumeKey []byte) ([]*changeEvent, error) {
+	var query = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", db.config.WatermarksTable)
+	rows, err := db.conn.Query(ctx, query)
+	if err != nil {
+		return fmt.Errorf("error creating watermarks table: %w", err)
+	}
+	rows.Close()
+
+	query = fmt.Sprintf(`INSERT INTO %s (slot, watermark) VALUES ($1,$2) ON CONFLICT (slot) DO UPDATE SET watermark = $2;`, db.config.WatermarksTable)
+	rows, err = db.conn.Query(ctx, query, db.config.SlotName, watermark)
+	if err != nil {
+		return fmt.Errorf("error upserting new watermark for slot %q: %w", db.config.SlotName, err)
+	}
+	rows.Close()
+	return nil
+}
+
+// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
+func (db *postgresDatabase) WatermarksTable() string {
+	return db.config.WatermarksTable
+}
+
+// ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
+func (db *postgresDatabase) ScanTableChunk(ctx context.Context, schema, table string, keyColumns []string, resumeKey []interface{}) ([]sqlcapture.ChangeEvent, error) {
 	logrus.WithFields(logrus.Fields{
-		"streamID":   streamID,
+		"schema":     schema,
+		"table":      table,
 		"keyColumns": keyColumns,
-		"resumeKey":  base64.StdEncoding.EncodeToString(resumeKey),
+		"resumeKey":  resumeKey,
 	}).Debug("scanning table chunk")
 
-	// Split "public.foo" tableID into "public" schema and "foo" table name
-	var parts = strings.SplitN(streamID, ".", 2)
-	var schemaName, tableName = parts[0], parts[1]
-
 	// Build and execute a query to fetch the next `backfillChunkSize` rows from the database
-	var query = buildScanQuery(resumeKey == nil, keyColumns, schemaName, tableName)
-	var args []interface{}
-	if resumeKey != nil {
-		var err error
-		args, err = unpackTuple(resumeKey)
-		if err != nil {
-			return nil, fmt.Errorf("error unpacking encoded tuple: %w", err)
-		}
-		if len(args) != len(keyColumns) {
-			return nil, fmt.Errorf("expected %d primary-key values but got %d", len(keyColumns), len(args))
-		}
-	}
-	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
-	rows, err := conn.Query(ctx, query, args...)
+	var query = buildScanQuery(resumeKey == nil, keyColumns, schema, table)
+	logrus.WithFields(logrus.Fields{"query": query, "args": resumeKey}).Debug("executing query")
+	rows, err := db.conn.Query(ctx, query, resumeKey...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
@@ -52,7 +55,7 @@ func scanTableChunk(ctx context.Context, conn *pgx.Conn, streamID string, keyCol
 
 	// Process the results into `changeEvent` structs and return them
 	var cols = rows.FieldDescriptions()
-	var events []*changeEvent
+	var events []sqlcapture.ChangeEvent
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
 		var vals, err = rows.Values()
@@ -64,14 +67,14 @@ func scanTableChunk(ctx context.Context, conn *pgx.Conn, streamID string, keyCol
 			fields[string(cols[idx].Name)] = vals[idx]
 		}
 
-		events = append(events, &changeEvent{
-			Operation: InsertOp,
-			Source: postgresSource{
-				SourceCommon: SourceCommon{
+		events = append(events, sqlcapture.ChangeEvent{
+			Operation: sqlcapture.InsertOp,
+			Source: &postgresSource{
+				SourceCommon: sqlcapture.SourceCommon{
 					Millis:   0, // Not known.
-					Schema:   schemaName,
+					Schema:   schema,
 					Snapshot: true,
-					Table:    tableName,
+					Table:    table,
 				},
 				Location: [3]pglogrepl.LSN{},
 			},
@@ -80,30 +83,6 @@ func scanTableChunk(ctx context.Context, conn *pgx.Conn, streamID string, keyCol
 		})
 	}
 	return events, nil
-}
-
-// writeWatermark writes a new random UUID into the 'watermarks' table and returns the
-// UUID. This is also an entrypoint to the database-specific portion of the backfill.
-func writeWatermark(ctx context.Context, conn *pgx.Conn, table, slot string) (string, error) {
-	// Generate a watermark UUID
-	var wm = uuid.New().String()
-
-	var query = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", table)
-	rows, err := conn.Query(ctx, query)
-	if err != nil {
-		return "", fmt.Errorf("error creating watermarks table: %w", err)
-	}
-	rows.Close()
-
-	query = fmt.Sprintf(`INSERT INTO %s (slot, watermark) VALUES ($1,$2) ON CONFLICT (slot) DO UPDATE SET watermark = $2;`, table)
-	rows, err = conn.Query(ctx, query, slot, wm)
-	if err != nil {
-		return "", fmt.Errorf("error upserting new watermark for slot %q: %w", slot, err)
-	}
-	rows.Close()
-
-	logrus.WithField("watermark", wm).Debug("wrote watermark")
-	return wm, nil
 }
 
 // backfillChunkSize controls how many rows will be read from the database in a

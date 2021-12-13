@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/protocols/airbyte"
 	"github.com/stretchr/testify/require"
 )
@@ -112,7 +113,7 @@ func TestDatatypes(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	var cfg, ctx = TestDefaultConfig, context.Background()
+	var db, ctx = &postgresDatabase{config: &TestDefaultConfig}, context.Background()
 
 	for idx, tc := range datatypeTestcases {
 		t.Run(fmt.Sprintf("%d_%s", idx, sanitizeName(tc.ColumnType)), func(t *testing.T) {
@@ -120,7 +121,7 @@ func TestDatatypes(t *testing.T) {
 
 			// Perform discovery and verify that the generated JSON schema looks correct
 			t.Run("discovery", func(t *testing.T) {
-				var discoveredCatalog, err = DiscoverCatalog(ctx, cfg)
+				var discoveredCatalog, err = sqlcapture.DiscoverCatalog(ctx, db)
 				require.NoError(t, err)
 
 				var stream *airbyte.Stream
@@ -153,17 +154,17 @@ func TestDatatypes(t *testing.T) {
 
 			// Insert a test row and scan it back out, then do the same via replication
 			t.Run("roundtrip", func(t *testing.T) {
-				var catalog, state = testCatalog(table), PersistentState{}
+				var catalog, state = testCatalog(table), sqlcapture.PersistentState{}
 
 				t.Run("scan", func(t *testing.T) {
 					dbQuery(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (1, %s);`, table, tc.ColumnValue))
-					var output, _ = performCapture(ctx, t, &cfg, &catalog, &state)
+					var output, _ = performCapture(ctx, t, db, &catalog, &state)
 					verifyRoundTrip(t, output, tc.ColumnType, tc.ColumnValue, tc.OutputValue)
 				})
 
 				t.Run("replication", func(t *testing.T) {
 					dbQuery(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (2, %s);`, table, tc.ColumnValue))
-					var output, _ = performCapture(ctx, t, &cfg, &catalog, &state)
+					var output, _ = performCapture(ctx, t, db, &catalog, &state)
 					verifyRoundTrip(t, output, tc.ColumnType, tc.ColumnValue, tc.OutputValue)
 				})
 			})
