@@ -44,7 +44,7 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 		// Build `properties` schemas for each table column.
 		var properties = make(map[string]*jsonschema.Type)
 		for _, column := range table.Columns {
-			var jsonType, err = db.TranslateDBToJSONType(column.DataType)
+			var jsonType, err = db.TranslateDBToJSONType(column)
 			if err != nil {
 				return nil, fmt.Errorf("error translating column type %q to JSON schema: %w", column.DataType, err)
 			}

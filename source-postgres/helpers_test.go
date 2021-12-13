@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/protocols/airbyte"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/jackc/pgconn"
@@ -253,9 +254,9 @@ func dbQueryInternal(ctx context.Context, t *testing.T, query string, args ...in
 // verifiedCapture is a test helper which performs a database capture and automatically
 // verifies the result against a golden snapshot. It returns a list of all states
 // emitted during the capture, and updates the `state` argument to the final one.
-func verifiedCapture(ctx context.Context, t *testing.T, cfg *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, suffix string) []PersistentState {
+func verifiedCapture(ctx context.Context, t *testing.T, db sqlcapture.Database, catalog *airbyte.ConfiguredCatalog, state *sqlcapture.PersistentState, suffix string) []sqlcapture.PersistentState {
 	t.Helper()
-	var result, states = performCapture(ctx, t, cfg, catalog, state)
+	var result, states = performCapture(ctx, t, db, catalog, state)
 	verifySnapshot(t, suffix, result)
 	return states
 }
@@ -267,7 +268,7 @@ func verifiedCapture(ctx context.Context, t *testing.T, cfg *Config, catalog *ai
 // test runs, and so can be fed directly into verifySnapshot.
 //
 // As a side effect the input state is modified to the final result state.
-func performCapture(ctx context.Context, t *testing.T, cfg *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState) (string, []PersistentState) {
+func performCapture(ctx context.Context, t *testing.T, db sqlcapture.Database, catalog *airbyte.ConfiguredCatalog, state *sqlcapture.PersistentState) (string, []sqlcapture.PersistentState) {
 	t.Helper()
 
 	// Use a JSON round-trip to deep-copy the state, so that the act of running a
@@ -277,13 +278,13 @@ func performCapture(ctx context.Context, t *testing.T, cfg *Config, catalog *air
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cleanState = new(PersistentState)
+	var cleanState = new(sqlcapture.PersistentState)
 	if err := json.Unmarshal(bs, cleanState); err != nil {
 		t.Fatal(err)
 	}
 
 	var buf = new(CaptureOutputBuffer)
-	if err := RunCapture(ctx, cfg, catalog, cleanState, buf); err != nil {
+	if err := sqlcapture.RunCapture(ctx, db, catalog, cleanState, buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -298,7 +299,7 @@ func performCapture(ctx context.Context, t *testing.T, cfg *Config, catalog *air
 // Capture instance, recording State updates in one list and Records
 // in another.
 type CaptureOutputBuffer struct {
-	States    []PersistentState
+	States    []sqlcapture.PersistentState
 	Snapshot  strings.Builder
 	lastState string
 }
@@ -327,14 +328,14 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	// that because we're unmarshalling each state update from JSON we
 	// can rely on the states being independent and not sharing any
 	// pointer-identity in their 'Streams' map or `ScanRanges` lists.
-	var originalState PersistentState
+	var originalState sqlcapture.PersistentState
 	if err := json.Unmarshal(msg.State.Data, &originalState); err != nil {
 		return fmt.Errorf("error unmarshaling to PersistentState: %w", err)
 	}
 
 	// Sanitize state by rewriting the LSN to a constant, then encode
 	// back into new bytes.
-	var cleanState = PersistentState{CurrentLSN: 1234, Streams: originalState.Streams}
+	var cleanState = sqlcapture.PersistentState{Cursor: "REDACTED", Streams: originalState.Streams}
 	var bs, err = json.Marshal(cleanState)
 	if err != nil {
 		return fmt.Errorf("error encoding cleaned state: %w", err)
@@ -394,7 +395,7 @@ func (buf *CaptureOutputBuffer) bufferMessage(msg airbyte.Message) error {
 	return nil
 }
 
-func (buf *CaptureOutputBuffer) Output() (string, []PersistentState) {
+func (buf *CaptureOutputBuffer) Output() (string, []sqlcapture.PersistentState) {
 	return buf.Snapshot.String(), buf.States
 }
 

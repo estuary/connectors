@@ -86,19 +86,21 @@ type Database interface {
 	Connect(ctx context.Context) error
 	// TODO(wgd): Document specific methods
 	Close(ctx context.Context) error
-	// TODO(wgd): Document specific methods
+	// StartReplication opens a connection to the database and returns a ReplicationStream
+	// from which a neverending sequence of change events can be read.
 	StartReplication(ctx context.Context, startCursor string) (ReplicationStream, error)
-	// TODO(wgd): Document specific methods
+	// WriteWatermark writes the provided string into the 'watermarks' table.
 	WriteWatermark(ctx context.Context, watermark string) error
-	// TODO(wgd): Document specific methods
+	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
 	WatermarksTable() string
-	// TODO(wgd): Document specific methods
+	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 	ScanTableChunk(ctx context.Context, schema, table string, keyColumns []string, resumeKey []interface{}) ([]ChangeEvent, error)
-	// TODO(wgd): Document specific methods
+	// DiscoverTables queries the database for information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[string]TableInfo, error)
-	// TODO(wgd): Document specific methods
-	TranslateDBToJSONType(typeName string) (*jsonschema.Type, error)
-	// TODO(wgd): Document specific methods
+	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
+	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Type, error)
+	// TranslateRecordField converts values as necessary to make the JSON serialization of a
+	// particular column value satisfy the corresponding JSON schema.
 	TranslateRecordField(val interface{}) (interface{}, error)
 	// TODO(wgd): Document specific methods
 	DefaultSchema(ctx context.Context) (string, error)
@@ -111,7 +113,7 @@ type Database interface {
 // these changes into a stream of ChangeEvents.
 type ReplicationStream interface {
 	Events() <-chan ChangeEvent
-	Commit(ctx context.Context, cursor string) error
+	Acknowledge(ctx context.Context, cursor string) error
 	Close(ctx context.Context) error
 }
 
