@@ -43,17 +43,6 @@ func (c *config) Validate() error {
 	return nil
 }
 
-func configFromJson(json json.RawMessage) (*config, error) {
-	var config = new(config)
-	if err := pf.UnmarshalStrict(json, config); err != nil {
-		return nil, fmt.Errorf("parsing Rockset configuration: %w", err)
-	} else if err = config.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid Rockset configuration: %w", err)
-	}
-
-	return config, nil
-}
-
 type resource struct {
 	Workspace    string `json:"workspace,omitempty"`
 	Collection   string `json:"collection,omitempty"`
@@ -82,18 +71,6 @@ func (r *resource) Validate() error {
 	}
 
 	return nil
-}
-
-func resourceFromJson(serialized *json.RawMessage) (*resource, error) {
-	var res *resource
-
-	if err := json.Unmarshal(*serialized, &res); err != nil {
-		return nil, fmt.Errorf("parsing resource config: %w -- %s", err, *serialized)
-	} else if err = res.Validate(); err != nil {
-		return nil, fmt.Errorf("resource invalid: %w", err)
-	}
-
-	return res, nil
 }
 
 func validateRocksetName(field string, value string) error {
@@ -142,10 +119,10 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 	}
 
 	var bindings = []*pm.ValidateResponse_Binding{}
-	for _, binding := range req.Bindings {
-		res, err := resourceFromJson(&binding.ResourceSpecJson)
-		if err != nil {
-			return nil, err
+	for i, binding := range req.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
 
 		var constraints = make(map[string]*pm.Constraint)
@@ -174,20 +151,20 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 
 // pm.DriverServer interface.
 func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	config, err := configFromJson(req.Materialization.EndpointSpecJson)
-	if err != nil {
-		return nil, err
+	var cfg config = config{}
+	if err := pf.UnmarshalStrict(req.Materialization.EndpointSpecJson, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing Rockset config: %w", err)
 	}
 
-	client, err := NewClient(config.ApiKey, config.HttpLogging)
+	client, err := NewClient(cfg.ApiKey, cfg.HttpLogging)
 	if err != nil {
 		return nil, err
 	}
 
 	actionLog := []string{}
 	for i, binding := range req.Materialization.Bindings {
-		res, err := resourceFromJson(&binding.ResourceSpecJson)
-		if err != nil {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
 
@@ -225,28 +202,28 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 		return fmt.Errorf("expected Open, got %#v", open)
 	}
 
-	config, err := configFromJson(open.Open.Materialization.EndpointSpecJson)
-	if err != nil {
-		return err
+	var cfg *config = &config{}
+	if err := pf.UnmarshalStrict(open.Open.Materialization.EndpointSpecJson, cfg); err != nil {
+		return fmt.Errorf("parsing Rockset config: %w", err)
 	}
 
-	client, err := NewClient(config.ApiKey, config.HttpLogging)
+	client, err := NewClient(cfg.ApiKey, cfg.HttpLogging)
 	if err != nil {
 		return err
 	}
 
 	var bindings = make([]*binding, 0, len(open.Open.Materialization.Bindings))
 	for i, spec := range open.Open.Materialization.Bindings {
-		res, err := resourceFromJson(&spec.ResourceSpecJson)
-		if err != nil {
+		var res resource
+		if err := pf.UnmarshalStrict(spec.ResourceSpecJson, &res); err != nil {
 			return fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
-		bindings = append(bindings, NewBinding(spec, res))
+		bindings = append(bindings, NewBinding(spec, &res))
 	}
 
 	transactor := transactor{
 		ctx:      stream.Context(),
-		config:   config,
+		config:   cfg,
 		client:   client,
 		bindings: bindings,
 	}
