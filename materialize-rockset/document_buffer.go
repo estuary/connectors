@@ -11,7 +11,7 @@ type DocumentBuffer struct {
 }
 
 // Creates a new buffer. This should be used sparingly, as the buffer is
-// intended to be reused after being emptied with `SplitN`.
+// intended to be reused after being emptied with `Clear`.
 func NewDocumentBuffer() *DocumentBuffer {
 	return &DocumentBuffer{inner: make([]json.RawMessage, 0, 1024)}
 }
@@ -24,7 +24,9 @@ func (b *DocumentBuffer) Push(item json.RawMessage) {
 	b.inner = append(b.inner, item)
 }
 
-// Splits the buffer into N non-overlapping chunks.
+// Splits the buffer into N non-overlapping chunks. Once split, no more
+// documents should be added until `Clear` is invoked. All chunks must be
+// dropped before calling `Clear`.
 func (b *DocumentBuffer) SplitN(n int) [][]json.RawMessage {
 	if n < 1 {
 		panic(fmt.Sprintf("cannot split into %v chunks. n must be a positive integer", n))
