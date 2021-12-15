@@ -14,17 +14,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Rockset has several API endpoints for manipulating documents. We need to
-// determine the action for each document and include it in the requests we make
-// to that endpoint.
-type operation = int
-
-const (
-	opNotFound       = -1
-	opDocumentUpsert = iota
-	opDocumentDelete
-)
-
 // A binding represents the relationship between a single Flow Collection and a single Rockset Collection.
 type binding struct {
 	spec *pf.MaterializationSpec_Binding
@@ -93,38 +82,8 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 
 		var b *binding = t.bindings[it.Binding]
 
-		var op operation = opNotFound
-		if t.config.ChangeIndicator == "" {
-			op = opDocumentUpsert
-		} else {
-			changeType := findStringField(b, &it.Key, &it.Values, t.config.ChangeIndicator)
-			switch changeType {
-			case "Insert":
-				op = opDocumentUpsert
-			case "Update":
-				// Sending an "AddDocument" request for a document which already
-				// exists will result in the previous document being completely
-				// overwritten. Since the CdcEvents contain the full document, this
-				// is the exact desired behavior.
-				op = opDocumentUpsert
-			case "Delete":
-				op = opDocumentDelete
-			default:
-				return fmt.Errorf("unrecognized change indicator field value: %s=`%s`", t.config.ChangeIndicator, changeType)
-			}
-		}
-
-		if op == opDocumentUpsert {
-			if err := t.storeUpsertOperations(b, &it.Key, &it.Values); err != nil {
-				return err
-			}
-
-		} else if op == opDocumentDelete {
-			if err := t.storeDeletionOperation(b, &it.Key); err != nil {
-				return err
-			}
-		} else {
-			return fmt.Errorf("unrecognized operation: %d", op)
+		if err := t.storeUpsertOperations(b, &it.Key, &it.Values); err != nil {
+			return err
 		}
 	}
 
@@ -157,27 +116,6 @@ func (t *transactor) Acknowledge(context.Context) error {
 // pm.Transactor
 func (t *transactor) Destroy() {
 	// Nothing to clean up
-}
-
-func findStringField(b *binding, keys *tuple.Tuple, values *tuple.Tuple, targetFieldName string) string {
-	// Look for the field in the document's keys.
-	for i, value := range *keys {
-		var propName = b.spec.FieldSelection.Keys[i]
-		if v, ok := value.(string); ok && propName == targetFieldName {
-			return v
-		}
-	}
-
-	// Look for the field in the document's other values.
-	for i, value := range *values {
-		var propName = b.spec.FieldSelection.Values[i]
-		if v, ok := value.(string); ok && propName == targetFieldName {
-			return v
-		}
-	}
-
-	// Not found
-	return ""
 }
 
 func (t *transactor) storeUpsertOperations(b *binding, keys *tuple.Tuple, values *tuple.Tuple) error {
@@ -213,20 +151,6 @@ func (t *transactor) storeUpsertOperations(b *binding, keys *tuple.Tuple, values
 	return nil
 }
 
-func (t *transactor) storeDeletionOperation(b *binding, key *tuple.Tuple) error {
-	var document = make(map[string]interface{})
-	document["_id"] = base64.RawStdEncoding.EncodeToString(key.Pack())
-
-	jsonDoc, err := json.Marshal(document)
-	if err != nil {
-		return fmt.Errorf("failed to serialize the deletion document: %w", err)
-	}
-
-	b.pendingDeletions.Push(jsonDoc)
-
-	return nil
-}
-
 func commitCollection(ctx context.Context, t *transactor, b *binding) error {
 	select {
 	case <-ctx.Done():
@@ -236,20 +160,12 @@ func commitCollection(ctx context.Context, t *transactor, b *binding) error {
 	}
 
 	totalUpserts := b.pendingUpserts.Len()
-	totalDeletions := b.pendingDeletions.Len()
 
-	defer logElapsedTime(time.Now(), fmt.Sprintf("commit completed: %d documents added %d documents deleted", totalUpserts, totalDeletions))
+	defer logElapsedTime(time.Now(), fmt.Sprintf("commit completed: %d documents added", totalUpserts))
 
-	numWorkers := workerPoolSize(t.config.MaxConcurrentRequests, totalUpserts+totalDeletions, b.res.MaxBatchSize)
-	workQueue, errors := newWorkerPool(ctx, numWorkers, func(ctx context.Context, j job, worker int) error {
-		switch j.op {
-		case opDocumentUpsert:
-			return t.client.AddDocuments(ctx, b.rocksetWorkspace(), b.rocksetCollection(), j.data)
-		case opDocumentDelete:
-			return t.client.DeleteDocuments(ctx, b.rocksetWorkspace(), b.rocksetCollection(), j.data)
-		default:
-			return fmt.Errorf("unrecognized operation type: %v", j.op)
-		}
+	numWorkers := workerPoolSize(t.config.MaxConcurrentRequests, totalUpserts, b.res.MaxBatchSize)
+	workQueue, errors := newWorkerPool(ctx, numWorkers, func(ctx context.Context, data []json.RawMessage, worker int) error {
+		return t.client.AddDocuments(ctx, b.rocksetWorkspace(), b.rocksetCollection(), data)
 	})
 
 	go func() {
@@ -257,19 +173,13 @@ func commitCollection(ctx context.Context, t *transactor, b *binding) error {
 
 		for _, batch := range b.pendingUpserts.SplitN(numWorkers) {
 			if len(batch) > 0 {
-				workQueue <- job{op: opDocumentUpsert, data: batch}
-			}
-		}
-		for _, batch := range b.pendingDeletions.SplitN(numWorkers) {
-			if len(batch) > 0 {
-				workQueue <- job{op: opDocumentDelete, data: batch}
+				workQueue <- batch
 			}
 		}
 	}()
 
 	err := errors.Wait()
 	b.pendingUpserts.Clear()
-	b.pendingDeletions.Clear()
 
 	if err != nil {
 		return fmt.Errorf("committing documents to rockset: %w", err)
@@ -278,17 +188,12 @@ func commitCollection(ctx context.Context, t *transactor, b *binding) error {
 	return nil
 }
 
-type job struct {
-	op   operation
-	data []json.RawMessage
-}
-
 func workerPoolSize(maxConcurrency int, totalOperations int, maxBatchSize int) int {
 	return clamp(1, maxConcurrency, totalOperations/maxBatchSize)
 }
 
-func newWorkerPool(ctx context.Context, poolSize int, doWork func(context.Context, job, int) error) (chan<- job, *errgroup.Group) {
-	jobs := make(chan job, poolSize)
+func newWorkerPool(ctx context.Context, poolSize int, doWork func(context.Context, []json.RawMessage, int) error) (chan<- []json.RawMessage, *errgroup.Group) {
+	jobs := make(chan []json.RawMessage, poolSize)
 	group, ctx := errgroup.WithContext(ctx)
 
 	for i := 0; i < poolSize; i++ {

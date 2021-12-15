@@ -20,8 +20,6 @@ type config struct {
 	ApiKey string `json:"api_key"`
 	// Enable verbose logging of the HTTP calls to the Rockset API.
 	HttpLogging bool `json:"http_logging"`
-	// Field name which contains CDC change types are located. Values should be one of `["Insert", "Update", "Delete"]`
-	ChangeIndicator string `json:"change_indicator"`
 	// The upper limit on how many concurrent requests will be sent to Rockset.
 	MaxConcurrentRequests int `json:"max_concurrent_requests" jsonschema:"default=1"`
 }
