@@ -52,8 +52,6 @@ func (b *binding) concurrencyFactor(numDocuments int) int {
 }
 
 type transactor struct {
-	// TODO: ctx will be removed when the protocol updates land.
-	ctx      context.Context
 	config   *config
 	client   *client
 	bindings []*binding
@@ -73,13 +71,6 @@ func (t *transactor) Prepare(ctx context.Context, msg pm.TransactionRequest_Prep
 // pm.Transactor
 func (t *transactor) Store(it *pm.StoreIterator) error {
 	for it.Next() {
-		select {
-		case <-t.ctx.Done():
-			return fmt.Errorf("transactor context cancelled")
-		default:
-			// Keep going!
-		}
-
 		var b *binding = t.bindings[it.Binding]
 
 		if err := t.storeUpsertOperations(b, &it.Key, &it.Values); err != nil {

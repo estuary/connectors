@@ -220,7 +220,6 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 	}
 
 	transactor := transactor{
-		ctx:      stream.Context(),
 		config:   cfg,
 		client:   client,
 		bindings: bindings,
