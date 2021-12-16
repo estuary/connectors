@@ -1,5 +1,5 @@
 {
-  "name": "test_discoverysimple",
+  "name": "test_generic_simplediscovery",
   "json_schema": {
     "allOf": [
       {
@@ -15,7 +15,7 @@
             "type": "object",
             "properties": {
               "before": {
-                "$ref": "#PublicTest_discoverysimple",
+                "$ref": "#PublicTest_generic_simplediscovery",
                 "description": "Record state immediately before this change was applied."
               },
               "op": {
@@ -66,16 +66,16 @@
         }
       },
       {
-        "$ref": "#PublicTest_discoverysimple"
+        "$ref": "#PublicTest_generic_simplediscovery"
       }
     ],
     "definitions": {
-      "PublicTest_discoverysimple": {
+      "PublicTest_generic_simplediscovery": {
         "required": [
           "a"
         ],
         "type": "object",
-        "$anchor": "PublicTest_discoverysimple",
+        "$anchor": "PublicTest_generic_simplediscovery",
         "properties": {
           "a": {
             "type": "integer"
