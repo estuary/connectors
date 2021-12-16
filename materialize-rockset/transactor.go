@@ -73,7 +73,7 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 	for it.Next() {
 		var b *binding = t.bindings[it.Binding]
 
-		if err := t.storeUpsertOperations(b, &it.Key, &it.Values); err != nil {
+		if err := t.storeUpsertOperations(b, it.Key, it.Values); err != nil {
 			return err
 		}
 	}
@@ -109,20 +109,20 @@ func (t *transactor) Destroy() {
 	// Nothing to clean up
 }
 
-func (t *transactor) storeUpsertOperations(b *binding, keys *tuple.Tuple, values *tuple.Tuple) error {
+func (t *transactor) storeUpsertOperations(b *binding, keys tuple.Tuple, values tuple.Tuple) error {
 	var document = make(map[string]interface{})
 
 	// Add the `_id` field to the document. This is required by Rockset.
 	document["_id"] = base64.RawStdEncoding.EncodeToString(keys.Pack())
 
 	// Add the keys to the document.
-	for i, value := range *keys {
+	for i, value := range keys {
 		var propName = b.spec.FieldSelection.Keys[i]
 		document[propName] = value
 	}
 
 	// Add the non-keys to the document.
-	for i, value := range *values {
+	for i, value := range values {
 		var propName = b.spec.FieldSelection.Values[i]
 
 		if raw, ok := value.([]byte); ok {
