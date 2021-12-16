@@ -1,2 +1,0 @@
-{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_emptytable":{"mode":"Backfill","key_columns":["id"]}}}}}
-{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_emptytable":{"mode":"Active","key_columns":["id"]}}}}}

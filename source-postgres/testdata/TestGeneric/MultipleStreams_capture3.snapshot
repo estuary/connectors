@@ -1,0 +1,1 @@
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_multiplestreams_one":{"mode":"Active","key_columns":["id"]},"public.test_generic_multiplestreams_three":{"mode":"Active","key_columns":["id"]}}}}}
