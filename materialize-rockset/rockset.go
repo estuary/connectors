@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Only creates the named collection if it does not already exist.
@@ -72,6 +74,7 @@ func createCollection(ctx context.Context, client *client, workspace string, col
 		return nil, fmt.Errorf("failed to create collection `%s`: %w", collectionName, err)
 	}
 
+	log.Infoln("Rockset is initializing the collection. This may take a moment.")
 	time.Sleep(time.Second * 2)
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*3)
 	defer cancel()
