@@ -10,17 +10,63 @@ compatible connector that captures change events from a PostgreSQL database via
 Prebuild connector images should be available at `ghcr.io/estuary/source-postgres`. See
 "Connector Development" for instructions to build locally.
 
-This connector operates via Logical Replication, so the source PostgreSQL instance
-will need to run with `wal_level=logical`. The connector will need a PostgreSQL
-[Replication Slot](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION-SLOTS)
-and [Publication](https://www.postgresql.org/docs/current/sql-createpublication.html),
-which will be automatically created if they don't already exist. Unless overridden in
-`config.json` the slot/publication names will default to `flow_slot` and `flow_publication`
-respectively.
+The connector has several prerequisites:
+* Logical replication must be enabled on the database ([`wal_level=logical`](https://www.postgresql.org/docs/current/runtime-config-wal.html)).
+* There must be a [replication slot](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION-SLOTS). The replication slot represents a "cursor" into
+  the PostgreSQL write-ahead log from which change events can be read.
+  - Unless overridden in the capture config this will be named `"flow_slot"`.
+  - This will be created automatically by the connector if it doesn’t already exist.
+* There must be a [publication](https://www.postgresql.org/docs/current/sql-createpublication.html). The publication represents the set of tables for which
+  change events will be reported.
+  - Unless overridden in the capture config this will be named `"flow_publication"`.
+  - This will be created automatically if the connector has suitable permissions,
+    but must be created manually (see below) in more restricted setups.
+* There must be a watermarks table. The watermarks table is a small "scratch space"
+  to which the connector occasionally writes a small amount of data (a UUID,
+  specifically) to ensure accuracy when backfilling preexisting table contents.
+  - Unless overridden this will be named `"public.flow_watermarks"`.
+  - This will be created automatically if the connector has suitable permissions,
+    but must be created manually (see below) in more restricted setups.
+* The connector must connect to PostgreSQL with appropriate permissions:
+  - The [`REPLICATION`](https://www.postgresql.org/docs/current/sql-createrole.html) attribute is required to open a replication connection.
+  - Permission to write to the watermarks table is required.
+  - Permission to read the tables being captured is required.
+  - Permission to read tables from `information_schema` and `pg_catalog` schemas is required for automatic discovery.
 
-A minimal `config.json` consists solely of the database connection parameters. Refer to the
-output of `docker run --rm -it ghcr.io/estuary/source-postgres spec` for a list of
-other supported config options:
+The connector will attempt to create the replication slot, publication,
+and watermarks table if necessary and they don't already exist, so one
+way of satisfying all these requirements (other than `wal_level=logical`,
+which must be done manually) is for the capture to connect as a database
+superuser. A more restricted setup can be achieved with something like
+the following example:
+
+```sql
+CREATE USER flow_capture WITH PASSWORD 'secret' REPLICATION;
+
+# The `pg_read_all_data` role is new in PostgreSQL v14. For older versions:
+#
+#   GRANT SELECT ON ALL TABLES IN SCHEMA public, <others> TO flow_capture;
+#   GRANT SELECT ON ALL TABLES IN SCHEMA information_schema, pg_catalog TO flow_capture;
+#
+# can be substituted, but all schemas which will be captured from must be listed.
+#
+# If an even more restricted set of permissions is desired, you can also grant SELECT on
+# just the specific table(s) which should be captured from. The ‘information_schema’ and
+# ‘pg_catalog’ access is required for stream auto-discovery, but not for capturing already
+# configured streams.
+GRANT pg_read_all_data TO flow_capture;
+
+CREATE TABLE IF NOT EXISTS public.flow_watermarks (slot TEXT PRIMARY KEY, watermark TEXT);
+GRANT ALL PRIVILEGES ON TABLE public.flow_watermarks TO flow_capture;
+
+CREATE PUBLICATION flow_publication FOR ALL TABLES;
+
+# Set WAL level to logical. Note that changing this requires a database
+# restart to take effect.
+ALTER SYSTEM SET wal_level = logical;
+```
+
+A minimal `config.json` consists solely of the database connection parameters:
 
 ```json
 {
@@ -28,29 +74,46 @@ other supported config options:
   "host": "localhost",
   "password": "flow",
   "port": 5432,
-  "user": "flow"
+  "user": "flow_capture"
 }
 ```
 
+Refer to the output of `docker run --rm -it ghcr.io/estuary/source-postgres spec` for
+a list of other supported config options.
+
 ## Mechanism of Operation
 
-In the "happy path" of operation, the connector starts or resumes replication using
-the configured replication slot and publication. Each `INSERT/UPDATE/DELETE` event
-received from the database for a configured stream is emitted as an equivalent JSON
-record message, and each `COMMIT` event causes a new state update to be emitted.
+The connector streams change events from the database via Logical Replication, but
+in general there can be large amounts of preexisting data in those tables which
+cannot be obtained via replication. So the connector must also issue `SELECT`
+queries to "backfill" this preexisting data. Unfortunately, naively merging
+replicated change events with backfilled data can, in various edge cases,
+result in missed or duplicated changes. What we want is for our capture output
+to start out with insertion events for each row, and then only report changes
+occurring after the previous row state.
 
-When a new stream is added to `catalog.json`, the connector will scan all preexisting
-rows from the table and translate them into `INSERT` events before resuming replication.
-This scanning process takes place in "chunks", and can be resumed across connector
-restarts until finished, however a long-running table scan will block replication
-event processing until complete. Once replication begins/resumes, any change event
-whose effect was already observed by the initial table scan will be suppressed.
+This is achieved by using **watermark writes** to establish a causal relationship
+between backfill results and the replication event stream, **buffering** the most
+recent chunk of backfill data for a period of time, and **patching** replication
+events falling within that chunk into the buffered results. In pseudo-code, the
+core loop of the capture looks like:
 
-The initial table scan requires a "primary key" which will be used to divide up the
-table into chunks. The primary key may span multiple columns. Normally the connector
-will default to using the primary key of the underlying table, unless overridden via
-the `primary_key` property in `catalog.json`. If the underlying table has no primary
-key then it must be explicitly provided in the catalog.
+```
+While there are still streams being backfilled:
+
+ 1. Write a new watermark UUID.
+ 2. Stream change events until that watermark write is observed,
+    patching changes which fall within the buffered result set
+    and ignoring changes which fall past the buffered results.
+ 3. Emit the buffered results from the last backfill query, and
+    if any streams are now done backfilling, mark them as fully active.
+ 4. Issue another backfill query to read a new chunk of rows from
+    all streams which are still being backfilled.
+
+Stream change events until a final "shutdown" watermark is observed.
+In production use this shutdown watermark doesn't exist, so the capture
+will continue to run indefinitely until stopped.
+```
 
 ## Connector Development
 

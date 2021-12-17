@@ -10,22 +10,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const watermarkSlot = 1
-
 func (db *mysqlDatabase) WriteWatermark(ctx context.Context, watermark string) error {
 	logrus.WithField("watermark", watermark).Debug("writing watermark")
 
-	//var query = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot INTEGER PRIMARY KEY, watermark TEXT);", db.config.WatermarksTable)
-	//results, err := db.conn.Execute(query)
-	//if err != nil {
-	//	return fmt.Errorf("error creating watermarks table: %w", err)
-	//}
-	//results.Close()
-
 	var query = fmt.Sprintf(`REPLACE INTO %s (slot, watermark) VALUES (?,?);`, db.config.WatermarksTable)
-	var results, err = db.conn.Execute(query, watermarkSlot, watermark)
+	var results, err = db.conn.Execute(query, db.config.ServerID, watermark)
 	if err != nil {
-		return fmt.Errorf("error upserting new watermark for slot %q: %w", watermarkSlot, err)
+		return fmt.Errorf("error upserting new watermark for slot %q: %w", db.config.ServerID, err)
 	}
 	results.Close()
 	return nil

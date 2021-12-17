@@ -10,14 +10,14 @@ COPY go.* ./
 RUN go mod download
 
 # Build the connector projects we depend on.
-COPY source-postgres ./source-postgres
+COPY source-mysql ./source-mysql
 COPY sqlcapture ./sqlcapture
 
 # Run the unit tests.
-RUN go test -v ./source-postgres/...
+RUN go test -v ./source-mysql/...
 
 # Build the connector.
-RUN go build -o ./connector -v ./source-postgres/...
+RUN go build -o ./connector -v ./source-mysql/...
 
 
 # Runtime Stage
