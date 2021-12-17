@@ -10,31 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// WriteWatermark writes the provided string into the 'watermarks' table.
-func (db *postgresDatabase) WriteWatermark(ctx context.Context, watermark string) error {
-	logrus.WithField("watermark", watermark).Debug("writing watermark")
-
-	var query = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", db.config.WatermarksTable)
-	rows, err := db.conn.Query(ctx, query)
-	if err != nil {
-		return fmt.Errorf("error creating watermarks table: %w", err)
-	}
-	rows.Close()
-
-	query = fmt.Sprintf(`INSERT INTO %s (slot, watermark) VALUES ($1,$2) ON CONFLICT (slot) DO UPDATE SET watermark = $2;`, db.config.WatermarksTable)
-	rows, err = db.conn.Query(ctx, query, db.config.SlotName, watermark)
-	if err != nil {
-		return fmt.Errorf("error upserting new watermark for slot %q: %w", db.config.SlotName, err)
-	}
-	rows.Close()
-	return nil
-}
-
-// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
-func (db *postgresDatabase) WatermarksTable() string {
-	return db.config.WatermarksTable
-}
-
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *postgresDatabase) ScanTableChunk(ctx context.Context, schema, table string, keyColumns []string, resumeKey []interface{}) ([]sqlcapture.ChangeEvent, error) {
 	logrus.WithFields(logrus.Fields{
@@ -83,6 +58,31 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, schema, table st
 		})
 	}
 	return events, nil
+}
+
+// WriteWatermark writes the provided string into the 'watermarks' table.
+func (db *postgresDatabase) WriteWatermark(ctx context.Context, watermark string) error {
+	logrus.WithField("watermark", watermark).Debug("writing watermark")
+
+	var query = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", db.config.WatermarksTable)
+	rows, err := db.conn.Query(ctx, query)
+	if err != nil {
+		return fmt.Errorf("error creating watermarks table: %w", err)
+	}
+	rows.Close()
+
+	query = fmt.Sprintf(`INSERT INTO %s (slot, watermark) VALUES ($1,$2) ON CONFLICT (slot) DO UPDATE SET watermark = $2;`, db.config.WatermarksTable)
+	rows, err = db.conn.Query(ctx, query, db.config.SlotName, watermark)
+	if err != nil {
+		return fmt.Errorf("error upserting new watermark for slot %q: %w", db.config.SlotName, err)
+	}
+	rows.Close()
+	return nil
+}
+
+// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
+func (db *postgresDatabase) WatermarksTable() string {
+	return db.config.WatermarksTable
 }
 
 // backfillChunkSize controls how many rows will be read from the database in a

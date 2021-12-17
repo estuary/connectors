@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/protocols/airbyte"
 	"github.com/go-mysql-org/go-mysql/client"
@@ -12,6 +13,16 @@ import (
 )
 
 func main() {
+	var schema = jsonschema.Reflect(&Config{})
+	var configSchema, err = schema.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+	var spec = airbyte.Spec{
+		SupportsIncremental:     true,
+		ConnectionSpecification: json.RawMessage(configSchema),
+	}
+
 	sqlcapture.AirbyteMain(spec, func(configFile airbyte.ConfigFile) (sqlcapture.Database, error) {
 		var config Config
 		if err := configFile.Parse(&config); err != nil {
@@ -24,50 +35,40 @@ func main() {
 // Config tells the connector how to connect to the source database and
 // capture changes from it.
 type Config struct {
-	Address  string `json:"address"`
-	User     string `json:"user"`
-	Pass     string `json:"pass"`
-	DBName   string `json:"dbname"`
-	ServerID int    `json:"server_id"`
+	Address  string `json:"address" jsonschema:"default=127.0.0.1:3306,description=Database host:port to connect to."`
+	User     string `json:"user" jsonschema:"default=flow_capture,description=Database user to connect as."`
+	Pass     string `json:"pass" jsonschema:"description=Password for the specified database user."`
+	DBName   string `json:"dbname" jsonschema:"description=Name of the database to connect to."`
+	ServerID int    `json:"server_id" jsonschema:"description=Server ID for replication."`
 
-	//SlotName        string `json:"slot_name"`
-	//PublicationName string `json:"publication_name"`
-	WatermarksTable string `json:"watermarks_table"`
+	WatermarksTable string `json:"watermarks_table,omitempty" jsonschema:"default=flow.watermarks,description=The name of the table used for watermark writes during backfills."`
 }
 
 // Validate checks that the configuration passes some basic sanity checks, and
 // fills in default values when optional parameters are unset.
 func (c *Config) Validate() error {
+	var requiredProperties = [][]string{
+		{"address", c.Address},
+		{"user", c.User},
+		{"pass", c.Pass},
+		{"dbname", c.DBName},
+	}
+	for _, req := range requiredProperties {
+		if req[1] == "" {
+			return fmt.Errorf("missing '%s'", req[0])
+		}
+	}
+	if c.ServerID == 0 {
+		return fmt.Errorf("missing 'server_id'")
+	}
+
+	// Note these are 1:1 with 'omitempty' in Config field tags,
+	// which cause these fields to be emitted as non-required.
 	if c.WatermarksTable == "" {
 		c.WatermarksTable = "flow.watermarks"
 	}
 	return nil
 }
-
-var spec = airbyte.Spec{
-	SupportsIncremental:     true,
-	ConnectionSpecification: json.RawMessage(configSchema),
-}
-
-const configSchema = `{
-	"$schema": "http://json-schema.org/draft-07/schema#",
-	"title":   "Postgres Source Spec",
-	"type":    "object",
-	"properties": {
-		"server_id": {
-			"type": "integer",
-			"title": "Server ID",
-			"description": "The unique Server ID in the cluster"
-		},
-		"watermarks_table": {
-			"type":        "string",
-			"title":       "Watermarks Table",
-			"description": "The name of the table used for watermark writes during backfills",
-			"default":     "flow.watermarks"
-		}
-	},
-	"required": [ "server_id" ]
-}`
 
 type mysqlDatabase struct {
 	config        *Config
@@ -77,10 +78,11 @@ type mysqlDatabase struct {
 
 func (db *mysqlDatabase) Connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
-		"addr":   db.config.Address,
-		"user":   db.config.User,
-		"pass":   db.config.Pass,
-		"dbName": db.config.DBName,
+		"addr":     db.config.Address,
+		"user":     db.config.User,
+		"pass":     db.config.Pass,
+		"dbName":   db.config.DBName,
+		"serverID": db.config.ServerID,
 	}).Info("initializing connector")
 
 	// Normal database connection used for table scanning
