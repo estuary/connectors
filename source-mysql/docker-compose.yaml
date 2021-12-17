@@ -1,0 +1,16 @@
+version: "3.7"
+
+services:
+  db:
+    image: 'mysql:latest'
+    command: ["--binlog-row-metadata=FULL"]
+    volumes: ["mysql_data:/var/lib/mysql"]
+    environment:
+      MYSQL_DATABASE: test
+      MYSQL_ROOT_PASSWORD: flow
+      MYSQL_USER: flow
+      MYSQL_PASSWORD: flow
+    network_mode: "host"
+
+volumes:
+  mysql_data: {}

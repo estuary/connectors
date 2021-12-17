@@ -1,0 +1,8 @@
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_generic_simplecapture":{"mode":"Backfill","key_columns":["id"]}}}}}
+{"type":"RECORD","record":{"stream":"test_generic_simplecapture","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_generic_simplecapture"}},"data":"A","id":0},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_generic_simplecapture","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_generic_simplecapture"}},"data":"bbb","id":1},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_generic_simplecapture","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_generic_simplecapture"}},"data":"CDEFGHIJKLMNOP","id":2},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_generic_simplecapture","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_generic_simplecapture"}},"data":"Four","id":3},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_generic_simplecapture","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_generic_simplecapture"}},"data":"5","id":4},"emitted_at":1234,"namespace":"test"}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_generic_simplecapture":{"mode":"Backfill","key_columns":["id"],"scanned":"FQQ="}}}}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_generic_simplecapture":{"mode":"Active","key_columns":["id"]}}}}}
