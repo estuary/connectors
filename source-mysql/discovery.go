@@ -61,7 +61,7 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 	}
 	colSchema.nullable = column.IsNullable
 
-	// Pass-through a postgres column description.
+	// Pass-through the column description.
 	if column.Description != nil {
 		colSchema.description = *column.Description
 	}

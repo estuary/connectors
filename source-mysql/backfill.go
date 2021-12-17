@@ -43,8 +43,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, schema, table strin
 	}
 	defer results.Close()
 
-	// // Process the results into `changeEvent` structs and return them
-	// var cols = rows.FieldDescriptions()
+	// Process the results into `changeEvent` structs and return them
 	var events []sqlcapture.ChangeEvent
 	for _, row := range results.Values {
 		var fields = make(map[string]interface{})

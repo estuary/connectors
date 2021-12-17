@@ -16,9 +16,11 @@ import (
 )
 
 var (
-	dbAddress = flag.String("db_addr", "127.0.0.1:3306", "Connect to the specified address/port for tests")
-	dbUser    = flag.String("db_user", "root", "Connect as the specified user for tests")
-	dbName    = flag.String("db_name", "test", "Connect to the named database for tests")
+	dbAddress  = flag.String("db_addr", "127.0.0.1:3306", "Connect to the specified address/port for tests")
+	dbUser     = flag.String("db_user", "root", "Connect as the specified user for tests")
+	dbPass     = flag.String("db_pass", "flow", "Password for the specified database test user")
+	dbName     = flag.String("db_name", "test", "Connect to the named database for tests")
+	dbServerID = flag.Int("db_serverid", 12345, "Unique server ID for replication")
 )
 
 var (
@@ -37,13 +39,12 @@ func TestMain(m *testing.M) {
 
 	// Initialize test config and database connection
 	var cfg = Config{
-		// TODO(wgd): Make configurable via a flag
-		Address:         "127.0.0.1:3306",
-		User:            "root",
-		Pass:            "flow",
-		DBName:          "test",
-		WatermarksTable: "test.flow_watermarks",
-		ServerID:        1234, // TODO(wgd): How do we handle this?
+		Address:         *dbAddress,
+		User:            *dbUser,
+		Pass:            *dbPass,
+		DBName:          *dbName,
+		WatermarksTable: "flow.watermarks",
+		ServerID:        *dbServerID,
 	}
 	if err := cfg.Validate(); err != nil {
 		logrus.WithFields(logrus.Fields{"err": err, "config": cfg}).Fatal("error validating test config")

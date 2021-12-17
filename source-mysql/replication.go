@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
@@ -14,7 +15,7 @@ import (
 )
 
 // replicationBufferSize controls how many change events can be buffered in the
-// replicationStream before it stops receiving further events from PostgreSQL.
+// replicationStream before it stops receiving further events from MySQL.
 // In normal use it's a constant, it's just a variable so that tests are more
 // likely to exercise blocking sends and backpressure.
 var replicationBufferSize = 1024
@@ -89,10 +90,11 @@ func splitHostPort(addr string) (string, int64, error) {
 }
 
 type mysqlReplicationStream struct {
-	syncer   *replication.BinlogSyncer
-	streamer *replication.BinlogStreamer
-	events   chan sqlcapture.ChangeEvent
-	cancel   context.CancelFunc
+	syncer        *replication.BinlogSyncer
+	streamer      *replication.BinlogStreamer
+	events        chan sqlcapture.ChangeEvent
+	cancel        context.CancelFunc
+	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
 }
 
 func (rs *mysqlReplicationStream) run(ctx context.Context) error {
@@ -111,7 +113,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 
 			var sourceMeta = &mysqlSourceInfo{
 				SourceCommon: sqlcapture.SourceCommon{
-					Millis: 0, // TODO(wgd): See if we have this information?
+					Millis: rs.gtidTimestamp.UnixMilli(),
 					Schema: schema,
 					Table:  table,
 				},
@@ -174,6 +176,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			logrus.WithField("data", data).Trace("Table Map Event")
 		case *replication.GTIDEvent:
 			logrus.WithField("data", data).Trace("GTID Event")
+			rs.gtidTimestamp = data.OriginalCommitTime()
 		case *replication.QueryEvent:
 			logrus.WithField("data", data).Trace("Query Event")
 		default:
@@ -199,6 +202,9 @@ func (rs *mysqlReplicationStream) Events() <-chan sqlcapture.ChangeEvent {
 }
 
 func (rs *mysqlReplicationStream) Acknowledge(ctx context.Context, cursor string) error {
+	// TODO(wgd): Figure out how MySQL advances whatever WAL-reserving cursor it has.
+	// I assume it's associated with the Server ID stuff, but I'm not sure if we're
+	// expected to explicitly advance it?
 	return nil
 }
 
