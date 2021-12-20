@@ -5,7 +5,7 @@ set -e
 echo "building and activating the testing catalog via build-and-activate.sh"
 
 flowctl api build \
-  --directory "${TEST_DIR}"/build \
+  --directory "${TEST_DIR}"/builds \
   --build-id "${BUILD_ID}" \
   --source "file://${TEST_DIR}/${CATALOG}" \
   --log.level debug
