@@ -43,9 +43,7 @@ mkdir -p "${TESTDIR}"
 
 # Map to an absolute directory.
 export TESTDIR=$(realpath ${TESTDIR})
-# `flowctl` commands look for a BUILDS_ROOT environment variable which roots
-# build databases known to the data plane.
-export BUILDS_ROOT="file://${TESTDIR}/"
+
 # `flowctl` commands which interact with the data plane look for *_ADDRESS
 # variables, which are created by the temp-data-plane we're about to start.
 export BROKER_ADDRESS=unix://localhost${TESTDIR}/gazette.sock
@@ -96,7 +94,7 @@ trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${C
 cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
 
 # Build the catalog.
-${TESTDIR}/flowctl api build --directory ${TESTDIR} --build-id test-build-id --source ${CATALOG_SOURCE} --ts-package || bail "Build failed."
+${TESTDIR}/flowctl api build --directory ${TESTDIR}/builds --build-id test-build-id --source ${CATALOG_SOURCE} --ts-package || bail "Build failed."
 # Activate the catalog.
 ${TESTDIR}/flowctl api activate --build-id test-build-id --all --log.level info || bail "Activate failed."
 # Wait for a data-flow pass to finish.
