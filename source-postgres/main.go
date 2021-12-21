@@ -59,7 +59,7 @@ const configSchema = `{
 			"type":        "string",
 			"title":       "Database Connection URI",
 			"description": "Connection parameters, as a libpq-compatible connection string",
-			"default":     "postgres://flow:flow@localhost:5432/flow"
+			"default":     "postgres://flow_capture:flow_capture@localhost:5432/flow"
 		},
 		"slot_name": {
 			"type":        "string",
