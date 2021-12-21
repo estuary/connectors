@@ -14,14 +14,95 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type changeEventHandler func(event *changeEvent) error
+// ChangeOp encodes a change operation type.
+// It's compatible with Debezium's change event representation.
+// TODO(johnny): Factor into a shared package.
+type ChangeOp string
+
+const (
+	// InsertOp is an INSERT operation.
+	InsertOp ChangeOp = "c"
+	// UpdateOp is an UPDATE operation.
+	UpdateOp ChangeOp = "u"
+	// DeleteOp is a DELETE operation.
+	DeleteOp ChangeOp = "d"
+	// FlushOp is an internal-only ChangeOp which flushes a completed
+	// transaction, but is not actually serialized.
+	FlushOp ChangeOp = "x"
+)
+
+// SourceCommon is common source metadata for data capture events.
+// It's a subset of the corresponding Debezium message definition.
+// Our design goal is a high signal-to-noise representation which can be
+// trivially converted to a Debezium equivalent if desired. See:
+// 	https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-create-events
+// TODO(johnny): Factor into a shared package.
+type SourceCommon struct {
+	Millis   int64  `json:"ts_ms,omitempty" jsonschema:"description=Unix timestamp (in millis) at which this event was recorded by the database."`
+	Schema   string `json:"schema" jsonschema:"description=Database schema (namespace) of the event."`
+	Snapshot bool   `json:"snapshot,omitempty" jsonschema:"description=Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."`
+	Table    string `json:"table" jsonschema:"description=Database table of the event."`
+
+	// Implementor's note: `snapshot` is a mildly contentious name, because it
+	// could imply involvement of a database snapshot that is not, in fact, used.
+	// A better term might be "backfill", but this is an established term in the
+	// CDC ecosystem and it's water under the bridge now.
+
+	// Fields which are part of the generalized Debezium representation
+	// but are not included here:
+	// * `version` string of the connector.
+	// * `connector` is the connector name.
+	// * `database` is the logical database name.
+	// * `name` string of the capture. Debezium connectors use strings like
+	//   "PostgreSQL_server", and it's expected that this string composes with
+	//   `schema` and `table` to produce an identifier under which an Avro schema is
+	//   registered within a schema registry, like "PostgreSQL_server.inventory.customers.Value".
+	//
+	// All of `version`, `connector`, and `database` are defined by the catalog specification
+	// and are available through logs. They seem noisy and low-signal here.
+}
+
+// postgresSource is source metadata for data capture events.
+//
+// For more nuance on LSN vs Last LSN vs Final LSN, see:
+//  https://github.com/postgres/postgres/blob/a8fd13cab0ba815e9925dc9676e6309f699b5f72/src/include/replication/reorderbuffer.h#L260-L280
+// See also how Materialize deserializes Postgres Debezium envelopes:
+// 	https://github.com/MaterializeInc/materialize/blob/4fca6f51338b0da9a44dd3a75a5a4a5da37a9733/src/interchange/src/avro/envelope_debezium.rs#L275
+type postgresSource struct {
+	SourceCommon
+
+	// This is a compact array to reduce noise in generated JSON outputs,
+	// and because a lexicographic ordering is also a correct event ordering.
+	Location [3]pglogrepl.LSN `json:"loc,omitempty" jsonschema:"description=Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"`
+
+	// Fields which are part of the Debezium Postgres representation but are not included here:
+	// * `lsn` is the log sequence number of this event. It's equal to loc[1].
+	// * `sequence` is a string-serialized JSON array which embeds a lexicographic
+	//    ordering of all events. It's equal to [loc[0], loc[1]].
+	// * `txId` is an opaque monotonic transaction identifier,
+	//   and defines its event boundaries. It can be set as loc[2].
+}
+
+// Named constants for the LSN locations within a postgresSource.Location.
+const (
+	pgLocLastCommitEndLSN = 0 // Index of last Commit.EndLSN in postgresSource.Location.
+	pgLocEventLSN         = 1 // Index of this event LSN in postgresSource.Location.
+	pgLocBeginFinalLSN    = 2 // Index of current Begin.FinalLSN in postgresSource.Location.
+)
 
 type changeEvent struct {
-	Type      string
-	LSN       pglogrepl.LSN // Only set for "Commit" events
-	Namespace string
-	Table     string
-	Fields    map[string]interface{}
+	Operation ChangeOp
+	Source    postgresSource
+	Before    map[string]interface{}
+	After     map[string]interface{}
+}
+
+// keyFields returns suitable fields for extracting the event primary key.
+func (e *changeEvent) keyFields() map[string]interface{} {
+	if e.Operation == DeleteOp {
+		return e.Before
+	}
+	return e.After
 }
 
 // A replicationStream represents the process of receiving PostgreSQL
@@ -30,10 +111,16 @@ type changeEvent struct {
 // is no built-in concurrency, so Process() must be called reasonably
 // soon after StartReplication() in order to not time out.
 type replicationStream struct {
-	replSlot  string         // The name of the PostgreSQL replication slot to use
-	pubName   string         // The name of the PostgreSQL publication to use
-	commitLSN uint64         // The most recently *committed* LSN, given to us by startReplication or the CommitLSN() method
-	conn      *pgconn.PgConn // The PostgreSQL replication connection
+	ackLSN          uint64             // The most recently Ack'd LSN, passed to startReplication or updated via CommitLSN.
+	cancel          context.CancelFunc // Cancel function for the replication goroutine's context
+	conn            *pgconn.PgConn     // The PostgreSQL replication connection
+	eventBuf        *changeEvent       // A single-element buffer used in between 'receiveMessage' and the output channel
+	events          chan *changeEvent  // The channel to which replication events will be written
+	lastTxnEndLSN   pglogrepl.LSN      // End LSN (record + 1) of the last completed transaction.
+	nextTxnFinalLSN pglogrepl.LSN      // Final LSN of the commit currently being processed, or zero if between transactions.
+	nextTxnMillis   int64              // Unix timestamp (in millis) at which the change originally occurred.
+	pubName         string             // The name of the PostgreSQL publication to use
+	replSlot        string             // The name of the PostgreSQL replication slot to use
 
 	// standbyStatusDeadline is the time at which we need to stop receiving
 	// replication messages and go send a Standby Status Update message to
@@ -48,11 +135,6 @@ type replicationStream struct {
 	// messages tell us about the integer ID corresponding to a particular table
 	// and other information about the table structure at a particular moment.
 	relations map[uint32]*pglogrepl.RelationMessage
-
-	inTransaction bool // inTransaction is true when we're in between a BEGIN/COMMIT message pair.
-
-	eventBuf *changeEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
-	events   chan *changeEvent // The channel to which replication events will be written
 }
 
 const standbyStatusInterval = 10 * time.Second
@@ -78,15 +160,18 @@ func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		"startLSN":    startLSN,
 		"publication": publication,
 		"slot":        slot,
-	}).Info("starting replication")
+	}).Debug("starting replication")
 
 	var stream = &replicationStream{
-		replSlot:  slot,
-		pubName:   publication,
-		commitLSN: uint64(startLSN),
-		conn:      conn,
-		connInfo:  pgtype.NewConnInfo(),
-		relations: make(map[uint32]*pglogrepl.RelationMessage),
+		replSlot:        slot,
+		pubName:         publication,
+		ackLSN:          uint64(startLSN),
+		lastTxnEndLSN:   startLSN,
+		nextTxnFinalLSN: 0,
+		nextTxnMillis:   0,
+		conn:            conn,
+		connInfo:        pgtype.NewConnInfo(),
+		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 		events: make(chan *changeEvent, replicationBufferSize),
 	}
@@ -107,13 +192,15 @@ func startReplication(ctx context.Context, conn *pgconn.PgConn, slot, publicatio
 		return nil, fmt.Errorf("unable to start replication: %w", err)
 	}
 
-	go func(ctx context.Context) {
-		var err = stream.run(ctx)
-		close(stream.events)
-		if err != nil && !errors.Is(err, context.Canceled) {
+	var streamCtx, streamCancel = context.WithCancel(ctx)
+	stream.cancel = streamCancel
+	go func() {
+		defer close(stream.events)
+		defer stream.conn.Close(ctx)
+		if err := stream.run(streamCtx); err != nil && !errors.Is(err, context.Canceled) {
 			logrus.WithField("err", err).Fatal("replication stream error")
 		}
-	}(ctx)
+	}()
 
 	return stream, nil
 }
@@ -167,7 +254,7 @@ func (s *replicationStream) relayMessages(ctx context.Context) error {
 
 		// In tbe absence of a buffered message, go try to receive another from
 		// the database.
-		var msg, err = s.receiveMessage(ctx)
+		var lsn, msg, err = s.receiveMessage(ctx)
 		if pgconn.Timeout(err) {
 			return nil
 		}
@@ -177,7 +264,7 @@ func (s *replicationStream) relayMessages(ctx context.Context) error {
 
 		// Once a message arrives, decode it and buffer the result until the next
 		// time this function is invoked.
-		event, err := s.decodeMessage(msg)
+		event, err := s.decodeMessage(lsn, msg)
 		if err != nil {
 			return fmt.Errorf("error decoding message: %w", err)
 		}
@@ -185,7 +272,7 @@ func (s *replicationStream) relayMessages(ctx context.Context) error {
 	}
 }
 
-func (s *replicationStream) decodeMessage(msg pglogrepl.Message) (*changeEvent, error) {
+func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Message) (*changeEvent, error) {
 	// Some notes on the Logical Replication / pgoutput message stream, since
 	// as far as I can tell this isn't documented anywhere but comments in the
 	// relevant PostgreSQL sources.
@@ -212,26 +299,34 @@ func (s *replicationStream) decodeMessage(msg pglogrepl.Message) (*changeEvent, 
 		s.relations[msg.RelationID] = msg
 		return nil, nil
 	case *pglogrepl.BeginMessage:
-		if s.inTransaction {
+		if s.nextTxnFinalLSN != 0 {
 			return nil, fmt.Errorf("got BEGIN message while another transaction in progress")
 		}
-		s.inTransaction = true
+		s.nextTxnFinalLSN = msg.FinalLSN
+		s.nextTxnMillis = msg.CommitTime.UnixMilli()
 		return nil, nil
 	case *pglogrepl.InsertMessage:
-		return s.decodeChangeEvent(msg.Type().String(), msg.Tuple, msg.RelationID)
+		return s.decodeChangeEvent(InsertOp, lsn, 0, nil, msg.Tuple, msg.RelationID)
 	case *pglogrepl.UpdateMessage:
-		return s.decodeChangeEvent(msg.Type().String(), msg.NewTuple, msg.RelationID)
+		return s.decodeChangeEvent(UpdateOp, lsn, msg.OldTupleType, msg.OldTuple, msg.NewTuple, msg.RelationID)
 	case *pglogrepl.DeleteMessage:
-		return s.decodeChangeEvent(msg.Type().String(), msg.OldTuple, msg.RelationID)
+		return s.decodeChangeEvent(DeleteOp, lsn, msg.OldTupleType, msg.OldTuple, nil, msg.RelationID)
 	case *pglogrepl.CommitMessage:
-		if !s.inTransaction {
+		if s.nextTxnFinalLSN == 0 {
 			return nil, fmt.Errorf("got COMMIT message without a transaction in progress")
+		} else if s.nextTxnFinalLSN != msg.CommitLSN {
+			return nil, fmt.Errorf("got COMMIT message with unexpected CommitLSN (%d; expected %d)",
+				msg.CommitLSN, s.nextTxnFinalLSN)
 		}
-		s.inTransaction = false
+		s.nextTxnFinalLSN = 0
+		s.nextTxnMillis = 0
+		s.lastTxnEndLSN = msg.TransactionEndLSN
 
 		var event = &changeEvent{
-			Type: "Commit",
-			LSN:  msg.TransactionEndLSN,
+			Operation: FlushOp,
+			Source: postgresSource{
+				Location: [3]pglogrepl.LSN{s.lastTxnEndLSN, lsn, 0},
+			},
 		}
 		return event, nil
 	}
@@ -265,9 +360,15 @@ func (s *replicationStream) decodeMessage(msg pglogrepl.Message) (*changeEvent, 
 	return nil, fmt.Errorf("unhandled message type %q: %v", msg.Type(), msg)
 }
 
-func (s *replicationStream) decodeChangeEvent(eventType string, tuple *pglogrepl.TupleData, relID uint32) (*changeEvent, error) {
-	if !s.inTransaction {
-		return nil, fmt.Errorf("got %s message without a transaction in progress", eventType)
+func (s *replicationStream) decodeChangeEvent(
+	op ChangeOp, // Operation of this event.
+	lsn pglogrepl.LSN, // LSN of this event.
+	beforeType uint8, // Postgres TupleType (0, 'K' for key, 'O' for old full tuple, 'N' for new).
+	before, after *pglogrepl.TupleData, // Before and after tuple data. Either may be nil.
+	relID uint32, // Relation ID to which tuple data pertains.
+) (*changeEvent, error) {
+	if s.nextTxnFinalLSN == 0 {
+		return nil, fmt.Errorf("got %q message without a transaction in progress", op)
 	}
 
 	var rel, ok = s.relations[relID]
@@ -275,32 +376,78 @@ func (s *replicationStream) decodeChangeEvent(eventType string, tuple *pglogrepl
 		return nil, fmt.Errorf("unknown relation ID %d", relID)
 	}
 
-	var fields = make(map[string]interface{})
-	if tuple != nil {
-		for idx, col := range tuple.Columns {
-			var colName = rel.Columns[idx].Name
-			switch col.DataType {
-			case 'n':
-				fields[colName] = nil
-			case 't':
-				var val, err = s.decodeTextColumnData(col.Data, rel.Columns[idx].DataType)
-				if err != nil {
-					return nil, fmt.Errorf("error decoding column data: %w", err)
-				}
-				fields[colName] = val
-			default:
-				return nil, fmt.Errorf("unhandled column data type %v", col.DataType)
-			}
-		}
+	bf, err := s.decodeTuple(before, beforeType, rel)
+	if err != nil {
+		return nil, fmt.Errorf("'before' tuple: %w", err)
+	}
+	af, err := s.decodeTuple(after, 'N', rel)
+	if err != nil {
+		return nil, fmt.Errorf("'after' tuple: %w", err)
 	}
 
 	var event = &changeEvent{
-		Type:      eventType,
-		Namespace: rel.Namespace,
-		Table:     rel.RelationName,
-		Fields:    fields,
+		Operation: op,
+		Source: postgresSource{
+			SourceCommon: SourceCommon{
+				Millis:   s.nextTxnMillis,
+				Schema:   rel.Namespace,
+				Snapshot: false,
+				Table:    rel.RelationName,
+			},
+			Location: [3]pglogrepl.LSN{s.lastTxnEndLSN, lsn, s.nextTxnFinalLSN},
+		},
+		Before: bf,
+		After:  af,
 	}
 	return event, nil
+}
+
+func (s *replicationStream) decodeTuple(
+	tuple *pglogrepl.TupleData,
+	tupleType uint8,
+	rel *pglogrepl.RelationMessage,
+) (map[string]interface{}, error) {
+
+	var keyOnly bool
+	switch tupleType {
+	case 0, 'K':
+		keyOnly = true
+	case 'O':
+		// Old tuple with REPLICA IDENTITY FULL set.
+	case 'N':
+		// New tuple.
+	default:
+		return nil, fmt.Errorf("unexpected tupleType %q", tupleType)
+	}
+
+	if tuple == nil {
+		return nil, nil
+	}
+
+	var fields = make(map[string]interface{})
+	for idx, col := range tuple.Columns {
+		if keyOnly && (rel.Columns[idx].Flags&1) == 0 {
+			// Skip non-key column because it may not be null-able,
+			// but will be null in this tuple encoding.
+			// Better to not emit it at all.
+			continue
+		}
+		var colName = rel.Columns[idx].Name
+
+		switch col.DataType {
+		case 'n':
+			fields[colName] = nil
+		case 't':
+			var val, err = s.decodeTextColumnData(col.Data, rel.Columns[idx].DataType)
+			if err != nil {
+				return nil, fmt.Errorf("error decoding column data: %w", err)
+			}
+			fields[colName] = val
+		default:
+			return nil, fmt.Errorf("unhandled column data type %v", col.DataType)
+		}
+	}
+	return fields, nil
 }
 
 func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (interface{}, error) {
@@ -322,11 +469,11 @@ func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (
 // receiveMessage reads and parses the next replication message from the database,
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
-func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.Message, error) {
+func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.LSN, pglogrepl.Message, error) {
 	for {
 		var msg, err = s.conn.ReceiveMessage(ctx)
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 
 		switch msg := msg.(type) {
@@ -335,7 +482,7 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.Messa
 			case pglogrepl.PrimaryKeepaliveMessageByteID:
 				var pkm, err = pglogrepl.ParsePrimaryKeepaliveMessage(msg.Data[1:])
 				if err != nil {
-					return nil, fmt.Errorf("error parsing keepalive: %w", err)
+					return 0, nil, fmt.Errorf("error parsing keepalive: %w", err)
 				}
 				if pkm.ReplyRequested {
 					s.standbyStatusDeadline = time.Now()
@@ -343,23 +490,23 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.Messa
 			case pglogrepl.XLogDataByteID:
 				var xld, err = pglogrepl.ParseXLogData(msg.Data[1:])
 				if err != nil {
-					return nil, fmt.Errorf("error parsing XLogData: %w", err)
+					return 0, nil, fmt.Errorf("error parsing XLogData: %w", err)
 				}
 				msg, err := pglogrepl.Parse(xld.WALData)
 				if err != nil {
-					return nil, fmt.Errorf("error parsing logical replication message: %w", err)
+					return 0, nil, fmt.Errorf("error parsing logical replication message: %w", err)
 				}
-				return msg, nil
+				return xld.WALStart, msg, nil
 			default:
-				return nil, fmt.Errorf("unknown CopyData message: %v", msg)
+				return 0, nil, fmt.Errorf("unknown CopyData message: %v", msg)
 			}
 		default:
-			return nil, fmt.Errorf("unexpected message: %v", msg)
+			return 0, nil, fmt.Errorf("unexpected message: %v", msg)
 		}
 	}
 }
 
-// CommitLSN informs the ReplicationStream that all messages up to the specified
+// AcknowledgeLSN informs the ReplicationStream that all messages up to the specified
 // LSN [1] have been persisted, and that a future restart will never need to return
 // to older portions of the transaction log. This fact will be communicated to the
 // database in a periodic status update, whereupon the replication slot's "Restart
@@ -384,19 +531,20 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.Messa
 // Thus you shouldn't expect that a specific "Committed LSN" value will necessarily
 // advance the "Restart LSN" to the same point, but so long as you ignore the details
 // things will work out in the end.
-func (s *replicationStream) CommitLSN(lsn pglogrepl.LSN) {
-	atomic.StoreUint64(&s.commitLSN, uint64(lsn))
+func (s *replicationStream) AcknowledgeLSN(lsn pglogrepl.LSN) {
+	atomic.StoreUint64(&s.ackLSN, uint64(lsn))
 }
 
 func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
-	var commitLSN = pglogrepl.LSN(atomic.LoadUint64(&s.commitLSN))
-	logrus.WithField("commitLSN", commitLSN).Debug("sending Standby Status Update")
+	var ackLSN = pglogrepl.LSN(atomic.LoadUint64(&s.ackLSN))
+	logrus.WithField("ackLSN", ackLSN).Debug("sending Standby Status Update")
 	return pglogrepl.SendStandbyStatusUpdate(ctx, s.conn, pglogrepl.StandbyStatusUpdate{
-		WALWritePosition: commitLSN,
+		WALWritePosition: ackLSN,
 	})
 }
 
 func (s *replicationStream) Close(ctx context.Context) error {
 	logrus.Debug("replication stream close requested")
-	return s.conn.Close(ctx)
+	s.cancel()
+	return nil
 }

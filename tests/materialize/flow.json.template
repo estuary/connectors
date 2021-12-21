@@ -11,6 +11,20 @@
        },
        "key": ["/id"]
     },
+    "${TEST_COLLECTION_DUPLICATED_KEYS}": {
+       "schema": {
+          "properties": {
+           "id": { "type": "integer" },
+           "int": { "type": "integer", "reduce": {"strategy": "sum"} },
+           "str": { "type": "string" }
+          },
+          "required": ["id"],
+          "type": "object",
+          "reduce": { "strategy": "merge" }
+       },
+       "key": ["/id"]
+    },
+ 
     "${TEST_COLLECTION_MULTIPLE_DATATYPES}": {
        "schema": {
        "properties": {
@@ -29,6 +43,17 @@
     }
   },
 
+  "captures": {
+    "${PUSH_CAPTURE_NAME}" : {
+      "endpoint": { "ingest": {} },
+      "bindings": [
+        { "target": "${TEST_COLLECTION_SIMPLE}", "resource": { "name": "${TEST_COLLECTION_SIMPLE}" } },
+        { "target": "${TEST_COLLECTION_DUPLICATED_KEYS}", "resource": { "name": "${TEST_COLLECTION_DUPLICATED_KEYS}" } },
+        { "target": "${TEST_COLLECTION_MULTIPLE_DATATYPES}", "resource": { "name": "${TEST_COLLECTION_MULTIPLE_DATATYPES}" } },
+      ]
+    },
+  },
+
   "materializations": {
     "tests/${CONNECTOR}/materialize": {
       "endpoint": {
@@ -38,6 +63,14 @@
         }
       },
       "bindings": ${RESOURCES_CONFIG}
+    }
+  },
+
+  "storageMappings": {
+    "": {
+      "stores": [
+        { "provider": "S3", "bucket": "a-bucket" }
+      ]
     }
   }
 }

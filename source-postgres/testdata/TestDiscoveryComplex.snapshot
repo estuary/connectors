@@ -1,0 +1,124 @@
+{
+  "name": "test_discoverycomplex",
+  "json_schema": {
+    "allOf": [
+      {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op",
+              "source"
+            ],
+            "type": "object",
+            "properties": {
+              "before": {
+                "$ref": "#PublicTest_discoverycomplex",
+                "description": "Record state immediately before this change was applied."
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "required": [
+                  "schema",
+                  "table"
+                ],
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "type": "array",
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      {
+        "$ref": "#PublicTest_discoverycomplex"
+      }
+    ],
+    "definitions": {
+      "PublicTest_discoverycomplex": {
+        "required": [
+          "k2",
+          "k1"
+        ],
+        "type": "object",
+        "$anchor": "PublicTest_discoverycomplex",
+        "properties": {
+          "Bounded Text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "doc": {},
+          "doc/bin": {},
+          "foo": {
+            "description": "This is a text field!",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "k1": {
+            "type": "integer",
+            "description": "I think this is a key ?"
+          },
+          "k2": {
+            "type": "string"
+          },
+          "real_": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "supported_sync_modes": [
+    "incremental",
+    "full_refresh"
+  ],
+  "source_defined_cursor": true,
+  "source_defined_primary_key": [
+    [
+      "k2"
+    ],
+    [
+      "k1"
+    ]
+  ],
+  "namespace": "public"
+}

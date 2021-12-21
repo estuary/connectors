@@ -93,12 +93,16 @@ pub fn find_topic<'m>(metadata: &'m Metadata, needle: &str) -> Option<&'m Metada
 /// **Warning**: This will _unsubscribe_ the consumer from any previous topic partitions.
 pub fn subscribe(
     consumer: &BaseConsumer,
-    topics: &state::TopicSet,
+    checkpoints: &state::CheckpointSet,
 ) -> Result<TopicPartitionList, Error> {
     let mut topic_partition_list = TopicPartitionList::new();
-    for topic in &topics.0 {
+    for checkpoint in checkpoints.iter() {
         topic_partition_list
-            .add_partition_offset(&topic.name, topic.partition, topic.offset.next().into())
+            .add_partition_offset(
+                &checkpoint.topic,
+                checkpoint.partition,
+                checkpoint.offset.next().into(),
+            )
             .map_err(Error::Subscription)?;
     }
 
@@ -111,16 +115,16 @@ pub fn subscribe(
 
 pub fn high_watermarks(
     consumer: &BaseConsumer,
-    topics: &state::TopicSet,
-) -> Result<state::TopicSet, Error> {
-    let mut watermarks = state::TopicSet::default();
+    checkpoints: &state::CheckpointSet,
+) -> Result<state::CheckpointSet, Error> {
+    let mut watermarks = state::CheckpointSet::default();
 
-    for topic in topics.0.iter() {
+    for checkpoint in checkpoints.iter() {
         // The low watermark represents the first message that can be read.
         // The high watermark is the "latest head" offset of the partition. This
         // is effectively the index of the next message to be read.
         let (low, high) = consumer
-            .fetch_watermarks(&topic.name, topic.partition, KAFKA_TIMEOUT)
+            .fetch_watermarks(&checkpoint.topic, checkpoint.partition, KAFKA_TIMEOUT)
             .map_err(Error::Metadata)?;
 
         let offset = if high == 0 || high == low {
@@ -139,7 +143,11 @@ pub fn high_watermarks(
             state::Offset::UpThrough(high - 1)
         };
 
-        watermarks.add_new(state::Topic::new(&topic.name, topic.partition, offset));
+        watermarks.add(state::Checkpoint::new(
+            &checkpoint.topic,
+            checkpoint.partition,
+            offset,
+        ));
     }
 
     Ok(watermarks)
@@ -159,14 +167,14 @@ pub enum ProcessingError {
 
 pub fn process_message<'m>(
     msg: &'m BorrowedMessage<'m>,
-) -> Result<(airbyte::Record, state::Topic), ProcessingError> {
+) -> Result<(airbyte::Record, state::Checkpoint), ProcessingError> {
     let payload = parse_message(msg)?;
     let emitted_at = timestamp_to_datetime(msg.timestamp());
     let namespace = format!("Partition {}", msg.partition());
 
     let message = airbyte::Record::new(msg.topic().to_owned(), payload, emitted_at, namespace);
-    let state = state::Topic::new(msg.topic(), msg.partition(), state::Offset::from(msg));
-    Ok((message, state))
+    let checkpoint = state::Checkpoint::new(msg.topic(), msg.partition(), state::Offset::from(msg));
+    Ok((message, checkpoint))
 }
 
 // TODO: replace with CLI parser?

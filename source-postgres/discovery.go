@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/protocols/airbyte"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
@@ -13,7 +14,7 @@ import (
 // DiscoverCatalog queries the database and generates an Airbyte Catalog
 // describing the available tables and their columns.
 func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, error) {
-	var conn, err = pgx.Connect(ctx, config.ConnectionURI)
+	var conn, err = pgx.Connect(ctx, config.ToURI())
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
@@ -24,6 +25,13 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 		return nil, err
 	}
 
+	// Shared schema of the embedded "source" property.
+	var sourceSchema = (&jsonschema.Reflector{
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}).Reflect(&postgresSource{}).Type
+	sourceSchema.Version = ""
+
 	var catalog = new(airbyte.Catalog)
 	for _, table := range tables {
 		logrus.WithFields(logrus.Fields{
@@ -32,22 +40,71 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 			"primaryKey": table.PrimaryKey,
 		}).Debug("discovered table")
 
-		var fields = make(map[string]json.RawMessage)
+		// The anchor by which we'll reference the table schema.
+		var anchor = strings.Title(table.Schema) + strings.Title(table.Name)
+
+		// Build `properties` schemas for each table column.
+		var properties = make(map[string]*jsonschema.Type)
 		for _, column := range table.Columns {
-			var jsonType, ok = postgresTypeToJSON[column.DataType]
+			var colSchema, ok = postgresTypeToJSON[column.DataType]
 			if !ok {
 				return nil, fmt.Errorf("cannot translate PostgreSQL column type %q to JSON schema", column.DataType)
 			}
-			if column.IsNullable && jsonType != "{}" {
-				jsonType = fmt.Sprintf(`{"anyOf":[%s,{"type":"null"}]}`, jsonType)
+			colSchema.nullable = column.IsNullable
+
+			// Pass-through a postgres column description.
+			if column.Description != nil {
+				colSchema.description = *column.Description
 			}
-			fields[column.Name] = json.RawMessage(jsonType)
+			properties[column.Name] = colSchema.toType()
 		}
-		var schema, err = json.Marshal(map[string]interface{}{
-			"type":       "object",
-			"required":   table.PrimaryKey,
-			"properties": fields,
-		})
+
+		// Schema.Properties is a weird OrderedMap thing, which doesn't allow for inline
+		// literal construction. Instead, use the Schema.Extras mechanism with "properties"
+		// to generate the properties keyword with an inline map.
+		var schema = jsonschema.Schema{
+			Definitions: jsonschema.Definitions{
+				anchor: &jsonschema.Type{
+					Type: "object",
+					Extras: map[string]interface{}{
+						"$anchor":    anchor,
+						"properties": properties,
+					},
+					Required: table.PrimaryKey,
+				},
+			},
+			Type: &jsonschema.Type{
+				AllOf: []*jsonschema.Type{
+					{
+						Extras: map[string]interface{}{
+							"properties": map[string]*jsonschema.Type{
+								"_meta": {
+									Type: "object",
+									Extras: map[string]interface{}{
+										"properties": map[string]*jsonschema.Type{
+											"op": {
+												Enum:        []interface{}{"c", "d", "u"},
+												Description: "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+											},
+											"source": sourceSchema,
+											"before": {
+												Ref:         "#" + anchor,
+												Description: "Record state immediately before this change was applied.",
+											},
+										},
+									},
+									Required: []string{"op", "source"},
+								},
+							},
+						},
+						Required: []string{"_meta"},
+					},
+					{Ref: "#" + anchor},
+				},
+			},
+		}
+
+		var rawSchema, err = schema.MarshalJSON()
 		if err != nil {
 			return nil, fmt.Errorf("error marshalling schema JSON: %w", err)
 		}
@@ -56,7 +113,7 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 			"table":     table.Name,
 			"namespace": table.Schema,
 			"columns":   table.Columns,
-			"schema":    string(schema),
+			"schema":    string(rawSchema),
 		}).Debug("translated table schema")
 
 		var sourceDefinedPrimaryKey [][]string
@@ -67,7 +124,7 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 		catalog.Streams = append(catalog.Streams, airbyte.Stream{
 			Name:                    table.Name,
 			Namespace:               table.Schema,
-			JSONSchema:              json.RawMessage(schema),
+			JSONSchema:              rawSchema,
 			SupportedSyncModes:      airbyte.AllSyncModes,
 			SourceDefinedCursor:     true,
 			SourceDefinedPrimaryKey: sourceDefinedPrimaryKey,
@@ -76,58 +133,87 @@ func DiscoverCatalog(ctx context.Context, config Config) (*airbyte.Catalog, erro
 	return catalog, err
 }
 
-var postgresTypeToJSON = map[string]string{
-	"bool": `{"type":"boolean"}`,
+type columnSchema struct {
+	contentEncoding string
+	description     string
+	format          string
+	nullable        bool
+	type_           string
+}
 
-	"int2": `{"type":"integer"}`,
-	"int4": `{"type":"integer"}`,
-	"int8": `{"type":"integer"}`,
+func (s columnSchema) toType() *jsonschema.Type {
+	var out = &jsonschema.Type{
+		Format:      s.format,
+		Description: s.description,
+		Extras:      make(map[string]interface{}),
+	}
+
+	if s.contentEncoding != "" {
+		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.
+	}
+
+	if s.type_ == "" {
+		// No type constraint.
+	} else if s.nullable {
+		out.Extras["type"] = []string{s.type_, "null"} // Use variadic form.
+	} else {
+		out.Type = s.type_
+	}
+	return out
+}
+
+var postgresTypeToJSON = map[string]columnSchema{
+	"bool": {type_: "boolean"},
+
+	"int2": {type_: "integer"},
+	"int4": {type_: "integer"},
+	"int8": {type_: "integer"},
 
 	// TODO(wgd): More systematic treatment of arrays?
-	"_int2":   `{"type":"string"}`,
-	"_int4":   `{"type":"string"}`,
-	"_int8":   `{"type":"string"}`,
-	"_float4": `{"type":"string"}`,
-	"_text":   `{"type":"string"}`,
+	"_int2":   {type_: "string"},
+	"_int4":   {type_: "string"},
+	"_int8":   {type_: "string"},
+	"_float4": {type_: "string"},
+	"_text":   {type_: "string"},
 
-	"numeric": `{"type":"number"}`,
-	"float4":  `{"type":"number"}`,
-	"float8":  `{"type":"number"}`,
+	"numeric": {type_: "number"},
+	"float4":  {type_: "number"},
+	"float8":  {type_: "number"},
 
-	"varchar": `{"type":"string"}`,
-	"bpchar":  `{"type":"string"}`,
-	"text":    `{"type":"string"}`,
-	"bytea":   `{"type":"string","contentEncoding":"base64"}`,
-	"xml":     `{"type":"string"}`,
-	"bit":     `{"type":"string"}`,
-	"varbit":  `{"type":"string"}`,
+	"varchar": {type_: "string"},
+	"bpchar":  {type_: "string"},
+	"text":    {type_: "string"},
+	"bytea":   {type_: "string", contentEncoding: "base64"},
+	"xml":     {type_: "string"},
+	"bit":     {type_: "string"},
+	"varbit":  {type_: "string"},
 
-	"json":     `{}`,
-	"jsonb":    `{}`,
-	"jsonpath": `{"type":"string"}`,
+	"json":     {},
+	"jsonb":    {},
+	"jsonpath": {type_: "string"},
 
 	// Domain-Specific Types
-	"date":        `{"type":"string","format":"date-time"}`,
-	"timestamp":   `{"type":"string","format":"date-time"}`,
-	"timestamptz": `{"type":"string","format":"date-time"}`,
-	"time":        `{"type":"integer"}`,
-	"timetz":      `{"type":"string","format":"time"}`,
-	"interval":    `{"type":"string"}`,
-	"money":       `{"type":"string"}`,
-	"point":       `{"type":"string"}`,
-	"line":        `{"type":"string"}`,
-	"lseg":        `{"type":"string"}`,
-	"box":         `{"type":"string"}`,
-	"path":        `{"type":"string"}`,
-	"polygon":     `{"type":"string"}`,
-	"circle":      `{"type":"string"}`,
-	"inet":        `{"type":"string"}`,
-	"cidr":        `{"type":"string"}`,
-	"macaddr":     `{"type":"string"}`,
-	"macaddr8":    `{"type":"string"}`,
-	"tsvector":    `{"type":"string"}`,
-	"tsquery":     `{"type":"string"}`,
-	"uuid":        `{"type":"string","format":"uuid"}`,
+	"date":        {type_: "string", format: "date-time"},
+	"timestamp":   {type_: "string", format: "date-time"},
+	"timestamptz": {type_: "string", format: "date-time"},
+	"time":        {type_: "integer"},
+	"timetz":      {type_: "string", format: "time"},
+	"interval":    {type_: "string"},
+	"money":       {type_: "string"},
+	"point":       {type_: "string"},
+	"line":        {type_: "string"},
+	"lseg":        {type_: "string"},
+	"box":         {type_: "string"},
+	"path":        {type_: "string"},
+	"polygon":     {type_: "string"},
+	"circle":      {type_: "string"},
+	"inet":        {type_: "string"},
+	"cidr":        {type_: "string"},
+	"macaddr":     {type_: "string"},
+	"macaddr8":    {type_: "string"},
+	"tsvector":    {type_: "string"},
+	"tsquery":     {type_: "string"},
+	"uuid":        {type_: "string", format: "uuid"},
 }
 
 // tableInfo represents all relevant knowledge about a PostgreSQL table.
@@ -141,12 +227,13 @@ type tableInfo struct {
 // columnInfo represents a specific column of a specific table in PostgreSQL,
 // along with some information about its type.
 type columnInfo struct {
-	Name        string // The name of the column.
-	Index       int    // The ordinal position of this column in a row.
-	TableName   string // The name of the table to which this column belongs.
-	TableSchema string // The schema of the table to which this column belongs.
-	IsNullable  bool   // True if the column can contain nulls.
-	DataType    string // The PostgreSQL type name of this column.
+	Name        string  // The name of the column.
+	Index       int     // The ordinal position of this column in a row.
+	TableName   string  // The name of the table to which this column belongs.
+	TableSchema string  // The schema of the table to which this column belongs.
+	IsNullable  bool    // True if the column can contain nulls.
+	DataType    string  // The PostgreSQL type name of this column.
+	Description *string // Stored PostgreSQL description of the column, if any.
 }
 
 // getDatabaseTables queries the database to produce a list of all tables
@@ -180,7 +267,7 @@ func getDatabaseTables(ctx context.Context, conn *pgx.Conn) ([]tableInfo, error)
 		if _, ok := tableMap[id]; !ok {
 			continue
 		}
-		logrus.WithField("table", id).WithField("key", key).Debug("queried primary key")
+		logrus.WithFields(logrus.Fields{"table": id, "key": key}).Debug("queried primary key")
 		tableMap[id].PrimaryKey = key
 	}
 
@@ -194,17 +281,34 @@ func getDatabaseTables(ctx context.Context, conn *pgx.Conn) ([]tableInfo, error)
 }
 
 const queryDiscoverColumns = `
-  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable::boolean, udt_name
+  SELECT
+		table_schema,
+		table_name,
+		ordinal_position,
+		column_name,
+		is_nullable::boolean,
+		udt_name,
+		pg_catalog.col_description(
+			format('%s.%s',table_schema,table_name)::regclass::oid,
+			ordinal_position
+		) AS column_description
   FROM information_schema.columns
-  WHERE table_schema != 'pg_catalog' AND table_schema != 'information_schema'
-        AND table_schema != 'pg_internal' AND table_schema != 'catalog_history'
-  ORDER BY table_schema, table_name, ordinal_position;`
+  WHERE
+		table_schema != 'pg_catalog' AND
+		table_schema != 'information_schema' AND
+		table_schema != 'pg_internal' AND
+		table_schema != 'catalog_history'
+  ORDER BY
+		table_schema,
+		table_name,
+		ordinal_position
+	;`
 
 func getColumns(ctx context.Context, conn *pgx.Conn) ([]columnInfo, error) {
 	var columns []columnInfo
 	var sc columnInfo
 	var _, err = conn.QueryFunc(ctx, queryDiscoverColumns, nil,
-		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType},
+		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType, &sc.Description},
 		func(r pgx.QueryFuncRow) error {
 			columns = append(columns, sc)
 			return nil

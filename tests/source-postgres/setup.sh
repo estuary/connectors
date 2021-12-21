@@ -5,15 +5,21 @@ export TEST_STREAM="estuary_test_$(shuf -zer -n6 {a..z} | tr -d '\0')"
 export RESOURCE="{ stream: ${TEST_STREAM} }"
 
 config_json_template='{
-    "connectionURI": "$POSTGRES_CONNECTION_URI"
+    "database": "$PGDATABASE",
+    "host":     "$PGHOST",
+    "password": "$PGPASSWORD",
+    "port":     $PGPORT,
+    "user":     "$PGUSER"
 }'
 
 export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
+echo "Connector configuration is: ${CONNECTOR_CONFIG}".
+
 root_dir="$(git rev-parse --show-toplevel)"
 
 function sql {
     echo "psql> " $@
-    psql "${POSTGRES_CONNECTION_URI}" -c "$@"
+    psql -c "$@"
 }
 
 sql "DROP TABLE IF EXISTS ${TEST_STREAM};"

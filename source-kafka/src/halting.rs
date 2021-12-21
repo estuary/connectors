@@ -4,11 +4,14 @@ use crate::state;
 #[derive(Debug)]
 pub enum HaltCheck {
     Neverending,
-    UntilWatermarks(state::TopicSet),
+    UntilWatermarks(state::CheckpointSet),
 }
 
 impl HaltCheck {
-    pub fn new(catalog: &catalog::ConfiguredCatalog, watermarks: state::TopicSet) -> HaltCheck {
+    pub fn new(
+        catalog: &catalog::ConfiguredCatalog,
+        watermarks: state::CheckpointSet,
+    ) -> HaltCheck {
         if catalog.tail {
             HaltCheck::Neverending
         } else {
@@ -16,19 +19,21 @@ impl HaltCheck {
         }
     }
 
-    pub fn should_halt(&self, latest_state: &state::TopicSet) -> bool {
+    pub fn should_halt(&self, latest_state: &state::CheckpointSet) -> bool {
         match self {
             HaltCheck::Neverending => false,
             HaltCheck::UntilWatermarks(watermarks) => watermarks
-                .0
                 .iter()
-                .all(|w| reached_latest_offset(w, latest_state)),
+                .all(|w| reached_latest_offset(&w, latest_state)),
         }
     }
 }
 
-fn reached_latest_offset(watermark: &state::Topic, current_levels: &state::TopicSet) -> bool {
-    if let Some(latest_offset) = current_levels.offset_for(&watermark.name, watermark.partition) {
+fn reached_latest_offset(
+    watermark: &state::Checkpoint,
+    current_levels: &state::CheckpointSet,
+) -> bool {
+    if let Some(latest_offset) = current_levels.offset_for(&watermark.topic, watermark.partition) {
         latest_offset >= watermark.offset
     } else {
         true
