@@ -189,8 +189,11 @@ func NewParquetFileProcessor(
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
-		var s3PathPrefix = fmt.Sprintf("%s/%d_%d", res.PathPrefix, open.KeyBegin, open.KeyEnd)
-		var localPathPrefix = fmt.Sprintf("%s/%d_%d_%d", tmpDir, i, open.KeyBegin, open.KeyEnd)
+		// Ensure exactly one / between the given prefix and the shard range, and in between the
+		// shard range and the filename. The prefixe only encodes the `KeyBegin`, so that the
+		// prefix will not change after a shard is split.
+		var s3PathPrefix = fmt.Sprintf("%s/%08x/", strings.TrimSuffix(res.PathPrefix, "/"), open.KeyBegin)
+		var localPathPrefix = fmt.Sprintf("%s/%d_%08x_", tmpDir, i, open.KeyBegin)
 
 		pqDataConverter, err := NewParquetDataConverter(binding)
 		if err != nil {
@@ -354,12 +357,18 @@ func (b *pqBinding) Commit() error {
 	return nil
 }
 
+func (b *pqBinding) filename() string {
+	// Pad the sequence number with 0's so that the lexicographical ordering of files will match the
+	// sequence number ordering.
+	return fmt.Sprintf("%09d.pq", b.nextSeqNum)
+}
+
 func (b *pqBinding) localFileName() string {
-	return fmt.Sprintf("%s_%d.pq", b.localPathPrefix, b.nextSeqNum)
+	return b.localPathPrefix + b.filename()
 }
 
 func (b *pqBinding) s3Path() string {
-	return fmt.Sprintf("%s_%d.pq", b.s3PathPrefix, b.nextSeqNum)
+	return b.s3PathPrefix + b.filename()
 }
 
 func (b *pqBinding) upload() error {
