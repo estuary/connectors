@@ -4,32 +4,57 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 
+	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/protocols/airbyte"
 )
-
-func main() {
-	airbyte.RunMain(spec, doCheck, doDiscover, doRead)
-}
 
 // Config tells the connector how to connect to the source database and can
 // optionally be used to customize some other parameters such as polling timeout.
 type Config struct {
-	ConnectionURI      string  `json:"connectionURI"`
-	SlotName           string  `json:"slot_name"`
-	PublicationName    string  `json:"publication_name"`
-	WatermarksTable    string  `json:"watermarks_table"`
-	PollTimeoutSeconds float64 `json:"poll_timeout_seconds"`
-	MaxLifespanSeconds float64 `json:"max_lifespan_seconds"`
+	Database        string `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
+	Host            string `json:"host" jsonschema:"description=Host name of the database to connect to."`
+	Password        string `json:"password" jsonschema:"description=User password configured within the database."`
+	Port            uint16 `json:"port" jsonschema:"default=5432"`
+	PublicationName string `json:"publication_name,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
+	SlotName        string `json:"slot_name,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
+	User            string `json:"user" jsonschema:"default=postgres,description=Database user to use."`
+	WatermarksTable string `json:"watermarks_table,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills."`
+}
+
+func main() {
+	var schema = jsonschema.Reflect(&Config{})
+	var configSchema, err = schema.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+
+	var spec = airbyte.Spec{
+		SupportsIncremental:     true,
+		ConnectionSpecification: json.RawMessage(configSchema),
+	}
+
+	airbyte.RunMain(spec, doCheck, doDiscover, doRead)
 }
 
 // Validate checks that the configuration passes some basic sanity checks, and
 // fills in default values when optional parameters are unset.
 func (c *Config) Validate() error {
-	if c.ConnectionURI == "" {
-		return fmt.Errorf("Database Connection URI must be set")
+	var requiredProperties = [][]string{
+		{"host", c.Host},
+		{"user", c.User},
+		{"password", c.Password},
 	}
+	for _, req := range requiredProperties {
+		if req[1] == "" {
+			return fmt.Errorf("missing '%s'", req[0])
+		}
+	}
+
+	// Note these are 1:1 with 'omitempty' in Config field tags,
+	// which cause these fields to be emitted as non-required.
 	if c.SlotName == "" {
 		c.SlotName = "flow_slot"
 	}
@@ -39,61 +64,26 @@ func (c *Config) Validate() error {
 	if c.WatermarksTable == "" {
 		c.WatermarksTable = "public.flow_watermarks"
 	}
-	if c.PollTimeoutSeconds == 0 {
-		c.PollTimeoutSeconds = 10
-	}
+
 	return nil
 }
 
-var spec = airbyte.Spec{
-	SupportsIncremental:     true,
-	ConnectionSpecification: json.RawMessage(configSchema),
+// ToURI converts the Config to a DSN string.
+func (c *Config) ToURI() string {
+	var host = c.Host
+	if c.Port != 0 {
+		host = fmt.Sprintf("%s:%d", host, c.Port)
+	}
+	var uri = url.URL{
+		Scheme: "postgres",
+		Host:   host,
+		User:   url.UserPassword(c.User, c.Password),
+	}
+	if c.Database != "" {
+		uri.Path = "/" + c.Database
+	}
+	return uri.String()
 }
-
-const configSchema = `{
-	"$schema": "http://json-schema.org/draft-07/schema#",
-	"title":   "Postgres Source Spec",
-	"type":    "object",
-	"properties": {
-		"connectionURI": {
-			"type":        "string",
-			"title":       "Database Connection URI",
-			"description": "Connection parameters, as a libpq-compatible connection string",
-			"default":     "postgres://flow_capture:flow_capture@localhost:5432/flow"
-		},
-		"slot_name": {
-			"type":        "string",
-			"title":       "Replication Slot Name",
-			"description": "The name of the PostgreSQL replication slot to replicate from",
-			"default":     "flow_slot"
-		},
-		"publication_name": {
-			"type":        "string",
-			"title":       "Publication Name",
-			"description": "The name of the PostgreSQL publication to replicate from",
-			"default":     "flow_publication"
-		},
-		"watermarks_table": {
-			"type":        "string",
-			"title":       "Watermarks Table",
-			"description": "The name of the table used for watermark writes during backfills",
-			"default":     "public.flow_watermarks"
-		},
-		"poll_timeout_seconds": {
-			"type":        "number",
-			"title":       "Poll Timeout (seconds)",
-			"description": "When tail=false, controls how long to sit idle before shutting down",
-			"default":     10
-		},
-		"max_lifespan_seconds": {
-			"type":        "number",
-			"title":       "Maximum Connector Lifespan (seconds)",
-			"description": "When nonzero, imposes a maximum runtime after which to unconditionally shut down",
-			"default":     0
-		}
-	},
-	"required": [ "connectionURI" ]
-}`
 
 func doCheck(args airbyte.CheckCmd) error {
 	var config Config

@@ -18,13 +18,17 @@ which will be automatically created if they don't already exist. Unless overridd
 `config.json` the slot/publication names will default to `flow_slot` and `flow_publication`
 respectively.
 
-A minimal `config.json` consists solely of the database connection URI. Refer to the
+A minimal `config.json` consists solely of the database connection parameters. Refer to the
 output of `docker run --rm -it ghcr.io/estuary/source-postgres spec` for a list of
 other supported config options:
 
 ```json
 {
-  "connectionURI": "postgres://flow_capture:flow_capture@localhost:5432/flow"
+  "database": "flow",
+  "host": "localhost",
+  "password": "flow_capture",
+  "port": 5432,
+  "user": "flow_capture"
 }
 ```
 
@@ -89,5 +93,12 @@ The `go test` suite only tests the connector in isolation. There's another test
 which runs it as part of a Flow catalog:
 
 ```bash
-CONNECTOR=source-postgres VERSION=dev POSTGRES_CONNECTION_URI='postgres://flow:flow@localhost:5432/flow' ./tests/run.sh
+PGDATABASE=flow \
+PGHOST=localhost \
+PGPASSWORD=flow \
+PGPORT=5432 \
+PGUSER=flow \
+CONNECTOR=source-postgres \
+VERSION=dev \
+./tests/run.sh
 ```

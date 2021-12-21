@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -81,14 +80,6 @@ type capture struct {
 
 	connScan   *pgx.Conn          // The DB connection used for table scanning
 	replStream *replicationStream // The high-level replication stream abstraction
-	watchdog   *time.Timer        // If non-nil, the Reset() method will be invoked whenever a record is emitted
-
-	// We keep a count of change events since the last state checkpoint was
-	// emitted. Currently this is only used to suppress "empty" commit messages
-	// from triggering a state update (which improves test stability), but
-	// this could also be used to "coalesce" smaller transactions in the
-	// future.
-	changesSinceLastCheckpoint int
 }
 
 // messageOutput represents "the thing to which Capture writes records and state checkpoints".
@@ -102,38 +93,20 @@ type messageOutput interface {
 // connections, scanning tables, and then streaming replication events until shutdown conditions
 // (if any) are met.
 func RunCapture(ctx context.Context, config *Config, catalog *airbyte.ConfiguredCatalog, state *PersistentState, dest messageOutput) error {
-	logrus.WithField("uri", config.ConnectionURI).WithField("slot", config.SlotName).Info("starting capture")
-
-	if config.MaxLifespanSeconds != 0 {
-		var duration = time.Duration(config.MaxLifespanSeconds * float64(time.Second))
-		logrus.WithField("duration", duration).Info("limiting connector lifespan")
-		var limitedCtx, cancel = context.WithTimeout(ctx, duration)
-		defer cancel()
-		ctx = limitedCtx
-	}
-
-	// In non-tailing mode (which should only occur during development) we need
-	// to shut down after no further changes have been reported for a while. To
-	// do this we create a cancellable context, and a watchdog timer which will
-	// perform said cancellation if `PollTimeout` elapses between resets.
-	var watchdog *time.Timer
-	if !catalog.Tail && config.PollTimeoutSeconds != 0 {
-		var streamCtx, streamCancel = context.WithCancel(ctx)
-		defer streamCancel()
-		var wdtDuration = time.Duration(config.PollTimeoutSeconds * float64(time.Second))
-		watchdog = time.AfterFunc(wdtDuration, streamCancel)
-		ctx = streamCtx
-	}
+	logrus.WithFields(logrus.Fields{
+		"uri":  config.ToURI(),
+		"slot": config.SlotName,
+	}).Info("starting capture")
 
 	// Normal database connection used for table scanning
-	var connScan, err = pgx.Connect(ctx, config.ConnectionURI)
+	var connScan, err = pgx.Connect(ctx, config.ToURI())
 	if err != nil {
 		return fmt.Errorf("unable to connect to database for table scan: %w", err)
 	}
 	defer connScan.Close(ctx)
 
 	// Replication database connection used for event streaming
-	replConnConfig, err := pgconn.ParseConfig(config.ConnectionURI)
+	replConnConfig, err := pgconn.ParseConfig(config.ToURI())
 	if err != nil {
 		return err
 	}
@@ -155,23 +128,13 @@ func RunCapture(ctx context.Context, config *Config, catalog *airbyte.Configured
 		encoder:    dest,
 		connScan:   connScan,
 		replStream: replStream,
-		watchdog:   watchdog,
 	}
 
 	if err := c.updateState(ctx); err != nil {
 		return fmt.Errorf("error updating capture state: %w", err)
 	}
 
-	err = c.streamChanges(ctx)
-	logrus.WithField("err", err).Debug("stopped streaming changes")
-	if errors.Is(err, context.DeadlineExceeded) && c.config.MaxLifespanSeconds != 0 {
-		logrus.WithField("err", err).WithField("maxLifespan", c.config.MaxLifespanSeconds).Info("maximum lifespan reached")
-		return nil
-	}
-	if errors.Is(err, context.Canceled) && !c.catalog.Tail {
-		return nil
-	}
-	return err
+	return c.streamChanges(ctx)
 }
 
 func (c *capture) updateState(ctx context.Context) error {
@@ -210,7 +173,10 @@ func (c *capture) updateState(ctx context.Context) error {
 		// Print a warning if the two are not the same.
 		var primaryKey = dbPrimaryKeys[streamID]
 		if len(primaryKey) != 0 {
-			logrus.WithField("table", streamID).WithField("key", primaryKey).Debug("queried primary key")
+			logrus.WithFields(logrus.Fields{
+				"table": streamID,
+				"key":   primaryKey,
+			}).Debug("queried primary key")
 		}
 		if len(catalogPrimaryKey) != 0 {
 			if strings.Join(primaryKey, ",") != strings.Join(catalogPrimaryKey, ",") {
@@ -269,60 +235,67 @@ func (c *capture) updateState(ctx context.Context) error {
 // This is the main loop of the capture process, which interleaves replication event
 // streaming with backfill scan results as necessary.
 func (c *capture) streamChanges(ctx context.Context) error {
-	if c.state.pendingStreams() != nil {
-		var results *resultSet
-		var watermark, err = writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
+	var results *resultSet
+	for c.state.pendingStreams() != nil {
+		watermark, err := writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
 		if err != nil {
-			return fmt.Errorf("error writing dummy watermark: %w", err)
+			return fmt.Errorf("error writing next watermark: %w", err)
 		}
-		for c.state.pendingStreams() != nil {
-			if err := c.streamToWatermark(watermark, results); err != nil {
-				return fmt.Errorf("error streaming until watermark: %w", err)
-			} else if err := c.emitBuffered(results); err != nil {
-				return fmt.Errorf("error emitting buffered results: %w", err)
-			}
-			results, err = c.backfillStreams(ctx, c.state.pendingStreams())
-			if err != nil {
-				return fmt.Errorf("error performing backfill: %w", err)
-			}
-			watermark, err = writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
-			if err != nil {
-				return fmt.Errorf("error writing next watermark: %w", err)
-			}
+		if err := c.streamToWatermark(watermark, results); err != nil {
+			return fmt.Errorf("error streaming until watermark: %w", err)
+		} else if err := c.emitBuffered(results); err != nil {
+			return fmt.Errorf("error emitting buffered results: %w", err)
+		}
+		results, err = c.backfillStreams(ctx, c.state.pendingStreams())
+		if err != nil {
+			return fmt.Errorf("error performing backfill: %w", err)
 		}
 	}
 
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
-	logrus.Info("all streams active")
-	return c.streamToWatermark("nonexistent-watermark", nil)
+	var targetWatermark = "nonexistent-watermark"
+	if !c.catalog.Tail {
+		var watermark, err = writeWatermark(ctx, c.connScan, c.config.WatermarksTable, c.config.SlotName)
+		if err != nil {
+			return fmt.Errorf("error writing poll watermark: %w", err)
+		}
+		targetWatermark = watermark
+	}
+	logrus.WithFields(logrus.Fields{
+		"tail":      c.catalog.Tail,
+		"watermark": targetWatermark,
+	}).Info("streaming until watermark")
+	return c.streamToWatermark(targetWatermark, nil)
 }
 
 func (c *capture) streamToWatermark(watermark string, results *resultSet) error {
 	var watermarkReached = false
 	for event := range c.replStream.Events() {
-		// Commit events update the current LSN and trigger a state update. If this is
-		// the commit after the target watermark, it ends the loop and then emitBuffered
-		// will emit the state update after all buffered rows.
-		if event.Type == "Commit" {
-			c.state.CurrentLSN = event.LSN
+		// Flush events update the checkpointed LSN and trigger a state update.
+		// If this is the commit after the target watermark, it also ends the loop.
+		if event.Operation == FlushOp {
+			c.state.CurrentLSN = event.Source.Location[pgLocLastCommitEndLSN]
+			if err := c.emitState(c.state); err != nil {
+				return fmt.Errorf("error emitting state update: %w", err)
+			}
 			if watermarkReached {
 				return nil
-			}
-			if c.changesSinceLastCheckpoint > 0 {
-				if err := c.emitState(c.state); err != nil {
-					return fmt.Errorf("error emitting state update: %w", err)
-				}
 			}
 			continue
 		}
 
 		// Note when the expected watermark is finally observed. The subsequent Commit will exit the loop.
 		// TODO(wgd): Can we ensure/require that 'WatermarksTable' is always fully-qualified?
-		var streamID = joinStreamID(event.Namespace, event.Table)
-		if streamID == c.config.WatermarksTable {
-			logrus.WithFields(logrus.Fields{"expected": watermark, "written": event.Fields["watermark"]}).Debug("watermark write")
-			if event.Fields["watermark"] == watermark {
+		var streamID = joinStreamID(event.Source.Schema, event.Source.Table)
+		if streamID == c.config.WatermarksTable && event.Operation != DeleteOp {
+			var actual = event.After["watermark"]
+			logrus.WithFields(logrus.Fields{
+				"expected": watermark,
+				"actual":   actual,
+			}).Debug("watermark write")
+
+			if actual == watermark {
 				watermarkReached = true
 			}
 		}
@@ -330,7 +303,10 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 		// Handle the easy cases: Events on ignored or fully-active tables.
 		var tableState = c.state.Streams[streamID]
 		if tableState == nil || tableState.Mode == tableModeIgnore {
-			logrus.WithFields(logrus.Fields{"stream": streamID, "type": event.Type}).Debug("ignoring stream")
+			logrus.WithFields(logrus.Fields{
+				"stream": streamID,
+				"op":     event.Operation,
+			}).Debug("ignoring stream")
 			continue
 		}
 		if tableState.Mode == tableModeActive {
@@ -346,7 +322,7 @@ func (c *capture) streamToWatermark(watermark string, results *resultSet) error 
 		// While a table is being backfilled, events occurring *before* the current scan point
 		// will be emitted, while events *after* that point will be patched (or ignored) into
 		// the buffered resultSet.
-		var rowKey, err = encodeRowKey(tableState.KeyColumns, event.Fields)
+		var rowKey, err = encodeRowKey(tableState.KeyColumns, event.keyFields())
 		if err != nil {
 			return fmt.Errorf("error encoding row key: %w", err)
 		}
@@ -412,21 +388,71 @@ func (c *capture) backfillStreams(ctx context.Context, streams []string) (*resul
 }
 
 func (c *capture) handleChangeEvent(event *changeEvent) error {
-	event.Fields["_change_type"] = event.Type
+	var out map[string]interface{}
 
-	for id, val := range event.Fields {
-		var translated, err = translateRecordField(val)
-		if err != nil {
-			logrus.WithField("val", val).Error("value translation error")
-			return fmt.Errorf("error translating field %q value: %w", id, err)
-		}
-		event.Fields[id] = translated
+	var meta = struct {
+		Operation ChangeOp               `json:"op"`
+		Source    *postgresSource        `json:"source"`
+		Before    map[string]interface{} `json:"before,omitempty"`
+	}{
+		Operation: event.Operation,
+		Source:    &event.Source,
+		Before:    nil,
 	}
-	return c.emitRecord(event.Namespace, event.Table, event.Fields)
+
+	switch event.Operation {
+	case InsertOp:
+		if err := translateRecordFields(event.After); err != nil {
+			return fmt.Errorf("'after' of insert: %w", err)
+		}
+		out = event.After // Before is never used.
+	case UpdateOp:
+		if err := translateRecordFields(event.Before); err != nil {
+			return fmt.Errorf("'before' of update: %w", err)
+		} else if err := translateRecordFields(event.After); err != nil {
+			return fmt.Errorf("'after' of update: %w", err)
+		}
+		meta.Before, out = event.Before, event.After
+	case DeleteOp:
+		if err := translateRecordFields(event.Before); err != nil {
+			return fmt.Errorf("'before' of delete: %w", err)
+		}
+		out = event.Before // After is never used.
+	}
+	out["_meta"] = &meta
+
+	var rawData, err = json.Marshal(out)
+	if err != nil {
+		return fmt.Errorf("error encoding record data: %w", err)
+	}
+	return c.emit(airbyte.Message{
+		Type: airbyte.MessageTypeRecord,
+		Record: &airbyte.Record{
+			Namespace: event.Source.Schema,
+			Stream:    event.Source.Table,
+			EmittedAt: time.Now().UnixNano() / int64(time.Millisecond),
+			Data:      json.RawMessage(rawData),
+		},
+	})
 }
 
-// TranslateRecordField "translates" a value from the PostgreSQL driver into
-// an appropriate JSON-encodable output format. As a concrete example, the
+func translateRecordFields(f map[string]interface{}) error {
+	if f == nil {
+		return nil
+	}
+
+	for id, val := range f {
+		var translated, err = translateRecordField(val)
+		if err != nil {
+			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
+		}
+		f[id] = translated
+	}
+	return nil
+}
+
+// translateRecordField "translates" a value from the PostgreSQL driver into
+// an appropriate JSON-encodeable output format. As a concrete example, the
 // PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
@@ -456,25 +482,7 @@ func translateRecordField(val interface{}) (interface{}, error) {
 	return val, nil
 }
 
-func (c *capture) emitRecord(ns, stream string, data interface{}) error {
-	c.changesSinceLastCheckpoint++
-	var rawData, err = json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("error encoding record data: %w", err)
-	}
-	return c.emit(airbyte.Message{
-		Type: airbyte.MessageTypeRecord,
-		Record: &airbyte.Record{
-			Namespace: ns,
-			Stream:    stream,
-			EmittedAt: time.Now().UnixNano() / int64(time.Millisecond),
-			Data:      json.RawMessage(rawData),
-		},
-	})
-}
-
 func (c *capture) emitState(state interface{}) error {
-	c.changesSinceLastCheckpoint = 0
 	var rawState, err = json.Marshal(state)
 	if err != nil {
 		return fmt.Errorf("error encoding state message: %w", err)
@@ -486,12 +494,6 @@ func (c *capture) emitState(state interface{}) error {
 }
 
 func (c *capture) emit(msg interface{}) error {
-	// When in non-tailing mode, reset the shutdown watchdog whenever we emit useful progress.
-	if c.watchdog != nil {
-		var wdtDuration = time.Duration(c.config.PollTimeoutSeconds * float64(time.Second))
-		c.watchdog.Reset(wdtDuration)
-	}
-
 	return c.encoder.Encode(msg)
 }
 

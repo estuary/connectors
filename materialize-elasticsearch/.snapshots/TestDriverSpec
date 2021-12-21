@@ -1,0 +1,158 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$ref": "#/definitions/config",
+    "definitions": {
+      "config": {
+        "required": [
+          "endpoint"
+        ],
+        "properties": {
+          "endpoint": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      }
+    }
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$ref": "#/definitions/resource",
+    "definitions": {
+      "DateSpec": {
+        "required": [
+          "format"
+        ],
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Format of the date. See https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-date-format.html."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "ElasticFieldType": {
+        "required": [
+          "field_type"
+        ],
+        "properties": {
+          "field_type": {
+            "type": "string",
+            "description": "The elastic search field data types. Supported types include: boolean, date, double, geo_point, geo_shape, keyword, long, null, text."
+          },
+          "date_spec": {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "$ref": "#/definitions/DateSpec",
+            "description": "Spec of the date field, effective if field_type is 'date'. See https://www.elastic.co/guide/en/elasticsearch/reference/current/date.html"
+          },
+          "keyword_spec": {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "$ref": "#/definitions/KeywordSpec",
+            "description": "Spec of the keyword field, effective if field_type is 'keyword'. See https://www.elastic.co/guide/en/elasticsearch/reference/current/keyword.html"
+          },
+          "text_spec": {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "$ref": "#/definitions/TextSpec",
+            "description": "Spec of the text field, effective if field_type is 'text'."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "FieldOverride": {
+        "required": [
+          "pointer",
+          "es_type"
+        ],
+        "properties": {
+          "pointer": {
+            "type": "string",
+            "description": "A '/'-delimitated json pointer to the location of the overridden field."
+          },
+          "es_type": {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "$ref": "#/definitions/ElasticFieldType",
+            "description": "The overriding elastic search data type of the field."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "KeywordSpec": {
+        "required": [
+          "ignore_above"
+        ],
+        "properties": {
+          "ignore_above": {
+            "type": "integer",
+            "description": "Strings longer than the ignore_above setting will not be indexed or stored. See https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-above.html"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "TextSpec": {
+        "required": [
+          "dual_keyword",
+          "keyword_ignore_above"
+        ],
+        "properties": {
+          "dual_keyword": {
+            "type": "boolean",
+            "description": "Whether or not to specify the field as text/keyword dual field."
+          },
+          "keyword_ignore_above": {
+            "type": "integer",
+            "description": "Effective only if DualKeyword is enabled. Strings longer than the ignore_above setting will not be indexed or stored. See https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-above.html"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "resource": {
+        "required": [
+          "index",
+          "delta_updates",
+          "field_overrides"
+        ],
+        "properties": {
+          "index": {
+            "type": "string",
+            "description": "Name of the ElasticSearch index to store the materialization results."
+          },
+          "delta_updates": {
+            "type": "boolean"
+          },
+          "field_overrides": {
+            "items": {
+              "$schema": "http://json-schema.org/draft-04/schema#",
+              "$ref": "#/definitions/FieldOverride"
+            },
+            "type": "array"
+          },
+          "number_of_shards": {
+            "type": "integer",
+            "description": "The number of shards in ElasticSearch index. Must set to be greater than 0.",
+            "default": 1
+          },
+          "number_of_replicas": {
+            "type": "integer",
+            "description": "The number of replicas in ElasticSearch index. If not set, default to be 0. For single-node clusters, make sure this field is 0, because the Elastic search needs to allocate replicas on different nodes."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      }
+    }
+  },
+  "documentation_url": "https://docs.estuary.dev#FIXME"
+}

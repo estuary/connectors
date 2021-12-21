@@ -1,7 +1,12 @@
-{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Insert","data":"some","id":1002},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Insert","data":"more","id":1000},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Insert","data":"rows","id":1001},"emitted_at":1234,"namespace":"public"}}
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Active","key_columns":["id"]}}}}}
-{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Update","data":"updated","id":1},"emitted_at":1234,"namespace":"public"}}
-{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_change_type":"Update","data":"updated","id":1002},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_replicationupdates"}},"data":"some","id":1002},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_replicationupdates"}},"data":"more","id":1000},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_replicationupdates"}},"data":"rows","id":1001},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Active","key_columns":["id"]}}}}}
+{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_meta":{"op":"u","source":{"schema":"public","table":"test_replicationupdates"}},"data":"updated","id":1},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_meta":{"op":"u","source":{"schema":"public","table":"test_replicationupdates"}},"data":"updated","id":1002},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Active","key_columns":["id"]}}}}}
+{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_meta":{"op":"u","source":{"schema":"public","table":"test_replicationupdates"},"before":{"data":"A","id":0}},"data":"updated again","id":0},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_meta":{"op":"u","source":{"schema":"public","table":"test_replicationupdates"},"before":{"data":"updated","id":1}},"data":"updated again","id":1},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_replicationupdates","data":{"_meta":{"op":"u","source":{"schema":"public","table":"test_replicationupdates"},"before":{"data":"more","id":1000}},"data":"updated again","id":1000},"emitted_at":1234,"namespace":"public"}}
 {"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_replicationupdates":{"mode":"Active","key_columns":["id"]}}}}}

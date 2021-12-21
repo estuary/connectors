@@ -1,0 +1,70 @@
+---
+source: tests/it/main.rs
+expression: parse_messages_from_output(&stdout)
+
+---
+- record:
+    data:
+      completed: true
+      id: 159
+      title: debitis adipisci quibusdam aliquam sed dolore ea praesentium nobis
+      userId: 8
+    emitted_at: "{{ UNIX_TIMESTAMP }}"
+    namespace: Partition 0
+    stream: todo-list
+  type: RECORD
+- state:
+    data:
+      todo-list:
+        "0":
+          UpThrough: 38
+  type: STATE
+- record:
+    data:
+      completed: false
+      id: 160
+      title: et praesentium aliquam est
+      userId: 8
+    emitted_at: "{{ UNIX_TIMESTAMP }}"
+    namespace: Partition 0
+    stream: todo-list
+  type: RECORD
+- state:
+    data:
+      todo-list:
+        "0":
+          UpThrough: 39
+  type: STATE
+- record:
+    data:
+      completed: true
+      id: 199
+      title: numquam repellendus a magnam
+      userId: 10
+    emitted_at: "{{ UNIX_TIMESTAMP }}"
+    namespace: Partition 2
+    stream: todo-list
+  type: RECORD
+- state:
+    data:
+      todo-list:
+        "2":
+          UpThrough: 58
+  type: STATE
+- record:
+    data:
+      completed: false
+      id: 200
+      title: ipsam aperiam voluptates qui
+      userId: 10
+    emitted_at: "{{ UNIX_TIMESTAMP }}"
+    namespace: Partition 2
+    stream: todo-list
+  type: RECORD
+- state:
+    data:
+      todo-list:
+        "2":
+          UpThrough: 59
+  type: STATE
+

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -20,6 +21,34 @@ func TestSimpleCapture(t *testing.T) {
 	// Add data, perform capture, verify result
 	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "")
+}
+
+// TestTailing performs a capture in 'tail' mode, which is how it actually runs
+// under Flow outside of development tests. This means that after the initial
+// backfilling completes, the capture will run indefinitely without writing
+// any more watermarks.
+func TestTailing(t *testing.T) {
+	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
+	var tableName = createTestTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var catalog, state = testCatalog(tableName), PersistentState{}
+	catalog.Tail = true
+
+	// Initial data which must be backfilled
+	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {10, "bbb"}, {20, "CDEFGHIJKLMNOP"}, {30, "Four"}, {40, "5"}})
+
+	// Run the capture
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	go verifiedCapture(captureCtx, t, &cfg, &catalog, &state, "")
+	time.Sleep(1 * time.Second)
+
+	// Some more changes occurring after the backfill completes
+	dbInsert(ctx, t, tableName, [][]interface{}{{5, "asdf"}, {100, "lots"}})
+	dbQuery(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 20;", tableName))
+	dbQuery(ctx, t, fmt.Sprintf("UPDATE %s SET data = 'updated' WHERE id = 30;", tableName))
+
+	// Let the capture catch up and then terminate it
+	time.Sleep(1 * time.Second)
+	cancelCapture()
 }
 
 // TestReplicationInserts runs two captures, where the first will perform the
@@ -46,8 +75,16 @@ func TestReplicationDeletes(t *testing.T) {
 
 	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
+
+	// Default REPLICA IDENTITY logs only the old primary key.
 	dbInsert(ctx, t, tableName, [][]interface{}{{1002, "some"}, {1000, "more"}, {1001, "rows"}})
 	dbQuery(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 1 OR id = 1002;", tableName))
+
+	// Increase to REPLICA IDENTITY FULL, and repeat. Expect to see complete deleted tuples logged.
+	dbInsert(ctx, t, tableName, [][]interface{}{{1003, "even"}, {1004, "moar"}, {1005, "rows!!"}})
+	dbQuery(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
+	dbQuery(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 3 OR id >= 1004;", tableName))
+
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "")
 }
 
@@ -61,12 +98,19 @@ func TestReplicationUpdates(t *testing.T) {
 
 	dbInsert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}})
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
+
+	// Default REPLICA IDENTITY logs only the old primary key.
 	dbInsert(ctx, t, tableName, [][]interface{}{{1002, "some"}, {1000, "more"}, {1001, "rows"}})
 	dbQuery(ctx, t, fmt.Sprintf("UPDATE %s SET data = 'updated' WHERE id = 1 OR id = 1002;", tableName))
+
+	// Increase to REPLICA IDENTITY FULL. Expect to see complete old tuples logged.
+	dbQuery(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
+	dbQuery(ctx, t, fmt.Sprintf("UPDATE %s SET data = 'updated again' WHERE id <= 1 OR id = 1000;", tableName))
+
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "")
 }
 
-// TestEmptyTable leaves the table empty during the initial table snapshotting
+// TestEmptyTable leaves the table empty during the initial table backfill
 // and only adds data after replication has begun.
 func TestEmptyTable(t *testing.T) {
 	var cfg, ctx = TestDefaultConfig, shortTestContext(t)
@@ -90,7 +134,7 @@ func TestComplexDataset(t *testing.T) {
 
 	dbLoadCSV(ctx, t, tableName, "statepop.csv", 0)
 	var states = verifiedCapture(ctx, t, &cfg, &catalog, &state, "init")
-	state = states[11] // Restart in between (1960, 'IA') and (1960, 'ID')
+	state = states[10] // Restart in between (1960, 'IA') and (1960, 'ID')
 
 	dbInsert(ctx, t, tableName, [][]interface{}{
 		{1930, "XX", "No Such State", 1234},   // An insert prior to the first restart, which will be reported once replication begins
@@ -106,6 +150,15 @@ func TestComplexDataset(t *testing.T) {
 		{1970, "XX", "No Such State", 12345},  // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
 		{1990, "XX", "No Such State", 123456}, // Deleting/reinserting this row will be filtered since this portion of the table has yet to be scanned
 	})
+
+	dbQuery(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
+
+	// We've scanned through (1980, 'IA'), and will see updates for N% states at that date or before,
+	// and creations for N% state records after that date which reflect the update.
+	dbQuery(ctx, t, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY');", tableName))
+	// We'll see a deletion since this row has already been scanned through.
+	dbQuery(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX' AND year = 1970;", tableName))
+
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "restart2")
 }
 
@@ -184,20 +237,24 @@ func TestIgnoredStreams(t *testing.T) {
 }
 
 // TestSlotLSNAdvances checks that the `restart_lsn` of a replication slot
-// has advanced after a connector restart.
+// eventually advances in response to connector restarts.
 func TestSlotLSNAdvances(t *testing.T) {
-	var cfg, ctx, state = TestDefaultConfig, longTestContext(t, 30*time.Second), PersistentState{}
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	var cfg, ctx, state = TestDefaultConfig, longTestContext(t, 60*time.Second), PersistentState{}
 	var table = createTestTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var catalog = testCatalog(table)
 
 	// Capture the current `restart_lsn` of the replication slot prior to our test
 	var beforeLSN pglogrepl.LSN
 	if err := TestDatabase.QueryRow(ctx, `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`, *TestReplicationSlot).Scan(&beforeLSN); err != nil {
-		logrus.WithField("slot", *TestReplicationSlot).WithField("err", err).Error("failed to query restart_lsn")
+		logrus.WithFields(logrus.Fields{"slot": *TestReplicationSlot, "err": err}).Error("failed to query restart_lsn")
 	}
 
-	// Insert some data, note down a deadline 20s after that data was inserted, and
-	// get the initial table scan out of the way.
+	// Insert some data, get the initial table scan out of the way, and wait long enough
+	// that the database must have written a new snapshot.
 	//
 	// PostgreSQL `BackgroundWriterMain()` will trigger `LogStandbySnapshot()` whenever
 	// "important records" have been inserted in the WAL and >15s have elapsed since
@@ -206,34 +263,26 @@ func TestSlotLSNAdvances(t *testing.T) {
 	// a replication slot's `restart_lsn` to advance in response to StandbyStatusUpdate
 	// messages.
 	dbInsert(ctx, t, table, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
-	var deadline = time.Now().Add(20 * time.Second)
 	verifiedCapture(ctx, t, &cfg, &catalog, &state, "capture1")
-
-	// Wait until we're confident a snapshot must have taken place, then create a
-	// few more change events. The next capture will advance 'CurrentLSN' in response
-	// to these 'Commit's.
 	logrus.Info("waiting so a standby snapshot can occur")
-	time.Sleep(time.Until(deadline))
-	dbInsert(ctx, t, table, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
+	time.Sleep(20 * time.Second)
 
-	// Perform two captures. The first one will receive all the change events up
-	// to this point and emit state updates advancing 'CurrentLSN'. The second
-	// capture will then treat the initial 'CurrentLSN' as "acknowledged" and
-	// relay it to the database in StandbyStatusUpdate messages. These status
-	// updates will interact with the XLOG_RUNNING_XACTS record in the WAL to
-	// actually advance the replication slot's `restart_lsn`.
-	cfg.PollTimeoutSeconds = 2
-	verifiedCapture(ctx, t, &cfg, &catalog, &state, "capture2")
-	verifiedCapture(ctx, t, &cfg, &catalog, &state, "capture3")
+	// Perform a capture and then check if `restart_lsn` has advanced. If not,
+	// keep trying until it does or the retry count is hit.
+	const retryCount = 50
+	for iter := 0; iter < retryCount; iter++ {
+		verifiedCapture(ctx, t, &cfg, &catalog, &state, "captureN")
 
-	// Finally, check the `restart_lsn` of the replication slot and verify that
-	// it's more recent than it used to be.
-	var afterLSN pglogrepl.LSN
-	if err := TestDatabase.QueryRow(ctx, `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`, *TestReplicationSlot).Scan(&afterLSN); err != nil {
-		logrus.WithField("slot", *TestReplicationSlot).WithField("err", err).Error("failed to query restart_lsn")
+		var afterLSN pglogrepl.LSN
+		if err := TestDatabase.QueryRow(ctx, `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`, *TestReplicationSlot).Scan(&afterLSN); err != nil {
+			logrus.WithFields(logrus.Fields{"slot": *TestReplicationSlot, "err": err}).Error("failed to query restart_lsn")
+		}
+		logrus.WithFields(logrus.Fields{"iter": iter, "before": beforeLSN, "after": afterLSN}).Info("checking slot LSN")
+		if afterLSN > beforeLSN {
+			return
+		}
+
+		time.Sleep(200 * time.Millisecond)
 	}
-	logrus.WithField("before", beforeLSN).WithField("after", afterLSN).Info("done")
-	if afterLSN <= beforeLSN {
-		t.Errorf("slot %q restart LSN didn't advance (before=%q, after=%q)", *TestReplicationSlot, beforeLSN, afterLSN)
-	}
+	t.Errorf("slot %q restart LSN failed to advance after %d retries", *TestReplicationSlot, retryCount)
 }

@@ -134,7 +134,6 @@ func newBigQueryDriver() *sqlDriver.Driver {
 			resources []sqlDriver.Resource,
 		) (_ pm.Transactor, err error) {
 			var t = &transactor{
-				ctx:      ctx,
 				ep:       ep.(*Endpoint),
 				fence:    sdFence.(*fence),
 				bindings: make([]*binding, len(spec.Bindings)),

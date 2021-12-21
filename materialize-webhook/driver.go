@@ -111,8 +111,13 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 	return &pm.ValidateResponse{Bindings: out}, nil
 }
 
-// Apply is a no-op.
-func (driver) Apply(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+// ApplyUpsert is a no-op.
+func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+	return &pm.ApplyResponse{}, nil
+}
+
+// ApplyDelete is a no-op.
+func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
 	return &pm.ApplyResponse{}, nil
 }
 
@@ -143,7 +148,6 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	}
 
 	var transactor = &transactor{
-		ctx:       stream.Context(),
 		addresses: addresses,
 		bodies:    make([]bytes.Buffer, len(open.Open.Materialization.Bindings)),
 	}
@@ -158,22 +162,21 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 }
 
 type transactor struct {
-	ctx       context.Context
 	addresses []*url.URL
 	bodies    []bytes.Buffer
 }
 
 // Load should not be called and panics.
-func (d *transactor) Load(_ *pm.LoadIterator, _ <-chan struct{}, _ func(int, json.RawMessage) error) error {
+func (d *transactor) Load(_ *pm.LoadIterator, _, _ <-chan struct{}, _ func(int, json.RawMessage) error) error {
 	panic("Load should never be called for webhook.Driver")
 }
 
 // Prepare returns a zero-valued Prepared.
-func (d *transactor) Prepare(req *pm.TransactionRequest_Prepare) (*pm.TransactionResponse_Prepared, error) {
+func (d *transactor) Prepare(_ context.Context, req pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	if d.bodies[0].Len() != 0 {
 		panic("d.body.Len() != 0") // Invariant: previous call is finished.
 	}
-	return &pm.TransactionResponse_Prepared{}, nil
+	return pf.DriverCheckpoint{}, nil
 }
 
 // Store invokes the Webhook URL, with a body containing StoreIterator documents.
@@ -198,7 +201,7 @@ func (d *transactor) Store(it *pm.StoreIterator) error {
 }
 
 // Commit awaits the completion of the call started in Store.
-func (d *transactor) Commit() error {
+func (d *transactor) Commit(ctx context.Context) error {
 
 	for i, address := range d.addresses {
 		var address = address.String()
@@ -206,8 +209,8 @@ func (d *transactor) Commit() error {
 
 		for attempt := 0; true; attempt++ {
 			select {
-			case <-d.ctx.Done():
-				return d.ctx.Err()
+			case <-ctx.Done():
+				return ctx.Err()
 			case <-time.After(backoff(attempt)):
 				// Fallthrough.
 			}
@@ -239,6 +242,10 @@ func (d *transactor) Commit() error {
 			}).Error("failed to invoke Webhook (will retry)")
 		}
 	}
+	return nil
+}
+
+func (d *transactor) Acknowledge(context.Context) error {
 	return nil
 }
 
