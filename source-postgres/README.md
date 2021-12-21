@@ -24,7 +24,7 @@ other supported config options:
 
 ```json
 {
-  "connectionURI": "postgres://flow:flow@localhost:5432/flow"
+  "connectionURI": "postgres://flow_capture:flow_capture@localhost:5432/flow"
 }
 ```
 
