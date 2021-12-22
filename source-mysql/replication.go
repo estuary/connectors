@@ -31,12 +31,12 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		Host:     host,
 		Port:     uint16(port),
 		User:     db.config.User,
-		Password: db.config.Pass,
+		Password: db.config.Password,
 	})
 
 	var pos mysql.Position
 	if startCursor != "" {
-		var binlogName, binlogPos, err = splitHostPort(startCursor)
+		var binlogName, binlogPos, err = splitCursor(startCursor)
 		if err != nil {
 			return nil, fmt.Errorf("invalid resume cursor: %w", err)
 		}
@@ -77,10 +77,22 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 	return stream, nil
 }
 
+func splitCursor(cursor string) (string, int64, error) {
+	seps := strings.Split(cursor, ":")
+	if len(seps) != 2 {
+		return "", 0, fmt.Errorf("input %q must have <logfile>:<position> shape", cursor)
+	}
+	position, err := strconv.ParseInt(seps[1], 10, 64)
+	if err != nil {
+		return "", 0, fmt.Errorf("invalid position value %q: %w", seps[1], err)
+	}
+	return seps[0], position, nil
+}
+
 func splitHostPort(addr string) (string, int64, error) {
 	seps := strings.Split(addr, ":")
 	if len(seps) != 2 {
-		return "", 0, fmt.Errorf("input %q doesn't have <str>:<int> shape", addr)
+		return "", 0, fmt.Errorf("input %q must have <host>:<port> shape", addr)
 	}
 	port, err := strconv.ParseInt(seps[1], 10, 64)
 	if err != nil {
@@ -125,7 +137,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			}
 
 			switch event.Header.EventType {
-			case replication.WRITE_ROWS_EVENTv0, replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
+			case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
 					var after = decodeRow(columnNames, row)
 					rs.events <- sqlcapture.ChangeEvent{
@@ -134,7 +146,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						After:     after,
 					}
 				}
-			case replication.UPDATE_ROWS_EVENTv0, replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
+			case replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
 				for rowIdx := range data.Rows {
 					// Update events contain alternating (before, after) pairs of rows
 					if rowIdx%2 == 1 {
@@ -148,7 +160,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						}
 					}
 				}
-			case replication.DELETE_ROWS_EVENTv0, replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
+			case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
 					var before = decodeRow(columnNames, row)
 					rs.events <- sqlcapture.ChangeEvent{
@@ -179,8 +191,12 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			rs.gtidTimestamp = data.OriginalCommitTime()
 		case *replication.QueryEvent:
 			logrus.WithField("data", data).Trace("Query Event")
+		case *replication.RotateEvent:
+			logrus.WithField("data", data).Trace("Rotate Event")
+		case *replication.FormatDescriptionEvent:
+			logrus.WithField("data", data).Trace("Format Description Event")
 		default:
-			logrus.WithField("type", event.Header.EventType).Warn("unhandled event type")
+			return fmt.Errorf("unhandled event type: %q", event.Header.EventType)
 		}
 	}
 }

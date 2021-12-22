@@ -29,6 +29,7 @@ func main() {
 		if err := configFile.Parse(&config); err != nil {
 			return nil, fmt.Errorf("error parsing config file: %w", err)
 		}
+		config.SetDefaults()
 		return &postgresDatabase{config: &config}, nil
 	})
 }
@@ -45,8 +46,7 @@ type Config struct {
 	WatermarksTable string `json:"watermarks_table,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills."`
 }
 
-// Validate checks that the configuration passes some basic sanity checks, and
-// fills in default values when optional parameters are unset.
+// Validate checks that the configuration possesses all required properties.
 func (c *Config) Validate() error {
 	var requiredProperties = [][]string{
 		{"host", c.Host},
@@ -58,7 +58,11 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+	return nil
+}
 
+// SetDefaults fills in the default values for unset optional parameters.
+func (c *Config) SetDefaults() {
 	// Note these are 1:1 with 'omitempty' in Config field tags,
 	// which cause these fields to be emitted as non-required.
 	if c.SlotName == "" {
@@ -70,8 +74,6 @@ func (c *Config) Validate() error {
 	if c.WatermarksTable == "" {
 		c.WatermarksTable = "public.flow_watermarks"
 	}
-
-	return nil
 }
 
 // ToURI converts the Config to a DSN string.
@@ -98,8 +100,11 @@ type postgresDatabase struct {
 
 func (db *postgresDatabase) Connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
-		"uri":  db.config.ToURI(),
-		"slot": db.config.SlotName,
+		"host":     db.config.Host,
+		"port":     db.config.Port,
+		"user":     db.config.User,
+		"database": db.config.Database,
+		"slot":     db.config.SlotName,
 	}).Info("initializing connector")
 
 	// Normal database connection used for table scanning
