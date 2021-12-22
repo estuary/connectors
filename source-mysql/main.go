@@ -28,6 +28,7 @@ func main() {
 		if err := configFile.Parse(&config); err != nil {
 			return nil, fmt.Errorf("error parsing config file: %w", err)
 		}
+		config.SetDefaults()
 		return &mysqlDatabase{config: &config}, nil
 	})
 }
@@ -37,20 +38,19 @@ func main() {
 type Config struct {
 	Address  string `json:"address" jsonschema:"default=127.0.0.1:3306,description=Database host:port to connect to."`
 	User     string `json:"user" jsonschema:"default=flow_capture,description=Database user to connect as."`
-	Pass     string `json:"pass" jsonschema:"description=Password for the specified database user."`
+	Password string `json:"password" jsonschema:"description=Password for the specified database user."`
 	DBName   string `json:"dbname" jsonschema:"description=Name of the database to connect to."`
 	ServerID int    `json:"server_id" jsonschema:"description=Server ID for replication."`
 
 	WatermarksTable string `json:"watermarks_table,omitempty" jsonschema:"default=flow.watermarks,description=The name of the table used for watermark writes during backfills."`
 }
 
-// Validate checks that the configuration passes some basic sanity checks, and
-// fills in default values when optional parameters are unset.
+// Validate checks that the configuration possesses all required properties.
 func (c *Config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
-		{"pass", c.Pass},
+		{"password", c.Password},
 		{"dbname", c.DBName},
 	}
 	for _, req := range requiredProperties {
@@ -61,13 +61,16 @@ func (c *Config) Validate() error {
 	if c.ServerID == 0 {
 		return fmt.Errorf("missing 'server_id'")
 	}
+	return nil
+}
 
+// SetDefaults fills in the default values for unset optional parameters.
+func (c *Config) SetDefaults() {
 	// Note these are 1:1 with 'omitempty' in Config field tags,
 	// which cause these fields to be emitted as non-required.
 	if c.WatermarksTable == "" {
 		c.WatermarksTable = "flow.watermarks"
 	}
-	return nil
 }
 
 type mysqlDatabase struct {
@@ -80,13 +83,12 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"addr":     db.config.Address,
 		"user":     db.config.User,
-		"pass":     db.config.Pass,
 		"dbName":   db.config.DBName,
 		"serverID": db.config.ServerID,
 	}).Info("initializing connector")
 
 	// Normal database connection used for table scanning
-	var conn, err = client.Connect(db.config.Address, db.config.User, db.config.Pass, db.config.DBName)
+	var conn, err = client.Connect(db.config.Address, db.config.User, db.config.Password, db.config.DBName)
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}

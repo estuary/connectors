@@ -18,7 +18,7 @@ import (
 var (
 	dbAddress  = flag.String("db_addr", "127.0.0.1:3306", "Connect to the specified address/port for tests")
 	dbUser     = flag.String("db_user", "root", "Connect as the specified user for tests")
-	dbPass     = flag.String("db_pass", "flow", "Password for the specified database test user")
+	dbPassword = flag.String("db_password", "flow", "Password for the specified database test user")
 	dbName     = flag.String("db_name", "test", "Connect to the named database for tests")
 	dbServerID = flag.Int("db_serverid", 12345, "Unique server ID for replication")
 )
@@ -41,7 +41,7 @@ func TestMain(m *testing.M) {
 	var cfg = Config{
 		Address:         *dbAddress,
 		User:            *dbUser,
-		Pass:            *dbPass,
+		Password:        *dbPassword,
 		DBName:          *dbName,
 		WatermarksTable: "flow.watermarks",
 		ServerID:        *dbServerID,
@@ -49,8 +49,9 @@ func TestMain(m *testing.M) {
 	if err := cfg.Validate(); err != nil {
 		logrus.WithFields(logrus.Fields{"err": err, "config": cfg}).Fatal("error validating test config")
 	}
+	cfg.SetDefaults()
 
-	var conn, err = client.Connect(cfg.Address, cfg.User, cfg.Pass, cfg.DBName)
+	var conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.DBName)
 	if err != nil {
 		logrus.WithField("err", err).Fatal("error connecting to database")
 	}

@@ -75,6 +75,7 @@ func TestMain(m *testing.M) {
 	if err := TestDefaultConfig.Validate(); err != nil {
 		logrus.WithFields(logrus.Fields{"err": err, "config": TestDefaultConfig}).Fatal("error validating test config")
 	}
+	TestDefaultConfig.SetDefaults()
 
 	conn, err := pgx.Connect(ctx, *TestConnectionURI)
 	if err != nil {
