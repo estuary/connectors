@@ -26,12 +26,11 @@ function exportParquetToJson() {
     local pq_path="${TEST_DIR}"/"$1"
     local jsonl_path="${TEST_DIR}"/"$2"
 
-    # Sort the files by names, in the order of
-    # xx_0.pq, xx_1.pq, ... xx_9.pq, xx_10.pq, xx_11.pq, ...   
-    # We output paths relative to pq_path, and then set the working dir of the
-    # docker container, so we don't have to translate absolute paths to
-    # something that will work in the container.
-    pq_files=$(cd "${pq_path}" && find . -type f -name '*.pq' | sort )
+    # Sort the files by name, which should also correspond to the order in which
+    # they were written.  We output paths relative to pq_path, and then set the
+    # working dir of the docker container, so we don't have to translate
+    # absolute paths to something that will work in the container.
+    pq_files=$(cd "${pq_path}" && find . -type f -name '*.parquet' | sort )
 
     if [[ -z "${pq_files}" ]]; then
         bail "no parquet file is generated."
