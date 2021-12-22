@@ -360,7 +360,7 @@ func (b *pqBinding) Commit() error {
 func (b *pqBinding) filename() string {
 	// Pad the sequence number with 0's so that the lexicographical ordering of files will match the
 	// sequence number ordering.
-	return fmt.Sprintf("%09d.pq", b.nextSeqNum)
+	return fmt.Sprintf("%09d.parquet", b.nextSeqNum)
 }
 
 func (b *pqBinding) localFileName() string {

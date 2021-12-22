@@ -96,7 +96,7 @@ type driverCheckpoint struct {
 	B64EncodedFlowCheckpoint string `json:"b64EncodedFlowCheckpoint"`
 	// The sequence number used to name the next files to be uploaded to the cloud.
 	// To be specific, the next parquet file from the i-th binding is named using the deterministic pattern of
-	// "<KeyBegin>_<KeyEnd>_<NextSeqNumList[i]>.pq".
+	// "<KeyBegin>_<KeyEnd>_<NextSeqNumList[i]>.parquet".
 	// The NextSeqNumList[i] is increased by 1 after each successful upload from the i-th binding.
 	NextSeqNumList []int `json:"nextSeqNumList"`
 }

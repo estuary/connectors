@@ -247,15 +247,15 @@ func TestParquetFileProcessor_SingleBinding(t *testing.T) {
 	nextSeqNumList, err := fileProcessor.Commit()
 	require.NoError(t, err)
 	var expectedA = []TestData{{Id: 1, Message: "msg #1"}, {Id: 1, Message: "msg #1"}}
-	require.Equal(t, expectedA, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000000.pq"])
+	require.Equal(t, expectedA, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000000.parquet"])
 	require.Equal(t, []int{1}, nextSeqNumList)
 
 	require.NoError(t, fileProcessor.Store(0, tuple.Tuple{2}, tuple.Tuple{"msg #2"}))
 	nextSeqNumList, err = fileProcessor.Commit()
 	require.NoError(t, err)
 	var expectedB = []TestData{{Id: 2, Message: "msg #2"}}
-	require.Equal(t, expectedA, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000000.pq"])
-	require.Equal(t, expectedB, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000001.pq"])
+	require.Equal(t, expectedA, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000000.parquet"])
+	require.Equal(t, expectedB, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000001.parquet"])
 	require.Equal(t, []int{2}, nextSeqNumList)
 
 	// The process resumed with nextSeqNum being 1 to override the previous file.
@@ -265,8 +265,8 @@ func TestParquetFileProcessor_SingleBinding(t *testing.T) {
 	nextSeqNumList, err = fileProcessor.Commit()
 	require.NoError(t, err)
 	var expectedC = []TestData{{Id: 2, Message: "msg #2"}, {Id: 3, Message: "msg #3"}}
-	require.Equal(t, expectedA, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000000.pq"])
-	require.Equal(t, expectedC, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000001.pq"])
+	require.Equal(t, expectedA, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000000.parquet"])
+	require.Equal(t, expectedC, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000001.parquet"])
 	require.Equal(t, []int{2}, nextSeqNumList)
 }
 
@@ -284,8 +284,8 @@ func TestParquetFileProcessor_MultipleBindings(t *testing.T) {
 	nextSeqNumList, err := fileProcessor.Commit()
 	require.NoError(t, err)
 	require.Equal(t, []int{2, 3, 3, 4}, nextSeqNumList)
-	require.Equal(t, []TestData{{Id: 0, Message: "msg #0"}}, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000001.pq"])
-	require.Equal(t, []TestData{{Id: 1, Message: "msg #1"}}, mockS3Uploader.contents["s3://test_bucket/test_path_1/0000007b/000000002.pq"])
+	require.Equal(t, []TestData{{Id: 0, Message: "msg #0"}}, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000001.parquet"])
+	require.Equal(t, []TestData{{Id: 1, Message: "msg #1"}}, mockS3Uploader.contents["s3://test_bucket/test_path_1/0000007b/000000002.parquet"])
 
 	require.NoError(t, fileProcessor.Store(0, tuple.Tuple{2}, tuple.Tuple{"msg #2"}))
 	require.NoError(t, fileProcessor.Store(1, tuple.Tuple{3}, tuple.Tuple{"msg #3"}))
@@ -295,10 +295,10 @@ func TestParquetFileProcessor_MultipleBindings(t *testing.T) {
 	nextSeqNumList, err = fileProcessor.Commit()
 	require.NoError(t, err)
 	require.Equal(t, []int{3, 4, 4, 5}, nextSeqNumList)
-	require.Equal(t, []TestData{{Id: 0, Message: "msg #0"}}, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000001.pq"])
-	require.Equal(t, []TestData{{Id: 2, Message: "msg #2"}}, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000002.pq"])
-	require.Equal(t, []TestData{{Id: 1, Message: "msg #1"}}, mockS3Uploader.contents["s3://test_bucket/test_path_1/0000007b/000000002.pq"])
-	require.Equal(t, []TestData{{Id: 3, Message: "msg #3"}}, mockS3Uploader.contents["s3://test_bucket/test_path_1/0000007b/000000003.pq"])
-	require.Equal(t, []TestData{{Id: 4, Message: "msg #4"}}, mockS3Uploader.contents["s3://test_bucket/test_path_2/0000007b/000000003.pq"])
-	require.Equal(t, []TestData{{Id: 5, Message: "msg #5"}}, mockS3Uploader.contents["s3://test_bucket/test_path_3/0000007b/000000004.pq"])
+	require.Equal(t, []TestData{{Id: 0, Message: "msg #0"}}, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000001.parquet"])
+	require.Equal(t, []TestData{{Id: 2, Message: "msg #2"}}, mockS3Uploader.contents["s3://test_bucket/test_path_0/0000007b/000000002.parquet"])
+	require.Equal(t, []TestData{{Id: 1, Message: "msg #1"}}, mockS3Uploader.contents["s3://test_bucket/test_path_1/0000007b/000000002.parquet"])
+	require.Equal(t, []TestData{{Id: 3, Message: "msg #3"}}, mockS3Uploader.contents["s3://test_bucket/test_path_1/0000007b/000000003.parquet"])
+	require.Equal(t, []TestData{{Id: 4, Message: "msg #4"}}, mockS3Uploader.contents["s3://test_bucket/test_path_2/0000007b/000000003.parquet"])
+	require.Equal(t, []TestData{{Id: 5, Message: "msg #5"}}, mockS3Uploader.contents["s3://test_bucket/test_path_3/0000007b/000000004.parquet"])
 }
