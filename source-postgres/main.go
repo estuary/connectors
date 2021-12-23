@@ -8,10 +8,25 @@ import (
 
 	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/connectors/sqlcapture"
+	sf "github.com/estuary/connectors/ssh-forwarding-service"
 	"github.com/estuary/protocols/airbyte"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
+
+// Config tells the connector how to connect to the source database and can
+// optionally be used to customize some other parameters such as polling timeout.
+type Config struct {
+	Database        string                  `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
+	Host            string                  `json:"host" jsonschema:"description=Host name of the database to connect to."`
+	SshForwarding   *sf.SshForwardingConfig `json:"ssh_forwarding,omitempty" jsonschema:"description=Configurations to enable local SSH forwarding."`
+	Password        string                  `json:"password" jsonschema:"description=User password configured within the database."`
+	Port            uint16                  `json:"port" jsonschema:"default=5432" jsonschema:"description=Port to the DB connection. If SshForwardingConfig is enabled, a dynamic port is allocated if Port is unspecified."`
+	PublicationName string                  `json:"publication_name,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
+	SlotName        string                  `json:"slot_name,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
+	User            string                  `json:"user" jsonschema:"default=postgres,description=Database user to use."`
+	WatermarksTable string                  `json:"watermarks_table,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills."`
+}
 
 func main() {
 	var schema = jsonschema.Reflect(&Config{})
@@ -58,6 +73,11 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+
+	if err := c.SshForwarding.Validate(); err != nil {
+		return fmt.Errorf("SshForwarding config err: %w", err)
+	}
+
 	return nil
 }
 
@@ -99,6 +119,14 @@ type postgresDatabase struct {
 }
 
 func (db *postgresDatabase) Connect(ctx context.Context) error {
+	if deployedLocalPort, err := config.SshForwarding.Start(config.Port); err != nil {
+		return err
+	} else {
+		// hack...
+		db.config.Port = deployedLocalPort
+		// should be per-node/per-resource?
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"host":     db.config.Host,
 		"port":     db.config.Port,
@@ -106,9 +134,9 @@ func (db *postgresDatabase) Connect(ctx context.Context) error {
 		"database": db.config.Database,
 		"slot":     db.config.SlotName,
 	}).Info("initializing connector")
-
 	// Normal database connection used for table scanning
 	var conn, err = pgx.Connect(ctx, db.config.ToURI())
+
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}

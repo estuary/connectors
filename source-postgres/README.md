@@ -122,6 +122,7 @@ against. To set this up, run:
 
 ```bash
 docker-compose --file source-postgres/docker-compose.yaml up --detach postgres
+docker-compose --file ssh-forwarding-service/docker-compose.yaml up --detach openssh-server
 ```
 
 The connector has a reasonably thorough `go test` suite which assumes the existence of
