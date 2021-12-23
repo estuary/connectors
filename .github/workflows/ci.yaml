@@ -32,17 +32,20 @@ jobs:
             ~/.cargo/git/db/
             parser/target/
             materialize-elasticsearch/schemabuilder/target/
+            ssh-forwarding-service/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test Rust Apps
         run: |
           cargo test --manifest-path=parser/Cargo.toml --locked
           cargo test --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked
+          cargo test --manifest-path=ssh-forwarding-service/Cargo.toml --locked
 
       - name: Build Rust Apps
         run: |
           cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
           cargo build --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
+          cargo build --manifest-path=ssh-forwarding-service/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
 
       - name: Upload Rust Apps
         uses: actions/upload-artifact@v2
@@ -51,6 +54,7 @@ jobs:
           path: |
             parser/target/x86_64-unknown-linux-musl/release/parser
             materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
+            ssh-forwarding-service/target/x86_64-unknown-linux-musl/release/ssh-forwarding-service
 
   build_connectors:
     needs: build_rust_releases
@@ -93,7 +97,8 @@ jobs:
         run: |
           chmod +x \
           parser/target/x86_64-unknown-linux-musl/release/parser \
-          materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
+          materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder \
+          ssh-forwarding-service/target/x86_64-unknown-linux-musl/release/ssh-forwarding-service
 
       - name: Install kafkactl
         if: matrix.connector == 'source-kafka'
@@ -126,6 +131,12 @@ jobs:
         if: matrix.connector == 'source-postgres'
         run: |
           docker-compose --file source-postgres/docker-compose.yaml up --detach postgres
+
+      - name: Start Open SSH server
+        if: matrix.connector == 'source-postgres'
+        run: |
+          cp -r ssh-forwarding-service/test_sshd_configs /tmp/test_sshd_configs &&
+          docker-compose --file /tmp/test_sshd_configs/docker-compose.yaml up --detach openssh-server
 
       - name: Login to GitHub package docker registry
         run: |
@@ -176,6 +187,34 @@ jobs:
           PGPASSWORD: flow
           PGPORT: 5432
           PGUSER: flow
+
+        run: CONNECTOR=${{ matrix.connector }} VERSION=test ./tests/run.sh;
+
+      - name: Source connector ${{ matrix.connector }} integration tests with SSH forwarding
+        if: |
+          contains('
+            source-postgres
+            ', matrix.connector)
+        env:
+          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
+          AWS_DEFAULT_OUTPUT: json
+
+          # Compare to: https://www.postgresql.org/docs/current/libpq-envars.html
+          PGDATABASE: flow
+          PGHOST: localhost
+          PGPASSWORD: flow
+          PGPORT: 5432
+          PGUSER: flow
+
+          # Based on configs in ssh-forwarding-service/docker-compose.yaml
+          SSHENDPOINT: localhost:2222
+          SSHUSER: flowssh
+          PRIVATE_KEY_FILE_PATH: ssh-forwarding-service/test_sshd_configs/keys/id_rsa
+          LOCALPORT: 9876
+          SSH_FORWARDING_ENABLED: true
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=test ./tests/run.sh;
 
