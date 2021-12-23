@@ -16,6 +16,7 @@ require (
 	github.com/elastic/go-elasticsearch/v7 v7.15.2-0.20211104170009-caf202868441
 	github.com/estuary/flow v0.1.1-0.20211207135900-65dc2d2b030a
 	github.com/estuary/protocols v0.0.0-20211129055338-9259b2dca80a
+	github.com/evanphx/json-patch/v5 v5.5.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/uuid v1.3.0
@@ -36,9 +37,9 @@ require (
 	github.com/xitongsys/parquet-go v1.6.1
 	github.com/xitongsys/parquet-go-source v0.0.0-20211010230925-397910c5e371
 	go.gazette.dev/core v0.89.1-0.20211118163301-f0ff6cd8fce4
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
-	golang.org/x/net v0.0.0-20211011170408-caeb26a5c8c0 // indirect
+	golang.org/x/crypto v0.0.0-20211209193657-4570a0811e8b // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys v0.0.0-20211213223007-03aa0b5f6827 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/api v0.60.0
 	google.golang.org/grpc v1.41.0
