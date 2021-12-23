@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/jsonschema"
 	"github.com/benbjohnson/clock"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	"github.com/estuary/connectors/materialize-s3-parquet/checkpoint"
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
 	log "github.com/sirupsen/logrus"
@@ -88,28 +89,13 @@ func (r resource) CompressionCodec() parquet.CompressionCodec {
 	return compressionTypeToCodec[r.CompressionType]
 }
 
-// The structure of a driver checkpoint.
-type driverCheckpoint struct {
-	// The flow checkpoint (base64-encoded), which marks the txn that has been successfully
-	// materialized and stored in the cloud. If the materialization process is stopped
-	// for any reason, this is the checkpoint to resume from.
-	B64EncodedFlowCheckpoint string `json:"b64EncodedFlowCheckpoint"`
-	// The sequence number used to name the next files to be uploaded to the cloud.
-	// To be specific, the next parquet file from the i-th binding is named using the deterministic pattern of
-	// "<KeyBegin>_<KeyEnd>_<NextSeqNumList[i]>.parquet".
-	// The NextSeqNumList[i] is increased by 1 after each successful upload from the i-th binding.
-	NextSeqNumList []int `json:"nextSeqNumList"`
-}
-
-func (dcp driverCheckpoint) Validate() error { return nil }
-
 // Creates a driver checkpoint, and encodes it into a json.RawMessage to populate the DriverCheckPointJson field in `prepared` response.
 func marshalDriverCheckpointJSON(flowCheckpoint []byte, nextSeqNumList []int) (json.RawMessage, error) {
 	if len(flowCheckpoint) == 0 {
 		panic("empty checkpoint received")
 	}
 
-	dcp := &driverCheckpoint{
+	dcp := &checkpoint.DriverCheckpoint{
 		B64EncodedFlowCheckpoint: base64.StdEncoding.EncodeToString(flowCheckpoint),
 		NextSeqNumList:           nextSeqNumList,
 	}
@@ -128,7 +114,7 @@ func unmarshalDriverCheckpointJSON(raw json.RawMessage) (flowCheckpoint []byte, 
 		return
 	}
 
-	var parsed driverCheckpoint
+	var parsed checkpoint.DriverCheckpoint
 	if err = pf.UnmarshalStrict(raw, &parsed); err != nil {
 		return
 	}

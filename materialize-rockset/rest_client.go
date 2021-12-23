@@ -93,7 +93,6 @@ func (c *client) makeRequest(ctx context.Context, method string, urlStr string, 
 
 	// Headers
 	req.Header.Add("Accept", headerAccept)
-	req.Header.Add("Authorization", c.apiKey)
 	req.Header.Add("Content-Type", headerContentType)
 
 	if c.dumpRequest {
@@ -102,6 +101,8 @@ func (c *client) makeRequest(ctx context.Context, method string, urlStr string, 
 			log.Infof("request: %v", string(requestDump))
 		}
 	}
+	// Add Authorization header after logging the request, to ensure we don't log someone's api key.
+	req.Header.Add("Authorization", c.apiKey)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -189,17 +190,58 @@ type collectionWrapper struct {
 }
 
 type Collection struct {
-	CreatedAt   time.Time `json:"created_at"`
-	CreatedBy   string    `json:"created_by"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Workspace   string    `json:"workspace"`
-	Status      string    `json:"status"`
+	CreatedAt   time.Time             `json:"created_at"`
+	CreatedBy   string                `json:"created_by"`
+	Name        string                `json:"name"`
+	Description string                `json:"description"`
+	Workspace   string                `json:"workspace"`
+	Status      string                `json:"status"`
+	Sources     []GetCollectionSource `json:"sources,omitempty"`
+}
+
+func (c *Collection) GetCloudStorageSource(integration string) *CloudStorageSource {
+	if source := c.GetIntegrationSource(integration); source != nil {
+		return source.S3
+	}
+	return nil
+}
+
+func (c *Collection) GetIntegrationSource(integration string) *GetCollectionSource {
+	for _, source := range c.Sources {
+		if source.IntegrationName == integration {
+			return &source
+		}
+	}
+	return nil
+}
+
+type CloudStorageSource struct {
+	ObjectCountDownloaded int64 `json:"object_count_downloaded"`
+	ObjectCountTotal      int64 `json:"object_count_total"`
+	ObjectBytesTotal      int64 `json:"object_bytes_total"`
+}
+
+type GetCollectionSource struct {
+	IntegrationName string              `json:"integration_name"`
+	S3              *CloudStorageSource `json:"s3,omitempty"`
+}
+
+type S3Integration struct {
+	Bucket  string `json:"bucket"`
+	Region  string `json:"region,omitempty"`
+	Prefix  string `json:"prefix,omitempty"`
+	Pattern string `json:"pattern,omitempty"`
+}
+
+type CreateCollectionSource struct {
+	IntegrationName string         `json:"integration_name"`
+	S3              *S3Integration `json:"s3,omitempty"`
 }
 
 type CreateCollection struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Name        string                   `json:"name"`
+	Description string                   `json:"description"`
+	Sources     []CreateCollectionSource `json:"sources,omitempty"`
 }
 
 // GetCollection

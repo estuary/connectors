@@ -18,7 +18,7 @@ COPY materialize-s3-parquet     ./materialize-s3-parquet
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-s3-parquet/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-s3-parquet/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-s3-parquet
 
 # Runtime Stage
 ################################################################################
