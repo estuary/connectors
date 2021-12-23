@@ -12,6 +12,7 @@ RUN go mod download
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-rockset     ./materialize-rockset
+COPY materialize-s3-parquet  ./materialize-s3-parquet
 
 # Test and build the connector. These hit the Rockset API, so it needs a real key. You can pass
 # these with Buildkit's `--secret` argument to `docker build`.
