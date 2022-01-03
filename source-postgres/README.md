@@ -72,7 +72,7 @@ A minimal `config.json` consists solely of the database connection parameters:
 {
   "database": "flow",
   "host": "localhost",
-  "password": "flow",
+  "password": "flow_capture",
   "port": 5432,
   "user": "flow_capture"
 }
