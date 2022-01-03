@@ -1,1 +1,0 @@
-{"type":"STATE","state":{"data":{"current_lsn":1234,"streams":{"public.test_multiplestreams_one":{"mode":"Active","key_columns":["id"]},"public.test_multiplestreams_three":{"mode":"Active","key_columns":["id"]}}}}}

@@ -16,6 +16,8 @@ require (
 	github.com/elastic/go-elasticsearch/v7 v7.15.2-0.20211104170009-caf202868441
 	github.com/estuary/flow v0.1.1-0.20211207135900-65dc2d2b030a
 	github.com/estuary/protocols v0.0.0-20211129055338-9259b2dca80a
+	github.com/evanphx/json-patch/v5 v5.5.0
+	github.com/go-mysql-org/go-mysql v1.4.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/uuid v1.3.0

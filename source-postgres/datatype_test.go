@@ -2,223 +2,101 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"strings"
 	"testing"
 
-	"github.com/estuary/protocols/airbyte"
-	"github.com/stretchr/testify/require"
+	"github.com/estuary/connectors/sqlcapture/tests"
 )
 
-type datatypeTestcase struct {
-	ColumnType  string
-	OutputType  string
-	ColumnValue string
-	OutputValue string
-}
-
-var datatypeTestcases = []datatypeTestcase{
-	// Basic Boolean/Numeric/Text Types
-	{`boolean`, `{"type":["boolean","null"]}`, `false`, `false`},
-	{`boolean`, `{"type":["boolean","null"]}`, `'yes'`, `true`},
-	{`integer`, `{"type":["integer","null"]}`, `123`, `123`},
-	{`integer`, `{"type":["integer","null"]}`, `null`, `null`},
-	{`integer not null`, `{"type":"integer"}`, `123`, `123`},
-	{`smallint`, `{"type":["integer","null"]}`, `123`, `123`},
-	{`bigint`, `{"type":["integer","null"]}`, `123`, `123`},
-	{`serial`, `{"type":"integer"}`, `123`, `123`},      // non-nullable
-	{`smallserial`, `{"type":"integer"}`, `123`, `123`}, // non-nullable
-	{`bigserial`, `{"type":"integer"}`, `123`, `123`},   // non-nullable
-	{`real`, `{"type":["number","null"]}`, `123.456`, `123.456`},
-	{`double precision`, `{"type":["number","null"]}`, `123.456`, `123.456`},
-
-	// TODO(wgd): The 'decimal' and 'numeric' types are generally used because precision
-	// and accuracy actually matter. I'm leery of just casting these to a float, so for
-	// now I'm letting the `pgtype.Numeric.EncodeText()` implementation turn them into a
-	// string. Revisit whether this is correct behavior at some point.
-	// TODO(johnny): This will fail schema validation. They need to be output as JSON numbers (doubles).
-	{`decimal`, `{"type":["number","null"]}`, `123.456`, `"123456e-3"`},
-	{`numeric`, `{"type":["number","null"]}`, `123.456`, `"123456e-3"`},
-	{`numeric(4,2)`, `{"type":["number","null"]}`, `12.34`, `"1234e-2"`},
-
-	{`character varying(10)`, `{"type":["string","null"]}`, `'foo'`, `"foo"`},
-	{`varchar(10)`, `{"type":["string","null"]}`, `'foo'`, `"foo"`},
-	{`varchar`, `{"type":["string","null"]}`, `'foo'`, `"foo"`},
-	{`character(10)`, `{"type":["string","null"]}`, `'foo'`, `"foo       "`},
-	{`char(10)`, `{"type":["string","null"]}`, `'foo'`, `"foo       "`},
-	{`char`, `{"type":["string","null"]}`, `'f'`, `"f"`},
-	{`text`, `{"type":["string","null"]}`, `'foo'`, `"foo"`},
-	{`bytea`, `{"type":["string","null"],"contentEncoding":"base64"}`, `'\xDEADBEEF'`, `"3q2+7w=="`},
-	{`bit`, `{"type":["string","null"]}`, `B'1'`, `"1"`},
-	{`bit(3)`, `{"type":["string","null"]}`, `B'101'`, `"101"`},
-	{`bit varying`, `{"type":["string","null"]}`, `B'1101'`, `"1101"`},
-	{`bit varying(5)`, `{"type":["string","null"]}`, `B'10111'`, `"10111"`},
-
-	// Domain-Specific Data Types
-	{`money`, `{"type":["string","null"]}`, `123.45`, `"$123.45"`},
-	{`money`, `{"type":["string","null"]}`, `'$123.45'`, `"$123.45"`},
-	{`date`, `{"type":["string","null"],"format":"date-time"}`, `'January 8, 1999'`, `"1999-01-08T00:00:00Z"`},
-	{`timestamp`, `{"type":["string","null"],"format":"date-time"}`, `'January 8, 1999'`, `"1999-01-08T00:00:00Z"`},
-	{`timestamp without time zone`, `{"type":["string","null"],"format":"date-time"}`, `'January 8, 1999'`, `"1999-01-08T00:00:00Z"`},
-	// TODO(wgd): The 'timestamp with time zone' type produces inconsistent results between
-	// table scanning and replication events. They're both valid timestamps, but they differ.
-	//{`timestamp with time zone`, `{"type":"string","format":"date-time"}`, `'January 8, 1999'`, `"1999-01-07T16:00:00-08:00"`},
-	{`time`, `{"type":["integer","null"]}`, `'04:05:06 PST'`, `14706000000`},
-	{`time without time zone`, `{"type":["integer","null"]}`, `'04:05:06 PST'`, `14706000000`},
-	{`time with time zone`, `{"type":["string","null"],"format":"time"}`, `'04:05:06 PST'`, `"04:05:06-08"`},
-	{`interval`, `{"type":["string","null"]}`, `'2 months 1 day 5 minutes 6 seconds'`, `"2 mon 1 day 00:05:06.000000"`},
-
-	{`point`, `{"type":["string","null"]}`, `'(1, 2)'`, `"(1,2)"`},
-	{`line`, `{"type":["string","null"]}`, `'{1, 2, 3}'`, `"{1,2,3}"`},
-	{`lseg`, `{"type":["string","null"]}`, `'[(1, 2), (3, 4)]'`, `"(1,2),(3,4)"`},
-	{`box`, `{"type":["string","null"]}`, `'((1, 2), (3, 4))'`, `"(3,4),(1,2)"`},
-	{`path`, `{"type":["string","null"]}`, `'[(1, 2), (3, 4), (5, 6)]'`, `"[(1,2),(3,4),(5,6)]"`},
-	{`polygon`, `{"type":["string","null"]}`, `'((0, 0), (0, 1), (1, 0))'`, `"((0,0),(0,1),(1,0))"`},
-	{`circle`, `{"type":["string","null"]}`, `'((1, 2), 3)'`, `"\u003c(1,2),3\u003e"`},
-
-	{`inet`, `{"type":["string","null"]}`, `'192.168.100.0/24'`, `"192.168.100.0/24"`},
-	{`inet`, `{"type":["string","null"]}`, `'2001:4f8:3:ba::/64'`, `"2001:4f8:3:ba::/64"`},
-	{`cidr`, `{"type":["string","null"]}`, `'192.168.100.0/24'`, `"192.168.100.0/24"`},
-	{`cidr`, `{"type":["string","null"]}`, `'2001:4f8:3:ba::/64'`, `"2001:4f8:3:ba::/64"`},
-	{`macaddr`, `{"type":["string","null"]}`, `'08:00:2b:01:02:03'`, `"08:00:2b:01:02:03"`},
-	{`macaddr8`, `{"type":["string","null"]}`, `'08-00-2b-01-02-03-04-05'`, `"08:00:2b:01:02:03:04:05"`},
-	{`uuid`, `{"type":["string","null"],"format":"uuid"}`, `'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'`, `"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"`},
-
-	{`tsvector`, `{"type":["string","null"]}`, `'a fat cat'`, `"'a' 'cat' 'fat'"`},
-	{`tsquery`, `{"type":["string","null"]}`, `'fat & cat'`, `"'fat' \u0026 'cat'"`},
-
-	// TODO(wgd): JSON values read by pgx/pgtype are currently unmarshalled (by the `pgtype.JSON.Get()` method)
-	// into an `interface{}`, which means that the un-normalized JSON text coming from PostgreSQL is getting
-	// normalized in various ways by the JSON -> interface{} -> JSON round-trip. For `jsonb` this is probably
-	// fine since the value has already been decomposed into a binary format within PostgreSQL, but we might
-	// possibly want to try and fix this for `json` at some point?
-	{`json`, `{}`, `'{"type": "test", "data": 123}'`, `{"data":123,"type":"test"}`},
-	{`jsonb`, `{}`, `'{"type": "test", "data": 123}'`, `{"data":123,"type":"test"}`},
-	{`jsonpath`, `{"type":["string","null"]}`, `'$foo'`, `"$\"foo\""`},
-	{`xml`, `{"type":["string","null"]}`, `'<foo>bar &gt; baz</foo>'`, `"\u003cfoo\u003ebar \u0026gt; baz\u003c/foo\u003e"`},
-
-	// TODO(wgd): Should arrays be strings or should we decode them?
-	{`integer[3][3]`, `{"type":["string","null"]}`, `'{{1,2,3},{4,5,6},{7,8,9}}'`, `"{{1,2,3},{4,5,6},{7,8,9}}"`},
-	{`smallint[3][3]`, `{"type":["string","null"]}`, `'{{1,2,3},{4,5,6},{7,8,9}}'`, `"{{1,2,3},{4,5,6},{7,8,9}}"`},
-	{`real[][]`, `{"type":["string","null"]}`, `'{{1,2,3},{4,5,6},{7,8,9}}'`, `"{{1,2,3},{4,5,6},{7,8,9}}"`},
-	{`text[]`, `{"type":["string","null"]}`, `'{"foo", "bar", "baz"}'`, `"{foo,bar,baz}"`},
-
-	// TODO(wgd): Add enumeration test case?
-}
-
+// TestDatatypes runs the generic datatype discovery and round-tripping test on various datatypes.
 func TestDatatypes(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
+	var ctx = context.Background()
+	tests.TestDatatypes(ctx, t, TestBackend, []tests.DatatypeTestCase{
+		// Basic Boolean/Numeric/Text Types
+		{ColumnType: `boolean`, ExpectType: `{"type":["boolean","null"]}`, InputValue: `false`, ExpectValue: `false`},
+		{ColumnType: `boolean`, ExpectType: `{"type":["boolean","null"]}`, InputValue: `yes`, ExpectValue: `true`},
+		{ColumnType: `integer`, ExpectType: `{"type":["integer","null"]}`, InputValue: `123`, ExpectValue: `123`},
+		{ColumnType: `integer`, ExpectType: `{"type":["integer","null"]}`, InputValue: 123, ExpectValue: `123`},
+		{ColumnType: `integer`, ExpectType: `{"type":["integer","null"]}`, InputValue: nil, ExpectValue: `null`},
+		{ColumnType: `integer not null`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`},
+		{ColumnType: `smallint`, ExpectType: `{"type":["integer","null"]}`, InputValue: `123`, ExpectValue: `123`},
+		{ColumnType: `bigint`, ExpectType: `{"type":["integer","null"]}`, InputValue: `123`, ExpectValue: `123`},
+		{ColumnType: `serial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`},      // non-nullable
+		{ColumnType: `smallserial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`}, // non-nullable
+		{ColumnType: `bigserial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`},   // non-nullable
+		{ColumnType: `real`, ExpectType: `{"type":["number","null"]}`, InputValue: `123.456`, ExpectValue: `123.456`},
+		{ColumnType: `double precision`, ExpectType: `{"type":["number","null"]}`, InputValue: `123.456`, ExpectValue: `123.456`},
 
-	var cfg, ctx = TestDefaultConfig, context.Background()
+		// TODO(wgd): The 'decimal' and 'numeric' types are generally used because precision
+		// and accuracy actually matter. I'm leery of just casting these to a float, so for
+		// now I'm letting the `pgtype.Numeric.EncodeText()` implementation turn them into a
+		// string. Revisit whether this is correct behavior at some point.
+		// TODO(johnny): This will fail schema validation. They need to be output as JSON numbers (doubles).
+		{ColumnType: `decimal`, ExpectType: `{"type":["number","null"]}`, InputValue: `123.456`, ExpectValue: `"123456e-3"`},
+		{ColumnType: `numeric`, ExpectType: `{"type":["number","null"]}`, InputValue: `123.456`, ExpectValue: `"123456e-3"`},
+		{ColumnType: `numeric(4,2)`, ExpectType: `{"type":["number","null"]}`, InputValue: `12.34`, ExpectValue: `"1234e-2"`},
 
-	for idx, tc := range datatypeTestcases {
-		t.Run(fmt.Sprintf("%d_%s", idx, sanitizeName(tc.ColumnType)), func(t *testing.T) {
-			var table = createTestTable(ctx, t, "", fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+		{ColumnType: `character varying(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
+		{ColumnType: `varchar(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
+		{ColumnType: `varchar`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
+		{ColumnType: `character(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo       "`},
+		{ColumnType: `char(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo       "`},
+		{ColumnType: `char`, ExpectType: `{"type":["string","null"]}`, InputValue: `f`, ExpectValue: `"f"`},
+		{ColumnType: `text`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
+		{ColumnType: `bytea`, ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: `\xDEADBEEF`, ExpectValue: `"3q2+7w=="`},
+		{ColumnType: `bit`, ExpectType: `{"type":["string","null"]}`, InputValue: `1`, ExpectValue: `"1"`},
+		{ColumnType: `bit(3)`, ExpectType: `{"type":["string","null"]}`, InputValue: `101`, ExpectValue: `"101"`},
+		{ColumnType: `bit varying`, ExpectType: `{"type":["string","null"]}`, InputValue: `1101`, ExpectValue: `"1101"`},
+		{ColumnType: `bit varying(5)`, ExpectType: `{"type":["string","null"]}`, InputValue: `10111`, ExpectValue: `"10111"`},
 
-			// Perform discovery and verify that the generated JSON schema looks correct
-			t.Run("discovery", func(t *testing.T) {
-				var discoveredCatalog, err = DiscoverCatalog(ctx, cfg)
-				require.NoError(t, err)
+		// Domain-Specific Data Types
+		{ColumnType: `money`, ExpectType: `{"type":["string","null"]}`, InputValue: 123.45, ExpectValue: `"$123.45"`},
+		{ColumnType: `money`, ExpectType: `{"type":["string","null"]}`, InputValue: `$123.45`, ExpectValue: `"$123.45"`},
+		{ColumnType: `date`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
+		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
+		{ColumnType: `timestamp without time zone`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
+		// TODO(wgd): The 'timestamp with time zone' type produces inconsistent results between
+		// table scanning and replication events. They're both valid timestamps, but they differ.
+		// {ColumnType: `timestamp with time zone`, ExpectType: `{"type":"string","format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-07T16:00:00-08:00"`},
+		{ColumnType: `time`, ExpectType: `{"type":["integer","null"]}`, InputValue: `'04:05:06 PST'`, ExpectValue: `14706000000`},
+		{ColumnType: `time without time zone`, ExpectType: `{"type":["integer","null"]}`, InputValue: `'04:05:06 PST'`, ExpectValue: `14706000000`},
+		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06 PST'`, ExpectValue: `"04:05:06-08"`},
+		{ColumnType: `interval`, ExpectType: `{"type":["string","null"]}`, InputValue: `'2 months 1 day 5 minutes 6 seconds'`, ExpectValue: `"2 mon 1 day 00:05:06.000000"`},
 
-				var stream *airbyte.Stream
-				for idx := range discoveredCatalog.Streams {
-					if strings.EqualFold(discoveredCatalog.Streams[idx].Name, table) {
-						stream = &discoveredCatalog.Streams[idx]
-						break
-					}
-				}
-				if stream == nil {
-					t.Errorf("column type %q: no stream named %q discovered", tc.ColumnType, table)
-					return
-				}
+		{ColumnType: `point`, ExpectType: `{"type":["string","null"]}`, InputValue: `(1, 2)`, ExpectValue: `"(1,2)"`},
+		{ColumnType: `line`, ExpectType: `{"type":["string","null"]}`, InputValue: `{1, 2, 3}`, ExpectValue: `"{1,2,3}"`},
+		{ColumnType: `lseg`, ExpectType: `{"type":["string","null"]}`, InputValue: `[(1, 2), (3, 4)]`, ExpectValue: `"(1,2),(3,4)"`},
+		{ColumnType: `box`, ExpectType: `{"type":["string","null"]}`, InputValue: `((1, 2), (3, 4))`, ExpectValue: `"(3,4),(1,2)"`},
+		{ColumnType: `path`, ExpectType: `{"type":["string","null"]}`, InputValue: `[(1, 2), (3, 4), (5, 6)]`, ExpectValue: `"[(1,2),(3,4),(5,6)]"`},
+		{ColumnType: `polygon`, ExpectType: `{"type":["string","null"]}`, InputValue: `((0, 0), (0, 1), (1, 0))`, ExpectValue: `"((0,0),(0,1),(1,0))"`},
+		{ColumnType: `circle`, ExpectType: `{"type":["string","null"]}`, InputValue: `((1, 2), 3)`, ExpectValue: `"\u003c(1,2),3\u003e"`},
 
-				var skimmed = struct {
-					Definitions map[string]struct {
-						Properties map[string]json.RawMessage
-					}
-				}{}
-				require.NoError(t, json.Unmarshal(stream.JSONSchema, &skimmed))
-				require.Len(t, skimmed.Definitions, 1)
+		{ColumnType: `inet`, ExpectType: `{"type":["string","null"]}`, InputValue: `192.168.100.0/24`, ExpectValue: `"192.168.100.0/24"`},
+		{ColumnType: `inet`, ExpectType: `{"type":["string","null"]}`, InputValue: `2001:4f8:3:ba::/64`, ExpectValue: `"2001:4f8:3:ba::/64"`},
+		{ColumnType: `cidr`, ExpectType: `{"type":["string","null"]}`, InputValue: `192.168.100.0/24`, ExpectValue: `"192.168.100.0/24"`},
+		{ColumnType: `cidr`, ExpectType: `{"type":["string","null"]}`, InputValue: `2001:4f8:3:ba::/64`, ExpectValue: `"2001:4f8:3:ba::/64"`},
+		{ColumnType: `macaddr`, ExpectType: `{"type":["string","null"]}`, InputValue: `08:00:2b:01:02:03`, ExpectValue: `"08:00:2b:01:02:03"`},
+		{ColumnType: `macaddr8`, ExpectType: `{"type":["string","null"]}`, InputValue: `08-00-2b-01-02-03-04-05`, ExpectValue: `"08:00:2b:01:02:03:04:05"`},
+		{ColumnType: `uuid`, ExpectType: `{"type":["string","null"],"format":"uuid"}`, InputValue: `a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11`, ExpectValue: `"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"`},
 
-				for _, tbl := range skimmed.Definitions {
-					var expectParsed, actualParsed interface{}
-					require.NoError(t, json.Unmarshal([]byte(tc.OutputType), &expectParsed))
-					require.NoError(t, json.Unmarshal(tbl.Properties["b"], &actualParsed))
-					require.Equal(t, expectParsed, actualParsed)
-				}
-			})
+		{ColumnType: `tsvector`, ExpectType: `{"type":["string","null"]}`, InputValue: `a fat cat`, ExpectValue: `"'a' 'cat' 'fat'"`},
+		{ColumnType: `tsquery`, ExpectType: `{"type":["string","null"]}`, InputValue: `fat & cat`, ExpectValue: `"'fat' \u0026 'cat'"`},
 
-			// Insert a test row and scan it back out, then do the same via replication
-			t.Run("roundtrip", func(t *testing.T) {
-				var catalog, state = testCatalog(table), PersistentState{}
+		// TODO(wgd): JSON values read by pgx/pgtype are currently unmarshalled (by the `pgtype.JSON.Get()` method)
+		// into an `interface{}`, which means that the un-normalized JSON text coming from PostgreSQL is getting
+		// normalized in various ways by the JSON -> interface{} -> JSON round-trip. For `jsonb` this is probably
+		// fine since the value has already been decomposed into a binary format within PostgreSQL, but we might
+		// possibly want to try and fix this for `json` at some point?
+		{ColumnType: `json`, ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
+		{ColumnType: `jsonb`, ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
+		{ColumnType: `jsonpath`, ExpectType: `{"type":["string","null"]}`, InputValue: `$foo`, ExpectValue: `"$\"foo\""`},
+		{ColumnType: `xml`, ExpectType: `{"type":["string","null"]}`, InputValue: `<foo>bar &gt; baz</foo>`, ExpectValue: `"\u003cfoo\u003ebar \u0026gt; baz\u003c/foo\u003e"`},
 
-				t.Run("scan", func(t *testing.T) {
-					dbQuery(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (1, %s);`, table, tc.ColumnValue))
-					var output, _ = performCapture(ctx, t, &cfg, &catalog, &state)
-					verifyRoundTrip(t, output, tc.ColumnType, tc.ColumnValue, tc.OutputValue)
-				})
+		// TODO(wgd): Should arrays be strings or should we decode them?
+		{ColumnType: `integer[3][3]`, ExpectType: `{"type":["string","null"]}`, InputValue: `{{1,2,3},{4,5,6},{7,8,9}}`, ExpectValue: `"{{1,2,3},{4,5,6},{7,8,9}}"`},
+		{ColumnType: `smallint[3][3]`, ExpectType: `{"type":["string","null"]}`, InputValue: `{{1,2,3},{4,5,6},{7,8,9}}`, ExpectValue: `"{{1,2,3},{4,5,6},{7,8,9}}"`},
+		{ColumnType: `real[][]`, ExpectType: `{"type":["string","null"]}`, InputValue: `{{1,2,3},{4,5,6},{7,8,9}}`, ExpectValue: `"{{1,2,3},{4,5,6},{7,8,9}}"`},
+		{ColumnType: `text[]`, ExpectType: `{"type":["string","null"]}`, InputValue: `{"foo", "bar", "baz"}`, ExpectValue: `"{foo,bar,baz}"`},
 
-				t.Run("replication", func(t *testing.T) {
-					dbQuery(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (2, %s);`, table, tc.ColumnValue))
-					var output, _ = performCapture(ctx, t, &cfg, &catalog, &state)
-					verifyRoundTrip(t, output, tc.ColumnType, tc.ColumnValue, tc.OutputValue)
-				})
-			})
-		})
-	}
-}
-
-type datatypeTestRecord struct {
-	Stream string `json:"stream"`
-	Data   struct {
-		Value json.RawMessage `json:"b"`
-	} `json:"data"`
-}
-
-func verifyRoundTrip(t *testing.T, output string, colType, colValue, expectedValue string) {
-	t.Helper()
-
-	// Extract the value record from the full output
-	var record *datatypeTestRecord
-	for _, line := range strings.Split(output, "\n") {
-		if strings.HasPrefix(line, `{"type":"RECORD","record":`) && strings.HasSuffix(line, `}`) {
-			line = strings.TrimPrefix(line, `{"type":"RECORD","record":`)
-			line = strings.TrimSuffix(line, `}`)
-
-			record = new(datatypeTestRecord)
-			if err := json.Unmarshal([]byte(line), record); err != nil {
-				t.Errorf("error unmarshalling result record: %v", err)
-				return
-			}
-		}
-	}
-	if record == nil {
-		t.Errorf("result record not found in output (input %q of type %q)", colValue, colType)
-		return
-	}
-
-	if string(record.Data.Value) != expectedValue {
-		t.Errorf("result mismatch for type %q: input %q, got %q, expected %q", colType, colValue,
-			string(record.Data.Value), expectedValue)
-	}
-}
-
-func sanitizeName(name string) string {
-	var xs = []byte(name)
-	for i := range xs {
-		if '0' <= xs[i] && xs[i] <= '9' {
-			continue
-		}
-		if 'a' <= xs[i] && xs[i] <= 'z' {
-			continue
-		}
-		if 'A' <= xs[i] && xs[i] <= 'Z' {
-			continue
-		}
-		xs[i] = '_'
-	}
-	return strings.TrimRight(string(xs), "_")
+		// TODO(wgd): Add enumeration test case?
+	})
 }
