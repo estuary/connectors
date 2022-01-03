@@ -30,7 +30,7 @@ RUN go build -o ./connector -v ./source-postgres/...
 ################################################################################
 FROM debian:bullseye-slim
 # Install openssh-client
-RUN apt update && apt install -y openssh-client
+RUN apt update && apt install -y pkg-config libssl-dev
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

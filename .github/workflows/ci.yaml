@@ -22,6 +22,9 @@ jobs:
       - name: Install MUSL
         run: sudo apt-get install -y musl-tools
 
+      - name: Install deps
+        run: sudo apt-get install -y pkg-config libssl-dev
+
       - name: Cargo Cache
         uses: actions/cache@v2
         with:

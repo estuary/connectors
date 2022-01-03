@@ -16,3 +16,14 @@ signal-hook="*"
 thiserror = "*"
 tracing = "*"
 tracing-subscriber = {version = "*", features = ["time", "json", "env-filter"]}
+
+openssl-sys = "*"
+async-ssh2-lite = "*"
+async-io = "*"
+futures="*"
+tokio = { version = "1.15.0", features = ["full"] }
+
+[features]
+# Force openssl-sys to staticly link in the openssl library. Necessary when
+# cross compiling to x86_64-unknown-linux-musl.
+vendored = ["openssl-sys/vendored"]
