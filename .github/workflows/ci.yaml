@@ -185,6 +185,11 @@ jobs:
             materialize-elasticsearch
             materialize-s3-parquet
             ', matrix.connector)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
+          AWS_DEFAULT_OUTPUT: json
         run: CONNECTOR=${{ matrix.connector }} VERSION=test tests/materialize/run.sh;
 
       - name: Push ${{ matrix.connector }} image

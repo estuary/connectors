@@ -18,7 +18,7 @@ tmp_dir=tmp
 mkdir -p "$(realpath "${TESTDIR}"/${tmp_dir})"
 
 # Sync data to local.
-aws s3 sync s3://"${TEST_BUCKET}" "${TESTDIR}/${tmp_dir}/" --endpoint-url "${LOCALSTACK_S3_ENDPOINT}" \
+aws s3 sync s3://"${TEST_BUCKET}/${TEST_ID}" "${TESTDIR}/${tmp_dir}/" \
     || bail "syncing data from s3 failed"
 
 # Read all the pq data as jsonl output.
