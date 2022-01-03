@@ -138,7 +138,7 @@ sed "s/CONNECTOR_CONFIG_PLACEHOLDER/${escaped_connector_config}/g" \
 > "${CATALOG}" || bail "generating ${CATALOG} failed."
 
 echo -e "\nbuilding test catalog"
-${TESTDIR}/flowctl api build --directory ${TESTDIR} --build-id test-build-id --source ${CATALOG} --ts-package || bail "Build failed."
+${TESTDIR}/flowctl api build --directory ${TESTDIR}/builds --build-id test-build-id --source ${CATALOG} --ts-package || bail "Build failed."
 echo -e "\nactivating test catalog"
 ${TESTDIR}/flowctl api activate --build-id test-build-id --all --log.level info || bail "Activate failed."
 
