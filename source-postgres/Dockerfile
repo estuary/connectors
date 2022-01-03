@@ -11,6 +11,7 @@ RUN go mod download
 
 # Build the connector projects we depend on.
 COPY source-postgres ./source-postgres
+COPY sqlcapture ./sqlcapture
 
 # Run the unit tests.
 RUN go test -v ./source-postgres/...
