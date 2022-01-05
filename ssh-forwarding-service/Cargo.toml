@@ -18,7 +18,7 @@ tracing = "*"
 tracing-subscriber = {version = "*", features = ["time", "json", "env-filter"]}
 
 openssl-sys = "*"
-async-ssh2-lite = "*"
+async-ssh2-lite = { versio = "*", features=[] }
 async-io = "*"
 futures="*"
 tokio = { version = "1.15.0", features = ["full"] }
