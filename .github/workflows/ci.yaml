@@ -54,11 +54,12 @@ jobs:
 
       - name: Build Rust Apps
         run: |
+          cargo build --manifest-path=ssh-forwarding-service/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
           cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
           cargo build --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
-          cargo install --force --version 0.1.16 cross
-          cd ssh-forwarding-service
-          cross build -v --locked --release --target=x86_64-unknown-linux-musl
+          #cargo install --force --version 0.1.16 cross
+          #cd ssh-forwarding-service
+          #cross build -v --locked --release --target=x86_64-unknown-linux-musl
           
           #- name: Build ssh-forwarding-service Rust App
           #  uses: actions-rs/cargo@v1
