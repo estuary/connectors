@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/estuary/protocols/fdb/tuple"
@@ -63,31 +62,25 @@ type transactor struct {
 // number of objects in the bucket (as reported by rockset) and the number of successfully imported objects
 // is the same.
 func (t *transactor) awaitAllIntegrationIngestCompletions(ctx context.Context) error {
-	var waitGroup sync.WaitGroup
-	var errors = make([]error, len(t.bindings))
-	for i, binding := range t.bindings {
+	group, ctx := errgroup.WithContext(ctx)
+	for _, binding := range t.bindings {
 		if binding.res.InitializeFromS3 != nil {
-			waitGroup.Add(1)
-			go func(errIndex int) {
-				errors[errIndex] = awaitCollectionReady(
+			group.Go(func() error {
+				var err = awaitCollectionReady(
 					ctx,
 					t.client,
 					binding.res.Workspace,
 					binding.res.Collection,
 					binding.res.InitializeFromS3.Integration,
 				)
-				waitGroup.Done()
-			}(i)
+				if err != nil {
+					return fmt.Errorf("awaiting bulk ingestion completion for rockset collection '%s': %w", binding.res.Collection, err)
+				}
+				return nil
+			})
 		}
 	}
-	waitGroup.Wait()
-	for i, err := range errors {
-		if err != nil {
-			return fmt.Errorf("awaiting bulk ingestion completion for rockset collection '%s': %w",
-				t.bindings[i].rocksetCollection(), err)
-		}
-	}
-	return nil
+	return group.Wait()
 }
 
 // pm.Transactor

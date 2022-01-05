@@ -62,7 +62,7 @@ type cloudStorageIntegration struct {
 	// The name of the S3 bucket to load data from.
 	Bucket string `json:"bucket"`
 	// The region of the S3 bucket. Optional.
-	Region string `json:"region"`
+	Region string `json:"region,omitempty"`
 	// A regex that is used to match objects to be ingested, according to the rules specified in the [rockset
 	// docs](https://rockset.com/docs/amazon-s3/#specifying-s3-path). Optional. Must not be set if 'prefix' is defined.
 	Pattern string `json:"pattern,omitempty"`
@@ -75,7 +75,6 @@ func (c *cloudStorageIntegration) Validate() error {
 	var requiredProperties = [][]string{
 		{"integration", c.Integration},
 		{"bucket", c.Bucket},
-		{"prefix", c.Prefix},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -105,10 +104,6 @@ func (r *resource) Validate() error {
 	if err := validateRocksetName("collection", r.Collection); err != nil {
 		return err
 	}
-	// TODO: move this mutating operation out of Validate
-	if r.MaxBatchSize == 0 {
-		r.MaxBatchSize = 1000
-	}
 
 	if r.InitializeFromS3 != nil {
 		if err := r.InitializeFromS3.Validate(); err != nil {
@@ -117,6 +112,12 @@ func (r *resource) Validate() error {
 	}
 
 	return nil
+}
+
+func (r *resource) SetDefaults() {
+	if r.MaxBatchSize == 0 {
+		r.MaxBatchSize = 1000
+	}
 }
 
 func validateRocksetName(field string, value string) error {
@@ -178,6 +179,7 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
+		res.SetDefaults()
 		rocksetCollection, err := getCollection(ctx, client, res.Workspace, res.Collection)
 		if err != nil {
 			return nil, fmt.Errorf("requesting rockset collection: %w", err)
@@ -233,6 +235,7 @@ func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
+		res.SetDefaults()
 
 		if createdWorkspace, err := createNewWorkspace(ctx, client, res.Workspace); err != nil {
 			return nil, err
@@ -303,6 +306,7 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 		if err := pf.UnmarshalStrict(spec.ResourceSpecJson, &res); err != nil {
 			return fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
+		res.SetDefaults()
 		bindings = append(bindings, NewBinding(spec, &res))
 	}
 
