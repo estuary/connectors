@@ -7,8 +7,6 @@ edition = "2018"
 
 [dependencies]
 base64="*"
-fancy-regex="*"
-libc="*"
 port_scanner="*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
@@ -17,15 +15,9 @@ thiserror = "*"
 tracing = "*"
 tracing-subscriber = {version = "*", features = ["time", "json", "env-filter"]}
 
-#openssl-sys = "*"
-openssl-sys = { version = "0.9", features = ['vendored'] }
-
-async-ssh2-lite = { version = "*", features=[] }
-async-io = "*"
+openssl-sys = { version = "*", features = ['vendored'] }
+openssl="*"
+thrussh={version="*", features=["openssl"]}
 futures="*"
+thrussh-keys={version="*", features=["openssl"]}
 tokio = { version = "1.15.0", features = ["full"] }
-
-[features]
-# Force openssl-sys to staticly link in the openssl library. Necessary when
-# cross compiling to x86_64-unknown-linux-musl.
-vendored = ["openssl-sys/vendored"]

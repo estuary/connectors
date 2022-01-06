@@ -1,3 +1,4 @@
+.vscode
 test_sshd_configs/config/custom-services.d
 test_sshd_configs/config/.ssh
 test_sshd_configs/config/logs
