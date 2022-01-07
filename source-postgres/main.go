@@ -109,9 +109,7 @@ func (db *postgresDatabase) Connect(ctx context.Context) error {
 	if deployedLocalPort, err := db.config.SshForwarding.Start(db.config.Port); err != nil {
 		return err
 	} else {
-		// hack...
 		db.config.Port = deployedLocalPort
-		// should be per-node/per-resource?
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -121,9 +119,9 @@ func (db *postgresDatabase) Connect(ctx context.Context) error {
 		"database": db.config.Database,
 		"slot":     db.config.SlotName,
 	}).Info("initializing connector")
+
 	// Normal database connection used for table scanning
 	var conn, err = pgx.Connect(ctx, db.config.ToURI())
-
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}

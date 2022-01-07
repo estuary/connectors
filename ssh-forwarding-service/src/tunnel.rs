@@ -1,19 +1,16 @@
-use thrussh_keys::key;
-
-use crate::logging::Must;
-
+use super::logging::Must;
 use super::errors::Error;
 
-use std::net::{SocketAddr, ToSocketAddrs};
-use std::sync::{Arc};
-use thrussh::{client::Handle, client};
 use base64::decode;
-use tokio::net::{TcpListener, TcpStream};
 use futures::{select, FutureExt};
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
-
 use port_scanner::local_port_available;
 use rand::{thread_rng, Rng};
+use std::net::{SocketAddr, ToSocketAddrs};
+use std::sync::Arc;
+use thrussh::{client::Handle, client};
+use thrussh_keys::key;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
 
 pub struct ClientHandler {}
 
@@ -78,7 +75,7 @@ impl SshTunnel {
                 remote_host, remote_port as u32, "127.0.0.1", 0).await?;
 
             tokio::task::spawn(async move {
-                tunnel_handle(forward_stream, bastion_channel).await.or_bail("tunnel_handle failed.");
+                tunnel_streaming(forward_stream, bastion_channel).await.or_bail("tunnel_handle failed.");
             });
         }
     }
@@ -88,8 +85,8 @@ impl SshTunnel {
     }
 }
 
-fn find_available_port(port: u16) -> Result<u16, Error> {
-    if port == 0 {
+fn find_available_port(suggested_port: u16) -> Result<u16, Error> {
+    if suggested_port == 0 {
         let mut rng = thread_rng();
         loop {
             let p = 10000 + rng.gen_range(1..10000);
@@ -97,13 +94,14 @@ fn find_available_port(port: u16) -> Result<u16, Error> {
                 break Ok(p)
             }
         }
-    } else if local_port_available(port) {
-        Ok(port)
+    } else if local_port_available(suggested_port) {
+        Ok(suggested_port)
     } else {
-        Err(Error::LocalPortUnavailableError(port))
+        Err(Error::LocalPortUnavailableError(suggested_port))
     }
 }
-async fn tunnel_handle(mut forward_stream: TcpStream, mut bastion_channel: client::Channel) -> Result<(), Error>{
+
+async fn tunnel_streaming(mut forward_stream: TcpStream, mut bastion_channel: client::Channel) -> Result<(), Error>{
     let mut buf_forward_stream = vec![0; 2048];
 
     loop {

@@ -6,21 +6,21 @@ pub enum Error {
     #[error("SSH private key is invalid.")]
     InvalidSshCredential,
 
-    #[error("Local port {0} is unavailable.")]
+    #[error("local port {0} is unavailable.")]
     LocalPortUnavailableError(u16),
 
-    #[error("failed in thrussh")]
+    #[error("thrussh error.")]
     ThrusshError(#[from] thrussh::Error),
 
-    #[error("failed in io operations")]
+    #[error("io operation error.")]
     IoError(#[from] std::io::Error),
 
-    #[error("failed in openssl operations")]
+    #[error("openssl error.")]
     OpenSslError(#[from] openssl::error::ErrorStack),
 
-    #[error("failed in base64 decoding")]
+    #[error("base64 decoding error.")]
     Base64DecodeError(#[from] base64::DecodeError),
 
-    #[error("failed in parsing IP address")]
+    #[error("IP parse error.")]
     IpAddrParseError(#[from] std::net::AddrParseError)
 }

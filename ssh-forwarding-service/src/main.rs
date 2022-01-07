@@ -20,7 +20,7 @@ async fn main() -> io::Result<()> {
     ssh_tunnel.authenticate(
         &input.ssh_forwarding_config.ssh_user,
         &input.ssh_forwarding_config.ssh_private_key_base64).await
-    .or_bail("SSH service failed to authenticate");
+    .or_bail("SSH service failed to authenticate.");
 
     // Write output to stdio.
     serde_json::to_writer(

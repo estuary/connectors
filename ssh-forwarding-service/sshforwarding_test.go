@@ -71,7 +71,7 @@ func TestSshForwardConfig_startWithConflictingPorts(t *testing.T) {
 
 	// The port is no longer available when trying to start a second tunnel with it.
 	_, err = config.startWithTimeout(15430, 1)
-	require.Contains(t, err.Error(), "Local port 15430 is unavailable.")
+	require.Contains(t, err.Error(), "local port 15430 is unavailable.")
 }
 
 func TestSshForwardConfig_startWithDefaultWithBadSshEndpoint(t *testing.T) {
