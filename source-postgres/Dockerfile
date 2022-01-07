@@ -12,13 +12,19 @@ RUN go mod download
 # Build the connector projects we depend on.
 COPY source-postgres ./source-postgres
 COPY sqlcapture ./sqlcapture
+COPY ssh-forwarding-service ./ssh-forwarding-service
 
+# Copy ssh-forwarding-service binary.
+COPY ssh-forwarding-service/target/x86_64-unknown-linux-musl/release/ssh-forwarding-service ./bin/ssh-forwarding-service
+
+ENV PATH="/builder/bin:$PATH"
 # Run the unit tests.
+RUN go test -v ./ssh-forwarding-service/...
 RUN go test -v ./source-postgres/...
+
 
 # Build the connector.
 RUN go build -o ./connector -v ./source-postgres/...
-
 
 # Runtime Stage
 ################################################################################
@@ -27,8 +33,9 @@ FROM gcr.io/distroless/base-debian10
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
-# Bring in the compiled connector artifact from the builder.
+# Bring in the compiled connector artifacts from the builder.
 COPY --from=builder /builder/connector ./connector
+COPY --from=builder /builder/bin/ssh-forwarding-service ./ssh-forwarding-service
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
