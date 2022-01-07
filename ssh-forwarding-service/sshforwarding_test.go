@@ -47,30 +47,30 @@ func createForwardingTestConfig() (*SshForwardingConfig, error) {
 	}, nil
 }
 
-func TestSshForwardConfig_startWithDefault(t *testing.T) {
+func TestSshForwardConfig_startSuccessfully(t *testing.T) {
 	var config, err = createForwardingTestConfig()
 	require.NoError(t, err)
 
-	deployed_local_port, err := config.Start(15433)
+	deployedLocalPort, err := config.Start(15433)
 	require.NoError(t, err)
-	require.Equal(t, uint16(15433), deployed_local_port)
+	require.Equal(t, uint16(15433), deployedLocalPort)
 
-	deployed_local_port, err = config.Start(0)
+	deployedLocalPort, err = config.Start(0)
 	require.NoError(t, err)
-	require.NotEqual(t, uint16(15433), deployed_local_port)
-	require.GreaterOrEqual(t, deployed_local_port, uint16(10000))
+	require.NotEqual(t, uint16(15433), deployedLocalPort)
+	require.GreaterOrEqual(t, deployedLocalPort, uint16(10000))
 }
 
 func TestSshForwardConfig_startWithConflictingPorts(t *testing.T) {
 	var config, err = createForwardingTestConfig()
 	require.NoError(t, err)
 
-	deployed_local_port, err := config.Start(15430)
+	deployedLocalPort, err := config.Start(15430)
 	require.NoError(t, err)
-	require.Equal(t, uint16(15433), deployed_local_port)
+	require.Equal(t, uint16(15430), deployedLocalPort)
 
 	// The port is no longer available when trying to start a second tunnel with it.
-	deployed_local_port, err = config.startWithTimeout(15430, 1)
+	_, err = config.startWithTimeout(15430, 1)
 	require.Contains(t, err.Error(), "Local port 15430 is unavailable.")
 }
 

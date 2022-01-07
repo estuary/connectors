@@ -22,9 +22,6 @@ jobs:
       - name: Install MUSL
         run: sudo apt-get install -y musl-tools
 
-      - name: Install deps
-        run: sudo apt-get install -y pkg-config libssl-dev
-
       - name: Cargo Cache
         uses: actions/cache@v2
         with:
@@ -38,35 +35,17 @@ jobs:
             ssh-forwarding-service/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-          #- name: Test Rust Apps
-          #  run: |
-          #    cargo test --manifest-path=parser/Cargo.toml --locked
-          #    cargo test --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked
-          #    cargo test --manifest-path=ssh-forwarding-service/Cargo.toml --locked
-
-      # https://github.com/rust-embedded/cross/issues/229#issuecomment-590546949
-      # This is temp solution to enable cross compile for ssh-forwarding-service, which requires OpenSSL.
-      #- name: Install cross 0.1.16
-      #  uses: actions-rs/cargo@v1
-      #  with:
-      #    command: install
-      #    args: --version 0.1.16 cross
+      - name: Test Rust Apps
+        run: |
+          cargo test --manifest-path=parser/Cargo.toml --locked
+          cargo test --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked
+          cargo test --manifest-path=ssh-forwarding-service/Cargo.toml --locked
 
       - name: Build Rust Apps
         run: |
           cargo build --manifest-path=ssh-forwarding-service/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
           cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
           cargo build --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
-          #cargo install --force --version 0.1.16 cross
-          #cd ssh-forwarding-service
-          #cross build -v --locked --release --target=x86_64-unknown-linux-musl
-          
-          #- name: Build ssh-forwarding-service Rust App
-          #  uses: actions-rs/cargo@v1
-          #  with:
-          #    use-cross: true
-          #    command: build
-          #    args: --manifest-path=ssh-forwarding-service/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl -v
 
       - name: Upload Rust Apps
         uses: actions/upload-artifact@v2

@@ -32,16 +32,16 @@ func createPostgresqlForwardingTestConfig() (*sf.SshForwardingConfig, error) {
 func TestSshForwardConfig_Postgresql(t *testing.T) {
 	config, err := createPostgresqlForwardingTestConfig()
 	require.NoError(t, err)
-	_, err = config.StartWithDefault(6666, 2)
+	port, err := config.Start(0)
 	require.NoError(t, err)
-	//require.GreaterOrEqual(t, port, uint16(10000))
+	require.GreaterOrEqual(t, port, uint16(10000))
 
 	var ctx = context.Background()
-	conn, err := pgx.Connect(ctx, fmt.Sprintf("postgres://flow:flow@localhost:%d/flow", 6666))
+	conn, err := pgx.Connect(ctx, fmt.Sprintf("postgres://flow:flow@localhost:%d/flow", port))
 	defer conn.Close(ctx)
 
 	var result int
-	err = conn.QueryRow(context.Background(), "select 1 +1").Scan(&result)
+	err = conn.QueryRow(context.Background(), "select 1 + 1").Scan(&result)
 	require.NoError(t, err)
 	require.Equal(t, 2, result)
 }
