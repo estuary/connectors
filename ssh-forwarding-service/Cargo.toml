@@ -1,0 +1,24 @@
+[package]
+name = "ssh-forwarding-service"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64="*"
+port_scanner="*"
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+signal-hook="*"
+thiserror = "*"
+tracing = "*"
+tracing-subscriber = {version = "*", features = ["time", "json", "env-filter"]}
+
+openssl-sys = { version = "*", features = ['vendored'] }
+openssl="*"
+thrussh={version="*", features=["openssl"]}
+futures="*"
+thrussh-keys={version="*", features=["openssl"]}
+tokio = { version = "1.15.0", features = ["full"] }
+rand = "*"
