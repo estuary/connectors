@@ -51,28 +51,33 @@ func TestSshForwardConfig_startWithDefault(t *testing.T) {
 	var config, err = createForwardingTestConfig()
 	require.NoError(t, err)
 
-	deployed_local_port, err := config.StartWithDefault(15433, 1)
+	deployed_local_port, err := config.Start(15433)
 	require.NoError(t, err)
 	require.Equal(t, uint16(15433), deployed_local_port)
 
-	//deployed_local_port, err = config.StartWithDefault(0, 1)
-	//require.NoError(t, err)
-	//require.NotEqual(t, uint16(15433), deployed_local_port)
-	//require.GreaterOrEqual(t, deployed_local_port, uint16(10000))
+	deployed_local_port, err = config.Start(0)
+	require.NoError(t, err)
+	require.NotEqual(t, uint16(15433), deployed_local_port)
+	require.GreaterOrEqual(t, deployed_local_port, uint16(10000))
 }
 
-//func TestSshForwardConfig_startWithDefaultWithBadSshEndpoint(t *testing.T) {
-//	var config, err = createForwardingTestConfig()
-//	require.NoError(t, err)
-//	config.SshEndpoint = "bad_endpoint"
-//	_, err = config.StartWithDefault(0, 1)
-//	require.Contains(t, err.Error(), "Could not resolve hostname bad_endpoint")
-//}
-//
-//func TestSshForwardConfig_startWithDefaultWithBadRemoteHost(t *testing.T) {
-//	var config, err = createForwardingTestConfig()
-//	require.NoError(t, err)
-//	config.RemoteHost = "bad_:remote_host"
-//	_, err = config.StartWithDefault(0, 1)
-//	require.Contains(t, err.Error(), "Bad local forwarding specification")
-//}
+func TestSshForwardConfig_startWithConflictingPorts(t *testing.T) {
+	var config, err = createForwardingTestConfig()
+	require.NoError(t, err)
+
+	deployed_local_port, err := config.Start(15430)
+	require.NoError(t, err)
+	require.Equal(t, uint16(15433), deployed_local_port)
+
+	// The port is no longer available when trying to start a second tunnel with it.
+	deployed_local_port, err = config.startWithTimeout(15430, 1)
+	require.Contains(t, err.Error(), "Local port 15430 is unavailable.")
+}
+
+func TestSshForwardConfig_startWithDefaultWithBadSshEndpoint(t *testing.T) {
+	var config, err = createForwardingTestConfig()
+	require.NoError(t, err)
+	config.SshEndpoint = "bad_endpoint"
+	_, err = config.startWithTimeout(0, 1)
+	require.Contains(t, err.Error(), "Failed to create to SSH tunnel.")
+}

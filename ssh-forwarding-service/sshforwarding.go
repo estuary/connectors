@@ -18,7 +18,6 @@ type SshForwardingConfig struct {
 }
 
 const ProgramName = "ssh-forwarding-service"
-const defaultMaxPollingRetryTimes = 5
 
 type forwardingServiceInput struct {
 	SshForwardingConfig  SshForwardingConfig `json:"ssh_forwarding_config"`
@@ -50,12 +49,13 @@ func (sfc *SshForwardingConfig) Validate() error {
 	return nil
 }
 
+const defaultTimeoutSecs = 5
+
 func (sfc *SshForwardingConfig) Start(suggestedLocalPort uint16) (uint16, error) {
-	return sfc.StartWithDefault(suggestedLocalPort, defaultMaxPollingRetryTimes)
+	return sfc.startWithTimeout(suggestedLocalPort, defaultTimeoutSecs)
 }
 
-func (sfc *SshForwardingConfig) StartWithDefault(
-	suggestedLocalPort uint16, maxPollingRetryTimes uint16) (uint16, error) {
+func (sfc *SshForwardingConfig) startWithTimeout(suggestedLocalPort uint16, timeoutSecs uint16) (uint16, error) {
 	if sfc == nil {
 		// SshForwardingConfig is not set.
 		return suggestedLocalPort, nil
@@ -69,7 +69,7 @@ func (sfc *SshForwardingConfig) StartWithDefault(
 	cmd.Stdout = &stdoutWriter{delegate: stdout, ch: readyCh}
 	cmd.Stderr = &stderr
 
-	if err := sfc.sendInput(cmd, suggestedLocalPort, maxPollingRetryTimes); err != nil {
+	if err := sfc.sendInput(cmd, suggestedLocalPort); err != nil {
 		return 0, fmt.Errorf("sending input to service: %w", err)
 	} else if err := cmd.Start(); err != nil {
 		return 0, fmt.Errorf("starting ssh forwarding service: %w", err)
@@ -85,7 +85,7 @@ func (sfc *SshForwardingConfig) StartWithDefault(
 		}
 
 		return output.DeployedLocalPort, nil
-	case <-time.After(time.Duration(1<<maxPollingRetryTimes) * time.Second):
+	case <-time.After(time.Duration(timeoutSecs) * time.Second):
 		if cmd.Process != nil {
 			cmd.Process.Signal(syscall.SIGTERM)
 		}
@@ -94,19 +94,17 @@ func (sfc *SshForwardingConfig) StartWithDefault(
 			stderr.String(),
 		)
 	}
-
 }
 
-func (sfc *SshForwardingConfig) sendInput(cmd *exec.Cmd, localPort, maxPollingRetryTimes uint16) error {
+func (sfc *SshForwardingConfig) sendInput(cmd *exec.Cmd, localPort uint16) error {
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("getting stdin pipe: %w", err)
 	}
 
 	input, err := json.Marshal(forwardingServiceInput{
-		SshForwardingConfig:  *sfc,
-		LocalPort:            localPort,
-		MaxPollingRetryTimes: maxPollingRetryTimes,
+		SshForwardingConfig: *sfc,
+		LocalPort:           localPort,
 	})
 
 	if err != nil {

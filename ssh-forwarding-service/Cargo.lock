@@ -888,6 +888,7 @@ dependencies = [
  "openssl",
  "openssl-sys",
  "port_scanner",
+ "rand",
  "serde",
  "serde_json",
  "signal-hook",

@@ -22,23 +22,22 @@ async fn main() -> io::Result<()> {
         &input.ssh_forwarding_config.ssh_private_key_base64).await
     .or_bail("SSH service failed to authenticate");
 
-    let serve_future = ssh_tunnel.start_serve(
-        &input.ssh_forwarding_config.remote_host, input.ssh_forwarding_config.remote_port);
-
     // Write output to stdio.
     serde_json::to_writer(
         io::stdout(),
         &Output {
-            deployed_local_port: input.local_port,
+            deployed_local_port: ssh_tunnel.deployed_port(),
         },
-    ).unwrap();
+    ).or_bail("Failed writing to stdio.");
 
     io::stdout()
         .write_all(&[0])
         .expect("Failed to write to stdout");
-    io::stdout().flush().expect("Failed flush output.");
+    io::stdout().flush().or_bail("Failed flushing output.");
 
-    serve_future.await.or_bail("ssh tunnel failed during serving.");
+    ssh_tunnel.start_serve(
+        &input.ssh_forwarding_config.remote_host, input.ssh_forwarding_config.remote_port).await
+        .or_bail("ssh tunnel failed during serving.");
 
     Ok(())
 }

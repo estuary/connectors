@@ -6,6 +6,9 @@ pub enum Error {
     #[error("SSH private key is invalid.")]
     InvalidSshCredential,
 
+    #[error("Local port {0} is unavailable.")]
+    LocalPortUnavailableError(u16),
+
     #[error("failed in thrussh")]
     ThrusshError(#[from] thrussh::Error),
 

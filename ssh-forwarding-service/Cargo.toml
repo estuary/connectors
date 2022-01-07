@@ -21,3 +21,4 @@ thrussh={version="*", features=["openssl"]}
 futures="*"
 thrussh-keys={version="*", features=["openssl"]}
 tokio = { version = "1.15.0", features = ["full"] }
+rand = "*"
