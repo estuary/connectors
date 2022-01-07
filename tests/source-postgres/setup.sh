@@ -4,8 +4,6 @@ set -e
 export TEST_STREAM="estuary_test_$(shuf -zer -n6 {a..z} | tr -d '\0')"
 export RESOURCE="{ stream: ${TEST_STREAM} }"
 
-#export PRIVATE_KEY="$(cat ~/.ssh/jixiang-estuary.pem)"
-
 if [[ "${SSH_FORWARDING_ENABLED}" == "true" ]]
 then
     if [[ ! -f "${PRIVATE_KEY_FILE_PATH}" ]]; then

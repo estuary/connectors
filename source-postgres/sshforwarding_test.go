@@ -14,7 +14,7 @@ import (
 
 // Configuration set based on:
 // - source-postgres/docker-compose.yaml
-// - ssh-forwarding-service/docker-compose.yaml
+// - ssh-forwarding-service/test_sshd_configs/docker-compose.yaml
 func createPostgresqlForwardingTestConfig() (*sf.SshForwardingConfig, error) {
 	var b, err = os.ReadFile("../ssh-forwarding-service/test_sshd_configs/keys/id_rsa")
 	if err != nil {

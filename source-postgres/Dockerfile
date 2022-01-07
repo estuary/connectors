@@ -22,9 +22,9 @@ ENV PATH="/builder/bin:$PATH"
 RUN go test -v ./ssh-forwarding-service/...
 RUN go test -v ./source-postgres/...
 
-
 # Build the connector.
 RUN go build -o ./connector -v ./source-postgres/...
+
 
 # Runtime Stage
 ################################################################################
