@@ -16,7 +16,7 @@ For each Flow collection you'd like to materialize, add a binding with the names
 materializations:
   example/toRockset:
     endpoint:
-      flowSink:
+      connector:
         image: ghcr.io/estuary/materialize-rockset:dev
         config:
           api_key: <your rockset API key here>
@@ -45,7 +45,7 @@ The [materialize-s3-parquet](../materialize-s3-parquet/) connector can be used t
   materializations:
     example/toRockset:
       endpoint:
-        flowSink:
+        connector:
           image: ghcr.io/estuary/materialize-s3-parquet:dev
           config:
             bucket: example-s3-bucket
@@ -71,7 +71,7 @@ The [materialize-s3-parquet](../materialize-s3-parquet/) connector can be used t
   materializations:
     example/toRockset:
       endpoint:
-        flowSink:
+        connector:
           image: ghcr.io/estuary/materialize-rockset:dev
           config:
             api_key: <your rockset API key here>
