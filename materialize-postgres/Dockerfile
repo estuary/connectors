@@ -9,6 +9,10 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 RUN go install github.com/mattn/go-sqlite3
+COPY ssh-forwarding-service ./ssh-forwarding-service
+COPY ssh-forwarding-service/target/x86_64-unknown-linux-musl/release/ssh-forwarding-service ./bin/ssh-forwarding-service
+
+ENV PATH="/builder/bin:$PATH"
 
 # Copy in a recent `flowctl` for usage by tests.
 COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl /usr/local/bin/flowctl
@@ -19,7 +23,7 @@ COPY materialize-postgres    ./materialize-postgres
 COPY testsupport             ./testsupport
 
 # Test and build the connector.
-RUN go test  -tags nozstd -v ./materialize-postgres/...
+#RUN go test  -tags nozstd -v ./materialize-postgres/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-postgres/...
 
 # Runtime Stage
@@ -31,6 +35,8 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./connector
+COPY --from=builder /builder/bin/ssh-forwarding-service ./ssh-forwarding-service
+COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
