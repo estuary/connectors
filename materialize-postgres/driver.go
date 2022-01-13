@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	sf "github.com/estuary/connectors/ssh-forwarding-service"
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
 	sqlDriver "github.com/estuary/protocols/materialize/sql"
@@ -21,11 +22,12 @@ import (
 // config represents the endpoint configuration for postgres.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Host     string `json:"host"`
-	Port     uint16 `json:"port,omitempty"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	Database string `json:"database,omitempty"`
+	Host          string                  `json:"host"`
+	Port          uint16                  `json:"port,omitempty"`
+	User          string                  `json:"user"`
+	Password      string                  `json:"password"`
+	Database      string                  `json:"database,omitempty"`
+	SshForwarding *sf.SshForwardingConfig `json:"ssh_forwarding,omitempty" jsonschema:"description=Configurations to enable local SSH forwarding."`
 }
 
 // Validate the configuration.
@@ -39,6 +41,10 @@ func (c *config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if err := c.SshForwarding.Validate(); err != nil {
+		return fmt.Errorf("invalid ssh forwarding config: %w", err)
 	}
 	return nil
 }
@@ -90,6 +96,12 @@ func newPostgresDriver() pm.DriverServer {
 			var parsed = new(config)
 			if err := pf.UnmarshalStrict(raw, parsed); err != nil {
 				return nil, fmt.Errorf("parsing Postgresql configuration: %w", err)
+			}
+
+			if deployedLocalPort, err := parsed.SshForwarding.Start(parsed.Port); err != nil {
+				return nil, err
+			} else {
+				parsed.Port = deployedLocalPort
 			}
 
 			log.WithFields(log.Fields{

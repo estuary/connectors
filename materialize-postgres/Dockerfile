@@ -31,6 +31,7 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./connector
+COPY --from=builder /builder/bin/ssh-forwarding-service ./ssh-forwarding-service
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
