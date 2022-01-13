@@ -17,6 +17,10 @@ COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl /usr/local/bin/flowc
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-postgres    ./materialize-postgres
 COPY testsupport             ./testsupport
+COPY ssh-forwarding-service ./ssh-forwarding-service
+
+# Copy ssh-forwarding-service binary.
+COPY ssh-forwarding-service/target/x86_64-unknown-linux-musl/release/ssh-forwarding-service ./bin/ssh-forwarding-service
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-postgres/...
