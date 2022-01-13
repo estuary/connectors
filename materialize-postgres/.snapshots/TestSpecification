@@ -21,10 +21,48 @@
       },
       "database": {
         "type": "string"
+      },
+      "ssh_forwarding": {
+        "$schema": "http://json-schema.org/draft-04/schema#",
+        "$ref": "#/definitions/SshForwardingConfig",
+        "description": "Configurations to enable local SSH forwarding."
       }
     },
     "additionalProperties": false,
-    "type": "object"
+    "type": "object",
+    "definitions": {
+      "SshForwardingConfig": {
+        "required": [
+          "ssh_endpoint",
+          "ssh_private_key_base64",
+          "remote_host"
+        ],
+        "properties": {
+          "ssh_endpoint": {
+            "type": "string",
+            "description": "Endpoint of the remote SSH server that supports tunneling"
+          },
+          "ssh_private_key_base64": {
+            "type": "string",
+            "description": "Base64-encoded private Key to connect to the remote SSH server."
+          },
+          "ssh_user": {
+            "type": "string",
+            "description": "User name to connect to the remote SSH server."
+          },
+          "remote_host": {
+            "type": "string",
+            "description": "Host name to connect from the remote SSH server to the remote destination (e.g. DB) via internal network."
+          },
+          "remote_port": {
+            "type": "integer",
+            "description": "Port of the remote destination."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      }
+    }
   },
   "resource_spec_schema_json": {
     "$schema": "http://json-schema.org/draft-04/schema#",
