@@ -9,18 +9,21 @@ pub enum Error {
     #[error("local port {0} is unavailable.")]
     LocalPortUnavailableError(u16),
 
-    #[error("thrussh error.")]
-    ThrusshError(#[from] thrussh::Error),
+    #[error("thrussh error: {source:?}.")]
+    ThrusshError{#[from] source: thrussh::Error},
 
-    #[error("io operation error.")]
-    IoError(#[from] std::io::Error),
+    #[error("io operation error: {source:?}.")]
+    IoError{#[from] source: std::io::Error},
 
-    #[error("openssl error.")]
-    OpenSslError(#[from] openssl::error::ErrorStack),
+    #[error("openssl error: {source:?}.")]
+    OpenSslError{#[from] source: openssl::error::ErrorStack},
 
-    #[error("base64 decoding error.")]
-    Base64DecodeError(#[from] base64::DecodeError),
+    #[error("base64 decoding error: {source:?}.")]
+    Base64DecodeError{#[from] source: base64::DecodeError},
 
-    #[error("IP parse error.")]
-    IpAddrParseError(#[from] std::net::AddrParseError)
+    #[error("ssh_endpoint parse error: {source:?}. Expected format: ssh://<host_url_or_ip>[:port]")]
+    UrlParseError{#[from] source: url::ParseError},
+
+    #[error("IP parse error: {source:?}.")]
+    IpAddrParseError{#[from] source: std::net::AddrParseError}
 }

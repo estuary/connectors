@@ -210,7 +210,7 @@ jobs:
           PGUSER: flow
 
           # Based on configs in ssh-forwarding-service/test_sshd_configs/docker-compose.yaml
-          SSHENDPOINT: localhost:2222
+          SSHENDPOINT: ssh://localhost:2222
           SSHUSER: flowssh
           PRIVATE_KEY_FILE_PATH: ssh-forwarding-service/test_sshd_configs/keys/id_rsa
           LOCALPORT: 9876

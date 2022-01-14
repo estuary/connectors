@@ -7,6 +7,9 @@ edition = "2018"
 
 [dependencies]
 base64="*"
+futures="*"
+openssl-sys = { version = "*", features = ['vendored'] }
+openssl="*"
 port_scanner="*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
@@ -15,10 +18,8 @@ thiserror = "*"
 tracing = "*"
 tracing-subscriber = {version = "*", features = ["time", "json", "env-filter"]}
 
-openssl-sys = { version = "*", features = ['vendored'] }
-openssl="*"
 thrussh={version="*", features=["openssl"]}
-futures="*"
 thrussh-keys={version="*", features=["openssl"]}
 tokio = { version = "1.15.0", features = ["full"] }
 rand = "*"
+url = "*"

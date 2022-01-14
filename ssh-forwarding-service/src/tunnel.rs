@@ -5,14 +5,17 @@ use base64::decode;
 use futures::{select, FutureExt};
 use port_scanner::local_port_available;
 use rand::{thread_rng, Rng};
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use thrussh::{client::Handle, client};
 use thrussh_keys::key;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use url::Url;
 
 pub struct ClientHandler {}
+
+const DEFAULT_SSH_PORT: u16 = 22;
 
 impl client::Handler for ClientHandler {
     type Error = thrussh::Error;
@@ -39,8 +42,8 @@ pub struct SshTunnel {
 impl SshTunnel {
     pub async fn create(ssh_endpoint: String, local_port: u16) -> Result<Self, Error> {
         // create ssh client.
-        let mut ssh_addrs = ssh_endpoint.to_socket_addrs()?;
-        let ssh_addr = ssh_addrs.next().ok_or(Error::InvalidSshEndpoint)?;
+        let ssh_addrs = Url::parse(&ssh_endpoint)?.socket_addrs(|| Some(DEFAULT_SSH_PORT))?;
+        let ssh_addr = ssh_addrs.iter().next().ok_or(Error::InvalidSshEndpoint)?;
         let config = Arc::new(client::Config::default());
         let handler = ClientHandler {};
         let ssh_client = client::connect( config, ssh_addr, handler).await?;

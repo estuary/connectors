@@ -21,7 +21,7 @@ func createPostgresqlForwardingTestConfig() (*sf.SshForwardingConfig, error) {
 		return nil, err
 	}
 	return &sf.SshForwardingConfig{
-		SshEndpoint:         "localhost:2222",
+		SshEndpoint:         "ssh://localhost:2222",
 		SshPrivateKeyBase64: base64.RawStdEncoding.EncodeToString(b),
 		SshUser:             "flowssh",
 		RemoteHost:          "127.0.0.1",

@@ -10,7 +10,7 @@ import (
 )
 
 type SshForwardingConfig struct {
-	SshEndpoint         string `json:"ssh_endpoint" jsonschema:"description=Endpoint of the remote SSH server that supports tunneling, in the form of hostname[:port]"`
+	SshEndpoint         string `json:"ssh_endpoint" jsonschema:"description=Endpoint of the remote SSH server that supports tunneling, in the form of ssh://hostname[:port]"`
 	SshPrivateKeyBase64 string `json:"ssh_private_key_base64" jsonschema:"description=Base64-encoded private Key to connect to the remote SSH server."`
 	SshUser             string `json:"ssh_user,omitempty" jsonschema:"description=User name to connect to the remote SSH server."`
 	RemoteHost          string `json:"remote_host" jsonschema:"description=Host name to connect from the remote SSH server to the remote destination (e.g. DB) via internal network."`

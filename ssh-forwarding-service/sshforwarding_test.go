@@ -39,7 +39,7 @@ func createForwardingTestConfig() (*SshForwardingConfig, error) {
 		return nil, err
 	}
 	return &SshForwardingConfig{
-		SshEndpoint:         "127.0.0.1:2222",
+		SshEndpoint:         "ssh://127.0.0.1:2222",
 		SshPrivateKeyBase64: base64.RawStdEncoding.EncodeToString(b),
 		SshUser:             "flowssh",
 		RemoteHost:          "127.0.0.1",
