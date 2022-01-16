@@ -6,8 +6,11 @@ pub enum Error {
     #[error("SSH private key is invalid.")]
     InvalidSshCredential,
 
-    #[error("local port {0} is unavailable.")]
-    LocalPortUnavailableError(u16),
+    #[error("SSH client is used before creation")]
+    SshClientUnInitialized,
+
+    #[error("Local Listener is used before creation")]
+    LocalListenerUnInitialized,
 
     #[error("thrussh error: {source:?}.")]
     ThrusshError{#[from] source: thrussh::Error},

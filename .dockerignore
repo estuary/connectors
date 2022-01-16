@@ -8,4 +8,4 @@ tests
 # We use the statically-compiled parser cli in the docker builds, so we can't ignore it.
 !parser/target/x86_64-unknown-linux-musl/release/parser
 
-!ssh-forwarding-service/target/x86_64-unknown-linux-musl/release/ssh-forwarding-service
+!network-proxy-service/target/x86_64-unknown-linux-musl/release/network-proxy-service

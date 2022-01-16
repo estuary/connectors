@@ -16,12 +16,16 @@ then
         "port":     $LOCALPORT,
         "password": "PGPASSWORD",
         "user":     "$PGUSER",
-        "ssh_forwarding": {
-          "ssh_endpoint": "$SSHENDPOINT",
-          "ssh_user": "$SSHUSER",
-          "remote_host": "$PGHOST",
-          "remote_port": $PGPORT,
-          "ssh_private_key_base64": "$PRIVATE_KEY_BASE64"
+        "network_proxy": {
+            "proxy_type": "ssh_forwarding",
+            "ssh_forwarding": {
+              "ssh_endpoint": "$SSHENDPOINT",
+              "ssh_user": "$SSHUSER",
+              "remote_host": "$PGHOST",
+              "remote_port": $PGPORT,
+              "ssh_private_key_base64": "$PRIVATE_KEY_BASE64",
+              "local_port": $LOCALPORT
+            }
         }
     }'
 else

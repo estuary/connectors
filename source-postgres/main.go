@@ -7,8 +7,8 @@ import (
 	"net/url"
 
 	"github.com/alecthomas/jsonschema"
+	np "github.com/estuary/connectors/network-proxy-service"
 	"github.com/estuary/connectors/sqlcapture"
-	sf "github.com/estuary/connectors/ssh-forwarding-service"
 	"github.com/estuary/protocols/airbyte"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
@@ -37,15 +37,15 @@ func main() {
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Database        string                  `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
-	Host            string                  `json:"host" jsonschema:"description=Host name of the database to connect to."`
-	SshForwarding   *sf.SshForwardingConfig `json:"ssh_forwarding,omitempty" jsonschema:"description=Configurations to enable local SSH forwarding."`
-	Password        string                  `json:"password" jsonschema:"description=User password configured within the database."`
-	Port            uint16                  `json:"port" jsonschema:"default=5432" jsonschema:"description=Port to the DB connection. If SshForwardingConfig is enabled, a dynamic port is allocated if Port is unspecified."`
-	PublicationName string                  `json:"publication_name,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
-	SlotName        string                  `json:"slot_name,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
-	User            string                  `json:"user" jsonschema:"default=postgres,description=Database user to use."`
-	WatermarksTable string                  `json:"watermarks_table,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills."`
+	Database        string                 `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
+	Host            string                 `json:"host" jsonschema:"description=Host name of the database to connect to."`
+	NetworkProxy    *np.NetworkProxyConfig `json:"network_proxy,omitempty" jsonschema:"description=Configurations to enable network proxies."`
+	Password        string                 `json:"password" jsonschema:"description=User password configured within the database."`
+	Port            uint16                 `json:"port" jsonschema:"default=5432" jsonschema:"description=Port to the DB connection. If SshForwardingConfig is enabled, a dynamic port is allocated if Port is unspecified."`
+	PublicationName string                 `json:"publication_name,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
+	SlotName        string                 `json:"slot_name,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
+	User            string                 `json:"user" jsonschema:"default=postgres,description=Database user to use."`
+	WatermarksTable string                 `json:"watermarks_table,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -61,8 +61,8 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if err := c.SshForwarding.Validate(); err != nil {
-		return fmt.Errorf("SshForwarding config err: %w", err)
+	if err := c.NetworkProxy.Validate(); err != nil {
+		return fmt.Errorf("Network proxy config err: %w", err)
 	}
 
 	return nil
@@ -106,10 +106,8 @@ type postgresDatabase struct {
 }
 
 func (db *postgresDatabase) Connect(ctx context.Context) error {
-	if deployedLocalPort, err := db.config.SshForwarding.Start(db.config.Port); err != nil {
-		return err
-	} else {
-		db.config.Port = deployedLocalPort
+	if err := db.config.NetworkProxy.Start(); err != nil {
+		return fmt.Errorf("unable to start network proxy %w", err)
 	}
 
 	logrus.WithFields(logrus.Fields{

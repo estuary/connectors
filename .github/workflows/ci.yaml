@@ -32,18 +32,18 @@ jobs:
             ~/.cargo/git/db/
             parser/target/
             materialize-elasticsearch/schemabuilder/target/
-            ssh-forwarding-service/target/
+            network-proxy-service/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test Rust Apps
         run: |
           cargo test --manifest-path=parser/Cargo.toml --locked
           cargo test --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked
-          cargo test --manifest-path=ssh-forwarding-service/Cargo.toml --locked
+          cargo test --manifest-path=network-proxy-service/Cargo.toml --locked
 
       - name: Build Rust Apps
         run: |
-          cargo build --manifest-path=ssh-forwarding-service/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
+          cargo build --manifest-path=network-proxy-service/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
           cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
           cargo build --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
 
@@ -54,7 +54,7 @@ jobs:
           path: |
             parser/target/x86_64-unknown-linux-musl/release/parser
             materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
-            ssh-forwarding-service/target/x86_64-unknown-linux-musl/release/ssh-forwarding-service
+            network-proxy-service/target/x86_64-unknown-linux-musl/release/network-proxy-service
 
   build_connectors:
     needs: build_rust_releases
@@ -98,7 +98,7 @@ jobs:
           chmod +x \
           parser/target/x86_64-unknown-linux-musl/release/parser \
           materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder \
-          ssh-forwarding-service/target/x86_64-unknown-linux-musl/release/ssh-forwarding-service
+          network-proxy-service/target/x86_64-unknown-linux-musl/release/network-proxy-service
 
       - name: Install kafkactl
         if: matrix.connector == 'source-kafka'
@@ -135,7 +135,7 @@ jobs:
       - name: Start Open SSH server
         if: matrix.connector == 'source-postgres'
         run: |
-          cp -r ssh-forwarding-service/test_sshd_configs /tmp/test_sshd_configs &&
+          cp -r network-proxy-service/sshforwarding/test_sshd_configs /tmp/test_sshd_configs &&
           docker-compose --file /tmp/test_sshd_configs/docker-compose.yaml up --detach openssh-server
 
       - name: Login to GitHub package docker registry
@@ -209,10 +209,10 @@ jobs:
           PGPORT: 5432
           PGUSER: flow
 
-          # Based on configs in ssh-forwarding-service/test_sshd_configs/docker-compose.yaml
+          # Based on configs in network-proxy-service/sshforwarding/test_sshd_configs/docker-compose.yaml
           SSHENDPOINT: ssh://localhost:2222
           SSHUSER: flowssh
-          PRIVATE_KEY_FILE_PATH: ssh-forwarding-service/test_sshd_configs/keys/id_rsa
+          PRIVATE_KEY_FILE_PATH: network-proxy-service/sshforwarding/test_sshd_configs/keys/id_rsa
           LOCALPORT: 9876
           SSH_FORWARDING_ENABLED: true
 

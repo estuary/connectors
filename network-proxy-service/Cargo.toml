@@ -1,16 +1,16 @@
 [package]
-name = "ssh-forwarding-service"
+name = "network-proxy-service"
 version = "0.1.0"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait="*"
 base64="*"
 futures="*"
 openssl-sys = { version = "*", features = ['vendored'] }
 openssl="*"
-port_scanner="*"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 signal-hook="*"
@@ -21,5 +21,4 @@ tracing-subscriber = {version = "*", features = ["time", "json", "env-filter"]}
 thrussh={version="*", features=["openssl"]}
 thrussh-keys={version="*", features=["openssl"]}
 tokio = { version = "1.15.0", features = ["full"] }
-rand = "*"
 url = "*"

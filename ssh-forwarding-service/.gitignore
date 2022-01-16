@@ -1,6 +1,0 @@
-.vscode
-test_sshd_configs/config/custom-services.d
-test_sshd_configs/config/.ssh
-test_sshd_configs/config/logs
-test_sshd_configs/config/sshd.pid
-test_sshd_configs/config/ssh_host_keys
