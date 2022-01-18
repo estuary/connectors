@@ -22,20 +22,40 @@
       "database": {
         "type": "string"
       },
-      "ssh_forwarding": {
+      "network_proxy": {
         "$schema": "http://json-schema.org/draft-04/schema#",
-        "$ref": "#/definitions/SshForwardingConfig",
-        "description": "Configurations to enable local SSH forwarding."
+        "$ref": "#/definitions/NetworkProxyConfig",
+        "description": "Configurations to enable network proxies."
       }
     },
     "additionalProperties": false,
     "type": "object",
     "definitions": {
+      "NetworkProxyConfig": {
+        "required": [
+          "proxy_type",
+          "ssh_forwarding"
+        ],
+        "properties": {
+          "proxy_type": {
+            "type": "string",
+            "description": "The type of the network proxy. Supported types are: ( ssh_forwarding )"
+          },
+          "ssh_forwarding": {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "$ref": "#/definitions/SshForwardingConfig",
+            "description": "Config for proxy of type ssh_forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
       "SshForwardingConfig": {
         "required": [
           "ssh_endpoint",
           "ssh_private_key_base64",
-          "remote_host"
+          "remote_host",
+          "local_port"
         ],
         "properties": {
           "ssh_endpoint": {
@@ -57,6 +77,10 @@
           "remote_port": {
             "type": "integer",
             "description": "Port of the remote destination."
+          },
+          "local_port": {
+            "type": "integer",
+            "description": "Local port to start the SSH tunnel. The connector should fetch data from localhost:\u003clocal_port\u003e after SSH tunnel is enabled."
           }
         },
         "additionalProperties": false,

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sf "github.com/estuary/connectors/ssh-forwarding-service"
+	np "github.com/estuary/connectors/network-proxy-service"
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
 	sqlDriver "github.com/estuary/protocols/materialize/sql"
@@ -22,12 +22,12 @@ import (
 // config represents the endpoint configuration for postgres.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Host          string                  `json:"host"`
-	Port          uint16                  `json:"port,omitempty"`
-	User          string                  `json:"user"`
-	Password      string                  `json:"password"`
-	Database      string                  `json:"database,omitempty"`
-	SshForwarding *sf.SshForwardingConfig `json:"ssh_forwarding,omitempty" jsonschema:"description=Configurations to enable local SSH forwarding."`
+	Host         string                 `json:"host"`
+	Port         uint16                 `json:"port,omitempty"`
+	User         string                 `json:"user"`
+	Password     string                 `json:"password"`
+	Database     string                 `json:"database,omitempty"`
+	NetworkProxy *np.NetworkProxyConfig `json:"network_proxy,omitempty" jsonschema:"description=Configurations to enable network proxies."`
 }
 
 // Validate the configuration.
@@ -43,7 +43,7 @@ func (c *config) Validate() error {
 		}
 	}
 
-	if err := c.SshForwarding.Validate(); err != nil {
+	if err := c.NetworkProxy.Validate(); err != nil {
 		return fmt.Errorf("invalid ssh forwarding config: %w", err)
 	}
 	return nil
@@ -98,10 +98,8 @@ func newPostgresDriver() pm.DriverServer {
 				return nil, fmt.Errorf("parsing Postgresql configuration: %w", err)
 			}
 
-			if deployedLocalPort, err := parsed.SshForwarding.Start(parsed.Port); err != nil {
+			if err := parsed.NetworkProxy.Start(); err != nil {
 				return nil, err
-			} else {
-				parsed.Port = deployedLocalPort
 			}
 
 			log.WithFields(log.Fields{

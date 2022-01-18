@@ -17,10 +17,10 @@ COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl /usr/local/bin/flowc
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-postgres    ./materialize-postgres
 COPY testsupport             ./testsupport
-COPY ssh-forwarding-service ./ssh-forwarding-service
+COPY network-proxy-service ./network-proxy-service
 
-# Copy ssh-forwarding-service binary.
-COPY ssh-forwarding-service/target/x86_64-unknown-linux-musl/release/ssh-forwarding-service ./bin/ssh-forwarding-service
+# Copy network-proxy-service binary.
+COPY network-proxy-service/target/x86_64-unknown-linux-musl/release/network-proxy-service ./bin/network-proxy-service
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-postgres/...
@@ -35,7 +35,8 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./connector
-COPY --from=builder /builder/bin/ssh-forwarding-service ./ssh-forwarding-service
+COPY --from=builder /builder/bin/network-proxy-service ./network-proxy-service
+COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
