@@ -152,9 +152,11 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 		}
 
 		// Convert all the values to database appropriate ones and store them in the GCS file.
-		if converted, err := b.store.paramsConverter.Convert(
-			append(append(it.Key, it.Values...), it.RawJSON),
-		); err != nil {
+		var vals = append(it.Key, it.Values...) // TODO(wgd): Was destructive reuse of `it.Key` intentional here?
+		if b.store.hasRootDocument {
+			vals = append(vals, it.RawJSON)
+		}
+		if converted, err := b.store.paramsConverter.Convert(vals); err != nil {
 			return fmt.Errorf("converting Store: %w", err)
 		} else if err = b.store.mergeFile.WriteRow(converted); err != nil {
 			return fmt.Errorf("encoding Store to scratch file: %w", err)
