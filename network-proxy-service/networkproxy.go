@@ -17,12 +17,12 @@ import (
 const ProgramName = "network-proxy-service"
 
 func SupportedNetworkProxyTypes() []string {
-	return []string{"ssh_forwarding"}
+	return []string{"sshForwarding"}
 }
 
 type NetworkProxyConfig struct {
-	ProxyType           string                 `json:"proxy_type"`
-	SshForwardingConfig sf.SshForwardingConfig `json:"ssh_forwarding"`
+	ProxyType           string                 `json:"proxyType"`
+	SshForwardingConfig sf.SshForwardingConfig `json:"sshForwarding"`
 }
 
 // GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface.
@@ -31,7 +31,7 @@ func (NetworkProxyConfig) GetFieldDocString(fieldName string) string {
 	case "ProxyType":
 		return fmt.Sprintf("The type of the network proxy. Supported types are: ( %s )", strings.Join(SupportedNetworkProxyTypes(), ", "))
 	case "SshForwardingConfig":
-		return "Config for proxy of type ssh_forwarding"
+		return "Config for proxy of type sshForwarding"
 	default:
 		return ""
 	}
@@ -55,7 +55,7 @@ func (npc *NetworkProxyConfig) Validate() error {
 	}
 
 	switch npc.ProxyType {
-	case "ssh_forwarding":
+	case "sshForwarding":
 		return npc.SshForwardingConfig.Validate()
 	default:
 		panic(fmt.Sprintf("Implementation of validating %s is not ready.", npc.ProxyType))
@@ -65,7 +65,7 @@ func (npc *NetworkProxyConfig) Validate() error {
 func (npc *NetworkProxyConfig) MarshalJSON() ([]byte, error) {
 	var m = make(map[string]interface{})
 	switch npc.ProxyType {
-	case "ssh_forwarding":
+	case "sshForwarding":
 		m[npc.ProxyType] = npc.SshForwardingConfig
 	default:
 		panic(fmt.Sprintf("Implementation of MarshalJSON for %s is missing.", npc.ProxyType))

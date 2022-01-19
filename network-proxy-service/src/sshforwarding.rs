@@ -16,6 +16,7 @@ use url::Url;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SshForwardingConfig {
     pub ssh_endpoint: String,
     pub ssh_user: String,

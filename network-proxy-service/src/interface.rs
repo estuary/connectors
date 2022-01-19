@@ -4,7 +4,7 @@ use super::networkproxy::NetworkProxy;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub enum NetworkProxyConfig {
     SshForwarding(SshForwardingConfig)
 }

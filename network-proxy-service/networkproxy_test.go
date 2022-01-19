@@ -15,7 +15,7 @@ func TestNetworkProxyConfig_Validate(t *testing.T) {
 	var unsupportedConfig = &NetworkProxyConfig{ProxyType: "unsupported"}
 	require.Error(t, unsupportedConfig.Validate(), "expected validation error for unsupported proxy type.")
 
-	var typeOnlyProxyConfig = NetworkProxyConfig{ProxyType: "ssh_forwarding"}
+	var typeOnlyProxyConfig = NetworkProxyConfig{ProxyType: "sshForwarding"}
 	require.Error(t, typeOnlyProxyConfig.Validate(), "expected validation error for ssh_forwording config without real configs.")
 
 	var sshForwardingConfig, err = CreateSshForwardingTestConfig(TestRsaFilePath, 15432)

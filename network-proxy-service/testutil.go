@@ -14,7 +14,7 @@ func CreateSshForwardingTestConfig(keyFilePath string, remotePort uint16) (*Netw
 		return nil, err
 	}
 	return &NetworkProxyConfig{
-		ProxyType: "ssh_forwarding",
+		ProxyType: "sshForwarding",
 		SshForwardingConfig: sf.SshForwardingConfig{
 			SshEndpoint:         "ssh://127.0.0.1:2222",
 			SshPrivateKeyBase64: base64.RawStdEncoding.EncodeToString(b),
