@@ -187,6 +187,7 @@ func SQLGenerator() sqlDriver.Generator {
 		sqlDriver.STRING: sqlDriver.StringTypeMapping{
 			Default: sqlDriver.RawConstColumnType("STRING"),
 			ByFormat: map[string]sqlDriver.TypeMapper{
+				"date":      sqlDriver.RawConstColumnType("DATE"),
 				"date-time": sqlDriver.RawConstColumnType("TIMESTAMP"),
 			},
 		},
