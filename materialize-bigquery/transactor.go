@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/estuary/protocols/fdb/tuple"
 	pf "github.com/estuary/protocols/flow"
 	pm "github.com/estuary/protocols/materialize"
 	log "github.com/sirupsen/logrus"
@@ -136,6 +137,7 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 
 	// Iterate through all the new values to store.
 	var err error
+	var vals []tuple.TupleElement
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 
@@ -152,7 +154,7 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 		}
 
 		// Convert all the values to database appropriate ones and store them in the GCS file.
-		var vals = append(it.Key, it.Values...) // TODO(wgd): Was destructive reuse of `it.Key` intentional here?
+		vals = append(append(vals[:0], it.Key...), it.Values...)
 		if b.store.hasRootDocument {
 			vals = append(vals, it.RawJSON)
 		}

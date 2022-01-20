@@ -118,9 +118,9 @@ func newBinding(generator sqlDriver.Generator, bindingPos int, targetName string
 	b.load.tempTableName = fmt.Sprintf("%s_load_%d", tempTableNamePrefix, bindingPos)
 
 	if spec.DeltaUpdates {
-		// TODO(wgd): Can we fill in some appropriate placeholder SQL that will always
-		// yield an empty result set?
-		b.load.sql = `THIS SHOULD NEVER BE EXECUTED`
+		// We should never issue a load query in delta updates mode, so just in case
+		// that happens we'll hopefully produce a reasonable error message with this.
+		b.load.sql = `ASSERT false AS 'Load queries should never be executed in Delta Updates mode.'`
 	} else {
 		// SELECT documents joined with the external table of keys to load
 		b.load.sql = fmt.Sprintf(`
