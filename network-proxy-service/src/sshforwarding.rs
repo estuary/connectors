@@ -51,6 +51,9 @@ impl SshForwarding {
     }
 
     pub async fn prepare_local_listener(&mut self) -> Result<(), Error> {
+        if self.config.local_port == 0 {
+            return Err(Error::ZeroLocalPort);
+        }
         let local_listen_addr: SocketAddr = format!("127.0.0.1:{}", self.config.local_port).parse()?;
         self.local_listener = Some(TcpListener::bind(local_listen_addr).await?);
 
@@ -100,7 +103,8 @@ impl NetworkProxy for SshForwarding {
 }
 
 async fn tunnel_streaming(mut forward_stream: TcpStream, mut bastion_channel: client::Channel) -> Result<(), Error>{
-    let mut buf_forward_stream = vec![0; 2048];
+    // Allocate a buffer of 128 KiB for forward stream.
+    let mut buf_forward_stream = vec![0; 2 << 17];
 
     loop {
         select! {
@@ -139,6 +143,8 @@ impl client::Handler for ClientHandler {
     type FutureUnit = futures::future::Ready<Result<(Self, client::Session), Self::Error>>;
     type FutureBool = futures::future::Ready<Result<(Self, bool), Self::Error>>;
 
+    // For the tunneling application, trivial functions, which immediately return Ready futures, are sufficient for
+    // the default implementations of the other APIs of the client handler.
     fn finished_bool(self, b: bool) -> Self::FutureBool {
         futures::future::ready(Ok((self, b)))
     }

@@ -12,7 +12,10 @@ pub enum Error {
     #[error("Local Listener is used before creation")]
     LocalListenerUnInitialized,
 
-    #[error("thrussh error: {source:?}.")]
+    #[error("Local port number of 0 is invalid")]
+    ZeroLocalPort,
+
+    #[error("SSH error: {source:?}.")]
     ThrusshError{#[from] source: thrussh::Error},
 
     #[error("io operation error: {source:?}.")]
