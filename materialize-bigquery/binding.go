@@ -30,6 +30,7 @@ type binding struct {
 		mergeFile       *ExternalDataConnectionFile
 		sql             string
 		tempTableName   string // The name the external table we be referenced by
+		hasRootDocument bool   // Whether the root document is included in this binding
 	}
 }
 
@@ -116,19 +117,25 @@ func newBinding(generator sqlDriver.Generator, bindingPos int, targetName string
 
 	b.load.tempTableName = fmt.Sprintf("%s_load_%d", tempTableNamePrefix, bindingPos)
 
-	// SELECT documents joined with the external table of keys to load
-	b.load.sql = fmt.Sprintf(`
+	if spec.DeltaUpdates {
+		// We should never issue a load query in delta updates mode, so just in case
+		// that happens we'll hopefully produce a reasonable error message with this.
+		b.load.sql = `ASSERT false AS 'Load queries should never be executed in Delta Updates mode.'`
+	} else {
+		// SELECT documents joined with the external table of keys to load
+		b.load.sql = fmt.Sprintf(`
 		SELECT %d, l.%s
 			FROM %s AS l
 			JOIN %s AS r
 			ON %s
 		`,
-		bindingPos,
-		tableDef.GetColumn(spec.FieldSelection.Document).Identifier,
-		tableDef.Identifier,
-		b.load.tempTableName,
-		strings.Join(pkJoins, " AND "),
-	)
+			bindingPos,
+			tableDef.GetColumn(spec.FieldSelection.Document).Identifier,
+			tableDef.Identifier,
+			b.load.tempTableName,
+			strings.Join(pkJoins, " AND "),
+		)
+	}
 
 	// BINDING STORES: Store is done via upserts using a merge query against an external table.
 
@@ -166,12 +173,9 @@ func newBinding(generator sqlDriver.Generator, bindingPos int, targetName string
 		rColIdentifiers = append(rColIdentifiers, fmt.Sprintf("r.%s", col.Identifier))
 	}
 
-	// Updates for all columns minus the primary keys plus the document field.
-	var lrUpdates []string
-	for _, colName := range append(spec.FieldSelection.Values, spec.FieldSelection.Document) {
-		var col = tableDef.GetColumn(colName)
-		lrUpdates = append(lrUpdates, fmt.Sprintf("l.%s = r.%s", col.Identifier, col.Identifier))
-	}
+	// If a field is selected whose document pointer is the root document, then Store()
+	// will need to include the root document in the set of values being written.
+	b.store.hasRootDocument = spec.FieldSelection.Document != ""
 
 	b.store.tempTableName = fmt.Sprintf("%s_store_%d", tempTableNamePrefix, bindingPos)
 
@@ -187,6 +191,13 @@ func newBinding(generator sqlDriver.Generator, bindingPos int, targetName string
 			b.store.tempTableName,
 		)
 	} else {
+		// Updates for all columns minus the primary keys plus the document field.
+		var lrUpdates []string
+		for _, colName := range append(spec.FieldSelection.Values, spec.FieldSelection.Document) {
+			var col = tableDef.GetColumn(colName)
+			lrUpdates = append(lrUpdates, fmt.Sprintf("l.%s = r.%s", col.Identifier, col.Identifier))
+		}
+
 		// Perform merge query to update existing values.
 		b.store.sql = fmt.Sprintf(`
 		MERGE INTO %s AS l
