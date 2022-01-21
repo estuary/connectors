@@ -77,10 +77,10 @@ func (npc *NetworkProxyConfig) MarshalJSON() ([]byte, error) {
 const defaultTimeoutSecs = 5
 
 func (npc *NetworkProxyConfig) Start() error {
-	return npc.startWithTimeout(defaultTimeoutSecs)
+	return npc.startInternal(defaultTimeoutSecs, os.Stderr)
 }
 
-func (npc *NetworkProxyConfig) startWithTimeout(timeoutSecs uint16) error {
+func (npc *NetworkProxyConfig) startInternal(timeoutSecs uint16, stderr io.Writer) error {
 	if npc == nil {
 		// NetworkProxyConfig is not set.
 		return nil
@@ -91,8 +91,7 @@ func (npc *NetworkProxyConfig) startWithTimeout(timeoutSecs uint16) error {
 
 	var readyCh = make(chan error)
 	cmd.Stdout = &readyWriter{delegate: os.Stdout, ch: readyCh}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	cmd.Stderr = stderr
 
 	if err := npc.sendInput(cmd); err != nil {
 		return fmt.Errorf("sending input to service: %w", err)
@@ -104,8 +103,8 @@ func (npc *NetworkProxyConfig) startWithTimeout(timeoutSecs uint16) error {
 	case err := <-readyCh:
 		if err != nil {
 			return fmt.Errorf(
-				"network proxy service error: %w. stderr: %s",
-				err, stderr.String(),
+				"network proxy service error: %w",
+				err,
 			)
 		}
 		return nil
@@ -114,10 +113,7 @@ func (npc *NetworkProxyConfig) startWithTimeout(timeoutSecs uint16) error {
 		if cmd.Process != nil {
 			cmd.Process.Signal(syscall.SIGTERM)
 		}
-		return fmt.Errorf(
-			"network proxy service failed to be ready after waiting for long enough. stderr: %s",
-			stderr.String(),
-		)
+		return fmt.Errorf("network proxy service failed to be ready after waiting for long enough")
 	}
 }
 

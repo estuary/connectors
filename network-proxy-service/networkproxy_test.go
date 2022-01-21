@@ -1,6 +1,7 @@
 package networkproxy
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -34,6 +35,7 @@ func TestSshForwardConfig_startWithDefaultWithBadSshEndpoint(t *testing.T) {
 	var config, err = CreateSshForwardingTestConfig(TestRsaFilePath, 2222)
 	require.NoError(t, err)
 	config.SshForwardingConfig.SshEndpoint = "bad_endpoint"
-	err = config.startWithTimeout(1)
-	require.Contains(t, err.Error(), "ssh_endpoint parse error")
+	var stubStderr bytes.Buffer
+	err = config.startInternal(1, &stubStderr)
+	require.Contains(t, stubStderr.String(), "ssh_endpoint parse error")
 }

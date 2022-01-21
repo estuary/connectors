@@ -39,7 +39,7 @@ impl SshForwarding {
     const DEFAULT_SSH_PORT: u16 = 22;
 
     pub fn new(config: SshForwardingConfig) -> Self {
-        return Self { config, ssh_client: None, local_listener: None };
+        Self { config, ssh_client: None, local_listener: None }
     }
 
 
@@ -123,9 +123,7 @@ impl ChannelWrapper {
             crypto_vec_read_start: 0
         } 
     }
-}
 
-impl ChannelWrapper {
     fn is_channel_eof(&mut self) -> bool {
         self.channel_eof
     }
@@ -153,6 +151,7 @@ impl ChannelWrapper {
 
     fn poll_channel(&mut self, cx: &mut Context<'_>) {
         if self.crypto_vec.is_some() {
+            // No need to poll for new data if self.crypto_vec still has data to send.
             return
         }
 
@@ -168,8 +167,11 @@ impl ChannelWrapper {
                         },
 
                         ChannelMsg::Data { data } => {
-                            self.crypto_vec = Some(data);
-                            return
+                            // Ignore empty CryptoVec, keep polling.
+                            if data.len() > 0 {
+                                self.crypto_vec = Some(data);
+                                return
+                            }
                         },
 
                         _ => {} // Ignore the other messages, keep polling.   
@@ -189,6 +191,7 @@ impl AsyncRead for ChannelWrapper {
         self.poll_channel(cx);
 
         if self.is_channel_eof() {
+            // Return ok without changing buf to indicate an EOF.
             Poll::Ready(Ok(()))
         } else {
             self.read_from_crypto_vec(buf)
