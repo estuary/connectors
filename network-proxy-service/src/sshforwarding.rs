@@ -4,13 +4,15 @@ use super::networkproxy::NetworkProxy;
 
 use async_trait::async_trait;
 use base64::decode;
-use futures::{select, FutureExt};
+use core::task::{Context, Poll};
+use futures::FutureExt;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use thrussh::{client::Handle, client};
+use std::pin::Pin;
+use thrussh::{client::Handle, client, ChannelMsg};
 use thrussh_keys::key;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tokio::net::TcpListener;
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf, copy_bidirectional};
 use url::Url;
 
 use serde::{Deserialize, Serialize};
@@ -90,51 +92,129 @@ impl NetworkProxy for SshForwarding {
         let sc = self.ssh_client.as_mut().ok_or(Error::SshClientUnInitialized)?;
         let ll = self.local_listener.as_mut().ok_or(Error::LocalListenerUnInitialized)?;
         loop {
-            let (forward_stream, _) = ll.accept().await?;
+            let (mut forward_stream, _) = ll.accept().await?;
             let bastion_channel = sc.channel_open_direct_tcpip(
                 &self.config.remote_host,
                 self.config.remote_port as u32,
                 "127.0.0.1", 0).await?;
             tokio::task::spawn(async move {
-                tunnel_streaming(forward_stream, bastion_channel).await.or_bail("tunnel_handle failed.");
+                copy_bidirectional(&mut forward_stream,
+                                   &mut ChannelWrapper::new(bastion_channel)
+                ).await.or_bail("SSH tunnel handler failed.");
             });
         }
     }
 }
 
-async fn tunnel_streaming(mut forward_stream: TcpStream, mut bastion_channel: client::Channel) -> Result<(), Error>{
-    // Allocate a buffer of 128 KiB for forward stream.
-    let mut buf_forward_stream = vec![0; 2 << 17];
+struct ChannelWrapper {
+    channel: client::Channel,
+    channel_eof: bool,
+    crypto_vec: Option<thrussh::CryptoVec>,
+    crypto_vec_read_start: usize,
+}
 
-    loop {
-        select! {
-            bytes_read = forward_stream.read(&mut buf_forward_stream).fuse() => match bytes_read? {
-                0 => {
-                    bastion_channel.eof().await?;
-                    break
-                },
-                n => {
-                    bastion_channel.data(&buf_forward_stream[..n]).await?;
-                },
-            },
-            bastion_channel_data = bastion_channel.wait().fuse() => match bastion_channel_data {
-                None => {},
-                Some(chan_data) => match chan_data {
-                    thrussh::ChannelMsg::Eof => {
-                      forward_stream.flush().await?;
-                      break;
-                    },
+impl ChannelWrapper {
+    pub fn new(channel: client::Channel) -> Self {
+        ChannelWrapper{
+            channel: channel,
+            channel_eof: false,
+            crypto_vec: None,
+            crypto_vec_read_start: 0
+        } 
+    }
+}
 
-                    thrussh::ChannelMsg::Data { ref data } => {
-                        forward_stream.write(&data).await?;
-                    },
-                    _ => {}
+impl ChannelWrapper {
+    fn is_channel_eof(&mut self) -> bool {
+        return self.channel_eof;
+    }
+
+    fn read_from_crypto_vec(&mut self, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        match self.crypto_vec {
+            None => Poll::Pending,
+            Some(ref v) => {
+                let amt = std::cmp::min(v.len() - self.crypto_vec_read_start, buf.remaining());
+                let read_end = self.crypto_vec_read_start + amt;
+                buf.put_slice(&v[self.crypto_vec_read_start..read_end]);
+
+                if read_end == v.len() {
+                    self.crypto_vec = None;
+                    self.crypto_vec_read_start = 0;
+                } else {
+                    self.crypto_vec_read_start = read_end;
+                }
+
+                Poll::Ready(Ok(()))
+            }
+        }
+    }
+
+    fn poll_channel(&mut self, cx: &mut Context<'_>) {
+        if !self.crypto_vec.is_none() {
+            return
+        }
+
+        loop {
+            match self.channel.wait().boxed().poll_unpin(cx) {
+                Poll::Pending => return,
+                Poll::Ready(channel_data) => match channel_data {
+                    None => {}, // Ignore empty message, keep polling.
+                    Some(channel_msg) => match channel_msg {
+                        ChannelMsg::Eof => {
+                            self.channel_eof = true;
+                            return
+                        },
+
+                        ChannelMsg::Data { data } => {
+                            self.crypto_vec = Some(data);
+                            return
+                        },
+
+                        _ => {} // Ignore the other messages, keep polling.   
+                    }
                 }
             }
         }
     }
-    Ok(())
+
 }
+impl AsyncRead for ChannelWrapper {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        self.poll_channel(cx);
+
+        if self.is_channel_eof() {
+            Poll::Ready(Ok(()))
+        } else {
+            self.read_from_crypto_vec(buf)
+        }
+   }
+}
+
+impl AsyncWrite for ChannelWrapper {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        match self.channel.data(buf).boxed().poll_unpin(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(_) => Poll::Ready(Ok(buf.len()))
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        Poll::Ready(Ok(()))
+    }
+}
+ 
 
 pub struct ClientHandler {}
 
