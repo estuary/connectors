@@ -134,7 +134,9 @@ func (npc *NetworkProxyConfig) sendInput(cmd *exec.Cmd) error {
 	}
 
 	go func() {
-		stdin.Write(input)
+		if _, err := stdin.Write(input); err != nil {
+			panic("Failed to send input to network-proxy-service binary.")
+		}
 		stdin.Close()
 	}()
 

@@ -17,15 +17,11 @@ async fn main() -> io::Result<()> {
 
     proxy.prepare().await.or_bail("Failed to prepare network proxy.");
 
-    let service_future = tokio::task::spawn(async move {
-        proxy.start_serve().await.or_bail("Failed to start proxy service.");
-    });
-
     // Write "READY" to stdio to unblock Go logic.
     println!("READY");
     io::stdout().flush().or_bail("Failed flushing output.");
 
-    service_future.await.or_bail("Network proxy serving stopped.");
+    proxy.start_serve().await.or_bail("Failed to start proxy service.");
 
     Ok(())
 }

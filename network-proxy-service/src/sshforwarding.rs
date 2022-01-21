@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct SshForwardingConfig {
     pub ssh_endpoint: String,
     pub ssh_user: String,
@@ -38,13 +39,13 @@ impl SshForwarding {
     const DEFAULT_SSH_PORT: u16 = 22;
 
     pub fn new(config: SshForwardingConfig) -> Self {
-        return Self { config: config, ssh_client: None, local_listener: None };
+        return Self { config, ssh_client: None, local_listener: None };
     }
 
 
     pub async fn prepare_ssh_client(&mut self) -> Result<(), Error> {
         let ssh_addrs = Url::parse(&self.config.ssh_endpoint)?.socket_addrs(|| Some(Self::DEFAULT_SSH_PORT))?;
-        let ssh_addr = ssh_addrs.iter().next().ok_or(Error::InvalidSshEndpoint)?;
+        let ssh_addr = ssh_addrs.get(0).ok_or(Error::InvalidSshEndpoint)?;
         let config = Arc::new(client::Config::default());
         let handler = ClientHandler {};
         self.ssh_client = Some(client::connect( config, ssh_addr, handler).await?);
@@ -116,7 +117,7 @@ struct ChannelWrapper {
 impl ChannelWrapper {
     pub fn new(channel: client::Channel) -> Self {
         ChannelWrapper{
-            channel: channel,
+            channel,
             channel_eof: false,
             crypto_vec: None,
             crypto_vec_read_start: 0
@@ -126,7 +127,7 @@ impl ChannelWrapper {
 
 impl ChannelWrapper {
     fn is_channel_eof(&mut self) -> bool {
-        return self.channel_eof;
+        self.channel_eof
     }
 
     fn read_from_crypto_vec(&mut self, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
@@ -138,6 +139,7 @@ impl ChannelWrapper {
                 buf.put_slice(&v[self.crypto_vec_read_start..read_end]);
 
                 if read_end == v.len() {
+                    // All data in crypto_vec has been read.
                     self.crypto_vec = None;
                     self.crypto_vec_read_start = 0;
                 } else {
@@ -150,7 +152,7 @@ impl ChannelWrapper {
     }
 
     fn poll_channel(&mut self, cx: &mut Context<'_>) {
-        if !self.crypto_vec.is_none() {
+        if self.crypto_vec.is_some() {
             return
         }
 
@@ -158,7 +160,7 @@ impl ChannelWrapper {
             match self.channel.wait().boxed().poll_unpin(cx) {
                 Poll::Pending => return,
                 Poll::Ready(channel_data) => match channel_data {
-                    None => {}, // Ignore empty message, keep polling.
+                    None => {}, // Ignore empty messages, keep polling.
                     Some(channel_msg) => match channel_msg {
                         ChannelMsg::Eof => {
                             self.channel_eof = true;
@@ -176,8 +178,8 @@ impl ChannelWrapper {
             }
         }
     }
-
 }
+
 impl AsyncRead for ChannelWrapper {
     fn poll_read(
         mut self: Pin<&mut Self>,
