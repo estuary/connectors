@@ -4,17 +4,15 @@ use super::networkproxy::NetworkProxy;
 
 use async_trait::async_trait;
 use base64::decode;
-use core::task::{Context, Poll};
-use futures::{Future, FutureExt};
-use futures_core::future::BoxFuture;
+use futures::pin_mut;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::pin::Pin;
-use thrussh::{client::Handle, client, ChannelMsg};
+use thrussh::{client::Handle, client};
 use thrussh_keys::key;
-use tokio::net::TcpListener;
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf, copy_bidirectional};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use url::Url;
+use tokio::net::tcp::{ReadHalf};
 
 use serde::{Deserialize, Serialize};
 
@@ -93,149 +91,72 @@ impl NetworkProxy for SshForwarding {
         let sc = self.ssh_client.as_mut().ok_or(Error::SshClientUnInitialized)?;
         let ll = self.local_listener.as_mut().ok_or(Error::LocalListenerUnInitialized)?;
         loop {
-            let (mut forward_stream, _) = ll.accept().await?;
+            let (forward_stream, _) = ll.accept().await?;
             let bastion_channel = sc.channel_open_direct_tcpip(
                 &self.config.remote_host,
                 self.config.remote_port as u32,
                 "127.0.0.1", 0).await?;
             tokio::task::spawn(async move {
-                copy_bidirectional(&mut forward_stream,
-                                   &mut ChannelWrapper::new(bastion_channel)
-                ).await.or_bail("SSH tunnel handler failed.");
+                tunnel_streaming(forward_stream, bastion_channel).await.or_bail("tunnel_handle failed.");
             });
         }
     }
 }
 
-struct ChannelWrapper {
-    channel: client::Channel,
-    //channel_future: Option<Pin<Box<dyn Future<Output = Option<ChannelMsg>> + Send + 'a>>>,
-    channel_future: Option<Pin<Box<dyn Future<Output = Option<ChannelMsg>> + 'static >>>,
-    channel_eof: bool,
-    crypto_vec: Option<thrussh::CryptoVec>,
-    crypto_vec_read_start: usize,
+async fn start_reading_forward_stream(
+    mut stream: ReadHalf<'_>,
+    mut buf: Vec<u8>,
+) -> Result<(usize, ReadHalf<'_>, Vec<u8>), Error> {
+    let n = stream.read(&mut buf).await?;
+    Ok((n, stream, buf))
 }
 
-impl ChannelWrapper {
-    pub fn new(channel: client::Channel) -> Self {
-        ChannelWrapper{
-            channel,
-            channel_future: None,
-            channel_eof: false,
-            crypto_vec: None,
-            crypto_vec_read_start: 0
-        } 
-    }
+async fn tunnel_streaming(mut forward_stream: TcpStream, mut bastion_channel: client::Channel) -> Result<(), Error>{
+    let (forward_stream_read, mut forward_stream_write) = forward_stream.split();
 
-    fn is_channel_eof(&mut self) -> bool {
-        self.channel_eof
-    }
+    // Allocate a buffer of 128 KiB for forward stream.
+    let buf_forward_stream = vec![0; 2 << 17];
+    let reading = start_reading_forward_stream(forward_stream_read, buf_forward_stream);
+    pin_mut!(reading);
 
-    fn read_from_crypto_vec(&mut self, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
-        match self.crypto_vec {
-            None => Poll::Pending,
-            Some(ref v) => {
-                let amt = std::cmp::min(v.len() - self.crypto_vec_read_start, buf.remaining());
-                let read_end = self.crypto_vec_read_start + amt;
-                buf.put_slice(&v[self.crypto_vec_read_start..read_end]);
-
-                if read_end == v.len() {
-                    // All data in crypto_vec has been read.
-                    self.crypto_vec = None;
-                    self.crypto_vec_read_start = 0;
-                } else {
-                    self.crypto_vec_read_start = read_end;
-                }
-
-                Poll::Ready(Ok(()))
-            }
-        }
-    }
-
-    fn poll_channel(&mut self, cx: &mut Context) {
-        if self.crypto_vec.is_some() {
-            // No need to poll for new data if self.crypto_vec still has data to send.
-            return
-        }
-
-        loop {
-            if self.channel_future.is_none() {
-                self.channel_future = Some(self.channel.wait().boxed());
-                //let channel_future = Some(Box::pin(f));
-                //self.channel_future = 
-                //Some(f.boxed());
-            }
-
-
-            if let Some(ref mut future) = self.channel_future {//pin_project? .boxed().poll_unpin(cx) {
-                match future.poll_unpin(cx) {
-                    Poll::Pending => return,
-                    Poll::Ready(channel_data) => {
-                        //self.channel_future.take();
-                        match channel_data {
-                            None => {}, // Ignore empty messages, keep polling.
-                            Some(channel_msg) => match channel_msg {
-                                ChannelMsg::Eof => {
-                                    self.channel_eof = true;
-                                    return
-                                },
-
-                                ChannelMsg::Data { data } => {
-                                    // Ignore empty CryptoVec, keep polling.
-                                    if data.len() > 0 {
-                                        self.crypto_vec = Some(data);
-                                        return
-                                    }
-                                },
-
-                                _ => {} // Ignore the other messages, keep polling.   
-                            }
+    loop {
+        tokio::select! {
+            r = &mut reading => match r {
+                Ok((n, forward_stream_read, buf_forward_stream)) => {
+                    match n {
+                        0 => {
+                            bastion_channel.eof().await?;
+                            break
+                        },
+                        n => {
+                          bastion_channel.data(&buf_forward_stream[..n]).await?;
                         }
                     }
+                    reading.set(start_reading_forward_stream(forward_stream_read, buf_forward_stream));
+                },
+                Err(e) => return Err(e),
+            },
+
+            // bastion_channel.wait() is calling `recv()` on a receiver, which is safe to cancel.
+            // https://doc.servo.org/tokio/sync/mpsc/struct.Receiver.html#cancel-safety
+            bastion_channel_data = bastion_channel.wait() => match bastion_channel_data {
+                None => {}, // Ignore None values, keep polling.
+                Some(chan_msg) => match chan_msg {
+                    thrussh::ChannelMsg::Eof => {
+                      forward_stream_write.flush().await?;
+                      break;
+                    },
+
+                    thrussh::ChannelMsg::Data { ref data } => {
+                        forward_stream_write.write(data).await?;
+                    },
+                    _ => {} // Ignore the other control messages, keep polling.
                 }
             }
         }
     }
+    Ok(())
 }
-
-impl AsyncRead for ChannelWrapper {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        self.poll_channel(cx);
-
-        if self.is_channel_eof() {
-            // Return ok without changing buf to indicate an EOF.
-            Poll::Ready(Ok(()))
-        } else {
-            self.read_from_crypto_vec(buf)
-        }
-   }
-}
-
-impl AsyncWrite for ChannelWrapper {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, std::io::Error>> {
-        match self.channel.data(buf).boxed().poll_unpin(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(_) => Poll::Ready(Ok(buf.len()))
-        }
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-        Poll::Ready(Ok(()))
-    }
-}
- 
 
 pub struct ClientHandler {}
 
