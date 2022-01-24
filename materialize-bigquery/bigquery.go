@@ -158,8 +158,8 @@ func newBigQueryDriver() *sqlDriver.Driver {
 	}
 }
 
-// Bigquery only allows underscore, letters and numbers for identifiers. Convert everything to underscore.
-var identifierSanitizerRegexp = regexp.MustCompile(`[^\._0-9a-zA-Z]`)
+// Bigquery only allows underscore, letters, numbers, and sometimes hyphens for identifiers. Convert everything else to underscore.
+var identifierSanitizerRegexp = regexp.MustCompile(`[^\-\._0-9a-zA-Z]`)
 
 func identifierSanitizer(text string) string {
 	return identifierSanitizerRegexp.ReplaceAllString(text, "_")
