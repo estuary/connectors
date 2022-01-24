@@ -8,6 +8,9 @@
       "bucket_path"
     ],
     "properties": {
+      "billing_project_id": {
+        "type": "string"
+      },
       "project_id": {
         "type": "string"
       },
