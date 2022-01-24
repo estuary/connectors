@@ -541,6 +541,7 @@ dependencies = [
  "async-trait",
  "base64",
  "futures",
+ "futures-core",
  "openssl",
  "openssl-sys",
  "serde",

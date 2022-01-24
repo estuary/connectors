@@ -5,7 +5,8 @@ use super::networkproxy::NetworkProxy;
 use async_trait::async_trait;
 use base64::decode;
 use core::task::{Context, Poll};
-use futures::FutureExt;
+use futures::{Future, FutureExt};
+use futures_core::future::BoxFuture;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::pin::Pin;
@@ -41,7 +42,6 @@ impl SshForwarding {
     pub fn new(config: SshForwardingConfig) -> Self {
         Self { config, ssh_client: None, local_listener: None }
     }
-
 
     pub async fn prepare_ssh_client(&mut self) -> Result<(), Error> {
         let ssh_addrs = Url::parse(&self.config.ssh_endpoint)?.socket_addrs(|| Some(Self::DEFAULT_SSH_PORT))?;
@@ -109,6 +109,8 @@ impl NetworkProxy for SshForwarding {
 
 struct ChannelWrapper {
     channel: client::Channel,
+    //channel_future: Option<Pin<Box<dyn Future<Output = Option<ChannelMsg>> + Send + 'a>>>,
+    channel_future: Option<Pin<Box<dyn Future<Output = Option<ChannelMsg>> + 'static >>>,
     channel_eof: bool,
     crypto_vec: Option<thrussh::CryptoVec>,
     crypto_vec_read_start: usize,
@@ -118,6 +120,7 @@ impl ChannelWrapper {
     pub fn new(channel: client::Channel) -> Self {
         ChannelWrapper{
             channel,
+            channel_future: None,
             channel_eof: false,
             crypto_vec: None,
             crypto_vec_read_start: 0
@@ -149,32 +152,45 @@ impl ChannelWrapper {
         }
     }
 
-    fn poll_channel(&mut self, cx: &mut Context<'_>) {
+    fn poll_channel(&mut self, cx: &mut Context) {
         if self.crypto_vec.is_some() {
             // No need to poll for new data if self.crypto_vec still has data to send.
             return
         }
 
         loop {
-            match self.channel.wait().boxed().poll_unpin(cx) {
-                Poll::Pending => return,
-                Poll::Ready(channel_data) => match channel_data {
-                    None => {}, // Ignore empty messages, keep polling.
-                    Some(channel_msg) => match channel_msg {
-                        ChannelMsg::Eof => {
-                            self.channel_eof = true;
-                            return
-                        },
+            if self.channel_future.is_none() {
+                self.channel_future = Some(self.channel.wait().boxed());
+                //let channel_future = Some(Box::pin(f));
+                //self.channel_future = 
+                //Some(f.boxed());
+            }
 
-                        ChannelMsg::Data { data } => {
-                            // Ignore empty CryptoVec, keep polling.
-                            if data.len() > 0 {
-                                self.crypto_vec = Some(data);
-                                return
+
+            if let Some(ref mut future) = self.channel_future {//pin_project? .boxed().poll_unpin(cx) {
+                match future.poll_unpin(cx) {
+                    Poll::Pending => return,
+                    Poll::Ready(channel_data) => {
+                        //self.channel_future.take();
+                        match channel_data {
+                            None => {}, // Ignore empty messages, keep polling.
+                            Some(channel_msg) => match channel_msg {
+                                ChannelMsg::Eof => {
+                                    self.channel_eof = true;
+                                    return
+                                },
+
+                                ChannelMsg::Data { data } => {
+                                    // Ignore empty CryptoVec, keep polling.
+                                    if data.len() > 0 {
+                                        self.crypto_vec = Some(data);
+                                        return
+                                    }
+                                },
+
+                                _ => {} // Ignore the other messages, keep polling.   
                             }
-                        },
-
-                        _ => {} // Ignore the other messages, keep polling.   
+                        }
                     }
                 }
             }

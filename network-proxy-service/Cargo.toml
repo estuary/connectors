@@ -9,6 +9,7 @@ edition = "2018"
 async-trait="*"
 base64="*"
 futures="*"
+futures-core = { version = "*", features = ['alloc']}
 openssl-sys = { version = "*", features = ['vendored'] }
 openssl="*"
 serde = { version = "*", features = ["derive"] }
