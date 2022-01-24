@@ -22,13 +22,14 @@ func main() {
 
 // Config represents the endpoint configuration for BigQuery.
 type config struct {
-	ProjectID       string `json:"project_id"`
-	Dataset         string `json:"dataset"`
-	Region          string `json:"region,omitempty"`
-	Bucket          string `json:"bucket"`
-	BucketPath      string `json:"bucket_path"`
-	CredentialsFile string `json:"credentials_file,omitempty"`
-	CredentialsJSON []byte `json:"credentials_json,omitempty"`
+	BillingProjectID string `json:"billing_project_id,omitempty"`
+	ProjectID        string `json:"project_id"`
+	Dataset          string `json:"dataset"`
+	Region           string `json:"region,omitempty"`
+	Bucket           string `json:"bucket"`
+	BucketPath       string `json:"bucket_path"`
+	CredentialsFile  string `json:"credentials_file,omitempty"`
+	CredentialsJSON  []byte `json:"credentials_json,omitempty"`
 }
 
 func (c *config) Validate() error {
@@ -49,7 +50,7 @@ func (c *config) Validate() error {
 
 // DatasetPath returns the sqlDriver.ResourcePath including the dataset.
 func (c *config) DatasetPath(path ...string) sqlDriver.ResourcePath {
-	return append([]string{c.Dataset}, path...)
+	return append([]string{c.ProjectID, c.Dataset}, path...)
 }
 
 type tableConfig struct {
@@ -108,7 +109,12 @@ func newBigQueryDriver() *sqlDriver.Driver {
 				clientOpts = append(clientOpts, option.WithCredentialsJSON(parsed.CredentialsJSON))
 			}
 
-			bigQueryClient, err := bigquery.NewClient(ctx, parsed.ProjectID, clientOpts...)
+			// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
+			var billingProjectID = parsed.BillingProjectID
+			if billingProjectID == "" {
+				billingProjectID = parsed.ProjectID
+			}
+			bigQueryClient, err := bigquery.NewClient(ctx, billingProjectID, clientOpts...)
 			if err != nil {
 				return nil, fmt.Errorf("creating bigquery client: %w", err)
 			}
@@ -123,7 +129,7 @@ func newBigQueryDriver() *sqlDriver.Driver {
 				bigQueryClient:     bigQueryClient,
 				cloudStorageClient: cloudStorageClient,
 				generator:          SQLGenerator(),
-				flowTables:         sqlDriver.DefaultFlowTables(parsed.Dataset + "."), // Prefix with dataset
+				flowTables:         sqlDriver.DefaultFlowTables(parsed.ProjectID + "." + parsed.Dataset + "."), // Prefix with project ID and dataset
 			}, nil
 		},
 		NewTransactor: func(
