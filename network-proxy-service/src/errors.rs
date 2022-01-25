@@ -6,12 +6,6 @@ pub enum Error {
     #[error("SSH private key is invalid.")]
     InvalidSshCredential,
 
-    #[error("SSH client is used before creation")]
-    SshClientUnInitialized,
-
-    #[error("Local Listener is used before creation")]
-    LocalListenerUnInitialized,
-
     #[error("Local port number of 0 is invalid")]
     ZeroLocalPort,
 

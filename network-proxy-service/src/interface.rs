@@ -11,7 +11,7 @@ pub enum NetworkProxyConfig {
 }
 
 impl NetworkProxyConfig {
-  pub fn new_proxy(self) -> Box<dyn NetworkProxy + Send> {
+  pub fn new_proxy(self) -> Box<dyn NetworkProxy> {
         match self {
             NetworkProxyConfig::SshForwarding(config) =>
                 Box::new(SshForwarding::new(config))

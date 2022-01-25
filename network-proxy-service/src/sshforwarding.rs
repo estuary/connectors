@@ -7,7 +7,7 @@ use base64::decode;
 use futures::pin_mut;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use thrussh::{client::Handle, client};
+use thrussh::{client::{Handle, Session}, client};
 use thrussh_keys::key;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
@@ -69,7 +69,7 @@ impl SshForwarding {
             hash: key::SignatureHash::SHA2_256,
         });
 
-        let sc = self.ssh_client.as_mut().ok_or(Error::SshClientUnInitialized)?;
+        let sc = self.ssh_client.as_mut().expect("ssh_client is uninitialized.");
         if !sc.authenticate_publickey(&self.config.ssh_user, key_pair).await? {
             return Err(Error::InvalidSshCredential)
         }
@@ -88,8 +88,8 @@ impl NetworkProxy for SshForwarding {
     }
 
     async fn start_serve(&mut self) -> Result<(), Error> {
-        let sc = self.ssh_client.as_mut().ok_or(Error::SshClientUnInitialized)?;
-        let ll = self.local_listener.as_mut().ok_or(Error::LocalListenerUnInitialized)?;
+        let sc = self.ssh_client.as_mut().expect("ssh_client is uninitialized.");
+        let ll = self.local_listener.as_mut().expect("local_listener is uninitialized.");
         loop {
             let (forward_stream, _) = ll.accept().await?;
             let bastion_channel = sc.channel_open_direct_tcpip(
@@ -132,6 +132,8 @@ async fn tunnel_streaming(mut forward_stream: TcpStream, mut bastion_channel: cl
                           bastion_channel.data(&buf_forward_stream[..n]).await?;
                         }
                     }
+                    // The `pin_mut!` called on `reading` turns it into a Pin of a mutable Future.
+                    // The `reading.set` replaces the terminated future behind the pinned pointer with a new future to be polled.
                     reading.set(start_reading_forward_stream(forward_stream_read, buf_forward_stream));
                 },
                 Err(e) => return Err(e),
@@ -150,7 +152,8 @@ async fn tunnel_streaming(mut forward_stream: TcpStream, mut bastion_channel: cl
                     thrussh::ChannelMsg::Data { ref data } => {
                         forward_stream_write.write(data).await?;
                     },
-                    _ => {} // Ignore the other control messages, keep polling.
+                    // Ignore the other control messages, keep polling.
+                    msg => { tracing::info!("SSH control message: {:?}", msg)} 
                 }
             }
         }
@@ -170,10 +173,17 @@ impl client::Handler for ClientHandler {
     fn finished_bool(self, b: bool) -> Self::FutureBool {
         futures::future::ready(Ok((self, b)))
     }
-    fn finished(self, session: client::Session) -> Self::FutureUnit {
+    fn finished(self, session: Session) -> Self::FutureUnit {
         futures::future::ready(Ok((self, session)))
     }
-    fn check_server_key(self, _server_public_key: &key::PublicKey) -> Self::FutureBool {
+
+    fn auth_banner(self, banner: &str, session: Session) -> Self::FutureUnit {
+        tracing::info!(banner);
+        self.finished(session)
+    }
+
+    fn check_server_key(self, server_public_key: &key::PublicKey) -> Self::FutureBool {
+        tracing::info!("received server public key: {:?}", server_public_key);
         self.finished_bool(true)
     }
 }
