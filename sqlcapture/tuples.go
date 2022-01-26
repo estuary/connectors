@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/estuary/protocols/fdb/tuple"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 // encodeRowKey extracts the appropriate key-fields by name from a map and encodes

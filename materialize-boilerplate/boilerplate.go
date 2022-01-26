@@ -10,7 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	pm "github.com/estuary/protocols/materialize"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	protoio "github.com/gogo/protobuf/io"
 	"github.com/gogo/protobuf/proto"
 	"github.com/jessevdk/go-flags"

@@ -8,10 +8,10 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/testsupport"
-	"github.com/estuary/protocols/catalog"
-	pf "github.com/estuary/protocols/flow"
-	pm "github.com/estuary/protocols/materialize"
-	sqlDriver "github.com/estuary/protocols/materialize/sql"
+	"github.com/estuary/flow/go/protocols/catalog"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
+	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

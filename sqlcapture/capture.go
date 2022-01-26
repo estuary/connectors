@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/estuary/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )

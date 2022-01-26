@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"cloud.google.com/go/bigquery"
-	pf "github.com/estuary/protocols/flow"
-	sqlDriver "github.com/estuary/protocols/materialize/sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
 )
 
 const tempTableNamePrefix = "flow_temp"

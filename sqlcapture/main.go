@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/estuary/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/airbyte"
 )
 
 // AirbyteMain implements the main function for an Airbyte connector, given

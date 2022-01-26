@@ -8,7 +8,7 @@ import (
 	"github.com/estuary/connectors/flowsim/matsim"
 	"github.com/estuary/connectors/flowsim/testdata"
 	connector "github.com/estuary/connectors/materialize-rockset"
-	"github.com/estuary/protocols/fdb/tuple"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 type FakeEvent struct {

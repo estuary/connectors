@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/estuary/protocols/fdb/tuple"
-	"github.com/estuary/protocols/flow"
-	pm "github.com/estuary/protocols/materialize"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	"github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 	"github.com/xitongsys/parquet-go-source/local"
 	"github.com/xitongsys/parquet-go/reader"

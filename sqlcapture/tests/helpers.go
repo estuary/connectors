@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/airbyte"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/sirupsen/logrus"
 )

@@ -12,7 +12,7 @@ import (
 	"github.com/estuary/connectors/flowsim/testdata"
 	"github.com/estuary/flow/go/flow/ops"
 	"github.com/estuary/flow/go/materialize/driver/image"
-	pm "github.com/estuary/protocols/materialize"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jessevdk/go-flags"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"

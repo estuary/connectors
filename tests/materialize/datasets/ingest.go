@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/estuary/protocols/capture"
-	"github.com/estuary/protocols/flow"
+	"github.com/estuary/flow/go/protocols/capture"
+	"github.com/estuary/flow/go/protocols/flow"
 	"google.golang.org/grpc"
 )
 

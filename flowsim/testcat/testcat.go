@@ -10,8 +10,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/estuary/protocols/catalog"
-	"github.com/estuary/protocols/flow"
+	"github.com/estuary/flow/go/protocols/catalog"
+	"github.com/estuary/flow/go/protocols/flow"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )

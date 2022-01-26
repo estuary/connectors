@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/estuary/protocols/fdb/tuple"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 // TestData is an interface that supports all the needed functions required to be used for testing.

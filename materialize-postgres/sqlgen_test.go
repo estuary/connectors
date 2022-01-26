@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/estuary/connectors/testsupport"
-	"github.com/estuary/protocols/catalog"
-	pf "github.com/estuary/protocols/flow"
-	sqlDriver "github.com/estuary/protocols/materialize/sql"
+	"github.com/estuary/flow/go/protocols/catalog"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
 	"github.com/stretchr/testify/require"
 )
 
