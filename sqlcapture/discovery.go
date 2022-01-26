@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/jsonschema"
-	"github.com/estuary/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/sirupsen/logrus"
 )
 

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/flowsim/testcat"
-	"github.com/estuary/protocols/materialize"
-	pm "github.com/estuary/protocols/materialize"
+	"github.com/estuary/flow/go/protocols/materialize"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 )
 

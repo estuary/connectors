@@ -1,6 +1,6 @@
 /*
 materialize-sql is a test-only package which tests the
-github.com/estuary/protocols/materialize/sql package.
+github.com/estuary/flow/go/protocols/materialize/sql package.
 
 Test code cannot be directly included in that repository
 due to its dependence on Flow catalog builds.
@@ -15,9 +15,9 @@ import (
 	"testing"
 
 	"github.com/estuary/connectors/testsupport"
-	"github.com/estuary/protocols/catalog"
-	pf "github.com/estuary/protocols/flow"
-	flowSql "github.com/estuary/protocols/materialize/sql"
+	"github.com/estuary/flow/go/protocols/catalog"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	flowSql "github.com/estuary/flow/go/protocols/materialize/sql"
 	_ "github.com/mattn/go-sqlite3" // Import for register side-effects.
 	"github.com/stretchr/testify/require"
 )

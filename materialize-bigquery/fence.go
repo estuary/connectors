@@ -1,7 +1,7 @@
 package main
 
 import (
-	pf "github.com/estuary/protocols/flow"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/sirupsen/logrus"
 )
 

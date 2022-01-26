@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/estuary/protocols/catalog"
+	"github.com/estuary/flow/go/protocols/catalog"
 	"github.com/stretchr/testify/require"
 )
 

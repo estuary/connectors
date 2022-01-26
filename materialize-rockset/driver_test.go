@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	pf "github.com/estuary/protocols/flow"
-	pm "github.com/estuary/protocols/materialize"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 	pb "go.gazette.dev/core/broker/protocol"
 )

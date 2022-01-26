@@ -7,7 +7,7 @@ This document describes Flow materialization connectors, how they work, and how 
 A [materialization](https://docs.estuary.dev/reference/catalog-reference/materialization) is implemented as a gRPC-based server. 
 If you've never worked with gRPC, this basically means to create a connector you implement a handful of functions in whatever language you desire. As long as
 they fulfill the function contracts and take or provide the correct data, they'll interoperate with Flow. 
-The gRPC specification for a Materialzation RPC is in the [proto definition file](https://github.com/estuary/protocols/blob/main/materialize/materialize.proto)
+The gRPC specification for a Materialzation RPC is in the [proto definition file](https://github.com/estuary/flow/blob/master/go/protocols/materialize/materialize.proto)
 The service that it must fulfill is the **driver** service. 
 
 There are few common elements used across the RPC functions in the connectors.

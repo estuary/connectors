@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	pf "github.com/estuary/protocols/flow"
-	pm "github.com/estuary/protocols/materialize"
-	sqlDriver "github.com/estuary/protocols/materialize/sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
+	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	pgxStd "github.com/jackc/pgx/v4/stdlib"

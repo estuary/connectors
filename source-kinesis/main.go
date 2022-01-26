@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/airbyte"
 	log "github.com/sirupsen/logrus"
 )
 

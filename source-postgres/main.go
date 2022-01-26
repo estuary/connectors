@@ -9,7 +9,7 @@ import (
 	"github.com/alecthomas/jsonschema"
 	np "github.com/estuary/connectors/network-proxy-service"
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
