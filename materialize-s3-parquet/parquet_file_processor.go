@@ -11,9 +11,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/estuary/protocols/fdb/tuple"
-	pf "github.com/estuary/protocols/flow"
-	pm "github.com/estuary/protocols/materialize"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/xitongsys/parquet-go-source/local"
 
 	"github.com/benbjohnson/clock"

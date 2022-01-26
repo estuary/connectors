@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/estuary/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/stretchr/testify/require"
 )
 

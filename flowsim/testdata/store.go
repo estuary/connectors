@@ -3,7 +3,7 @@ package testdata
 import (
 	"sync"
 
-	"github.com/estuary/protocols/fdb/tuple"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 // TestStore is a simple store for TestData that supports the functions needed to test connectors.

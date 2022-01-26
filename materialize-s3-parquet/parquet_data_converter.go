@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/estuary/protocols/fdb/tuple"
-	pf "github.com/estuary/protocols/flow"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 // typeStrategy is an interface that provides functions with datatype-specific logic to process a column of a parquet file.

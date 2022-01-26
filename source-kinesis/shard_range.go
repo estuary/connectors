@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/estuary/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/airbyte"
 )
 
 // Applies the same hash operation that kinesis uses to determine which shard a given record should

@@ -12,9 +12,9 @@ import (
 	"github.com/elastic/go-elasticsearch/v7/esutil"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-elasticsearch/schemabuilder"
-	"github.com/estuary/protocols/fdb/tuple"
-	pf "github.com/estuary/protocols/flow"
-	pm "github.com/estuary/protocols/materialize"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 )
 

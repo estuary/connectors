@@ -90,7 +90,7 @@ return an error on commit because the second stream should supersede the first.
 
 If you are developing in Go, to run matsim directly against your connector, create a main method in your connector 
 and pass in a struct the fulfills the `github.com/estuary/protocols/materialize.DriverServer` interface. 
-https://github.com/estuary/protocols/blob/9b8d02b54d1918f41879f708ac517a8c06495774/materialize/materialize.pb.go#L1290
+https://github.com/estuary/flow/blob/master/go/protocols/materialize/materialize.pb.go
 (All materialization connectors need this in order to operate)
 
 For example in the postgres driver:  https://github.com/estuary/connectors/blob/main/materialize-postgres/driver.go
