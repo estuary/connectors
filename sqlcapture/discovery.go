@@ -46,9 +46,19 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 		for _, column := range table.Columns {
 			var jsonType, err = db.TranslateDBToJSONType(column)
 			if err != nil {
-				return nil, fmt.Errorf("error translating column type %q to JSON schema: %w", column.DataType, err)
+				logrus.WithFields(logrus.Fields{
+					"error": err,
+					"type":  column.DataType,
+				}).Warn("error translating column type to JSON schema")
+
+				// Logging an error from the connector is nice, but can be swallowed by `flowctl`.
+				// Putting an error in the generated schema is ugly, but makes the failure visible.
+				properties[column.Name] = &jsonschema.Type{
+					Description: fmt.Sprintf("ERROR: could not translate column type %q to JSON schema: %v", column.DataType, err),
+				}
+			} else {
+				properties[column.Name] = jsonType
 			}
-			properties[column.Name] = jsonType
 		}
 
 		// Schema.Properties is a weird OrderedMap thing, which doesn't allow for inline
