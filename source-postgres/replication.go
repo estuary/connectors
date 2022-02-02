@@ -410,6 +410,14 @@ func (s *replicationStream) decodeTuple(
 				return nil, fmt.Errorf("error decoding column data: %w", err)
 			}
 			fields[colName] = val
+		case 'u':
+			logrus.WithFields(logrus.Fields{
+				"replicaIdentity": rel.ReplicaIdentity,
+				"table":           rel.Namespace + "." + rel.RelationName,
+				"column":          colName,
+				"length":          col.Length,
+				"data":            col.Data,
+			}).Warn("omitting unchanged TOAST value")
 		default:
 			return nil, fmt.Errorf("unhandled column data type %v", col.DataType)
 		}
