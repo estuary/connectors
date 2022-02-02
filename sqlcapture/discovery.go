@@ -61,6 +61,9 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 					Extras: map[string]interface{}{
 						"$anchor":    anchor,
 						"properties": properties,
+						"reduce": map[string]interface{}{
+							"strategy": "merge",
+						},
 					},
 					Required: table.PrimaryKey,
 				},

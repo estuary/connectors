@@ -103,6 +103,9 @@
           "real_": {
             "type": "number"
           }
+        },
+        "reduce": {
+          "strategy": "merge"
         }
       }
     }

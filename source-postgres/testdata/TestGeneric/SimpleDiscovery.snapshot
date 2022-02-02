@@ -95,6 +95,9 @@
               "null"
             ]
           }
+        },
+        "reduce": {
+          "strategy": "merge"
         }
       }
     }
