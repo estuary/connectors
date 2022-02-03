@@ -4,7 +4,11 @@ services:
   db:
     image: 'mysql:latest'
     command: ["--binlog-row-metadata=FULL"]
-    volumes: ["mysql_data:/var/lib/mysql"]
+    volumes:
+      - type: bind
+        source: ./docker-entrypoint-initdb.d/init-user-db.sh
+        target: /docker-entrypoint-initdb.d/init-user-db.sh
+      - mysql_data:/var/lib/mysql
     environment:
       MYSQL_DATABASE: test
       MYSQL_ROOT_PASSWORD: flow
