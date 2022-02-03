@@ -174,6 +174,9 @@ func (tb *postgresTestBackend) Query(ctx context.Context, t *testing.T, query st
 		}
 		logrus.WithField("values", vals).Debug("query result row")
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("error running query: %v", err)
+	}
 }
 
 func (tb *postgresTestBackend) GetDatabase() sqlcapture.Database {
