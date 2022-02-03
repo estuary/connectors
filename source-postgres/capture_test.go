@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +39,45 @@ func TestReplicaIdentity(t *testing.T) {
 	tb.Update(ctx, t, tableName, "id", 4, "data", "UPDATED")
 
 	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "")
+}
+
+func TestToastColumns(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, other INTEGER, data TEXT)")
+	var catalog, state = tests.ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+
+	// Table is created with REPLICA IDENTITY DEFAULT, which does *not* include
+	// unchanged TOAST fields within the replication log.
+	// Postgres will attempt to compress values by default.
+	// Tell it to use TOAST but disable compression so our fixture spills out of the table.
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN data SET STORAGE EXTERNAL;", tableName))
+
+	// Create a data fixture which is (barely) larger that Postgres's desired inline storage size.
+	const toastThreshold = 2048
+	var data = strings.Repeat("data", toastThreshold/4)
+
+	// Initial capture backfill.
+	tb.Insert(ctx, t, tableName, [][]interface{}{{1, 32, "smol"}})
+	tb.Insert(ctx, t, tableName, [][]interface{}{{2, 42, data}})
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
+
+	// Insert TOAST value, update TOAST value, and change an unrelated value.
+	tb.Insert(ctx, t, tableName, [][]interface{}{{3, 52, data}})        // Insert TOAST.
+	tb.Insert(ctx, t, tableName, [][]interface{}{{4, 62, "more smol"}}) // Insert non-TOAST.
+	tb.Update(ctx, t, tableName, "id", 1, "data", "UPDATE ONE "+data)   // Update non-TOAST => TOAST.
+	tb.Update(ctx, t, tableName, "id", 2, "data", "UPDATE TWO "+data)   // Update TOAST => TOAST.
+	tb.Update(ctx, t, tableName, "id", 3, "data", "UPDATE smol")        // Update TOAST => non-TOAST.
+	tb.Update(ctx, t, tableName, "id", 1, "other", 72)                  // Update other (TOAST); data _not_ expected.
+	tb.Update(ctx, t, tableName, "id", 3, "other", 82)                  // Update other (non-TOAST).
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "ident-default")
+
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
+	tb.Update(ctx, t, tableName, "id", 1, "other", 92)                // Update other (TOAST); data *is* expected.
+	tb.Update(ctx, t, tableName, "id", 3, "other", 102)               // Update other (non-TOAST).
+	tb.Update(ctx, t, tableName, "id", 1, "data", "smol smol")        // Update TOAST => non-TOAST.
+	tb.Update(ctx, t, tableName, "id", 4, "data", "UPDATE SIX "+data) // Update non-TOAST => TOAST.
+
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "ident-full")
 }
 
 // TestComplexDataset tries to throw together a bunch of different bits of complexity

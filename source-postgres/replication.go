@@ -343,11 +343,11 @@ func (s *replicationStream) decodeChangeEvent(
 		return nil, fmt.Errorf("unknown relation ID %d", relID)
 	}
 
-	bf, err := s.decodeTuple(before, beforeType, rel)
+	bf, err := s.decodeTuple(before, beforeType, rel, nil)
 	if err != nil {
 		return nil, fmt.Errorf("'before' tuple: %w", err)
 	}
-	af, err := s.decodeTuple(after, 'N', rel)
+	af, err := s.decodeTuple(after, 'N', rel, bf)
 	if err != nil {
 		return nil, fmt.Errorf("'after' tuple: %w", err)
 	}
@@ -373,6 +373,7 @@ func (s *replicationStream) decodeTuple(
 	tuple *pglogrepl.TupleData,
 	tupleType uint8,
 	rel *pglogrepl.RelationMessage,
+	before map[string]interface{},
 ) (map[string]interface{}, error) {
 
 	var keyOnly bool
@@ -410,6 +411,14 @@ func (s *replicationStream) decodeTuple(
 				return nil, fmt.Errorf("error decoding column data: %w", err)
 			}
 			fields[colName] = val
+		case 'u':
+			// This fields is a TOAST value which is unchanged in this event.
+			// Depending on the REPLICA IDENTITY, the value may be available
+			// in the "before" tuple of the record. If not, we simply omit it
+			// from the event output.
+			if val, ok := before[colName]; ok {
+				fields[colName] = val
+			}
 		default:
 			return nil, fmt.Errorf("unhandled column data type %v", col.DataType)
 		}
