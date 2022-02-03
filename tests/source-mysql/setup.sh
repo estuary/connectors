@@ -7,7 +7,7 @@ export RESOURCE="{ stream: ${TEST_STREAM} }"
 config_json_template='{
     "address": "$MYSQL_HOST:$MYSQL_PORT",
     "user": "$MYSQL_USER",
-    "pass": "$MYSQL_PWD",
+    "password": "$MYSQL_PWD",
     "dbname": "$MYSQL_DATABASE",
     "server_id": $MYSQL_SERVERID
 }'
@@ -25,4 +25,4 @@ function sql {
 sql "DROP TABLE IF EXISTS test.${TEST_STREAM};"
 sql "CREATE TABLE test.${TEST_STREAM} (id INTEGER PRIMARY KEY, canary TEXT);"
 sql "SET GLOBAL local_infile=1;"
-sql "LOAD DATA LOCAL INFILE '${root_dir}/tests/files/b.csv' INTO TABLE ${TEST_STREAM} FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n' IGNORE 1 ROWS;"
+sql "LOAD DATA LOCAL INFILE '${root_dir}/tests/files/b.csv' INTO TABLE ${TEST_STREAM} FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '\"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;"
