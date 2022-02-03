@@ -82,11 +82,22 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 											"before": {
 												Ref:         "#" + anchor,
 												Description: "Record state immediately before this change was applied.",
+												Extras: map[string]interface{}{
+													"reduce": map[string]interface{}{
+														"strategy": "firstWriteWins",
+													},
+												},
 											},
+										},
+										"reduce": map[string]interface{}{
+											"strategy": "merge",
 										},
 									},
 									Required: []string{"op", "source"},
 								},
+							},
+							"reduce": map[string]interface{}{
+								"strategy": "merge",
 							},
 						},
 						Required: []string{"_meta"},

@@ -16,7 +16,10 @@
             "properties": {
               "before": {
                 "$ref": "#PublicTest_discoverycomplex",
-                "description": "Record state immediately before this change was applied."
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
               },
               "op": {
                 "enum": [
@@ -61,8 +64,14 @@
                 "additionalProperties": false,
                 "type": "object"
               }
+            },
+            "reduce": {
+              "strategy": "merge"
             }
           }
+        },
+        "reduce": {
+          "strategy": "merge"
         }
       },
       {
