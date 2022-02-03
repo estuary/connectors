@@ -67,6 +67,7 @@ jobs:
           - source-hello-world
           - source-kafka
           - source-kinesis
+          - source-mysql
           - source-postgres
           - source-s3
           - materialize-bigquery
@@ -127,10 +128,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
 
-      - name: Start Test PostgreSQL Instance
-        if: matrix.connector == 'source-postgres'
+      - name: Start ${{ matrix.connector }} Test Database
+        if: |
+          contains('
+            source-mysql
+            source-postgres
+            ', matrix.connector)
         run: |
-          docker-compose --file source-postgres/docker-compose.yaml up --detach postgres
+          docker-compose --file ${{ matrix.connector }}/docker-compose.yaml up --detach
 
       - name: Start Open SSH server
         if: matrix.connector == 'source-postgres'
@@ -171,6 +176,7 @@ jobs:
             source-gcs
             source-kafka
             source-kinesis
+            source-mysql
             source-postgres
             source-s3
             ', matrix.connector)
@@ -181,6 +187,12 @@ jobs:
           DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
           AWS_DEFAULT_OUTPUT: json
           ROCKSET_API_KEY: ${{ secrets.ROCKSET_API_KEY }}
+          MYSQL_DATABASE: test
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: root
+          MYSQL_PWD: flow
+          MYSQL_SERVERID: 12345
           # Compare to: https://www.postgresql.org/docs/current/libpq-envars.html
           PGDATABASE: flow
           PGHOST: localhost
