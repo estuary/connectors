@@ -88,7 +88,15 @@ func (db *postgresDatabase) TranslateRecordField(val interface{}) (interface{}, 
 			fmt.Fprintf(s, "%02x", x[i])
 		}
 		return s.String(), nil
+
+	case pgtype.Numeric:
+		var n float64
+		if err := x.AssignTo(&n); err != nil {
+			return nil, fmt.Errorf("decoding pgtype.Numeric, %w", err)
+		}
+		return n, nil
 	}
+
 	if _, ok := val.(json.Marshaler); ok {
 		return val, nil
 	}
