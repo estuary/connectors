@@ -3,9 +3,13 @@ package sqlcapture
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	"github.com/jackc/pgtype"
 )
+
+const TimeKey = "T"
 
 // encodeRowKey extracts the appropriate key-fields by name from a map and encodes
 // them as a FoundationDB serialized tuple.
@@ -33,6 +37,20 @@ func packTuple(xs []interface{}) (bs []byte, err error) {
 		switch x := x.(type) {
 		case int32:
 			t = append(t, int(x))
+		case time.Time:
+			// This is a temp workaround tat enables the capture to work with
+			// tables that specifies a field of "timestamp with time zone"
+			// to be part of the key.
+			t = append(t, tuple.Tuple{TimeKey, x.UnixNano()})
+
+		case pgtype.Numeric:
+			// This is a temp workaround that enables the capture to work with
+			// tables that specifies a Numberic field to be part of the key.
+			var n int
+			if err := x.AssignTo(&n); err != nil {
+				return nil, fmt.Errorf("decoding pgtype.Numeric, %w", err)
+			}
+			t = append(t, n)
 		default:
 			t = append(t, x)
 		}
@@ -60,7 +78,20 @@ func unpackTuple(bs []byte) ([]interface{}, error) {
 	}
 	var xs []interface{}
 	for _, elem := range t {
+		switch elem := elem.(type) {
+		case tuple.Tuple:
+			if len(elem) == 2 {
+				if key, ok := elem[0].(string); ok && key == TimeKey {
+					if unixNano, ok := elem[1].(int64); ok {
+						xs = append(xs, time.Unix(0, unixNano))
+						continue
+					}
+				}
+			}
+		}
+
 		xs = append(xs, elem)
+
 	}
 	return xs, nil
 }
