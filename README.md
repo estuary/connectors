@@ -1,4 +1,4 @@
-# Estuary Connectors
+ # Estuary Connectors
 
 This repo hosts development of connectors implementing the 
 [Airbyte spec](https://docs.airbyte.io/understanding-airbyte/airbyte-specification). Flow uses the 
