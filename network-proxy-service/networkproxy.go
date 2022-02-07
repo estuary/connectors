@@ -12,6 +12,7 @@ import (
 	"time"
 
 	sf "github.com/estuary/connectors/network-proxy-service/sshforwarding"
+	"github.com/sirupsen/logrus"
 )
 
 const ProgramName = "network-proxy-service"
@@ -80,7 +81,7 @@ func (npc *NetworkProxyConfig) Start() error {
 	var stderr bytes.Buffer
 
 	if err := npc.startInternal(defaultTimeoutSecs, &stderr); err != nil {
-		return fmt.Errorf("%w, err: %s.", err, stderr.String())
+		return fmt.Errorf("start network proxy: %w, err: %s", err, stderr.String())
 	}
 
 	return nil
@@ -95,31 +96,33 @@ func (npc *NetworkProxyConfig) startInternal(timeoutSecs uint16, stderr io.Write
 	var cmd = exec.Command(ProgramName)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM}
 
+	var stderr1 bytes.Buffer
 	var readyCh = make(chan error)
 	cmd.Stdout = &readyWriter{delegate: os.Stdout, ch: readyCh}
-	cmd.Stderr = stderr
+	cmd.Stderr = &stderr1
 
 	if err := npc.sendInput(cmd); err != nil {
-		return fmt.Errorf("sending input to service: %w", err)
+		return fmt.Errorf("sending input to service: %w, %s", err, stderr1.String())
 	} else if err := cmd.Start(); err != nil {
-		return fmt.Errorf("starting ssh forwarding service: %w", err)
+		return fmt.Errorf("starting ssh forwarding service: %w, %s", err, stderr1.String())
 	}
 
 	select {
 	case err := <-readyCh:
 		if err != nil {
 			return fmt.Errorf(
-				"network proxy service error: %w",
-				err,
+				"network proxy service error: %w, %s",
+				err, stderr1.String(),
 			)
 		}
+		logrus.Info(fmt.Sprintf("started successfully, output from stderr: %s", stderr1.String()))
 		return nil
 
 	case <-time.After(time.Duration(timeoutSecs) * time.Second):
 		if cmd.Process != nil {
 			cmd.Process.Signal(syscall.SIGTERM)
 		}
-		return fmt.Errorf("network proxy service failed to be ready after waiting for long enough")
+		return fmt.Errorf("network proxy service failed to be ready after waiting for long enough, %s", stderr1.String())
 	}
 }
 

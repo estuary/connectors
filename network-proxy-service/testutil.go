@@ -21,7 +21,7 @@ func CreateSshForwardingTestConfig(keyFilePath string, remotePort uint16) (*Netw
 			SshUser:             "flowssh",
 			RemoteHost:          "127.0.0.1",
 			RemotePort:          remotePort,
-			LocalPort:           15432,
+			LocalPort:           12345,
 		},
 	}, nil
 }

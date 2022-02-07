@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	np "github.com/estuary/connectors/network-proxy-service"
 	"github.com/jackc/pgx/v4"
@@ -18,6 +19,8 @@ func TestSshForwardConfig_Postgresql(t *testing.T) {
 	require.NoError(t, err)
 	err = config.Start()
 	require.NoError(t, err)
+
+	time.Sleep(time.Second)
 
 	var ctx = context.Background()
 	conn, err := pgx.Connect(ctx, fmt.Sprintf("postgres://flow:flow@localhost:%d/flow", config.SshForwardingConfig.LocalPort))
