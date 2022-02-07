@@ -2,6 +2,7 @@ package networkproxy
 
 import (
 	"encoding/base64"
+	"math/rand"
 	"os"
 
 	sf "github.com/estuary/connectors/network-proxy-service/sshforwarding"
@@ -21,7 +22,7 @@ func CreateSshForwardingTestConfig(keyFilePath string, remotePort uint16) (*Netw
 			SshUser:             "flowssh",
 			RemoteHost:          "127.0.0.1",
 			RemotePort:          remotePort,
-			LocalPort:           12345,
+			LocalPort:           uint16(rand.Intn(65535-1024) + 1024),
 		},
 	}, nil
 }
