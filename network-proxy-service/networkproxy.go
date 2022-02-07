@@ -77,7 +77,13 @@ func (npc *NetworkProxyConfig) MarshalJSON() ([]byte, error) {
 const defaultTimeoutSecs = 5
 
 func (npc *NetworkProxyConfig) Start() error {
-	return npc.startInternal(defaultTimeoutSecs, os.Stderr)
+	var stderr bytes.Buffer
+
+	if err := npc.startInternal(defaultTimeoutSecs, &stderr); err != nil {
+		return fmt.Errorf("%w, err: %s.", err, stderr.String())
+	}
+
+	return nil
 }
 
 func (npc *NetworkProxyConfig) startInternal(timeoutSecs uint16, stderr io.Writer) error {
