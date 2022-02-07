@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
   openssh-server:
-    image: lscr.io/linuxserver/openssh-server
+    image: lscr.io/linuxserver/openssh-server:8.6_p1-r3-ls71
     container_name: openssh-server
     volumes:
       - type: bind
