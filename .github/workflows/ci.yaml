@@ -141,7 +141,11 @@ jobs:
         if: matrix.connector == 'source-postgres'
         run: |
           cp -r network-proxy-service/sshforwarding/test_sshd_configs /tmp/test_sshd_configs &&
-          docker-compose --file /tmp/test_sshd_configs/docker-compose.yaml up --detach openssh-server
+          cd /tmp/test_sshd_configs &&
+          sudo chown -R root config/custom-cont-init.d &&
+          docker-compose up --detach openssh-server &&
+          sleep 1 &&
+          docker-compose logs openssh-server
 
       - name: Login to GitHub package docker registry
         run: |
