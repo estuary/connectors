@@ -183,7 +183,7 @@ func testComplexDataset(ctx context.Context, t *testing.T, tb TestBackend) {
 
 	LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
 	var states = VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
-	state = states[10] // Restart in between (1960, 'IA') and (1960, 'ID')
+	state = states[20] // Restart in between (1960, 'IA') and (1960, 'ID')
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{1930, "XX", "No Such State", 1234},   // An insert in the already-scanned portion, which will be reported before backfilling resumes.
@@ -191,7 +191,7 @@ func testComplexDataset(ctx context.Context, t *testing.T, tb TestBackend) {
 		{1990, "XX", "No Such State", 123456}, // An insert after the already-scanned portion, which will be reported when backfilling reaches this row.
 	})
 	states = VerifiedCapture(ctx, t, tb, &catalog, &state, "restart1")
-	state = states[6] // Restart in between (1980, 'SD') and (1980, 'TN')
+	state = states[10] // Restart in between (1980, 'SC') and (1980, 'SD')
 
 	// All three "XX" states are deleted, but at the restart point only (1930, 'XX')
 	// and (1970, 'XX') should be considered "already backfilled", and so there should

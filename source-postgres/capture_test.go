@@ -92,7 +92,7 @@ func TestComplexDataset(t *testing.T) {
 
 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
 	var states = tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
-	state = states[10] // Restart in between (1960, 'IA') and (1960, 'ID')
+	state = states[20] // Restart in between (1960, 'IA') and (1960, 'ID')
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{1930, "XX", "No Such State", 1234},   // An insert prior to the first restart, which will be reported once replication begins
@@ -100,7 +100,7 @@ func TestComplexDataset(t *testing.T) {
 		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
 	})
 	states = tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "restart1")
-	state = states[6] // Restart in between (1980, 'SD') and (1980, 'TN')
+	state = states[10] // Restart in between (1980, 'SC') and (1980, 'SD')
 
 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))
 	tb.Insert(ctx, t, tableName, [][]interface{}{
