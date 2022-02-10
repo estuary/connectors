@@ -184,26 +184,28 @@ var postgresTypeToJSON = map[string]columnSchema{
 
 const queryDiscoverColumns = `
   SELECT
-		table_schema,
-		table_name,
-		ordinal_position,
-		column_name,
-		is_nullable::boolean,
-		udt_name,
+		c.table_schema,
+		c.table_name,
+		c.ordinal_position,
+		c.column_name,
+		c.is_nullable::boolean,
+		c.udt_name,
 		pg_catalog.col_description(
-			format('%s.%s',table_schema,table_name)::regclass::oid,
-			ordinal_position
+			format('%s.%s',c.table_schema,c.table_name)::regclass::oid,
+			c.ordinal_position
 		) AS column_description
-  FROM information_schema.columns
+  FROM information_schema.columns c
+  JOIN information_schema.tables t ON (c.table_schema = t.table_schema AND c.table_name = t.table_name)
   WHERE
-		table_schema != 'pg_catalog' AND
-		table_schema != 'information_schema' AND
-		table_schema != 'pg_internal' AND
-		table_schema != 'catalog_history'
+		c.table_schema != 'pg_catalog' AND
+		c.table_schema != 'information_schema' AND
+		c.table_schema != 'pg_internal' AND
+		c.table_schema != 'catalog_history' AND
+		t.table_type = 'BASE TABLE'
   ORDER BY
-		table_schema,
-		table_name,
-		ordinal_position
+		c.table_schema,
+		c.table_name,
+		c.ordinal_position
 	;`
 
 func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, error) {

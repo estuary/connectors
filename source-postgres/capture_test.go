@@ -11,6 +11,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/jackc/pglogrepl"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 // TestGeneric runs the generic sqlcapture test suite.
@@ -172,4 +173,35 @@ func TestSlotLSNAdvances(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 	t.Errorf("slot %q restart LSN failed to advance after %d retries", *TestReplicationSlot, retryCount)
+}
+
+func TestViewDiscovery(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+	var table = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, grp INTEGER, data TEXT)")
+
+	var view = table + "_view"
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE VIEW %s AS SELECT id, data FROM %s WHERE grp = 1;`, view, table))
+	t.Cleanup(func() {
+		logrus.WithField("view", view).Debug("dropping view")
+		tb.Query(ctx, t, fmt.Sprintf(`DROP VIEW IF EXISTS %s;`, view))
+	})
+
+	var matview = table + "_matview"
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE MATERIALIZED VIEW %s AS SELECT id, data FROM %s WHERE grp = 1;`, matview, table))
+	t.Cleanup(func() {
+		logrus.WithField("view", matview).Debug("dropping materialized view")
+		tb.Query(ctx, t, fmt.Sprintf(`DROP MATERIALIZED VIEW IF EXISTS %s;`, matview))
+	})
+
+	var catalog, err = sqlcapture.DiscoverCatalog(ctx, tb.GetDatabase())
+	require.NoError(t, err)
+	for _, stream := range catalog.Streams {
+		logrus.WithField("name", stream.Name).Debug("discovered stream")
+		if stream.Name == view {
+			t.Errorf("view returned by catalog discovery")
+		}
+		if stream.Name == matview {
+			t.Errorf("materialized view returned by catalog discovery")
+		}
+	}
 }
