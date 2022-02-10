@@ -16,8 +16,8 @@ import (
 // PersistentState represents the part of a connector's state which can be serialized
 // and emitted in a state checkpoint, and resumed from after a restart.
 type PersistentState struct {
-	Cursor  string                `json:"cursor"`  // The replication cursor of the most recent 'Commit' event
-	Streams map[string]TableState `json:"streams"` // A mapping from table IDs (<namespace>.<table>) to table-specific state.
+	Cursor  string                `json:"cursor"`            // The replication cursor of the most recent 'Commit' event
+	Streams map[string]TableState `json:"streams,omitempty"` // A mapping from table IDs (<namespace>.<table>) to table-specific state.
 }
 
 // Validate performs basic sanity-checking after a state has been parsed from JSON. More
@@ -47,11 +47,14 @@ type TableState struct {
 	// or "Active" once the backfill is complete.
 	Mode string `json:"mode"`
 	// KeyColumns is the "primary key" used for ordering/chunking the backfill scan.
-	KeyColumns []string `json:"key_columns,omitempty"`
+	KeyColumns []string `json:"key_columns"`
 	// Scanned is a FoundationDB-serialized tuple representing the KeyColumns
 	// values of the last row which has been backfilled. Replication events will
 	// only be emitted for rows <= this value while backfilling is in progress.
-	Scanned []byte `json:"scanned,omitempty"`
+	Scanned []byte `json:"scanned"`
+	// dirty is set whenever the table state changes, and cleared whenever
+	// a state update is emitted. It should never be serialized itself.
+	dirty bool
 }
 
 // The table's mode can be one of:
@@ -129,12 +132,9 @@ func (c *Capture) Run(ctx context.Context) error {
 }
 
 func (c *Capture) updateState(ctx context.Context) error {
-	var stateDirty = false
-
 	// Create the Streams map if nil
 	if c.State.Streams == nil {
 		c.State.Streams = make(map[string]TableState)
-		stateDirty = true
 	}
 
 	// Streams may be added to the catalog at various times. We need to
@@ -199,9 +199,8 @@ func (c *Capture) updateState(ctx context.Context) error {
 
 		// See if the stream is already initialized. If it's not, then create it.
 		var streamState, ok = c.State.Streams[streamID]
-		if !ok {
-			c.State.Streams[streamID] = TableState{Mode: TableModeBackfill, KeyColumns: primaryKey}
-			stateDirty = true
+		if !ok || streamState.Mode == TableModeIgnore {
+			c.State.Streams[streamID] = TableState{Mode: TableModeBackfill, KeyColumns: primaryKey, dirty: true}
 			continue
 		}
 
@@ -224,17 +223,13 @@ func (c *Capture) updateState(ctx context.Context) error {
 
 		if !streamExistsInCatalog {
 			logrus.WithField("stream", streamID).Info("stream removed from catalog")
-			delete(c.State.Streams, streamID)
-			stateDirty = true
+			c.State.Streams[streamID] = TableState{Mode: TableModeIgnore, dirty: true}
 		}
 	}
 
-	// If we've altered the state, emit it to stdout. This isn't strictly necessary
-	// but it helps to make the emitted sequence of state updates a lot more readable.
-	if stateDirty {
-		c.emitState()
-	}
-	return nil
+	// Emit the new state to stdout. This isn't strictly necessary but it helps to make
+	// the emitted sequence of state updates a lot more readable.
+	return c.emitState()
 }
 
 func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark string, results *resultSet) error {
@@ -323,6 +318,7 @@ func (c *Capture) emitBuffered(results *resultSet) error {
 		} else {
 			state.Scanned = results.Scanned(streamID)
 		}
+		state.dirty = true
 		c.State.Streams[streamID] = state
 	}
 
@@ -437,13 +433,31 @@ func translateRecordFields(db Database, f map[string]interface{}) error {
 }
 
 func (c *Capture) emitState() error {
-	var rawState, err = json.Marshal(c.State)
+	// Put together an update which includes only those streams which have changed
+	// since the last state output. At the same time, clear the dirty flags on all
+	// those tables.
+	var stateUpdate = PersistentState{
+		Cursor:  c.State.Cursor,
+		Streams: make(map[string]TableState),
+	}
+	for streamID, state := range c.State.Streams {
+		if state.dirty {
+			state.dirty = false
+			c.State.Streams[streamID] = state
+			stateUpdate.Streams[streamID] = state
+		}
+	}
+
+	var rawState, err = json.Marshal(stateUpdate)
 	if err != nil {
 		return fmt.Errorf("error encoding state message: %w", err)
 	}
 	return c.Encoder.Encode(airbyte.Message{
-		Type:  airbyte.MessageTypeState,
-		State: &airbyte.State{Data: json.RawMessage(rawState)},
+		Type: airbyte.MessageTypeState,
+		State: &airbyte.State{
+			Data:  json.RawMessage(rawState),
+			Merge: true,
+		},
 	})
 }
 

@@ -37,20 +37,10 @@ func VerifiedCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog 
 func PerformCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog *airbyte.ConfiguredCatalog, state *sqlcapture.PersistentState) (string, []sqlcapture.PersistentState) {
 	t.Helper()
 
-	// Use a JSON round-trip to deep-copy the state, so that the act of running a
-	// capture can't modify the passed-in state argument, and thus we can treat
-	// the sequence of states as having value semantics within tests.
-	var bs, err = json.Marshal(state)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var cleanState = new(sqlcapture.PersistentState)
-	if err := json.Unmarshal(bs, cleanState); err != nil {
-		t.Fatal(err)
-	}
-
 	var buf = new(CaptureOutputBuffer)
-	if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), catalog, cleanState, buf); err != nil {
+	buf.MergeBase = copyState(*state)
+	var initState = copyState(*state)
+	if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), catalog, &initState, buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -211,6 +201,7 @@ func LoadCSV(ctx context.Context, t *testing.T, tb TestBackend, table string, fi
 // Capture instance, recording State updates in one list and Records
 // in another.
 type CaptureOutputBuffer struct {
+	MergeBase sqlcapture.PersistentState
 	States    []sqlcapture.PersistentState
 	Snapshot  strings.Builder
 	lastState string
@@ -237,19 +228,36 @@ func (buf *CaptureOutputBuffer) Encode(v interface{}) error {
 	return fmt.Errorf("unhandled message type: %#v", msg.Type)
 }
 
+// copyState returns a copy of the input PersistentState which doesn't share
+// any mutable pointers with the original.
+func copyState(x sqlcapture.PersistentState) sqlcapture.PersistentState {
+	var streams = make(map[string]sqlcapture.TableState)
+	for streamID, state := range x.Streams {
+		streams[streamID] = sqlcapture.TableState{
+			Mode:       state.Mode,
+			KeyColumns: append([]string(nil), state.KeyColumns...),
+			Scanned:    append([]byte(nil), state.Scanned...),
+		}
+	}
+	return sqlcapture.PersistentState{
+		Cursor:  x.Cursor,
+		Streams: streams,
+	}
+}
+
 func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	// Parse state data and store a copy for later resume testing. Note
 	// that because we're unmarshalling each state update from JSON we
 	// can rely on the states being independent and not sharing any
 	// pointer-identity in their 'Streams' map or `ScanRanges` lists.
-	var originalState sqlcapture.PersistentState
-	if err := json.Unmarshal(msg.State.Data, &originalState); err != nil {
+	var inputState sqlcapture.PersistentState
+	if err := json.Unmarshal(msg.State.Data, &inputState); err != nil {
 		return fmt.Errorf("error unmarshaling to PersistentState: %w", err)
 	}
 
 	// Sanitize state by rewriting the LSN to a constant, then encode
 	// back into new bytes.
-	var cleanState = sqlcapture.PersistentState{Cursor: "REDACTED", Streams: originalState.Streams}
+	var cleanState = sqlcapture.PersistentState{Cursor: "REDACTED", Streams: inputState.Streams}
 	var bs, err = json.Marshal(cleanState)
 	if err != nil {
 		return fmt.Errorf("error encoding cleaned state: %w", err)
@@ -263,12 +271,23 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	}
 	buf.lastState = string(bs)
 
-	// Buffer the original state for later resuming, and append the sanitized
-	// state to the output buffer.
-	buf.States = append(buf.States, originalState)
+	// Apply merge semantics to state updates and buffer the history of "merged"
+	// state values so that we can resume from any of them if needed. This part
+	// is done *after* duplicate suppression so that any "reset to state #N" logic
+	// in tests matches up with the actual `STATE` lines in output snapshots.
+	buf.MergeBase.Cursor = inputState.Cursor
+	for streamID, state := range inputState.Streams {
+		buf.MergeBase.Streams[streamID] = state
+	}
+	buf.States = append(buf.States, copyState(buf.MergeBase))
+
+	// Finally buffer the sanitized state update so it can be part of the test results.
 	return buf.bufferMessage(airbyte.Message{
-		Type:  airbyte.MessageTypeState,
-		State: &airbyte.State{Data: json.RawMessage(bs)},
+		Type: airbyte.MessageTypeState,
+		State: &airbyte.State{
+			Data:  json.RawMessage(bs),
+			Merge: msg.State.Merge,
+		},
 	})
 }
 

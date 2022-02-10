@@ -1,1 +1,2 @@
-{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_generic_multiplestreams_one":{"mode":"Active","key_columns":["id"]},"test.test_generic_multiplestreams_three":{"mode":"Active","key_columns":["id"]}}}}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_generic_multiplestreams_two":{"mode":"Ignore","key_columns":null,"scanned":null}}},"estuary.dev/merge":true}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
