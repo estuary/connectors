@@ -1,1 +1,1 @@
-{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_slotlsnadvances_one":{"mode":"Active","key_columns":["id"]}}}}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
