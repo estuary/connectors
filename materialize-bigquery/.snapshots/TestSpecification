@@ -2,16 +2,16 @@
   "endpoint_spec_schema_json": {
     "$schema": "http://json-schema.org/draft-04/schema#",
     "required": [
-      "project_id",
+      "projectId",
       "dataset",
       "bucket",
-      "bucket_path"
+      "bucketPath"
     ],
     "properties": {
-      "billing_project_id": {
+      "billingProjectId": {
         "type": "string"
       },
-      "project_id": {
+      "projectId": {
         "type": "string"
       },
       "dataset": {
@@ -23,13 +23,13 @@
       "bucket": {
         "type": "string"
       },
-      "bucket_path": {
+      "bucketPath": {
         "type": "string"
       },
-      "credentials_file": {
+      "credentialsFile": {
         "type": "string"
       },
-      "credentials_json": {
+      "credentialsJson": {
         "type": "string",
         "media": {
           "binaryEncoding": "base64"
@@ -48,7 +48,7 @@
       "table": {
         "type": "string"
       },
-      "delta_updates": {
+      "deltaUpdates": {
         "type": "boolean"
       }
     },

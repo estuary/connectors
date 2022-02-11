@@ -27,15 +27,15 @@ yield much better performance.
 The configuration required:
 
 ```
-project_id - The project ID for the Google Cloud Storage bucket and BigQuery Dataset
+projectId - The project ID for the Google Cloud Storage bucket and BigQuery Dataset
 region - The Google region.
 bucket - The Google Cloud Storage bucket name
-bucket_path - The base path to store temporary files
-credentials_file - The path to a JSON service account file
-credentials_json - Base64 encoded string of the full service account file
+bucketPath - The base path to store temporary files
+credentialsFile - The path to a JSON service account file
+credentialsJson - Base64 encoded string of the full service account file
 ```
 
-You should specify one of `credentials_file` or `credentials_json`. It will also leverage 
+You should specify one of `credentialsFile` or `credentialsJson`. It will also leverage 
 the `GOOGLE_APPLICATION_CREDENTIALS` environment variable if provided which can point
-to a service account file. If multiple options are listed, tt will first try `credentials_file`
-followed by `credentials_json` and then any provided `GOOGLE_APPLICATION_CREDENTIALS`.
+to a service account file. If multiple options are listed, tt will first try `credentialsFile`
+followed by `credentialsJson` and then any provided `GOOGLE_APPLICATION_CREDENTIALS`.

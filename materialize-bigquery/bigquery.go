@@ -22,14 +22,14 @@ func main() {
 
 // Config represents the endpoint configuration for BigQuery.
 type config struct {
-	BillingProjectID string `json:"billing_project_id,omitempty"`
-	ProjectID        string `json:"project_id"`
+	BillingProjectID string `json:"billingProjectId,omitempty"`
+	ProjectID        string `json:"projectId"`
 	Dataset          string `json:"dataset"`
 	Region           string `json:"region,omitempty"`
 	Bucket           string `json:"bucket"`
-	BucketPath       string `json:"bucket_path"`
-	CredentialsFile  string `json:"credentials_file,omitempty"`
-	CredentialsJSON  []byte `json:"credentials_json,omitempty"`
+	BucketPath       string `json:"bucketPath"`
+	CredentialsFile  string `json:"credentialsFile,omitempty"`
+	CredentialsJSON  []byte `json:"credentialsJson,omitempty"`
 }
 
 func (c *config) Validate() error {
@@ -57,7 +57,7 @@ type tableConfig struct {
 	base *config
 
 	Table string `json:"table"`
-	Delta bool   `json:"delta_updates,omitempty"`
+	Delta bool   `json:"deltaUpdates,omitempty"`
 }
 
 func (c *tableConfig) Validate() error {
@@ -93,11 +93,11 @@ func newBigQueryDriver() *sqlDriver.Driver {
 			}
 
 			log.WithFields(log.Fields{
-				"project_id":  parsed.ProjectID,
-				"dataset":     parsed.Dataset,
-				"region":      parsed.Region,
-				"bucket":      parsed.Bucket,
-				"bucket_path": parsed.BucketPath,
+				"project_id": parsed.ProjectID,
+				"dataset":    parsed.Dataset,
+				"region":     parsed.Region,
+				"bucket":     parsed.Bucket,
+				"bucketPath": parsed.BucketPath,
 			}).Info("opening bigquery")
 
 			var clientOpts []option.ClientOption
@@ -109,7 +109,7 @@ func newBigQueryDriver() *sqlDriver.Driver {
 				clientOpts = append(clientOpts, option.WithCredentialsJSON(parsed.CredentialsJSON))
 			}
 
-			// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
+			// Allow overriding the main 'projectId' with 'billingProjectId' for client operation billing.
 			var billingProjectID = parsed.BillingProjectID
 			if billingProjectID == "" {
 				billingProjectID = parsed.ProjectID
