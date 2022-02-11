@@ -1,11 +1,18 @@
 package tests
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"math"
+	"math/big"
 	"testing"
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	"github.com/jackc/pgtype"
+	"github.com/stretchr/testify/require"
 )
 
 // Run executes the generic SQL capture test suite
@@ -23,6 +30,7 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 	t.Run("ComplexDataset", func(t *testing.T) { testComplexDataset(ctx, t, tb) })
 	t.Run("CatalogPrimaryKey", func(t *testing.T) { testCatalogPrimaryKey(ctx, t, tb) })
 	t.Run("CatalogPrimaryKeyOverride", func(t *testing.T) { testCatalogPrimaryKeyOverride(ctx, t, tb) })
+	t.Run("TestEncodePgNumeric", func(t *testing.T) { testEncodePgNumeric(t) })
 }
 
 // testSimpleDiscovery creates a new table in the database, performs stream discovery,
@@ -238,4 +246,135 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 		{1990, "XX", "No Such State", 123456},
 	})
 	VerifiedCapture(ctx, t, tb, &catalog, &state, "capture2")
+}
+
+func testEncodePgNumeric(t *testing.T) {
+	var testCases = []struct {
+		input    pgtype.Numeric
+		expected tuple.Tuple
+	}{
+		// Positives.
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(1), Exp: 0},
+			[]tuple.TupleElement{20001, []byte("1")}, // "1e0"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(2), Exp: 0},
+			[]tuple.TupleElement{20001, []byte("2")}, // "2e0"
+		},
+
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(1), Exp: -1},
+			[]tuple.TupleElement{20000, []byte("1")}, // "1e-1"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(1), Exp: -5},
+			[]tuple.TupleElement{19996, []byte("1")}, // "1e-5"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(12309), Exp: -6},
+			[]tuple.TupleElement{19999, []byte("12309")}, // "12309e-6"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(1230), Exp: 0},
+			[]tuple.TupleElement{20004, []byte("123")}, // "1230e0"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(123400), Exp: 3},
+			[]tuple.TupleElement{20009, []byte("1234")}, // "123400e3"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(12300), Exp: -2},
+			[]tuple.TupleElement{20003, []byte("123")}, // "12300e-2"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(12300), Exp: -5},
+			[]tuple.TupleElement{20000, []byte("123")}, // "12300e-5"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(12300), Exp: -10},
+			[]tuple.TupleElement{19995, []byte("123")}, // "12300e-10"
+		},
+		// Zeros.
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(0), Exp: 0},
+			[]tuple.TupleElement{0, []byte(nil)}, // "0e0"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-0), Exp: 2},
+			[]tuple.TupleElement{0, []byte(nil)}, // "0e2"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(0), Exp: -2},
+			[]tuple.TupleElement{0, []byte(nil)}, // "0e-2"
+		},
+		// Negatives.
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-1), Exp: 0},
+			[]tuple.TupleElement{-20001, []byte("8:")}, // "-1e0"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-2), Exp: 0},
+			[]tuple.TupleElement{-20001, []byte("7:")}, // "-2e0"
+		},
+
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-1), Exp: -1},
+			[]tuple.TupleElement{-20000, []byte("8:")}, // "-1e-1"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-1), Exp: -5},
+			[]tuple.TupleElement{-19996, []byte("8:")}, // "-1e-5"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-12309), Exp: -6},
+			[]tuple.TupleElement{-19999, []byte("87690:")}, // "-12309e-6"
+		},
+
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-1230), Exp: -0},
+			[]tuple.TupleElement{-20004, []byte("876:")}, // "-1230e0"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-123400), Exp: 3},
+			[]tuple.TupleElement{-20009, []byte("8765:")}, // "-123400e3"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-12300), Exp: -2},
+			[]tuple.TupleElement{-20003, []byte("876:")}, // "-12300e-2"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-12300), Exp: -5},
+			[]tuple.TupleElement{-20000, []byte("876:")}, // "-12300e-5"
+		},
+		{
+			pgtype.Numeric{Status: pgtype.Present, Int: big.NewInt(-12300), Exp: -10},
+			[]tuple.TupleElement{-19995, []byte("876:")}, // "-12300e-10"
+		},
+	}
+	for _, test := range testCases {
+		var actual, err = sqlcapture.EncodePgNumeric(test.input)
+		require.NoError(t, err)
+		require.Equal(t, test.expected, actual)
+	}
+
+	for p1 := 0; p1 < len(testCases); p1++ {
+		for p2 := 0; p2 < len(testCases); p2++ {
+			var f1, f2 float64
+			require.NoError(t, testCases[p1].input.AssignTo(&f1))
+			require.NoError(t, testCases[p2].input.AssignTo(&f2))
+
+			var t1 = tuple.Tuple(testCases[p1].expected).Pack()
+			var t2 = tuple.Tuple(testCases[p2].expected).Pack()
+
+			var message = fmt.Sprintf("Comparing %+v, %+v", testCases[p1], testCases[p2])
+			if math.Abs(f1-f2) < 1e-9 { // Almost equal.
+				require.Equal(t, 0, bytes.Compare(t1, t2), message)
+			} else if f1 > f2 {
+				require.Equal(t, 1, bytes.Compare(t1, t2), message)
+			} else {
+				require.Equal(t, -1, bytes.Compare(t1, t2), message)
+			}
+		}
+	}
 }
