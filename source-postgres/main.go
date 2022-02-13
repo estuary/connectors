@@ -10,6 +10,8 @@ import (
 	np "github.com/estuary/connectors/network-proxy-service"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
@@ -140,4 +142,20 @@ func (db *postgresDatabase) DefaultSchema(ctx context.Context) (string, error) {
 
 func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &postgresSource{}
+}
+
+func (db *postgresDatabase) EncodeKeyFDB(key interface{}) (tuple.TupleElement, error) {
+	switch key := key.(type) {
+	case pgtype.Numeric:
+		return EncodePgNumericKeyFDB(key)
+	default:
+		return key, nil
+	}
+}
+
+func (db *postgresDatabase) DecodeKeyFDB(t tuple.TupleElement) interface{} {
+	if d := DecodeFDBTuple(t); d != nil {
+		return d
+	}
+	return t
 }

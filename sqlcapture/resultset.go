@@ -29,7 +29,7 @@ func newResultSet() *resultSet {
 // Buffer appends new "Insert" events to the buffered range for the specified stream. An
 // empty list of events indicates that the stream is completed, and thus the *range* of the
 // buffer now extends to infinity.
-func (r *resultSet) Buffer(streamID string, keyColumns []string, events []ChangeEvent) error {
+func (r *resultSet) Buffer(streamID string, keyColumns []string, events []ChangeEvent, db Database) error {
 	var chunk, ok = r.streams[streamID]
 	if !ok {
 		chunk = &backfillChunk{keyColumns: keyColumns, rows: make(map[string]ChangeEvent)}
@@ -46,7 +46,7 @@ func (r *resultSet) Buffer(streamID string, keyColumns []string, events []Change
 
 	// Otherwise add the new row to the `rows` map and update `scanned`.
 	for _, event := range events {
-		var bs, err = encodeRowKey(chunk.keyColumns, event.After)
+		var bs, err = encodeRowKey(chunk.keyColumns, event.After, db)
 		if err != nil {
 			return fmt.Errorf("error encoding row key: %w", err)
 		}
@@ -102,7 +102,7 @@ func (r *resultSet) Scanned(streamID string) []byte {
 // Patch modifies the buffered results to include the effect of the provided
 // changeEvent. This may simply mean ignoring the event, if it occured on a
 // table which is not in the resultSet or for a row which is not yet included.
-func (r *resultSet) Patch(streamID string, event ChangeEvent) error {
+func (r *resultSet) Patch(streamID string, event ChangeEvent, db Database) error {
 	// If a particular table is not represented in the backfill result-set then
 	// patching its changes is a no-op.
 	if r == nil {
@@ -113,7 +113,7 @@ func (r *resultSet) Patch(streamID string, event ChangeEvent) error {
 		return nil
 	}
 
-	var bs, err = encodeRowKey(chunk.keyColumns, event.KeyFields())
+	var bs, err = encodeRowKey(chunk.keyColumns, event.KeyFields(), db)
 	if err != nil {
 		return fmt.Errorf("error encoding patch key: %w", err)
 	}

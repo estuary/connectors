@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/alecthomas/jsonschema"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 // ChangeOp encodes a change operation type.
@@ -106,6 +107,12 @@ type Database interface {
 	DefaultSchema(ctx context.Context) (string, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
 	EmptySourceMetadata() SourceMetadata
+	// EncodeRowKeyForFDB converts a key as necessary to produce a TupleElement,
+	// which is encoded as part of a FoundationDB serialized tuple.
+	// Make sure the conversion is partial-order-preserving.
+	EncodeKeyFDB(key interface{}) (tuple.TupleElement, error)
+	// DecodeKeyFDB decodes the result of `EncodeKeyFDB` to its original form.
+	DecodeKeyFDB(t tuple.TupleElement) interface{}
 }
 
 // ReplicationStream represents the process of receiving change events
