@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 
 	"github.com/alecthomas/jsonschema"
@@ -55,17 +56,48 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]sqlc
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
 func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Type, error) {
-	var colSchema, ok = postgresTypeToJSON[column.DataType]
+	// If the column type looks like `_foo` then it's an array of elements of type `foo`.
+	var columnType = column.DataType
+	var arrayColumn = false
+	if strings.HasPrefix(columnType, "_") {
+		columnType = strings.TrimPrefix(columnType, "_")
+		arrayColumn = true
+	}
+
+	// Translate the basic value/element type into a JSON Schema type
+	var colSchema, ok = postgresTypeToJSON[columnType]
 	if !ok {
-		return nil, fmt.Errorf("unhandled PostgreSQL type %q", column.DataType)
+		return nil, fmt.Errorf("unhandled PostgreSQL type %q", columnType)
 	}
 	colSchema.nullable = column.IsNullable
+	var jsonType = colSchema.toType()
+
+	// If the column is an array, wrap the element type in a multidimensional
+	// array structure.
+	if arrayColumn {
+		jsonType = &jsonschema.Type{
+			Type: "object",
+			Extras: map[string]interface{}{
+				"properties": map[string]*jsonschema.Type{
+					"dimensions": {
+						Type:  "array",
+						Items: &jsonschema.Type{Type: "integer"},
+					},
+					"elements": {
+						Type:  "array",
+						Items: jsonType,
+					},
+				},
+			},
+			Required: []string{"dimensions", "elements"},
+		}
+	}
 
 	// Pass-through a postgres column description.
 	if column.Description != nil {
-		colSchema.description = *column.Description
+		jsonType.Description = *column.Description
 	}
-	return colSchema.toType(), nil
+	return jsonType, nil
 }
 
 // translateRecordField "translates" a value from the PostgreSQL driver into
@@ -88,6 +120,19 @@ func (db *postgresDatabase) TranslateRecordField(val interface{}) (interface{}, 
 			fmt.Fprintf(s, "%02x", x[i])
 		}
 		return s.String(), nil
+	case pgtype.Bytea:
+		return x.Bytes, nil
+	case pgtype.Float4:
+		return x.Float, nil
+	case pgtype.Float8:
+		return x.Float, nil
+	case pgtype.BPCharArray, pgtype.BoolArray, pgtype.ByteaArray, pgtype.CIDRArray,
+		pgtype.DateArray, pgtype.EnumArray, pgtype.Float4Array, pgtype.Float8Array,
+		pgtype.HstoreArray, pgtype.InetArray, pgtype.Int2Array, pgtype.Int4Array,
+		pgtype.Int8Array, pgtype.JSONBArray, pgtype.MacaddrArray, pgtype.NumericArray,
+		pgtype.TextArray, pgtype.TimestampArray, pgtype.TimestamptzArray, pgtype.TsrangeArray,
+		pgtype.TstzrangeArray, pgtype.UUIDArray, pgtype.UntypedTextArray, pgtype.VarcharArray:
+		return db.translateArray(x)
 	}
 	if _, ok := val.(json.Marshaler); ok {
 		return val, nil
@@ -99,9 +144,44 @@ func (db *postgresDatabase) TranslateRecordField(val interface{}) (interface{}, 
 	return val, nil
 }
 
+func (db *postgresDatabase) translateArray(x interface{}) (interface{}, error) {
+	// Use reflection to extract the 'elements' field
+	var array = reflect.ValueOf(x)
+	if array.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("array translation expected struct, got %v", array.Kind())
+	}
+
+	var elements = array.FieldByName("Elements")
+	if elements.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("array translation expected Elements slice, got %v", elements.Kind())
+	}
+	var vals = make([]interface{}, elements.Len())
+	for idx := 0; idx < len(vals); idx++ {
+		var element = elements.Index(idx)
+		var translated, err = db.TranslateRecordField(element.Interface())
+		if err != nil {
+			return nil, fmt.Errorf("error translating array element %d: %w", idx, err)
+		}
+		vals[idx] = translated
+	}
+
+	var dimensions, ok = array.FieldByName("Dimensions").Interface().([]pgtype.ArrayDimension)
+	if !ok {
+		return nil, fmt.Errorf("array translation error: expected Dimensions to have type []ArrayDimension")
+	}
+	var dims = make([]int, len(dimensions))
+	for idx := 0; idx < len(dims); idx++ {
+		dims[idx] = int(dimensions[idx].Length)
+	}
+
+	return map[string]interface{}{
+		"dimensions": dims,
+		"elements":   vals,
+	}, nil
+}
+
 type columnSchema struct {
 	contentEncoding string
-	description     string
 	format          string
 	nullable        bool
 	type_           string
@@ -109,9 +189,8 @@ type columnSchema struct {
 
 func (s columnSchema) toType() *jsonschema.Type {
 	var out = &jsonschema.Type{
-		Format:      s.format,
-		Description: s.description,
-		Extras:      make(map[string]interface{}),
+		Format: s.format,
+		Extras: make(map[string]interface{}),
 	}
 
 	if s.contentEncoding != "" {
@@ -135,14 +214,7 @@ var postgresTypeToJSON = map[string]columnSchema{
 	"int4": {type_: "integer"},
 	"int8": {type_: "integer"},
 
-	// TODO(wgd): More systematic treatment of arrays?
-	"_int2":   {type_: "string"},
-	"_int4":   {type_: "string"},
-	"_int8":   {type_: "string"},
-	"_float4": {type_: "string"},
-	"_text":   {type_: "string"},
-
-	"numeric": {type_: "number"},
+	"numeric": {type_: "string"},
 	"float4":  {type_: "number"},
 	"float8":  {type_: "number"},
 
