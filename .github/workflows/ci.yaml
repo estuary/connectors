@@ -7,57 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  build_rust_releases:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-unknown-linux-musl
-
-      - name: Install MUSL
-        run: sudo apt-get install -y musl-tools
-
-      - name: Cargo Cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            parser/target/
-            materialize-elasticsearch/schemabuilder/target/
-            network-proxy-service/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Test Rust Apps
-        run: |
-          cargo test --manifest-path=parser/Cargo.toml --locked
-          cargo test --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked
-          cargo test --manifest-path=network-proxy-service/Cargo.toml --locked
-
-      - name: Build Rust Apps
-        run: |
-          cargo build --manifest-path=network-proxy-service/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
-          cargo build --manifest-path=parser/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
-          cargo build --manifest-path=materialize-elasticsearch/schemabuilder/Cargo.toml --locked --release --target=x86_64-unknown-linux-musl
-
-      - name: Upload Rust Apps
-        uses: actions/upload-artifact@v2
-        with:
-          name: rust_binary
-          path: |
-            parser/target/x86_64-unknown-linux-musl/release/parser
-            materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder
-            network-proxy-service/target/x86_64-unknown-linux-musl/release/network-proxy-service
-
   build_connectors:
-    needs: build_rust_releases
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
@@ -89,17 +39,8 @@ jobs:
           TAG=$(echo $GITHUB_SHA | head -c7)
           echo ::set-output name=tag::${TAG}
 
-      - uses: actions/download-artifact@v2
-        with:
-          name: rust_binary
-
-      # Downloaded artifacts lose their prior permission settings
-      - name: Adjust rust binary permissions
-        run: |
-          chmod +x \
-          parser/target/x86_64-unknown-linux-musl/release/parser \
-          materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder \
-          network-proxy-service/target/x86_64-unknown-linux-musl/release/network-proxy-service
+      - name: Download latest Flow release binaries
+        run: ./fetch-flow.sh
 
       - name: Install kafkactl
         if: matrix.connector == 'source-kafka'

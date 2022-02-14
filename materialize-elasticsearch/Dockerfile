@@ -13,8 +13,9 @@ RUN go mod download
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-elasticsearch ./materialize-elasticsearch
 
+# TODO: copy flow bins
 # Copy schema-builder binary.
-COPY materialize-elasticsearch/schemabuilder/target/x86_64-unknown-linux-musl/release/schema-builder ./schema-builder
+COPY flow-bin/flow-schemalate ./
 
 ENV PATH="/builder:$PATH"
 # Test and build the connector.
@@ -23,14 +24,14 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-elasticsearch
 
 # Runtime Stage
 ################################################################################
-FROM gcr.io/distroless/base-debian11
+FROM gcr.io/distroless/cc-debian11
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
-COPY --from=builder /builder/connector /connector/connector
-COPY --from=builder /builder/schema-builder /connector/schema-builder
+COPY --from=builder /builder/connector /connector/
+COPY --from=builder /builder/flow-schemalate /connector/
 COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
 # Avoid running the connector as root.

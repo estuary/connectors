@@ -1,15 +1,19 @@
+// The schemabuilder package is a Go wrapper around the `flow-schemalate` binary for building
+// elasticsearch schemas using the `elasticsearch-schema` subcommand. For now, this package is
+// specific to the `elasticsearch-schema` subcommand, and doesn't wrap any other subcommands
+// provided by flow-schemalate.
 package schemabuilder
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"os/exec"
 )
 
-// ProgramName is the name of schema builder binary built from rust.
-const ProgramName = "schema-builder"
+// ProgramName is the name of schemalate binary built from rust.
+const ProgramName = "flow-schemalate"
 
 // DateSpec configures a date field in elastic search schema.
 type DateSpec struct {
@@ -121,7 +125,8 @@ func (e ElasticFieldType) MarshalJSON() ([]byte, error) {
 }
 
 // FieldOverride specifies which field in the resulting elastic search schema
-// and how it is overridden.
+// and how it is overridden. This structure matches the JSON that's expected by the `--es-type`
+// argument of the `elasticsearch-scheama` subcommand.
 type FieldOverride struct {
 	Pointer string           `json:"pointer"`
 	EsType  ElasticFieldType `json:"es_type"`
@@ -139,34 +144,24 @@ func (FieldOverride) GetFieldDocString(fieldName string) string {
 	}
 }
 
-// Input provides the input data for schema builder.
-type Input struct {
-	SchemaJSON []byte
-	overrides  []FieldOverride
-}
-
-// MarshalJSON provides customized marshalJSON of Input
-func (s Input) MarshalJSON() ([]byte, error) {
-	var overrides = s.overrides
-	if overrides == nil {
-		overrides = []FieldOverride{}
-	}
-	var output = struct {
-		SchemaJSONBase64 string          `json:"schema_json_base64"`
-		Overrides        []FieldOverride `json:"overrides"`
-	}{
-		SchemaJSONBase64: base64.StdEncoding.EncodeToString(s.SchemaJSON),
-		Overrides:        overrides,
-	}
-	return json.Marshal(output)
-}
-
-// RunSchemaBuilder is a wrapper in GO around rust schema-builder.
+// RunSchemaBuilder is a wrapper in GO around the flow-schemalate CLI
 func RunSchemaBuilder(
 	schemaJSON json.RawMessage,
 	overrides []FieldOverride,
 ) ([]byte, error) {
-	var cmd = exec.Command(ProgramName)
+	var args = []string{"elasticsearch-schema"}
+	for _, fo := range overrides {
+		if typeOverride, err := json.Marshal(&fo); err != nil {
+			return nil, fmt.Errorf("marshalling field override: %w", err)
+		} else {
+			args = append(args, "--es-type", string(typeOverride))
+		}
+	}
+
+	log.WithFields(log.Fields{
+		"args": args,
+	}).Debug("resolved flow-schemalate args")
+	var cmd = exec.Command(ProgramName, args...)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -176,17 +171,18 @@ func RunSchemaBuilder(
 		return nil, fmt.Errorf("getting stdin pipeline: %w", err)
 	}
 
-	input, err := json.Marshal(Input{
-		SchemaJSON: schemaJSON,
-		overrides:  overrides,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("marshal input: %w", err)
-	}
-
 	go func() {
 		defer stdin.Close()
-		stdin.Write(input)
+		var n, writeErr = stdin.Write([]byte(schemaJSON))
+		var entry = log.WithFields(log.Fields{
+			"nBytes": n,
+			"error":  writeErr,
+		})
+		if writeErr == nil {
+			entry.Debug("finished writing json schema to schemalate")
+		} else {
+			entry.Error("failed to write json schema to schemalate")
+		}
 	}()
 
 	out, err := cmd.Output()
