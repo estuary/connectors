@@ -14,7 +14,7 @@ import (
 	sf "github.com/estuary/connectors/network-proxy-service/sshforwarding"
 )
 
-const ProgramName = "network-proxy-service"
+const ProgramName = "flow-network-proxy"
 
 func SupportedNetworkProxyTypes() []string {
 	return []string{"sshForwarding"}

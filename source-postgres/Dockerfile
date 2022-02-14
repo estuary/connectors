@@ -15,7 +15,7 @@ COPY sqlcapture ./sqlcapture
 COPY network-proxy-service ./network-proxy-service
 
 # Copy network-proxy-service binary.
-COPY network-proxy-service/target/x86_64-unknown-linux-musl/release/network-proxy-service ./bin/network-proxy-service
+COPY flow-bin/flow-network-proxy ./bin/
 
 ENV PATH="/builder/bin:$PATH"
 # Run the unit tests.
@@ -34,8 +34,8 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifacts from the builder.
-COPY --from=builder /builder/connector ./connector
-COPY --from=builder /builder/bin/network-proxy-service ./network-proxy-service
+COPY --from=builder /builder/connector ./
+COPY --from=builder /builder/bin/flow-network-proxy ./
 COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
 # Avoid running the connector as root.

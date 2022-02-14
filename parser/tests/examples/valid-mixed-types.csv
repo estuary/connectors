@@ -1,5 +1,0 @@
-int_or_string,bool_or_string
-5,true
-6,foo
-bar,false
-baz,qux

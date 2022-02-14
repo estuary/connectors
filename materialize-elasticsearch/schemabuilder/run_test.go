@@ -88,7 +88,7 @@ func TestRunSchemaBuilder_WithOverrides(t *testing.T) {
 func TestRunSchemaBuilder_Errors(t *testing.T) {
 	var corruptedSchema = "corrupted schema"
 	_, e := RunSchemaBuilder(json.RawMessage(corruptedSchema), []FieldOverride{})
-	require.Contains(t, e.Error(), "Failed generating elastic search schema based on input")
+	require.Contains(t, e.Error(), "fetching output: ")
 
 	var badOverrides = []FieldOverride{
 		{Pointer: "/arr/nonexisting_field", EsType: ElasticFieldType{FieldType: "text"}},
