@@ -4,3 +4,6 @@
 /source-kinesis/source-kinesis
 /source-s3/source-s3
 */target
+
+# top-level directory where we put flow binaries downloaded from the latest flow release
+/flow-bin/
