@@ -102,7 +102,7 @@ func (r *resultSet) Scanned(streamID string) []byte {
 // Patch modifies the buffered results to include the effect of the provided
 // changeEvent. This may simply mean ignoring the event, if it occured on a
 // table which is not in the resultSet or for a row which is not yet included.
-func (r *resultSet) Patch(streamID string, event ChangeEvent, db Database) error {
+func (r *resultSet) Patch(streamID string, event ChangeEvent, rowKey []byte) error {
 	// If a particular table is not represented in the backfill result-set then
 	// patching its changes is a no-op.
 	if r == nil {
@@ -113,20 +113,14 @@ func (r *resultSet) Patch(streamID string, event ChangeEvent, db Database) error
 		return nil
 	}
 
-	var bs, err = encodeRowKey(chunk.keyColumns, event.KeyFields(), db)
-	if err != nil {
-		return fmt.Errorf("error encoding patch key: %w", err)
-	}
-	var rowKey = string(bs)
-
 	// Ignore mutations occurring after the end of the current resultset, unless this
 	// is the final resultset which will complete the backfill.
-	if !chunk.complete && compareTuples([]byte(rowKey), chunk.scanned) > 0 {
+	if !chunk.complete && compareTuples(rowKey, chunk.scanned) > 0 {
 		if logrus.IsLevelEnabled(logrus.DebugLevel) {
 			logrus.WithFields(logrus.Fields{
 				"stream":   streamID,
 				"op":       event.Operation,
-				"rowKey":   base64.StdEncoding.EncodeToString([]byte(rowKey)),
+				"rowKey":   base64.StdEncoding.EncodeToString(rowKey),
 				"chunkEnd": base64.StdEncoding.EncodeToString(chunk.scanned),
 			}).Debug("filtering change")
 		}
@@ -140,16 +134,16 @@ func (r *resultSet) Patch(streamID string, event ChangeEvent, db Database) error
 	// all such inconsistencies by the time the next watermark is reached.
 	switch event.Operation {
 	case InsertOp:
-		chunk.rows[rowKey] = event
+		chunk.rows[string(rowKey)] = event
 	case UpdateOp:
-		chunk.rows[rowKey] = ChangeEvent{
+		chunk.rows[string(rowKey)] = ChangeEvent{
 			Operation: InsertOp,
 			Source:    event.Source,
 			Before:    nil,
 			After:     event.After,
 		}
 	case DeleteOp:
-		delete(chunk.rows, rowKey)
+		delete(chunk.rows, string(rowKey))
 	default:
 		return fmt.Errorf("patched invalid change type %q", event.Operation)
 	}

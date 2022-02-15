@@ -128,8 +128,8 @@ func (db *mysqlDatabase) EncodeKeyFDB(key interface{}) (tuple.TupleElement, erro
 	return key, nil
 }
 
-func (db *mysqlDatabase) DecodeKeyFDB(t tuple.TupleElement) interface{} {
-	return t
+func (db *mysqlDatabase) DecodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
+	return t, nil
 }
 
 // mysqlSourceInfo is source metadata for data capture events.

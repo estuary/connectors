@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -147,15 +148,21 @@ func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 func (db *postgresDatabase) EncodeKeyFDB(key interface{}) (tuple.TupleElement, error) {
 	switch key := key.(type) {
 	case pgtype.Numeric:
-		return EncodePgNumericKeyFDB(key)
+		return encodePgNumericKeyFDB(key)
 	default:
 		return key, nil
 	}
 }
 
-func (db *postgresDatabase) DecodeKeyFDB(t tuple.TupleElement) interface{} {
-	if d := DecodeFDBTuple(t); d != nil {
-		return d
+func (db *postgresDatabase) DecodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
+	switch t := t.(type) {
+	case tuple.Tuple:
+		if d := maybeDecodePgNumericTuple(t); d != nil {
+			return d, nil
+		}
+
+		return nil, errors.New("failed in decoding the fdb tuple")
+	default:
+		return t, nil
 	}
-	return t
 }

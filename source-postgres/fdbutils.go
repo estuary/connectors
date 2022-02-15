@@ -11,8 +11,8 @@ import (
 
 const numericKey = "N"
 
-// EncodePgNumericKeyFDB encodes a pgtype.Numeric value to an FDB tuple.
-func EncodePgNumericKeyFDB(key pgtype.Numeric) (tuple.Tuple, error) {
+// encodePgNumericKeyFDB encodes a pgtype.Numeric value to an FDB tuple.
+func encodePgNumericKeyFDB(key pgtype.Numeric) (tuple.Tuple, error) {
 	if encodedKey, err := encodePgNumeric(key); err != nil {
 		return nil, fmt.Errorf("encode pgtype.Numeric: %w", err)
 	} else if encodedBinary, err := key.EncodeBinary(nil, nil); err != nil {
@@ -22,19 +22,14 @@ func EncodePgNumericKeyFDB(key pgtype.Numeric) (tuple.Tuple, error) {
 	}
 }
 
-// DecodeFDBTuple decodes the input TupleElement to its original value.
-// Return nil if the input cannot be decoded.
-func DecodeFDBTuple(t tuple.TupleElement) interface{} {
-	switch t := t.(type) {
-	case tuple.Tuple:
-		if len(t) == 3 {
-			if key, ok := t[0].(string); ok && key == numericKey {
-				if b, ok := t[2].([]byte); ok {
-					var n pgtype.Numeric
-					if err := n.DecodeBinary(nil, b); err == nil {
-						return n
-					}
-				}
+// maybeDecodePgNumericTuple tries to decode the input tuple as a pgNumeric value.
+// returns the decoded value if succeeds, and nil if not.
+func maybeDecodePgNumericTuple(t tuple.Tuple) interface{} {
+	if len(t) == 3 && t[0] == numericKey {
+		if b, ok := t[2].([]byte); ok {
+			var n pgtype.Numeric
+			if err := n.DecodeBinary(nil, b); err == nil {
+				return n
 			}
 		}
 	}

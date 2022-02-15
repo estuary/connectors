@@ -299,7 +299,7 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 			if err := c.handleChangeEvent(event); err != nil {
 				return fmt.Errorf("error handling replication event: %w", err)
 			}
-		} else if err := results.Patch(streamID, event, c.Database); err != nil {
+		} else if err := results.Patch(streamID, event, rowKey); err != nil {
 			return fmt.Errorf("error patching resultset: %w", err)
 		}
 	}

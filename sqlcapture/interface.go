@@ -112,7 +112,7 @@ type Database interface {
 	// Make sure the conversion is partial-order-preserving.
 	EncodeKeyFDB(key interface{}) (tuple.TupleElement, error)
 	// DecodeKeyFDB decodes the result of `EncodeKeyFDB` to its original form.
-	DecodeKeyFDB(t tuple.TupleElement) interface{}
+	DecodeKeyFDB(t tuple.TupleElement) (interface{}, error)
 }
 
 // ReplicationStream represents the process of receiving change events

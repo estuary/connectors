@@ -69,7 +69,7 @@ func TestEncodeAndDecodePgNumericKeyFDB(t *testing.T) {
 
 	var preEncoded []byte
 	for i := 0; i < len(testCases); i++ {
-		tp, err := EncodePgNumericKeyFDB(testCases[i])
+		tp, err := encodePgNumericKeyFDB(testCases[i])
 		require.NoError(t, err)
 
 		// Make sure the encoded preserves the order.
@@ -81,7 +81,7 @@ func TestEncodeAndDecodePgNumericKeyFDB(t *testing.T) {
 		preEncoded = encoded
 
 		// Make sure decode returns the original value.
-		var decoded = DecodeFDBTuple(tp)
+		var decoded = maybeDecodePgNumericTuple(tp)
 		require.Equal(t, testCases[i], decoded, fmt.Sprintf("Testing: %+v", testCases[i]))
 
 		// Make sure the decoded element can be used in resume query.
