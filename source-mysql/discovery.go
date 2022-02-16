@@ -165,8 +165,40 @@ func (s columnSchema) toType() *jsonschema.Type {
 }
 
 var mysqlTypeToJSON = map[string]columnSchema{
-	"int":     {type_: "integer"},
-	"varchar": {type_: "string"},
-	"text":    {type_: "string"},
+	"tinyint":   {type_: "integer"},
+	"smallint":  {type_: "integer"},
+	"mediumint": {type_: "integer"},
+	"int":       {type_: "integer"},
+	"bigint":    {type_: "integer"},
+	// "bit":       {type_: "integer"}, // TODO(wgd): Enable after fixing translation so BIT(n) colums actually work consistently
+
+	"float":   {type_: "number"},
 	"double":  {type_: "number"},
+	"decimal": {type_: "string"},
+
+	"char":    {type_: "string"},
+	"varchar": {type_: "string"},
+
+	"tinytext":   {type_: "string"},
+	"text":       {type_: "string"},
+	"mediumtext": {type_: "string"},
+	"longtext":   {type_: "string"},
+
+	"binary":     {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
+	"varbinary":  {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
+	"tinyblob":   {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
+	"blob":       {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
+	"mediumblob": {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
+	"longblob":   {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
+
+	// "enum": {type_: "string"}, // TODO(wgd): Enable after fixing translation for enum columns
+	// "set": {type_: "string"}, // TODO(wgd): Enable after fixing translation for set columns
+
+	"date":     {type_: "string"},
+	"datetime": {type_: "string"},
+	// "timestamp": {type_: "string"}, // TODO(wgd): Enable after fixing timezone conversion inconsistencies
+	"time": {type_: "string"},
+	"year": {type_: "integer"},
+
+	// "json": {}, // TODO(wgd): Enable after fixing translation for JSON values
 }
