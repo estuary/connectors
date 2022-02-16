@@ -9,10 +9,13 @@ import (
 
 // encodeRowKey extracts the appropriate key-fields by name from a map and encodes
 // them as a FoundationDB serialized tuple.
-func encodeRowKey(key []string, fields map[string]interface{}) ([]byte, error) {
+func encodeRowKey(key []string, fields map[string]interface{}, db Database) ([]byte, error) {
 	var xs = make([]interface{}, len(key))
+	var err error
 	for i, elem := range key {
-		xs[i] = fields[elem]
+		if xs[i], err = db.EncodeKeyFDB(fields[elem]); err != nil {
+			return nil, fmt.Errorf("encode row key: %w", err)
+		}
 	}
 	return packTuple(xs)
 }
@@ -53,15 +56,20 @@ func packTuple(xs []interface{}) (bs []byte, err error) {
 	return tuple.Tuple(t).Pack(), nil
 }
 
-func unpackTuple(bs []byte) ([]interface{}, error) {
+func unpackTuple(bs []byte, db Database) ([]interface{}, error) {
 	var t, err = tuple.Unpack(bs)
 	if err != nil {
 		return nil, err
 	}
 	var xs []interface{}
 	for _, elem := range t {
-		xs = append(xs, elem)
+		if decoded, err := db.DecodeKeyFDB(elem); err != nil {
+			return nil, fmt.Errorf("unpack tuple: %w", err)
+		} else {
+			xs = append(xs, decoded)
+		}
 	}
+
 	return xs, nil
 }
 

@@ -286,7 +286,7 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 		// While a table is being backfilled, events occurring *before* the current scan point
 		// will be emitted, while events *after* that point will be patched (or ignored) into
 		// the buffered resultSet.
-		var rowKey, err = encodeRowKey(tableState.KeyColumns, event.KeyFields())
+		var rowKey, err = encodeRowKey(tableState.KeyColumns, event.KeyFields(), c.Database)
 		if err != nil {
 			return fmt.Errorf("error encoding row key: %w", err)
 		}
@@ -294,7 +294,7 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 			if err := c.handleChangeEvent(event); err != nil {
 				return fmt.Errorf("error handling replication event: %w", err)
 			}
-		} else if err := results.Patch(streamID, event); err != nil {
+		} else if err := results.Patch(streamID, event, rowKey); err != nil {
 			return fmt.Errorf("error patching resultset: %w", err)
 		}
 	}
@@ -345,7 +345,7 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 		var err error
 		var resumeKey []interface{}
 		if streamState.Scanned != nil {
-			resumeKey, err = unpackTuple(streamState.Scanned)
+			resumeKey, err = unpackTuple(streamState.Scanned, c.Database)
 			if err != nil {
 				return nil, fmt.Errorf("error unpacking resume key: %w", err)
 			}
@@ -360,7 +360,7 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 		}
 
 		// Translate the resulting list of entries into a backfillChunk
-		if err := results.Buffer(streamID, streamState.KeyColumns, events); err != nil {
+		if err := results.Buffer(streamID, streamState.KeyColumns, events, c.Database); err != nil {
 			return nil, fmt.Errorf("error buffering scan results: %w", err)
 		}
 	}

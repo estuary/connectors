@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -10,6 +11,8 @@ import (
 	np "github.com/estuary/connectors/network-proxy-service"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
@@ -140,4 +143,26 @@ func (db *postgresDatabase) DefaultSchema(ctx context.Context) (string, error) {
 
 func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &postgresSource{}
+}
+
+func (db *postgresDatabase) EncodeKeyFDB(key interface{}) (tuple.TupleElement, error) {
+	switch key := key.(type) {
+	case pgtype.Numeric:
+		return encodePgNumericKeyFDB(key)
+	default:
+		return key, nil
+	}
+}
+
+func (db *postgresDatabase) DecodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
+	switch t := t.(type) {
+	case tuple.Tuple:
+		if d := maybeDecodePgNumericTuple(t); d != nil {
+			return d, nil
+		}
+
+		return nil, errors.New("failed in decoding the fdb tuple")
+	default:
+		return t, nil
+	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/airbyte"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/sirupsen/logrus"
 )
@@ -121,6 +122,14 @@ func (db *mysqlDatabase) DefaultSchema(ctx context.Context) (string, error) {
 
 func (db *mysqlDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &mysqlSourceInfo{}
+}
+
+func (db *mysqlDatabase) EncodeKeyFDB(key interface{}) (tuple.TupleElement, error) {
+	return key, nil
+}
+
+func (db *mysqlDatabase) DecodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
+	return t, nil
 }
 
 // mysqlSourceInfo is source metadata for data capture events.
