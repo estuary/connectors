@@ -102,7 +102,7 @@ type Database interface {
 	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Type, error)
 	// TranslateRecordField converts values as necessary to make the JSON serialization of a
 	// particular column value satisfy the corresponding JSON schema.
-	TranslateRecordField(val interface{}) (interface{}, error)
+	TranslateRecordField(column *ColumnInfo, val interface{}) (interface{}, error)
 	// TODO(wgd): Document specific methods
 	DefaultSchema(ctx context.Context) (string, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
@@ -127,10 +127,10 @@ type ReplicationStream interface {
 // TableInfo holds metadata about a specific table in the database, and
 // is used during discovery to automatically generate catalog information.
 type TableInfo struct {
-	Name       string       // The PostgreSQL table name.
-	Schema     string       // The PostgreSQL schema (a namespace, in normal parlance) which contains the table.
-	Columns    []ColumnInfo // Information about each column of the table.
-	PrimaryKey []string     // An ordered list of the column names which together form the table's primary key.
+	Name       string                // The PostgreSQL table name.
+	Schema     string                // The PostgreSQL schema (a namespace, in normal parlance) which contains the table.
+	Columns    map[string]ColumnInfo // Information about each column of the table.
+	PrimaryKey []string              // An ordered list of the column names which together form the table's primary key.
 }
 
 // ColumnInfo holds metadata about a specific column of some table in the

@@ -46,7 +46,7 @@ func testSimpleDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 // shut down due to a lack of further events.
 func testSimpleCapture(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog, state = ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+	var catalog, state = ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	VerifiedCapture(ctx, t, tb, &catalog, &state, "")
 }
@@ -57,7 +57,7 @@ func testSimpleCapture(ctx context.Context, t *testing.T, tb TestBackend) {
 // any more watermarks.
 func testTailing(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog, state = ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+	var catalog, state = ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 	catalog.Tail = true
 
 	// Initial data which must be backfilled
@@ -83,7 +83,7 @@ func testTailing(ctx context.Context, t *testing.T, tb TestBackend) {
 // additional inserts performed after the first capture.
 func testReplicationInserts(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog, state = ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+	var catalog, state = ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
@@ -96,7 +96,7 @@ func testReplicationInserts(ctx context.Context, t *testing.T, tb TestBackend) {
 // additional inserts and deletions performed after the first capture.
 func testReplicationDeletes(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog, state = ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+	var catalog, state = ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
@@ -111,7 +111,7 @@ func testReplicationDeletes(ctx context.Context, t *testing.T, tb TestBackend) {
 // additional inserts and row updates performed after the first capture.
 func testReplicationUpdates(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog, state = ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+	var catalog, state = ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}})
 	VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
@@ -125,7 +125,7 @@ func testReplicationUpdates(ctx context.Context, t *testing.T, tb TestBackend) {
 // and only adds data after replication has begun.
 func testEmptyTable(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog, state = ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+	var catalog, state = ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 
 	VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
 	tb.Insert(ctx, t, tableName, [][]interface{}{{1002, "some"}, {1000, "more"}, {1001, "rows"}})
@@ -140,7 +140,7 @@ func testIgnoredStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 	var table2 = tb.CreateTable(ctx, t, "two", "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
 	tb.Insert(ctx, t, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
-	var catalog = ConfiguredCatalog(table1)
+	var catalog = ConfiguredCatalog(ctx, t, tb, table1)
 	VerifiedCapture(ctx, t, tb, &catalog, &state, "capture1") // Scan table1
 	tb.Insert(ctx, t, table1, [][]interface{}{{6, "six"}})
 	tb.Insert(ctx, t, table2, [][]interface{}{{7, "seven"}})
@@ -159,9 +159,9 @@ func testMultipleStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 	tb.Insert(ctx, t, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
 	tb.Insert(ctx, t, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
 	tb.Insert(ctx, t, table3, [][]interface{}{{6, "six"}, {7, "seven"}, {8, "eight"}})
-	var catalog1 = ConfiguredCatalog(table1)
-	var catalog123 = ConfiguredCatalog(table1, table2, table3)
-	var catalog13 = ConfiguredCatalog(table1, table3)
+	var catalog1 = ConfiguredCatalog(ctx, t, tb, table1)
+	var catalog123 = ConfiguredCatalog(ctx, t, tb, table1, table2, table3)
+	var catalog13 = ConfiguredCatalog(ctx, t, tb, table1, table3)
 	VerifiedCapture(ctx, t, tb, &catalog1, &state, "capture1")   // Scan table1
 	VerifiedCapture(ctx, t, tb, &catalog123, &state, "capture2") // Add table2 and table3
 	VerifiedCapture(ctx, t, tb, &catalog13, &state, "capture3")  // Forget about table2
@@ -179,7 +179,7 @@ func testMultipleStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 // some concurrent modifications to row ranges already-scanned and not-yet-scanned.
 func testComplexDataset(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER, PRIMARY KEY (year, state))")
-	var catalog, state = ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+	var catalog, state = ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 
 	LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
 	var states = VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
@@ -212,7 +212,7 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 	var state = sqlcapture.PersistentState{}
 	var table = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER)")
 	LoadCSV(ctx, t, tb, table, "statepop.csv", 100)
-	var catalog = ConfiguredCatalog(table)
+	var catalog = ConfiguredCatalog(ctx, t, tb, table)
 	catalog.Streams[0].PrimaryKey = [][]string{{"fullname"}, {"year"}}
 	VerifiedCapture(ctx, t, tb, &catalog, &state, "capture1")
 	tb.Insert(ctx, t, table, [][]interface{}{
@@ -229,7 +229,7 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 	var state = sqlcapture.PersistentState{}
 	var table = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER, PRIMARY KEY (year, state))")
 	LoadCSV(ctx, t, tb, table, "statepop.csv", 100)
-	var catalog = ConfiguredCatalog(table)
+	var catalog = ConfiguredCatalog(ctx, t, tb, table)
 	catalog.Streams[0].PrimaryKey = [][]string{{"fullname"}, {"year"}}
 	VerifiedCapture(ctx, t, tb, &catalog, &state, "capture1")
 	tb.Insert(ctx, t, table, [][]interface{}{

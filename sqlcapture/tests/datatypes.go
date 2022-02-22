@@ -31,13 +31,13 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 	for idx, tc := range cases {
 		t.Run(fmt.Sprintf("%d_%s", idx, sanitizeName(tc.ColumnType)), func(t *testing.T) {
 			var table = tb.CreateTable(ctx, t, "", fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+			var stream *airbyte.Stream
 
 			// Perform discovery and verify that the generated JSON schema looks correct
 			t.Run("discovery", func(t *testing.T) {
 				var discoveredCatalog, err = sqlcapture.DiscoverCatalog(ctx, tb.GetDatabase())
 				require.NoError(t, err)
 
-				var stream *airbyte.Stream
 				for idx := range discoveredCatalog.Streams {
 					if strings.EqualFold(discoveredCatalog.Streams[idx].Name, table) {
 						stream = &discoveredCatalog.Streams[idx]
@@ -67,7 +67,12 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 
 			// Insert a test row and scan it back out, then do the same via replication
 			t.Run("roundtrip", func(t *testing.T) {
-				var catalog, state = ConfiguredCatalog(table), sqlcapture.PersistentState{}
+				var catalog = airbyte.ConfiguredCatalog{
+					Streams: []airbyte.ConfiguredStream{
+						{Stream: *stream},
+					},
+				}
+				var state = sqlcapture.PersistentState{}
 
 				t.Run("scan", func(t *testing.T) {
 					tb.Insert(ctx, t, table, [][]interface{}{{1, tc.InputValue}})
