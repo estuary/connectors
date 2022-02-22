@@ -48,6 +48,9 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		if err != nil {
 			return nil, fmt.Errorf("error getting latest binlog position: %w", err)
 		}
+		if len(results.Values) == 0 {
+			return nil, fmt.Errorf("failed to query latest binlog position (is binary logging enabled on %q?)", host)
+		}
 		var row = results.Values[0]
 		pos.Name = string(row[0].AsString())
 		pos.Pos = uint32(row[1].AsInt64())
