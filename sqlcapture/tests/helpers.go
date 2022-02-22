@@ -52,11 +52,25 @@ func PerformCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog *
 }
 
 // ConfiguredCatalog is a test helper for constructing a ConfiguredCatalog from stream names
-func ConfiguredCatalog(streams ...string) airbyte.ConfiguredCatalog {
+func ConfiguredCatalog(ctx context.Context, t *testing.T, tb TestBackend, streamNames ...string) airbyte.ConfiguredCatalog {
+	// Perform discovery and construct a map from names to discovered streams
+	var discoveredCatalog, err = sqlcapture.DiscoverCatalog(ctx, tb.GetDatabase())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var streams = make(map[string]airbyte.Stream)
+	for _, stream := range discoveredCatalog.Streams {
+		streams[strings.ToLower(stream.Name)] = stream
+	}
+
 	var catalog = airbyte.ConfiguredCatalog{}
-	for _, s := range streams {
+	for _, name := range streamNames {
+		stream, ok := streams[strings.ToLower(name)]
+		if !ok {
+			t.Fatalf("no stream named %q was discovered", name)
+		}
 		catalog.Streams = append(catalog.Streams, airbyte.ConfiguredStream{
-			Stream: airbyte.Stream{Name: s},
+			Stream: stream,
 		})
 	}
 	return catalog

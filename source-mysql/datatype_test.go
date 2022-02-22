@@ -62,13 +62,14 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "mediumtext", ExpectType: `{"type":["string","null"]}`, InputValue: "foo", ExpectValue: `"foo"`},
 		{ColumnType: "longtext", ExpectType: `{"type":["string","null"]}`, InputValue: "foo", ExpectValue: `"foo"`},
 
-		// TODO(wgd): Figure out how to distinguish between textual and binary stringish types
-		// {ColumnType: "binary(5)", ExpectType: `{"type":["string","null"]}`, InputValue: []byte{1, 2, 3}, ExpectValue: `"\u001\u002\u003"`},
-		// {ColumnType: "varbinary(5)", ExpectType: `{"type":["string","null"]}`, InputValue: []byte{1, 2, 3}, ExpectValue: `""`},
-		// {ColumnType: "tinyblob", ExpectType: `{"type":["string","null"]}`, InputValue: []byte{1, 2, 3}, ExpectValue: `""`},
-		// {ColumnType: "blob", ExpectType: `{"type":["string","null"]}`, InputValue: []byte{1, 2, 3}, ExpectValue: `""`},
-		// {ColumnType: "mediumblob", ExpectType: `{"type":["string","null"]}`, InputValue: []byte{1, 2, 3}, ExpectValue: `""`},
-		// {ColumnType: "longblob", ExpectType: `{"type":["string","null"]}`, InputValue: []byte{1, 2, 3}, ExpectValue: `""`},
+		// TODO(wgd): The BINARY(n) type has a mild inconsistency in its treatment of trailing null bytes
+		// between backfill and replication.
+		{ColumnType: "binary(5)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78, 0x9A}, ExpectValue: `"EjRWeJo="`},
+		{ColumnType: "varbinary(5)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
+		{ColumnType: "tinyblob", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
+		{ColumnType: "blob", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
+		{ColumnType: "mediumblob", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
+		{ColumnType: "longblob", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
 
 		// TODO(wgd): Enums are reported differently in backfills vs replication. Backfill queries return
 		// the string value of the column, while replicated change events appear to hold an integer index.
@@ -88,7 +89,6 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "time", ExpectType: `{"type":["string","null"]}`, InputValue: "765:43:21", ExpectValue: `"765:43:21"`},
 		{ColumnType: "year", ExpectType: `{"type":["integer","null"]}`, InputValue: "2003", ExpectValue: `2003`},
 
-		// TODO(wgd): JSON values are returned as strings and need to be translated into RawJSON values
-		// {ColumnType: "json", ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
+		{ColumnType: "json", ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
 	})
 }

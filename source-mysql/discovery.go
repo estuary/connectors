@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/alecthomas/jsonschema"
@@ -30,7 +31,10 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]sqlcapt
 		if !ok {
 			info = sqlcapture.TableInfo{Schema: column.TableSchema, Name: column.TableName}
 		}
-		info.Columns = append(info.Columns, column)
+		if info.Columns == nil {
+			info.Columns = make(map[string]sqlcapture.ColumnInfo)
+		}
+		info.Columns[column.Name] = column
 		tableMap[id] = info
 	}
 	for id, key := range primaryKeys {
@@ -68,7 +72,20 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 	return colSchema.toType(), nil
 }
 
-func (db *mysqlDatabase) TranslateRecordField(val interface{}) (interface{}, error) {
+func (db *mysqlDatabase) TranslateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
+	switch val := val.(type) {
+	case string:
+		switch column.DataType {
+		case "binary", "varbinary":
+			return []byte(val), nil
+		case "blob", "tinyblob", "mediumblob", "longblob":
+			return []byte(val), nil
+		case "json":
+			return json.RawMessage(val), nil
+		default:
+			return val, nil
+		}
+	}
 	return val, nil
 }
 
@@ -184,12 +201,12 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"mediumtext": {type_: "string"},
 	"longtext":   {type_: "string"},
 
-	"binary":     {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
-	"varbinary":  {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
-	"tinyblob":   {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
-	"blob":       {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
-	"mediumblob": {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
-	"longblob":   {type_: "string"}, // TODO(wgd): Enable after fixing translation for binary data
+	"binary":     {type_: "string", contentEncoding: "base64"},
+	"varbinary":  {type_: "string", contentEncoding: "base64"},
+	"tinyblob":   {type_: "string", contentEncoding: "base64"},
+	"blob":       {type_: "string", contentEncoding: "base64"},
+	"mediumblob": {type_: "string", contentEncoding: "base64"},
+	"longblob":   {type_: "string", contentEncoding: "base64"},
 
 	// "enum": {type_: "string"}, // TODO(wgd): Enable after fixing translation for enum columns
 	// "set": {type_: "string"}, // TODO(wgd): Enable after fixing translation for set columns
@@ -200,5 +217,5 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"time": {type_: "string"},
 	"year": {type_: "integer"},
 
-	// "json": {}, // TODO(wgd): Enable after fixing translation for JSON values
+	"json": {},
 }
