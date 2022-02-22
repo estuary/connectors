@@ -58,13 +58,15 @@ var configJSONSchema = `{
 			"type":        "string",
 			"title":       "AWS Access Key ID",
 			"description": "Part of the AWS credentials that will be used to connect to Kinesis",
-			"default":     "example-aws-access-key-id"
+			"default":     "example-aws-access-key-id",
+			"secret": true
 		},
 		"awsSecretAccessKey": {
 			"type":        "string",
 			"title":       "AWS Secret Access Key",
 			"description": "Part of the AWS credentials that will be used to connect to Kinesis",
-			"default":     "example-aws-secret-access-key"
+			"default":     "example-aws-secret-access-key",
+			"secret": true
 		}
 	}
 }`
