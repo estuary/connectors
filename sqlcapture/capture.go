@@ -82,6 +82,8 @@ type Capture struct {
 	State    *PersistentState           // State read from `state.json` and emitted as updates
 	Encoder  MessageOutput              // The encoder to which records and state updates are written
 	Database Database                   // The database-specific interface which is operated by the generic Capture logic
+
+	discovery map[string]TableInfo // Cached result of the most recent table discovery request
 }
 
 // Run is the top level entry point of the capture process.
@@ -91,6 +93,15 @@ func (c *Capture) Run(ctx context.Context) error {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
 	defer replStream.Close(ctx)
+
+	// Perform discovery and cache the result. This is used at startup when
+	// updating the state to reflect catalog changes, and then later it is
+	// plumbed through so that value translation can take column types into
+	// account.
+	c.discovery, err = c.Database.DiscoverTables(ctx)
+	if err != nil {
+		return fmt.Errorf("error discovering database tables: %w", err)
+	}
 
 	if err := c.updateState(ctx); err != nil {
 		return fmt.Errorf("error updating capture state: %w", err)
@@ -138,14 +149,6 @@ func (c *Capture) updateState(ctx context.Context) error {
 		c.State.Streams = make(map[string]TableState)
 	}
 
-	// Streams may be added to the catalog at various times. We need to
-	// initialize new state entries for these streams, and while we're at
-	// it this is a good time to sanity-check the primary key configuration.
-	var dbTables, err = c.Database.DiscoverTables(ctx)
-	if err != nil {
-		return fmt.Errorf("error discovering database tables: %w", err)
-	}
-
 	// Just to be a bit more forgiving, default unspecified namespaces to a
 	// reasonable value. This whole bit of logic, as well as the `DefaultSchema`
 	// method, could be removed but only if we're willing to let things break
@@ -160,6 +163,9 @@ func (c *Capture) updateState(ctx context.Context) error {
 		}
 	}
 
+	// Streams may be added to the catalog at various times. We need to
+	// initialize new state entries for these streams, and while we're at
+	// it this is a good time to sanity-check the primary key configuration.
 	for _, catalogStream := range c.Catalog.Streams {
 		var streamID = JoinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
 
@@ -177,7 +183,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 		// If the `PrimaryKey` property is specified in the catalog then use that,
 		// otherwise use the "native" primary key of this table in the database.
 		// Print a warning if the two are not the same.
-		var primaryKey = dbTables[streamID].PrimaryKey
+		var primaryKey = c.discovery[streamID].PrimaryKey
 		if len(primaryKey) != 0 {
 			logrus.WithFields(logrus.Fields{
 				"table": streamID,
@@ -275,7 +281,7 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 			continue
 		}
 		if tableState.Mode == TableModeActive {
-			if err := c.handleChangeEvent(event); err != nil {
+			if err := c.handleChangeEvent(streamID, event); err != nil {
 				return fmt.Errorf("error handling replication event: %w", err)
 			}
 			continue
@@ -292,7 +298,7 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 			return fmt.Errorf("error encoding row key: %w", err)
 		}
 		if compareTuples(rowKey, tableState.Scanned) <= 0 {
-			if err := c.handleChangeEvent(event); err != nil {
+			if err := c.handleChangeEvent(streamID, event); err != nil {
 				return fmt.Errorf("error handling replication event: %w", err)
 			}
 		} else if err := results.Patch(streamID, event, rowKey); err != nil {
@@ -307,7 +313,7 @@ func (c *Capture) emitBuffered(results *resultSet) error {
 	for _, streamID := range results.Streams() {
 		var events = results.Changes(streamID)
 		for _, event := range events {
-			if err := c.handleChangeEvent(event); err != nil {
+			if err := c.handleChangeEvent(streamID, event); err != nil {
 				return fmt.Errorf("error handling backfill change: %w", err)
 			}
 		}
@@ -369,7 +375,7 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 	return results, nil
 }
 
-func (c *Capture) handleChangeEvent(event ChangeEvent) error {
+func (c *Capture) handleChangeEvent(streamID string, event ChangeEvent) error {
 	var out map[string]interface{}
 
 	var meta = struct {
@@ -384,19 +390,19 @@ func (c *Capture) handleChangeEvent(event ChangeEvent) error {
 
 	switch event.Operation {
 	case InsertOp:
-		if err := translateRecordFields(c.Database, event.After); err != nil {
+		if err := c.translateRecordFields(c.Database, streamID, event.After); err != nil {
 			return fmt.Errorf("'after' of insert: %w", err)
 		}
 		out = event.After // Before is never used.
 	case UpdateOp:
-		if err := translateRecordFields(c.Database, event.Before); err != nil {
+		if err := c.translateRecordFields(c.Database, streamID, event.Before); err != nil {
 			return fmt.Errorf("'before' of update: %w", err)
-		} else if err := translateRecordFields(c.Database, event.After); err != nil {
+		} else if err := c.translateRecordFields(c.Database, streamID, event.After); err != nil {
 			return fmt.Errorf("'after' of update: %w", err)
 		}
 		meta.Before, out = event.Before, event.After
 	case DeleteOp:
-		if err := translateRecordFields(c.Database, event.Before); err != nil {
+		if err := c.translateRecordFields(c.Database, streamID, event.Before); err != nil {
 			return fmt.Errorf("'before' of delete: %w", err)
 		}
 		out = event.Before // After is never used.
@@ -419,13 +425,23 @@ func (c *Capture) handleChangeEvent(event ChangeEvent) error {
 	})
 }
 
-func translateRecordFields(db Database, f map[string]interface{}) error {
+func (c *Capture) translateRecordFields(db Database, streamID string, f map[string]interface{}) error {
 	if f == nil {
 		return nil
 	}
 
 	for id, val := range f {
-		var translated, err = db.TranslateRecordField(val)
+		// Get information about this column, if the table and column name are known.
+		// Otherwise columnInfo will be nil, but it's up to TranslateRecordField to
+		// decide whether that is an error.
+		var columnInfo *ColumnInfo
+		if tableInfo, ok := c.discovery[streamID]; ok {
+			if info, ok := tableInfo.Columns[id]; ok {
+				columnInfo = &info
+			}
+		}
+
+		var translated, err = db.TranslateRecordField(columnInfo, val)
 		if err != nil {
 			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
 		}

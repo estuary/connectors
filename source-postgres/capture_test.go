@@ -25,7 +25,7 @@ func TestGeneric(t *testing.T) {
 func TestReplicaIdentity(t *testing.T) {
 	var tb, ctx = TestBackend, context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog, state = tests.ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
@@ -45,7 +45,7 @@ func TestReplicaIdentity(t *testing.T) {
 func TestToastColumns(t *testing.T) {
 	var tb, ctx = TestBackend, context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, other INTEGER, data TEXT)")
-	var catalog, state = tests.ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 
 	// Table is created with REPLICA IDENTITY DEFAULT, which does *not* include
 	// unchanged TOAST fields within the replication log.
@@ -89,7 +89,7 @@ func TestToastColumns(t *testing.T) {
 func TestComplexDataset(t *testing.T) {
 	var tb, ctx = TestBackend, context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
-	var catalog, state = tests.ConfiguredCatalog(tableName), sqlcapture.PersistentState{}
+	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 
 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
 	var states = tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
@@ -130,7 +130,7 @@ func TestSlotLSNAdvances(t *testing.T) {
 
 	var tb, ctx, state = TestBackend, context.Background(), sqlcapture.PersistentState{}
 	var table = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog = tests.ConfiguredCatalog(table)
+	var catalog = tests.ConfiguredCatalog(ctx, t, tb, table)
 
 	var lsnQuery = `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`
 	var slotName = *TestReplicationSlot

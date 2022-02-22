@@ -37,7 +37,10 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]sqlc
 		if !ok {
 			info = sqlcapture.TableInfo{Schema: column.TableSchema, Name: column.TableName}
 		}
-		info.Columns = append(info.Columns, column)
+		if info.Columns == nil {
+			info.Columns = make(map[string]sqlcapture.ColumnInfo)
+		}
+		info.Columns[column.Name] = column
 		tableMap[id] = info
 	}
 	for id, key := range primaryKeys {
@@ -105,7 +108,7 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 // PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
-func (db *postgresDatabase) TranslateRecordField(val interface{}) (interface{}, error) {
+func (db *postgresDatabase) TranslateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
 	switch x := val.(type) {
 	case *net.IPNet:
 		return x.String(), nil

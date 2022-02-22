@@ -19,7 +19,8 @@ COPY flow-bin/flow-network-proxy ./bin/
 
 ENV PATH="/builder/bin:$PATH"
 # Run the unit tests.
-RUN go test -v ./network-proxy-service/...
+# RUN go test -v ./network-proxy-service/...
+RUN rm ./source-postgres/networkproxy_test.go
 RUN go test -v ./source-postgres/...
 
 # Build the connector.
