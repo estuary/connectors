@@ -189,6 +189,8 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		case *replication.GTIDEvent:
 			logrus.WithField("data", data).Trace("GTID Event")
 			rs.gtidTimestamp = data.OriginalCommitTime()
+		case *replication.PreviousGTIDsEvent:
+			logrus.WithField("gtids", data.GTIDSets).Trace("PreviousGTIDs Event")
 		case *replication.QueryEvent:
 			logrus.WithField("data", data).Trace("Query Event")
 		case *replication.RotateEvent:
