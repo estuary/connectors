@@ -30,7 +30,7 @@ func TestRocksetResource(t *testing.T) {
 	var too_ascii = resource{Workspace: "must only include letters and numbers", Collection: "widgets"}
 	require.Error(t, too_ascii.Validate())
 
-	var valid = resource{Workspace: "testing", Collection: "widgets"}
+	var valid = resource{Workspace: "testing-33", Collection: "widgets_1"}
 	require.Nil(t, valid.Validate())
 }
 
