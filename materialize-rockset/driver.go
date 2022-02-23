@@ -122,7 +122,7 @@ func (r *resource) SetDefaults() {
 
 func validateRocksetName(field string, value string) error {
 	// Alphanumeric or dash
-	if match, err := regexp.MatchString("\\A[[:alnum:]-]+\\z", value); err != nil {
+	if match, err := regexp.MatchString("\\A[[:alnum:]_-]+\\z", value); err != nil {
 		return fmt.Errorf("malformed regexp: %v", err)
 	} else if !match {
 		return fmt.Errorf("%s must be alphanumeric. got: %s", field, value)
