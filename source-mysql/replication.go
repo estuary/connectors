@@ -195,7 +195,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		case *replication.PreviousGTIDsEvent:
 			logrus.WithField("gtids", data.GTIDSets).Trace("PreviousGTIDs Event")
 		case *replication.QueryEvent:
-			logrus.WithField("data", data).Trace("Query Event")
+			// Receiving a query event isn't _necessarily_ a problem, but it could be an indication
+			// that the server's `binlog_format` is not set correctly. Even when it's correctly set
+			// to `ROW`, Query events will still be sent for DDL statements, so we don't want to
+			// return an error here, but we do want these logs to be fairly visible.
+			logrus.WithField("data", data).Info("Query Event")
 		case *replication.RotateEvent:
 			logrus.WithField("data", data).Trace("Rotate Event")
 		case *replication.FormatDescriptionEvent:
