@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/connectors/sqlcapture"
@@ -11,9 +12,12 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/sirupsen/logrus"
+
+	mysqlLog "github.com/siddontang/go-log/log"
 )
 
 func main() {
+	fixMysqlLogging()
 	var schema = jsonschema.Reflect(&Config{})
 	var configSchema, err = schema.MarshalJSON()
 	if err != nil {
@@ -32,6 +36,26 @@ func main() {
 		config.SetDefaults()
 		return &mysqlDatabase{config: &config}, nil
 	})
+}
+
+// fixMysqlLogging works around some unfortunate defaults in the go-log package, which is used by
+// go-mysql. This configures their logger to write to stderr instead of stdout (who does that?) and
+// sets the level filter to match the level used by logrus. Unfortunately, there's no way to configure
+// go-log to log in JSON format, so we'll still end up with interleaved JSON and plain text. But
+// Flow handles that fine, so it's primarily just a visual inconvenience.
+func fixMysqlLogging() {
+	var handler, err = mysqlLog.NewStreamHandler(os.Stderr)
+	// Based on a look at the source code, NewStreamHandler never actually returns an error, so this
+	// is just a bit of future proofing.
+	if err != nil {
+		panic(fmt.Sprintf("failed to intialize mysql logging: %v", err))
+	}
+
+	mysqlLog.SetDefaultLogger(mysqlLog.NewDefault(handler))
+	// Looking at the source code, it seems that the level names pretty muc" match those used by logrus.
+	// In the event that anything doesn't match, it'll fall back to info level.
+	// Source: https://github.com/siddontang/go-log/blob/1e957dd83bed/log/logger.go#L116
+	mysqlLog.SetLevelByName(logrus.GetLevel().String())
 }
 
 // Config tells the connector how to connect to the source database and

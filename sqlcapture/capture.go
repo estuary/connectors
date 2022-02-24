@@ -113,6 +113,7 @@ func (c *Capture) Run(ctx context.Context) error {
 			return fmt.Errorf("error performing backfill: %w", err)
 		}
 	}
+	logrus.Debug("finished backfilling tables")
 
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
@@ -329,6 +330,7 @@ func (c *Capture) emitBuffered(results *resultSet) error {
 }
 
 func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resultSet, error) {
+	logrus.WithField("streams", streams).Debug("backfilling streams")
 	var results = newResultSet()
 
 	// TODO(wgd): Add a sanity-check assertion that the current watermark value
