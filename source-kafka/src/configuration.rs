@@ -17,21 +17,25 @@ pub enum Error {
     NoBootstrapServersGiven,
 }
 
-/// # Kafka Connector Configuration
+/// # Kafka Source Configuration
 #[derive(Deserialize, Default, JsonSchema, Serialize)]
 pub struct Configuration {
+    /// # Bootstrap Servers
+    ///
     /// The initial servers in the Kafka cluster to initially connect to. The Kafka
     /// client will be informed of the rest of the cluster nodes by connecting to
     /// one of these nodes.
     #[schemars(with = "Vec<String>")]
     pub bootstrap_servers: Vec<BootstrapServer>,
 
+    /// # Authentication
+    ///
     /// The connection details for authenticating a client connection to Kafka via SASL.
     /// When not provided, the client connection will attempt to use PLAINTEXT
     /// (insecure) protocol. This must only be used in dev/test environments.
     pub authentication: Option<Authentication>,
 
-    /// The TLS connection settings.
+    /// # TLS connection settings.
     pub tls: TlsSettings,
 }
 
@@ -138,6 +142,8 @@ impl<'de> Visitor<'de> for BootstrapServerVisitor {
     }
 }
 
+/// # SASL Mechanism
+///
 /// The SASL Mechanism describes _how_ to exchange and authenticate
 /// clients/servers. For secure communication, TLS is **required** for all
 /// supported mechanisms.
@@ -170,14 +176,22 @@ impl Display for SaslMechanism {
     }
 }
 
+/// # Authentication
+///
 /// The information necessary to connect to Kafka.
 #[derive(Debug, Deserialize, JsonSchema, Serialize)]
 pub struct Authentication {
+    /// # Sasl Mechanism
     pub mechanism: SaslMechanism,
+    /// # Username
     pub username: String,
+    /// # Password
     pub password: String,
 }
 
+/// # TLS Settings
+///
+/// Controls how should TLS certificates be found or used.
 #[derive(Debug, Deserialize, JsonSchema, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TlsSettings {
