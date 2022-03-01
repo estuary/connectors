@@ -39,7 +39,7 @@ const configSchema = `{
 			"type":        "integer",
 			"title":       "Number of Greetings",
 			"description": "Number of greeting documents to produce when running in non-tailing mode",
-			"default":     "1000"
+			"default":     1000
 		}
 	}
 }`
