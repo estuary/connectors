@@ -1,7 +1,6 @@
 package networkproxy
 
 import (
-	"encoding/base64"
 	"os"
 
 	sf "github.com/estuary/connectors/network-proxy-service/sshforwarding"
@@ -16,12 +15,12 @@ func CreateSshForwardingTestConfig(keyFilePath string, remotePort uint16) (*Netw
 	return &NetworkProxyConfig{
 		ProxyType: "sshForwarding",
 		SshForwardingConfig: sf.SshForwardingConfig{
-			SshEndpoint:         "ssh://127.0.0.1:2222",
-			SshPrivateKeyBase64: base64.RawStdEncoding.EncodeToString(b),
-			SshUser:             "flowssh",
-			RemoteHost:          "127.0.0.1",
-			RemotePort:          remotePort,
-			LocalPort:           12345,
+			SshEndpoint: "ssh://127.0.0.1:2222",
+			PrivateKey:  string(b),
+			User:        "flowssh",
+			ForwardHost: "127.0.0.1",
+			ForwardPort: remotePort,
+			LocalPort:   12345,
 		},
 	}, nil
 }

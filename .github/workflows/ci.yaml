@@ -101,7 +101,7 @@ jobs:
           context: .
           file: ${{ matrix.connector }}/Dockerfile
           load: true
-          tags: ghcr.io/estuary/${{ matrix.connector }}:test
+          tags: ghcr.io/estuary/${{ matrix.connector }}:test_${{ github.sha }}
           secrets: |
             "rockset_api_key=${{ secrets.ROCKSET_API_KEY }}"
 
@@ -141,7 +141,7 @@ jobs:
           PGPORT: 5432
           PGUSER: flow
 
-        run: CONNECTOR=${{ matrix.connector }} VERSION=test ./tests/run.sh;
+        run: CONNECTOR=${{ matrix.connector }} VERSION=test_${{ github.sha }} ./tests/run.sh;
 
       - name: Source connector ${{ matrix.connector }} integration tests with SSH forwarding
         if: |
@@ -169,7 +169,7 @@ jobs:
           LOCALPORT: 9876
           SSH_FORWARDING_ENABLED: true
 
-        run: CONNECTOR=${{ matrix.connector }} VERSION=test ./tests/run.sh;
+        run: CONNECTOR=${{ matrix.connector }} VERSION=test_${{ github.sha }} ./tests/run.sh;
 
       - name: Materialization connector ${{ matrix.connector }} integration tests
         if: |
@@ -177,7 +177,7 @@ jobs:
             materialize-elasticsearch
             materialize-s3-parquet
             ', matrix.connector)
-        run: CONNECTOR=${{ matrix.connector }} VERSION=test tests/materialize/run.sh;
+        run: CONNECTOR=${{ matrix.connector }} VERSION=test_${{ github.sha }} tests/materialize/run.sh;
 
       - name: Push ${{ matrix.connector }} image
         uses: docker/build-push-action@v2

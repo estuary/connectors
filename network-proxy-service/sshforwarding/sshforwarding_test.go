@@ -8,11 +8,11 @@ import (
 
 func TestSshForwardConfig_Validate(t *testing.T) {
 	var validConfig = SshForwardingConfig{
-		SshEndpoint:         "test_endpoint",
-		SshPrivateKeyBase64: "test_private_key",
-		SshUser:             "test_ssh_user",
-		RemoteHost:          "remote_host",
-		RemotePort:          1234,
+		SshEndpoint: "test_endpoint",
+		PrivateKey:  "test_private_key",
+		User:        "test_ssh_user",
+		ForwardHost: "forward_host",
+		ForwardPort: 1234,
 	}
 
 	require.NoError(t, validConfig.Validate())
@@ -21,11 +21,11 @@ func TestSshForwardConfig_Validate(t *testing.T) {
 	MissingSshEndpoint.SshEndpoint = ""
 	require.Error(t, MissingSshEndpoint.Validate(), "expected validation error if ssh_endpoint is missing")
 
-	var MissingRemoteHost = validConfig
-	MissingRemoteHost.RemoteHost = ""
-	require.Error(t, MissingRemoteHost.Validate(), "expected validation error if remote_host is missing")
+	var MissingForwardHost = validConfig
+	MissingForwardHost.ForwardHost = ""
+	require.Error(t, MissingForwardHost.Validate(), "expected validation error if forward_host is missing")
 
-	var MissingSshPrivateKey = validConfig
-	MissingSshPrivateKey.SshPrivateKeyBase64 = ""
-	require.Error(t, MissingSshPrivateKey.Validate(), "expected validation error if ssh_private_key_base64 is missing")
+	var MissingPrivateKey = validConfig
+	MissingPrivateKey.PrivateKey = ""
+	require.Error(t, MissingPrivateKey.Validate(), "expected validation error if private_key is missing")
 }
