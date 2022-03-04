@@ -52,7 +52,6 @@ export CONSUMER_ADDRESS=unix://localhost${TESTDIR}/consumer.sock
 # Always use the latest development package to verify the mutual integration
 # of connectors and the Flow runtime.
 curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" | tar -zx -C ${TESTDIR}
-cp ${TESTDIR}/flowctl-go ${TESTDIR}/flowctl
 
 # Start an empty local data plane within our TESTDIR as a background job.
 # --poll so that connectors are polled rather than continuously tailed.

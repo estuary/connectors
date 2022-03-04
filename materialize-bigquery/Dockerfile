@@ -10,7 +10,7 @@ COPY go.* ./
 RUN go mod download
 
 # Download recent flow binaries for usage by tests.
-RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" | tar -zx -C /usr/local/bin/ && cp /usr/local/bin/flowctl-go /usr/local/bin/flowctl
+RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" | tar -zx -C /usr/local/bin/
 
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate
