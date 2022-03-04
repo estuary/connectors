@@ -15,6 +15,8 @@ services:
       MYSQL_USER: flow
       MYSQL_PASSWORD: flow
     network_mode: "host"
+    cap_add:
+      - SYS_NICE  # Prevents 'mbind: Operation not permitted' errors. In theory those are benign but it's better to not have them.
 
 volumes:
   mysql_data: {}
