@@ -9,7 +9,7 @@ then
     if [[ ! -f "${PRIVATE_KEY_FILE_PATH}" ]]; then
         bail "${PRIVATE_KEY_FILE_PATH} does not exists."
     fi
-    export PRIVATE_KEY_BASE64="$(cat ${PRIVATE_KEY_FILE_PATH} | base64 -w 0)"
+    export PRIVATE_KEY="$(awk '{printf "%s\\n", $0}' ${PRIVATE_KEY_FILE_PATH})"
     config_json_template='{
         "database": "$PGDATABASE",
         "host":     "localhost",
@@ -20,10 +20,10 @@ then
             "proxyType": "sshForwarding",
             "sshForwarding": {
               "sshEndpoint": "$SSHENDPOINT",
-              "sshUser": "$SSHUSER",
-              "remoteHost": "$PGHOST",
-              "remotePort": $PGPORT,
-              "sshPrivateKeyBase64": "$PRIVATE_KEY_BASE64",
+              "user": "$SSHUSER",
+              "forwardHost": "$PGHOST",
+              "forwardPort": $PGPORT,
+              "privateKey": "$PRIVATE_KEY",
               "localPort": $LOCALPORT
             }
         }

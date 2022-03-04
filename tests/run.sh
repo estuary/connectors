@@ -49,16 +49,9 @@ export TESTDIR=$(realpath ${TESTDIR})
 export BROKER_ADDRESS=unix://localhost${TESTDIR}/gazette.sock
 export CONSUMER_ADDRESS=unix://localhost${TESTDIR}/consumer.sock
 
-# Always use the latest development image to verify the mutual integration
-# of connectors and the Flow runtime. Pull to bust a cached version,
-# and copy out binaries we'll need for this test.
-FLOW_IMAGE="ghcr.io/estuary/flow:dev"
-docker pull ${FLOW_IMAGE}
-FLOW_CONTAINER=$(docker create $FLOW_IMAGE)
-docker cp ${FLOW_CONTAINER}:/usr/local/bin/flowctl ${TESTDIR}/flowctl
-docker cp ${FLOW_CONTAINER}:/usr/local/bin/etcd ${TESTDIR}/etcd
-docker cp ${FLOW_CONTAINER}:/usr/local/bin/gazette ${TESTDIR}/gazette
-docker rm ${FLOW_CONTAINER}
+# Always use the latest development package to verify the mutual integration
+# of connectors and the Flow runtime.
+curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" | tar -zx -C ${TESTDIR}
 
 # Start an empty local data plane within our TESTDIR as a background job.
 # --poll so that connectors are polled rather than continuously tailed.
@@ -95,6 +88,7 @@ cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
 
 # Build the catalog.
 ${TESTDIR}/flowctl api build --directory ${TESTDIR}/builds --build-id test-build-id --source ${CATALOG_SOURCE} --ts-package || bail "Build failed."
+
 # Activate the catalog.
 ${TESTDIR}/flowctl api activate --build-id test-build-id --all --log.level info || bail "Activate failed."
 # Wait for a data-flow pass to finish.
