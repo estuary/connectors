@@ -37,5 +37,5 @@ func TestSshForwardConfig_startWithDefaultWithBadSshEndpoint(t *testing.T) {
 	config.SshForwardingConfig.SshEndpoint = "bad_endpoint"
 	var stubStderr bytes.Buffer
 	err = config.startInternal(1, &stubStderr)
-	require.Contains(t, stubStderr.String(), "ssh_endpoint parse error")
+	require.Contains(t, stubStderr.String(), "UrlParseError")
 }

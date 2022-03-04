@@ -10,8 +10,8 @@ COPY go.* ./
 RUN go mod download
 RUN go install github.com/mattn/go-sqlite3
 
-# Copy in a recent `flowctl` for usage by tests.
-COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl /usr/local/bin/flowctl
+# Download recent flow binaries for usage by tests.
+RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz"| tar -zx -C /usr/local/bin/
 
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate
