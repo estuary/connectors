@@ -9,8 +9,8 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Copy in a recent `flowctl` for usage by tests.
-COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl-go /usr/local/bin/flowctl
+# Download recent flow binaries for usage by tests.
+RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" | tar -zx -C /usr/local/bin/ && cp /usr/local/bin/flowctl-go /usr/local/bin/flowctl
 
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate
