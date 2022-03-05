@@ -135,7 +135,10 @@ func (db *postgresDatabase) TranslateRecordField(column *sqlcapture.ColumnInfo, 
 		pgtype.Int8Array, pgtype.JSONBArray, pgtype.MacaddrArray, pgtype.NumericArray,
 		pgtype.TextArray, pgtype.TimestampArray, pgtype.TimestamptzArray, pgtype.TsrangeArray,
 		pgtype.TstzrangeArray, pgtype.UUIDArray, pgtype.UntypedTextArray, pgtype.VarcharArray:
-		return db.translateArray(x)
+		// TODO(wgd): If PostgreSQL value translation starts using the provided column
+		// information, this will need to be plumbed through the array translation
+		// logic so that the same behavior can apply to individual array elements.
+		return db.translateArray(nil, x)
 	}
 	if _, ok := val.(json.Marshaler); ok {
 		return val, nil
@@ -147,7 +150,7 @@ func (db *postgresDatabase) TranslateRecordField(column *sqlcapture.ColumnInfo, 
 	return val, nil
 }
 
-func (db *postgresDatabase) translateArray(x interface{}) (interface{}, error) {
+func (db *postgresDatabase) translateArray(column *sqlcapture.ColumnInfo, x interface{}) (interface{}, error) {
 	// Use reflection to extract the 'elements' field
 	var array = reflect.ValueOf(x)
 	if array.Kind() != reflect.Struct {
@@ -161,7 +164,7 @@ func (db *postgresDatabase) translateArray(x interface{}) (interface{}, error) {
 	var vals = make([]interface{}, elements.Len())
 	for idx := 0; idx < len(vals); idx++ {
 		var element = elements.Index(idx)
-		var translated, err = db.TranslateRecordField(element.Interface())
+		var translated, err = db.TranslateRecordField(column, element.Interface())
 		if err != nil {
 			return nil, fmt.Errorf("error translating array element %d: %w", idx, err)
 		}
