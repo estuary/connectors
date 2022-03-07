@@ -29,6 +29,7 @@ func main() {
 	}
 
 	sqlcapture.AirbyteMain(spec, func(configFile airbyte.ConfigFile) (sqlcapture.Database, error) {
+		logrus.SetLevel(logrus.DebugLevel)
 		var config Config
 		if err := configFile.Parse(&config); err != nil {
 			return nil, fmt.Errorf("error parsing config file: %w", err)
