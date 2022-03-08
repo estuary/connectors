@@ -11,7 +11,7 @@ import (
 
 type Config struct {
 	EngineURL string
-	TableName string
+	Database  string
 	Username  string
 	Password  string
 }
@@ -23,11 +23,12 @@ type Client struct {
 	tokenExpiresIn time.Time
 	accessToken    string
 	refreshToken   string
+	tokenType      string
 }
 
 type loginRequest struct {
-	username string
-	password string
+	Username string
+	Password string
 }
 
 type loginResponse struct {
@@ -44,7 +45,7 @@ const contentType = "application/json;charset=UTF-8"
 func New(config Config) (*Client, error) {
 	httpClient := http.Client{}
 
-	usernameAndPassword, err := json.Marshal(loginRequest{username: config.Username, password: config.Password})
+	usernameAndPassword, err := json.Marshal(loginRequest{Username: config.Username, Password: config.Password})
 	if err != nil {
 		return nil, fmt.Errorf("creating login request failed: %w", err)
 	}
@@ -68,7 +69,7 @@ func New(config Config) (*Client, error) {
 	err = json.Unmarshal([]byte(respBuf.String()), &response)
 
 	if err != nil {
-		return nil, fmt.Errorf("parsing response body of login request to get access token failed: %w", err)
+		return nil, fmt.Errorf("parsing response body of login request to get access token failed: %s, %w", respBuf, err)
 	}
 
 	if resp.StatusCode >= 400 {
@@ -88,5 +89,21 @@ func New(config Config) (*Client, error) {
 		refreshToken:   response.RefreshToken,
 		tokenAcquired:  time.Now(),
 		tokenExpiresIn: time.Now().Add(expiryDuration),
+		tokenType:      response.TokenType,
 	}, nil
+}
+
+func (c *Client) Query(query io.Reader) (*http.Response, error) {
+	url := fmt.Sprintf("%s/?database=%s", c.config.EngineURL, c.config.Database)
+	req, err := http.NewRequest("POST", url, query)
+	if err != nil {
+		return nil, fmt.Errorf("creating query request failed: %w", err)
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("%s %s", c.tokenType, c.accessToken))
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("query request failed: %w", err)
+	}
+
+	return resp, nil
 }

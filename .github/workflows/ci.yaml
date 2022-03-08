@@ -27,6 +27,7 @@ jobs:
           - materialize-s3-parquet
           - materialize-snowflake
           - materialize-webhook
+          - materialize-firebolt
 
     steps:
       - uses: actions/checkout@v2

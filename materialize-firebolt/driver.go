@@ -6,13 +6,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/alecthomas/jsonschema"
-	"github.com/elastic/go-elasticsearch/v7/esutil"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-firebolt/firebolt"
-	"github.com/estuary/connectors/materialize-firebolt/schemabuilder"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -20,10 +23,12 @@ import (
 )
 
 type config struct {
-	EngineURL string `json:"engine_url"`
-	Database  string `json:"database"`
-	Username  string `json:"username,omitempty"`
-	Password  string `json:"password,omitempty"`
+	EngineURL    string `json:"engine_url"`
+	Database     string `json:"database"`
+	Username     string `json:"username,omitempty"`
+	Password     string `json:"password,omitempty"`
+	AWSKeyId     string `json:"aws_key_id"`
+	AWSSecretKey string `json:"aws_secret_key"`
 }
 
 func (c config) Validate() error {
@@ -43,25 +48,21 @@ func (c config) Validate() error {
 }
 
 type resource struct {
-	Table         string                        `json:"table"`
-	S3URL         string                        `json:"s3_url"`
-	AWSKeyId      string                        `json:"aws_key_id"`
-	AWSSecretKey  string                        `json:"aws_secret_key"`
-	FieldOverides []schemabuilder.FieldOverride `json:"field_overrides"`
+	Table     string `json:"table"`
+	Bucket    string `json:"bucket"`
+	Prefix    string `json:"prefix,omitempty"`
+	AWSRegion string `json:"aws_region"`
 }
 
 func (r resource) Validate() error {
 	if r.Table == "" {
 		return fmt.Errorf("missing required table")
 	}
-	if r.S3URL == "" {
-		return fmt.Errorf("missing required s3_url")
+	if r.Bucket == "" {
+		return fmt.Errorf("missing required bucket")
 	}
-	if r.AWSKeyId == "" {
-		return fmt.Errorf("missing required aws_key_id")
-	}
-	if r.AWSSecretKey == "" {
-		return fmt.Errorf("missing required aws_secret_key")
+	if r.AWSRegion == "" {
+		return fmt.Errorf("missing required region")
 	}
 
 	return nil
@@ -72,12 +73,16 @@ func (resource) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Table":
 		return "Name of the Firebolt table to store materialized results in. The external table will be named after this table with an `_external` suffix."
-	case "S3URL":
-		return "URL of S3 bucket and prefix where the intermediate files for external table will be stored. Should be an empty S3 prefix."
+	case "Bucket":
+		return "Name of S3 bucket where the intermediate files for external table will be stored. Should be an empty S3 bucket."
+	case "Prefix":
+		return "A prefix for files stored in the bucket."
 	case "AWSKeyId":
 		return "AWS Key ID for accessing the S3 bucket."
 	case "AWSSecretKey":
 		return "AWS Secret Key for accessing the S3 bucket."
+	case "Region":
+		return "AWS Region the bucket is in."
 	default:
 		return ""
 	}
@@ -87,6 +92,7 @@ func (resource) GetFieldDocString(fieldName string) string {
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+	log.Info("FIREBOLT Spec")
 	endpointSchema, err := jsonschema.Reflect(&config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
@@ -105,14 +111,20 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 }
 
 func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
+	log.Info("FIREBOLT Validate")
 	var cfg config
 	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	firebolt, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
+	_, err := firebolt.New(firebolt.Config{
+		EngineURL: cfg.EngineURL,
+		Database:  cfg.Database,
+		Username:  cfg.Username,
+		Password:  cfg.Password,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("creating elasticSearch: %w", err)
+		return nil, fmt.Errorf("creating firebolt client: %w", err)
 	}
 
 	var out []*pm.ValidateResponse_Binding
@@ -122,16 +134,23 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		// Make sure the specified resource is valid to build
-		if schema, err := schemabuilder.RunSchemaBuilder(
-			binding.Collection.SchemaJson,
-			res.FieldOverides,
-		); err != nil {
-			return nil, fmt.Errorf("building elastic search schema: %w", err)
-		} else if err = elasticSearch.CreateIndex(res.Index, res.NumOfShards, res.NumOfReplicas, schema, true); err != nil {
-			// Dry run the index creation to make sure the specifications of the index are consistent with the existing one, if any.
-			return nil, fmt.Errorf("validate elastic search index: %w", err)
+		// Make sure we have read/write access to the S3 path with the given credentials
+		/*awsConfig := aws.Config{
+			Credentials: credentials.NewStaticCredentials(res.AWSKeyId, res.AWSSecretKey, ""),
 		}
+		sess, err := session.NewSession()
+		if err != nil {
+			return nil, fmt.Errorf("building s3 session: %w", err)
+		}
+		s3Client := s3.New(sess, &awsConfig)*/
+
+		// Make sure the table, if it already exists, is valid with our expected schema
+		// Make sure the specified resource is valid to build
+		/*if schema, err := schemabuilder.RunSchemaBuilder(
+			binding.Collection.SchemaJson,
+		); err != nil {
+			return nil, fmt.Errorf("building firebolt schema: %w", err)
+		}*/
 
 		var constraints = make(map[string]*pm.Constraint)
 
@@ -150,8 +169,8 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		}
 		out = append(out, &pm.ValidateResponse_Binding{
 			Constraints:  constraints,
-			DeltaUpdates: res.DeltaUpdates,
-			ResourcePath: []string{res.Index},
+			DeltaUpdates: true,
+			ResourcePath: []string{res.Table},
 		})
 	}
 
@@ -159,6 +178,7 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 }
 
 func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+	log.Info("FIREBOLT ApplyUpsert")
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -167,34 +187,31 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
-	if err != nil {
-		return nil, fmt.Errorf("creating elasticSearch: %w", err)
-	}
-
-	var indices []string
+	var tables []string
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		if elasticSearchSchema, err := schemabuilder.RunSchemaBuilder(
-			binding.Collection.SchemaJson,
-			res.FieldOverides,
-		); err != nil {
-			return nil, fmt.Errorf("building elastic search schema: %w", err)
-		} else if err = elasticSearch.CreateIndex(res.Index, res.NumOfShards, res.NumOfReplicas, elasticSearchSchema, false); err != nil {
-			return nil, fmt.Errorf("creating elastic search index: %w", err)
-		}
+		// Create table and external table
+		//if elasticSearchSchema, err := schemabuilder.RunSchemaBuilder(
+		//binding.Collection.SchemaJson,
+		//res.FieldOverides,
+		//); err != nil {
+		//return nil, fmt.Errorf("building elastic search schema: %w", err)
+		//} else if err = elasticSearch.CreateIndex(res.Index, res.NumOfShards, res.NumOfReplicas, elasticSearchSchema, false); err != nil {
+		//return nil, fmt.Errorf("creating elastic search index: %w", err)
+		//}
 
-		indices = append(indices, res.Index)
+		tables = append(tables, res.Table)
 	}
 
-	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("created indices: ", strings.Join(indices, ","))}, nil
+	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("created tables: ", strings.Join(tables, ","))}, nil
 }
 
 func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+	log.Info("FIREBOLT ApplyDelete")
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -204,32 +221,26 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
-	if err != nil {
-		return nil, fmt.Errorf("creating elasticSearch: %w", err)
-	}
-
-	var indices []string
+	var tables []string
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
-		indices = append(indices, res.Index)
+		tables = append(tables, res.Table)
 	}
 
 	if req.DryRun {
-		return &pm.ApplyResponse{ActionDescription: fmt.Sprint("to delete indices: ", strings.Join(indices, ","))}, nil
+		return &pm.ApplyResponse{ActionDescription: fmt.Sprint("to delete tables: ", strings.Join(tables, ","))}, nil
 	}
 
-	if err = elasticSearch.DeleteIndices(indices); err != nil {
-		return nil, fmt.Errorf("deleting elastic search index: %w", err)
-	}
-	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("deleted indices: ", strings.Join(indices, ","))}, nil
+	// Delete table and external table
+	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("deleted tables: ", strings.Join(tables, ","))}, nil
 }
 
 // Transactions implements the DriverServer interface.
 func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
+	log.Info("FIREBOLT Transactions")
 	var open, err = stream.Recv()
 	if err != nil {
 		return fmt.Errorf("read Open: %w", err)
@@ -242,10 +253,14 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch *ElasticSearch
-	elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
+	fb, err := firebolt.New(firebolt.Config{
+		EngineURL: cfg.EngineURL,
+		Database:  cfg.Database,
+		Username:  cfg.Username,
+		Password:  cfg.Password,
+	})
 	if err != nil {
-		return fmt.Errorf("creating elastic search client: %w", err)
+		return fmt.Errorf("creating firebolt client: %w", err)
 	}
 
 	var bindings []*binding
@@ -256,15 +271,19 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		}
 		bindings = append(bindings,
 			&binding{
-				index:        res.Index,
-				deltaUpdates: res.DeltaUpdates,
+				table:        res.Table,
+				bucket:       res.Bucket,
+				prefix:       res.Prefix,
+				awsKeyId:     cfg.AWSKeyId,
+				awsSecretKey: cfg.AWSSecretKey,
+				awsRegion:    res.AWSRegion,
 			})
 	}
 
 	var transactor = &transactor{
-		elasticSearch:    elasticSearch,
-		bindings:         bindings,
-		bulkIndexerItems: []*esutil.BulkIndexerItem{},
+		fb:              fb,
+		bindings:        bindings,
+		filesLeftToCopy: make([]temporaryFileRecord, 0),
 	}
 
 	if err = stream.Send(&pm.TransactionResponse{
@@ -273,102 +292,131 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return fmt.Errorf("sending Opened: %w", err)
 	}
 
-	var log = log.WithField("materialization", "elasticsearch")
+	var log = log.WithField("materialization", "firebolt")
 	return pm.RunTransactions(stream, transactor, log)
 }
 
 type binding struct {
-	index        string
-	deltaUpdates bool
+	table        string
+	bucket       string
+	prefix       string
+	awsKeyId     string
+	awsSecretKey string
+	awsRegion    string
+}
+
+type temporaryFileRecord struct {
+	bucket       string
+	key          string
+	table        string
+	awsKeyId     string
+	awsSecretKey string
+	awsRegion    string
 }
 
 type transactor struct {
-	elasticSearch    *ElasticSearch
-	bindings         []*binding
-	bulkIndexerItems []*esutil.BulkIndexerItem
+	fb              *firebolt.Client
+	bindings        []*binding
+	filesLeftToCopy []temporaryFileRecord
 }
 
-const loadByIdBatchSize = 1000
-
+// firebolt is delta-update only, so loading of data from Firebolt is not necessary
 func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	var loadingIdsByBinding = map[int][]string{}
-
-	for it.Next() {
-		loadingIdsByBinding[it.Binding] = append(loadingIdsByBinding[it.Binding], documentId(it.Key))
-	}
-
-	for binding, ids := range loadingIdsByBinding {
-		var b = t.bindings[binding]
-		for start := 0; start < len(ids); start += loadByIdBatchSize {
-			var stop = start + loadByIdBatchSize
-			if stop > len(ids) {
-				stop = len(ids)
-			}
-
-			var docs, err = t.elasticSearch.SearchByIds(b.index, ids[start:stop])
-			if err != nil {
-				return fmt.Errorf("Load docs by ids: %w", err)
-			}
-
-			for _, doc := range docs {
-				if err = loaded(binding, doc); err != nil {
-					return fmt.Errorf("callback: %w", err)
-				}
-			}
-		}
-	}
-
+	log.Info("FIREBOLT Load")
 	return nil
 }
 
 func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	if len(t.bulkIndexerItems) != 0 {
-		panic("non-empty bulkIndexerItems") // Invariant: previous call is finished.
+	log.Info("FIREBOLT Prepare")
+	if len(t.filesLeftToCopy) != 0 {
+		panic("non-empty filesLeftToCopy") // Invariant: previous call is finished.
 	}
 	return pf.DriverCheckpoint{}, nil
 }
 
+// write file to S3 and keep a record of them to be copied to the table
 func (t *transactor) Store(it *pm.StoreIterator) error {
+	log.Info("FIREBOLT Store")
 	for it.Next() {
 		var b = t.bindings[it.Binding]
-		var action, docId = "create", ""
-		if !b.deltaUpdates {
-			action, docId = "index", documentId(it.Key)
+
+		awsConfig := aws.Config{
+			Credentials: credentials.NewStaticCredentials(b.awsKeyId, b.awsSecretKey, ""),
+			Region:      &b.awsRegion,
+		}
+		sess := session.Must(session.NewSession(&awsConfig))
+		log.Info("FIREBOLT REGION", b.awsRegion)
+		uploader := s3manager.NewUploader(sess)
+		key := fmt.Sprintf("%s%s.json", b.prefix, documentId(it.Key))
+		log.Info("FIREBOLT STORE WITH KEY", key)
+
+		// delete _meta field for now. Once we have the proper schema translation
+		// this won't be necessary
+		var m map[string]interface{}
+		if err := json.Unmarshal([]byte(it.RawJSON), &m); err != nil {
+			return fmt.Errorf("parsing store json: %w", err)
+		}
+		delete(m, "_meta")
+		newJSONBytes, err := json.Marshal(m)
+
+		if err != nil {
+			return fmt.Errorf("marshalling new store json: %w", err)
 		}
 
-		var item = &esutil.BulkIndexerItem{
-			Index:      t.bindings[it.Binding].index,
-			Action:     action,
-			DocumentID: docId,
-			Body:       bytes.NewReader(it.RawJSON),
+		item := &s3manager.UploadInput{
+			Bucket: aws.String(b.bucket),
+			Key:    aws.String(key),
+			Body:   bytes.NewReader(newJSONBytes),
+		}
+		_, err = uploader.Upload(item)
+		if err != nil {
+			return fmt.Errorf("uploading file to s3: %w", err)
 		}
 
-		t.bulkIndexerItems = append(t.bulkIndexerItems, item)
+		t.filesLeftToCopy = append(t.filesLeftToCopy, temporaryFileRecord{
+			bucket:       b.bucket,
+			key:          key,
+			table:        b.table,
+			awsKeyId:     b.awsKeyId,
+			awsSecretKey: b.awsSecretKey,
+		})
 	}
 
 	return nil
 }
 
 func (t *transactor) Commit(ctx context.Context) error {
-	if err := t.elasticSearch.Commit(ctx, t.bulkIndexerItems); err != nil {
-		return fmt.Errorf("commit: %w", err)
-	}
-
-	for _, b := range t.bindings {
-		// Using Flush instead of Refresh to make sure the data are persisted.
-		// Although both operations ensure the data in ElasticSearch available for search,
-		// Flush guarantees the data are persisted to disk. For details see
-		// https://qbox.io/blog/refresh-flush-operations-elasticsearch-guide/)
-		if err := t.elasticSearch.Flush(b.index); err != nil {
-			return fmt.Errorf("commit flush: %w", err)
-		}
-	}
-
-	t.bulkIndexerItems = t.bulkIndexerItems[:0]
+	log.Info("FIREBOLT Commit")
 	return nil
 }
 
+// load stored file into table
 func (t *transactor) Acknowledge(context.Context) error {
+	log.Info("FIREBOLT Acknowledge")
+	for _, item := range t.filesLeftToCopy {
+		queryString := fmt.Sprintf("INSERT INTO %s SELECT *, source_file_name FROM %s_external WHERE source_file_name='%s';", item.table, item.table, item.key)
+		log.Info("QUERY STRING", queryString)
+		resp, err := t.fb.Query(strings.NewReader(queryString))
+
+		if err != nil {
+			return fmt.Errorf("running data copy query: %w", err)
+		}
+
+		respBuf := new(strings.Builder)
+		_, err = io.Copy(respBuf, resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return fmt.Errorf("reading response of query failed: %w", err)
+		}
+
+		if resp.StatusCode >= 400 {
+			return fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf)
+		}
+
+		log.Info(respBuf)
+	}
+
+	t.filesLeftToCopy = t.filesLeftToCopy[:0]
 	return nil
 }
 
