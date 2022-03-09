@@ -292,6 +292,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return fmt.Errorf("sending Opened: %w", err)
 	}
 
+	log.SetLevel(log.DebugLevel)
 	var log = log.WithField("materialization", "firebolt")
 	return pm.RunTransactions(stream, transactor, log)
 }
