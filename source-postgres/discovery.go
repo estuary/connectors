@@ -261,11 +261,7 @@ const queryDiscoverColumns = `
 		c.ordinal_position,
 		c.column_name,
 		c.is_nullable::boolean,
-		c.udt_name,
-		pg_catalog.col_description(
-			format('%s.%s',c.table_schema,c.table_name)::regclass::oid,
-			c.ordinal_position
-		) AS column_description
+		c.udt_name
   FROM information_schema.columns c
   JOIN information_schema.tables t ON (c.table_schema = t.table_schema AND c.table_name = t.table_name)
   WHERE
@@ -280,15 +276,25 @@ const queryDiscoverColumns = `
 		c.ordinal_position
 	;`
 
+const queryColumnDescription = `SELECT pg_catalog.col_description($1::regclass::oid, $2) AS description;`
+
 func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, error) {
 	var columns []sqlcapture.ColumnInfo
 	var sc sqlcapture.ColumnInfo
 	var _, err = conn.QueryFunc(ctx, queryDiscoverColumns, nil,
-		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType, &sc.Description},
+		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType},
 		func(r pgx.QueryFuncRow) error {
 			columns = append(columns, sc)
 			return nil
 		})
+	for idx := range columns {
+		var col = &columns[idx]
+		// Ignore errors when trying to get column descriptions, because failures are non-fatal.
+		conn.QueryFunc(ctx, queryColumnDescription,
+			[]interface{}{col.TableSchema + "." + col.TableName, col.Index},
+			[]interface{}{&col.Description},
+			func(r pgx.QueryFuncRow) error { return nil })
+	}
 	return columns, err
 }
 
