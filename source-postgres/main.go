@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/alecthomas/jsonschema"
 	np "github.com/estuary/connectors/network-proxy-service"
@@ -48,7 +49,7 @@ type Config struct {
 	PublicationName string                 `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
 	SlotName        string                 `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
 	User            string                 `json:"user" jsonschema:"default=postgres,description=Database user to use."`
-	WatermarksTable string                 `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills."`
+	WatermarksTable string                 `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -62,6 +63,10 @@ func (c *Config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if c.WatermarksTable != "" && !strings.Contains(c.WatermarksTable, ".") {
+		return fmt.Errorf("config parameter 'watermarksTable' must be fully-qualified as '<schema>.<table>': %q", c.WatermarksTable)
 	}
 
 	if err := c.NetworkProxy.Validate(); err != nil {
