@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/connectors/sqlcapture"
@@ -67,7 +68,7 @@ type Config struct {
 	DBName   string `json:"dbname" jsonschema:"description=Name of the database to connect to."`
 	ServerID int    `json:"server_id" jsonschema:"description=Server ID for replication."`
 
-	WatermarksTable string `json:"watermarks_table,omitempty" jsonschema:"default=flow.watermarks,description=The name of the table used for watermark writes during backfills."`
+	WatermarksTable string `json:"watermarks_table,omitempty" jsonschema:"default=flow.watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -82,6 +83,9 @@ func (c *Config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+	if c.WatermarksTable != "" && !strings.Contains(c.WatermarksTable, ".") {
+		return fmt.Errorf("config parameter 'watermarksTable' must be fully-qualified as '<schema>.<table>': %q", c.WatermarksTable)
 	}
 	if c.ServerID == 0 {
 		return fmt.Errorf("missing 'server_id'")
