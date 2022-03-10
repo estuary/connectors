@@ -24,7 +24,7 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-firebolt
 
 # Runtime Stage
 ################################################################################
-FROM gcr.io/distroless/cc-debian11
+FROM --platform=linux/amd64 gcr.io/distroless/cc-debian11
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

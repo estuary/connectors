@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/alecthomas/jsonschema"
@@ -16,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-firebolt/firebolt"
+	"github.com/estuary/connectors/materialize-firebolt/schemabuilder"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -48,10 +48,12 @@ func (c config) Validate() error {
 }
 
 type resource struct {
-	Table     string `json:"table"`
-	Bucket    string `json:"bucket"`
-	Prefix    string `json:"prefix,omitempty"`
-	AWSRegion string `json:"aws_region"`
+	Table        string `json:"table"`
+	TableType    string `json:"table_type"`
+	PrimaryIndex string `json:"primary_index"`
+	Bucket       string `json:"bucket"`
+	Prefix       string `json:"prefix,omitempty"`
+	AWSRegion    string `json:"aws_region"`
 }
 
 func (r resource) Validate() error {
@@ -187,6 +189,17 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
+	fb, err := firebolt.New(firebolt.Config{
+		EngineURL: cfg.EngineURL,
+		Database:  cfg.Database,
+		Username:  cfg.Username,
+		Password:  cfg.Password,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("creating firebolt client: %w", err)
+	}
+
 	var tables []string
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
@@ -194,15 +207,33 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		// Create table and external table
-		//if elasticSearchSchema, err := schemabuilder.RunSchemaBuilder(
-		//binding.Collection.SchemaJson,
-		//res.FieldOverides,
-		//); err != nil {
-		//return nil, fmt.Errorf("building elastic search schema: %w", err)
-		//} else if err = elasticSearch.CreateIndex(res.Index, res.NumOfShards, res.NumOfReplicas, elasticSearchSchema, false); err != nil {
-		//return nil, fmt.Errorf("creating elastic search index: %w", err)
-		//}
+		// Make sure the specified resource is valid to build
+		if schema, err := schemabuilder.RunSchemaBuilder(
+			binding.Collection.SchemaJson,
+		); err != nil {
+			return nil, fmt.Errorf("building firebolt search schema: %w", err)
+		} else {
+			log.Info("FIREBOLT Schema ", string(schema))
+
+			url := fmt.Sprintf("s3://%s/%s", res.Bucket, res.Prefix)
+			externalTable := fmt.Sprintf("CREATE EXTERNAL TABLE IF NOT EXISTS %s_external (%s) TYPE=(JSON) URL='%s' OBJECT_PATTERN='*.json' CREDENTIALS = (AWS_KEY_ID = '%s' AWS_SECRET_KEY = '%s');", res.Table, string(schema), url, cfg.AWSKeyId, cfg.AWSSecretKey)
+			log.Info("QUERY STRING", externalTable)
+			resp, err := fb.Query(strings.NewReader(externalTable))
+
+			if err != nil {
+				return nil, fmt.Errorf("running table creation query: %w", err)
+			}
+
+			mainTable := fmt.Sprintf("CREATE %s TABLE IF NOT EXISTS %s (%s,source_file_name TEXT) PRIMARY INDEX %s;", strings.ToUpper(res.TableType), res.Table, string(schema), res.PrimaryIndex)
+			log.Info("QUERY STRING", mainTable)
+			resp, err = fb.Query(strings.NewReader(mainTable))
+
+			if err != nil {
+				return nil, fmt.Errorf("running table creation query: %w", err)
+			}
+
+			log.Info(resp)
+		}
 
 		tables = append(tables, res.Table)
 	}
@@ -403,18 +434,7 @@ func (t *transactor) Acknowledge(context.Context) error {
 			return fmt.Errorf("running data copy query: %w", err)
 		}
 
-		respBuf := new(strings.Builder)
-		_, err = io.Copy(respBuf, resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return fmt.Errorf("reading response of query failed: %w", err)
-		}
-
-		if resp.StatusCode >= 400 {
-			return fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf)
-		}
-
-		log.Info(respBuf)
+		log.Info(resp)
 	}
 
 	t.filesLeftToCopy = t.filesLeftToCopy[:0]

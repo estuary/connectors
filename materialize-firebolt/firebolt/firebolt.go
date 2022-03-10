@@ -93,17 +93,28 @@ func New(config Config) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Query(query io.Reader) (*http.Response, error) {
+func (c *Client) Query(query io.Reader) (string, error) {
 	url := fmt.Sprintf("%s/?database=%s", c.config.EngineURL, c.config.Database)
 	req, err := http.NewRequest("POST", url, query)
 	if err != nil {
-		return nil, fmt.Errorf("creating query request failed: %w", err)
+		return "", fmt.Errorf("creating query request failed: %w", err)
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("%s %s", c.tokenType, c.accessToken))
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("query request failed: %w", err)
+		return "", fmt.Errorf("query request failed: %w", err)
 	}
 
-	return resp, nil
+	respBuf := new(strings.Builder)
+	_, err = io.Copy(respBuf, resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return "", fmt.Errorf("reading response of query failed: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf)
+	}
+
+	return respBuf.String(), nil
 }
