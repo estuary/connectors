@@ -465,7 +465,7 @@ func (r *reader) emit(lines []json.RawMessage) error {
 	var stateWrapper = &struct {
 		Type  airbyte.MessageType `json:"type"`
 		State struct {
-			Data States
+			Data States `json:"data"`
 		} `json:"state,omitempty"`
 	}{
 		Type: airbyte.MessageTypeState,
