@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/jsonschema"
 	"github.com/aws/aws-sdk-go/aws"
@@ -27,8 +29,11 @@ type config struct {
 	Database     string `json:"database"`
 	Username     string `json:"username,omitempty"`
 	Password     string `json:"password,omitempty"`
-	AWSKeyId     string `json:"aws_key_id"`
-	AWSSecretKey string `json:"aws_secret_key"`
+	AWSKeyId     string `json:"aws_key_id,omitempty"`
+	AWSSecretKey string `json:"aws_secret_key,omitempty"`
+	AWSRegion    string `json:"aws_region,omitempty"`
+	S3Bucket     string `json:"s3_bucket"`
+	S3Prefix     string `json:"s3_prefix,omitempty"`
 }
 
 func (c config) Validate() error {
@@ -44,6 +49,9 @@ func (c config) Validate() error {
 	if c.Password == "" {
 		return fmt.Errorf("missing required password")
 	}
+	if c.S3Bucket == "" {
+		return fmt.Errorf("missing required bucket")
+	}
 	return nil
 }
 
@@ -51,20 +59,11 @@ type resource struct {
 	Table        string `json:"table"`
 	TableType    string `json:"table_type"`
 	PrimaryIndex string `json:"primary_index"`
-	Bucket       string `json:"bucket"`
-	Prefix       string `json:"prefix,omitempty"`
-	AWSRegion    string `json:"aws_region"`
 }
 
 func (r resource) Validate() error {
 	if r.Table == "" {
 		return fmt.Errorf("missing required table")
-	}
-	if r.Bucket == "" {
-		return fmt.Errorf("missing required bucket")
-	}
-	if r.AWSRegion == "" {
-		return fmt.Errorf("missing required region")
 	}
 
 	return nil
@@ -136,23 +135,16 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		// Make sure we have read/write access to the S3 path with the given credentials
-		/*awsConfig := aws.Config{
-			Credentials: credentials.NewStaticCredentials(res.AWSKeyId, res.AWSSecretKey, ""),
-		}
-		sess, err := session.NewSession()
-		if err != nil {
-			return nil, fmt.Errorf("building s3 session: %w", err)
-		}
-		s3Client := s3.New(sess, &awsConfig)*/
-
-		// Make sure the table, if it already exists, is valid with our expected schema
+		// TODO: Make sure we have read/write access to the S3 path with the given credentials
+		// TODO: Make sure the table, if it already exists, is valid with our expected schema
 		// Make sure the specified resource is valid to build
-		/*if schema, err := schemabuilder.RunSchemaBuilder(
+		if _, err := schemabuilder.RunSchemaBuilder(
 			binding.Collection.SchemaJson,
 		); err != nil {
 			return nil, fmt.Errorf("building firebolt schema: %w", err)
-		}*/
+		}
+
+		// TODO: what are the projection constraints for Firebolt?
 
 		var constraints = make(map[string]*pm.Constraint)
 
@@ -215,24 +207,20 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		} else {
 			log.Info("FIREBOLT Schema ", string(schema))
 
-			url := fmt.Sprintf("s3://%s/%s", res.Bucket, res.Prefix)
-			externalTable := fmt.Sprintf("CREATE EXTERNAL TABLE IF NOT EXISTS %s_external (%s) TYPE=(JSON) URL='%s' OBJECT_PATTERN='*.json' CREDENTIALS = (AWS_KEY_ID = '%s' AWS_SECRET_KEY = '%s');", res.Table, string(schema), url, cfg.AWSKeyId, cfg.AWSSecretKey)
-			log.Info("QUERY STRING", externalTable)
-			resp, err := fb.Query(strings.NewReader(externalTable))
-
+			// Create External Table
+			externalTableName := fmt.Sprintf("%s_external", res.Table)
+			url := fmt.Sprintf("s3://%s/%s", cfg.S3Bucket, cfg.S3Prefix)
+			_, err := fb.CreateExternalTable(externalTableName, string(schema), url, cfg.AWSKeyId, cfg.AWSSecretKey)
 			if err != nil {
 				return nil, fmt.Errorf("running table creation query: %w", err)
 			}
 
-			mainTable := fmt.Sprintf("CREATE %s TABLE IF NOT EXISTS %s (%s,source_file_name TEXT) PRIMARY INDEX %s;", strings.ToUpper(res.TableType), res.Table, string(schema), res.PrimaryIndex)
-			log.Info("QUERY STRING", mainTable)
-			resp, err = fb.Query(strings.NewReader(mainTable))
-
+			// Create main table
+			mainTableSchema := string(schema)
+			_, err = fb.CreateTable(res.TableType, res.Table, mainTableSchema, res.PrimaryIndex)
 			if err != nil {
 				return nil, fmt.Errorf("running table creation query: %w", err)
 			}
-
-			log.Info(resp)
 		}
 
 		tables = append(tables, res.Table)
@@ -252,12 +240,36 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
+	fb, err := firebolt.New(firebolt.Config{
+		EngineURL: cfg.EngineURL,
+		Database:  cfg.Database,
+		Username:  cfg.Username,
+		Password:  cfg.Password,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("creating firebolt client: %w", err)
+	}
+
 	var tables []string
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
+
+		// Drop external table
+		_, err := fb.DropTable(fmt.Sprintf("%s_external", res.Table))
+		if err != nil {
+			return nil, fmt.Errorf("running table deletion query: %w", err)
+		}
+
+		// Drop main table
+		_, err = fb.DropTable(res.Table)
+		if err != nil {
+			return nil, fmt.Errorf("running table deletion query: %w", err)
+		}
+
 		tables = append(tables, res.Table)
 	}
 
@@ -284,6 +296,13 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
+	var checkpoint FireboltCheckpoint
+	if open.Open.DriverCheckpointJson != nil {
+		if err := json.Unmarshal(open.Open.DriverCheckpointJson, &checkpoint); err != nil {
+			return fmt.Errorf("parsing driver config: %w", err)
+		}
+	}
+
 	fb, err := firebolt.New(firebolt.Config{
 		EngineURL: cfg.EngineURL,
 		Database:  cfg.Database,
@@ -302,19 +321,19 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		}
 		bindings = append(bindings,
 			&binding{
-				table:        res.Table,
-				bucket:       res.Bucket,
-				prefix:       res.Prefix,
-				awsKeyId:     cfg.AWSKeyId,
-				awsSecretKey: cfg.AWSSecretKey,
-				awsRegion:    res.AWSRegion,
+				table: res.Table,
 			})
 	}
 
 	var transactor = &transactor{
-		fb:              fb,
-		bindings:        bindings,
-		filesLeftToCopy: make([]temporaryFileRecord, 0),
+		fb:           fb,
+		checkpoint:   checkpoint,
+		bindings:     bindings,
+		awsKeyId:     cfg.AWSKeyId,
+		awsSecretKey: cfg.AWSSecretKey,
+		awsRegion:    cfg.AWSRegion,
+		bucket:       cfg.S3Bucket,
+		prefix:       cfg.S3Prefix,
 	}
 
 	if err = stream.Send(&pm.TransactionResponse{
@@ -329,58 +348,69 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 }
 
 type binding struct {
-	table        string
-	bucket       string
-	prefix       string
-	awsKeyId     string
-	awsSecretKey string
-	awsRegion    string
+	table string
 }
 
-type temporaryFileRecord struct {
-	bucket       string
-	key          string
-	table        string
-	awsKeyId     string
-	awsSecretKey string
-	awsRegion    string
+type TemporaryFileRecord struct {
+	Bucket string
+	Key    string
+	Table  string
+}
+
+type FireboltCheckpoint struct {
+	Files []TemporaryFileRecord
 }
 
 type transactor struct {
-	fb              *firebolt.Client
-	bindings        []*binding
-	filesLeftToCopy []temporaryFileRecord
+	fb           *firebolt.Client
+	checkpoint   FireboltCheckpoint
+	awsKeyId     string
+	awsSecretKey string
+	awsRegion    string
+	bucket       string
+	prefix       string
+	bindings     []*binding
 }
 
 // firebolt is delta-update only, so loading of data from Firebolt is not necessary
 func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	log.Info("FIREBOLT Load")
-	return nil
+	panic("delta updates have no load phase")
 }
 
 func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	log.Info("FIREBOLT Prepare")
-	if len(t.filesLeftToCopy) != 0 {
-		panic("non-empty filesLeftToCopy") // Invariant: previous call is finished.
+	checkpoint := FireboltCheckpoint{}
+	for _, b := range t.bindings {
+		checkpoint.Files = append(checkpoint.Files, TemporaryFileRecord{
+			Bucket: t.bucket,
+			Key:    fmt.Sprintf("%s%s.json", t.prefix, randomDocumentKey()),
+			Table:  b.table,
+		})
 	}
-	return pf.DriverCheckpoint{}, nil
+
+	jsn, err := json.Marshal(checkpoint)
+	if err != nil {
+		return pf.DriverCheckpoint{}, fmt.Errorf("creating checkpoint json: %w", err)
+	}
+	t.checkpoint = checkpoint
+	return pf.DriverCheckpoint{DriverCheckpointJson: jsn}, nil
 }
 
 // write file to S3 and keep a record of them to be copied to the table
 func (t *transactor) Store(it *pm.StoreIterator) error {
 	log.Info("FIREBOLT Store")
-	for it.Next() {
-		var b = t.bindings[it.Binding]
+	awsConfig := aws.Config{
+		Credentials: credentials.NewStaticCredentials(t.awsKeyId, t.awsSecretKey, ""),
+		Region:      &t.awsRegion,
+	}
+	sess := session.Must(session.NewSession(&awsConfig))
+	uploader := s3manager.NewUploader(sess)
 
-		awsConfig := aws.Config{
-			Credentials: credentials.NewStaticCredentials(b.awsKeyId, b.awsSecretKey, ""),
-			Region:      &b.awsRegion,
-		}
-		sess := session.Must(session.NewSession(&awsConfig))
-		log.Info("FIREBOLT REGION", b.awsRegion)
-		uploader := s3manager.NewUploader(sess)
-		key := fmt.Sprintf("%s%s.json", b.prefix, documentId(it.Key))
-		log.Info("FIREBOLT STORE WITH KEY", key)
+	uploads := []s3manager.BatchUploadObject{}
+
+	files := make(map[int][]byte)
+
+	for it.Next() {
 
 		// delete _meta field for now. Once we have the proper schema translation
 		// this won't be necessary
@@ -390,28 +420,38 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 		}
 		delete(m, "_meta")
 		newJSONBytes, err := json.Marshal(m)
-
 		if err != nil {
 			return fmt.Errorf("marshalling new store json: %w", err)
 		}
 
-		item := &s3manager.UploadInput{
-			Bucket: aws.String(b.bucket),
-			Key:    aws.String(key),
-			Body:   bytes.NewReader(newJSONBytes),
+		if _, ok := files[it.Binding]; ok {
+			files[it.Binding] = append(files[it.Binding], byte('\n'))
+			files[it.Binding] = append(files[it.Binding], newJSONBytes...)
+		} else {
+			files[it.Binding] = newJSONBytes
 		}
-		_, err = uploader.Upload(item)
-		if err != nil {
-			return fmt.Errorf("uploading file to s3: %w", err)
-		}
+	}
 
-		t.filesLeftToCopy = append(t.filesLeftToCopy, temporaryFileRecord{
-			bucket:       b.bucket,
-			key:          key,
-			table:        b.table,
-			awsKeyId:     b.awsKeyId,
-			awsSecretKey: b.awsSecretKey,
+	for bindingIndex, data := range files {
+		cp := t.checkpoint.Files[bindingIndex]
+		log.Info("FIREBOLT STORE WITH KEY", cp.Key)
+
+		uploads = append(uploads, s3manager.BatchUploadObject{
+			Object: &s3manager.UploadInput{
+				Bucket: aws.String(cp.Bucket),
+				Key:    aws.String(cp.Key),
+				Body:   bytes.NewReader(data),
+			},
 		})
+	}
+
+	uploadIterator := s3manager.UploadObjectsIterator{
+		Objects: uploads,
+	}
+
+	err := uploader.UploadWithIterator(aws.BackgroundContext(), &uploadIterator)
+	if err != nil {
+		return fmt.Errorf("uploading files to s3: %w", err)
 	}
 
 	return nil
@@ -425,24 +465,49 @@ func (t *transactor) Commit(ctx context.Context) error {
 // load stored file into table
 func (t *transactor) Acknowledge(context.Context) error {
 	log.Info("FIREBOLT Acknowledge")
-	for _, item := range t.filesLeftToCopy {
-		queryString := fmt.Sprintf("INSERT INTO %s SELECT *, source_file_name FROM %s_external WHERE source_file_name='%s';", item.table, item.table, item.key)
-		log.Info("QUERY STRING", queryString)
-		resp, err := t.fb.Query(strings.NewReader(queryString))
 
-		if err != nil {
-			return fmt.Errorf("running data copy query: %w", err)
+	sourceFileNames := map[string][]string{}
+	for _, item := range t.checkpoint.Files {
+		table := item.Table
+		fileName := item.Key
+
+		if _, ok := sourceFileNames[table]; ok {
+			sourceFileNames[table] = append(sourceFileNames[table], fileName)
+		} else {
+			sourceFileNames[table] = []string{fileName}
 		}
-
-		log.Info(resp)
 	}
 
-	t.filesLeftToCopy = t.filesLeftToCopy[:0]
+	for table, fileNames := range sourceFileNames {
+		log.Info("FIREBOLT moving files from ", table, " for ", sourceFileNames)
+		_, err := t.fb.InsertFromExternal(table, fileNames)
+		if err != nil {
+			return fmt.Errorf("moving files from external to main table: %w", err)
+		}
+	}
+
+	t.checkpoint.Files = []TemporaryFileRecord{}
+
 	return nil
 }
 
 func documentId(tuple tuple.Tuple) string {
 	return base64.RawStdEncoding.EncodeToString(tuple.Pack())
+}
+
+func randomDocumentKey() string {
+	const charset = "abcdefghijklmnopqrstuvwxyz" +
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const length = 32
+
+	var seededRand *rand.Rand = rand.New(
+		rand.NewSource(time.Now().UnixNano()))
+
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
 }
 
 func (t *transactor) Destroy() {}
