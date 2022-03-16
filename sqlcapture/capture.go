@@ -86,6 +86,12 @@ type Capture struct {
 	discovery map[string]TableInfo // Cached result of the most recent table discovery request
 }
 
+const (
+	nonexistentWatermark   = "nonexistent-watermark" // The watermark which will be used for the final "tailing" stream call.
+	streamIdleWarning      = 60 * time.Second        // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
+	streamProgressInterval = 60 * time.Second        // After `streamProgressInterval` the replication streaming code may log a progress report.
+)
+
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) error {
 	var replStream, err = c.Database.StartReplication(ctx, c.State.Cursor)
@@ -129,7 +135,7 @@ func (c *Capture) Run(ctx context.Context) error {
 
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
-	var targetWatermark = "nonexistent-watermark"
+	var targetWatermark = nonexistentWatermark
 	if !c.Catalog.Tail {
 		var watermark = uuid.New().String()
 		if err = c.Database.WriteWatermark(ctx, watermark); err != nil {
@@ -240,7 +246,51 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 	logrus.WithField("watermark", watermark).Info("streaming to watermark")
 	var watermarksTable = c.Database.WatermarksTable()
 	var watermarkReached = false
+
+	// This part is all about logging enough information to give insight into
+	// connector operation without being unusably spammy. These logs take two forms:
+	//
+	//   + A warning/info message when the stream has been sitting idle
+	//     for a while since the last replication event. This is a warning
+	//     when we expect to catch up to a watermark, and informational when
+	//     that watermark is "nonexistent-watermark".
+	//   + Periodic progress updates, just to show that streaming is ongoing.
+	//
+	// Neither of these can occur more frequently than their respective timeout
+	// values, so the impact of the additional logging should be minimal.
+	//
+	// During backfills no individual `streamToWatermark` call should last long
+	// enough for those timeouts to be hit (and if they are then that's very
+	// useful information). Once we hit the steady state of pure replication
+	// streaming:
+	//
+	//   + If change events are sufficiently infrequent or bursty, each change
+	//     event (or burst of events) will elicit a "progress" log, followed by
+	//     an "idle" log message some time after the event-burst has ended.
+	//   + If a burst of events continues for longer than `streamProgressInterval`
+	//     then additional progress reports will be logged.
+	//   + A consistent high rate of events is just a burst that hasn't ended (so
+	//     far), and will report progress every `streamProgressInterval`.
+	var eventCount int
+	var nextProgress = time.Now().Add(streamProgressInterval)
+	var idleTimeout = time.AfterFunc(streamIdleWarning, func() {
+		if watermark != nonexistentWatermark {
+			logrus.WithField("timeout", streamIdleWarning.String()).Warn("replication stream idle")
+		} else {
+			logrus.WithField("timeout", streamIdleWarning.String()).Info("replication stream idle")
+		}
+	})
+	defer idleTimeout.Stop()
+
 	for event := range replStream.Events() {
+		// Progress logging concerns
+		eventCount++
+		if time.Now().After(nextProgress) {
+			logrus.WithField("count", eventCount).Info("replication stream progress")
+			nextProgress = time.Now().Add(streamProgressInterval)
+		}
+		idleTimeout.Reset(streamIdleWarning)
+
 		// Flush events update the checkpointed LSN and trigger a state update.
 		// If this is the commit after the target watermark, it also ends the loop.
 		if event.Operation == FlushOp {
