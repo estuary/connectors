@@ -51,7 +51,7 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 		"startLSN":    startLSN,
 		"publication": publication,
 		"slot":        slot,
-	}).Debug("starting replication")
+	}).Info("starting replication")
 
 	var stream = &replicationStream{
 		replSlot:        slot,

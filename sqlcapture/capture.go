@@ -98,6 +98,7 @@ func (c *Capture) Run(ctx context.Context) error {
 	// updating the state to reflect catalog changes, and then later it is
 	// plumbed through so that value translation can take column types into
 	// account.
+	logrus.Info("discovering tables")
 	c.discovery, err = c.Database.DiscoverTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
@@ -136,10 +137,6 @@ func (c *Capture) Run(ctx context.Context) error {
 		}
 		targetWatermark = watermark
 	}
-	logrus.WithFields(logrus.Fields{
-		"tail":      c.Catalog.Tail,
-		"watermark": targetWatermark,
-	}).Info("streaming until watermark")
 	return c.streamToWatermark(replStream, targetWatermark, nil)
 }
 
@@ -240,7 +237,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 }
 
 func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark string, results *resultSet) error {
-	logrus.WithField("watermark", watermark).Debug("streaming to watermark")
+	logrus.WithField("watermark", watermark).Info("streaming to watermark")
 	var watermarksTable = c.Database.WatermarksTable()
 	var watermarkReached = false
 	for event := range replStream.Events() {
@@ -336,7 +333,7 @@ func (c *Capture) emitBuffered(results *resultSet) error {
 }
 
 func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resultSet, error) {
-	logrus.WithField("streams", streams).Debug("backfilling streams")
+	logrus.WithField("streams", streams).Info("backfilling streams")
 	var results = newResultSet()
 
 	// TODO(wgd): Add a sanity-check assertion that the current watermark value

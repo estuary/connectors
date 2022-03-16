@@ -54,9 +54,10 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		var row = results.Values[0]
 		pos.Name = string(row[0].AsString())
 		pos.Pos = uint32(row[1].AsInt64())
-		logrus.WithField("pos", pos).Info("initialized binlog position")
+		logrus.WithField("pos", pos).Debug("initialized binlog position")
 	}
 
+	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
 	streamer, err := syncer.StartSync(pos)
 	if err != nil {
 		return nil, fmt.Errorf("error starting binlog sync: %w", err)
