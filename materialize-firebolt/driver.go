@@ -17,7 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-firebolt/firebolt"
-	"github.com/estuary/connectors/materialize-firebolt/schemabuilder"
+	"github.com/estuary/connectors/materialize-firebolt/schemalate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -137,41 +137,24 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 
 		// TODO: Make sure we have read/write access to the S3 path with the given credentials
 		// TODO: Make sure the table, if it already exists, is valid with our expected schema
+
+		// TODO: First load any existing MaterializationSpec and validate against that, otherwise validate new
 		// Make sure the specified resource is valid to build
-		if _, err := schemabuilder.RunSchemaBuilder(
-			binding.Collection.SchemaJson,
-		); err != nil {
+		if constraints, err := schemalate.ValidateNewProjection(binding); err != nil {
 			return nil, fmt.Errorf("building firebolt schema: %w", err)
+		} else {
+			out = append(out, &pm.ValidateResponse_Binding{
+				Constraints:  constraints,
+				DeltaUpdates: true,
+				ResourcePath: []string{res.Table},
+			})
 		}
-
-		// TODO: what are the projection constraints for Firebolt?
-
-		var constraints = make(map[string]*pm.Constraint)
-
-		for _, projection := range binding.Collection.Projections {
-			var constraint = &pm.Constraint{}
-			switch {
-			case projection.IsRootDocumentProjection():
-			case projection.IsPrimaryKey:
-				constraint.Type = pm.Constraint_LOCATION_REQUIRED
-				constraint.Reason = "The root document and primary key fields are needed."
-			default:
-				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
-				constraint.Reason = "Non-root document fields and non-primary key fields are not needed."
-			}
-			constraints[projection.Field] = constraint
-		}
-		out = append(out, &pm.ValidateResponse_Binding{
-			Constraints:  constraints,
-			DeltaUpdates: true,
-			ResourcePath: []string{res.Table},
-		})
 	}
 
 	return &pm.ValidateResponse{Bindings: out}, nil
 }
 
-func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
 	log.Info("FIREBOLT ApplyUpsert")
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
@@ -193,37 +176,26 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 	}
 
 	var tables []string
-	for _, binding := range req.Materialization.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
-		}
 
-		// Make sure the specified resource is valid to build
-		if schema, err := schemabuilder.RunSchemaBuilder(
-			binding.Collection.SchemaJson,
-		); err != nil {
-			return nil, fmt.Errorf("building firebolt search schema: %w", err)
-		} else {
-			log.Info("FIREBOLT Schema ", string(schema))
-
-			// Create External Table
-			externalTableName := fmt.Sprintf("%s_external", res.Table)
-			url := fmt.Sprintf("s3://%s/%s", cfg.S3Bucket, cfg.S3Prefix)
-			_, err := fb.CreateExternalTable(externalTableName, string(schema), url, cfg.AWSKeyId, cfg.AWSSecretKey)
+	if queries, err := schemalate.GetQueriesBundle(
+		req.Materialization,
+	); err != nil {
+		return nil, fmt.Errorf("building firebolt search schema: %w", err)
+	} else {
+		for _, bundle := range queries.Bindings {
+			log.Info("FIREBOLT Queries ", bundle.CreateExternalTable, bundle.CreateTable, bundle.InsertFromTable)
+			_, err := fb.Query(bundle.CreateExternalTable)
 			if err != nil {
 				return nil, fmt.Errorf("running table creation query: %w", err)
 			}
 
-			// Create main table
-			mainTableSchema := string(schema)
-			_, err = fb.CreateTable(res.TableType, res.Table, mainTableSchema, res.PrimaryIndex)
+			_, err = fb.Query(bundle.CreateTable)
 			if err != nil {
 				return nil, fmt.Errorf("running table creation query: %w", err)
 			}
-		}
 
-		tables = append(tables, res.Table)
+			//tables = append(tables, req.Materialization.Bindings[i].ResourceSpecJson)
+		}
 	}
 
 	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("created tables: ", strings.Join(tables, ","))}, nil
@@ -240,7 +212,7 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	fb, err := firebolt.New(firebolt.Config{
+	/*fb, err := firebolt.New(firebolt.Config{
 		EngineURL: cfg.EngineURL,
 		Database:  cfg.Database,
 		Username:  cfg.Username,
@@ -249,7 +221,7 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 
 	if err != nil {
 		return nil, fmt.Errorf("creating firebolt client: %w", err)
-	}
+	}*/
 
 	var tables []string
 	for _, binding := range req.Materialization.Bindings {
@@ -259,7 +231,7 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		}
 
 		// Drop external table
-		_, err := fb.DropTable(fmt.Sprintf("%s_external", res.Table))
+		/*_, err := fb.DropTable(fmt.Sprintf("%s_external", res.Table))
 		if err != nil {
 			return nil, fmt.Errorf("running table deletion query: %w", err)
 		}
@@ -268,7 +240,7 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		_, err = fb.DropTable(res.Table)
 		if err != nil {
 			return nil, fmt.Errorf("running table deletion query: %w", err)
-		}
+		}*/
 
 		tables = append(tables, res.Table)
 	}
@@ -325,8 +297,16 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 			})
 	}
 
+	queries, err := schemalate.GetQueriesBundle(
+		open.Open.Materialization,
+	)
+	if err != nil {
+		return fmt.Errorf("building firebolt search schema: %w", err)
+	}
+
 	var transactor = &transactor{
 		fb:           fb,
+		queries:      queries,
 		checkpoint:   checkpoint,
 		bindings:     bindings,
 		awsKeyId:     cfg.AWSKeyId,
@@ -352,9 +332,9 @@ type binding struct {
 }
 
 type TemporaryFileRecord struct {
-	Bucket string
-	Key    string
-	Table  string
+	Bucket  string
+	Key     string
+	Binding int
 }
 
 type FireboltCheckpoint struct {
@@ -363,6 +343,7 @@ type FireboltCheckpoint struct {
 
 type transactor struct {
 	fb           *firebolt.Client
+	queries      *schemalate.QueriesBundle
 	checkpoint   FireboltCheckpoint
 	awsKeyId     string
 	awsSecretKey string
@@ -380,11 +361,11 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struc
 func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	log.Info("FIREBOLT Prepare")
 	checkpoint := FireboltCheckpoint{}
-	for _, b := range t.bindings {
+	for i, _ := range t.bindings {
 		checkpoint.Files = append(checkpoint.Files, TemporaryFileRecord{
-			Bucket: t.bucket,
-			Key:    fmt.Sprintf("%s%s.json", t.prefix, randomDocumentKey()),
-			Table:  b.table,
+			Bucket:  t.bucket,
+			Key:     fmt.Sprintf("%s%s.json", t.prefix, randomDocumentKey()),
+			Binding: i,
 		})
 	}
 
@@ -466,21 +447,23 @@ func (t *transactor) Commit(ctx context.Context) error {
 func (t *transactor) Acknowledge(context.Context) error {
 	log.Info("FIREBOLT Acknowledge")
 
-	sourceFileNames := map[string][]string{}
+	sourceFileNames := map[int][]string{}
 	for _, item := range t.checkpoint.Files {
-		table := item.Table
+		binding := item.Binding
 		fileName := item.Key
 
-		if _, ok := sourceFileNames[table]; ok {
-			sourceFileNames[table] = append(sourceFileNames[table], fileName)
+		if _, ok := sourceFileNames[binding]; ok {
+			sourceFileNames[binding] = append(sourceFileNames[binding], fileName)
 		} else {
-			sourceFileNames[table] = []string{fileName}
+			sourceFileNames[binding] = []string{fileName}
 		}
 	}
 
-	for table, fileNames := range sourceFileNames {
-		log.Info("FIREBOLT moving files from ", table, " for ", sourceFileNames)
-		_, err := t.fb.InsertFromExternal(table, fileNames)
+	for binding, fileNames := range sourceFileNames {
+		log.Info("FIREBOLT moving files from binding ", binding, " for ", sourceFileNames)
+		insertQuery := t.queries.Bindings[binding].InsertFromTable
+		values := fmt.Sprintf("'%s'", strings.Join(fileNames, "','"))
+		_, err := t.fb.Query(strings.Replace(insertQuery, "?", values, 1))
 		if err != nil {
 			return fmt.Errorf("moving files from external to main table: %w", err)
 		}

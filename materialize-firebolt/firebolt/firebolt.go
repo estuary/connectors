@@ -3,7 +3,7 @@ package firebolt
 import (
 	"encoding/json"
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	//log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"strings"
@@ -113,9 +113,9 @@ type QueryResponse struct {
 	Statistics QueryStatistics
 }
 
-func (c *Client) Query(query io.Reader) (*QueryResponse, error) {
-	url := fmt.Sprintf("%s/?database=%s", c.config.EngineURL, c.config.Database)
-	req, err := http.NewRequest("POST", url, query)
+func (c *Client) Query(query string) (*QueryResponse, error) {
+	url := fmt.Sprintf("https://%s/?database=%s", c.config.EngineURL, c.config.Database)
+	req, err := http.NewRequest("POST", url, strings.NewReader(query))
 	if err != nil {
 		return nil, fmt.Errorf("creating query request failed: %w", err)
 	}
@@ -145,7 +145,7 @@ func (c *Client) Query(query io.Reader) (*QueryResponse, error) {
 	return &queryResponse, nil
 }
 
-func (c *Client) CreateExternalTable(tableName string, schema string, url string, awsKeyId string, awsSecretKey string) (*QueryResponse, error) {
+/*func (c *Client) CreateExternalTable(tableName string, schema string, url string, awsKeyId string, awsSecretKey string) (*QueryResponse, error) {
 	query := fmt.Sprintf(
 		"CREATE EXTERNAL TABLE IF NOT EXISTS %s (%s) TYPE=(JSON) URL='%s' OBJECT_PATTERN='*.json' CREDENTIALS = (AWS_KEY_ID = '%s' AWS_SECRET_KEY = '%s');",
 		tableName,
@@ -208,4 +208,4 @@ func (c *Client) InsertFromExternal(tableName string, sourceFileNames []string) 
 
 	log.Info("Insert From External Query ", query)
 	return c.Query(strings.NewReader(query))
-}
+}*/
