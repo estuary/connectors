@@ -294,6 +294,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		bindings = append(bindings,
 			&binding{
 				table: res.Table,
+				spec:  b,
 			})
 	}
 
@@ -329,6 +330,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 
 type binding struct {
 	table string
+	spec  *pf.MaterializationSpec_Binding
 }
 
 type TemporaryFileRecord struct {
@@ -377,6 +379,34 @@ func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare)
 	return pf.DriverCheckpoint{DriverCheckpointJson: jsn}, nil
 }
 
+func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys tuple.Tuple, values tuple.Tuple) ([]byte, error) {
+	var document = make(map[string]interface{})
+
+	// Add the keys to the document.
+	for i, value := range keys {
+		var propName = spec.FieldSelection.Keys[i]
+		document[propName] = value
+	}
+
+	// Add the non-keys to the document.
+	for i, value := range values {
+		var propName = spec.FieldSelection.Values[i]
+
+		if raw, ok := value.([]byte); ok {
+			document[propName] = json.RawMessage(raw)
+		} else {
+			document[propName] = value
+		}
+	}
+
+	jsonDoc, err := json.Marshal(document)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize the addition document: %w", err)
+	}
+
+	return jsonDoc, nil
+}
+
 // write file to S3 and keep a record of them to be copied to the table
 func (t *transactor) Store(it *pm.StoreIterator) error {
 	log.Info("FIREBOLT Store")
@@ -392,24 +422,16 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 	files := make(map[int][]byte)
 
 	for it.Next() {
-
-		// delete _meta field for now. Once we have the proper schema translation
-		// this won't be necessary
-		var m map[string]interface{}
-		if err := json.Unmarshal([]byte(it.RawJSON), &m); err != nil {
-			return fmt.Errorf("parsing store json: %w", err)
-		}
-		delete(m, "_meta")
-		newJSONBytes, err := json.Marshal(m)
+		doc, err := t.projectDocument(t.bindings[it.Binding].spec, it.Key, it.Values)
 		if err != nil {
-			return fmt.Errorf("marshalling new store json: %w", err)
+			return fmt.Errorf("projecting new store json: %w", err)
 		}
 
 		if _, ok := files[it.Binding]; ok {
 			files[it.Binding] = append(files[it.Binding], byte('\n'))
-			files[it.Binding] = append(files[it.Binding], newJSONBytes...)
+			files[it.Binding] = append(files[it.Binding], doc...)
 		} else {
-			files[it.Binding] = newJSONBytes
+			files[it.Binding] = doc
 		}
 	}
 
