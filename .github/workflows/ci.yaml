@@ -55,7 +55,7 @@ jobs:
 
       - name: Set up Cloud SDK
         if: matrix.connector == 'source-gcs'
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
