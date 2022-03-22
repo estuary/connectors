@@ -20,6 +20,8 @@ type BindingBundle struct {
 	CreateTable         string `json:"create_table"`
 	CreateExternalTable string `json:"create_external_table"`
 	InsertFromTable     string `json:"insert_from_table"`
+	DropTable           string `json:"drop_table"`
+	DropExternalTable   string `json:"drop_external_table"`
 }
 
 type QueriesBundle struct {
@@ -44,7 +46,7 @@ func GetQueriesBundle(
 	var bundle QueriesBundle
 	err = json.Unmarshal(out, &bundle)
 	if err != nil {
-		return nil, fmt.Errorf("parsing queries bundle %w", err)
+		return nil, fmt.Errorf("parsing queries bundle %w with stdout %s", err, out)
 	}
 
 	return &bundle, nil
@@ -68,7 +70,37 @@ func ValidateNewProjection(
 	var constraints map[string]*pm.Constraint
 	err = json.Unmarshal(out, &constraints)
 	if err != nil {
-		return nil, fmt.Errorf("parsing queries bundle %w", err)
+		return nil, fmt.Errorf("parsing constraints map %w with stdout %s", err, out)
+	}
+
+	return constraints, nil
+}
+
+func ValidateExistingProjection(
+	existing *pf.MaterializationSpec_Binding,
+	proposed *pm.ValidateRequest_Binding,
+) (map[string]*pm.Constraint, error) {
+	var args = []string{"firebolt-schema", "--validate-existing-projection"}
+
+	req := pm.Extra_ValidateExistingProjectionRequest{
+		ExistingBinding: existing,
+		ProposedBinding: proposed,
+	}
+
+	reqBytes, err := proto.Marshal(&req)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling validate existing projection request: %w", err)
+	}
+
+	out, err := Run(args, reqBytes)
+	if err != nil {
+		return nil, fmt.Errorf("error running command %w", err)
+	}
+
+	var constraints map[string]*pm.Constraint
+	err = json.Unmarshal(out, &constraints)
+	if err != nil {
+		return nil, fmt.Errorf("parsing constraints map %w with stdout %s", err, out)
 	}
 
 	return constraints, nil
@@ -107,7 +139,7 @@ func Run(
 
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("fetching output: %w. With stderr: %s", err, stderr.String())
+		return nil, fmt.Errorf("fetching output: %w. With stdout %s and stderr: %s", err, out, stderr.String())
 	}
 
 	return out, nil

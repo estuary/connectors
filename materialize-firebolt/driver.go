@@ -12,8 +12,10 @@ import (
 
 	"github.com/alecthomas/jsonschema"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-firebolt/firebolt"
@@ -21,6 +23,7 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	proto "github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -128,10 +131,40 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		return nil, fmt.Errorf("creating firebolt client: %w", err)
 	}
 
+	awsConfig := aws.Config{
+		Credentials: credentials.NewStaticCredentials(cfg.AWSKeyId, cfg.AWSSecretKey, ""),
+		Region:      &cfg.AWSRegion,
+	}
+	sess := session.Must(session.NewSession(&awsConfig))
+	downloader := s3manager.NewDownloader(sess)
+	buf := aws.NewWriteAtBuffer([]byte{})
+	existingSpecKey := fmt.Sprintf("%s%s.flow.materialization_spec", cfg.S3Prefix, req.Materialization)
+
+	var existing pf.MaterializationSpec
+	haveExisting := false
+
+	_, err = downloader.Download(buf, &s3.GetObjectInput{
+		Bucket: &cfg.S3Bucket,
+		Key:    &existingSpecKey,
+	})
+
+	if err != nil {
+		// The file not existing is fine, otherwise it's an actual error
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() != s3.ErrCodeNoSuchKey {
+			return nil, fmt.Errorf("downloading existing spec failed: %w", err)
+		}
+	} else {
+		err = proto.Unmarshal(buf.Bytes(), &existing)
+		if err != nil {
+			return nil, fmt.Errorf("parsing existing materialization spec: %w", err)
+		}
+		haveExisting = true
+	}
+
 	var out []*pm.ValidateResponse_Binding
-	for _, binding := range req.Bindings {
+	for _, proposed := range req.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(proposed.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
@@ -140,7 +173,31 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 
 		// TODO: First load any existing MaterializationSpec and validate against that, otherwise validate new
 		// Make sure the specified resource is valid to build
-		if constraints, err := schemalate.ValidateNewProjection(binding); err != nil {
+		var constraints map[string]*pm.Constraint
+
+		if haveExisting {
+			var existingBinding *pf.MaterializationSpec_Binding = nil
+			for _, b := range existing.Bindings {
+				var r resource
+				if err := pf.UnmarshalStrict(proposed.ResourceSpecJson, &r); err != nil {
+					return nil, fmt.Errorf("parsing resource config: %w", err)
+				}
+				if r.Table == res.Table {
+					existingBinding = b
+					break
+				}
+			}
+
+			if existingBinding != nil {
+				constraints, err = schemalate.ValidateExistingProjection(existingBinding, proposed)
+			} else {
+				// TODO error or just validate new projection?
+			}
+		} else {
+			constraints, err = schemalate.ValidateNewProjection(proposed)
+		}
+
+		if err != nil {
 			return nil, fmt.Errorf("building firebolt schema: %w", err)
 		} else {
 			out = append(out, &pm.ValidateResponse_Binding{
@@ -182,7 +239,7 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 	); err != nil {
 		return nil, fmt.Errorf("building firebolt search schema: %w", err)
 	} else {
-		for _, bundle := range queries.Bindings {
+		for i, bundle := range queries.Bindings {
 			log.Info("FIREBOLT Queries ", bundle.CreateExternalTable, bundle.CreateTable, bundle.InsertFromTable)
 			_, err := fb.Query(bundle.CreateExternalTable)
 			if err != nil {
@@ -194,7 +251,29 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 				return nil, fmt.Errorf("running table creation query: %w", err)
 			}
 
-			//tables = append(tables, req.Materialization.Bindings[i].ResourceSpecJson)
+			tables = append(tables, string(req.Materialization.Bindings[i].ResourceSpecJson))
+		}
+
+		awsConfig := aws.Config{
+			Credentials: credentials.NewStaticCredentials(cfg.AWSKeyId, cfg.AWSSecretKey, ""),
+			Region:      &cfg.AWSRegion,
+		}
+		sess := session.Must(session.NewSession(&awsConfig))
+		uploader := s3manager.NewUploader(sess)
+		materializationBytes, err := proto.Marshal(req.Materialization)
+		if err != nil {
+			return nil, fmt.Errorf("marshalling materialization spec: %w", err)
+		}
+		specKey := fmt.Sprintf("%s%s.flow.materialization_spec", cfg.S3Prefix, req.Materialization.Materialization)
+
+		_, err = uploader.Upload(&s3manager.UploadInput{
+			Bucket: &cfg.S3Bucket,
+			Key:    &specKey,
+			Body:   bytes.NewReader(materializationBytes),
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("uploading materialization spec %s: %w", specKey, err)
 		}
 	}
 
@@ -212,7 +291,7 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	/*fb, err := firebolt.New(firebolt.Config{
+	fb, err := firebolt.New(firebolt.Config{
 		EngineURL: cfg.EngineURL,
 		Database:  cfg.Database,
 		Username:  cfg.Username,
@@ -221,28 +300,28 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 
 	if err != nil {
 		return nil, fmt.Errorf("creating firebolt client: %w", err)
-	}*/
+	}
 
 	var tables []string
-	for _, binding := range req.Materialization.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
+	if queries, err := schemalate.GetQueriesBundle(
+		req.Materialization,
+	); err != nil {
+		return nil, fmt.Errorf("building firebolt search schema: %w", err)
+	} else {
+		for i, bundle := range queries.Bindings {
+			log.Info("FIREBOLT Queries ", bundle.DropTable, bundle.DropExternalTable)
+			_, err := fb.Query(bundle.DropTable)
+			if err != nil {
+				return nil, fmt.Errorf("running table drop query: %w", err)
+			}
+
+			_, err = fb.Query(bundle.DropExternalTable)
+			if err != nil {
+				return nil, fmt.Errorf("running table drop query: %w", err)
+			}
+
+			tables = append(tables, string(req.Materialization.Bindings[i].ResourceSpecJson))
 		}
-
-		// Drop external table
-		/*_, err := fb.DropTable(fmt.Sprintf("%s_external", res.Table))
-		if err != nil {
-			return nil, fmt.Errorf("running table deletion query: %w", err)
-		}
-
-		// Drop main table
-		_, err = fb.DropTable(res.Table)
-		if err != nil {
-			return nil, fmt.Errorf("running table deletion query: %w", err)
-		}*/
-
-		tables = append(tables, res.Table)
 	}
 
 	if req.DryRun {
