@@ -13,7 +13,6 @@ RUN go mod download
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-firebolt ./materialize-firebolt
 
-# TODO: copy flow bins
 # Copy schema-builder binary.
 COPY flow-bin/flow-schemalate ./
 

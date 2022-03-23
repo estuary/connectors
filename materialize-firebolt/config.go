@@ -4,8 +4,6 @@ import (
 	"fmt"
 )
 
-// TODO: make sure we have the necessary documentation information
-// as requested here: https://github.com/estuary/connectors/issues/153
 type config struct {
 	EngineURL    string `json:"engine_url" jsonschema:"title=Engine URL,description=Engine URL of the Firebolt database.,example=engine-name.organisation.region.app.firebolt.io"`
 	Database     string `json:"database" jsonschema:"title=Database,description=Name of the Firebolt database."`
