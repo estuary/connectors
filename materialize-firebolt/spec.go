@@ -50,7 +50,7 @@ func LoadSpec(cfg config, materialization string) (bool, map[string]*pf.Material
 		return false, nil, nil
 	}
 
-	var bindingsByTable map[string]*pf.MaterializationSpec_Binding
+	bindingsByTable := map[string]*pf.MaterializationSpec_Binding{}
 
 	for _, binding := range existing.Bindings {
 		var r resource

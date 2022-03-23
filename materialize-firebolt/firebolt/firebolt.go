@@ -43,7 +43,8 @@ type loginResponse struct {
 const endpoint = "https://api.app.firebolt.io"
 const contentType = "application/json;charset=UTF-8"
 
-// TODO: refresh token when it expires
+// TODO: do we need to refresh token when it expires?
+// tokens are valid for 24 hours. Can transactions last that long?
 func New(config Config) (*Client, error) {
 	httpClient := http.Client{}
 

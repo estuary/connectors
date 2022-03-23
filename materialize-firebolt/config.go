@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+// TODO: make sure we have the necessary documentation information
+// as requested here: https://github.com/estuary/connectors/issues/153
 type config struct {
 	EngineURL    string `json:"engine_url"`
 	Database     string `json:"database"`

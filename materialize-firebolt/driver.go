@@ -112,11 +112,9 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 
 	// TODO: send materialization spec to GetQueriesBundle
 	// so we can check whether creating a table is necessary or not
-	queries, err := schemalate.GetQueriesBundle(
-		req.Materialization,
-	)
+	queries, err := schemalate.GetQueriesBundle(req.Materialization)
 	if err != nil {
-		return nil, fmt.Errorf("building firebolt search schema: %w", err)
+		return nil, fmt.Errorf("building queries bundle: %w", err)
 	}
 
 	for i, bundle := range queries.Bindings {
@@ -149,7 +147,6 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 }
 
 // Delete main and external tables
-// TODO: should we also clear up the materialization spec from s3?
 func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
 	log.Info("FIREBOLT ApplyDelete")
 	if err := req.Validate(); err != nil {
@@ -173,9 +170,7 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 	}
 
 	var tables []string
-	queries, err := schemalate.GetQueriesBundle(
-		req.Materialization,
-	)
+	queries, err := schemalate.GetQueriesBundle(req.Materialization)
 	if err != nil {
 		return nil, fmt.Errorf("building firebolt search schema: %w", err)
 	}

@@ -66,9 +66,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 			})
 	}
 
-	queries, err := schemalate.GetQueriesBundle(
-		open.Open.Materialization,
-	)
+	queries, err := schemalate.GetQueriesBundle(open.Open.Materialization)
 	if err != nil {
 		return fmt.Errorf("building firebolt search schema: %w", err)
 	}
@@ -107,10 +105,9 @@ type TemporaryFileRecord struct {
 	Binding int
 }
 
-// TODO: must include bindings. Bindings are not guaranteed to be the same in the Acknowledge
-// step since Acknowledge step might run in another process with a new version of materialization
 type FireboltCheckpoint struct {
-	Files []TemporaryFileRecord
+	Files   []TemporaryFileRecord
+	Queries schemalate.QueriesBundle
 }
 
 type transactor struct {
@@ -132,7 +129,9 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struc
 
 func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	log.Info("FIREBOLT Prepare")
-	checkpoint := FireboltCheckpoint{}
+	checkpoint := FireboltCheckpoint{
+		Queries: *t.queries,
+	}
 	for i, _ := range t.bindings {
 		checkpoint.Files = append(checkpoint.Files, TemporaryFileRecord{
 			Bucket:  t.bucket,
@@ -146,6 +145,7 @@ func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare)
 		return pf.DriverCheckpoint{}, fmt.Errorf("creating checkpoint json: %w", err)
 	}
 	t.checkpoint = checkpoint
+
 	return pf.DriverCheckpoint{DriverCheckpointJson: jsn}, nil
 }
 
@@ -239,6 +239,10 @@ func (t *transactor) Commit(ctx context.Context) error {
 func (t *transactor) Acknowledge(context.Context) error {
 	log.Info("FIREBOLT Acknowledge")
 
+	if len(t.checkpoint.Files) < 1 {
+		return nil
+	}
+
 	sourceFileNames := map[int][]string{}
 	for _, item := range t.checkpoint.Files {
 		binding := item.Binding
@@ -251,9 +255,15 @@ func (t *transactor) Acknowledge(context.Context) error {
 		}
 	}
 
+	// Acknowledge step might end up being run by a separate process
+	// different from the original, and the new transactor process might be initialised with
+	// a new version of the MaterializationSpec. This means it's possible to have an Acknowledge
+	// with MaterializationSpec v1 be run by a transactor initialised with MaterializationSpec v2.
+	// As such, we keep a copy of the queries generated from the MaterializationSpec of the
+	// transaction to which this Acknowledge belongs in the checkpoint to avoid inconsistencies.
 	for binding, fileNames := range sourceFileNames {
 		log.Info("FIREBOLT moving files from binding ", binding, " for ", sourceFileNames)
-		insertQuery := t.queries.Bindings[binding].InsertFromTable
+		insertQuery := t.checkpoint.Queries.Bindings[binding].InsertFromTable
 		values := fmt.Sprintf("'%s'", strings.Join(fileNames, "','"))
 		_, err := t.fb.Query(strings.Replace(insertQuery, "?", values, 1))
 		if err != nil {
