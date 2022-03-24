@@ -110,6 +110,45 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 
 	var tables []string
 
+	// Validate the new MaterializationSpec against its own constraints as a sanity check
+	haveExisting, existing, err := LoadSpec(cfg, req.Materialization.Materialization.String())
+	if err != nil {
+		return nil, fmt.Errorf("loading materialization spec: %w", err)
+	}
+
+	for _, proposed := range req.Materialization.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(proposed.ResourceSpecJson, &res); err != nil {
+			return nil, fmt.Errorf("parsing resource config: %w", err)
+		}
+
+		// Make sure the specified resource is valid to build
+		var constraints map[string]*pm.Constraint
+		mappedBinding := pm.ValidateRequest_Binding{
+			ResourceSpecJson: proposed.ResourceSpecJson,
+			Collection:       proposed.Collection,
+		}
+
+		if haveExisting {
+			if existingBinding, ok := existing[res.Table]; ok {
+				constraints, err = schemalate.ValidateExistingProjection(existingBinding, &mappedBinding)
+			} else {
+				// A new binding that didn't exist in previous materialization spec
+				constraints, err = schemalate.ValidateNewProjection(&mappedBinding)
+			}
+		} else {
+			constraints, err = schemalate.ValidateNewProjection(&mappedBinding)
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("validating binding and generating constraints: %w", err)
+		}
+		err := schemalate.ValidateBindingAgainstConstraints(proposed, constraints)
+		if err != nil {
+			return nil, fmt.Errorf("validating binding %v against constraints %v: %w", proposed, constraints, err)
+		}
+	}
+
 	// TODO: send materialization spec to GetQueriesBundle
 	// so we can check whether creating a table is necessary or not
 	queries, err := schemalate.GetQueriesBundle(req.Materialization)

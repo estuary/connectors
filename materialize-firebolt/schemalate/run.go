@@ -106,6 +106,35 @@ func ValidateExistingProjection(
 	return constraints, nil
 }
 
+func ValidateBindingAgainstConstraints(
+	binding *pf.MaterializationSpec_Binding,
+	constraints map[string]*pm.Constraint,
+) error {
+	var args = []string{"firebolt-schema", "--validate-binding-against-constraints"}
+
+	req := pm.Extra_ValidateBindingAgainstConstraints{
+		Binding:     binding,
+		Constraints: constraints,
+	}
+
+	reqBytes, err := proto.Marshal(&req)
+	if err != nil {
+		return fmt.Errorf("marshalling validate binding against constraints request: %w", err)
+	}
+
+	out, err := Run(args, reqBytes)
+	if err != nil {
+		return fmt.Errorf("error running command %w", err)
+	}
+
+	outString := string(out)
+	if outString != "" {
+		return fmt.Errorf("validation failed %s", outString)
+	}
+
+	return nil
+}
+
 func Run(
 	args []string,
 	input []byte,
