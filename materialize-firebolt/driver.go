@@ -19,7 +19,6 @@ import (
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
-	log.Info("FIREBOLT Spec")
 	endpointSchema, err := jsonschema.Reflect(&config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
@@ -40,7 +39,6 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 // Retrieve existing materialization spec and validate the new bindings either against
 // the old materialization spec, or validate it as new
 func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
-	log.Info("FIREBOLT Validate")
 	var cfg config
 	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
@@ -88,7 +86,6 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 
 // Create main and external table and persist materialization spec on S3
 func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	log.Info("FIREBOLT ApplyUpsert")
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -157,8 +154,6 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 	}
 
 	for i, bundle := range queries.Bindings {
-		log.Info("FIREBOLT Queries ", bundle.CreateExternalTable, bundle.CreateTable, bundle.InsertFromTable)
-
 		if !req.DryRun {
 			_, err := fb.Query(bundle.CreateExternalTable)
 			if err != nil {
@@ -187,7 +182,6 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 
 // Delete main and external tables
 func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	log.Info("FIREBOLT ApplyDelete")
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -215,8 +209,6 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 	}
 
 	for i, bundle := range queries.Bindings {
-		log.Info("FIREBOLT Queries ", bundle.DropTable, bundle.DropExternalTable)
-
 		if !req.DryRun {
 			_, err := fb.Query(bundle.DropTable)
 			if err != nil {

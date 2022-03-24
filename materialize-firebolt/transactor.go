@@ -23,7 +23,6 @@ import (
 
 // Transactions implements the DriverServer interface.
 func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	log.Info("FIREBOLT Transactions")
 	var open, err = stream.Recv()
 	if err != nil {
 		return fmt.Errorf("read Open: %w", err)
@@ -128,7 +127,6 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struc
 }
 
 func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	log.Info("FIREBOLT Prepare")
 	checkpoint := FireboltCheckpoint{
 		Queries: *t.queries,
 	}
@@ -179,7 +177,6 @@ func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys 
 
 // write file to S3 and keep a record of them to be copied to the table
 func (t *transactor) Store(it *pm.StoreIterator) error {
-	log.Info("FIREBOLT Store")
 	awsConfig := aws.Config{
 		Credentials: credentials.NewStaticCredentials(t.awsKeyId, t.awsSecretKey, ""),
 		Region:      &t.awsRegion,
@@ -207,7 +204,6 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 
 	for bindingIndex, data := range files {
 		cp := t.checkpoint.Files[bindingIndex]
-		log.Info("FIREBOLT STORE WITH KEY", cp.Key)
 
 		uploads = append(uploads, s3manager.BatchUploadObject{
 			Object: &s3manager.UploadInput{
@@ -231,13 +227,11 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 }
 
 func (t *transactor) Commit(ctx context.Context) error {
-	log.Info("FIREBOLT Commit")
 	return nil
 }
 
 // load stored file into table
 func (t *transactor) Acknowledge(context.Context) error {
-	log.Info("FIREBOLT Acknowledge")
 
 	if len(t.checkpoint.Files) < 1 {
 		return nil
@@ -262,7 +256,6 @@ func (t *transactor) Acknowledge(context.Context) error {
 	// As such, we keep a copy of the queries generated from the MaterializationSpec of the
 	// transaction to which this Acknowledge belongs in the checkpoint to avoid inconsistencies.
 	for binding, fileNames := range sourceFileNames {
-		log.Info("FIREBOLT moving files from binding ", binding, " for ", sourceFileNames)
 		insertQuery := t.checkpoint.Queries.Bindings[binding].InsertFromTable
 		values := fmt.Sprintf("'%s'", strings.Join(fileNames, "','"))
 		_, err := t.fb.Query(strings.Replace(insertQuery, "?", values, 1))
