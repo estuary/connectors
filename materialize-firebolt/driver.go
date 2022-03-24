@@ -12,7 +12,6 @@ import (
 	"github.com/estuary/connectors/materialize-firebolt/schemalate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	log "github.com/sirupsen/logrus"
 )
 
 // driver implements the DriverServer interface.
@@ -36,21 +35,14 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 	}, nil
 }
 
-// Retrieve existing materialization spec and validate the new bindings either against
-// the old materialization spec, or validate it as new
-func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
-	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
-	}
-
-	haveExisting, existing, err := LoadSpec(cfg, req.Materialization.String())
+func ValidateBindings(cfg config, materialization string, bindings []*pm.ValidateRequest_Binding) ([]map[string]*pm.Constraint, error) {
+	haveExisting, existing, err := LoadSpec(cfg, materialization)
 	if err != nil {
 		return nil, fmt.Errorf("loading materialization spec: %w", err)
 	}
 
-	var out []*pm.ValidateResponse_Binding
-	for _, proposed := range req.Bindings {
+	var out []map[string]*pm.Constraint
+	for _, proposed := range bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(proposed.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
@@ -73,12 +65,38 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		if err != nil {
 			return nil, fmt.Errorf("validating binding and generating constraints: %w", err)
 		} else {
-			out = append(out, &pm.ValidateResponse_Binding{
-				Constraints:  constraints,
-				DeltaUpdates: true,
-				ResourcePath: []string{res.Table},
-			})
+			out = append(out, constraints)
 		}
+	}
+
+	return out, nil
+}
+
+// Retrieve existing materialization spec and validate the new bindings either against
+// the old materialization spec, or validate it as new
+func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
+	var cfg config
+	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
+
+	constraints, err := ValidateBindings(cfg, req.Materialization.String(), req.Bindings)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []*pm.ValidateResponse_Binding
+	for i, proposed := range req.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(proposed.ResourceSpecJson, &res); err != nil {
+			return nil, fmt.Errorf("parsing resource config: %w", err)
+		}
+
+		out = append(out, &pm.ValidateResponse_Binding{
+			Constraints:  constraints[i],
+			DeltaUpdates: true,
+			ResourcePath: []string{res.Table},
+		})
 	}
 
 	return &pm.ValidateResponse{Bindings: out}, nil
@@ -108,39 +126,24 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 	var tables []string
 
 	// Validate the new MaterializationSpec against its own constraints as a sanity check
-	haveExisting, existing, err := LoadSpec(cfg, req.Materialization.Materialization.String())
-	if err != nil {
-		return nil, fmt.Errorf("loading materialization spec: %w", err)
-	}
-
+	// Map the materialization bindings to ValidateRequest_Binding to generate constraints again
+	mappedBindings := []*pm.ValidateRequest_Binding{}
 	for _, proposed := range req.Materialization.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(proposed.ResourceSpecJson, &res); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		// Make sure the specified resource is valid to build
-		var constraints map[string]*pm.Constraint
 		mappedBinding := pm.ValidateRequest_Binding{
 			ResourceSpecJson: proposed.ResourceSpecJson,
 			Collection:       proposed.Collection,
 		}
+		mappedBindings = append(mappedBindings, &mappedBinding)
+	}
 
-		if haveExisting {
-			if existingBinding, ok := existing[res.Table]; ok {
-				constraints, err = schemalate.ValidateExistingProjection(existingBinding, &mappedBinding)
-			} else {
-				// A new binding that didn't exist in previous materialization spec
-				constraints, err = schemalate.ValidateNewProjection(&mappedBinding)
-			}
-		} else {
-			constraints, err = schemalate.ValidateNewProjection(&mappedBinding)
-		}
+	constraints, err := ValidateBindings(cfg, req.Materialization.Materialization.String(), mappedBindings)
+	if err != nil {
+		return nil, err
+	}
 
-		if err != nil {
-			return nil, fmt.Errorf("validating binding and generating constraints: %w", err)
-		}
-		err := schemalate.ValidateBindingAgainstConstraints(proposed, constraints)
+	// Send the materialization bindings along with the constraints for validation
+	for i, proposed := range req.Materialization.Bindings {
+		err := schemalate.ValidateBindingAgainstConstraints(proposed, constraints[i])
 		if err != nil {
 			return nil, fmt.Errorf("validating binding %v against constraints %v: %w", proposed, constraints, err)
 		}
