@@ -3,7 +3,6 @@ package firebolt
 import (
 	"encoding/json"
 	"fmt"
-	//log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"strings"
