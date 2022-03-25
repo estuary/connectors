@@ -18,6 +18,7 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -79,7 +80,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		awsSecretKey: cfg.AWSSecretKey,
 		awsRegion:    cfg.AWSRegion,
 		bucket:       cfg.S3Bucket,
-		prefix:       strings.TrimLeft("/", fmt.Sprintf("%s/%s/", cfg.S3Prefix, open.Open.Materialization.Materialization.String())),
+		prefix:       strings.TrimLeft(fmt.Sprintf("%s/%s/", cfg.S3Prefix, open.Open.Materialization.Materialization.String()), "/"),
 	}
 
 	if err = stream.Send(&pm.TransactionResponse{
@@ -129,7 +130,11 @@ func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare)
 	var queries []string
 	var files []TemporaryFileRecord
 	for i, _ := range t.bindings {
-		var key = fmt.Sprintf("%s%s.json", t.prefix, randomDocumentKey())
+		var randomKey, err = uuid.NewRandom()
+		if err != nil {
+			return pf.DriverCheckpoint{}, fmt.Errorf("generating random key for file: %w", err)
+		}
+		var key = fmt.Sprintf("%s%s.json", t.prefix, randomKey)
 		files = append(files, TemporaryFileRecord{
 			Bucket: t.bucket,
 			Key:    key,
@@ -137,7 +142,7 @@ func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare)
 
 		var insertQuery = t.queries.Bindings[i].InsertFromTable
 		var values = fmt.Sprintf("'%s'", key)
-		queries = append(queries, strings.Replace(insertQuery, "?", values, 1))
+		queries = append(queries, strings.Replace(insertQuery, "?", values, -1))
 	}
 	checkpoint := FireboltCheckpoint{
 		Queries: queries,
