@@ -233,6 +233,12 @@ func TestNewParquetDataConverter_empty(t *testing.T) {
 }
 
 func testConverterInput(mustExist bool) *pf.MaterializationSpec_Binding {
+	var exists pf.Inference_Exists
+	if mustExist {
+		exists = pf.Inference_MUST
+	} else {
+		exists = pf.Inference_MAY
+	}
 	return &pf.MaterializationSpec_Binding{
 		FieldSelection: pf.FieldSelection{
 			Keys:   []string{"str", "bool"},
@@ -240,14 +246,14 @@ func testConverterInput(mustExist bool) *pf.MaterializationSpec_Binding {
 		},
 		Collection: pf.CollectionSpec{
 			Projections: []pf.Projection{
-				{Field: "str", Inference: pf.Inference{Types: []string{"string"}, MustExist: mustExist}},
-				{Field: "bool", Inference: pf.Inference{Types: []string{"boolean"}, MustExist: mustExist}},
-				{Field: "int64", Inference: pf.Inference{Types: []string{"integer"}, MustExist: mustExist}},
-				{Field: "uint64", Inference: pf.Inference{Types: []string{"integer"}, MustExist: mustExist}},
-				{Field: "int", Inference: pf.Inference{Types: []string{"integer"}, MustExist: mustExist}},
-				{Field: "uint", Inference: pf.Inference{Types: []string{"integer"}, MustExist: mustExist}},
-				{Field: "float32", Inference: pf.Inference{Types: []string{"number"}, MustExist: mustExist}},
-				{Field: "float64", Inference: pf.Inference{Types: []string{"number"}, MustExist: mustExist}},
+				{Field: "str", Inference: pf.Inference{Types: []string{"string"}, Exists: exists}},
+				{Field: "bool", Inference: pf.Inference{Types: []string{"boolean"}, Exists: exists}},
+				{Field: "int64", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
+				{Field: "uint64", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
+				{Field: "int", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
+				{Field: "uint", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
+				{Field: "float32", Inference: pf.Inference{Types: []string{"number"}, Exists: exists}},
+				{Field: "float64", Inference: pf.Inference{Types: []string{"number"}, Exists: exists}},
 			},
 		},
 	}
