@@ -3,7 +3,7 @@
 set -e
 
 # Flow image / container name used in testing.
-FLOW_IMAGE="ghcr.io/estuary/flow:dev"
+FLOW_IMAGE="ghcr.io/estuary/flow:dev-152-g59f8df60"
 # Prefix of the containers running flowctl via Flow image.
 FLOW_CONTAINER_NAME_PREFIX=flowctl-${CONNECTOR}
 

@@ -80,7 +80,11 @@ jobs:
           docker-compose --file ${{ matrix.connector }}/docker-compose.yaml up --detach
 
       - name: Start Open SSH server
-        if: matrix.connector == 'source-postgres'
+        if: |
+          contains('
+            source-mysql
+            source-postgres
+            ', matrix.connector)
         run: |
           cp -r network-proxy-service/sshforwarding/test_sshd_configs /tmp/test_sshd_configs &&
           docker-compose --file /tmp/test_sshd_configs/docker-compose.yaml up --detach openssh-server
@@ -144,18 +148,9 @@ jobs:
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local-test-tag ./tests/run.sh;
 
-      - name: Source connector ${{ matrix.connector }} integration tests with SSH forwarding
-        if: |
-          contains('
-            source-postgres
-            ', matrix.connector)
+      - name: Source connector postgres integration tests with SSH forwarding
+        if: matrix.connector == 'source-postgres'
         env:
-          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
-          AWS_DEFAULT_OUTPUT: json
-
           # Compare to: https://www.postgresql.org/docs/current/libpq-envars.html
           PGDATABASE: flow
           PGHOST: localhost
@@ -167,7 +162,27 @@ jobs:
           SSHENDPOINT: ssh://localhost:2222
           SSHUSER: flowssh
           PRIVATE_KEY_FILE_PATH: network-proxy-service/sshforwarding/test_sshd_configs/keys/id_rsa
-          LOCALPORT: 9876
+          LOCALPORT: 15432
+          SSH_FORWARDING_ENABLED: true
+
+        run: CONNECTOR=${{ matrix.connector }} VERSION=local-test-tag ./tests/run.sh;
+
+
+      - name: Source connector mysql integration tests with SSH forwarding
+        if: matrix.connector == 'source-mysql'
+        env:
+          MYSQL_DATABASE: test
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: root
+          MYSQL_PWD: flow
+          MYSQL_SERVERID: 12345
+
+          # Based on configs in network-proxy-service/sshforwarding/test_sshd_configs/docker-compose.yaml
+          SSHENDPOINT: ssh://localhost:2222
+          SSHUSER: flowssh
+          PRIVATE_KEY_FILE_PATH: network-proxy-service/sshforwarding/test_sshd_configs/keys/id_rsa
+          LOCALPORT: 13306
           SSH_FORWARDING_ENABLED: true
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local-test-tag ./tests/run.sh;
