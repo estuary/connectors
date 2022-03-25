@@ -10,6 +10,7 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/estuary/flow/go/protocols/flow"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 	"github.com/xitongsys/parquet-go-source/local"
@@ -215,8 +216,8 @@ func buildTestOpenRequest(numOfBindings int) *pm.TransactionRequest_Open {
 			ResourceSpecJson: resourceSpecJSON,
 			FieldSelection:   flow.FieldSelection{Keys: []string{"Id"}, Values: []string{"Message"}},
 			Collection: flow.CollectionSpec{Projections: []flow.Projection{
-				{Field: "Id", Inference: flow.Inference{Types: []string{"integer"}, MustExist: true}},
-				{Field: "Message", Inference: flow.Inference{Types: []string{"string"}, MustExist: true}},
+				{Field: "Id", Inference: flow.Inference{Types: []string{"integer"}, Exists: pf.Inference_MUST}},
+				{Field: "Message", Inference: flow.Inference{Types: []string{"string"}, Exists: pf.Inference_MUST}},
 			}},
 		}
 
