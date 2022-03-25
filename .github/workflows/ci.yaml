@@ -22,12 +22,12 @@ jobs:
           - source-s3
           - materialize-bigquery
           - materialize-elasticsearch
+          - materialize-firebolt
           - materialize-postgres
           - materialize-rockset
           - materialize-s3-parquet
           - materialize-snowflake
           - materialize-webhook
-          - materialize-firebolt
 
     steps:
       - uses: actions/checkout@v2

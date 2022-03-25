@@ -79,7 +79,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		awsSecretKey: cfg.AWSSecretKey,
 		awsRegion:    cfg.AWSRegion,
 		bucket:       cfg.S3Bucket,
-		prefix:       cfg.S3Prefix,
+		prefix:       strings.TrimLeft("/", fmt.Sprintf("%s/%s/", cfg.S3Prefix, open.Open.Materialization.Materialization.String())),
 	}
 
 	if err = stream.Send(&pm.TransactionResponse{
@@ -99,14 +99,13 @@ type binding struct {
 }
 
 type TemporaryFileRecord struct {
-	Bucket  string
-	Key     string
-	Binding int
+	Bucket string
+	Key    string
 }
 
 type FireboltCheckpoint struct {
 	Files   []TemporaryFileRecord
-	Queries schemalate.QueriesBundle
+	Queries []string
 }
 
 type transactor struct {
@@ -127,15 +126,22 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struc
 }
 
 func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	checkpoint := FireboltCheckpoint{
-		Queries: *t.queries,
-	}
+	var queries []string
+	var files []TemporaryFileRecord
 	for i, _ := range t.bindings {
-		checkpoint.Files = append(checkpoint.Files, TemporaryFileRecord{
-			Bucket:  t.bucket,
-			Key:     fmt.Sprintf("%s%s.json", t.prefix, randomDocumentKey()),
-			Binding: i,
+		var key = fmt.Sprintf("%s%s.json", t.prefix, randomDocumentKey())
+		files = append(files, TemporaryFileRecord{
+			Bucket: t.bucket,
+			Key:    key,
 		})
+
+		var insertQuery = t.queries.Bindings[i].InsertFromTable
+		var values = fmt.Sprintf("'%s'", key)
+		queries = append(queries, strings.Replace(insertQuery, "?", values, 1))
+	}
+	checkpoint := FireboltCheckpoint{
+		Queries: queries,
+		Files:   files,
 	}
 
 	jsn, err := json.Marshal(checkpoint)
@@ -175,7 +181,6 @@ func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys 
 	return jsonDoc, nil
 }
 
-// write file to S3 and keep a record of them to be copied to the table
 func (t *transactor) Store(it *pm.StoreIterator) error {
 	awsConfig := aws.Config{
 		Credentials: credentials.NewStaticCredentials(t.awsKeyId, t.awsSecretKey, ""),
@@ -186,7 +191,7 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 
 	uploads := []s3manager.BatchUploadObject{}
 
-	files := make(map[int][]byte)
+	var files = make([][]byte, len(t.bindings))
 
 	for it.Next() {
 		doc, err := t.projectDocument(t.bindings[it.Binding].spec, it.Key, it.Values)
@@ -194,7 +199,7 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 			return fmt.Errorf("projecting new store json: %w", err)
 		}
 
-		if _, ok := files[it.Binding]; ok {
+		if v := files[it.Binding]; v != nil {
 			files[it.Binding] = append(files[it.Binding], byte('\n'))
 			files[it.Binding] = append(files[it.Binding], doc...)
 		} else {
@@ -230,23 +235,11 @@ func (t *transactor) Commit(ctx context.Context) error {
 	return nil
 }
 
-// load stored file into table
+// Acknowledge loads stored files from external table to main table
 func (t *transactor) Acknowledge(context.Context) error {
 
 	if len(t.checkpoint.Files) < 1 {
 		return nil
-	}
-
-	sourceFileNames := map[int][]string{}
-	for _, item := range t.checkpoint.Files {
-		binding := item.Binding
-		fileName := item.Key
-
-		if _, ok := sourceFileNames[binding]; ok {
-			sourceFileNames[binding] = append(sourceFileNames[binding], fileName)
-		} else {
-			sourceFileNames[binding] = []string{fileName}
-		}
 	}
 
 	// Acknowledge step might end up being run by a separate process
@@ -255,16 +248,15 @@ func (t *transactor) Acknowledge(context.Context) error {
 	// with MaterializationSpec v1 be run by a transactor initialised with MaterializationSpec v2.
 	// As such, we keep a copy of the queries generated from the MaterializationSpec of the
 	// transaction to which this Acknowledge belongs in the checkpoint to avoid inconsistencies.
-	for binding, fileNames := range sourceFileNames {
-		insertQuery := t.checkpoint.Queries.Bindings[binding].InsertFromTable
-		values := fmt.Sprintf("'%s'", strings.Join(fileNames, "','"))
-		_, err := t.fb.Query(strings.Replace(insertQuery, "?", values, 1))
+	for _, query := range t.checkpoint.Queries {
+		_, err := t.fb.Query(query)
 		if err != nil {
 			return fmt.Errorf("moving files from external to main table: %w", err)
 		}
 	}
 
 	t.checkpoint.Files = []TemporaryFileRecord{}
+	t.checkpoint.Queries = []string{}
 
 	return nil
 }

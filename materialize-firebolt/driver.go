@@ -18,7 +18,7 @@ import (
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
-	endpointSchema, err := jsonschema.Reflect(&config{}).MarshalJSON()
+	var endpointSchema, err = jsonschema.Reflect(&config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -31,12 +31,12 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 	return &pm.SpecResponse{
 		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
 		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://docs.estuary.dev/reference/Connectors/materialization-connectors/Firebolt/",
+		DocumentationUrl:       "https://go.estuary.dev/Gpy680",
 	}, nil
 }
 
 func ValidateBindings(cfg config, materialization string, bindings []*pm.ValidateRequest_Binding) ([]map[string]*pm.Constraint, error) {
-	haveExisting, existing, err := LoadSpec(cfg, materialization)
+	existing, err := LoadSpec(cfg, materialization)
 	if err != nil {
 		return nil, fmt.Errorf("loading materialization spec: %w", err)
 	}
@@ -51,14 +51,10 @@ func ValidateBindings(cfg config, materialization string, bindings []*pm.Validat
 		// Make sure the specified resource is valid to build
 		var constraints map[string]*pm.Constraint
 
-		if haveExisting {
-			if existingBinding, ok := existing[res.Table]; ok {
-				constraints, err = schemalate.ValidateExistingProjection(existingBinding, proposed)
-			} else {
-				// A new binding that didn't exist in previous materialization spec
-				constraints, err = schemalate.ValidateNewProjection(proposed)
-			}
+		if existingBinding, ok := existing[res.Table]; ok {
+			constraints, err = schemalate.ValidateExistingProjection(existingBinding, proposed)
 		} else {
+			// A new binding that didn't exist in previous materialization spec
 			constraints, err = schemalate.ValidateNewProjection(proposed)
 		}
 
@@ -72,7 +68,7 @@ func ValidateBindings(cfg config, materialization string, bindings []*pm.Validat
 	return out, nil
 }
 
-// Retrieve existing materialization spec and validate the new bindings either against
+// Validate retrieves existing materialization spec and validates the new bindings either against
 // the old materialization spec, or validate it as new
 func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
 	var cfg config
@@ -80,7 +76,7 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	constraints, err := ValidateBindings(cfg, req.Materialization.String(), req.Bindings)
+	var constraints, err = ValidateBindings(cfg, req.Materialization.String(), req.Bindings)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +98,7 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 	return &pm.ValidateResponse{Bindings: out}, nil
 }
 
-// Create main and external table and persist materialization spec on S3
+// ApplyUpsert creates main and external table and persist materialization spec on S3
 func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
@@ -112,7 +108,7 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	fb, err := firebolt.New(firebolt.Config{
+	var fb, err = firebolt.New(firebolt.Config{
 		EngineURL: cfg.EngineURL,
 		Database:  cfg.Database,
 		Username:  cfg.Username,
@@ -127,7 +123,7 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 
 	// Validate the new MaterializationSpec against its own constraints as a sanity check
 	// Map the materialization bindings to ValidateRequest_Binding to generate constraints again
-	mappedBindings := []*pm.ValidateRequest_Binding{}
+	var mappedBindings = []*pm.ValidateRequest_Binding{}
 	for _, proposed := range req.Materialization.Bindings {
 		mappedBinding := pm.ValidateRequest_Binding{
 			ResourceSpecJson: proposed.ResourceSpecJson,
@@ -149,8 +145,6 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		}
 	}
 
-	// TODO: send materialization spec to GetQueriesBundle
-	// so we can check whether creating a table is necessary or not
 	queries, err := schemalate.GetQueriesBundle(req.Materialization)
 	if err != nil {
 		return nil, fmt.Errorf("building queries bundle: %w", err)
@@ -176,14 +170,14 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		return &pm.ApplyResponse{ActionDescription: fmt.Sprint("to create tables: ", strings.Join(tables, ","))}, nil
 	}
 
-	err = WriteSpec(cfg, req.Materialization)
+	err = WriteSpec(cfg, req.Materialization, req.Version)
 	if err != nil {
 		return nil, fmt.Errorf("writing materialization spec to s3: %w", err)
 	}
 	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("created tables: ", strings.Join(tables, ","))}, nil
 }
 
-// Delete main and external tables
+// ApplyDelete deletes main and external tables
 func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
@@ -194,7 +188,7 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	fb, err := firebolt.New(firebolt.Config{
+	var fb, err = firebolt.New(firebolt.Config{
 		EngineURL: cfg.EngineURL,
 		Database:  cfg.Database,
 		Username:  cfg.Username,

@@ -33,7 +33,7 @@ func GetQueriesBundle(
 ) (*QueriesBundle, error) {
 	var args = []string{"firebolt-schema", "query-bundle"}
 
-	specBytes, err := proto.Marshal(spec)
+	var specBytes, err = proto.Marshal(spec)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling materialization spec: %w", err)
 	}
@@ -57,7 +57,7 @@ func ValidateNewProjection(
 ) (map[string]*pm.Constraint, error) {
 	var args = []string{"firebolt-schema", "validate-new-projection"}
 
-	specBytes, err := proto.Marshal(spec)
+	var specBytes, err = proto.Marshal(spec)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling materialization spec: %w", err)
 	}
@@ -82,12 +82,12 @@ func ValidateExistingProjection(
 ) (map[string]*pm.Constraint, error) {
 	var args = []string{"firebolt-schema", "validate-existing-projection"}
 
-	req := pm.Extra_ValidateExistingProjectionRequest{
+	var req = pm.Extra_ValidateExistingProjectionRequest{
 		ExistingBinding: existing,
 		ProposedBinding: proposed,
 	}
 
-	reqBytes, err := proto.Marshal(&req)
+	var reqBytes, err = proto.Marshal(&req)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling validate existing projection request: %w", err)
 	}
@@ -112,12 +112,12 @@ func ValidateBindingAgainstConstraints(
 ) error {
 	var args = []string{"firebolt-schema", "validate-binding-against-constraints"}
 
-	req := pm.Extra_ValidateBindingAgainstConstraints{
+	var req = pm.Extra_ValidateBindingAgainstConstraints{
 		Binding:     binding,
 		Constraints: constraints,
 	}
 
-	reqBytes, err := proto.Marshal(&req)
+	var reqBytes, err = proto.Marshal(&req)
 	if err != nil {
 		return fmt.Errorf("marshalling validate binding against constraints request: %w", err)
 	}
@@ -146,27 +146,9 @@ func Run(
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
+	cmd.Stdin = bytes.NewReader(input)
 
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, fmt.Errorf("getting stdin pipeline: %w", err)
-	}
-
-	go func() {
-		defer stdin.Close()
-		var n, writeErr = stdin.Write(input)
-		var entry = log.WithFields(log.Fields{
-			"nBytes": n,
-			"error":  writeErr,
-		})
-		if writeErr == nil {
-			entry.Debug("finished writing json schema to schemalate")
-		} else {
-			entry.Error("failed to write json schema to schemalate")
-		}
-	}()
-
-	out, err := cmd.Output()
+	var out, err = cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("fetching output: %w. With stdout %s and stderr: %s", err, out, stderr.String())
 	}

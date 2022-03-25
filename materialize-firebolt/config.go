@@ -5,15 +5,15 @@ import (
 )
 
 type config struct {
-	EngineURL    string `json:"engine_url" jsonschema:"title=Engine URL,description=Engine URL of the Firebolt database.,example=engine-name.organisation.region.app.firebolt.io"`
-	Database     string `json:"database" jsonschema:"title=Database,description=Name of the Firebolt database."`
-	Username     string `json:"username" jsonschema:"title=Username,description=Firebolt username."`
-	Password     string `json:"password" jsonschema:"title=Password,description=Firebolt password."`
-	AWSKeyId     string `json:"aws_key_id,omitempty" jsonschema:"title=AWS Key ID,description=AWS Key ID for accessing the S3 bucket."`
-	AWSSecretKey string `json:"aws_secret_key,omitempty" jsonschema:"title=AWS Secret Key,description=AWS Secret Key for accessing the S3 bucket."`
-	AWSRegion    string `json:"aws_region,omitempty" jsonschema:"title=AWS Region,description=AWS Region the S3 bucket is in."`
-	S3Bucket     string `json:"s3_bucket" jsonschema:"title=S3 Bucket,description=Name of S3 bucket where the intermediate files for external table will be stored."`
-	S3Prefix     string `json:"s3_prefix,omitempty" jsonschema:"title=S3 Prefix,description=A prefix for files stored in the bucket."`
+	EngineURL    string `json:"engine_url" jsonschema:"title=Engine URL,example=engine-name.organisation.region.app.firebolt.io"`
+	Database     string `json:"database" jsonschema:"title=Database"`
+	Username     string `json:"username" jsonschema:"title=Username"`
+	Password     string `json:"password" jsonschema:"title=Password"`
+	AWSKeyId     string `json:"aws_key_id,omitempty" jsonschema:"title=AWS Key ID"`
+	AWSSecretKey string `json:"aws_secret_key,omitempty" jsonschema:"title=AWS Secret Key"`
+	AWSRegion    string `json:"aws_region,omitempty" jsonschema:"title=AWS Region"`
+	S3Bucket     string `json:"s3_bucket" jsonschema:"title=S3 Bucket"`
+	S3Prefix     string `json:"s3_prefix,omitempty" jsonschema:"title=S3 Prefix"`
 }
 
 func (c config) Validate() error {
@@ -35,7 +35,8 @@ func (c config) Validate() error {
 	return nil
 }
 
-// GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface.
+// GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface
+// which provides the jsonschema description of the fields
 func (config) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "EngineURL":
@@ -62,8 +63,8 @@ func (config) GetFieldDocString(fieldName string) string {
 }
 
 type resource struct {
-	Table     string "json:\"table\" jsonschema:\"title=Table,description=Name of the Firebolt table to store materialized results in. The external table will be named after this table with an `_external` suffix.\""
-	TableType string `json:"table_type" jsonschema:"title=Table Type,description=Type of the Firebolt table to store materialized results in. See https://docs.firebolt.io/working-with-tables.html for more details.,enum=fact,enum=dimension"`
+	Table     string `json:"table" jsonschema:"title=Table"`
+	TableType string `json:"table_type" jsonschema:"title=Table Type,enum=fact,enum=dimension"`
 }
 
 func (r resource) Validate() error {

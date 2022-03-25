@@ -47,19 +47,19 @@ const contentType = "application/json;charset=UTF-8"
 func New(config Config) (*Client, error) {
 	httpClient := http.Client{}
 
-	usernameAndPassword, err := json.Marshal(loginRequest{Username: config.Username, Password: config.Password})
+	var usernameAndPassword, err = json.Marshal(loginRequest{Username: config.Username, Password: config.Password})
 	if err != nil {
 		return nil, fmt.Errorf("creating login request failed: %w", err)
 	}
 
-	buf := strings.NewReader(string(usernameAndPassword[:]))
+	var buf = strings.NewReader(string(usernameAndPassword[:]))
 	resp, err := httpClient.Post(fmt.Sprintf("%s/auth/v1/login", endpoint), contentType, buf)
 
 	if err != nil {
 		return nil, fmt.Errorf("login request to get access token failed: %w", err)
 	}
 
-	respBuf := new(strings.Builder)
+	var respBuf = new(strings.Builder)
 	_, err = io.Copy(respBuf, resp.Body)
 	resp.Body.Close()
 
@@ -114,8 +114,8 @@ type QueryResponse struct {
 }
 
 func (c *Client) Query(query string) (*QueryResponse, error) {
-	url := fmt.Sprintf("https://%s/?database=%s", c.config.EngineURL, c.config.Database)
-	req, err := http.NewRequest("POST", url, strings.NewReader(query))
+	var url = fmt.Sprintf("https://%s/?database=%s", c.config.EngineURL, c.config.Database)
+	var req, err = http.NewRequest("POST", url, strings.NewReader(query))
 	if err != nil {
 		return nil, fmt.Errorf("creating query request failed: %w", err)
 	}
@@ -125,7 +125,7 @@ func (c *Client) Query(query string) (*QueryResponse, error) {
 		return nil, fmt.Errorf("query request failed: %w", err)
 	}
 
-	respBuf := new(strings.Builder)
+	var respBuf = new(strings.Builder)
 	_, err = io.Copy(respBuf, resp.Body)
 	resp.Body.Close()
 	if err != nil {
