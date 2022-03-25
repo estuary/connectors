@@ -31,7 +31,7 @@ type QueriesBundle struct {
 func GetQueriesBundle(
 	spec *pf.MaterializationSpec,
 ) (*QueriesBundle, error) {
-	var args = []string{"firebolt-schema", "--query-bundle"}
+	var args = []string{"firebolt-schema", "query-bundle"}
 
 	specBytes, err := proto.Marshal(spec)
 	if err != nil {
@@ -55,7 +55,7 @@ func GetQueriesBundle(
 func ValidateNewProjection(
 	spec *pm.ValidateRequest_Binding,
 ) (map[string]*pm.Constraint, error) {
-	var args = []string{"firebolt-schema", "--validate-new-projection"}
+	var args = []string{"firebolt-schema", "validate-new-projection"}
 
 	specBytes, err := proto.Marshal(spec)
 	if err != nil {
@@ -80,7 +80,7 @@ func ValidateExistingProjection(
 	existing *pf.MaterializationSpec_Binding,
 	proposed *pm.ValidateRequest_Binding,
 ) (map[string]*pm.Constraint, error) {
-	var args = []string{"firebolt-schema", "--validate-existing-projection"}
+	var args = []string{"firebolt-schema", "validate-existing-projection"}
 
 	req := pm.Extra_ValidateExistingProjectionRequest{
 		ExistingBinding: existing,
@@ -110,7 +110,7 @@ func ValidateBindingAgainstConstraints(
 	binding *pf.MaterializationSpec_Binding,
 	constraints map[string]*pm.Constraint,
 ) error {
-	var args = []string{"firebolt-schema", "--validate-binding-against-constraints"}
+	var args = []string{"firebolt-schema", "validate-binding-against-constraints"}
 
 	req := pm.Extra_ValidateBindingAgainstConstraints{
 		Binding:     binding,
