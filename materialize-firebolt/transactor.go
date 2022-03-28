@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"strings"
 	"time"
@@ -20,6 +20,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 // Transactions implements the DriverServer interface.
@@ -187,50 +188,48 @@ func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys 
 }
 
 func (t *transactor) Store(it *pm.StoreIterator) error {
-	awsConfig := aws.Config{
+	var awsConfig = aws.Config{
 		Credentials: credentials.NewStaticCredentials(t.awsKeyId, t.awsSecretKey, ""),
 		Region:      &t.awsRegion,
 	}
-	sess := session.Must(session.NewSession(&awsConfig))
-	uploader := s3manager.NewUploader(sess)
+	var sess = session.Must(session.NewSession(&awsConfig))
+	var uploader = s3manager.NewUploader(sess)
 
-	uploads := []s3manager.BatchUploadObject{}
-
-	var files = make([][]byte, len(t.bindings))
+	var pipes = make([]*io.PipeWriter, len(t.bindings))
+	g, ctx := errgroup.WithContext(context.Background())
 
 	for it.Next() {
-		doc, err := t.projectDocument(t.bindings[it.Binding].spec, it.Key, it.Values)
+		var doc, err = t.projectDocument(t.bindings[it.Binding].spec, it.Key, it.Values)
 		if err != nil {
 			return fmt.Errorf("projecting new store json: %w", err)
 		}
 
-		if v := files[it.Binding]; v != nil {
-			files[it.Binding] = append(files[it.Binding], byte('\n'))
-			files[it.Binding] = append(files[it.Binding], doc...)
-		} else {
-			files[it.Binding] = doc
+		if pipes[it.Binding] == nil {
+			var reader, writer = io.Pipe()
+			pipes[it.Binding] = writer
+
+			cp := t.checkpoint.Files[it.Binding]
+			g.Go(func() error {
+				var _, err = uploader.UploadWithContext(ctx, &s3manager.UploadInput{
+					Bucket: aws.String(cp.Bucket),
+					Key:    aws.String(cp.Key),
+					Body:   reader,
+				})
+				return err
+			})
 		}
+		var pipe = pipes[it.Binding]
+
+		pipe.Write(doc)
+		pipe.Write([]byte("\n"))
 	}
 
-	for bindingIndex, data := range files {
-		cp := t.checkpoint.Files[bindingIndex]
-
-		uploads = append(uploads, s3manager.BatchUploadObject{
-			Object: &s3manager.UploadInput{
-				Bucket: aws.String(cp.Bucket),
-				Key:    aws.String(cp.Key),
-				Body:   bytes.NewReader(data),
-			},
-		})
+	for _, pipe := range pipes {
+		pipe.Close()
 	}
 
-	uploadIterator := s3manager.UploadObjectsIterator{
-		Objects: uploads,
-	}
-
-	err := uploader.UploadWithIterator(aws.BackgroundContext(), &uploadIterator)
-	if err != nil {
-		return fmt.Errorf("uploading files to s3: %w", err)
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
 	return nil
