@@ -163,13 +163,13 @@ func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys 
 
 	// Add the keys to the document.
 	for i, value := range keys {
-		var propName = strings.ReplaceAll(spec.FieldSelection.Keys[i], "/", "_")
+		var propName = spec.FieldSelection.Keys[i]
 		document[propName] = value
 	}
 
 	// Add the non-keys to the document.
 	for i, value := range values {
-		var propName = strings.ReplaceAll(spec.FieldSelection.Values[i], "/", "_")
+		var propName = spec.FieldSelection.Values[i]
 
 		if raw, ok := value.([]byte); ok {
 			var nestedObject = make(map[string]interface{})
