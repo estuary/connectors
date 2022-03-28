@@ -163,16 +163,31 @@ func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys 
 
 	// Add the keys to the document.
 	for i, value := range keys {
-		var propName = spec.FieldSelection.Keys[i]
+		var propName = strings.ReplaceAll(spec.FieldSelection.Keys[i], "/", "_")
 		document[propName] = value
 	}
 
 	// Add the non-keys to the document.
 	for i, value := range values {
-		var propName = spec.FieldSelection.Values[i]
+		var propName = strings.ReplaceAll(spec.FieldSelection.Values[i], "/", "_")
 
 		if raw, ok := value.([]byte); ok {
-			document[propName] = json.RawMessage(raw)
+			var nestedObject = make(map[string]interface{})
+			err := json.Unmarshal(raw, &nestedObject)
+
+			// If we can parse this raw json as an object, we marshal it
+			// so it can be stored as a stringified JSON object, since
+			// Firebolt does not support JSON objects.
+			if err == nil {
+				obj, err := json.Marshal(nestedObject)
+				if err != nil {
+					return nil, fmt.Errorf("failed to serialize the nested object: %w", err)
+				}
+
+				document[propName] = string(obj)
+			} else {
+				document[propName] = json.RawMessage(raw)
+			}
 		} else {
 			document[propName] = value
 		}

@@ -10,6 +10,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	proto "github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"os"
 	"os/exec"
 )
 
@@ -152,6 +153,7 @@ func Run(
 	if err != nil {
 		return nil, fmt.Errorf("fetching output: %w. With stdout %s and stderr: %s", err, out, stderr.String())
 	}
+	os.Stderr.WriteString(stderr.String())
 
 	return out, nil
 }
