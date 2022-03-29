@@ -175,16 +175,10 @@ func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys 
 			var nestedObject = make(map[string]interface{})
 			err := json.Unmarshal(raw, &nestedObject)
 
-			// If we can parse this raw json as an object, we marshal it
-			// so it can be stored as a stringified JSON object, since
-			// Firebolt does not support JSON objects.
+			// If we can parse this raw json as an object, we store it as a
+			// stringified JSON object, since Firebolt does not support JSON objects.
 			if err == nil {
-				obj, err := json.Marshal(nestedObject)
-				if err != nil {
-					return nil, fmt.Errorf("failed to serialize the nested object: %w", err)
-				}
-
-				document[propName] = string(obj)
+				document[propName] = string(raw)
 			} else {
 				document[propName] = json.RawMessage(raw)
 			}
