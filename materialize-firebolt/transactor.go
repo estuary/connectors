@@ -172,7 +172,16 @@ func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys 
 		var propName = spec.FieldSelection.Values[i]
 
 		if raw, ok := value.([]byte); ok {
-			document[propName] = json.RawMessage(raw)
+			var nestedObject = make(map[string]interface{})
+			err := json.Unmarshal(raw, &nestedObject)
+
+			// If we can parse this raw json as an object, we store it as a
+			// stringified JSON object, since Firebolt does not support JSON objects.
+			if err == nil {
+				document[propName] = string(raw)
+			} else {
+				document[propName] = json.RawMessage(raw)
+			}
 		} else {
 			document[propName] = value
 		}
