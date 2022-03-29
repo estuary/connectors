@@ -196,7 +196,7 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 	var uploader = s3manager.NewUploader(sess)
 
 	var pipes = make([]*io.PipeWriter, len(t.bindings))
-	g, ctx := errgroup.WithContext(context.Background())
+	g, ctx := errgroup.WithContext(it.Context())
 
 	for it.Next() {
 		var doc, err = t.projectDocument(t.bindings[it.Binding].spec, it.Key, it.Values)
