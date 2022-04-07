@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/estuary/flow/go/protocols/materialize/sql"
 )
@@ -19,6 +20,17 @@ func PostgresSQLGenerator() sql.Generator {
 			sql.BINARY:  sql.RawConstColumnType("BYTEA"),
 			sql.STRING: sql.StringTypeMapping{
 				Default: sql.RawConstColumnType("TEXT"),
+				ByFormat: map[string]sql.TypeMapper{
+					// This format is for RFC3339 timestamps. As of this writing, Flow's schema
+					// validation does not actually validate that String values match their declared
+					// format, so there's no guarantee that the values will parse successfully here.
+					"date-time": sql.ConstColumnType{
+						SQLType: "TIMESTAMPTZ",
+						ValueConverter: func(in interface{}) (interface{}, error) {
+							return time.Parse(time.RFC3339Nano, in.(string))
+						},
+					},
+				},
 			},
 		},
 	}
