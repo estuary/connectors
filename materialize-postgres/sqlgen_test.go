@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/estuary/connectors/testsupport"
 	"github.com/estuary/flow/go/protocols/catalog"
@@ -20,7 +21,7 @@ func TestSQLGeneration(t *testing.T) {
 			return err
 		}))
 
-	var gen = sqlDriver.PostgresSQLGenerator()
+	var gen = PostgresSQLGenerator()
 	var table = sqlDriver.TableForMaterialization("test_table", "", gen.IdentifierRenderer, spec.Bindings[0])
 
 	keyCreate, keyInsert, keyJoin, err := buildSQL(&gen, 123, table, spec.Bindings[0].FieldSelection)
@@ -46,4 +47,28 @@ func TestSQLGeneration(t *testing.T) {
 			JOIN flow_load_key_tmp_123 AS r
 			ON l.key1 = r.key1 AND l.key2 = r.key2
 		`, keyJoin)
+}
+
+func TestDateTimeColumn(t *testing.T) {
+	var gen = PostgresSQLGenerator()
+	var column = sqlDriver.Column{
+		Name:       "foo",
+		Identifier: "fooi",
+		Comment:    "",
+		PrimaryKey: false,
+		Type:       sqlDriver.STRING,
+		StringType: &sqlDriver.StringTypeInfo{
+			Format: "date-time",
+		},
+		NotNull: false,
+	}
+	var result, err = gen.TypeMappings.GetColumnType(&column)
+	require.NoError(t, err)
+	require.Equal(t, "TIMESTAMPTZ", result.SQLType)
+
+	parsed, err := result.ValueConverter("2022-04-04T10:09:08.234567Z")
+	require.NoError(t, err)
+	// The value returned from the converter must be a time.Time
+	_, ok := parsed.(time.Time)
+	require.True(t, ok)
 }
