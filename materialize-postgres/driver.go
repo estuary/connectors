@@ -103,7 +103,7 @@ func newPostgresDriver() pm.DriverServer {
 			if err != nil {
 				return nil, fmt.Errorf("opening Postgres database: %w", err)
 			}
-			return sqlDriver.NewStdEndpoint(parsed, db, sqlDriver.PostgresSQLGenerator(), sqlDriver.DefaultFlowTables("")), nil
+			return sqlDriver.NewStdEndpoint(parsed, db, PostgresSQLGenerator(), sqlDriver.DefaultFlowTables("")), nil
 		},
 		NewTransactor: func(
 			ctx context.Context,
