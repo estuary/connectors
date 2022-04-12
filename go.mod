@@ -4,6 +4,8 @@ go 1.16
 
 require (
 	cloud.google.com/go/bigquery v1.24.0
+	cloud.google.com/go/compute v1.5.0 // indirect
+	cloud.google.com/go/iam v0.3.0 // indirect
 	cloud.google.com/go/storage v1.18.2
 	github.com/alecthomas/jsonschema v0.0.0-20210920000243-787cd8204a0d
 	github.com/apache/arrow/go/arrow v0.0.0-20211012085237-157d48ccd47a // indirect
@@ -39,10 +41,12 @@ require (
 	github.com/xitongsys/parquet-go-source v0.0.0-20211010230925-397910c5e371
 	go.gazette.dev/core v0.89.1-0.20220212151322-e7c18c1b78cc
 	golang.org/x/crypto v0.0.0-20211209193657-4570a0811e8b // indirect
+	golang.org/x/net v0.0.0-20220412020605-290c469a71a5 // indirect
+	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211213223007-03aa0b5f6827 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
-	google.golang.org/api v0.60.0
-	google.golang.org/grpc v1.41.0
+	google.golang.org/api v0.70.0
+	google.golang.org/grpc v1.44.0
+	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 )
