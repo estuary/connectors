@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
@@ -207,8 +208,21 @@ func SQLGenerator() sqlDriver.Generator {
 	return sqlDriver.Generator{
 		Placeholder:        sqlDriver.QuestionMarkPlaceholder,
 		CommentRenderer:    sqlDriver.LineCommentRenderer(),
-		IdentifierRenderer: sqlDriver.NewRenderer(identifierSanitizer, sqlDriver.BackticksWrapper(), nil),
+		IdentifierRenderer: sqlDriver.NewRenderer(identifierSanitizer, sqlDriver.BackticksWrapper(), SkipWrapper),
 		ValueRenderer:      sqlDriver.NewRenderer(sqlDriver.DefaultQuoteSanitizer, sqlDriver.SingleQuotesWrapper(), nil),
 		TypeMappings:       nullable,
 	}
+}
+
+func SkipWrapper(identifier string) bool {
+	return !sliceContains(strings.ToLower(identifier), BQ_RESERVED_WORDS)
+}
+
+func sliceContains(expected string, actual []string) bool {
+	for _, ty := range actual {
+		if ty == expected {
+			return true
+		}
+	}
+	return false
 }
