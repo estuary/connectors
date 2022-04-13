@@ -85,6 +85,7 @@ func newPostgresDriver() pm.DriverServer {
 		DocumentationURL: "https://docs.estuary.dev/#FIXME",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
+		ReservedWords:    PG_RESERVED_WORDS,
 		NewResource:      func(sqlDriver.Endpoint) sqlDriver.Resource { return new(tableConfig) },
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage) (sqlDriver.Endpoint, error) {
 			var parsed = new(config)

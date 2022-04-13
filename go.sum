@@ -224,6 +224,10 @@ github.com/estuary/flow v0.1.1-0.20220325144111-c94a73c3acac h1:IYMmtK/4Gj3oK8cu
 github.com/estuary/flow v0.1.1-0.20220325144111-c94a73c3acac/go.mod h1:VztgR4Yn2WUzsKR1cYmc8/SzqcmSm/sd1VkUCwKgdmY=
 github.com/estuary/flow v0.1.1-0.20220412155258-453bb0e503ea h1:1u8vFk1eo+uPTDJnVkQG8qKz8LJEPSMsQ5C/lzCJs8E=
 github.com/estuary/flow v0.1.1-0.20220412155258-453bb0e503ea/go.mod h1:VztgR4Yn2WUzsKR1cYmc8/SzqcmSm/sd1VkUCwKgdmY=
+github.com/estuary/flow v0.1.1-0.20220413122659-c0a9ef481dd5 h1:GOgS4y8rIAOyoxh7Ffh1Ac60adpyualyCl1l1pEO/Sc=
+github.com/estuary/flow v0.1.1-0.20220413122659-c0a9ef481dd5/go.mod h1:VztgR4Yn2WUzsKR1cYmc8/SzqcmSm/sd1VkUCwKgdmY=
+github.com/estuary/flow v0.1.1-0.20220413124629-6aeb12dab8d0 h1:54ZvQkirBa0cw4CptWCVTSp7w3OB9fN3wejFHLyBNGM=
+github.com/estuary/flow v0.1.1-0.20220413124629-6aeb12dab8d0/go.mod h1:VztgR4Yn2WUzsKR1cYmc8/SzqcmSm/sd1VkUCwKgdmY=
 github.com/evanphx/json-patch v4.2.0+incompatible h1:fUDGZCv/7iAN7u0puUVhvKCcsR6vRfwrJatElLBEf0I=
 github.com/evanphx/json-patch v4.2.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.6.0 h1:b91NhWfaz02IuVxO9faSllyAtNXHMPkC5J8sJCLunww=
