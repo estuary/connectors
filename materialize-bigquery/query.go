@@ -36,7 +36,7 @@ func (ep *Endpoint) newQuery(queryString string, parameters ...interface{}) *big
 
 }
 
-// runQuery will run a query and return the compelted job.
+// runQuery will run a query and return the completed job.
 func (ep *Endpoint) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.Job, error) {
 
 	job, err := query.Run(ctx)
