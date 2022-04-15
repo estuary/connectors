@@ -1,4 +1,4 @@
-package networkproxy
+package networktunnel
 
 import (
 	"bytes"
@@ -9,15 +9,15 @@ import (
 
 const TestRsaFilePath = "sshforwarding/test_sshd_configs/keys/id_rsa"
 
-func TestNetworkProxyConfig_Validate(t *testing.T) {
-	var nilConfig *NetworkProxyConfig
+func TestNetworkTunnelConfig_Validate(t *testing.T) {
+	var nilConfig *NetworkTunnelConfig
 	require.NoError(t, nilConfig.Validate())
 
-	var unsupportedConfig = &NetworkProxyConfig{ProxyType: "unsupported"}
-	require.Error(t, unsupportedConfig.Validate(), "expected validation error for unsupported proxy type.")
+	var unsupportedConfig = &NetworkTunnelConfig{TunnelType: "unsupported"}
+	require.Error(t, unsupportedConfig.Validate(), "expected validation error for unsupported tunnel type.")
 
-	var typeOnlyProxyConfig = NetworkProxyConfig{ProxyType: "sshForwarding"}
-	require.Error(t, typeOnlyProxyConfig.Validate(), "expected validation error for ssh_forwording config without real configs.")
+	var typeOnlyTunnelConfig = NetworkTunnelConfig{TunnelType: "sshForwarding"}
+	require.Error(t, typeOnlyTunnelConfig.Validate(), "expected validation error for ssh_forwording config without real configs.")
 
 	var sshForwardingConfig, err = CreateSshForwardingTestConfig(TestRsaFilePath, 15432)
 	require.NoError(t, err)

@@ -16,8 +16,8 @@ then
         "port":     $LOCALPORT,
         "password": "PGPASSWORD",
         "user":     "$PGUSER",
-        "networkProxy": {
-            "proxyType": "sshForwarding",
+        "networkTunnel": {
+            "tunnelType": "sshForwarding",
             "sshForwarding": {
               "sshEndpoint": "$SSHENDPOINT",
               "user": "$SSHUSER",
