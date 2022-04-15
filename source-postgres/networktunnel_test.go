@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"testing"
 
-	np "github.com/estuary/connectors/network-proxy-service"
+	np "github.com/estuary/flow/go/network-tunnel"
 	"github.com/jackc/pgx/v4"
 	"github.com/stretchr/testify/require"
 )
 
-const TestKeyFilePath = "../network-proxy-service/sshforwarding/test_sshd_configs/keys/id_rsa"
+const TestKeyFilePath = "../network-tunnel-service/sshforwarding/test_sshd_configs/keys/id_rsa"
 
 func TestSshForwardConfig_Postgresql(t *testing.T) {
 	config, err := np.CreateSshForwardingTestConfig(TestKeyFilePath, 5432)

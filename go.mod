@@ -16,7 +16,7 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/brianvoe/gofakeit/v6 v6.9.0
 	github.com/elastic/go-elasticsearch/v7 v7.15.2-0.20211104170009-caf202868441
-	github.com/estuary/flow v0.1.1-0.20220412155258-453bb0e503ea
+	github.com/estuary/flow v0.1.1-0.20220415145755-8e21bd3b88ce
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.4.0
 	github.com/gogo/protobuf v1.3.2

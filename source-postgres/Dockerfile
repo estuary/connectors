@@ -12,15 +12,13 @@ RUN go mod download
 # Build the connector projects we depend on.
 COPY source-postgres ./source-postgres
 COPY sqlcapture ./sqlcapture
-COPY network-proxy-service ./network-proxy-service
+COPY network-tunnel-service ./network-tunnel-service
 
-# Copy network-proxy-service binary.
-COPY flow-bin/flow-network-proxy ./bin/
+# Copy network-tunnel-service binary.
+COPY flow-bin/flow-network-tunnel ./bin/
 
 ENV PATH="/builder/bin:$PATH"
 # Run the unit tests.
-# RUN go test -v ./network-proxy-service/...
-RUN rm ./source-postgres/networkproxy_test.go
 RUN go test -v ./source-postgres/...
 
 # Build the connector.
@@ -36,7 +34,7 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifacts from the builder.
 COPY --from=builder /builder/connector ./
-COPY --from=builder /builder/bin/flow-network-proxy ./
+COPY --from=builder /builder/bin/flow-network-tunnel ./
 COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
 # Avoid running the connector as root.
