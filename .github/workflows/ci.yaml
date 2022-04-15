@@ -82,7 +82,7 @@ jobs:
       - name: Start Open SSH server
         if: matrix.connector == 'source-postgres'
         run: |
-          cp -r network-proxy-service/sshforwarding/test_sshd_configs /tmp/test_sshd_configs &&
+          cp -r network-tunnel-service/sshforwarding/test_sshd_configs /tmp/test_sshd_configs &&
           docker-compose --file /tmp/test_sshd_configs/docker-compose.yaml up --detach openssh-server
 
       - name: Login to GitHub package docker registry
@@ -163,10 +163,10 @@ jobs:
           PGPORT: 5432
           PGUSER: flow
 
-          # Based on configs in network-proxy-service/sshforwarding/test_sshd_configs/docker-compose.yaml
+          # Based on configs in network-tunnel-service/sshforwarding/test_sshd_configs/docker-compose.yaml
           SSHENDPOINT: ssh://localhost:2222
           SSHUSER: flowssh
-          PRIVATE_KEY_FILE_PATH: network-proxy-service/sshforwarding/test_sshd_configs/keys/id_rsa
+          PRIVATE_KEY_FILE_PATH: network-tunnel-service/sshforwarding/test_sshd_configs/keys/id_rsa
           LOCALPORT: 9876
           SSH_FORWARDING_ENABLED: true
 

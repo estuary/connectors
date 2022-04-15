@@ -1,4 +1,4 @@
-package networkproxy
+package networktunnel
 
 import (
 	"bytes"
@@ -11,64 +11,64 @@ import (
 	"syscall"
 	"time"
 
-	sf "github.com/estuary/connectors/network-proxy-service/sshforwarding"
+	sf "github.com/estuary/connectors/network-tunnel-service/sshforwarding"
 )
 
-const ProgramName = "flow-network-proxy"
+const ProgramName = "flow-network-tunnel"
 
-func SupportedNetworkProxyTypes() []string {
+func SupportedNetworkTunnelTypes() []string {
 	return []string{"sshForwarding"}
 }
 
-type NetworkProxyConfig struct {
-	ProxyType           string                 `json:"proxyType"`
+type NetworkTunnelConfig struct {
+	TunnelType          string                 `json:"tunnelType"`
 	SshForwardingConfig sf.SshForwardingConfig `json:"sshForwarding"`
 }
 
 // GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface.
-func (NetworkProxyConfig) GetFieldDocString(fieldName string) string {
+func (NetworkTunnelConfig) GetFieldDocString(fieldName string) string {
 	switch fieldName {
-	case "ProxyType":
-		return fmt.Sprintf("The type of the network proxy. Supported types are: ( %s )", strings.Join(SupportedNetworkProxyTypes(), ", "))
+	case "TunnelType":
+		return fmt.Sprintf("The type of the network tunnel. Supported types are: ( %s )", strings.Join(SupportedNetworkTunnelTypes(), ", "))
 	case "SshForwardingConfig":
-		return "Config for proxy of type sshForwarding"
+		return "Config for tunnel of type sshForwarding"
 	default:
 		return ""
 	}
 }
 
-func (npc *NetworkProxyConfig) Validate() error {
+func (npc *NetworkTunnelConfig) Validate() error {
 	if npc == nil {
 		return nil
 	}
 
 	var supported = false
-	for _, t := range SupportedNetworkProxyTypes() {
-		if t == npc.ProxyType {
+	for _, t := range SupportedNetworkTunnelTypes() {
+		if t == npc.TunnelType {
 			supported = true
 			break
 		}
 	}
 
 	if !supported {
-		return fmt.Errorf("Unsupported proxy type: %s. Valid values are: ( %s ).", npc.ProxyType, strings.Join(SupportedNetworkProxyTypes(), ", "))
+		return fmt.Errorf("Unsupported tunnel type: %s. Valid values are: ( %s ).", npc.TunnelType, strings.Join(SupportedNetworkTunnelTypes(), ", "))
 	}
 
-	switch npc.ProxyType {
+	switch npc.TunnelType {
 	case "sshForwarding":
 		return npc.SshForwardingConfig.Validate()
 	default:
-		panic(fmt.Sprintf("Implementation of validating %s is not ready.", npc.ProxyType))
+		panic(fmt.Sprintf("Implementation of validating %s is not ready.", npc.TunnelType))
 	}
 }
 
-func (npc *NetworkProxyConfig) MarshalJSON() ([]byte, error) {
+func (npc *NetworkTunnelConfig) MarshalJSON() ([]byte, error) {
 	var m = make(map[string]interface{})
-	switch npc.ProxyType {
+	switch npc.TunnelType {
 	case "sshForwarding":
-		m[npc.ProxyType] = npc.SshForwardingConfig
+		m[npc.TunnelType] = npc.SshForwardingConfig
 	default:
-		panic(fmt.Sprintf("Implementation of MarshalJSON for %s is missing.", npc.ProxyType))
+		panic(fmt.Sprintf("Implementation of MarshalJSON for %s is missing.", npc.TunnelType))
 	}
 
 	return json.Marshal(m)
@@ -76,13 +76,13 @@ func (npc *NetworkProxyConfig) MarshalJSON() ([]byte, error) {
 
 const defaultTimeoutSecs = 5
 
-func (npc *NetworkProxyConfig) Start() error {
+func (npc *NetworkTunnelConfig) Start() error {
 	return npc.startInternal(defaultTimeoutSecs, os.Stderr)
 }
 
-func (npc *NetworkProxyConfig) startInternal(timeoutSecs uint16, stderr io.Writer) error {
+func (npc *NetworkTunnelConfig) startInternal(timeoutSecs uint16, stderr io.Writer) error {
 	if npc == nil {
-		// NetworkProxyConfig is not set.
+		// NetworkTunnelConfig is not set.
 		return nil
 	}
 
@@ -103,7 +103,7 @@ func (npc *NetworkProxyConfig) startInternal(timeoutSecs uint16, stderr io.Write
 	case err := <-readyCh:
 		if err != nil {
 			return fmt.Errorf(
-				"network proxy service error: %w",
+				"network tunnel service error: %w",
 				err,
 			)
 		}
@@ -113,11 +113,11 @@ func (npc *NetworkProxyConfig) startInternal(timeoutSecs uint16, stderr io.Write
 		if cmd.Process != nil {
 			cmd.Process.Signal(syscall.SIGTERM)
 		}
-		return fmt.Errorf("network proxy service failed to be ready after waiting for long enough")
+		return fmt.Errorf("network tunnel service failed to be ready after waiting for long enough")
 	}
 }
 
-func (npc *NetworkProxyConfig) sendInput(cmd *exec.Cmd) error {
+func (npc *NetworkTunnelConfig) sendInput(cmd *exec.Cmd) error {
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("getting stdin pipe: %w", err)
@@ -131,7 +131,7 @@ func (npc *NetworkProxyConfig) sendInput(cmd *exec.Cmd) error {
 
 	go func() {
 		if n, err := stdin.Write(input); err != nil {
-			panic(fmt.Errorf("Failed to send input to network-proxy-service binary. %d, %w", n, err))
+			panic(fmt.Errorf("Failed to send input to network-tunnel-service binary. %d, %w", n, err))
 		}
 		stdin.Close()
 	}()
