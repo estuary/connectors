@@ -210,11 +210,24 @@ func SQLGenerator() sqlDriver.Generator {
 
 	return sqlDriver.Generator{
 		CommentRenderer:    sqlDriver.LineCommentRenderer(),
-		IdentifierRenderer: sqlDriver.NewRenderer(nil, sqlDriver.DoubleQuotesWrapper(), sqlDriver.DefaultUnwrappedIdentifiers),
+		IdentifierRenderer: sqlDriver.NewRenderer(nil, sqlDriver.DoubleQuotesWrapper(), SkipWrapper),
 		ValueRenderer:      sqlDriver.NewRenderer(sqlDriver.DefaultQuoteSanitizer, sqlDriver.SingleQuotesWrapper(), nil),
 		Placeholder:        sqlDriver.QuestionMarkPlaceholder,
 		TypeMappings:       nullable,
 	}
+}
+
+func SkipWrapper(identifier string) bool {
+	return sqlDriver.DefaultUnwrappedIdentifiers(identifier) && !sliceContains(strings.ToLower(identifier), SF_RESERVED_WORDS)
+}
+
+func sliceContains(expected string, actual []string) bool {
+	for _, ty := range actual {
+		if ty == expected {
+			return true
+		}
+	}
+	return false
 }
 
 type transactor struct {
