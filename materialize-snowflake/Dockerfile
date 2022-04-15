@@ -8,7 +8,6 @@ WORKDIR /builder
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
 RUN go mod download
-RUN go install github.com/mattn/go-sqlite3
 
 # Download recent flow binaries for usage by tests.
 RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" | tar -zx -C /usr/local/bin/
