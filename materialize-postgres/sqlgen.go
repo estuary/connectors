@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/estuary/flow/go/protocols/materialize/sql"
@@ -37,11 +38,24 @@ func PostgresSQLGenerator() sql.Generator {
 
 	return sql.Generator{
 		CommentRenderer:    sql.LineCommentRenderer(),
-		IdentifierRenderer: sql.NewRenderer(nil, sql.DoubleQuotesWrapper(), sql.DefaultUnwrappedIdentifiers),
+		IdentifierRenderer: sql.NewRenderer(nil, sql.DoubleQuotesWrapper(), SkipWrapper),
 		ValueRenderer:      sql.NewRenderer(sql.DefaultQuoteSanitizer, sql.SingleQuotesWrapper(), nil),
 		Placeholder:        PostgresParameterPlaceholder,
 		TypeMappings:       typeMappings,
 	}
+}
+
+func SkipWrapper(identifier string) bool {
+	return sql.DefaultUnwrappedIdentifiers(identifier) && !sliceContains(strings.ToLower(identifier), PG_RESERVED_WORDS)
+}
+
+func sliceContains(expected string, actual []string) bool {
+	for _, ty := range actual {
+		if ty == expected {
+			return true
+		}
+	}
+	return false
 }
 
 // PostgresParameterPlaceholder returns $N style parameters where N is the parameter number
