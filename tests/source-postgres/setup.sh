@@ -17,7 +17,6 @@ then
         "password": "$PGPASSWORD",
         "user":     "$PGUSER",
         "networkTunnel": {
-            "tunnelType": "sshForwarding",
             "sshForwarding": {
               "sshEndpoint": "$SSHENDPOINT",
               "user": "$SSHUSER",

@@ -13,11 +13,8 @@ func TestNetworkTunnelConfig_Validate(t *testing.T) {
 	var nilConfig *NetworkTunnelConfig
 	require.NoError(t, nilConfig.Validate())
 
-	var unsupportedConfig = &NetworkTunnelConfig{TunnelType: "unsupported"}
-	require.Error(t, unsupportedConfig.Validate(), "expected validation error for unsupported tunnel type.")
-
-	var typeOnlyTunnelConfig = NetworkTunnelConfig{TunnelType: "sshForwarding"}
-	require.Error(t, typeOnlyTunnelConfig.Validate(), "expected validation error for ssh_forwording config without real configs.")
+	var noTunnelConfig NetworkTunnelConfig
+	require.Error(t, noTunnelConfig.Validate(), "You must provide at least one tunnel configuration. Supported tunnel configurations: sshForwarding")
 
 	var sshForwardingConfig, err = CreateSshForwardingTestConfig(TestRsaFilePath, 15432)
 	require.NoError(t, err)
