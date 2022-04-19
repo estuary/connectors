@@ -311,8 +311,12 @@ type reader struct {
 }
 
 func (r *reader) sweep(ctx context.Context) error {
-	r.log("sweeping %s starting at %q, from %s through %s",
-		r.prefix, r.state.Path, r.state.MinBound, r.state.MaxBound)
+	log.WithFields(log.Fields{
+		"prefix":   r.prefix,
+		"path":     r.state.Path,
+		"minBound": r.state.MinBound,
+		"maxBound": r.state.MaxBound,
+	}).Info("sweeping")
 
 	var listing, err = r.store.List(ctx, Query{
 		Prefix:    r.prefix,
@@ -340,8 +344,11 @@ func (r *reader) sweep(ctx context.Context) error {
 		}
 	}
 
-	r.log("completed sweep of %s from %s through %s",
-		r.prefix, r.state.MinBound, r.state.MaxBound)
+	log.WithFields(log.Fields{
+		"prefix":   r.prefix,
+		"minBound": r.state.MinBound,
+		"maxBound": r.state.MaxBound,
+	}).Info("completed sweep")
 	r.state.finishSweep(r.config.FilesAreMonotonic())
 
 	// Write a final checkpoint to mark the completion of the sweep.
@@ -350,12 +357,6 @@ func (r *reader) sweep(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (r *reader) log(msg string, args ...interface{}) {
-	r.shared.mu.Lock()
-	defer r.shared.mu.Unlock()
-	_ = r.shared.enc.Encode(airbyte.NewLogMessage(airbyte.LogLevelInfo, msg, args...))
 }
 
 func (r *reader) shouldSkip(obj ObjectInfo) (_ bool, reason string) {
@@ -390,7 +391,10 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 		log.WithField("path", obj.Path).Debug("skipping path (after Read)")
 		return nil
 	}
-	r.log("processing file %q modified at %s", obj.Path, obj.ModTime)
+	log.WithFields(log.Fields{
+		"path":  obj.Path,
+		"mtime": obj.ModTime,
+	}).Info("processing file")
 
 	tmp, err := ioutil.TempFile("", "parser-config-*.json")
 	if err != nil {
