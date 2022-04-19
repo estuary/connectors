@@ -21,15 +21,12 @@ func SupportedNetworkTunnelTypes() []string {
 }
 
 type NetworkTunnelConfig struct {
-	TunnelType          string                 `json:"tunnelType"`
-	SshForwardingConfig sf.SshForwardingConfig `json:"sshForwarding"`
+	SshForwardingConfig *sf.SshForwardingConfig `json:"sshForwarding"`
 }
 
 // GetFieldDocString implements the jsonschema.customSchemaGetFieldDocString interface.
 func (NetworkTunnelConfig) GetFieldDocString(fieldName string) string {
 	switch fieldName {
-	case "TunnelType":
-		return fmt.Sprintf("The type of the network tunnel. Supported types are: ( %s )", strings.Join(SupportedNetworkTunnelTypes(), ", "))
 	case "SshForwardingConfig":
 		return "Config for tunnel of type sshForwarding"
 	default:
@@ -42,33 +39,19 @@ func (npc *NetworkTunnelConfig) Validate() error {
 		return nil
 	}
 
-	var supported = false
-	for _, t := range SupportedNetworkTunnelTypes() {
-		if t == npc.TunnelType {
-			supported = true
-			break
-		}
-	}
-
-	if !supported {
-		return fmt.Errorf("Unsupported tunnel type: %s. Valid values are: ( %s ).", npc.TunnelType, strings.Join(SupportedNetworkTunnelTypes(), ", "))
-	}
-
-	switch npc.TunnelType {
-	case "sshForwarding":
+	if npc.SshForwardingConfig != nil {
 		return npc.SshForwardingConfig.Validate()
-	default:
-		panic(fmt.Sprintf("Implementation of validating %s is not ready.", npc.TunnelType))
+	} else {
+		panic(fmt.Sprintf("You must provide at least one tunnel configuration. Supported tunnel configurations: %s", strings.Join(SupportedNetworkTunnelTypes(), ", ")))
 	}
 }
 
 func (npc *NetworkTunnelConfig) MarshalJSON() ([]byte, error) {
 	var m = make(map[string]interface{})
-	switch npc.TunnelType {
-	case "sshForwarding":
-		m[npc.TunnelType] = npc.SshForwardingConfig
-	default:
-		panic(fmt.Sprintf("Implementation of MarshalJSON for %s is missing.", npc.TunnelType))
+	if npc.SshForwardingConfig != nil {
+		m["sshForwarding"] = npc.SshForwardingConfig
+	} else {
+		panic(fmt.Sprintf("Could not find any tunnel configuration to marshal. Supported tunnel configurations: %s", strings.Join(SupportedNetworkTunnelTypes(), ", ")))
 	}
 
 	return json.Marshal(m)

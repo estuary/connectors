@@ -13,8 +13,7 @@ func CreateSshForwardingTestConfig(keyFilePath string, remotePort uint16) (*Netw
 		return nil, err
 	}
 	return &NetworkTunnelConfig{
-		TunnelType: "sshForwarding",
-		SshForwardingConfig: sf.SshForwardingConfig{
+		SshForwardingConfig: &sf.SshForwardingConfig{
 			SshEndpoint: "ssh://127.0.0.1:2222",
 			PrivateKey:  string(b),
 			User:        "flowssh",
