@@ -14,7 +14,7 @@ then
         "database": "$PGDATABASE",
         "host":     "localhost",
         "port":     $LOCALPORT,
-        "password": "PGPASSWORD",
+        "password": "$PGPASSWORD",
         "user":     "$PGUSER",
         "networkTunnel": {
             "tunnelType": "sshForwarding",
