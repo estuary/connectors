@@ -14,12 +14,12 @@ RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/rel
 
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate
-COPY materialize-bigquery    ./materialize-bigquery
+COPY materialize-bigquery2   ./materialize-bigquery2
 COPY testsupport             ./testsupport
 
 # Test and build the connector.
 # RUN go test  -tags nozstd -v ./materialize-bigquery/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery2/...
 
 # Runtime Stage
 ################################################################################
