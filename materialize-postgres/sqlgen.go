@@ -28,7 +28,14 @@ func PostgresSQLGenerator() sql.Generator {
 					"date-time": sql.ConstColumnType{
 						SQLType: "TIMESTAMPTZ",
 						ValueConverter: func(in interface{}) (interface{}, error) {
-							return time.Parse(time.RFC3339Nano, in.(string))
+							if in == nil { // in case of nullable fields
+								return nil, nil
+							}
+							var v, ok = in.(string)
+							if !ok {
+								return nil, fmt.Errorf("could not convert format: date-time field to string")
+							}
+							return time.Parse(time.RFC3339Nano, v)
 						},
 					},
 				},
