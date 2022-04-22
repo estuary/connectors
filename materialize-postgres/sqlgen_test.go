@@ -72,3 +72,47 @@ func TestDateTimeColumn(t *testing.T) {
 	_, ok := parsed.(time.Time)
 	require.True(t, ok)
 }
+
+func TestDateTimeColumnNullable(t *testing.T) {
+	var gen = PostgresSQLGenerator()
+	var column = sqlDriver.Column{
+		Name:       "foo",
+		Identifier: "fooi",
+		Comment:    "",
+		PrimaryKey: false,
+		Type:       sqlDriver.STRING,
+		StringType: &sqlDriver.StringTypeInfo{
+			Format: "date-time",
+		},
+		NotNull: false,
+	}
+	var result, err = gen.TypeMappings.GetColumnType(&column)
+	require.NoError(t, err)
+	require.Equal(t, "TIMESTAMPTZ", result.SQLType)
+
+	parsed, err := result.ValueConverter(nil)
+	require.NoError(t, err)
+	// The value returned from the converter must be nil
+	require.Equal(t, nil, parsed)
+}
+
+func TestDateTimeColumnError(t *testing.T) {
+	var gen = PostgresSQLGenerator()
+	var column = sqlDriver.Column{
+		Name:       "foo",
+		Identifier: "fooi",
+		Comment:    "",
+		PrimaryKey: false,
+		Type:       sqlDriver.STRING,
+		StringType: &sqlDriver.StringTypeInfo{
+			Format: "date-time",
+		},
+		NotNull: false,
+	}
+	var result, err = gen.TypeMappings.GetColumnType(&column)
+	require.NoError(t, err)
+	require.Equal(t, "TIMESTAMPTZ", result.SQLType)
+
+	_, err = result.ValueConverter(0)
+	require.EqualError(t, err, "could not convert format: date-time field to string")
+}
