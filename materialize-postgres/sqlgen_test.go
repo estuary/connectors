@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"testing"
-	"time"
 
 	"github.com/estuary/connectors/testsupport"
 	"github.com/estuary/flow/go/protocols/catalog"
@@ -67,10 +66,8 @@ func TestDateTimeColumn(t *testing.T) {
 	require.Equal(t, "TIMESTAMPTZ", result.SQLType)
 
 	parsed, err := result.ValueConverter("2022-04-04T10:09:08.234567Z")
+	require.Equal(t, "2022-04-04T10:09:08.234567Z", parsed)
 	require.NoError(t, err)
-	// The value returned from the converter must be a time.Time
-	_, ok := parsed.(time.Time)
-	require.True(t, ok)
 }
 
 func TestDateTimeColumnNullable(t *testing.T) {
@@ -94,25 +91,4 @@ func TestDateTimeColumnNullable(t *testing.T) {
 	require.NoError(t, err)
 	// The value returned from the converter must be nil
 	require.Equal(t, nil, parsed)
-}
-
-func TestDateTimeColumnError(t *testing.T) {
-	var gen = PostgresSQLGenerator()
-	var column = sqlDriver.Column{
-		Name:       "foo",
-		Identifier: "fooi",
-		Comment:    "",
-		PrimaryKey: false,
-		Type:       sqlDriver.STRING,
-		StringType: &sqlDriver.StringTypeInfo{
-			Format: "date-time",
-		},
-		NotNull: false,
-	}
-	var result, err = gen.TypeMappings.GetColumnType(&column)
-	require.NoError(t, err)
-	require.Equal(t, "TIMESTAMPTZ", result.SQLType)
-
-	_, err = result.ValueConverter(0)
-	require.EqualError(t, err, "could not convert format: date-time field to string")
 }
