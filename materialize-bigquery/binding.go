@@ -26,10 +26,11 @@ type Binding struct {
 	objectPath         string
 	externalTableAlias string
 
+	// Stateful and mutable part of the Binding struct. This writer gets
+	// replaced everytime
 	*writer
 }
 
-// Stateful and mutable part of the Binding struct
 type writer struct {
 	dataCommitted bool
 	empty         bool
@@ -41,9 +42,8 @@ type writer struct {
 }
 
 type sqlQueries struct {
-	CreateSQL string
-	LoadSQL   string
-	WriteSQL  string
+	LoadSQL  string
+	WriteSQL string
 }
 
 var externalTableNameTemplate = "external_table_binding_%s"
@@ -83,18 +83,6 @@ func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, 
 
 	b.Reset(ctx, fmt.Sprintf("%s/%s", cfg.BucketPath, name))
 	return b, nil
-}
-
-// Returns the ExternalDataConfig that was created for this binding. This is available
-// to allow an external object to use this as a way to generate a `bigquery.Job` and provided it
-// the data mapping required to make a SQL query that would be able to join accross the bigquery's dataset
-// and data living in Cloudstorage.
-//
-// Since the EDC struct is generated when resetting the underlying `writer` struct, it's important to not hold
-// onto the returned value after we're done processing. Calling this method will always give the EDC that is connected
-// to the current Writer instance.
-func (b *Binding) EDC() *bigquery.ExternalDataConfig {
-	return &b.writer.edc
 }
 
 // FilePath for the CloudStorage object that the underlying `writer` is connected to.
@@ -315,9 +303,8 @@ func generateSQLQueries(externalTableAlias string, br bindingResource, bindingSp
 		)
 	}
 	return &sqlQueries{
-		CreateSQL: "",
-		LoadSQL:   loadQuery,
-		WriteSQL:  writeQuery,
+		LoadSQL:  loadQuery,
+		WriteSQL: writeQuery,
 	}
 }
 
