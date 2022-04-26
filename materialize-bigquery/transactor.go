@@ -43,7 +43,7 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 		bigqueryClient:  bigqueryClient,
 		storageClient:   storageClient,
 		materialization: open.Materialization,
-		checkpoint:      NewDriverCheckpoint(),
+		checkpoint:      NewBigQueryCheckPoint(),
 		bindings:        make([]*Binding, len(open.Materialization.Bindings)),
 	}
 
@@ -120,7 +120,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, priorAcknowled
 }
 
 func (t *transactor) Prepare(ctx context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	t.checkpoint = NewDriverCheckpoint()
+	t.checkpoint = NewBigQueryCheckPoint()
 
 	for _, binding := range t.bindings {
 		name, err := randomString()

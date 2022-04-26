@@ -13,7 +13,7 @@ type DriverCheckPointBinding struct {
 
 var ErrDriverCheckPointBindingInvalid = errors.New("No driver checkpoint binding found at this index.")
 
-func NewDriverCheckpoint() *BigQueryCheckPoint {
+func NewBigQueryCheckPoint() *BigQueryCheckPoint {
 	return &BigQueryCheckPoint{
 		Bindings: make([]*DriverCheckPointBinding, 0),
 	}
