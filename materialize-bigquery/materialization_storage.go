@@ -10,19 +10,19 @@ import (
 	proto "github.com/gogo/protobuf/proto"
 )
 
-type SpecStorage struct {
+type MaterialiationStorage struct {
 	client *storage.Client
 	config *config
 }
 
-func NewSpecStorage(ctx context.Context, cfg *config) (*SpecStorage, error) {
+func NewMaterializationStorage(ctx context.Context, cfg *config) (*MaterialiationStorage, error) {
 	client, err := cfg.StorageClient(ctx)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &SpecStorage{
+	return &MaterialiationStorage{
 		client: client,
 		config: cfg,
 	}, nil
@@ -30,7 +30,7 @@ func NewSpecStorage(ctx context.Context, cfg *config) (*SpecStorage, error) {
 
 // Load the MaterializationSpec from Cloud Storage. It's possible that there is no materialization
 // to be found in storage if the materialization is new. In this case, the return value is an empty map.
-func (s *SpecStorage) LoadBindings(ctx context.Context, name string) (map[string]*pf.MaterializationSpec_Binding, error) {
+func (s *MaterialiationStorage) LoadBindings(ctx context.Context, name string) (map[string]*pf.MaterializationSpec_Binding, error) {
 	var existing pf.MaterializationSpec
 
 	bucket := s.client.Bucket(s.config.Bucket)
@@ -67,7 +67,7 @@ func (s *SpecStorage) LoadBindings(ctx context.Context, name string) (map[string
 	return bindingsByTable, nil
 }
 
-func (s *SpecStorage) Write(ctx context.Context, materialization *pf.MaterializationSpec, version string) error {
+func (s *MaterialiationStorage) Write(ctx context.Context, materialization *pf.MaterializationSpec, version string) error {
 	bucket := s.client.Bucket(s.config.Bucket)
 	specKey := materializationPath(s.config.BucketPath, materialization.Materialization.String())
 	writer := bucket.Object(specKey).NewWriter(ctx)
@@ -92,7 +92,7 @@ func (s *SpecStorage) Write(ctx context.Context, materialization *pf.Materializa
 	return nil
 }
 
-func (s *SpecStorage) Delete(ctx context.Context, materialization *pf.MaterializationSpec) error {
+func (s *MaterialiationStorage) Delete(ctx context.Context, materialization *pf.MaterializationSpec) error {
 	bucket := s.client.Bucket(s.config.Bucket)
 	specKey := materializationPath(s.config.BucketPath, materialization.Materialization.String())
 	err := bucket.Object(specKey).Delete(ctx)
