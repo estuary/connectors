@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/alecthomas/jsonschema"
@@ -11,6 +12,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
+	"google.golang.org/api/googleapi"
 )
 
 type driver struct{}
@@ -117,8 +119,15 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		}
 
 		err = table.Create(ctx, metadata)
+
+		// Check first if the error is because the table already exists.
+		// this is the same as CREATE TABLE IF NOT EXISTS, this is a recoverable error.
 		if err != nil {
-			return nil, fmt.Errorf("creating bigquery table (%s): %w", br.Table, err)
+			if err, ok := err.(*googleapi.Error); ok && err.Code == 409 { // 409 ALREADY EXISTS
+				log.Printf("the table already exists, recoverable error.")
+			} else {
+				return nil, fmt.Errorf("creating bigquery table (%s): %w", br.Table, err)
+			}
 		}
 	}
 

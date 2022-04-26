@@ -67,7 +67,6 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 		if driverBinding, err := t.checkpoint.Binding(i); err == nil {
 			binding.Reset(ctx, driverBinding.FilePath)
 		}
-
 	}
 
 	if err := stream.Send(&pm.TransactionResponse{
