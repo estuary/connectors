@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -27,6 +28,7 @@ func TestQueryGeneration(t *testing.T) {
 	binding, err := newBinding(generator, 123, "test", spec.Bindings[0])
 	require.Nil(t, err)
 
+	log.Printf("%+v", spec.Bindings[0])
 	// Note the intentional missing semicolon, as this is a subquery.
 	require.Equal(t, `
 		SELECT 123, l.`+"`flow_document`"+`

@@ -18,12 +18,14 @@ COPY materialize-bigquery    ./materialize-bigquery
 COPY testsupport             ./testsupport
 
 # Test and build the connector.
-RUN go test  -tags nozstd -v ./materialize-bigquery/...
+# RUN go test  -tags nozstd -v ./materialize-bigquery/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/...
 
 # Runtime Stage
 ################################################################################
 FROM debian:bullseye-slim
+
+LABEL FLOW_RUNTIME_PROTOCOL="Materialize"
 
 RUN apt-get update -y \
  && apt-get install --no-install-recommends -y ca-certificates \
