@@ -94,5 +94,8 @@ type bindingResource struct {
 }
 
 func (br *bindingResource) Validate() error {
+	if br.Table == "" {
+		return fmt.Errorf("expected table")
+	}
 	return nil
 }
