@@ -39,7 +39,7 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 		return nil, err
 	}
 
-	specStorage, err := NewSpecStorage(ctx, cfg)
+	specStorage, err := NewMaterializationStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, err
 	}
 
-	specStorage, err := NewSpecStorage(ctx, cfg)
+	specStorage, err := NewMaterializationStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, err
 	}
 
-	specStorage, err := NewSpecStorage(ctx, cfg)
+	specStorage, err := NewMaterializationStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
