@@ -64,7 +64,7 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 		if existingBinding, ok := existing[res.Table]; ok {
 			constraints = sqlDriver.ValidateMatchesExisting(existingBinding, &proposed.Collection)
 		} else {
-			constraints = sqlDriver.ValidateNewSQLProjections(&proposed.Collection, false) // hardcoding false for now
+			constraints = sqlDriver.ValidateNewSQLProjections(&proposed.Collection, res.Delta)
 		}
 
 		if err != nil {
@@ -72,7 +72,7 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 		} else {
 			out.Bindings = append(out.Bindings, &pm.ValidateResponse_Binding{
 				Constraints:  constraints,
-				DeltaUpdates: false, // hardocding just for testing
+				DeltaUpdates: res.Delta,
 				ResourcePath: []string{res.Table},
 			})
 		}
