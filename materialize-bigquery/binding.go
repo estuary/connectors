@@ -29,6 +29,7 @@ type Binding struct {
 	*writer
 }
 
+// Stateful and mutable part of the Binding struct
 type writer struct {
 	dataCommitted bool
 	empty         bool
@@ -47,6 +48,10 @@ type sqlQueries struct {
 
 var externalTableNameTemplate = "external_table_binding_%s"
 
+// Returns a new compiled Binding ready to be used. The Binding is generated from a materialization spec and merges the config
+// info available to generate data structure that only requires to be compiled once when the materialization starts up. When
+// this struct is called, all the information to generate the proper SQL queries is already available.
+// The Binding object also includes a mutable part that is encapsulated inside the `writer` struct.
 func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, bindingSpec *pf.MaterializationSpec_Binding) (*Binding, error) {
 	schema, err := schemaForBinding(bindingSpec)
 	if err != nil {
@@ -80,10 +85,19 @@ func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, 
 	return b, nil
 }
 
+// Returns the ExternalDataConfig that was created for this binding. This is available
+// to allow an external object to use this as a way to generate a `bigquery.Job` and provided it
+// the data mapping required to make a SQL query that would be able to join accross the bigquery's dataset
+// and data living in Cloudstorage.
+//
+// Since the EDC struct is generated when resetting the underlying `writer` struct, it's important to not hold
+// onto the returned value after we're done processing. Calling this method will always give the EDC that is connected
+// to the current Writer instance.
 func (b *Binding) EDC() *bigquery.ExternalDataConfig {
 	return &b.writer.edc
 }
 
+// FilePath for the CloudStorage object that the underlying `writer` is connected to.
 func (b *Binding) FilePath() string {
 	obj := b.writer.object
 
@@ -107,6 +121,14 @@ func (b *Binding) GenerateDocument(key, values tuple.Tuple, flowDocument json.Ra
 	return document
 }
 
+// Job is a small wrapper around `bigquery.Job` and doesn't provide much in terms of logic
+// but ultimately removes some of the boilerplate code for the user's convenience.
+// Since all the data to generate a job lives inside a Binding, it is possible for a Binding
+// to build the job on its own and return a running Job.
+//
+// The returned Job is going to be configured so it's possible to run a query that joins over
+// the bigquery dataset & the cloud storage external table. The name of the table is already computed
+// in the initialization of a Binding and is stored in `externalTableAlias`
 func (b *Binding) Job(ctx context.Context, client *bigquery.Client, q string) (*bigquery.Job, error) {
 	query := client.Query(q)
 	query.TableDefinitions = map[string]bigquery.ExternalData{b.externalTableAlias: &b.writer.edc}
@@ -121,7 +143,19 @@ func (b *Binding) Commit(ctx context.Context) error {
 	return b.writer.commit(ctx)
 }
 
-func (b *Binding) Reset(ctx context.Context, name string) {
+// Reset is called when a new Writer need to be instantiated.
+// This is done so every pipeline operation in the bigquery materialization
+// can work with it's own writer to avoid data integrity issues.
+// Call Reset when the lifecycle of a bigquery materialization is completed and
+// the data is committed and acknowledged.
+func (b *Binding) Reset(ctx context.Context, name string) error {
+	if b.writer != nil {
+		err := b.writer.Destroy(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
 	obj := b.bucket.Object(name)
 	edc := bigquery.ExternalDataConfig{
 		SourceFormat: bigquery.JSON,
@@ -130,6 +164,8 @@ func (b *Binding) Reset(ctx context.Context, name string) {
 	}
 
 	b.writer = newWriter(ctx, edc, obj)
+
+	return nil
 }
 
 func (b *Binding) Store(doc map[string]interface{}) error {
@@ -187,6 +223,14 @@ func (w *writer) commit(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// Delete the object associated to this Writer. Once deleted, the file
+// cannot be recovered. This is a destructive operation that should only
+// happen once the underlying data is written to bigquery. Otherwise, it could result
+// in data loss.
+func (w *writer) Destroy(ctx context.Context) error {
+	return w.object.Delete(ctx)
 }
 
 func randomString() (string, error) {
