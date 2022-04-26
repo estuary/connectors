@@ -16,14 +16,39 @@ import (
 )
 
 type Binding struct {
+	// Queries is a collection of the queries that this binding
+	// is configured to run over its lifetime. The queries do not change between
+	// pipelines and as a result, gets compiled and stored here for use everytime
+	// a Binding needs to run.
 	Queries *sqlQueries
 
-	spec               *pf.MaterializationSpec_Binding
-	schema             bigquery.Schema
-	bucket             *storage.BucketHandle
-	region             string
-	dataset            string
-	objectPath         string
+	// Reference to the definition of this binding as it was generated from
+	// MaterializatioSpec. It is stored here so the individual values inside this
+	// spec doesn't need to be explicitely referenced in this Binding struct and can
+	// just be accessed when needed.
+	spec *pf.MaterializationSpec_Binding
+
+	schema bigquery.Schema
+	bucket *storage.BucketHandle
+
+	// Region is a configuration flag set by the user to determine
+	// in which Region, in GCP, should the queries run.
+	region string
+
+	// Dataset is a configuration flag set by the user that defines the
+	// location of the dataset, in GCP.
+	dataset string
+
+	// ObjectPath is a configuration flag set by the user to allow them to namespace
+	// where this connector stores data in Google Cloud Storage
+	objectPath string
+
+	// ExternalTableAlias is a string generated so that it can be used to reference
+	// the external cloud storage data in a SQL Query. At the core of this, there is data
+	// stored in Google Cloud Storage in a JSON format, and the connector needs to access that data to
+	// merge it into BigQuery's dataset. By defining this table alias here, the Queries stored above can
+	// use this alias when compiling the SQL queries, and job will be configured so that the query runs
+	// and has access to that external table.
 	externalTableAlias string
 
 	// Stateful and mutable part of the Binding struct. This writer gets
