@@ -18,5 +18,4 @@ func (fd *flowDocument) Load(v []bigquery.Value, s bigquery.Schema) error {
 		fd.Body = json.RawMessage(document)
 	}
 	return nil
-
 }
