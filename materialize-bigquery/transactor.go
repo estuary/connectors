@@ -65,7 +65,7 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 		// a checkpoint binding, which is a normal scenario if the last time the driver
 		// stored a checkpoint, the binding didn't exist.
 		if driverBinding, err := t.checkpoint.Binding(i); err == nil {
-			binding.Reset(ctx, driverBinding.FilePath)
+			binding.InitializeNewWriter(ctx, driverBinding.FilePath)
 		}
 	}
 
@@ -127,7 +127,7 @@ func (t *transactor) Prepare(ctx context.Context, _ pm.TransactionRequest_Prepar
 			return pf.DriverCheckpoint{}, err
 		}
 
-		binding.Reset(ctx, fmt.Sprintf("%s/%s", t.config.BucketPath, name))
+		binding.InitializeNewWriter(ctx, fmt.Sprintf("%s/%s", t.config.BucketPath, name))
 
 		t.checkpoint.Bindings = append(t.checkpoint.Bindings, &DriverCheckPointBinding{
 			FilePath: binding.FilePath(),
@@ -168,13 +168,6 @@ func (t *transactor) Commit(ctx context.Context) error {
 func (t *transactor) Acknowledge(ctx context.Context) error {
 	for i, cpBinding := range t.checkpoint.Bindings {
 		binding := t.bindings[i]
-
-		// A binding can only run a job if there is data that was
-		// committed to Cloud Storage. If there's no data
-		// committed for this binding, it should skip to the next one.
-		if !binding.Committed() {
-			continue
-		}
 
 		job, err := binding.Job(ctx, t.bigqueryClient, cpBinding.Query)
 
