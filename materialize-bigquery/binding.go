@@ -52,18 +52,16 @@ type Binding struct {
 	externalTableAlias string
 
 	// Stateful and mutable part of the Binding struct. This writer gets
-	// replaced everytime
+	// replaced everytime the pipeline needs to write new data
 	*writer
 }
 
 type writer struct {
-	dataCommitted bool
-	dataWritten   int64
-	edc           bigquery.ExternalDataConfig
-	object        *storage.ObjectHandle
-	writer        *storage.Writer
-	buffer        *bufio.Writer
-	encoder       *json.Encoder
+	edc     bigquery.ExternalDataConfig
+	object  *storage.ObjectHandle
+	writer  *storage.Writer
+	buffer  *bufio.Writer
+	encoder *json.Encoder
 }
 
 type sqlQueries struct {
@@ -91,7 +89,7 @@ func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, 
 
 	externalTableAlias := fmt.Sprintf(externalTableNameTemplate, br.Table)
 
-	b := &Binding{
+	return &Binding{
 		Queries:            generateSQLQueries(externalTableAlias, br, bindingSpec),
 		bucket:             bucket,
 		spec:               bindingSpec,
@@ -99,15 +97,7 @@ func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, 
 		region:             cfg.Region,
 		dataset:            cfg.Dataset,
 		externalTableAlias: externalTableAlias,
-	}
-
-	name, err := randomString()
-	if err != nil {
-		return nil, err
-	}
-
-	b.Reset(ctx, fmt.Sprintf("%s/%s", cfg.BucketPath, name))
-	return b, nil
+	}, nil
 }
 
 // FilePath for the CloudStorage object that the underlying `writer` is connected to.
@@ -178,7 +168,7 @@ func (b *Binding) Reset(ctx context.Context, name string) error {
 		SourceURIs:   []string{fmt.Sprintf("gs://%s/%s", obj.BucketName(), obj.ObjectName())},
 	}
 
-	b.writer, err = newWriter(ctx, edc, obj)
+	b.writer = newWriter(ctx, edc, obj)
 
 	return err
 }
@@ -193,13 +183,7 @@ func (b *Binding) DeltaUpdates() bool {
 	return b.spec.DeltaUpdates
 }
 
-// Whether the underlying writter has data committed
-// to the storage.
-func (b *Binding) Committed() bool {
-	return b.writer.dataCommitted && b.writer.dataWritten > 0
-}
-
-func newWriter(ctx context.Context, edc bigquery.ExternalDataConfig, objHandle *storage.ObjectHandle) (*writer, error) {
+func newWriter(ctx context.Context, edc bigquery.ExternalDataConfig, objHandle *storage.ObjectHandle) *writer {
 	w := objHandle.NewWriter(ctx)
 	b := bufio.NewWriter(w)
 
@@ -214,7 +198,7 @@ func newWriter(ctx context.Context, edc bigquery.ExternalDataConfig, objHandle *
 		buffer:  b,
 		encoder: e,
 	}
-	return writer, writer.updateCommitInformation(ctx)
+	return writer
 }
 
 // After commit has returend, the writer cannot be written to
@@ -223,7 +207,6 @@ func newWriter(ctx context.Context, edc bigquery.ExternalDataConfig, objHandle *
 // error occurred while comitting the data. This is so it tells the binding
 // that it's not safe to write data to this writer anymore.
 func (w *writer) commit(ctx context.Context) error {
-	w.dataCommitted = true
 
 	var err error
 	if err = w.buffer.Flush(); err != nil {
@@ -234,7 +217,7 @@ func (w *writer) commit(ctx context.Context) error {
 		return fmt.Errorf("closing the writer to cloud storage: %w", err)
 	}
 
-	return w.updateCommitInformation(ctx)
+	return nil
 }
 
 // Delete the object associated to this Writer. Once deleted, the file
@@ -243,35 +226,6 @@ func (w *writer) commit(ctx context.Context) error {
 // in data loss.
 func (w *writer) Destroy(ctx context.Context) error {
 	return w.object.Delete(ctx)
-}
-
-// Refresh the information stored in the writter regarding
-// the amount of data written to the writer and also whether
-// the writer has committed data to the underlying Cloud Storage
-// object. This function makes a network round trip to get
-// information about the object.
-func (w *writer) updateCommitInformation(ctx context.Context) error {
-	attrs, err := w.object.Attrs(ctx)
-
-	if err != nil {
-		// It's a normal scenario to not have an object at this
-		// location when creating a new writer. However, when a
-		// writer gets initialized with a file from a DriverCheckpoint,
-		// it's possible and probably expected to have data in that file
-		// and we want to mark this writer as committed, so it cannot be
-		// written to
-		if err == storage.ErrObjectNotExist {
-			w.dataCommitted = false
-			w.dataWritten = 0
-		} else {
-			return err
-		}
-	} else {
-		w.dataWritten = attrs.Size
-		w.dataCommitted = true
-	}
-
-	return nil
 }
 
 func randomString() (string, error) {
