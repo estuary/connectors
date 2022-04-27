@@ -146,12 +146,12 @@ func (b *Binding) Commit(ctx context.Context) error {
 	return b.writer.commit(ctx)
 }
 
-// Reset is called when a new Writer need to be instantiated.
+// InitializeNewWriter is called when a new Writer need to be instantiated.
 // This is done so every pipeline operation in the bigquery materialization
 // can work with it's own writer to avoid data integrity issues.
 // Call Reset when the lifecycle of a bigquery materialization is completed and
 // the data is committed and acknowledged.
-func (b *Binding) Reset(ctx context.Context, name string) error {
+func (b *Binding) InitializeNewWriter(ctx context.Context, name string) error {
 	var err error
 
 	if b.writer != nil {
