@@ -71,11 +71,17 @@ func fieldSchemaForNameAndProjections(fieldName string, projections []pf.Project
 
 func preferredFieldType(possibleFields []string) bigquery.FieldType {
 	switch possibleFields[0] {
+	case "binary":
+		return bigquery.BytesFieldType
 	case "string":
 		return bigquery.StringFieldType
 	case "integer":
 		return bigquery.IntegerFieldType
+	case "number":
+		return bigquery.BigNumericFieldType
+	case "timestamp":
+		return bigquery.TimestampFieldType
 	default:
-		return bigquery.StringFieldType
+		return bigquery.BytesFieldType
 	}
 }
