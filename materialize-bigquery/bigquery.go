@@ -82,6 +82,6 @@ func preferredFieldType(possibleFields []string) bigquery.FieldType {
 	case "timestamp":
 		return bigquery.TimestampFieldType
 	default:
-		return bigquery.BytesFieldType
+		panic(fmt.Sprintf("Could not map the field to a big query type: %s", possibleFields[0]))
 	}
 }

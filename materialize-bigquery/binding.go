@@ -58,7 +58,7 @@ type Binding struct {
 
 type writer struct {
 	dataCommitted bool
-	empty         bool
+	dataWritten   int64
 	edc           bigquery.ExternalDataConfig
 	object        *storage.ObjectHandle
 	writer        *storage.Writer
@@ -162,8 +162,10 @@ func (b *Binding) Commit(ctx context.Context) error {
 // Call Reset when the lifecycle of a bigquery materialization is completed and
 // the data is committed and acknowledged.
 func (b *Binding) Reset(ctx context.Context, name string) error {
+	var err error
+
 	if b.writer != nil {
-		err := b.writer.Destroy(ctx)
+		err = b.writer.Destroy(ctx)
 		if err != nil {
 			return err
 		}
@@ -176,17 +178,13 @@ func (b *Binding) Reset(ctx context.Context, name string) error {
 		SourceURIs:   []string{fmt.Sprintf("gs://%s/%s", obj.BucketName(), obj.ObjectName())},
 	}
 
-	b.writer = newWriter(ctx, edc, obj)
+	b.writer, err = newWriter(ctx, edc, obj)
 
-	return nil
+	return err
 }
 
 func (b *Binding) Store(doc map[string]interface{}) error {
 	err := b.writer.encoder.Encode(doc)
-
-	if err == nil {
-		b.empty = false
-	}
 
 	return err
 }
@@ -195,11 +193,13 @@ func (b *Binding) DeltaUpdates() bool {
 	return b.spec.DeltaUpdates
 }
 
-func (b *Binding) DataCommitted() bool {
-	return b.writer.dataCommitted
+// Whether the underlying writter has data committed
+// to the storage.
+func (b *Binding) Committed() bool {
+	return b.writer.dataCommitted && b.writer.dataWritten > 0
 }
 
-func newWriter(ctx context.Context, edc bigquery.ExternalDataConfig, objHandle *storage.ObjectHandle) *writer {
+func newWriter(ctx context.Context, edc bigquery.ExternalDataConfig, objHandle *storage.ObjectHandle) (*writer, error) {
 	w := objHandle.NewWriter(ctx)
 	b := bufio.NewWriter(w)
 
@@ -207,15 +207,14 @@ func newWriter(ctx context.Context, edc bigquery.ExternalDataConfig, objHandle *
 	e.SetEscapeHTML(false)
 	e.SetIndent("", "")
 
-	return &writer{
-		empty:         true,
-		dataCommitted: false,
-		edc:           edc,
-		object:        objHandle,
-		writer:        w,
-		buffer:        b,
-		encoder:       e,
+	writer := &writer{
+		edc:     edc,
+		object:  objHandle,
+		writer:  w,
+		buffer:  b,
+		encoder: e,
 	}
+	return writer, writer.updateCommitInformation(ctx)
 }
 
 // After commit has returend, the writer cannot be written to
@@ -235,7 +234,7 @@ func (w *writer) commit(ctx context.Context) error {
 		return fmt.Errorf("closing the writer to cloud storage: %w", err)
 	}
 
-	return nil
+	return w.updateCommitInformation(ctx)
 }
 
 // Delete the object associated to this Writer. Once deleted, the file
@@ -244,6 +243,35 @@ func (w *writer) commit(ctx context.Context) error {
 // in data loss.
 func (w *writer) Destroy(ctx context.Context) error {
 	return w.object.Delete(ctx)
+}
+
+// Refresh the information stored in the writter regarding
+// the amount of data written to the writer and also whether
+// the writer has committed data to the underlying Cloud Storage
+// object. This function makes a network round trip to get
+// information about the object.
+func (w *writer) updateCommitInformation(ctx context.Context) error {
+	attrs, err := w.object.Attrs(ctx)
+
+	if err != nil {
+		// It's a normal scenario to not have an object at this
+		// location when creating a new writer. However, when a
+		// writer gets initialized with a file from a DriverCheckpoint,
+		// it's possible and probably expected to have data in that file
+		// and we want to mark this writer as committed, so it cannot be
+		// written to
+		if err == storage.ErrObjectNotExist {
+			w.dataCommitted = false
+			w.dataWritten = 0
+		} else {
+			return err
+		}
+	} else {
+		w.dataWritten = attrs.Size
+		w.dataCommitted = true
+	}
+
+	return nil
 }
 
 func randomString() (string, error) {

@@ -168,6 +168,14 @@ func (t *transactor) Commit(ctx context.Context) error {
 func (t *transactor) Acknowledge(ctx context.Context) error {
 	for i, cpBinding := range t.checkpoint.Bindings {
 		binding := t.bindings[i]
+
+		// A binding can only run a job if there is data that was
+		// committed to Cloud Storage. If there's no data
+		// committed for this binding, it should skip to the next one.
+		if !binding.Committed() {
+			continue
+		}
+
 		job, err := binding.Job(ctx, t.bigqueryClient, cpBinding.Query)
 
 		if err != nil {
