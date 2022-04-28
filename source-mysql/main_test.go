@@ -13,6 +13,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -161,4 +162,52 @@ func (tb *mysqlTestBackend) GetDatabase() sqlcapture.Database {
 // TestGeneric runs the generic sqlcapture test suite.
 func TestGeneric(t *testing.T) {
 	tests.Run(context.Background(), t, TestBackend)
+}
+
+// TestBinlogExpirySanityCheck verifies that the "dangerously short binlog expiry"
+// sanity check is working as intended.
+func TestBinlogExpirySanityCheck(t *testing.T) {
+	var ctx = context.Background()
+
+	for idx, tc := range []struct {
+		VarName     string
+		VarValue    int
+		SkipCheck   bool
+		ExpectError bool
+		Message     string
+	}{
+		{"binlog_expire_logs_seconds", 2592000, false, false, "A 30-day expiry should not produce an error"},
+		{"binlog_expire_logs_seconds", 604800, false, false, "A 7-day expiry should not produce an error"},
+		{"binlog_expire_logs_seconds", 518400, false, true, "A 6-day expiry *should* produce an error"},
+		{"binlog_expire_logs_seconds", 518400, true, false, "A 6-day expiry should not produce an error if we skip the sanity check"},
+		{"expire_logs_days", 30, false, false, "A 30-day expiry should not produce an error"},
+		{"expire_logs_days", 7, false, false, "A 7-day expiry should not produce an error"},
+		{"expire_logs_days", 6, false, true, "A 6-day expiry *should* produce an error"},
+		{"expire_logs_days", 6, true, false, "A 6-day expiry should not produce an error if we skip the sanity check"},
+		{"binlog_expire_logs_seconds", 0, false, false, "A value of zero should also not produce an error"},
+		{"binlog_expire_logs_seconds", 2592000, false, false, "Resetting expiry back to the default value"},
+	} {
+		t.Run(fmt.Sprintf("%d_%s_%d", idx, tc.VarName, tc.VarValue), func(t *testing.T) {
+			// Set both expiry variables to their desired values. We start by setting them
+			// both to zero because MySQL only allows one at a time to be nonzero.
+			TestBackend.Query(ctx, t, "SET GLOBAL binlog_expire_logs_seconds = 0;")
+			TestBackend.Query(ctx, t, "SET GLOBAL expire_logs_days = 0;")
+			TestBackend.Query(ctx, t, fmt.Sprintf("SET GLOBAL %s = %d;", tc.VarName, tc.VarValue))
+
+			// Connect to the database, which may run the sanity-check
+			db := TestBackend.GetDatabase()
+			if tc.SkipCheck {
+				db.(*mysqlDatabase).config.SkipBinlogRetentionCheck = true
+			}
+			err := db.Connect(ctx)
+			db.Close(ctx)
+
+			// Verify the result
+			if tc.ExpectError {
+				require.Error(t, err, tc.Message)
+			} else {
+				require.NoError(t, err, tc.Message)
+			}
+		})
+	}
 }

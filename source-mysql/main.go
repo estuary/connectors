@@ -5,17 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/go-mysql-org/go-mysql/client"
+	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/sirupsen/logrus"
 
 	mysqlLog "github.com/siddontang/go-log/log"
 )
+
+const minimumExpiryTime = 7 * 24 * time.Hour
 
 func main() {
 	fixMysqlLogging()
@@ -66,9 +71,11 @@ type Config struct {
 	User     string `json:"user" jsonschema:"default=flow_capture,description=Database user to connect as."`
 	Password string `json:"password" jsonschema:"description=Password for the specified database user."`
 	DBName   string `json:"dbname" jsonschema:"description=Name of the database to connect to."`
-	ServerID int    `json:"server_id" jsonschema:"description=Server ID for replication."`
+	ServerID int    `json:"server_id" jsonschema:"description=Server ID for replication (each node in a cluster should have a unique ID)."`
 
 	WatermarksTable string `json:"watermarks_table,omitempty" jsonschema:"default=flow.watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+
+	SkipBinlogRetentionCheck bool `json:"skip_binlog_retention_check,omitempty" jsonschema:"default=false,description=For advanced users only. Bypasses the 'dangerously short binlog retention' sanity check at startup."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -122,7 +129,79 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 	db.conn = conn
+
+	// Sanity-check binlog retention and error out if it's insufficiently long.
+	// By doing this during the Connect operation it will occur both during
+	// actual captures and when performing discovery/config validation, which
+	// is likely what we want.
+	if !db.config.SkipBinlogRetentionCheck {
+		expiryTime, err := db.getBinlogExpiry()
+		if err != nil {
+			return fmt.Errorf("error querying binlog expiry time: %w", err)
+		}
+		if expiryTime < minimumExpiryTime {
+			return fmt.Errorf("binlog retention period is too short (go.estuary.dev/PoMlNf): server reports %s but at least %s is required (and 30+ days is preferred)", expiryTime.String(), minimumExpiryTime.String())
+		}
+	}
+
 	return nil
+}
+
+func (db *mysqlDatabase) getBinlogExpiry() (time.Duration, error) {
+	// TODO(wgd): Test whether this works on Amazon RDS, and add additional logic
+	// to use the appropriate `mysql.rds_show_configuration` incantation if needed.
+
+	// The new 'binlog_expire_logs_seconds' variable takes priority
+	expireLogsSeconds, err := db.getIntegerSystemVariable("binlog_expire_logs_seconds")
+	if err != nil {
+		return 0, err
+	}
+	if expireLogsSeconds > 0 {
+		return time.Duration(expireLogsSeconds) * time.Second, nil
+	}
+
+	// However 'expire_logs_days' will be used instead if 'seconds' was zero
+	expireLogsDays, err := db.getIntegerSystemVariable("expire_logs_days")
+	if err != nil {
+		return 0, err
+	}
+	if expireLogsDays > 0 {
+		return time.Duration(expireLogsDays) * 24 * time.Hour, nil
+	}
+
+	// If both 'binlog_expire_logs_seconds' and 'expire_logs_days' are set to zero
+	// MySQL will not automatically purge binlog segments. For simplicity we just
+	// represent that as a 'one year' expiry time, since all we need the value for
+	// is to make sure it's not too short.
+	return 365 * 24 * time.Hour, nil
+}
+
+func (db *mysqlDatabase) getIntegerSystemVariable(name string) (int64, error) {
+	var results, err = db.conn.Execute(fmt.Sprintf("SHOW VARIABLES LIKE '%s';", name))
+	if err != nil {
+		return 0, fmt.Errorf("error querying system variables: %w", err)
+	}
+	for _, row := range results.Values {
+		var rowName, rowValue = string(row[0].AsString()), &row[1]
+		logrus.WithFields(logrus.Fields{"name": rowName, "value": rowValue.Value()}).Debug("got system variable")
+		if rowName == name {
+			switch rowValue.Type {
+			case mysql.FieldValueTypeString:
+				var n, err = strconv.ParseInt(string(rowValue.AsString()), 10, 64)
+				if err != nil {
+					return 0, fmt.Errorf("couldn't parse string value as decimal number: %w", err)
+				}
+				return n, nil
+			case mysql.FieldValueTypeFloat:
+				return int64(rowValue.AsFloat64()), nil
+			case mysql.FieldValueTypeUnsigned:
+				return int64(rowValue.AsUint64()), nil
+			default:
+				return rowValue.AsInt64(), nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("no value found for '%s'", name)
 }
 
 func (db *mysqlDatabase) Close(ctx context.Context) error {
