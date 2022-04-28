@@ -20,6 +20,7 @@ import (
 func main() {
 	fixMysqlLogging()
 	var schema = jsonschema.Reflect(&Config{})
+	schema.Title = "MySQL Source Spec"
 	var configSchema, err = schema.MarshalJSON()
 	if err != nil {
 		panic(err)

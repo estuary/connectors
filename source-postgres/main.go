@@ -20,6 +20,7 @@ import (
 
 func main() {
 	var schema = jsonschema.Reflect(&Config{})
+	schema.Title = "PostgreSQL Source Spec"
 	var configSchema, err = schema.MarshalJSON()
 	if err != nil {
 		panic(err)
