@@ -152,6 +152,18 @@ func fieldSchema(projections []pf.Projection, fieldName string) (*bigquery.Field
 		return nil, fmt.Errorf("Could not map the field to a big query type: %s", fieldName)
 	}
 
+	// This is a test to make sure that the only value in the infered type is either 1
+	// or 2 but it includes a nullable field. If it has more than the expected count, it returns an
+	// error back, ie. Inference.Types = [string, integer] is wrong. [string, null] is OK. [string, integer, null] is wrong
+	expectedSize := 1
+	if includesNull {
+		expectedSize += 1
+	}
+
+	if len(projection.Inference.Types) != expectedSize {
+		return nil, fmt.Errorf("Don't expect multiple types besides Null and a real type, can't proceed: %s", &projection.Inference.Types)
+	}
+
 	return &bigquery.FieldSchema{
 		Name:        projection.Field,
 		Type:        fieldType,
