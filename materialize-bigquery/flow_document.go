@@ -11,7 +11,7 @@ type flowDocument struct {
 	Body json.RawMessage
 }
 
-func (fd *flowDocument) Load(v []bigquery.Value, s bigquery.Schema) error {
+func (fd *flowDocument) Load(v []bigquery.Value, _ bigquery.Schema) error {
 	if document, ok := v[0].(string); !ok {
 		return fmt.Errorf("value[0] wrong type %T expecting string", v[0])
 	} else {

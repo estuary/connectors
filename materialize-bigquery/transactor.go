@@ -79,9 +79,7 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 }
 
 func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, priorAcknowledgedCh <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	select {
-	case <-priorAcknowledgedCh:
-	}
+	<-priorAcknowledgedCh
 
 	for it.Next() {
 		binding := t.bindings[it.Binding]
@@ -127,7 +125,9 @@ func (t *transactor) Prepare(ctx context.Context, _ pm.TransactionRequest_Prepar
 			return pf.DriverCheckpoint{}, err
 		}
 
-		binding.InitializeNewWriter(ctx, fmt.Sprintf("%s/%s", t.config.BucketPath, name))
+		if err = binding.InitializeNewWriter(ctx, fmt.Sprintf("%s/%s", t.config.BucketPath, name)); err != nil {
+			return pf.DriverCheckpoint{}, err
+		}
 
 		t.checkpoint.Bindings = append(t.checkpoint.Bindings, &DriverCheckPointBinding{
 			FilePath: binding.FilePath(),

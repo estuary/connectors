@@ -11,7 +11,6 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
 	"google.golang.org/api/googleapi"
 )
 
@@ -64,20 +63,21 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 		}
 
 		if existingBinding, ok := existing[res.Table]; ok {
-			constraints = sqlDriver.ValidateMatchesExisting(existingBinding, &proposed.Collection)
+			constraints, err = ConstraintsForExistingBinding(existingBinding, &proposed.Collection, res.Delta)
+
+			if err != nil {
+				return nil, fmt.Errorf("validating binding and generating constraints: %w", err)
+			}
+
 		} else {
-			constraints = sqlDriver.ValidateNewSQLProjections(&proposed.Collection, res.Delta)
+			constraints = ConstraintsForNewBinding(&proposed.Collection, res.Delta)
 		}
 
-		if err != nil {
-			return nil, fmt.Errorf("validating binding and generating constraints: %w", err)
-		} else {
-			out.Bindings = append(out.Bindings, &pm.ValidateResponse_Binding{
-				Constraints:  constraints,
-				DeltaUpdates: res.Delta,
-				ResourcePath: []string{res.Table},
-			})
-		}
+		out.Bindings = append(out.Bindings, &pm.ValidateResponse_Binding{
+			Constraints:  constraints,
+			DeltaUpdates: res.Delta,
+			ResourcePath: []string{res.Table},
+		})
 	}
 
 	return out, err
@@ -98,6 +98,11 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, err
 	}
 
+	existingBindings, err := specStorage.LoadBindings(ctx, req.Materialization.String())
+	if err != nil {
+		return nil, err
+	}
+
 	bigqueryClient, err := cfg.BigQueryClient(ctx)
 	if err != nil {
 		return nil, err
@@ -105,20 +110,30 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 
 	for _, binding := range req.Materialization.Bindings {
 		var br bindingResource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &br); err != nil {
+		var err error
+		var table *Table
+
+		if err = pf.UnmarshalStrict(binding.ResourceSpecJson, &br); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		table := bigqueryClient.Dataset(cfg.Dataset).Table(br.Table)
-		schema, err := schemaForBinding(binding)
-		if err != nil {
+		if table, err = NewTable(binding, &br); err != nil {
 			return nil, fmt.Errorf("creating the schema for table (%s): %w", br.Table, err)
 		}
-		metadata := &bigquery.TableMetadata{
-			Schema: schema,
+
+		if err = table.Validate(existingBindings[br.Table]); err != nil {
+			return nil, err
 		}
 
-		err = table.Create(ctx, metadata)
+		// Everything below this line will run the Upsert, so we need to skip at this point
+		// if the request is in DryRun.
+		if req.DryRun {
+			continue
+		}
+
+		err = bigqueryClient.Dataset(cfg.Dataset).Table(table.Name()).Create(ctx, &bigquery.TableMetadata{
+			Schema: table.Schema,
+		})
 
 		// Check first if the error is because the table already exists.
 		// this is the same as CREATE TABLE IF NOT EXISTS, this is a recoverable error.
@@ -132,6 +147,10 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 	}
 
 	response := &pm.ApplyResponse{}
+
+	if req.DryRun {
+		return response, err
+	}
 
 	if err = specStorage.Write(ctx, req.Materialization, req.Version); err != nil {
 		return nil, err
@@ -153,6 +172,11 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 	specStorage, err := NewMaterializationStorage(ctx, cfg)
 	if err != nil {
 		return nil, err
+	}
+
+	// Everything below this condition cannot run in DryRun mode.
+	if req.DryRun {
+		return &pm.ApplyResponse{}, nil
 	}
 
 	specStorage.Delete(ctx, req.Materialization)

@@ -22,13 +22,11 @@ type Binding struct {
 	// a Binding needs to run.
 	Queries *sqlQueries
 
-	// Reference to the definition of this binding as it was generated from
-	// MaterializatioSpec. It is stored here so the individual values inside this
-	// spec doesn't need to be explicitely referenced in this Binding struct and can
-	// just be accessed when needed.
-	spec *pf.MaterializationSpec_Binding
+	// Table is an internal represation of the Schema for this binding. The schema
+	// contains references to the underlying BindingSpec as well as the BigQuery schema
+	// generated and validated against the Binding Spec and the Binding Resource spec.
+	table *Table
 
-	schema bigquery.Schema
 	bucket *storage.BucketHandle
 
 	// Region is a configuration flag set by the user to determine
@@ -76,15 +74,14 @@ var externalTableNameTemplate = "external_table_binding_%s"
 // this struct is called, all the information to generate the proper SQL queries is already available.
 // The Binding object also includes a mutable part that is encapsulated inside the `writer` struct.
 func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, bindingSpec *pf.MaterializationSpec_Binding) (*Binding, error) {
-	schema, err := schemaForBinding(bindingSpec)
-	if err != nil {
-		return nil, err
-	}
-
 	var br bindingResource
-
 	if err := pf.UnmarshalStrict(bindingSpec.ResourceSpecJson, &br); err != nil {
 		return nil, fmt.Errorf("parsing resource config: %w", err)
+	}
+
+	table, err := NewTable(bindingSpec, &br)
+	if err != nil {
+		return nil, err
 	}
 
 	externalTableAlias := fmt.Sprintf(externalTableNameTemplate, br.Table)
@@ -92,8 +89,7 @@ func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, 
 	return &Binding{
 		Queries:            generateSQLQueries(externalTableAlias, br, bindingSpec),
 		bucket:             bucket,
-		spec:               bindingSpec,
-		schema:             schema,
+		table:              table,
 		region:             cfg.Region,
 		dataset:            cfg.Dataset,
 		externalTableAlias: externalTableAlias,
@@ -110,15 +106,15 @@ func (b *Binding) FilePath() string {
 func (b *Binding) GenerateDocument(key, values tuple.Tuple, flowDocument json.RawMessage) map[string]interface{} {
 	document := make(map[string]interface{})
 	for i, value := range key {
-		document[b.spec.FieldSelection.Keys[i]] = value
+		document[b.table.spec.FieldSelection.Keys[i]] = value
 	}
 
 	for i, value := range values {
-		document[b.spec.FieldSelection.Values[i]] = value
+		document[b.table.spec.FieldSelection.Values[i]] = value
 	}
 
-	if b.spec.FieldSelection.Document != "" {
-		document[b.spec.FieldSelection.Document] = string(flowDocument)
+	if b.table.spec.FieldSelection.Document != "" {
+		document[b.table.spec.FieldSelection.Document] = string(flowDocument)
 	}
 
 	return document
@@ -164,7 +160,7 @@ func (b *Binding) InitializeNewWriter(ctx context.Context, name string) error {
 	obj := b.bucket.Object(name)
 	edc := bigquery.ExternalDataConfig{
 		SourceFormat: bigquery.JSON,
-		Schema:       b.schema,
+		Schema:       b.table.Schema,
 		SourceURIs:   []string{fmt.Sprintf("gs://%s/%s", obj.BucketName(), obj.ObjectName())},
 	}
 
@@ -180,7 +176,7 @@ func (b *Binding) Store(doc map[string]interface{}) error {
 }
 
 func (b *Binding) DeltaUpdates() bool {
-	return b.spec.DeltaUpdates
+	return b.table.DeltaUpdates()
 }
 
 func newWriter(ctx context.Context, edc bigquery.ExternalDataConfig, objHandle *storage.ObjectHandle) *writer {
