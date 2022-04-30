@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/alecthomas/jsonschema"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -130,7 +131,9 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 			continue
 		}
 
-		err = table.Create(ctx, bigqueryClient.Dataset(cfg.Dataset))
+		err = bigqueryClient.Dataset(cfg.Dataset).Table(table.Name()).Create(ctx, &bigquery.TableMetadata{
+			Schema: table.Schema,
+		})
 
 		// Check first if the error is because the table already exists.
 		// this is the same as CREATE TABLE IF NOT EXISTS, this is a recoverable error.

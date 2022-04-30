@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -96,14 +95,6 @@ func (t *Table) Validate(existing *pf.MaterializationSpec_Binding) error {
 		}
 		return sqlDriver.ValidateSelectedFields(constraints, t.spec)
 	}
-}
-
-// Creates the table with the current Schema to BigQuery. This sends the
-// request to BigQuery
-func (t *Table) Create(ctx context.Context, dataset *bigquery.Dataset) error {
-	return dataset.Table(t.Name()).Create(ctx, &bigquery.TableMetadata{
-		Schema: t.Schema,
-	})
 }
 
 // Whether this Table is configured to be only receive
