@@ -117,6 +117,14 @@ func (t *Table) Name() string {
 	return t.resource.Table
 }
 
+// fieldSchema inspect each projection and builds up a bigquery.FieldSchema that can then be
+// used within a bigquery.Schema. A field in bigquery is analogous to a column, in RDBMS parlance.
+// Although a slice of projection is passed in, fieldSchema only consumes 1 Projection within the slice
+// that matches the fieldName.
+// A projection will hold an inference types slice that is expected to contains only 1 or 2 values, depending
+// on whether the projection is nullable or not. If the field is nullable, the type slice will contain
+// one entry called "null". Otherwise, the slice needs to contain only 1 element, representing the type
+// for this projection
 func fieldSchema(projections []pf.Projection, fieldName string) (*bigquery.FieldSchema, error) {
 	var fieldType bigquery.FieldType
 	var projection *pf.Projection
@@ -135,10 +143,29 @@ func fieldSchema(projections []pf.Projection, fieldName string) (*bigquery.Field
 
 	for _, p := range projection.Inference.Types {
 		switch p {
+		// The string format can be further expanded so that it can be stored in a more specific format
+		// When a projection is a string and it has the Inference_String set, it's possible for the user
+		// to pass along more information about the string field to let the connector create a more
+		// appropriate field for that string. If an Inference_String{} is present, it doesn't default back
+		// to a normal string as it is prefered to let the user know that the inference could not be matched.
+		case "string":
+			if projection.Inference.String_ != nil {
+				s := projection.Inference.String_
+				switch s.Format {
+				case "date-time":
+					fieldType = bigquery.DateTimeFieldType
+				case "date":
+					fieldType = bigquery.DateFieldType
+				case "geography-wkt":
+					fieldType = bigquery.GeographyFieldType
+				default:
+					return nil, fmt.Errorf("inferring string column type as the format is not supported: %s", s.Format)
+				}
+			} else {
+				fieldType = bigquery.StringFieldType
+			}
 		case "boolean":
 			fieldType = bigquery.BooleanFieldType
-		case "string":
-			fieldType = bigquery.StringFieldType
 		case "integer":
 			fieldType = bigquery.IntegerFieldType
 		case "number":
@@ -149,7 +176,7 @@ func fieldSchema(projections []pf.Projection, fieldName string) (*bigquery.Field
 	}
 
 	if fieldType == "" {
-		return nil, fmt.Errorf("Could not map the field to a big query type: %s", fieldName)
+		return nil, fmt.Errorf("could not map the field to a big query type: %s", fieldName)
 	}
 
 	// This is a test to make sure that the only value in the infered type is either 1
@@ -161,7 +188,7 @@ func fieldSchema(projections []pf.Projection, fieldName string) (*bigquery.Field
 	}
 
 	if len(projection.Inference.Types) != expectedSize {
-		return nil, fmt.Errorf("Don't expect multiple types besides Null and a real type, can't proceed: %s", &projection.Inference.Types)
+		return nil, fmt.Errorf("don't expect multiple types besides Null and a real type, can't proceed: %s", &projection.Inference.Types)
 	}
 
 	return &bigquery.FieldSchema{
