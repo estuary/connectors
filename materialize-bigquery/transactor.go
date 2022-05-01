@@ -127,7 +127,9 @@ func (t *transactor) Prepare(ctx context.Context, _ pm.TransactionRequest_Prepar
 			return pf.DriverCheckpoint{}, err
 		}
 
-		binding.InitializeNewWriter(ctx, fmt.Sprintf("%s/%s", t.config.BucketPath, name))
+		if err = binding.InitializeNewWriter(ctx, fmt.Sprintf("%s/%s", t.config.BucketPath, name)); err != nil {
+			return pf.DriverCheckpoint{}, err
+		}
 
 		t.checkpoint.Bindings = append(t.checkpoint.Bindings, &DriverCheckPointBinding{
 			FilePath: binding.FilePath(),
