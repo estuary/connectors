@@ -147,8 +147,6 @@ func fieldSchema(projections []pf.Projection, fieldName string) (*bigquery.Field
 					fieldType = bigquery.DateTimeFieldType
 				case "date":
 					fieldType = bigquery.DateFieldType
-				case "geography-wkt":
-					fieldType = bigquery.GeographyFieldType
 				default:
 					return nil, fmt.Errorf("inferring string column type as the format is not supported: %s", s.Format)
 				}
