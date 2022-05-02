@@ -79,9 +79,7 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 }
 
 func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, priorAcknowledgedCh <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	select {
-	case <-priorAcknowledgedCh:
-	}
+	<-priorAcknowledgedCh
 
 	for it.Next() {
 		binding := t.bindings[it.Binding]
