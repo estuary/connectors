@@ -129,7 +129,13 @@ func fieldSchema(projections []pf.Projection, fieldName string) (*bigquery.Field
 	}
 
 	if projection == nil {
-		return nil, fmt.Errorf("Couldn't find a projection for field name: %s", fieldName)
+		return nil, fmt.Errorf("couldn't find a projection for field name: %s", fieldName)
+	}
+
+	// This is a test to make sure that their is only 1 infered type for this projection
+	// ie. Inference.Types = [string, integer] is wrong. [string, null] is OK. [string, integer, null] is wrong
+	if !projection.Inference.IsSingleType() {
+		return nil, fmt.Errorf("don't expect multiple types besides Null and a real type, can't proceed: %s", &projection.Inference.Types)
 	}
 
 	for _, p := range projection.Inference.Types {
@@ -166,18 +172,6 @@ func fieldSchema(projections []pf.Projection, fieldName string) (*bigquery.Field
 
 	if fieldType == "" {
 		return nil, fmt.Errorf("could not map the field to a big query type: %s", fieldName)
-	}
-
-	// This is a test to make sure that the only value in the infered type is either 1
-	// or 2 but it includes a nullable field. If it has more than the expected count, it returns an
-	// error back, ie. Inference.Types = [string, integer] is wrong. [string, null] is OK. [string, integer, null] is wrong
-	expectedSize := 1
-	if includesNull {
-		expectedSize += 1
-	}
-
-	if len(projection.Inference.Types) != expectedSize {
-		return nil, fmt.Errorf("don't expect multiple types besides Null and a real type, can't proceed: %s", &projection.Inference.Types)
 	}
 
 	return &bigquery.FieldSchema{

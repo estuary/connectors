@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
@@ -36,10 +35,6 @@ type Binding struct {
 	// Dataset is a configuration flag set by the user that defines the
 	// location of the dataset, in GCP.
 	dataset string
-
-	// ObjectPath is a configuration flag set by the user to allow them to namespace
-	// where this connector stores data in Google Cloud Storage
-	objectPath string
 
 	// ExternalTableAlias is a string generated so that it can be used to reference
 	// the external cloud storage data in a SQL Query. At the core of this, there is data
@@ -243,12 +238,13 @@ func generateSQLQueries(externalTableAlias string, br bindingResource, bindingSp
 
 	var loadPredicates []string
 	for i, value := range bindingSpec.FieldSelection.Keys {
-		loadPredicates = append(loadPredicates, fmt.Sprintf("%s = '%s'", bindingSpec.FieldSelection.Keys[i], value))
+		loadPredicates = append(loadPredicates, fmt.Sprintf("`%s` = `%s'", quoteString(bindingSpec.FieldSelection.Keys[i]), value))
 	}
 
 	for _, key := range bindingSpec.FieldSelection.AllFields() {
-		columns = append(columns, key)
-		rColumns = append(rColumns, fmt.Sprintf("r.%s", key))
+		quotedKey := quoteString(key)
+		columns = append(columns, quotedKey)
+		rColumns = append(rColumns, fmt.Sprintf(`r.%s`, quotedKey))
 	}
 
 	if bindingSpec.DeltaUpdates {
@@ -257,7 +253,7 @@ func generateSQLQueries(externalTableAlias string, br bindingResource, bindingSp
 		INSERT INTO %s (%s)
 		SELECT %s FROM %s
 		;`,
-			br.Table,
+			quoteString(br.Table),
 			strings.Join(columns, ", "),
 			strings.Join(rColumns, ", "),
 			br.Table,
@@ -269,19 +265,19 @@ func generateSQLQueries(externalTableAlias string, br bindingResource, bindingSp
 			FROM %s
 			WHERE %s
 			;`,
-			bindingSpec.FieldSelection.Document,
-			br.Table,
+			quoteString(bindingSpec.FieldSelection.Document),
+			quoteString(br.Table),
 			strings.Join(loadPredicates, " AND "),
 		)
 
 		var joinPredicates []string
 		for _, key := range bindingSpec.FieldSelection.Keys {
-			joinPredicates = append(joinPredicates, fmt.Sprintf("l.%s = r.%s", key, key))
+			joinPredicates = append(joinPredicates, fmt.Sprintf("l.%s = r.%s", quoteString(key), quoteString(key)))
 		}
 
 		var updates []string
 		for _, k := range append(bindingSpec.FieldSelection.Values, bindingSpec.FieldSelection.Document) {
-			updates = append(updates, fmt.Sprintf("l.%s = r.%s", k, k))
+			updates = append(updates, fmt.Sprintf("l.%s = r.%s", quoteString(k), quoteString(k)))
 		}
 
 		writeQuery = fmt.Sprintf(`
@@ -296,7 +292,7 @@ func generateSQLQueries(externalTableAlias string, br bindingResource, bindingSp
 				INSERT (%s)
 				VALUES (%s)
 			;`,
-			br.Table,
+			quoteString(br.Table),
 			externalTableAlias,
 			strings.Join(joinPredicates, " AND "),
 			bindingSpec.FieldSelection.Document,
@@ -311,9 +307,10 @@ func generateSQLQueries(externalTableAlias string, br bindingResource, bindingSp
 	}
 }
 
-// Bigquery only allows underscore, letters, numbers, and sometimes hyphens for identifiers. Convert everything else to underscore.
-var identifierSanitizerRegexp = regexp.MustCompile(`[^\-\._0-9a-zA-Z]`)
-
-func identifierSanitizer(text string) string {
-	return identifierSanitizerRegexp.ReplaceAllString(text, "_")
+// quoteString makes sure the that string is properly quoted for bigQuery.
+// bigQuery's mention that quoted string for table and columns are a lot more permissive, so
+// that's what this function is using to make sure it can accomodate more usecases.
+// Reference: https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_identifiers
+func quoteString(text string) string {
+	return strings.Join([]string{"`", strings.ReplaceAll(text, "`", ""), "`"}, "")
 }
