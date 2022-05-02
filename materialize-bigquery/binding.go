@@ -37,10 +37,6 @@ type Binding struct {
 	// location of the dataset, in GCP.
 	dataset string
 
-	// ObjectPath is a configuration flag set by the user to allow them to namespace
-	// where this connector stores data in Google Cloud Storage
-	objectPath string
-
 	// ExternalTableAlias is a string generated so that it can be used to reference
 	// the external cloud storage data in a SQL Query. At the core of this, there is data
 	// stored in Google Cloud Storage in a JSON format, and the connector needs to access that data to
