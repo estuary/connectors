@@ -11,7 +11,7 @@ type DriverCheckPointBinding struct {
 	FilePath string
 }
 
-var ErrDriverCheckPointBindingInvalid = errors.New("No driver checkpoint binding found at this index.")
+var ErrDriverCheckPointBindingInvalid = errors.New("no driver checkpoint binding found at this index")
 
 func NewBigQueryCheckPoint() *BigQueryCheckPoint {
 	return &BigQueryCheckPoint{
