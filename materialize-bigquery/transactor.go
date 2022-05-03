@@ -20,7 +20,6 @@ type transactor struct {
 	bigqueryClient  *bigquery.Client
 	storageClient   *storage.Client
 	materialization *pf.MaterializationSpec
-	schemas         []bigquery.Schema
 
 	// Mutable fields that evolves throughout a transactor lifecyle.
 	checkpoint *BigQueryCheckPoint
