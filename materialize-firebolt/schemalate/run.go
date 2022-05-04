@@ -8,6 +8,7 @@ import (
 	"fmt"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/gogo/protobuf/jsonpb"
 	proto "github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"os"
@@ -68,13 +69,23 @@ func ValidateNewProjection(
 		return nil, fmt.Errorf("error running command %w", err)
 	}
 
-	var constraints map[string]*pm.Constraint
+	var constraints map[string]json.RawMessage
 	err = json.Unmarshal(out, &constraints)
 	if err != nil {
 		return nil, fmt.Errorf("parsing constraints map %w with stdout %s", err, out)
 	}
 
-	return constraints, nil
+	var finalConstraints = map[string]*pm.Constraint{}
+	for key, val := range constraints {
+		var finalConstraint pm.Constraint
+		err = jsonpb.Unmarshal(bytes.NewReader(val), &finalConstraint)
+		if err != nil {
+			return nil, fmt.Errorf("parsing constraints map %w with stdout %s", err, out)
+		}
+		finalConstraints[key] = &finalConstraint
+	}
+
+	return finalConstraints, nil
 }
 
 func ValidateExistingProjection(
@@ -98,13 +109,23 @@ func ValidateExistingProjection(
 		return nil, fmt.Errorf("error running command %w", err)
 	}
 
-	var constraints map[string]*pm.Constraint
+	var constraints map[string]json.RawMessage
 	err = json.Unmarshal(out, &constraints)
 	if err != nil {
 		return nil, fmt.Errorf("parsing constraints map %w with stdout %s", err, out)
 	}
 
-	return constraints, nil
+	var finalConstraints = map[string]*pm.Constraint{}
+	for key, val := range constraints {
+		var finalConstraint pm.Constraint
+		err = jsonpb.Unmarshal(bytes.NewReader(val), &finalConstraint)
+		if err != nil {
+			return nil, fmt.Errorf("parsing constraints map %w with stdout %s", err, out)
+		}
+		finalConstraints[key] = &finalConstraint
+	}
+
+	return finalConstraints, nil
 }
 
 func ValidateBindingAgainstConstraints(
