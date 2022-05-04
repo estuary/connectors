@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/storage"
@@ -60,12 +61,22 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 
 		t.bindings[i] = binding
 
+		var writerFilePath string
+
 		// Error here doesn't mean it's fatal, it just means the checkpoint didn't have
 		// a checkpoint binding, which is a normal scenario if the last time the driver
 		// stored a checkpoint, the binding didn't exist.
 		if driverBinding, err := t.checkpoint.Binding(i); err == nil {
-			binding.InitializeNewWriter(ctx, driverBinding.FilePath)
+			writerFilePath = driverBinding.FilePath
+		} else {
+			randomFilePath, err := randomString()
+			if err != nil {
+				return err
+			}
+			writerFilePath = randomFilePath
 		}
+
+		binding.InitializeNewWriter(ctx, writerFilePath)
 	}
 
 	if err := stream.Send(&pm.TransactionResponse{
@@ -82,8 +93,20 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, priorAcknowled
 
 	for it.Next() {
 		binding := t.bindings[it.Binding]
+		predicates := []string{}
 
-		job, err := binding.Job(it.Context(), t.bigqueryClient, binding.Queries.LoadSQL)
+		for idx, key := range it.Key {
+			field := binding.Table.Fields[idx]
+			value, err := field.Render(key)
+			if err != nil {
+				return fmt.Errorf("generating SQL value: %w", err)
+			}
+
+			// We're casting everything, because bigquery supports casting all
+			// the currently supported values and it simplifies the quoting and sanitizing of all values
+			predicates = append(predicates, fmt.Sprintf("%s = CAST('%s' as %s)", field.Key(), value, field.fieldType))
+		}
+		job, err := binding.Job(it.Context(), t.bigqueryClient, fmt.Sprintf("%s WHERE %s;", binding.Queries.LoadSQL, strings.Join(predicates, " AND ")))
 
 		if err != nil {
 			return fmt.Errorf("running BigQuery job: %w", err)
@@ -128,7 +151,7 @@ func (t *transactor) Prepare(ctx context.Context, _ pm.TransactionRequest_Prepar
 			return pf.DriverCheckpoint{}, err
 		}
 
-		t.checkpoint.Bindings = append(t.checkpoint.Bindings, &DriverCheckPointBinding{
+		t.checkpoint.Bindings = append(t.checkpoint.Bindings, DriverCheckPointBinding{
 			FilePath: binding.FilePath(),
 			Query:    binding.Queries.WriteSQL,
 		})

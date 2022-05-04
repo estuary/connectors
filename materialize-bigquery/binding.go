@@ -24,7 +24,7 @@ type Binding struct {
 	// Table is an internal represation of the Schema for this binding. The schema
 	// contains references to the underlying BindingSpec as well as the BigQuery schema
 	// generated and validated against the Binding Spec and the Binding Resource spec.
-	table *Table
+	Table *Table
 
 	bucket *storage.BucketHandle
 
@@ -81,14 +81,17 @@ func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, 
 
 	externalTableAlias := fmt.Sprintf(externalTableNameTemplate, br.Table)
 
-	return &Binding{
-		Queries:            generateSQLQueries(externalTableAlias, br, bindingSpec),
+	b := &Binding{
 		bucket:             bucket,
-		table:              table,
+		Table:              table,
 		region:             cfg.Region,
 		dataset:            cfg.Dataset,
 		externalTableAlias: externalTableAlias,
-	}, nil
+	}
+
+	b.Queries = b.generateSQLQueries(externalTableAlias, br, bindingSpec)
+
+	return b, nil
 }
 
 // FilePath for the CloudStorage object that the underlying `writer` is connected to.
@@ -100,16 +103,20 @@ func (b *Binding) FilePath() string {
 
 func (b *Binding) GenerateDocument(key, values tuple.Tuple, flowDocument json.RawMessage) map[string]interface{} {
 	document := make(map[string]interface{})
-	for i, value := range key {
-		document[b.table.spec.FieldSelection.Keys[i]] = value
+	fields := b.Table.spec.FieldSelection.AllFields()
+	allValues := append(key, values...)
+
+	for i, value := range allValues {
+		renderedValue, err := b.Table.Fields[i].Render(value)
+		if err != nil {
+			panic(err)
+		}
+
+		document[fields[i]] = renderedValue
 	}
 
-	for i, value := range values {
-		document[b.table.spec.FieldSelection.Values[i]] = value
-	}
-
-	if b.table.spec.FieldSelection.Document != "" {
-		document[b.table.spec.FieldSelection.Document] = string(flowDocument)
+	if b.Table.spec.FieldSelection.Document != "" {
+		document[b.Table.spec.FieldSelection.Document] = string(flowDocument)
 	}
 
 	return document
@@ -147,7 +154,11 @@ func (b *Binding) InitializeNewWriter(ctx context.Context, name string) error {
 
 	if b.writer != nil {
 		err = b.writer.Destroy(ctx)
-		if err != nil {
+		// It's possible that the previous writer never persisted
+		// and as a result, the destroy operation won't have anything
+		// to cleanup. If the object doesn't exist, it can safely move
+		// to the next step
+		if err != nil && err != storage.ErrObjectNotExist {
 			return err
 		}
 	}
@@ -155,13 +166,13 @@ func (b *Binding) InitializeNewWriter(ctx context.Context, name string) error {
 	obj := b.bucket.Object(name)
 	edc := bigquery.ExternalDataConfig{
 		SourceFormat: bigquery.JSON,
-		Schema:       b.table.Schema,
+		Schema:       b.Table.Schema,
 		SourceURIs:   []string{fmt.Sprintf("gs://%s/%s", obj.BucketName(), obj.ObjectName())},
 	}
 
 	b.writer = newWriter(ctx, edc, obj)
 
-	return err
+	return nil
 }
 
 func (b *Binding) Store(doc map[string]interface{}) error {
@@ -171,7 +182,7 @@ func (b *Binding) Store(doc map[string]interface{}) error {
 }
 
 func (b *Binding) DeltaUpdates() bool {
-	return b.table.DeltaUpdates()
+	return b.Table.DeltaUpdates()
 }
 
 func newWriter(ctx context.Context, edc bigquery.ExternalDataConfig, objHandle *storage.ObjectHandle) *writer {
@@ -231,15 +242,10 @@ func randomString() (string, error) {
 // Generates the sqlQueries that reflects the specification for the provided materialization
 // binding.
 //
-func generateSQLQueries(externalTableAlias string, br bindingResource, bindingSpec *pf.MaterializationSpec_Binding) *sqlQueries {
+func (b *Binding) generateSQLQueries(externalTableAlias string, br bindingResource, bindingSpec *pf.MaterializationSpec_Binding) *sqlQueries {
 	var loadQuery, writeQuery string
 	var columns []string
 	var rColumns []string
-
-	var loadPredicates []string
-	for i, value := range bindingSpec.FieldSelection.Keys {
-		loadPredicates = append(loadPredicates, fmt.Sprintf("`%s` = `%s'", quoteString(bindingSpec.FieldSelection.Keys[i]), value))
-	}
 
 	for _, key := range bindingSpec.FieldSelection.AllFields() {
 		quotedKey := quoteString(key)
@@ -256,18 +262,16 @@ func generateSQLQueries(externalTableAlias string, br bindingResource, bindingSp
 			quoteString(br.Table),
 			strings.Join(columns, ", "),
 			strings.Join(rColumns, ", "),
-			br.Table,
+			quoteString(br.Table),
 		)
 
 	} else {
 		loadQuery = fmt.Sprintf(`
 			SELECT %s
 			FROM %s
-			WHERE %s
-			;`,
+			`,
 			quoteString(bindingSpec.FieldSelection.Document),
 			quoteString(br.Table),
-			strings.Join(loadPredicates, " AND "),
 		)
 
 		var joinPredicates []string

@@ -98,7 +98,7 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		return nil, err
 	}
 
-	existingBindings, err := specStorage.LoadBindings(ctx, req.Materialization.String())
+	existingBindings, err := specStorage.LoadBindings(ctx, req.Materialization.Materialization.String())
 	if err != nil {
 		return nil, err
 	}

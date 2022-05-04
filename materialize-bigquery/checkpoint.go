@@ -3,7 +3,7 @@ package main
 import "errors"
 
 type BigQueryCheckPoint struct {
-	Bindings []*DriverCheckPointBinding
+	Bindings []DriverCheckPointBinding
 }
 
 type DriverCheckPointBinding struct {
@@ -15,14 +15,14 @@ var ErrDriverCheckPointBindingInvalid = errors.New("no driver checkpoint binding
 
 func NewBigQueryCheckPoint() *BigQueryCheckPoint {
 	return &BigQueryCheckPoint{
-		Bindings: make([]*DriverCheckPointBinding, 0),
+		Bindings: make([]DriverCheckPointBinding, 0),
 	}
 }
 
-func (cp *BigQueryCheckPoint) Binding(i int) (*DriverCheckPointBinding, error) {
+func (cp *BigQueryCheckPoint) Binding(i int) (DriverCheckPointBinding, error) {
 	if len(cp.Bindings) < i {
 		return cp.Bindings[i], nil
 	}
 
-	return nil, ErrDriverCheckPointBindingInvalid
+	return DriverCheckPointBinding{}, ErrDriverCheckPointBindingInvalid
 }
