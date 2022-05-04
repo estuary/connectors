@@ -42,6 +42,9 @@ func ConstraintsForExistingBinding(
 
 // Table represent the Table inside BigQuery.
 type Table struct {
+	// Fields holds the transformation required for a Field to go from a Flow Document (JSON)
+	// to a SQL field. The slice matches
+	Fields []*Field
 	// Reference to the definition of this binding as it was generated from
 	// MaterializatioSpec. It is stored here so the individual values inside this
 	// spec doesn't need to be explicitely referenced in this Binding struct and can
@@ -65,21 +68,41 @@ func NewTable(binding *pf.MaterializationSpec_Binding, resource *bindingResource
 		resource: resource,
 		spec:     binding,
 		Schema:   make(bigquery.Schema, len(fields)),
+		Fields:   make([]*Field, len(fields)),
 	}
 
 	for idx, fieldName := range fields {
 		var (
-			err   error
-			field *bigquery.FieldSchema
+			err        error
+			field      *Field
+			projection *pf.Projection
 		)
-		field, err = fieldSchema(binding.Collection.Projections, fieldName)
+
+		for _, p := range binding.Collection.Projections {
+			if p.Field == fieldName {
+				projection = &p
+				break
+			}
+		}
+
+		if projection == nil {
+			return nil, fmt.Errorf("couldn't find a projection for field name: %s", fieldName)
+		}
+
+		field, err = NewField(projection)
 
 		// This is a fatal error. Panicking.
 		if err != nil {
 			panic(err)
 		}
 
-		table.Schema[idx] = field
+		schema, err := field.FieldSchema(projection)
+		if err != nil {
+			panic(err)
+		}
+
+		table.Fields[idx] = field
+		table.Schema[idx] = schema
 	}
 
 	return table, nil
@@ -108,31 +131,28 @@ func (t *Table) Name() string {
 	return t.resource.Table
 }
 
-// fieldSchema inspect each projection and builds up a bigquery.FieldSchema that can then be
-// used within a bigquery.Schema. A field in bigquery is analogous to a column, in RDBMS parlance.
-// Although a slice of projection is passed in, fieldSchema only consumes 1 Projection within the slice
-// that matches the fieldName.
-// A projection will hold an inference types slice that is expected to contains only 1 or 2 values, depending
-// on whether the projection is nullable or not. If the field is nullable, the type slice will contain
-// one entry called "null". Otherwise, the slice needs to contain only 1 element, representing the type
-// for this projection
-func fieldSchema(projections []pf.Projection, fieldName string) (*bigquery.FieldSchema, error) {
-	var fieldType bigquery.FieldType
-	var projection *pf.Projection
-	var includesNull bool
+type Field struct {
+	name      string
+	fieldType bigquery.FieldType
 
-	for _, p := range projections {
-		if p.Field == fieldName {
-			projection = &p
-			break
-		}
+	// Sanitizers are executed in the order
+	// they are added in the slice.
+	sanitizers []sanitizerFunc
+}
+
+type sanitizerFunc func(string) string
+
+// NewField returns a field constructed from a projection provided by a BindingSpec
+// The Field returned includes logic that allows a field to map a Key and its associated value
+// into SQL safely. The field gets sanitized and quoted according to the type of field
+// bigquery will see.
+func NewField(projection *pf.Projection) (*Field, error) {
+	f := &Field{
+		name:       projection.Field,
+		sanitizers: []sanitizerFunc{},
 	}
 
-	if projection == nil {
-		return nil, fmt.Errorf("couldn't find a projection for field name: %s", fieldName)
-	}
-
-	// This is a test to make sure that their is only 1 infered type for this projection
+	// This is a test to make sure that there is only 1 infered type for this projection
 	// ie. Inference.Types = [string, integer] is wrong. [string, null] is OK. [string, integer, null] is wrong
 	if !projection.Inference.IsSingleType() {
 		return nil, fmt.Errorf("don't expect multiple types besides Null and a real type, can't proceed: %s", &projection.Inference.Types)
@@ -150,33 +170,83 @@ func fieldSchema(projections []pf.Projection, fieldName string) (*bigquery.Field
 				s := projection.Inference.String_
 				switch s.Format {
 				case "date-time":
-					fieldType = bigquery.DateTimeFieldType
+					f.fieldType = bigquery.TimestampFieldType
 				case "date":
-					fieldType = bigquery.DateFieldType
+					f.fieldType = bigquery.DateFieldType
+				// There is a case where a String_ is present but the values aren't set.
+				// I'm not sure how this can happen since the protobuf struct should
+				// be optional and nil, but it did happen in my testing and I couldn't
+				// figured out why, so this is here as a precaution (P-O)
+				case "":
+					f.fieldType = bigquery.StringFieldType
+					f.sanitizers = append(f.sanitizers, sqlDriver.DefaultQuoteSanitizer)
+
 				default:
 					return nil, fmt.Errorf("inferring string column type as the format is not supported: %s", s.Format)
 				}
 			} else {
-				fieldType = bigquery.StringFieldType
+				f.fieldType = bigquery.StringFieldType
+				f.sanitizers = append(f.sanitizers, sqlDriver.DefaultQuoteSanitizer)
 			}
 		case "boolean":
-			fieldType = bigquery.BooleanFieldType
+			f.fieldType = bigquery.BooleanFieldType
 		case "integer":
-			fieldType = bigquery.IntegerFieldType
+			f.fieldType = bigquery.IntegerFieldType
 		case "number":
-			fieldType = bigquery.BigNumericFieldType
-		case "null":
+			f.fieldType = bigquery.BigNumericFieldType
+		case "object":
+			f.fieldType = bigquery.StringFieldType
+			f.sanitizers = append(f.sanitizers, sqlDriver.DefaultQuoteSanitizer, sqlDriver.SingleQuotesWrapper())
+		}
+	}
+
+	if f.fieldType == "" {
+		return nil, fmt.Errorf("could not map the field to a big query type: %s", projection.Field)
+	}
+
+	return f, nil
+}
+
+func (f *Field) FieldType() bigquery.FieldType {
+	return bigquery.FieldType(f.fieldType)
+}
+
+func (f *Field) Name() string {
+	return f.name
+}
+
+func (f *Field) Key() string {
+	return sqlDriver.BackticksWrapper()(f.name)
+}
+
+func (f *Field) Render(val interface{}) (str string, err error) {
+	str = fmt.Sprint(val)
+
+	for _, sanitizer := range f.sanitizers {
+		str = sanitizer(str)
+	}
+
+	return str, err
+}
+
+func (f *Field) FieldSchema(projection *pf.Projection) (*bigquery.FieldSchema, error) {
+	var includesNull bool
+
+	// This is a test to make sure that their is only 1 infered type for this projection
+	// ie. Inference.Types = [string, integer] is wrong. [string, null] is OK. [string, integer, null] is wrong
+	if !projection.Inference.IsSingleType() {
+		return nil, fmt.Errorf("don't expect multiple types besides Null and a real type, can't proceed: %s", &projection.Inference.Types)
+	}
+
+	for _, p := range projection.Inference.Types {
+		if p == "null" {
 			includesNull = true
 		}
 	}
 
-	if fieldType == "" {
-		return nil, fmt.Errorf("could not map the field to a big query type: %s", fieldName)
-	}
-
 	return &bigquery.FieldSchema{
 		Name:        projection.Field,
-		Type:        fieldType,
+		Type:        f.FieldType(),
 		Required:    projection.Inference.Exists == pf.Inference_MUST && !includesNull, // If Required is False, it means it's nullable
 		Description: projection.Inference.Description,
 	}, nil
