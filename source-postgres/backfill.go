@@ -11,7 +11,7 @@ import (
 )
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-func (db *postgresDatabase) ScanTableChunk(ctx context.Context, schema, table string, keyColumns []string, resumeKey []interface{}) ([]sqlcapture.ChangeEvent, error) {
+func (db *postgresDatabase) ScanTableChunk(ctx context.Context, schema, table string, info *sqlcapture.TableInfo, keyColumns []string, resumeKey []interface{}) ([]sqlcapture.ChangeEvent, error) {
 	logrus.WithFields(logrus.Fields{
 		"schema":     schema,
 		"table":      table,
@@ -40,6 +40,9 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, schema, table st
 		var fields = make(map[string]interface{})
 		for idx := range cols {
 			fields[string(cols[idx].Name)] = vals[idx]
+		}
+		if err := translateRecordFields(info, fields); err != nil {
+			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
 		events = append(events, sqlcapture.ChangeEvent{

@@ -103,12 +103,33 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 	return jsonType, nil
 }
 
+func translateRecordFields(table *sqlcapture.TableInfo, f map[string]interface{}) error {
+	if f == nil {
+		return nil
+	}
+	for id, val := range f {
+		var columnInfo *sqlcapture.ColumnInfo
+		if table != nil {
+			if info, ok := table.Columns[id]; ok {
+				columnInfo = &info
+			}
+		}
+
+		var translated, err = translateRecordField(columnInfo, val)
+		if err != nil {
+			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
+		}
+		f[id] = translated
+	}
+	return nil
+}
+
 // translateRecordField "translates" a value from the PostgreSQL driver into
 // an appropriate JSON-encodeable output format. As a concrete example, the
 // PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
-func (db *postgresDatabase) TranslateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
+func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
 	switch x := val.(type) {
 	case *net.IPNet:
 		return x.String(), nil
@@ -138,7 +159,7 @@ func (db *postgresDatabase) TranslateRecordField(column *sqlcapture.ColumnInfo, 
 		// TODO(wgd): If PostgreSQL value translation starts using the provided column
 		// information, this will need to be plumbed through the array translation
 		// logic so that the same behavior can apply to individual array elements.
-		return db.translateArray(nil, x)
+		return translateArray(nil, x)
 	}
 	if _, ok := val.(json.Marshaler); ok {
 		return val, nil
@@ -150,7 +171,7 @@ func (db *postgresDatabase) TranslateRecordField(column *sqlcapture.ColumnInfo, 
 	return val, nil
 }
 
-func (db *postgresDatabase) translateArray(column *sqlcapture.ColumnInfo, x interface{}) (interface{}, error) {
+func translateArray(column *sqlcapture.ColumnInfo, x interface{}) (interface{}, error) {
 	// Use reflection to extract the 'elements' field
 	var array = reflect.ValueOf(x)
 	if array.Kind() != reflect.Struct {
@@ -164,7 +185,7 @@ func (db *postgresDatabase) translateArray(column *sqlcapture.ColumnInfo, x inte
 	var vals = make([]interface{}, elements.Len())
 	for idx := 0; idx < len(vals); idx++ {
 		var element = elements.Index(idx)
-		var translated, err = db.TranslateRecordField(column, element.Interface())
+		var translated, err = translateRecordField(column, element.Interface())
 		if err != nil {
 			return nil, fmt.Errorf("error translating array element %d: %w", idx, err)
 		}

@@ -89,20 +89,17 @@ type Database interface {
 	Close(ctx context.Context) error
 	// StartReplication opens a connection to the database and returns a ReplicationStream
 	// from which a neverending sequence of change events can be read.
-	StartReplication(ctx context.Context, startCursor string) (ReplicationStream, error)
+	StartReplication(ctx context.Context, startCursor string, tableInfo map[string]TableInfo) (ReplicationStream, error)
 	// WriteWatermark writes the provided string into the 'watermarks' table.
 	WriteWatermark(ctx context.Context, watermark string) error
 	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
 	WatermarksTable() string
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-	ScanTableChunk(ctx context.Context, schema, table string, keyColumns []string, resumeKey []interface{}) ([]ChangeEvent, error)
+	ScanTableChunk(ctx context.Context, schema, table string, info *TableInfo, keyColumns []string, resumeKey []interface{}) ([]ChangeEvent, error)
 	// DiscoverTables queries the database for information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[string]TableInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
 	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Type, error)
-	// TranslateRecordField converts values as necessary to make the JSON serialization of a
-	// particular column value satisfy the corresponding JSON schema.
-	TranslateRecordField(column *ColumnInfo, val interface{}) (interface{}, error)
 	// TODO(wgd): Document specific methods
 	DefaultSchema(ctx context.Context) (string, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).

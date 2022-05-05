@@ -20,7 +20,7 @@ import (
 // likely to exercise blocking sends and backpressure.
 var replicationBufferSize = 1024
 
-func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
+func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor string, tableInfo map[string]sqlcapture.TableInfo) (sqlcapture.ReplicationStream, error) {
 	var host, port, err = splitHostPort(db.config.Address)
 	if err != nil {
 		return nil, fmt.Errorf("invalid mysql address: %w", err)
@@ -65,10 +65,11 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 
 	var streamCtx, streamCancel = context.WithCancel(ctx)
 	var stream = &mysqlReplicationStream{
-		syncer:   syncer,
-		streamer: streamer,
-		events:   make(chan sqlcapture.ChangeEvent, replicationBufferSize),
-		cancel:   streamCancel,
+		syncer:    syncer,
+		streamer:  streamer,
+		tableInfo: tableInfo,
+		events:    make(chan sqlcapture.ChangeEvent, replicationBufferSize),
+		cancel:    streamCancel,
 	}
 	go func() {
 		defer close(stream.events)
@@ -108,6 +109,7 @@ func splitHostPort(addr string) (string, int64, error) {
 type mysqlReplicationStream struct {
 	syncer        *replication.BinlogSyncer
 	streamer      *replication.BinlogStreamer
+	tableInfo     map[string]sqlcapture.TableInfo
 	events        chan sqlcapture.ChangeEvent
 	cancel        context.CancelFunc
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
@@ -126,6 +128,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			if schema == "mysql" {
 				continue
 			}
+			var streamID = sqlcapture.JoinStreamID(schema, table)
 
 			var sourceMeta = &mysqlSourceInfo{
 				SourceCommon: sqlcapture.SourceCommon{
@@ -140,10 +143,18 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				return fmt.Errorf("binlog doesn't include column names (are you running with '--binlog-row-metadata=FULL'?)")
 			}
 
+			var info *sqlcapture.TableInfo
+			if cachedInfo, ok := rs.tableInfo[streamID]; ok {
+				info = &cachedInfo
+			}
+
 			switch event.Header.EventType {
 			case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
 					var after = decodeRow(columnNames, row)
+					if err := translateRecordFields(info, after); err != nil {
+						return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
+					}
 					rs.events <- sqlcapture.ChangeEvent{
 						Operation: sqlcapture.InsertOp,
 						Source:    sourceMeta,
@@ -156,6 +167,12 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if rowIdx%2 == 1 {
 						var before = decodeRow(columnNames, data.Rows[rowIdx-1])
 						var after = decodeRow(columnNames, data.Rows[rowIdx])
+						if err := translateRecordFields(info, before); err != nil {
+							return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
+						}
+						if err := translateRecordFields(info, after); err != nil {
+							return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
+						}
 						rs.events <- sqlcapture.ChangeEvent{
 							Operation: sqlcapture.UpdateOp,
 							Source:    sourceMeta,
@@ -167,6 +184,9 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
 					var before = decodeRow(columnNames, row)
+					if err := translateRecordFields(info, before); err != nil {
+						return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
+					}
 					rs.events <- sqlcapture.ChangeEvent{
 						Operation: sqlcapture.DeleteOp,
 						Source:    sourceMeta,

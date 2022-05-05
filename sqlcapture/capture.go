@@ -94,17 +94,12 @@ const (
 
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) error {
-	var replStream, err = c.Database.StartReplication(ctx, c.State.Cursor)
-	if err != nil {
-		return fmt.Errorf("error starting replication: %w", err)
-	}
-	defer replStream.Close(ctx)
-
 	// Perform discovery and cache the result. This is used at startup when
 	// updating the state to reflect catalog changes, and then later it is
 	// plumbed through so that value translation can take column types into
 	// account.
 	logrus.Info("discovering tables")
+	var err error
 	c.discovery, err = c.Database.DiscoverTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
@@ -113,6 +108,12 @@ func (c *Capture) Run(ctx context.Context) error {
 	if err := c.updateState(ctx); err != nil {
 		return fmt.Errorf("error updating capture state: %w", err)
 	}
+
+	replStream, err := c.Database.StartReplication(ctx, c.State.Cursor, c.discovery)
+	if err != nil {
+		return fmt.Errorf("error starting replication: %w", err)
+	}
+	defer replStream.Close(ctx)
 
 	// Backfill any tables which require it
 	var results *resultSet
@@ -409,7 +410,11 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 			}
 		}
 
-		events, err := c.Database.ScanTableChunk(ctx, schema, table, streamState.KeyColumns, resumeKey)
+		var tableInfo *TableInfo
+		if discoveryInfo, ok := c.discovery[streamID]; ok {
+			tableInfo = &discoveryInfo
+		}
+		events, err := c.Database.ScanTableChunk(ctx, schema, table, tableInfo, streamState.KeyColumns, resumeKey)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning table: %w", err)
 		}
@@ -437,21 +442,10 @@ func (c *Capture) handleChangeEvent(streamID string, event ChangeEvent) error {
 
 	switch event.Operation {
 	case InsertOp:
-		if err := c.translateRecordFields(c.Database, streamID, event.After); err != nil {
-			return fmt.Errorf("'after' of insert: %w", err)
-		}
 		out = event.After // Before is never used.
 	case UpdateOp:
-		if err := c.translateRecordFields(c.Database, streamID, event.Before); err != nil {
-			return fmt.Errorf("'before' of update: %w", err)
-		} else if err := c.translateRecordFields(c.Database, streamID, event.After); err != nil {
-			return fmt.Errorf("'after' of update: %w", err)
-		}
 		meta.Before, out = event.Before, event.After
 	case DeleteOp:
-		if err := c.translateRecordFields(c.Database, streamID, event.Before); err != nil {
-			return fmt.Errorf("'before' of delete: %w", err)
-		}
 		out = event.Before // After is never used.
 	}
 	out["_meta"] = &meta
@@ -470,31 +464,6 @@ func (c *Capture) handleChangeEvent(streamID string, event ChangeEvent) error {
 			Data:      json.RawMessage(rawData),
 		},
 	})
-}
-
-func (c *Capture) translateRecordFields(db Database, streamID string, f map[string]interface{}) error {
-	if f == nil {
-		return nil
-	}
-
-	for id, val := range f {
-		// Get information about this column, if the table and column name are known.
-		// Otherwise columnInfo will be nil, but it's up to TranslateRecordField to
-		// decide whether that is an error.
-		var columnInfo *ColumnInfo
-		if tableInfo, ok := c.discovery[streamID]; ok {
-			if info, ok := tableInfo.Columns[id]; ok {
-				columnInfo = &info
-			}
-		}
-
-		var translated, err = db.TranslateRecordField(columnInfo, val)
-		if err != nil {
-			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
-		}
-		f[id] = translated
-	}
-	return nil
 }
 
 func (c *Capture) emitState() error {
