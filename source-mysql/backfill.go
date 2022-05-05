@@ -26,7 +26,7 @@ func (db *mysqlDatabase) WatermarksTable() string {
 	return db.config.Advanced.WatermarksTable
 }
 
-func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, schema, table string, keyColumns []string, resumeKey []interface{}) ([]sqlcapture.ChangeEvent, error) {
+func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, schema, table string, info *sqlcapture.TableInfo, keyColumns []string, resumeKey []interface{}) ([]sqlcapture.ChangeEvent, error) {
 	logrus.WithFields(logrus.Fields{
 		"schema":     schema,
 		"table":      table,
@@ -64,6 +64,10 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, schema, table strin
 				fields[name] = nil
 			}
 		}
+		if err := translateRecordFields(info, fields); err != nil {
+			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
+		}
+
 		logrus.WithField("fields", fields).Trace("got row")
 		events = append(events, sqlcapture.ChangeEvent{
 			Operation: sqlcapture.InsertOp,

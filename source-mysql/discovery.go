@@ -81,7 +81,34 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 	return colSchema.toType(), nil
 }
 
-func (db *mysqlDatabase) TranslateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
+func translateRecordFields(table *sqlcapture.TableInfo, f map[string]interface{}) error {
+	if table == nil {
+		return fmt.Errorf("table information unavailable")
+	}
+	if f == nil {
+		return nil
+	}
+	for id, val := range f {
+		var columnInfo *sqlcapture.ColumnInfo
+		if table != nil {
+			if info, ok := table.Columns[id]; ok {
+				columnInfo = &info
+			}
+		}
+
+		var translated, err = translateRecordField(columnInfo, val)
+		if err != nil {
+			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
+		}
+		f[id] = translated
+	}
+	return nil
+}
+
+func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
+	if column == nil {
+		return nil, fmt.Errorf("column information unavailable")
+	}
 	switch val := val.(type) {
 	case string:
 		switch column.DataType {
