@@ -17,7 +17,7 @@ import (
 
 // StartReplication opens a connection to the database and returns a ReplicationStream
 // from which a neverending sequence of change events can be read.
-func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
+func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor string, tableInfo map[string]sqlcapture.TableInfo) (sqlcapture.ReplicationStream, error) {
 	// Replication database connection used for event streaming
 	connConfig, err := pgconn.ParseConfig(db.config.ToURI())
 	if err != nil {
@@ -350,6 +350,12 @@ func (s *replicationStream) decodeChangeEvent(
 	af, err := s.decodeTuple(after, 'N', rel, bf)
 	if err != nil {
 		return nil, fmt.Errorf("'after' tuple: %w", err)
+	}
+	if err := translateRecordFields(nil, bf); err != nil {
+		return nil, fmt.Errorf("error translating 'before' tuple: %w", err)
+	}
+	if err := translateRecordFields(nil, af); err != nil {
+		return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
 	}
 
 	var event = &sqlcapture.ChangeEvent{
