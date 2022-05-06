@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/storage"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -61,22 +62,14 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 
 		t.bindings[i] = binding
 
-		var writerFilePath string
-
 		// Error here doesn't mean it's fatal, it just means the checkpoint didn't have
 		// a checkpoint binding, which is a normal scenario if the last time the driver
 		// stored a checkpoint, the binding didn't exist.
 		if driverBinding, err := t.checkpoint.Binding(i); err == nil {
-			writerFilePath = driverBinding.FilePath
-		} else {
-			randomFilePath, err := randomString()
-			if err != nil {
-				return err
+			if driverBinding.FilePath != "" {
+				binding.SetWriter(ctx, NewWriter(ctx, binding, driverBinding.FilePath))
 			}
-			writerFilePath = randomFilePath
 		}
-
-		binding.InitializeNewWriter(ctx, writerFilePath)
 	}
 
 	if err := stream.Send(&pm.TransactionResponse{
@@ -89,71 +82,125 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 }
 
 func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, priorAcknowledgedCh <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	<-priorAcknowledgedCh
+	writers := map[string]*Writer{}
+	externalData := map[string]bigquery.ExternalData{}
+	group, ctx := errgroup.WithContext(it.Context())
 
 	for it.Next() {
 		binding := t.bindings[it.Binding]
-		predicates := []string{}
+		writer, ok := writers[binding.Table.Name()]
+
+		if !ok {
+			path := fmt.Sprintf("%s/%s", t.config.BucketPath, randomString())
+			writer = NewWriter(it.Context(), binding, path)
+			// Need to relax the schema because it's a lookup on a different type of payload that
+			// will only have a subset of the fields present.
+			writer.ExternalDataConfig.Schema = writer.ExternalDataConfig.Schema.Relax()
+
+			writers[binding.Name()] = writer
+			externalData[binding.externalTableAlias] = writer.ExternalDataConfig
+		}
 
 		for idx, key := range it.Key {
+			doc := make(map[string]interface{})
+
 			field := binding.Table.Fields[idx]
 			value, err := field.Render(key)
 			if err != nil {
 				return fmt.Errorf("generating SQL value: %w", err)
 			}
 
-			// We're casting everything, because bigquery supports casting all
-			// the currently supported values and it simplifies the quoting and sanitizing of all values
-			predicates = append(predicates, fmt.Sprintf("%s = CAST('%s' as %s)", field.Key(), value, field.fieldType))
+			doc[field.Name()] = value
+			writer.Store(doc)
 		}
-		job, err := binding.Job(it.Context(), t.bigqueryClient, fmt.Sprintf("%s WHERE %s;", binding.Queries.LoadSQL, strings.Join(predicates, " AND ")))
-
-		if err != nil {
-			return fmt.Errorf("running BigQuery job: %w", err)
-		}
-
-		bqit, err := job.Read(it.Context())
-		if err != nil {
-			return fmt.Errorf("load job read: %w", err)
-		}
-
-		// Load documents.
-		for {
-			// Fetch and decode from database.
-			var fd flowDocument
-
-			if err = bqit.Next(&fd); err == iterator.Done {
-				break
-			} else if err != nil {
-				return fmt.Errorf("load row read: %w", err)
-			}
-
-			// Load the document by sending it back into Flow.
-			if err = loaded(it.Binding, fd.Body); err != nil {
-				return fmt.Errorf("load row loaded: %w", err)
-			}
-		}
-
 	}
+
+	// This blocks until the previous pipeline is acknowledged
+	<-priorAcknowledgedCh
+
+	for i, b := range t.bindings {
+		// We're copying the value in local scope because they will be used
+		// in a Go routine and the variables i & b are
+		// defined outside the loop, which would mean the values of i and b
+		// would be undefined when those routines starts working
+		var idx = i
+		var binding = b
+
+		writer, ok := writers[binding.Name()]
+
+		// Only processing bindings that have a writer associated to them
+		if !ok {
+			continue
+		}
+
+		// Sending {bindings} number of queries to BigQuery. Since each binding
+		// is isolated to a file and a table, the number of bytes to read is theoratically the same
+		// if the SQL queries were merged into one. By running those queries separately, the connector
+		// can start sending flow documents back to flow before all bindings are returned.
+		group.Go(func() error {
+			err := writer.Commit(ctx)
+			if err != nil {
+				return fmt.Errorf("commit writer for binding: %s. %w", binding.Name(), err)
+			}
+
+			defer func() {
+				writer.Destroy(ctx)
+			}()
+
+			query := t.bigqueryClient.Query(binding.LoadSQL)
+			query.DefaultDatasetID = t.config.Dataset
+			query.Location = t.config.Region
+			query.TableDefinitions = externalData
+
+			job, err := query.Run(ctx)
+			if err != nil {
+				return fmt.Errorf("running BigQuery job: %w", err)
+			}
+
+			bqit, err := job.Read(it.Context())
+			if err != nil {
+				return fmt.Errorf("load job read: %w", err)
+			}
+
+			for {
+				var fd flowDocument
+
+				if err = bqit.Next(&fd); err == iterator.Done {
+					break
+				} else if err != nil {
+					return fmt.Errorf("load row read: %w", err)
+				}
+
+				// Load the document by sending it back into Flow.
+				if err = loaded(idx, fd.Body); err != nil {
+					return fmt.Errorf("load row loaded: %w", err)
+				}
+			}
+
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return fmt.Errorf("one of the load call in the group failed: %w", err)
+	}
+
 	return nil
 }
 
 func (t *transactor) Prepare(ctx context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	t.checkpoint = NewBigQueryCheckPoint()
 
-	for _, binding := range t.bindings {
-		name, err := randomString()
-		if err != nil {
-			return pf.DriverCheckpoint{}, err
-		}
-
-		if err = binding.InitializeNewWriter(ctx, fmt.Sprintf("%s/%s", t.config.BucketPath, name)); err != nil {
-			return pf.DriverCheckpoint{}, err
-		}
+	for i, binding := range t.bindings {
+		binding.SetWriter(
+			ctx,
+			NewWriter(ctx, binding, fmt.Sprintf("%s/%s", t.config.BucketPath, randomString())),
+		)
 
 		t.checkpoint.Bindings = append(t.checkpoint.Bindings, DriverCheckPointBinding{
-			FilePath: binding.FilePath(),
-			Query:    binding.Queries.WriteSQL,
+			FilePath:     binding.FilePath(),
+			Query:        binding.CreateSQL,
+			BindingIndex: i,
 		})
 	}
 
@@ -172,7 +219,6 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 		binding := t.bindings[it.Binding]
 		binding.Store(binding.GenerateDocument(it.Key, it.Values, it.RawJSON))
 	}
-
 	return nil
 }
 
@@ -188,10 +234,14 @@ func (t *transactor) Commit(ctx context.Context) error {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) error {
-	for i, cpBinding := range t.checkpoint.Bindings {
-		binding := t.bindings[i]
+	for _, cpBinding := range t.checkpoint.Bindings {
+		binding := t.bindings[cpBinding.BindingIndex]
 
-		job, err := binding.Job(ctx, t.bigqueryClient, cpBinding.Query)
+		query := t.bigqueryClient.Query(cpBinding.Query)
+		query.DefaultDatasetID = t.config.Dataset
+		query.Location = t.config.Region
+		query.TableDefinitions = map[string]bigquery.ExternalData{binding.externalTableAlias: binding.Writer.ExternalDataConfig}
+		job, err := query.Run(ctx)
 
 		if err != nil {
 			return err
@@ -205,6 +255,10 @@ func (t *transactor) Acknowledge(ctx context.Context) error {
 		if status.Err() != nil {
 			return fmt.Errorf("Store: job completed with error: %v", status.Err())
 		}
+
+		if err = binding.DestroyWriter(ctx); err != nil {
+			return fmt.Errorf("Writer: failed to destroy: %w", err)
+		}
 	}
 
 	return nil
@@ -214,3 +268,5 @@ func (t *transactor) Destroy() {
 	t.bigqueryClient.Close()
 	t.storageClient.Close()
 }
+
+var backtickWrapper = sqlDriver.BackticksWrapper()

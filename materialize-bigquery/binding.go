@@ -1,40 +1,33 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
-	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/storage"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/google/uuid"
 )
 
 type Binding struct {
-	// Queries is a collection of the queries that this binding
-	// is configured to run over its lifetime. The queries do not change between
-	// pipelines and as a result, gets compiled and stored here for use everytime
-	// a Binding needs to run.
-	Queries *sqlQueries
+	// CreateSQL is a template SQL query that is generated
+	// based on the values for this binding. The value can be compiled when the
+	// Binding is initialized as there's no dynamic value in the
+	// query as it's moving data that is stored in cloud storage.
+	LoadSQL string
 
-	// Table is an internal represation of the Schema for this binding. The schema
-	// contains references to the underlying BindingSpec as well as the BigQuery schema
-	// generated and validated against the Binding Spec and the Binding Resource spec.
-	Table *Table
+	// CreateSQL is a template SQL query that is generated
+	// based on the values for this binding. The value can be compiled when the
+	// Binding is initialized as there's no dynamic value in the
+	// query as it's moving data that is stored in cloud storage.
+	CreateSQL string
 
+	// The google cloud storage bucket that is configured
+	// to work with this binding. It is expected to be
+	// configured and working when being assigned here.
 	bucket *storage.BucketHandle
-
-	// Region is a configuration flag set by the user to determine
-	// in which Region, in GCP, should the queries run.
-	region string
-
-	// Dataset is a configuration flag set by the user that defines the
-	// location of the dataset, in GCP.
-	dataset string
 
 	// ExternalTableAlias is a string generated so that it can be used to reference
 	// the external cloud storage data in a SQL Query. At the core of this, there is data
@@ -46,20 +39,12 @@ type Binding struct {
 
 	// Stateful and mutable part of the Binding struct. This writer gets
 	// replaced everytime the pipeline needs to write new data
-	*writer
-}
+	*Writer
 
-type writer struct {
-	edc     bigquery.ExternalDataConfig
-	object  *storage.ObjectHandle
-	writer  *storage.Writer
-	buffer  *bufio.Writer
-	encoder *json.Encoder
-}
-
-type sqlQueries struct {
-	LoadSQL  string
-	WriteSQL string
+	// Table is an internal represation of the Schema for this binding. The schema
+	// contains references to the underlying BindingSpec as well as the BigQuery schema
+	// generated and validated against the Binding Spec and the Binding Resource spec.
+	*Table
 }
 
 var externalTableNameTemplate = "external_table_binding_%s"
@@ -84,76 +69,78 @@ func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, 
 	b := &Binding{
 		bucket:             bucket,
 		Table:              table,
-		region:             cfg.Region,
-		dataset:            cfg.Dataset,
 		externalTableAlias: externalTableAlias,
 	}
 
-	b.Queries = b.generateSQLQueries(externalTableAlias, br, bindingSpec)
+	if !b.DeltaUpdates() {
+		b.LoadSQL = generateLoadSQLQuery(b)
+	}
+
+	b.CreateSQL = generateCreateSQLQuery(b)
 
 	return b, nil
 }
 
 // FilePath for the CloudStorage object that the underlying `writer` is connected to.
 func (b *Binding) FilePath() string {
-	obj := b.writer.object
-
+	obj := b.Writer.object
 	return fmt.Sprintf("%s/%s", obj.BucketName(), obj.ObjectName())
 }
 
 func (b *Binding) GenerateDocument(key, values tuple.Tuple, flowDocument json.RawMessage) map[string]interface{} {
 	document := make(map[string]interface{})
-	fields := b.Table.spec.FieldSelection.AllFields()
 	allValues := append(key, values...)
 
 	for i, value := range allValues {
-		renderedValue, err := b.Table.Fields[i].Render(value)
+		field := b.Table.Fields[i]
+		// If a value is nil, we need to
+		if value == nil {
+			continue
+		}
+
+		renderedValue, err := field.Render(value)
 		if err != nil {
 			panic(err)
 		}
 
-		document[fields[i]] = renderedValue
+		document[field.Name()] = renderedValue
 	}
 
-	if b.Table.spec.FieldSelection.Document != "" {
-		document[b.Table.spec.FieldSelection.Document] = string(flowDocument)
+	if b.Table.RootDocument != nil {
+		document[b.Table.RootDocument.Name()] = string(flowDocument)
 	}
 
 	return document
 }
 
-// Job is a small wrapper around `bigquery.Job` and doesn't provide much in terms of logic
-// but ultimately removes some of the boilerplate code for the user's convenience.
-// Since all the data to generate a job lives inside a Binding, it is possible for a Binding
-// to build the job on its own and return a running Job.
-//
-// The returned Job is going to be configured so it's possible to run a query that joins over
-// the bigquery dataset & the cloud storage external table. The name of the table is already computed
-// in the initialization of a Binding and is stored in `externalTableAlias`
-func (b *Binding) Job(ctx context.Context, client *bigquery.Client, q string) (*bigquery.Job, error) {
-	query := client.Query(q)
-	query.TableDefinitions = map[string]bigquery.ExternalData{b.externalTableAlias: &b.writer.edc}
-	query.DefaultDatasetID = b.dataset
-	query.Location = b.region
-
-	return query.Run(ctx)
-}
-
-// Once Commit returns, the binding cannot be written to until Reset() is called.
-func (b *Binding) Commit(ctx context.Context) error {
-	return b.writer.commit(ctx)
-}
-
-// InitializeNewWriter is called when a new Writer need to be instantiated.
-// This is done so every pipeline operation in the bigquery materialization
-// can work with it's own writer to avoid data integrity issues.
-// Call Reset when the lifecycle of a bigquery materialization is completed and
-// the data is committed and acknowledged.
-func (b *Binding) InitializeNewWriter(ctx context.Context, name string) error {
+// SetWriter will replace whatever writer was attached to this binding
+// If an existing writer is already attached, that writer gets destroyed
+// by calling DestroyWriter() to make sure no data persists on Cloud Storage
+func (b *Binding) SetWriter(ctx context.Context, w *Writer) error {
 	var err error
 
-	if b.writer != nil {
-		err = b.writer.Destroy(ctx)
+	if b.Writer != nil {
+		if err = b.DestroyWriter(ctx); err != nil {
+			return err
+		}
+	}
+
+	b.Writer = w
+
+	return nil
+}
+
+// DestroyWriter clears the writer and delete the underlying
+// asset in Cloud Storage.
+// When this method returns, no writer is associated to this binding
+// and it's required to assign a new one using the SetWriter() method.
+func (b *Binding) DestroyWriter(ctx context.Context) error {
+	defer func() {
+		b.Writer = nil
+	}()
+
+	if b.Writer != nil {
+		err := b.Writer.Destroy(ctx)
 		// It's possible that the previous writer never persisted
 		// and as a result, the destroy operation won't have anything
 		// to cleanup. If the object doesn't exist, it can safely move
@@ -163,128 +150,141 @@ func (b *Binding) InitializeNewWriter(ctx context.Context, name string) error {
 		}
 	}
 
-	obj := b.bucket.Object(name)
-	edc := bigquery.ExternalDataConfig{
-		SourceFormat: bigquery.JSON,
-		Schema:       b.Table.Schema,
-		SourceURIs:   []string{fmt.Sprintf("gs://%s/%s", obj.BucketName(), obj.ObjectName())},
-	}
-
-	b.writer = newWriter(ctx, edc, obj)
-
 	return nil
 }
 
-func (b *Binding) Store(doc map[string]interface{}) error {
-	err := b.writer.encoder.Encode(doc)
-
-	return err
-}
-
-func (b *Binding) DeltaUpdates() bool {
-	return b.Table.DeltaUpdates()
-}
-
-func newWriter(ctx context.Context, edc bigquery.ExternalDataConfig, objHandle *storage.ObjectHandle) *writer {
-	w := objHandle.NewWriter(ctx)
-	b := bufio.NewWriter(w)
-
-	e := json.NewEncoder(b)
-	e.SetEscapeHTML(false)
-	e.SetIndent("", "")
-
-	writer := &writer{
-		edc:     edc,
-		object:  objHandle,
-		writer:  w,
-		buffer:  b,
-		encoder: e,
-	}
-	return writer
-}
-
-// After commit has returend, the writer cannot be written to
-// as the underlying objects are closed.
-// This method will make the writer as committed, even if an
-// error occurred while comitting the data. This is so it tells the binding
-// that it's not safe to write data to this writer anymore.
-func (w *writer) commit(ctx context.Context) error {
-
-	var err error
-	if err = w.buffer.Flush(); err != nil {
-		return fmt.Errorf("flushing the buffer: %w", err)
-	}
-
-	if err = w.writer.Close(); err != nil {
-		return fmt.Errorf("closing the writer to cloud storage: %w", err)
-	}
-
-	return nil
-}
-
-// Delete the object associated to this Writer. Once deleted, the file
-// cannot be recovered. This is a destructive operation that should only
-// happen once the underlying data is written to bigquery. Otherwise, it could result
-// in data loss.
-func (w *writer) Destroy(ctx context.Context) error {
-	return w.object.Delete(ctx)
-}
-
-func randomString() (string, error) {
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return "", fmt.Errorf("generating UUID: %w", err)
-	}
-
-	return id.String(), nil
-}
-
-// Generates the sqlQueries that reflects the specification for the provided materialization
-// binding.
+// Generate the query for the provided binding to load
+// rows from BigQuery. Essentially, this function returns
+// a SQL Query that will look like this:
 //
-func (b *Binding) generateSQLQueries(externalTableAlias string, br bindingResource, bindingSpec *pf.MaterializationSpec_Binding) *sqlQueries {
-	var loadQuery, writeQuery string
+// "
+// 		SELECT bq.`flow_document`
+// 		FROM `materialized_table` AS bq
+//  	JOIN `external_table_binding_materialized_table` AS external
+//  	ON CAST(bq.`bike_id` AS INTEGER) = CAST(external.`bike_id` AS INTEGER)
+//  	AND CAST(bq.`station_id` AS INTEGER) = CAST(external.`station_id` AS INTEGER);
+// "
+//
+// All joined fields are casted mostly because the query joins
+// between two different table format and I've seen some odd thing with timestamps
+// and felt like if an error between type mismatch can happen, I rather
+// have the error raised as a casting issue from BigQuery as that might help
+// debugging in the future (P-O)
+//
+func generateLoadSQLQuery(binding *Binding) string {
+	queryBuilder := strings.Builder{}
+	queryBuilder.WriteString(fmt.Sprintf(`
+				SELECT bq.%s
+				FROM %s AS bq
+				JOIN %s AS external
+				ON 
+			`, backtickWrapper(binding.Table.RootDocument.Name()), backtickWrapper(binding.Name()), backtickWrapper(binding.externalTableAlias)))
+
+	for i, field := range binding.Table.Keys {
+		if i > 0 {
+			queryBuilder.WriteString(" AND ")
+		}
+
+		// We're casting everything, because bigquery supports casting all
+		// the currently supported values and it simplifies the quoting and sanitizing of all values
+		queryBuilder.WriteString(fmt.Sprintf(
+			"CAST(bq.%s AS %s) = CAST(external.%s AS %s)",
+			backtickWrapper(field.Name()),
+			field.fieldType,
+			backtickWrapper(field.Name()),
+			field.fieldType,
+		))
+	}
+
+	queryBuilder.WriteString(";")
+
+	return queryBuilder.String()
+}
+
+// Generate the query for the provided binding to create
+// rows to BigQuery. The SQL statements aren't dynamic because the data
+// is structured in a way that we're effectively merging data from an external
+// table (Cloud storage) into BigQuery. ExternalDataConfig allows the query
+// to use the same table name over and over but point to a different file
+// in Cloud Storage. This allows the create statement to be immutable and reused
+// on every occasion and still point at a dynamic table.
+//
+// Depending on the binding being configured
+// to run in DeltaUpdate or not, the SQL returned here will be
+// different. When a binding operates in non-delta mode, the SQL will look
+// something like this:
+//
+// "
+//  /* Non-Delta Mode SQL */
+//		MERGE INTO `materialized_table` AS l
+//		USING `external_table_binding_materialized_table` as r
+//  	ON l.`bike_id` = r.`bike_id`
+//		WHEN MATCHED AND r.`bike_id` IS NULL THEN
+//			DELETE
+//		WHEN MATCHED THEN
+//			UPDATE SET (
+//				l.`bike_id` = r.`bike_id`,
+//				l.`station_id` = r.`station_id`,
+//				l.`other_field` = r.`other_field`,
+//				l.`flow_document` = r.`flow_document`
+//			)
+//		WHEN NOT MATCHED THEN
+//			INSERT (`bike_id`, `station_id`, `other_field`, `flow_document`)
+//			VALUES (r.`bike_id`, r.`station_id`, r.`other_field`, r.`flow_document`)
+//		;`,
+// "
+//
+// In case of a Delta update, the SQL generated is much simpler:
+// "
+//  /* Delta Mode SQL */
+//		INSERT INTO `materialized_table` (`bike_id`, `station_id`, `other_field`, `flow_document`)
+//		SELECT `bike_id`, `station_id`, `other_field`, `flow_document`
+//		FROM `external_table_binding_materialized_table`;
+// "
+
+func generateCreateSQLQuery(binding *Binding) string {
 	var columns []string
 	var rColumns []string
 
-	for _, key := range bindingSpec.FieldSelection.AllFields() {
-		quotedKey := quoteString(key)
-		columns = append(columns, quotedKey)
-		rColumns = append(rColumns, fmt.Sprintf(`r.%s`, quotedKey))
+	for _, field := range binding.Fields {
+		columns = append(columns, backtickWrapper(field.Name()))
+		rColumns = append(rColumns, fmt.Sprintf("r.%s", backtickWrapper(field.Name())))
 	}
 
-	if bindingSpec.DeltaUpdates {
-		loadQuery = "ASSERT false AS 'Load queries should never be executed in Delta Updates mode.';"
-		writeQuery = fmt.Sprintf(`
-		INSERT INTO %s (%s)
-		SELECT %s FROM %s
-		;`,
-			quoteString(br.Table),
+	// Early return if the binding spec is a delta
+	// update
+	if binding.spec.DeltaUpdates {
+		return fmt.Sprintf(`
+			INSERT INTO %s (%s)
+			SELECT %s FROM %s
+			;`,
+			backtickWrapper(binding.Table.Name()),
 			strings.Join(columns, ", "),
 			strings.Join(rColumns, ", "),
-			quoteString(br.Table),
+			backtickWrapper(binding.externalTableAlias),
 		)
+	}
 
-	} else {
-		loadQuery = fmt.Sprintf(`
-			SELECT %s
-			FROM %s
-			`,
-			quoteString(bindingSpec.FieldSelection.Document),
-			quoteString(br.Table),
+	var joinPredicates []string
+	var updates []string
+
+	for _, field := range binding.Keys {
+		joinPredicates = append(joinPredicates, fmt.Sprintf(
+			"l.%s = r.%s",
+			backtickWrapper(field.Name()),
+			backtickWrapper(field.Name())),
 		)
+	}
 
-		var joinPredicates []string
-		for _, key := range bindingSpec.FieldSelection.Keys {
-			joinPredicates = append(joinPredicates, fmt.Sprintf("l.%s = r.%s", quoteString(key), quoteString(key)))
-		}
+	for _, field := range binding.Values {
+		updates = append(updates, fmt.Sprintf(
+			"l.%s = r.%s",
+			backtickWrapper(field.Name()),
+			backtickWrapper(field.Name())),
+		)
+	}
 
-		var updates []string
-		for _, k := range append(bindingSpec.FieldSelection.Values, bindingSpec.FieldSelection.Document) {
-			updates = append(updates, fmt.Sprintf("l.%s = r.%s", quoteString(k), quoteString(k)))
-		}
-
-		writeQuery = fmt.Sprintf(`
+	return fmt.Sprintf(`
 			MERGE INTO %s AS l
 			USING %s as r
 			ON %s
@@ -296,25 +296,12 @@ func (b *Binding) generateSQLQueries(externalTableAlias string, br bindingResour
 				INSERT (%s)
 				VALUES (%s)
 			;`,
-			quoteString(br.Table),
-			externalTableAlias,
-			strings.Join(joinPredicates, " AND "),
-			bindingSpec.FieldSelection.Document,
-			strings.Join(updates, ", "),
-			strings.Join(columns, ", "),
-			strings.Join(rColumns, ", "),
-		)
-	}
-	return &sqlQueries{
-		LoadSQL:  loadQuery,
-		WriteSQL: writeQuery,
-	}
-}
-
-// quoteString makes sure the that string is properly quoted for bigQuery.
-// bigQuery's mention that quoted string for table and columns are a lot more permissive, so
-// that's what this function is using to make sure it can accomodate more usecases.
-// Reference: https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_identifiers
-func quoteString(text string) string {
-	return strings.Join([]string{"`", strings.ReplaceAll(text, "`", ""), "`"}, "")
+		backtickWrapper(binding.Table.Name()),
+		backtickWrapper(binding.externalTableAlias),
+		strings.Join(joinPredicates, " AND "),
+		backtickWrapper(binding.RootDocument.Name()),
+		strings.Join(updates, ", "),
+		strings.Join(columns, ", "),
+		strings.Join(rColumns, ", "),
+	)
 }

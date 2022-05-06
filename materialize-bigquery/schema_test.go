@@ -1,14 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
+	"cloud.google.com/go/bigquery"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 type projectionTestExample struct {
 	projection  *pf.Projection
-	testFn      func(f *Field) error
+	testFn      func(*Field, *pf.Projection) error
 	shouldError bool
 }
 
@@ -32,11 +34,28 @@ func TestNewField(t *testing.T) {
 		},
 		{
 			projection: &pf.Projection{
+				Field: "column_a",
 				Inference: pf.Inference{
 					Types: []string{"string", "null"},
 				},
 			},
 			shouldError: false,
+			testFn: func(f *Field, pf *pf.Projection) error {
+				if f.fieldType != bigquery.StringFieldType {
+					return fmt.Errorf("expected string field, got %s", f.fieldType)
+				}
+
+				schema, err := f.FieldSchema(pf)
+				if err != nil {
+					return err
+				}
+
+				if schema.Required == true {
+					return fmt.Errorf("expected schema field to be nullable")
+				}
+
+				return nil
+			},
 		},
 	}
 
@@ -52,7 +71,7 @@ func TestNewField(t *testing.T) {
 			continue
 		}
 
-		if err = te.testFn(field); err != nil {
+		if err = te.testFn(field, te.projection); err != nil {
 			t.Error(err)
 		}
 	}

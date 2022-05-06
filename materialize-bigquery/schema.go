@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
@@ -45,15 +46,31 @@ type Table struct {
 	// Fields holds the transformation required for a Field to go from a Flow Document (JSON)
 	// to a SQL field. The slice matches
 	Fields []*Field
+
+	// Keys is a subset of Fields that only includes the
+	// Keys as defined by the MaterializationSpec_Binding
+	Keys []*Field
+
+	// Values is a subset of Fields that only includes the Values as defined
+	// by the MaterializationSpec_Binding. Note that if there's a root document,
+	// it will be included in Values
+	Values []*Field
+
+	// RootDocument is the flow document's field that is used
+	// to store the Flow document in bigquery in the form of a
+	// marshalled JSON Object
+	RootDocument *Field
+
+	// Name of the table
+	name string
+
+	deltaUpdates bool
+
 	// Reference to the definition of this binding as it was generated from
 	// MaterializatioSpec. It is stored here so the individual values inside this
 	// spec doesn't need to be explicitely referenced in this Binding struct and can
 	// just be accessed when needed.
 	spec *pf.MaterializationSpec_Binding
-
-	// The binding resource associated with this table. The Table name and the mode for
-	// this table is stored here
-	resource *bindingResource
 
 	// The compiled BigQuery schema that is associated with this Table. This schema can
 	// be used to either create a table, or to use it as a definition for cloud storage
@@ -64,11 +81,15 @@ type Table struct {
 
 func NewTable(binding *pf.MaterializationSpec_Binding, resource *bindingResource) (*Table, error) {
 	fields := binding.FieldSelection.AllFields()
+
 	table := &Table{
-		resource: resource,
-		spec:     binding,
-		Schema:   make(bigquery.Schema, len(fields)),
-		Fields:   make([]*Field, len(fields)),
+		deltaUpdates: resource.Delta,
+		name:         identifierSanitizer(resource.Table),
+		Schema:       make(bigquery.Schema, len(fields)),
+		Fields:       make([]*Field, len(fields)),
+		Keys:         make([]*Field, len(binding.FieldSelection.Keys)),
+		Values:       make([]*Field, len(binding.FieldSelection.Values)+1), // The extra entry is for the RootDocument inclusion
+		spec:         binding,
 	}
 
 	for idx, fieldName := range fields {
@@ -103,6 +124,16 @@ func NewTable(binding *pf.MaterializationSpec_Binding, resource *bindingResource
 
 		table.Fields[idx] = field
 		table.Schema[idx] = schema
+
+		if idx < cap(table.Keys) {
+			table.Keys[idx] = field
+		} else {
+			table.Values[idx-cap(table.Keys)] = field
+		}
+
+		if fieldName == binding.FieldSelection.Document {
+			table.RootDocument = field
+		}
 	}
 
 	return table, nil
@@ -110,9 +141,9 @@ func NewTable(binding *pf.MaterializationSpec_Binding, resource *bindingResource
 
 func (t *Table) Validate(existing *pf.MaterializationSpec_Binding) error {
 	if existing == nil {
-		return sqlDriver.ValidateSelectedFields(ConstraintsForNewBinding(&t.spec.Collection, t.resource.Delta), t.spec)
+		return sqlDriver.ValidateSelectedFields(ConstraintsForNewBinding(&t.spec.Collection, t.DeltaUpdates()), t.spec)
 	} else {
-		constraints, err := ConstraintsForExistingBinding(existing, &t.spec.Collection, t.resource.Delta)
+		constraints, err := ConstraintsForExistingBinding(existing, &t.spec.Collection, t.DeltaUpdates())
 		if err != nil {
 			return err
 		}
@@ -123,14 +154,17 @@ func (t *Table) Validate(existing *pf.MaterializationSpec_Binding) error {
 // Whether this Table is configured to be only receive
 // delta updates
 func (t *Table) DeltaUpdates() bool {
-	return t.resource.Delta
+	return t.deltaUpdates
 }
 
 // The name of the Table as created in BigQuery
 func (t *Table) Name() string {
-	return t.resource.Table
+	return t.name
 }
 
+// Field represents a field in BigQuery. The underlying Projection
+// needs to be analyzed and sanitized so that it can be safely used inside
+// BigQuery.
 type Field struct {
 	name      string
 	fieldType bigquery.FieldType
@@ -148,7 +182,7 @@ type sanitizerFunc func(string) string
 // bigquery will see.
 func NewField(projection *pf.Projection) (*Field, error) {
 	f := &Field{
-		name:       projection.Field,
+		name:       identifierSanitizer(projection.Field),
 		sanitizers: []sanitizerFunc{},
 	}
 
@@ -215,10 +249,6 @@ func (f *Field) Name() string {
 	return f.name
 }
 
-func (f *Field) Key() string {
-	return sqlDriver.BackticksWrapper()(f.name)
-}
-
 func (f *Field) Render(val interface{}) (str string, err error) {
 	str = fmt.Sprint(val)
 
@@ -245,9 +275,15 @@ func (f *Field) FieldSchema(projection *pf.Projection) (*bigquery.FieldSchema, e
 	}
 
 	return &bigquery.FieldSchema{
-		Name:        projection.Field,
+		Name:        f.name,
 		Type:        f.FieldType(),
 		Required:    projection.Inference.Exists == pf.Inference_MUST && !includesNull, // If Required is False, it means it's nullable
 		Description: projection.Inference.Description,
 	}, nil
+}
+
+var identifierSanitizerRegexp = regexp.MustCompile(`[^\-\._0-9a-zA-Z]`)
+
+func identifierSanitizer(text string) string {
+	return identifierSanitizerRegexp.ReplaceAllString(text, "_")
 }

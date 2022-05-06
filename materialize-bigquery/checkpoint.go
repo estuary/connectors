@@ -7,8 +7,9 @@ type BigQueryCheckPoint struct {
 }
 
 type DriverCheckPointBinding struct {
-	Query    string
-	FilePath string
+	Query        string
+	FilePath     string
+	BindingIndex int
 }
 
 var ErrDriverCheckPointBindingInvalid = errors.New("no driver checkpoint binding found at this index")
@@ -19,10 +20,18 @@ func NewBigQueryCheckPoint() *BigQueryCheckPoint {
 	}
 }
 
-func (cp *BigQueryCheckPoint) Binding(i int) (DriverCheckPointBinding, error) {
-	if len(cp.Bindings) < i {
-		return cp.Bindings[i], nil
+func (cp *BigQueryCheckPoint) Binding(bindingIndex int) (*DriverCheckPointBinding, error) {
+	var chpb *DriverCheckPointBinding
+	for _, bd := range cp.Bindings {
+		if bd.BindingIndex == bindingIndex {
+			chpb = &bd
+			break
+		}
 	}
 
-	return DriverCheckPointBinding{}, ErrDriverCheckPointBindingInvalid
+	if chpb == nil {
+		return nil, ErrDriverCheckPointBindingInvalid
+	}
+
+	return chpb, nil
 }

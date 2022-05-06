@@ -25,7 +25,7 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/...
 ################################################################################
 FROM debian:bullseye-slim
 
-LABEL FLOW_RUNTIME_PROTOCOL="Materialize"
+LABEL FLOW_RUNTIME_PROTOCOL="materialize"
 
 RUN apt-get update -y \
  && apt-get install --no-install-recommends -y ca-certificates \
