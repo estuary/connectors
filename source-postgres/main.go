@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/alecthomas/jsonschema"
+	schemagen "github.com/estuary/connectors/go-schema-gen"
 	np "github.com/estuary/connectors/network-tunnel-service"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/airbyte"
@@ -19,8 +19,7 @@ import (
 )
 
 func main() {
-	var schema = jsonschema.Reflect(&Config{})
-	schema.Title = "PostgreSQL Source Spec"
+	var schema = schemagen.GenerateSchema("PostgreSQL Source Spec", &Config{})
 	var configSchema, err = schema.MarshalJSON()
 	if err != nil {
 		panic(err)

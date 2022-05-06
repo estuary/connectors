@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alecthomas/jsonschema"
+	schemagen "github.com/estuary/connectors/go-schema-gen"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -24,7 +24,7 @@ const minimumExpiryTime = 7 * 24 * time.Hour
 
 func main() {
 	fixMysqlLogging()
-	var schema = jsonschema.Reflect(&Config{})
+	var schema = schemagen.GenerateSchema("MySQL Source Spec", &Config{})
 	schema.Title = "MySQL Source Spec"
 	var configSchema, err = schema.MarshalJSON()
 	if err != nil {

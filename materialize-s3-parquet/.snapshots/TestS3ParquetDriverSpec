@@ -1,74 +1,66 @@
 {
   "endpoint_spec_schema_json": {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "$ref": "#/definitions/config",
-    "definitions": {
-      "config": {
-        "required": [
-          "awsAccessKeyId",
-          "awsSecretAccessKey",
-          "bucket",
-          "uploadIntervalInSeconds"
-        ],
-        "properties": {
-          "awsAccessKeyId": {
-            "type": "string"
-          },
-          "awsSecretAccessKey": {
-            "type": "string"
-          },
-          "bucket": {
-            "type": "string"
-          },
-          "endpoint": {
-            "type": "string"
-          },
-          "region": {
-            "type": "string"
-          },
-          "uploadIntervalInSeconds": {
-            "type": "integer"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "oneOf": [
-          {
-            "required": [
-              "endpoint"
-            ],
-            "title": "endpoint"
-          },
-          {
-            "required": [
-              "region"
-            ],
-            "title": "region"
-          }
-        ]
+    "required": [
+      "awsAccessKeyId",
+      "awsSecretAccessKey",
+      "bucket",
+      "uploadIntervalInSeconds"
+    ],
+    "properties": {
+      "awsAccessKeyId": {
+        "type": "string"
+      },
+      "awsSecretAccessKey": {
+        "type": "string"
+      },
+      "bucket": {
+        "type": "string"
+      },
+      "endpoint": {
+        "type": "string"
+      },
+      "region": {
+        "type": "string"
+      },
+      "uploadIntervalInSeconds": {
+        "type": "integer"
       }
-    }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "oneOf": [
+      {
+        "required": [
+          "endpoint"
+        ],
+        "title": "endpoint"
+      },
+      {
+        "required": [
+          "region"
+        ],
+        "title": "region"
+      }
+    ],
+    "title": "S3 Connection"
   },
   "resource_spec_schema_json": {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "$ref": "#/definitions/resource",
-    "definitions": {
-      "resource": {
-        "required": [
-          "pathPrefix"
-        ],
-        "properties": {
-          "pathPrefix": {
-            "type": "string"
-          },
-          "compressionType": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object"
+    "required": [
+      "pathPrefix"
+    ],
+    "properties": {
+      "pathPrefix": {
+        "type": "string"
+      },
+      "compressionType": {
+        "type": "string"
       }
-    }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "S3 Prefix"
   },
   "documentation_url": "https://docs.estuary.dev#FIXME"
 }

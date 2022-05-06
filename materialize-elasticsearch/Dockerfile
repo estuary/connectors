@@ -11,6 +11,7 @@ RUN go mod download
 
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate
+COPY go-schema-gen           ./go-schema-gen
 COPY materialize-elasticsearch ./materialize-elasticsearch
 
 # TODO: copy flow bins

@@ -10,8 +10,9 @@ COPY go.* ./
 RUN go mod download
 
 # Build the connector projects we depend on.
-COPY source-mysql ./source-mysql
-COPY sqlcapture ./sqlcapture
+COPY source-mysql  ./source-mysql
+COPY go-schema-gen ./go-schema-gen
+COPY sqlcapture    ./sqlcapture
 
 # Run the unit tests.
 RUN go test -v ./source-mysql/...
