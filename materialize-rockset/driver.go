@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alecthomas/jsonschema"
+	schemagen "github.com/estuary/connectors/go-schema-gen"
 	"github.com/estuary/connectors/materialize-s3-parquet/checkpoint"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -143,11 +143,11 @@ func (d *rocksetDriver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.Spec
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	endpointSchema, err := jsonschema.Reflect(new(config)).MarshalJSON()
+	endpointSchema, err := schemagen.GenerateSchema("Rockset Endpoint", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
-	resourceSchema, err := jsonschema.Reflect(new(resource)).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("Rockset Collection", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}

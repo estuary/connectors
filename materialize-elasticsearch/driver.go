@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alecthomas/jsonschema"
 	"github.com/elastic/go-elasticsearch/v7/esutil"
+	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-elasticsearch/schemabuilder"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -71,12 +71,12 @@ func (resource) GetFieldDocString(fieldName string) string {
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
-	endpointSchema, err := jsonschema.Reflect(&config{}).MarshalJSON()
+	endpointSchema, err := schemagen.GenerateSchema("Elasticsearch Connection", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
 
-	resourceSchema, err := jsonschema.Reflect(&resource{}).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("Elasticsearch resource", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}

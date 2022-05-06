@@ -10,8 +10,9 @@ COPY go.* ./
 RUN go mod download
 
 # Build the connector projects we depend on.
-COPY source-postgres ./source-postgres
-COPY sqlcapture ./sqlcapture
+COPY source-postgres        ./source-postgres
+COPY sqlcapture             ./sqlcapture
+COPY go-schema-gen          ./go-schema-gen
 COPY network-tunnel-service ./network-tunnel-service
 
 # Copy network-tunnel-service binary.
