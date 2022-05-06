@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/alecthomas/jsonschema"
 	"github.com/benbjohnson/clock"
+	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-s3-parquet/checkpoint"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -128,12 +128,12 @@ func unmarshalDriverCheckpointJSON(raw json.RawMessage) (flowCheckpoint []byte, 
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
-	endpointSchema, err := jsonschema.Reflect(&config{}).MarshalJSON()
+	endpointSchema, err := schemagen.GenerateSchema("S3 Connection", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
 
-	resourceSchema, err := jsonschema.Reflect(&resource{}).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("S3 Prefix", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}

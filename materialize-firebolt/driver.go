@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alecthomas/jsonschema"
+	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-firebolt/firebolt"
 	"github.com/estuary/connectors/materialize-firebolt/schemalate"
@@ -18,12 +18,12 @@ import (
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
-	var endpointSchema, err = jsonschema.Reflect(&config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("Firebolt Connection", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
 
-	resourceSchema, err := jsonschema.Reflect(&resource{}).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("Firebolt resource", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}

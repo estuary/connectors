@@ -14,7 +14,8 @@ COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl /usr/local/bin/flowc
 
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate
-COPY materialize-s3-parquet     ./materialize-s3-parquet
+COPY go-schema-gen           ./go-schema-gen
+COPY materialize-s3-parquet  ./materialize-s3-parquet
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-s3-parquet/...
