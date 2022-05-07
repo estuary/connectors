@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
-	np "github.com/estuary/connectors/network-tunnel-service"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -41,15 +40,14 @@ func main() {
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Database        string                  `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
-	Host            string                  `json:"host" jsonschema:"description=Host name of the database to connect to."`
-	NetworkTunnel   *np.NetworkTunnelConfig `json:"networkTunnel,omitempty" jsonschema:"description=Configurations to enable network proxies."`
-	Password        string                  `json:"password" jsonschema:"description=User password configured within the database."`
-	Port            uint16                  `json:"port" jsonschema:"default=5432" jsonschema:"description=Port to the DB connection. If SshForwardingConfig is enabled, a dynamic port is allocated if Port is unspecified."`
-	PublicationName string                  `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
-	SlotName        string                  `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
-	User            string                  `json:"user" jsonschema:"default=postgres,description=Database user to use."`
-	WatermarksTable string                  `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	Database        string `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
+	Host            string `json:"host" jsonschema:"description=Host name of the database to connect to."`
+	Password        string `json:"password" jsonschema:"description=User password configured within the database."`
+	Port            uint16 `json:"port" jsonschema:"default=5432" jsonschema:"description=Port to the DB connection. If SshForwardingConfig is enabled, a dynamic port is allocated if Port is unspecified."`
+	PublicationName string `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
+	SlotName        string `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
+	User            string `json:"user" jsonschema:"default=postgres,description=Database user to use."`
+	WatermarksTable string `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -67,10 +65,6 @@ func (c *Config) Validate() error {
 
 	if c.WatermarksTable != "" && !strings.Contains(c.WatermarksTable, ".") {
 		return fmt.Errorf("config parameter 'watermarksTable' must be fully-qualified as '<schema>.<table>': %q", c.WatermarksTable)
-	}
-
-	if err := c.NetworkTunnel.Validate(); err != nil {
-		return fmt.Errorf("Network tunnel config err: %w", err)
 	}
 
 	return nil
@@ -114,10 +108,6 @@ type postgresDatabase struct {
 }
 
 func (db *postgresDatabase) Connect(ctx context.Context) error {
-	if err := db.config.NetworkTunnel.Start(); err != nil {
-		return fmt.Errorf("unable to start network tunnel %w", err)
-	}
-
 	logrus.WithFields(logrus.Fields{
 		"host":     db.config.Host,
 		"port":     db.config.Port,
