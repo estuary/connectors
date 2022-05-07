@@ -13,15 +13,9 @@ RUN go mod download
 COPY source-postgres        ./source-postgres
 COPY sqlcapture             ./sqlcapture
 COPY go-schema-gen          ./go-schema-gen
-COPY network-tunnel-service ./network-tunnel-service
-
-# Copy network-tunnel-service binary.
-COPY flow-bin/flow-network-tunnel ./bin/
 
 ENV PATH="/builder/bin:$PATH"
 # Run the unit tests.
-# RUN go test -v ./network-tunnel-service/...
-RUN rm ./source-postgres/networktunnel_test.go
 RUN go test -v ./source-postgres/...
 
 # Build the connector.
@@ -37,7 +31,6 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifacts from the builder.
 COPY --from=builder /builder/connector ./
-COPY --from=builder /builder/bin/flow-network-tunnel ./
 COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
 # Avoid running the connector as root.
