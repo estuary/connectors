@@ -79,12 +79,6 @@ jobs:
         run: |
           docker-compose --file ${{ matrix.connector }}/docker-compose.yaml up --detach
 
-      - name: Start Open SSH server
-        if: matrix.connector == 'source-postgres'
-        run: |
-          cp -r network-tunnel-service/sshforwarding/test_sshd_configs /tmp/test_sshd_configs &&
-          docker-compose --file /tmp/test_sshd_configs/docker-compose.yaml up --detach openssh-server
-
       - name: Login to GitHub package docker registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | \
@@ -141,34 +135,6 @@ jobs:
           PGPASSWORD: flow
           PGPORT: 5432
           PGUSER: flow
-
-        run: CONNECTOR=${{ matrix.connector }} VERSION=local-test-tag ./tests/run.sh;
-
-      - name: Source connector ${{ matrix.connector }} integration tests with SSH forwarding
-        if: |
-          contains('
-            source-postgres
-            ', matrix.connector)
-        env:
-          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
-          AWS_DEFAULT_OUTPUT: json
-
-          # Compare to: https://www.postgresql.org/docs/current/libpq-envars.html
-          PGDATABASE: flow
-          PGHOST: localhost
-          PGPASSWORD: flow
-          PGPORT: 5432
-          PGUSER: flow
-
-          # Based on configs in network-tunnel-service/sshforwarding/test_sshd_configs/docker-compose.yaml
-          SSHENDPOINT: ssh://localhost:2222
-          SSHUSER: flowssh
-          PRIVATE_KEY_FILE_PATH: network-tunnel-service/sshforwarding/test_sshd_configs/keys/id_rsa
-          LOCALPORT: 9876
-          SSH_FORWARDING_ENABLED: true
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local-test-tag ./tests/run.sh;
 
