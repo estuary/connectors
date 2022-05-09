@@ -24,8 +24,7 @@ const minimumExpiryTime = 7 * 24 * time.Hour
 
 func main() {
 	fixMysqlLogging()
-	var schema = schemagen.GenerateSchema("MySQL Source Spec", &Config{})
-	schema.Title = "MySQL Source Spec"
+	var schema = schemagen.GenerateSchema("MySQL Connection", &Config{})
 	var configSchema, err = schema.MarshalJSON()
 	if err != nil {
 		panic(err)
