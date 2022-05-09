@@ -124,7 +124,7 @@
     },
     "additionalProperties": false,
     "type": "object",
-    "title": "Elasticsearch resource",
+    "title": "Elasticsearch Index",
     "definitions": {
       "DateSpec": {
         "required": [
