@@ -42,6 +42,18 @@ func AirbyteMain(spec airbyte.Spec, init func(airbyte.ConfigFile) (Database, err
 			if err != nil {
 				return err
 			}
+
+			// Filter the watermarks table out of the discovered catalog before output
+			// It's basically never useful to capture so we shouldn't suggest it.
+			var watermarkStreamID = db.WatermarksTable()
+			var filteredStreams = []airbyte.Stream{} // Empty discovery must result in `[]` rather than `null`
+			for _, stream := range catalog.Streams {
+				if JoinStreamID(stream.Name, stream.Namespace) != watermarkStreamID {
+					filteredStreams = append(filteredStreams, stream)
+				}
+			}
+			catalog.Streams = filteredStreams
+
 			return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
 				Type:    airbyte.MessageTypeCatalog,
 				Catalog: catalog,
