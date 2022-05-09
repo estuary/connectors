@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	var schema = schemagen.GenerateSchema("PostgreSQL Source Spec", &Config{})
+	var schema = schemagen.GenerateSchema("PostgreSQL Connection", &Config{})
 	var configSchema, err = schema.MarshalJSON()
 	if err != nil {
 		panic(err)
