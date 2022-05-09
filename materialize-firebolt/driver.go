@@ -23,7 +23,7 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
 
-	resourceSchema, err := schemagen.GenerateSchema("Firebolt resource", &resource{}).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("Firebolt Table", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
