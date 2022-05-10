@@ -231,6 +231,9 @@ func NewField(projection *pf.Projection) (*Field, error) {
 		case "object":
 			f.fieldType = bigquery.StringFieldType
 			f.sanitizers = append(f.sanitizers, sqlDriver.DefaultQuoteSanitizer, sqlDriver.SingleQuotesWrapper())
+		case "array":
+			f.fieldType = bigquery.StringFieldType
+			f.sanitizers = append(f.sanitizers, sqlDriver.DefaultQuoteSanitizer, sqlDriver.SingleQuotesWrapper())
 		}
 	}
 
