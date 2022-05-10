@@ -87,15 +87,22 @@ func doCheck(args airbyte.CheckCmd) error {
 }
 
 func doDiscover(args airbyte.DiscoverCmd) error {
-	if err := args.ConfigFile.Parse(new(Config)); err != nil {
+	var config Config
+
+	if err := args.ConfigFile.Parse(&config); err != nil {
 		return err
+	}
+
+	var syncModes = []airbyte.SyncMode{airbyte.SyncModeIncremental}
+	if config.SkipState {
+		syncModes := []airbyte.SyncMode{airbyte.SyncModeFullRefresh}
 	}
 
 	var catalog = new(airbyte.Catalog)
 	catalog.Streams = append(catalog.Streams, airbyte.Stream{
 		Name:                    "greetings",
 		JSONSchema:              json.RawMessage(greetingSchema),
-		SupportedSyncModes:      []airbyte.SyncMode{airbyte.SyncModeIncremental},
+		SupportedSyncModes:      syncModes,
 		SourceDefinedCursor:     true,
 		SourceDefinedPrimaryKey: [][]string{{"count"}},
 	})
