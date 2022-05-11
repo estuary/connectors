@@ -12,7 +12,7 @@ import (
 )
 
 type Binding struct {
-	// CreateSQL is a template SQL query that is generated
+	// LoadSQL is a template SQL query that is generated
 	// based on the values for this binding. The value can be compiled when the
 	// Binding is initialized as there's no dynamic value in the
 	// query as it's moving data that is stored in cloud storage.
