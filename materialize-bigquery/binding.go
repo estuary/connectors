@@ -260,7 +260,7 @@ func generateCreateSQLQuery(binding *Binding) string {
 			;`,
 			backtickWrapper(binding.Table.Name()),
 			strings.Join(columns, ", "),
-			strings.Join(rColumns, ", "),
+			strings.Join(columns, ", "),
 			backtickWrapper(binding.externalTableAlias),
 		)
 	}
@@ -286,7 +286,7 @@ func generateCreateSQLQuery(binding *Binding) string {
 
 	return fmt.Sprintf(`
 			MERGE INTO %s AS l
-			USING %s as r
+			USING %s AS r
 			ON %s
 			WHEN MATCHED AND r.%s IS NULL THEN
 				DELETE
