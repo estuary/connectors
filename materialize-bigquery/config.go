@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/storage"
@@ -31,6 +32,13 @@ func NewConfig(data json.RawMessage) (*config, error) {
 	if err := pf.UnmarshalStrict(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing BigQuery configuration: %w", err)
 	}
+
+	// Bucket path can be a problematic value if it starts or ends
+	// with a slash(/) because the connector will format a finalized path
+	// with this as part of it. Because double slash are problematic in some cases
+	// with Cloudstorage, it's better for the connector to trim the slashes
+	// if they are provided so path can be constructed the same way.
+	cfg.BucketPath = strings.Trim(cfg.BucketPath, "/")
 
 	log.WithFields(log.Fields{
 		"project_id":  cfg.ProjectID,
