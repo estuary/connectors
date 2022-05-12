@@ -33,12 +33,9 @@ func NewConfig(data json.RawMessage) (*config, error) {
 		return nil, fmt.Errorf("parsing BigQuery configuration: %w", err)
 	}
 
-	// Bucket path can be a problematic value if it starts or ends
-	// with a slash(/) because the connector will format a finalized path
-	// with this as part of it. Because double slash are problematic in some cases
-	// with Cloudstorage, it's better for the connector to trim the slashes
-	// if they are provided so path can be constructed the same way.
-	cfg.BucketPath = strings.Trim(cfg.BucketPath, "/")
+	if len(cfg.BucketPath) > 0 && (strings.HasPrefix(cfg.BucketPath, "/") || strings.HasSuffix(cfg.BucketPath, "/")) {
+		return nil, fmt.Errorf("bucket_path cannot start or end with a slash (/), you can use a multi-level path using slash, ie. 'multi/level/bucket/path")
+	}
 
 	log.WithFields(log.Fields{
 		"project_id":  cfg.ProjectID,
