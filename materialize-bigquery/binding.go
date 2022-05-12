@@ -76,7 +76,7 @@ func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, 
 		b.LoadSQL = generateLoadSQLQuery(b)
 	}
 
-	b.CreateSQL = generateCreateSQLQuery(b)
+	b.CreateSQL = generateInsertOrMergeSQL(b)
 
 	return b, nil
 }
@@ -242,7 +242,7 @@ func generateLoadSQLQuery(binding *Binding) string {
 //		FROM `external_table_binding_materialized_table`;
 // "
 
-func generateCreateSQLQuery(binding *Binding) string {
+func generateInsertOrMergeSQL(binding *Binding) string {
 	var columns []string
 	var rColumns []string
 
