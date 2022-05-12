@@ -18,11 +18,11 @@ type Binding struct {
 	// query as it's moving data that is stored in cloud storage.
 	LoadSQL string
 
-	// CreateSQL is a template SQL query that is generated
+	// InsertOrMergeSQL is a template SQL query that is generated
 	// based on the values for this binding. The value can be compiled when the
 	// Binding is initialized as there's no dynamic value in the
 	// query as it's moving data that is stored in cloud storage.
-	CreateSQL string
+	InsertOrMergeSQL string
 
 	// The google cloud storage bucket that is configured
 	// to work with this binding. It is expected to be
@@ -37,14 +37,18 @@ type Binding struct {
 	// and has access to that external table.
 	externalTableAlias string
 
-	// Stateful and mutable part of the Binding struct. This writer gets
-	// replaced everytime the pipeline needs to write new data
-	*Writer
+	// Read only
+	Version string
 
 	// Table is an internal represation of the Schema for this binding. The schema
 	// contains references to the underlying BindingSpec as well as the BigQuery schema
 	// generated and validated against the Binding Spec and the Binding Resource spec.
 	*Table
+
+	// Stateful and mutable part of the Binding struct. The ExternalStorage is a
+	// Google Cloud Storage object representation that is used to stored the values
+	// before it gets acknowledged and merged into BigQuery.
+	*ExternalStorage
 }
 
 var externalTableNameTemplate = "external_table_binding_%s"
@@ -52,8 +56,13 @@ var externalTableNameTemplate = "external_table_binding_%s"
 // Returns a new compiled Binding ready to be used. The Binding is generated from a materialization spec and merges the config
 // info available to generate data structure that only requires to be compiled once when the materialization starts up. When
 // this struct is called, all the information to generate the proper SQL queries is already available.
-// The Binding object also includes a mutable part that is encapsulated inside the `writer` struct.
-func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, bindingSpec *pf.MaterializationSpec_Binding) (*Binding, error) {
+func NewBinding(
+	ctx context.Context,
+	bucket *storage.BucketHandle,
+	bindingSpec *pf.MaterializationSpec_Binding,
+	version string,
+) (*Binding, error) {
+
 	var br bindingResource
 	if err := pf.UnmarshalStrict(bindingSpec.ResourceSpecJson, &br); err != nil {
 		return nil, fmt.Errorf("parsing resource config: %w", err)
@@ -70,21 +79,16 @@ func NewBinding(ctx context.Context, cfg *config, bucket *storage.BucketHandle, 
 		bucket:             bucket,
 		Table:              table,
 		externalTableAlias: externalTableAlias,
+		Version:            version,
 	}
 
 	if !b.DeltaUpdates() {
 		b.LoadSQL = generateLoadSQLQuery(b)
 	}
 
-	b.CreateSQL = generateInsertOrMergeSQL(b)
+	b.InsertOrMergeSQL = generateInsertOrMergeSQL(b)
 
 	return b, nil
-}
-
-// FilePath for the CloudStorage object that the underlying `writer` is connected to.
-func (b *Binding) FilePath() string {
-	obj := b.Writer.object
-	return fmt.Sprintf("%s/%s", obj.BucketName(), obj.ObjectName())
 }
 
 func (b *Binding) GenerateDocument(key, values tuple.Tuple, flowDocument json.RawMessage) map[string]interface{} {
@@ -113,19 +117,19 @@ func (b *Binding) GenerateDocument(key, values tuple.Tuple, flowDocument json.Ra
 	return document
 }
 
-// SetWriter will replace whatever writer was attached to this binding
-// If an existing writer is already attached, that writer gets destroyed
-// by calling DestroyWriter() to make sure no data persists on Cloud Storage
-func (b *Binding) SetWriter(ctx context.Context, w *Writer) error {
+// SetExternalStorage will replace whatever storage was attached to this binding
+// If an existing storage is already attached, that external storage gets destroyed
+// by calling DestroyExternalStorage() to make sure no data persists on Cloud Storage
+func (b *Binding) SetExternalStorage(ctx context.Context, es *ExternalStorage) error {
 	var err error
 
-	if b.Writer != nil {
-		if err = b.DestroyWriter(ctx); err != nil {
+	if b.ExternalStorage != nil {
+		if err = b.DestroyExternalStorage(ctx); err != nil {
 			return err
 		}
 	}
 
-	b.Writer = w
+	b.ExternalStorage = es
 
 	return nil
 }
@@ -134,13 +138,13 @@ func (b *Binding) SetWriter(ctx context.Context, w *Writer) error {
 // asset in Cloud Storage.
 // When this method returns, no writer is associated to this binding
 // and it's required to assign a new one using the SetWriter() method.
-func (b *Binding) DestroyWriter(ctx context.Context) error {
+func (b *Binding) DestroyExternalStorage(ctx context.Context) error {
 	defer func() {
-		b.Writer = nil
+		b.ExternalStorage = nil
 	}()
 
-	if b.Writer != nil {
-		err := b.Writer.Destroy(ctx)
+	if b.ExternalStorage != nil {
+		err := b.ExternalStorage.Destroy(ctx)
 		// It's possible that the previous writer never persisted
 		// and as a result, the destroy operation won't have anything
 		// to cleanup. If the object doesn't exist, it can safely move
@@ -151,6 +155,13 @@ func (b *Binding) DestroyWriter(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// Helper function to generate a unique version for a given index and materialization spec
+// It is created because the version needs to be passed to a Binding, even though the logic is
+// simple, using a function to generate it means that the version generated is always consistent
+func BindingVersion(materializationVersion string, bindingIndex int) string {
+	return fmt.Sprintf("%s.%d", materializationVersion, bindingIndex)
 }
 
 // Generate the query for the provided binding to load
@@ -253,7 +264,7 @@ func generateInsertOrMergeSQL(binding *Binding) string {
 
 	// Early return if the binding spec is a delta
 	// update
-	if binding.spec.DeltaUpdates {
+	if binding.Spec.DeltaUpdates {
 		return fmt.Sprintf(`
 			INSERT INTO %s (%s)
 			SELECT %s FROM %s

@@ -61,16 +61,16 @@ type Table struct {
 	// marshalled JSON Object
 	RootDocument *Field
 
-	// Name of the table
-	name string
-
-	deltaUpdates bool
-
 	// Reference to the definition of this binding as it was generated from
 	// MaterializatioSpec. It is stored here so the individual values inside this
 	// spec doesn't need to be explicitely referenced in this Binding struct and can
 	// just be accessed when needed.
-	spec *pf.MaterializationSpec_Binding
+	Spec *pf.MaterializationSpec_Binding
+
+	// Name of the table
+	name string
+
+	deltaUpdates bool
 
 	// The compiled BigQuery schema that is associated with this Table. This schema can
 	// be used to either create a table, or to use it as a definition for cloud storage
@@ -89,7 +89,7 @@ func NewTable(binding *pf.MaterializationSpec_Binding, resource *bindingResource
 		Fields:       make([]*Field, len(fields)),
 		Keys:         make([]*Field, len(binding.FieldSelection.Keys)),
 		Values:       make([]*Field, len(binding.FieldSelection.Values)+1), // The extra entry is for the RootDocument inclusion
-		spec:         binding,
+		Spec:         binding,
 	}
 
 	for idx, fieldName := range fields {
@@ -141,13 +141,13 @@ func NewTable(binding *pf.MaterializationSpec_Binding, resource *bindingResource
 
 func (t *Table) Validate(existing *pf.MaterializationSpec_Binding) error {
 	if existing == nil {
-		return sqlDriver.ValidateSelectedFields(ConstraintsForNewBinding(&t.spec.Collection, t.DeltaUpdates()), t.spec)
+		return sqlDriver.ValidateSelectedFields(ConstraintsForNewBinding(&t.Spec.Collection, t.DeltaUpdates()), t.Spec)
 	} else {
-		constraints, err := ConstraintsForExistingBinding(existing, &t.spec.Collection, t.DeltaUpdates())
+		constraints, err := ConstraintsForExistingBinding(existing, &t.Spec.Collection, t.DeltaUpdates())
 		if err != nil {
 			return err
 		}
-		return sqlDriver.ValidateSelectedFields(constraints, t.spec)
+		return sqlDriver.ValidateSelectedFields(constraints, t.Spec)
 	}
 }
 

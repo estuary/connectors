@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/bigquery"
-	"cloud.google.com/go/storage"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 
+	cloudStorage "cloud.google.com/go/storage"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
@@ -18,10 +18,11 @@ import (
 
 type transactor struct {
 	// Fields that the transactor is initialized with
-	config          *config
-	bigqueryClient  *bigquery.Client
-	storageClient   *storage.Client
-	materialization *pf.MaterializationSpec
+	config                 *config
+	bigqueryClient         *bigquery.Client
+	storageClient          *cloudStorage.Client
+	materialization        *pf.MaterializationSpec
+	materializationVersion string
 
 	// Mutable fields that evolves throughout a transactor lifecyle.
 	checkpoint *BigQueryCheckPoint
@@ -40,12 +41,13 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 	}
 
 	t := &transactor{
-		config:          cfg,
-		bigqueryClient:  bigqueryClient,
-		storageClient:   storageClient,
-		materialization: open.Materialization,
-		checkpoint:      NewBigQueryCheckPoint(),
-		bindings:        make([]*Binding, len(open.Materialization.Bindings)),
+		config:                 cfg,
+		bigqueryClient:         bigqueryClient,
+		storageClient:          storageClient,
+		materialization:        open.Materialization,
+		materializationVersion: open.Version,
+		checkpoint:             NewBigQueryCheckPoint(),
+		bindings:               make([]*Binding, len(open.Materialization.Bindings)),
 	}
 
 	if open.DriverCheckpointJson != nil {
@@ -55,21 +57,12 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 	}
 
 	for i, sb := range open.Materialization.Bindings {
-		binding, err := NewBinding(ctx, cfg, storageClient.Bucket(cfg.Bucket), sb)
+		binding, err := NewBinding(ctx, storageClient.Bucket(cfg.Bucket), sb, BindingVersion(t.materializationVersion, i))
 		if err != nil {
 			return fmt.Errorf("binding generation: %w", err)
 		}
 
 		t.bindings[i] = binding
-
-		// Error here doesn't mean it's fatal, it just means the checkpoint didn't have
-		// a checkpoint binding, which is a normal scenario if the last time the driver
-		// stored a checkpoint, the binding didn't exist.
-		if driverBinding, err := t.checkpoint.Binding(i); err == nil {
-			if driverBinding.FilePath != "" {
-				binding.SetWriter(ctx, NewWriter(ctx, binding, driverBinding.FilePath))
-			}
-		}
 	}
 
 	if err := stream.Send(&pm.TransactionResponse{
@@ -82,23 +75,23 @@ func RunTransactor(ctx context.Context, cfg *config, stream pm.Driver_Transactio
 }
 
 func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, priorAcknowledgedCh <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	writers := map[string]*Writer{}
+	storages := map[string]*ExternalStorage{}
 	externalData := map[string]bigquery.ExternalData{}
 	group, ctx := errgroup.WithContext(it.Context())
 
 	for it.Next() {
 		binding := t.bindings[it.Binding]
-		writer, ok := writers[binding.Table.Name()]
+		storage, ok := storages[binding.Table.Name()]
 
 		if !ok {
 			path := fmt.Sprintf("%s/%s", t.config.BucketPath, randomString())
-			writer = NewWriter(it.Context(), binding, path)
+			storage = NewExternalStorage(it.Context(), binding, path)
 			// Need to relax the schema because it's a lookup on a different type of payload that
 			// will only have a subset of the fields present.
-			writer.ExternalDataConfig.Schema = writer.ExternalDataConfig.Schema.Relax()
+			storage.ExternalDataConfig.Schema = storage.ExternalDataConfig.Schema.Relax()
 
-			writers[binding.Name()] = writer
-			externalData[binding.externalTableAlias] = writer.ExternalDataConfig
+			storages[binding.Name()] = storage
+			externalData[binding.externalTableAlias] = storage.ExternalDataConfig
 		}
 
 		for idx, key := range it.Key {
@@ -111,7 +104,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, priorAcknowled
 			}
 
 			doc[field.Name()] = value
-			writer.Store(doc)
+			storage.Store(doc)
 		}
 	}
 
@@ -126,7 +119,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, priorAcknowled
 		var idx = i
 		var binding = b
 
-		writer, ok := writers[binding.Name()]
+		storage, ok := storages[binding.Name()]
 
 		// Only processing bindings that have a writer associated to them
 		if !ok {
@@ -138,13 +131,13 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, priorAcknowled
 		// if the SQL queries were merged into one. By running those queries separately, the connector
 		// can start sending flow documents back to flow before all bindings are returned.
 		group.Go(func() error {
-			err := writer.Commit(ctx)
+			err := storage.Commit(ctx)
 			if err != nil {
 				return fmt.Errorf("commit writer for binding: %s. %w", binding.Name(), err)
 			}
 
 			defer func() {
-				writer.Destroy(ctx)
+				storage.Destroy(ctx)
 			}()
 
 			query := t.bigqueryClient.Query(binding.LoadSQL)
@@ -191,17 +184,21 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, priorAcknowled
 func (t *transactor) Prepare(ctx context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	t.checkpoint = NewBigQueryCheckPoint()
 
-	for i, binding := range t.bindings {
-		binding.SetWriter(
-			ctx,
-			NewWriter(ctx, binding, fmt.Sprintf("%s/%s", t.config.BucketPath, randomString())),
-		)
+	for _, binding := range t.bindings {
+		data, _ := json.Marshal(binding.Spec)
 
-		t.checkpoint.Bindings = append(t.checkpoint.Bindings, DriverCheckPointBinding{
-			FilePath:     binding.FilePath(),
-			Query:        binding.CreateSQL,
-			BindingIndex: i,
-		})
+		cpBinding := DriverCheckPointBinding{
+			FilePath:        fmt.Sprintf("%s/%s", t.config.BucketPath, randomString()),
+			BindingSpecJson: json.RawMessage(data),
+			Version:         binding.Version,
+		}
+
+		t.checkpoint.Bindings = append(t.checkpoint.Bindings, cpBinding)
+
+		binding.SetExternalStorage(
+			ctx,
+			NewExternalStorage(ctx, binding, cpBinding.FilePath),
+		)
 	}
 
 	jsn, err := json.Marshal(t.checkpoint)
@@ -235,12 +232,33 @@ func (t *transactor) Commit(ctx context.Context) error {
 
 func (t *transactor) Acknowledge(ctx context.Context) error {
 	for _, cpBinding := range t.checkpoint.Bindings {
-		binding := t.bindings[cpBinding.BindingIndex]
+		var binding *Binding
+		var err error
 
-		query := t.bigqueryClient.Query(cpBinding.Query)
+		for _, bd := range t.bindings {
+			if bd.Version == cpBinding.Version {
+				binding = bd
+				break
+			}
+		}
+
+		if binding == nil {
+			var bindingSpec *pf.MaterializationSpec_Binding
+
+			err := json.Unmarshal(cpBinding.BindingSpecJson, &bindingSpec)
+			if err != nil {
+				return fmt.Errorf("unmarshalling binding spec from driver's checkpoint: %w", err)
+			}
+
+			if binding, err = NewBinding(ctx, t.storageClient.Bucket(t.config.Bucket), bindingSpec, cpBinding.Version); err != nil {
+				return fmt.Errorf("initializing binding: %w", err)
+			}
+		}
+
+		query := t.bigqueryClient.Query(binding.InsertOrMergeSQL)
 		query.DefaultDatasetID = t.config.Dataset
 		query.Location = t.config.Region
-		query.TableDefinitions = map[string]bigquery.ExternalData{binding.externalTableAlias: binding.Writer.ExternalDataConfig}
+		query.TableDefinitions = map[string]bigquery.ExternalData{binding.externalTableAlias: binding.ExternalStorage.ExternalDataConfig}
 		job, err := query.Run(ctx)
 
 		if err != nil {
@@ -253,11 +271,11 @@ func (t *transactor) Acknowledge(ctx context.Context) error {
 		}
 
 		if status.Err() != nil {
-			return fmt.Errorf("Store: job completed with error: %v", status.Err())
+			return fmt.Errorf("store: job completed with error: %v", status.Err())
 		}
 
-		if err = binding.DestroyWriter(ctx); err != nil {
-			return fmt.Errorf("Writer: failed to destroy: %w", err)
+		if err = binding.DestroyExternalStorage(ctx); err != nil {
+			return fmt.Errorf("writer: failed to destroy: %w", err)
 		}
 	}
 
