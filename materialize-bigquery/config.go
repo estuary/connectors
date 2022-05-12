@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -20,7 +21,6 @@ type config struct {
 	Region           string `json:"region,omitempty"`
 	Bucket           string `json:"bucket"`
 	BucketPath       string `json:"bucket_path"`
-	CredentialsFile  string `json:"credentials_file,omitempty"`
 	CredentialsJSON  []byte `json:"credentials_json,omitempty"`
 
 	ClientOpts []option.ClientOption
@@ -48,11 +48,10 @@ func NewConfig(data json.RawMessage) (*config, error) {
 		"bucket_path": cfg.BucketPath,
 	}).Info("opening bigquery")
 
-	// Pick one of the credentials options. It's plausible you could use machine credentials in which case neither option is present.
-	if cfg.CredentialsFile != "" {
-		cfg.ClientOpts = append(cfg.ClientOpts, option.WithCredentialsFile(cfg.CredentialsFile))
-	} else if len(cfg.CredentialsJSON) != 0 {
+	if len(cfg.CredentialsJSON) != 0 {
 		cfg.ClientOpts = append(cfg.ClientOpts, option.WithCredentialsJSON(cfg.CredentialsJSON))
+	} else {
+		return nil, errors.New("JSON credentials required")
 	}
 
 	if cfg.BillingProjectID == "" {
