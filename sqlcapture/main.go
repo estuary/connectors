@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/estuary/flow/go/protocols/airbyte"
+	"github.com/sirupsen/logrus"
 )
 
 // AirbyteMain implements the main function for an Airbyte connector, given
@@ -48,8 +49,14 @@ func AirbyteMain(spec airbyte.Spec, init func(airbyte.ConfigFile) (Database, err
 			var watermarkStreamID = db.WatermarksTable()
 			var filteredStreams = []airbyte.Stream{} // Empty discovery must result in `[]` rather than `null`
 			for _, stream := range catalog.Streams {
-				if JoinStreamID(stream.Name, stream.Namespace) != watermarkStreamID {
+				var streamID = JoinStreamID(stream.Namespace, stream.Name)
+				if streamID != watermarkStreamID {
 					filteredStreams = append(filteredStreams, stream)
+				} else {
+					logrus.WithFields(logrus.Fields{
+						"filtered":   streamID,
+						"watermarks": watermarkStreamID,
+					}).Debug("filtered watermarks table from discovery")
 				}
 			}
 			catalog.Streams = filteredStreams
