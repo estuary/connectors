@@ -206,17 +206,9 @@ func NewField(projection *pf.Projection) (*Field, error) {
 				case "date-time":
 					f.fieldType = bigquery.TimestampFieldType
 				case "date":
-					f.fieldType = bigquery.DateFieldType
-				// There is a case where a String_ is present but the values aren't set.
-				// I'm not sure how this can happen since the protobuf struct should
-				// be optional and nil, but it did happen in my testing and I couldn't
-				// figured out why, so this is here as a precaution (P-O)
-				case "":
+				default:
 					f.fieldType = bigquery.StringFieldType
 					f.sanitizers = append(f.sanitizers, sqlDriver.DefaultQuoteSanitizer)
-
-				default:
-					return nil, fmt.Errorf("inferring string column type as the format is not supported: %s", s.Format)
 				}
 			} else {
 				f.fieldType = bigquery.StringFieldType
