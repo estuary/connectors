@@ -98,6 +98,8 @@ func (b *Binding) GenerateDocument(key, values tuple.Tuple, flowDocument json.Ra
 	for i, value := range allValues {
 		field := b.Table.Fields[i]
 		// If a value is nil, we need to
+		// skip it, because otherwise it will overwrite
+		// the value as "".
 		if value == nil {
 			continue
 		}
