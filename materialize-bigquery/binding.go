@@ -186,7 +186,7 @@ func generateLoadSQLQuery(binding *Binding) string {
 		}
 
 		// We're casting everything, because bigquery supports casting all
-		// the currently supported values and it simplifies the quoting and sanitizing of all values
+		// the currently supported values and it simplifies the quoting.
 		queryBuilder.WriteString(fmt.Sprintf(
 			"CAST(bq.%s AS %s) = CAST(external.%s AS %s)",
 			backtickWrapper(field.Name()),
