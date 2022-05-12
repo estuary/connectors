@@ -15,6 +15,7 @@ RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/rel
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-bigquery    ./materialize-bigquery
+COPY go-schema-gen           ./go-schema-gen
 COPY testsupport             ./testsupport
 
 # Test and build the connector.

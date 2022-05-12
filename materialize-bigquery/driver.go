@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/alecthomas/jsonschema"
+	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -17,12 +17,12 @@ import (
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
-	var endpointSchema, err = jsonschema.Reflect(&config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("BigQuery Connection", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
 
-	resourceSchema, err := jsonschema.Reflect(&bindingResource{}).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("BigQuery Binding Resources", &bindingResource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
