@@ -243,14 +243,14 @@ func (t *transactor) Acknowledge(ctx context.Context) error {
 		}
 
 		if binding == nil {
-			var bindingSpec *pf.MaterializationSpec_Binding
+			var bindingSpec pf.MaterializationSpec_Binding
 
 			err := json.Unmarshal(cpBinding.BindingSpecJson, &bindingSpec)
 			if err != nil {
 				return fmt.Errorf("unmarshalling binding spec from driver's checkpoint: %w", err)
 			}
 
-			if binding, err = NewBinding(ctx, t.storageClient.Bucket(t.config.Bucket), bindingSpec, cpBinding.Version); err != nil {
+			if binding, err = NewBinding(ctx, t.storageClient.Bucket(t.config.Bucket), &bindingSpec, cpBinding.Version); err != nil {
 				return fmt.Errorf("initializing binding: %w", err)
 			}
 
