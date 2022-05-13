@@ -235,6 +235,8 @@ func (t *transactor) Acknowledge(ctx context.Context) error {
 		var binding *Binding
 		var err error
 
+		log.Infof("Locating binding for version: %s", cpBinding.Version)
+
 		for _, bd := range t.bindings {
 			if bd.Version == cpBinding.Version {
 				binding = bd
@@ -243,6 +245,7 @@ func (t *transactor) Acknowledge(ctx context.Context) error {
 		}
 
 		if binding == nil {
+			log.Info("Binding not found, generateing from Checkpoint")
 			var bindingSpec pf.MaterializationSpec_Binding
 
 			err := json.Unmarshal(cpBinding.BindingSpecJson, &bindingSpec)

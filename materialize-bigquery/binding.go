@@ -65,6 +65,8 @@ func NewBinding(
 	version string,
 ) (*Binding, error) {
 
+	log.Infof("Generating Binding for Version: %s", version)
+
 	var br bindingResource
 	if err := pf.UnmarshalStrict(bindingSpec.ResourceSpecJson, &br); err != nil {
 		return nil, fmt.Errorf("parsing resource config: %w", err)
