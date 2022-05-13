@@ -9,7 +9,8 @@ import (
 )
 
 type Config struct {
-	Greetings int `json:"greetings"`
+	Greetings int  `json:"greetings"`
+	SkipState bool `json:"skip_state"`
 }
 
 type State struct {
@@ -29,7 +30,7 @@ func (c *State) Validate() error {
 
 const configSchema = `{
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"title":   "Hello World Source Spec",
+	"title":   "Test Source Spec",
 	"type":    "object",
 	"required": [
 		"greetings"
@@ -40,7 +41,13 @@ const configSchema = `{
 			"title":       "Number of Greetings",
 			"description": "Number of greeting documents to produce when running in non-tailing mode",
 			"default":     1000
-		}
+		},
+    "skip_state": {
+      "type": "boolean",
+      "title": "Skip sending an Airbyte state message",
+      "description": "Some Airbyte connectors do not send a state message. This option can be used to emulate those cases",
+      "default": false
+    }
 	}
 }`
 
@@ -80,7 +87,9 @@ func doCheck(args airbyte.CheckCmd) error {
 }
 
 func doDiscover(args airbyte.DiscoverCmd) error {
-	if err := args.ConfigFile.Parse(new(Config)); err != nil {
+	var config Config
+
+	if err := args.ConfigFile.Parse(&config); err != nil {
 		return err
 	}
 
@@ -145,13 +154,15 @@ func doRead(args airbyte.ReadCmd) error {
 			return err
 		}
 
-		if b, err = json.Marshal(state); err != nil {
-			return err
-		} else if err = enc.Encode(airbyte.Message{
-			Type:  airbyte.MessageTypeState,
-			State: &airbyte.State{Data: b},
-		}); err != nil {
-			return err
+		if !config.SkipState {
+			if b, err = json.Marshal(state); err != nil {
+				return err
+			} else if err = enc.Encode(airbyte.Message{
+				Type:  airbyte.MessageTypeState,
+				State: &airbyte.State{Data: b},
+			}); err != nil {
+				return err
+			}
 		}
 
 		if catalog.Tail {
