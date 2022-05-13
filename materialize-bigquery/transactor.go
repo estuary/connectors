@@ -233,6 +233,7 @@ func (t *transactor) Commit(ctx context.Context) error {
 func (t *transactor) Acknowledge(ctx context.Context) error {
 	for _, cpBinding := range t.checkpoint.Bindings {
 		var binding *Binding
+		var externalStorage *ExternalStorage
 		var err error
 
 		log.Infof("Locating binding for version: %s", cpBinding.Version)
@@ -263,14 +264,18 @@ func (t *transactor) Acknowledge(ctx context.Context) error {
 			)
 		}
 
-		if binding.ExternalStorage == nil {
-			log.Printf("Unknown state, binidng doesn't have an external storage: %+v", binding)
+		externalStorage = binding.ExternalStorage
+
+		// This can happen if Acknowledge is called directly after the transactor
+		// was spun up, specially a catastrophic failure.
+		if externalStorage == nil {
+			externalStorage = NewExternalStorage(ctx, binding, cpBinding.FilePath)
 		}
 
 		query := t.bigqueryClient.Query(binding.InsertOrMergeSQL)
 		query.DefaultDatasetID = t.config.Dataset
 		query.Location = t.config.Region
-		query.TableDefinitions = map[string]bigquery.ExternalData{binding.externalTableAlias: binding.ExternalStorage.ExternalDataConfig}
+		query.TableDefinitions = map[string]bigquery.ExternalData{binding.externalTableAlias: externalStorage.ExternalDataConfig}
 		job, err := query.Run(ctx)
 
 		if err != nil {
