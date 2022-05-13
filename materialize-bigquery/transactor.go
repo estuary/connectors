@@ -253,6 +253,11 @@ func (t *transactor) Acknowledge(ctx context.Context) error {
 			if binding, err = NewBinding(ctx, t.storageClient.Bucket(t.config.Bucket), bindingSpec, cpBinding.Version); err != nil {
 				return fmt.Errorf("initializing binding: %w", err)
 			}
+
+			binding.SetExternalStorage(
+				ctx,
+				NewExternalStorage(ctx, binding, cpBinding.FilePath),
+			)
 		}
 
 		query := t.bigqueryClient.Query(binding.InsertOrMergeSQL)
