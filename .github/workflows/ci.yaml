@@ -15,6 +15,7 @@ jobs:
         connector:
           - source-gcs
           - source-hello-world
+          - source-test
           - source-kafka
           - source-kinesis
           - source-mysql
