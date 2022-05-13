@@ -9,6 +9,8 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Binding struct {
@@ -122,18 +124,16 @@ func (b *Binding) GenerateDocument(key, values tuple.Tuple, flowDocument json.Ra
 // SetExternalStorage will replace whatever storage was attached to this binding
 // If an existing storage is already attached, that external storage gets destroyed
 // by calling DestroyExternalStorage() to make sure no data persists on Cloud Storage
-func (b *Binding) SetExternalStorage(ctx context.Context, es *ExternalStorage) error {
+func (b *Binding) SetExternalStorage(ctx context.Context, es *ExternalStorage) {
 	var err error
 
 	if b.ExternalStorage != nil {
 		if err = b.DestroyExternalStorage(ctx); err != nil {
-			return err
+			log.Errorf("tried to delete the external storage: %v", err)
 		}
 	}
 
 	b.ExternalStorage = es
-
-	return nil
 }
 
 // DestroyWriter clears the writer and delete the underlying

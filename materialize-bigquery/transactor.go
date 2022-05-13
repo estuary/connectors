@@ -260,6 +260,10 @@ func (t *transactor) Acknowledge(ctx context.Context) error {
 			)
 		}
 
+		if binding.ExternalStorage == nil {
+			log.Printf("Unknown state, binidng doesn't have an external storage: %+v", binding)
+		}
+
 		query := t.bigqueryClient.Query(binding.InsertOrMergeSQL)
 		query.DefaultDatasetID = t.config.Dataset
 		query.Location = t.config.Region
