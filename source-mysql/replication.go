@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -20,7 +21,18 @@ import (
 // likely to exercise blocking sends and backpressure.
 var replicationBufferSize = 1024
 
-func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor string, tableInfo map[string]sqlcapture.TableInfo) (sqlcapture.ReplicationStream, error) {
+func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor string, captureTables map[string]bool, discovery map[string]sqlcapture.TableInfo, metadata map[string]json.RawMessage) (sqlcapture.ReplicationStream, error) {
+	var parsedMetadata = make(map[string]*mysqlTableMetadata)
+	for streamID, metadataJSON := range metadata {
+		var parsed *mysqlTableMetadata
+		if metadataJSON != nil {
+			if err := json.Unmarshal(metadataJSON, &parsed); err != nil {
+				return nil, fmt.Errorf("error parsing metadata JSON: %w", err)
+			}
+		}
+		parsedMetadata[streamID] = parsed
+	}
+
 	var host, port, err = splitHostPort(db.config.Address)
 	if err != nil {
 		return nil, fmt.Errorf("invalid mysql address: %w", err)
@@ -65,11 +77,13 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 
 	var streamCtx, streamCancel = context.WithCancel(ctx)
 	var stream = &mysqlReplicationStream{
-		syncer:    syncer,
-		streamer:  streamer,
-		tableInfo: tableInfo,
-		events:    make(chan sqlcapture.ChangeEvent, replicationBufferSize),
-		cancel:    streamCancel,
+		syncer:        syncer,
+		streamer:      streamer,
+		captureTables: captureTables,
+		discovery:     discovery,
+		metadata:      parsedMetadata,
+		events:        make(chan sqlcapture.ChangeEvent, replicationBufferSize),
+		cancel:        streamCancel,
 	}
 	go func() {
 		defer close(stream.events)
@@ -109,10 +123,20 @@ func splitHostPort(addr string) (string, int64, error) {
 type mysqlReplicationStream struct {
 	syncer        *replication.BinlogSyncer
 	streamer      *replication.BinlogStreamer
-	tableInfo     map[string]sqlcapture.TableInfo
+	captureTables map[string]bool
+	discovery     map[string]sqlcapture.TableInfo
+	metadata      map[string]*mysqlTableMetadata
 	events        chan sqlcapture.ChangeEvent
 	cancel        context.CancelFunc
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
+}
+
+type mysqlTableMetadata struct {
+	Schema mysqlTableSchema `json:"schema"`
+}
+
+type mysqlTableSchema struct {
+	Columns []string `json:"columns"`
 }
 
 func (rs *mysqlReplicationStream) run(ctx context.Context) error {
@@ -125,10 +149,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		switch data := event.Event.(type) {
 		case *replication.RowsEvent:
 			var schema, table = string(data.Table.Schema), string(data.Table.Table)
-			if schema == "mysql" {
+			var streamID = sqlcapture.JoinStreamID(schema, table)
+			// Skip change events from tables which aren't being captured
+			if !rs.captureTables[streamID] {
 				continue
 			}
-			var streamID = sqlcapture.JoinStreamID(schema, table)
 
 			var sourceMeta = &mysqlSourceInfo{
 				SourceCommon: sqlcapture.SourceCommon{
@@ -144,7 +169,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			}
 
 			var info *sqlcapture.TableInfo
-			if cachedInfo, ok := rs.tableInfo[streamID]; ok {
+			if cachedInfo, ok := rs.discovery[streamID]; ok {
 				info = &cachedInfo
 			}
 
