@@ -52,6 +52,10 @@ type TableState struct {
 	// values of the last row which has been backfilled. Replication events will
 	// only be emitted for rows <= this value while backfilling is in progress.
 	Scanned []byte `json:"scanned"`
+	// Metadata is some arbitrary amount of database-specific metadata
+	// which needs to be tracked persistently on a per-table basis. The
+	// original purpose is/was for tracking table schema information.
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// dirty is set whenever the table state changes, and cleared whenever
 	// a state update is emitted. It should never be serialized itself.
 	dirty bool
@@ -109,7 +113,15 @@ func (c *Capture) Run(ctx context.Context) error {
 		return fmt.Errorf("error updating capture state: %w", err)
 	}
 
-	replStream, err := c.Database.StartReplication(ctx, c.State.Cursor, c.discovery)
+	var captureTables = make(map[string]bool)
+	var tableMetadata = make(map[string]json.RawMessage)
+	for streamID, state := range c.State.Streams {
+		tableMetadata[streamID] = state.Metadata
+		captureTables[streamID] = true
+	}
+	captureTables[c.Database.WatermarksTable()] = true
+
+	replStream, err := c.Database.StartReplication(ctx, c.State.Cursor, captureTables, c.discovery, tableMetadata)
 	if err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
