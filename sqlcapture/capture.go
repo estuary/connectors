@@ -323,6 +323,7 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 		if event.Operation == MetadataOp {
 			var streamID = event.Metadata.StreamID
 			if state, ok := c.State.Streams[streamID]; ok {
+				logrus.WithField("stream", streamID).Trace("stream metadata changed")
 				state.Metadata = event.Metadata.Metadata
 				state.dirty = true
 				c.State.Streams[streamID] = state
@@ -398,6 +399,8 @@ func (c *Capture) emitBuffered(results *resultSet) error {
 		} else {
 			state.Scanned = results.Scanned(streamID)
 		}
+
+		logrus.WithField("stream", streamID).Trace("stream mode/cursor changed")
 		state.dirty = true
 		c.State.Streams[streamID] = state
 	}
@@ -511,6 +514,7 @@ func (c *Capture) emitState() error {
 	if err != nil {
 		return fmt.Errorf("error encoding state message: %w", err)
 	}
+	logrus.WithField("state", string(rawState)).Trace("emitting state update")
 	return c.Encoder.Encode(airbyte.Message{
 		Type: airbyte.MessageTypeState,
 		State: &airbyte.State{

@@ -251,6 +251,7 @@ func copyState(x sqlcapture.PersistentState) sqlcapture.PersistentState {
 			Mode:       state.Mode,
 			KeyColumns: append([]string(nil), state.KeyColumns...),
 			Scanned:    append([]byte(nil), state.Scanned...),
+			Metadata:   append([]byte(nil), state.Metadata...),
 		}
 	}
 	return sqlcapture.PersistentState{
