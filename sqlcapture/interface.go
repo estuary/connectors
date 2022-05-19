@@ -23,6 +23,10 @@ const (
 	// FlushOp is an internal-only ChangeOp which flushes a completed
 	// transaction, but is not actually serialized.
 	FlushOp ChangeOp = "x"
+	// MetadataOp is an internal-only ChangeOp which informs the generic
+	// SQL capture logic about changes to the per-table metadata JSON. It
+	// is not serialized.
+	MetadataOp ChangeOp = "m"
 )
 
 // SourceCommon is common source metadata for data capture events.
@@ -63,13 +67,16 @@ type SourceMetadata interface {
 }
 
 // ChangeEvent represents either an Insert/Update/Delete operation on a specific
-// row in the database, or a Commit event which indicates that the database is at
-// a consistent point from which we could restart in the future.
+// row in the database, a Commit event which indicates that the database is at
+// a consistent point from which we could restart in the future, or a Metadata
+// event which indicates that some database-specific per-table metadata has
+// changed.
 type ChangeEvent struct {
 	Operation ChangeOp
 	Source    SourceMetadata
 	Before    map[string]interface{}
 	After     map[string]interface{}
+	Metadata  *MetadataChangeEvent
 }
 
 // KeyFields returns suitable fields for extracting the event primary key.
@@ -78,6 +85,13 @@ func (e *ChangeEvent) KeyFields() map[string]interface{} {
 		return e.Before
 	}
 	return e.After
+}
+
+// MetadataChangeEvent represents a change to some database-specific per-table
+// metadata.
+type MetadataChangeEvent struct {
+	StreamID string
+	Metadata json.RawMessage
 }
 
 // Database represents the operations which must be performed on a specific database

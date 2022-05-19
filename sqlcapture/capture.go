@@ -317,6 +317,19 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 			continue
 		}
 
+		// Metadata events update the per-table metadata and dirty flag.
+		// They have no other effect, the new metadata will only be written
+		// as part of a subsequent state checkpoint.
+		if event.Operation == MetadataOp {
+			var streamID = event.Metadata.StreamID
+			if state, ok := c.State.Streams[streamID]; ok {
+				state.Metadata = event.Metadata.Metadata
+				state.dirty = true
+				c.State.Streams[streamID] = state
+			}
+			continue
+		}
+
 		// Note when the expected watermark is finally observed. The subsequent Commit will exit the loop.
 		var sourceCommon = event.Source.Common()
 		var streamID = JoinStreamID(sourceCommon.Schema, sourceCommon.Table)
