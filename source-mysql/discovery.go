@@ -35,6 +35,7 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]sqlcapt
 			info.Columns = make(map[string]sqlcapture.ColumnInfo)
 		}
 		info.Columns[column.Name] = column
+		info.ColumnNames = append(info.ColumnNames, column.Name)
 		tableMap[id] = info
 	}
 	for id, key := range primaryKeys {
@@ -81,22 +82,15 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 	return colSchema.toType(), nil
 }
 
-func translateRecordFields(table *sqlcapture.TableInfo, f map[string]interface{}) error {
-	if table == nil {
-		return fmt.Errorf("table information unavailable")
+func translateRecordFields(columnTypes map[string]string, f map[string]interface{}) error {
+	if columnTypes == nil {
+		return fmt.Errorf("unknown column types")
 	}
 	if f == nil {
 		return nil
 	}
 	for id, val := range f {
-		var columnInfo *sqlcapture.ColumnInfo
-		if table != nil {
-			if info, ok := table.Columns[id]; ok {
-				columnInfo = &info
-			}
-		}
-
-		var translated, err = translateRecordField(columnInfo, val)
+		var translated, err = translateRecordField(columnTypes[id], val)
 		if err != nil {
 			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
 		}
@@ -105,13 +99,13 @@ func translateRecordFields(table *sqlcapture.TableInfo, f map[string]interface{}
 	return nil
 }
 
-func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
-	if column == nil {
-		return nil, fmt.Errorf("column information unavailable")
+func translateRecordField(columnType string, val interface{}) (interface{}, error) {
+	if columnType == "" {
+		return nil, fmt.Errorf("unknown column type")
 	}
 	switch val := val.(type) {
 	case string:
-		switch column.DataType {
+		switch columnType {
 		case "binary", "varbinary":
 			return []byte(val), nil
 		case "blob", "tinyblob", "mediumblob", "longblob":
