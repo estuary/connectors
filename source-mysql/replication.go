@@ -150,6 +150,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			continue
 		}
 
+		// Construct table metadata for the new table
 		logrus.WithField("stream", streamID).Debug("initializing table metadata")
 		var metadata = new(mysqlTableMetadata)
 		if discovery, ok := rs.discovery[streamID]; ok {
@@ -167,8 +168,20 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				"types":   metadata.Schema.ColumnTypes,
 			}).Debug("initialized table metadata")
 		}
-		// TODO(wgd): Emit some sort of 'metadata change' to rs.events right here
+
+		// Set the new table metadata and inform the change event consumer
 		rs.metadata[streamID] = metadata
+		bs, err := json.Marshal(metadata)
+		if err != nil {
+			return fmt.Errorf("error serializing metadata JSON for %q: %w", streamID, err)
+		}
+		rs.events <- sqlcapture.ChangeEvent{
+			Operation: sqlcapture.MetadataOp,
+			Metadata: &sqlcapture.MetadataChangeEvent{
+				StreamID: streamID,
+				Metadata: json.RawMessage(bs),
+			},
+		}
 	}
 
 	for {
@@ -212,7 +225,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			switch event.Header.EventType {
 			case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
-					var after = decodeRow(columnNames, row)
+					var after = decodeRow(streamID, columnNames, row)
 					if err := translateRecordFields(columnTypes, after); err != nil {
 						return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 					}
@@ -226,8 +239,8 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				for rowIdx := range data.Rows {
 					// Update events contain alternating (before, after) pairs of rows
 					if rowIdx%2 == 1 {
-						var before = decodeRow(columnNames, data.Rows[rowIdx-1])
-						var after = decodeRow(columnNames, data.Rows[rowIdx])
+						var before = decodeRow(streamID, columnNames, data.Rows[rowIdx-1])
+						var after = decodeRow(streamID, columnNames, data.Rows[rowIdx])
 						if err := translateRecordFields(columnTypes, before); err != nil {
 							return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
 						}
@@ -244,7 +257,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				}
 			case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
-					var before = decodeRow(columnNames, row)
+					var before = decodeRow(streamID, columnNames, row)
 					if err := translateRecordFields(columnTypes, before); err != nil {
 						return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
 					}
@@ -295,18 +308,27 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 	}
 }
 
-func decodeRow(colNames []string, row []interface{}) map[string]interface{} {
+func decodeRow(streamID string, colNames []string, row []interface{}) map[string]interface{} {
 	var fields = make(map[string]interface{})
 	for idx, val := range row {
-		// TODO(wgd): Do something to handle the edge case where a
-		// column is removed from a table which is then added to the
-		// capture, so discovery names fewer columns than actually
-		// exist in the row change events during catchup streaming.
-		var name = colNames[idx]
-		if bs, ok := val.([]byte); ok {
-			val = string(bs)
+		// If change events contain more values than we have column names,
+		// something may have gone wrong. However, that "something" could
+		// be benign, for instance during catchup streaming when a stream
+		// is newly added and a column was deleted since the last binlog
+		// offset checkpoint.
+		if idx >= len(colNames) {
+			logrus.WithFields(logrus.Fields{
+				"stream":   streamID,
+				"expected": len(colNames),
+				"actual":   len(row),
+			}).Warn("row change event contains more values than expected (go.estuary.dev/sCSfKS)")
+		} else {
+			var name = colNames[idx]
+			if bs, ok := val.([]byte); ok {
+				val = string(bs)
+			}
+			fields[name] = val
 		}
-		fields[name] = val
 	}
 	return fields
 }
