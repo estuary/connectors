@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -17,7 +18,7 @@ import (
 
 // StartReplication opens a connection to the database and returns a ReplicationStream
 // from which a neverending sequence of change events can be read.
-func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor string, tableInfo map[string]sqlcapture.TableInfo) (sqlcapture.ReplicationStream, error) {
+func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor string, captureTables map[string]bool, discovery map[string]sqlcapture.TableInfo, metadata map[string]json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	// Replication database connection used for event streaming
 	connConfig, err := pgconn.ParseConfig(db.config.ToURI())
 	if err != nil {
@@ -62,6 +63,7 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 		nextTxnMillis:   0,
 		conn:            conn,
 		connInfo:        pgtype.NewConnInfo(),
+		captureTables:   captureTables,
 		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 		events: make(chan sqlcapture.ChangeEvent, replicationBufferSize),
@@ -162,6 +164,11 @@ type replicationStream struct {
 	// messages tell us about the integer ID corresponding to a particular table
 	// and other information about the table structure at a particular moment.
 	relations map[uint32]*pglogrepl.RelationMessage
+
+	// captureTables keeps track of what tables we actually care about
+	// capturing, so that replication can stop processing events from
+	// other tables early.
+	captureTables map[string]bool
 }
 
 const standbyStatusInterval = 10 * time.Second
@@ -341,6 +348,13 @@ func (s *replicationStream) decodeChangeEvent(
 	var rel, ok = s.relations[relID]
 	if !ok {
 		return nil, fmt.Errorf("unknown relation ID %d", relID)
+	}
+
+	// If this change event is on a table we're not capturing, skip doing any
+	// further processing on it.
+	var streamID = sqlcapture.JoinStreamID(rel.Namespace, rel.RelationName)
+	if !s.captureTables[streamID] {
+		return nil, nil
 	}
 
 	bf, err := s.decodeTuple(before, beforeType, rel, nil)

@@ -2,6 +2,7 @@ package sqlcapture
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -89,7 +90,7 @@ type Database interface {
 	Close(ctx context.Context) error
 	// StartReplication opens a connection to the database and returns a ReplicationStream
 	// from which a neverending sequence of change events can be read.
-	StartReplication(ctx context.Context, startCursor string, tableInfo map[string]TableInfo) (ReplicationStream, error)
+	StartReplication(ctx context.Context, startCursor string, captureTables map[string]bool, discovery map[string]TableInfo, metadata map[string]json.RawMessage) (ReplicationStream, error)
 	// WriteWatermark writes the provided string into the 'watermarks' table.
 	WriteWatermark(ctx context.Context, watermark string) error
 	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
