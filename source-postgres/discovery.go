@@ -41,6 +41,7 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]sqlc
 			info.Columns = make(map[string]sqlcapture.ColumnInfo)
 		}
 		info.Columns[column.Name] = column
+		info.ColumnNames = append(info.ColumnNames, column.Name)
 		tableMap[id] = info
 	}
 	for id, key := range primaryKeys {

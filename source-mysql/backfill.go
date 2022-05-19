@@ -34,6 +34,11 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, schema, table strin
 		"resumeKey":  resumeKey,
 	}).Debug("scanning table chunk")
 
+	var columnTypes = make(map[string]string)
+	for name, column := range info.Columns {
+		columnTypes[name] = column.DataType
+	}
+
 	// Build and execute a query to fetch the next `backfillChunkSize` rows from the database
 	var query = buildScanQuery(resumeKey == nil, keyColumns, schema, table)
 	logrus.WithFields(logrus.Fields{"query": query, "args": resumeKey}).Debug("executing query")
@@ -64,7 +69,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, schema, table strin
 				fields[name] = nil
 			}
 		}
-		if err := translateRecordFields(info, fields); err != nil {
+		if err := translateRecordFields(columnTypes, fields); err != nil {
 			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 

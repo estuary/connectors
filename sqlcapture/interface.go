@@ -125,10 +125,11 @@ type ReplicationStream interface {
 // TableInfo holds metadata about a specific table in the database, and
 // is used during discovery to automatically generate catalog information.
 type TableInfo struct {
-	Name       string                // The PostgreSQL table name.
-	Schema     string                // The PostgreSQL schema (a namespace, in normal parlance) which contains the table.
-	Columns    map[string]ColumnInfo // Information about each column of the table.
-	PrimaryKey []string              // An ordered list of the column names which together form the table's primary key.
+	Name        string                // The PostgreSQL table name.
+	Schema      string                // The PostgreSQL schema (a namespace, in normal parlance) which contains the table.
+	Columns     map[string]ColumnInfo // Information about each column of the table.
+	PrimaryKey  []string              // An ordered list of the column names which together form the table's primary key.
+	ColumnNames []string              // The names of all columns, in the table's natural order.
 }
 
 // ColumnInfo holds metadata about a specific column of some table in the
