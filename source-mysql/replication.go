@@ -136,10 +136,41 @@ type mysqlTableMetadata struct {
 }
 
 type mysqlTableSchema struct {
-	Columns []string `json:"columns"`
+	Columns     []string          `json:"columns"`
+	ColumnTypes map[string]string `json:"types"`
 }
 
 func (rs *mysqlReplicationStream) run(ctx context.Context) error {
+	// Initialize metadata for any tables that don't already have some.
+	for streamID, capture := range rs.captureTables {
+		if !capture {
+			continue
+		}
+		if metadata := rs.metadata[streamID]; metadata != nil {
+			continue
+		}
+
+		logrus.WithField("stream", streamID).Debug("initializing table metadata")
+		var metadata = new(mysqlTableMetadata)
+		if discovery, ok := rs.discovery[streamID]; ok {
+			var colTypes = make(map[string]string)
+			for colName, colInfo := range discovery.Columns {
+				colTypes[colName] = colInfo.DataType
+			}
+
+			metadata.Schema.Columns = discovery.ColumnNames
+			metadata.Schema.ColumnTypes = colTypes
+
+			logrus.WithFields(logrus.Fields{
+				"stream":  streamID,
+				"columns": metadata.Schema.Columns,
+				"types":   metadata.Schema.ColumnTypes,
+			}).Debug("initialized table metadata")
+		}
+		// TODO(wgd): Emit some sort of 'metadata change' to rs.events right here
+		rs.metadata[streamID] = metadata
+	}
+
 	for {
 		var event, err = rs.streamer.GetEvent(ctx)
 		if err != nil {
@@ -163,21 +194,26 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				},
 			}
 
+			// Get column names and types from persistent metadata. If available, allow
+			// override the persistent column name tracking using binlog row metadata.
+			var metadata, ok = rs.metadata[streamID]
+			if !ok {
+				return fmt.Errorf("missing metadata for stream %q", streamID)
+			}
+			var columnTypes = metadata.Schema.ColumnTypes
 			var columnNames = data.Table.ColumnNameString()
 			if len(columnNames) == 0 {
-				return fmt.Errorf("binlog doesn't include column names (are you running with '--binlog-row-metadata=FULL'?)")
+				columnNames = metadata.Schema.Columns
 			}
-
-			var info *sqlcapture.TableInfo
-			if cachedInfo, ok := rs.discovery[streamID]; ok {
-				info = &cachedInfo
+			if len(columnNames) == 0 {
+				return fmt.Errorf("unknown column names for stream %q (go.estuary.dev/eiKbOh)", streamID)
 			}
 
 			switch event.Header.EventType {
 			case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
 					var after = decodeRow(columnNames, row)
-					if err := translateRecordFields(info, after); err != nil {
+					if err := translateRecordFields(columnTypes, after); err != nil {
 						return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 					}
 					rs.events <- sqlcapture.ChangeEvent{
@@ -192,10 +228,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if rowIdx%2 == 1 {
 						var before = decodeRow(columnNames, data.Rows[rowIdx-1])
 						var after = decodeRow(columnNames, data.Rows[rowIdx])
-						if err := translateRecordFields(info, before); err != nil {
+						if err := translateRecordFields(columnTypes, before); err != nil {
 							return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
 						}
-						if err := translateRecordFields(info, after); err != nil {
+						if err := translateRecordFields(columnTypes, after); err != nil {
 							return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
 						}
 						rs.events <- sqlcapture.ChangeEvent{
@@ -209,7 +245,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
 					var before = decodeRow(columnNames, row)
-					if err := translateRecordFields(info, before); err != nil {
+					if err := translateRecordFields(columnTypes, before); err != nil {
 						return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
 					}
 					rs.events <- sqlcapture.ChangeEvent{
@@ -262,6 +298,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 func decodeRow(colNames []string, row []interface{}) map[string]interface{} {
 	var fields = make(map[string]interface{})
 	for idx, val := range row {
+		// TODO(wgd): Do something to handle the edge case where a
+		// column is removed from a table which is then added to the
+		// capture, so discovery names fewer columns than actually
+		// exist in the row change events during catchup streaming.
 		var name = colNames[idx]
 		if bs, ok := val.([]byte); ok {
 			val = string(bs)
