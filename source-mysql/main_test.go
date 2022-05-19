@@ -30,8 +30,12 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 
-	if testing.Verbose() {
-		logrus.SetLevel(logrus.InfoLevel)
+	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
+		level, err := logrus.ParseLevel(logLevel)
+		if err != nil {
+			logrus.WithField("level", logLevel).Fatal("invalid log level")
+		}
+		logrus.SetLevel(level)
 	}
 
 	backfillChunkSize = 16

@@ -42,6 +42,14 @@ func TestMain(m *testing.M) {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
+	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
+		level, err := logrus.ParseLevel(logLevel)
+		if err != nil {
+			logrus.WithField("level", logLevel).Fatal("invalid log level")
+		}
+		logrus.SetLevel(level)
+	}
+
 	// Tweak some parameters to make things easier to test on a smaller scale
 	backfillChunkSize = 16
 	replicationBufferSize = 0
