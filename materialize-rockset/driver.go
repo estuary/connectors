@@ -14,14 +14,17 @@ import (
 	"github.com/estuary/connectors/materialize-s3-parquet/checkpoint"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	rockset "github.com/rockset/rockset-go-client"
 	log "github.com/sirupsen/logrus"
 )
 
 type config struct {
 	// Credentials used to authenticate with the Rockset API.
 	ApiKey string `json:"api_key"`
+	// TODO: remove HttpLogging
 	// Enable verbose logging of the HTTP calls to the Rockset API.
 	HttpLogging bool `json:"http_logging"`
+	// TODO: remove MaxConcurrentRequests
 	// The upper limit on how many concurrent requests will be sent to Rockset.
 	MaxConcurrentRequests int `json:"max_concurrent_requests" jsonschema:"default=1"`
 }
@@ -164,11 +167,11 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
-	var cfg = config{}
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing Rockset config: %w", err)
+	cfg, err := ResolveEndpointConfig(req.EndpointSpecJson)
+	if err != nil {
+		return nil, err
 	}
-	client, err := NewClient(cfg.ApiKey, cfg.HttpLogging)
+	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey))
 	if err != nil {
 		return nil, fmt.Errorf("creating Rockset client: %w", err)
 	}
@@ -188,7 +191,7 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 		// then it must already have the integration, since the collection definition is immutable.
 		if rocksetCollection != nil &&
 			res.InitializeFromS3 != nil &&
-			rocksetCollection.GetIntegrationSource(res.InitializeFromS3.Integration) == nil {
+			GetS3IntegrationSource(rocksetCollection, res.InitializeFromS3.Integration) == nil {
 			return nil, fmt.Errorf("Rockset collection '%s' does not have an integration named '%s', which is required by the binding '%s'",
 				res.Collection, res.InitializeFromS3.Integration, binding.Collection.Collection.String())
 		}
@@ -224,7 +227,7 @@ func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (
 		return nil, fmt.Errorf("parsing Rockset config: %w", err)
 	}
 
-	client, err := NewClient(cfg.ApiKey, cfg.HttpLogging)
+	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey))
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +243,7 @@ func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (
 		if createdWorkspace, err := createNewWorkspace(ctx, client, res.Workspace); err != nil {
 			return nil, err
 		} else if createdWorkspace != nil {
-			actionLog = append(actionLog, fmt.Sprintf("created %s workspace", createdWorkspace.Name))
+			actionLog = append(actionLog, fmt.Sprintf("created %s workspace", *createdWorkspace.Name))
 		}
 
 		if createdCollection, err := createNewCollection(ctx, client, res.Workspace, res.Collection, res.InitializeFromS3); err != nil {
@@ -271,12 +274,12 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 		return fmt.Errorf("expected Open, got %#v", open)
 	}
 
-	var cfg *config = &config{}
-	if err := pf.UnmarshalStrict(open.Open.Materialization.EndpointSpecJson, cfg); err != nil {
-		return fmt.Errorf("parsing Rockset config: %w", err)
+	cfg, err := ResolveEndpointConfig(open.Open.Materialization.EndpointSpecJson)
+	if err != nil {
+		return err
 	}
 
-	client, err := NewClient(cfg.ApiKey, cfg.HttpLogging)
+	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey))
 	if err != nil {
 		return err
 	}
@@ -311,7 +314,7 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 	}
 
 	transactor := transactor{
-		config:   cfg,
+		config:   &cfg,
 		client:   client,
 		bindings: bindings,
 	}
@@ -329,6 +332,14 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 	log := log.NewEntry(log.StandardLogger())
 
 	return pm.RunTransactions(stream, &transactor, log)
+}
+
+func ResolveEndpointConfig(specJson json.RawMessage) (config, error) {
+	var cfg = config{}
+	if err := pf.UnmarshalStrict(specJson, &cfg); err != nil {
+		return cfg, fmt.Errorf("parsing Rockset config: %w", err)
+	}
+	return cfg, cfg.Validate()
 }
 
 func RandString(len int) string {
