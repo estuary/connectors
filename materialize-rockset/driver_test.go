@@ -11,6 +11,7 @@ import (
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	rockset "github.com/rockset/rockset-go-client"
 	"github.com/stretchr/testify/require"
 	pb "go.gazette.dev/core/broker/protocol"
 )
@@ -194,16 +195,16 @@ func TestRocksetDriverApply(t *testing.T) {
 
 func cleanup(config config, workspaceName string, collectionName string) {
 	ctx := context.Background()
-	client, err := NewClient(config.ApiKey, false)
+	client, err := rockset.NewClient(rockset.WithAPIKey(config.ApiKey))
 	if err != nil {
 		log.Fatalf("initializing client: %s", err.Error())
 	}
 
-	if err := client.DestroyCollection(ctx, workspaceName, collectionName); err != nil {
+	if err := client.DeleteCollection(ctx, workspaceName, collectionName); err != nil {
 		log.Fatalf("failed to cleanup collection: %s/%s: %s", workspaceName, collectionName, err.Error())
 	}
 
-	client.DestroyWorkspace(ctx, workspaceName)
+	client.DeleteWorkspace(ctx, workspaceName)
 }
 
 func randWorkspace() string {

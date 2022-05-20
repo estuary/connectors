@@ -6,11 +6,14 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/relvacode/iso8601"
+	rockset "github.com/rockset/rockset-go-client"
+	rtypes "github.com/rockset/rockset-go-client/openapi"
 	log "github.com/sirupsen/logrus"
 )
 
 // Only creates the named collection if it does not already exist.
-func createNewWorkspace(ctx context.Context, client *client, workspace string) (*Workspace, error) {
+func createNewWorkspace(ctx context.Context, client *rockset.RockClient, workspace string) (*rtypes.Workspace, error) {
 	if res, err := getWorkspace(ctx, client, workspace); err != nil {
 		return nil, err
 	} else if res != nil {
@@ -22,30 +25,29 @@ func createNewWorkspace(ctx context.Context, client *client, workspace string) (
 	}
 }
 
-func getWorkspace(ctx context.Context, client *client, workspace string) (*Workspace, error) {
+func getWorkspace(ctx context.Context, client *rockset.RockClient, workspace string) (*rtypes.Workspace, error) {
 	res, err := client.GetWorkspace(ctx, workspace)
-	if se, ok := err.(*StatusError); ok && se.NotFound() {
+	if se, ok := err.(rockset.Error); ok && se.IsNotFoundError() {
 		// Everything worked, but this workspace does not exist.
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to fetch workspace `%s`: %w", workspace, err)
 	} else {
-		return res, nil
+		return &res, nil
 	}
 }
 
-func createWorkspace(ctx context.Context, client *client, workspaceName string) (*Workspace, error) {
-	workspace := CreateWorkspace{Name: workspaceName}
-	if res, err := client.CreateWorkspace(ctx, &workspace); err != nil {
+func createWorkspace(ctx context.Context, client *rockset.RockClient, workspaceName string) (*rtypes.Workspace, error) {
+	if res, err := client.CreateWorkspace(ctx, workspaceName); err != nil {
 		return nil, fmt.Errorf("failed to create workspace `%s`: %w", workspaceName, err)
 	} else {
-		return res, nil
+		return &res, nil
 	}
 }
 
 // Only creates the named collection if it does not already exist. The returned boolean indicates whether it was
 // actually created. It will be false if the collection already exists or if an error is returned.
-func createNewCollection(ctx context.Context, client *client, workspace string, collection string, integration *cloudStorageIntegration) (bool, error) {
+func createNewCollection(ctx context.Context, client *rockset.RockClient, workspace string, collection string, integration *cloudStorageIntegration) (bool, error) {
 	if res, err := getCollection(ctx, client, workspace, collection); err != nil {
 		return false, err
 	} else if res != nil {
@@ -54,7 +56,7 @@ func createNewCollection(ctx context.Context, client *client, workspace string, 
 		// are immutable, so there's no way to add an integration to an existing
 		// collection.  Thus, if the integration named in the resource
 		// configuration does not exist, it must be returned as an error.
-		if integration != nil && res.GetIntegrationSource(integration.Integration) == nil {
+		if integration != nil && GetS3IntegrationSource(res, integration.Integration) == nil {
 			return false, fmt.Errorf("expected collection '%s' to have a source with an integration named '%s', but no such integration source exists", collection, integration)
 		}
 		return false, nil
@@ -65,36 +67,53 @@ func createNewCollection(ctx context.Context, client *client, workspace string, 
 	}
 }
 
-func getCollection(ctx context.Context, client *client, workspace string, collection string) (*Collection, error) {
+func GetS3IntegrationSource(collection *rtypes.Collection, integrationName string) *rtypes.SourceS3 {
+	for _, source := range collection.Sources {
+		if source.IntegrationName == integrationName {
+			return source.S3
+		}
+	}
+	return nil
+}
+
+func getCollection(ctx context.Context, client *rockset.RockClient, workspace string, collection string) (*rtypes.Collection, error) {
 	res, err := client.GetCollection(ctx, workspace, collection)
-	if se, ok := err.(*StatusError); ok && se.NotFound() {
+	if se, ok := err.(rockset.Error); ok && se.IsNotFoundError() {
 		// Everything worked, but this collection does not exist.
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to fetch collection `%s`: %w", collection, err)
 	} else {
-		return res, nil
+		return &res, nil
 	}
 }
 
-func createCollection(ctx context.Context, client *client, workspace string, collectionName string, integration *cloudStorageIntegration) error {
-	collection := CreateCollection{Name: collectionName}
+func createCollection(ctx context.Context, client *rockset.RockClient, workspace string, collectionName string, integration *cloudStorageIntegration) error {
+	collection := rtypes.CreateCollectionRequest{Name: collectionName}
 	if integration != nil {
-		collection.Sources = []CreateCollectionSource{{
+		collection.Sources = []rtypes.Source{{
 			IntegrationName: integration.Integration,
-			S3: &S3Integration{
+			S3: &rtypes.SourceS3{
 				Bucket:  integration.Bucket,
-				Region:  integration.Region,
-				Prefix:  integration.Prefix,
-				Pattern: integration.Pattern,
+				Region:  trimToNill(integration.Region),
+				Prefix:  trimToNill(integration.Prefix),
+				Pattern: trimToNill(integration.Pattern),
 			},
 		}}
 	}
-	_, err := client.CreateCollection(ctx, workspace, &collection)
+	_, err := client.CreateCollection(ctx, workspace, collectionName, &collection)
 	if err != nil {
 		return fmt.Errorf("failed to create collection `%s`: %w", collectionName, err)
 	}
 	return nil
+}
+
+func trimToNill(s string) *string {
+	if s == "" {
+		return nil
+	} else {
+		return &s
+	}
 }
 
 // awaitCollectionReady blocks until the given Rockset collection has a READY status AND has completed
@@ -103,7 +122,7 @@ func createCollection(ctx context.Context, client *client, workspace string, col
 // Basically, we need to wait until all the documents in the cloud storage bucket have been ingested before we can start
 // using the write API, or else an earlier document from cloud storage may overwrite the one we ingest using the write
 // API.
-func awaitCollectionReady(ctx context.Context, client *client, workspace, collectionName, integration string) error {
+func awaitCollectionReady(ctx context.Context, client *rockset.RockClient, workspace, collectionName, integration string) error {
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -116,7 +135,7 @@ func awaitCollectionReady(ctx context.Context, client *client, workspace, collec
 			return fmt.Errorf("rockset collection '%s' does not exist or has been deleted", collectionName)
 		}
 
-		var ready = collection.Status == STATUS_READY
+		var ready = isStatusReady(collection)
 
 		// We'll check to see if a collection has made no progress and emit a specific warning in that case.  If a
 		// Rockset collection isn't using a large enough instance, then it'll silently refuse to actually use the
@@ -124,7 +143,10 @@ func awaitCollectionReady(ctx context.Context, client *client, workspace, collec
 		// to actually detect the instance size via the API, so we'll try to log a helpful warning if the collection
 		// goes too long without downloading any of the objects from cloud storage.
 		var bulkIngestStalled = false
-		var collectionAge = time.Since(collection.CreatedAt)
+		collectionAge, err := getCollectionAge(collection)
+		if err != nil {
+			return err
+		}
 		// If an integration was specified, then we need to _also_ wait for that integration to fully process all of its
 		// files. Technically, this will already be the case if there was enough data in the source bucket to trigger a
 		// "bulk load", because in that case Rockset will not set the status to READY until after all the files have
@@ -132,12 +154,12 @@ func awaitCollectionReady(ctx context.Context, client *client, workspace, collec
 		// status may be set to READY before all of the source files have been processed. This condition is a guard
 		// against ingesting data out of order in that specific case.
 		if integration != "" {
-			var source = collection.GetCloudStorageSource(integration)
+			var source = GetS3IntegrationSource(collection, integration)
 			if source == nil {
 				return fmt.Errorf("expected collection '%s' to have a compatible cloud-storage integration named '%s', but no such source exists", collectionName, integration)
 			}
-			ready = ready && source.ObjectCountTotal == source.ObjectCountDownloaded
-			bulkIngestStalled = source.ObjectCountTotal > 0 && source.ObjectCountDownloaded == 0 && collectionAge > time.Minute*5
+			ready = ready && *source.ObjectCountTotal == *source.ObjectCountDownloaded
+			bulkIngestStalled = *source.ObjectCountTotal > 0 && *source.ObjectCountDownloaded == 0 && collectionAge > time.Minute*5
 		}
 
 		var logEntry = log.WithFields(log.Fields{
@@ -154,6 +176,30 @@ func awaitCollectionReady(ctx context.Context, client *client, workspace, collec
 		}
 
 		time.Sleep(nextIngestCompletionBackoff(collectionAge))
+	}
+}
+
+func getCollectionAge(collection *rtypes.Collection) (time.Duration, error) {
+	if createdAt, err := getCollectionCreationTime(collection); err != nil {
+		return 0, err
+	} else {
+		return time.Since(createdAt), nil
+	}
+}
+
+func getCollectionCreationTime(collection *rtypes.Collection) (time.Time, error) {
+	if collection != nil && collection.CreatedAt != nil {
+		return iso8601.ParseString(*collection.CreatedAt)
+	} else {
+		return time.Time{}, fmt.Errorf("missing CreatedAt time in collection")
+	}
+}
+
+func isStatusReady(collection *rtypes.Collection) bool {
+	if collection != nil && collection.Status != nil {
+		return (*collection.Status) == STATUS_READY
+	} else {
+		return false
 	}
 }
 
