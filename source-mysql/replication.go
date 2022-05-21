@@ -13,6 +13,7 @@ import (
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/sirupsen/logrus"
+	"vitess.io/vitess/go/vt/sqlparser"
 )
 
 // replicationBufferSize controls how many change events can be buffered in the
@@ -290,14 +291,9 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		case *replication.PreviousGTIDsEvent:
 			logrus.WithField("gtids", data.GTIDSets).Trace("PreviousGTIDs Event")
 		case *replication.QueryEvent:
-			// Receiving a query event isn't _necessarily_ a problem, but it could be an indication
-			// that the server's `binlog_format` is not set correctly. Even when it's correctly set
-			// to `ROW`, Query events will still be sent for DDL statements, so we don't want to
-			// return an error here, but we do want these logs to be fairly visible.
-			logrus.WithFields(logrus.Fields{
-				"event": data,
-				"query": string(data.Query),
-			}).Info("Query Event")
+			if err := rs.handleQuery(string(data.Schema), string(data.Query)); err != nil {
+				return fmt.Errorf("error processing query event: %w", err)
+			}
 		case *replication.RotateEvent:
 			logrus.WithField("data", data).Trace("Rotate Event")
 		case *replication.FormatDescriptionEvent:
@@ -331,6 +327,70 @@ func decodeRow(streamID string, colNames []string, row []interface{}) map[string
 		}
 	}
 	return fields
+}
+
+func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
+	// There are basically three types of query events we might receive:
+	//   * An INSERT/UPDATE/DELETE query is an error, we should never receive
+	//     these if the server's `binlog_format` is set to ROW as it should be
+	//     for CDC to work properly.
+	//   * Various DDL queries like CREATE/ALTER/DROP/TRUNCATE/RENAME TABLE,
+	//     which should in general be treated like errors *if they occur on
+	//     a table we're capturing*, though we expect to eventually handle
+	//     some subset of possible alterations like adding/renaming columns.
+	//   * Some other queries like BEGIN and CREATE DATABASE and other things
+	//     that we don't care about, either because they change things that
+	//     don't impact our capture or because we get the relevant information
+	//     by some other means.
+	logrus.WithField("query", query).Debug("handling query event")
+
+	var stmt, err = sqlparser.ParseStrictDDL(query)
+	if err != nil {
+		return fmt.Errorf("error parsing query: %w", err)
+	}
+	logrus.WithField("stmt", fmt.Sprintf("%#v", stmt)).Debug("parsed query")
+
+	switch stmt := stmt.(type) {
+	case *sqlparser.Begin:
+	case *sqlparser.CreateDatabase:
+	case *sqlparser.CreateTable:
+		logrus.WithField("query", query).Trace("ignoring benign query")
+	case *sqlparser.AlterTable:
+		if streamID := resolveTableName(schema, stmt.Table); rs.captureTables[streamID] {
+			return fmt.Errorf("unsupported ALTER TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
+		}
+	case *sqlparser.DropTable:
+		for _, table := range stmt.FromTables {
+			if streamID := resolveTableName(schema, table); rs.captureTables[streamID] {
+				return fmt.Errorf("unsupported DROP TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
+			}
+		}
+	case *sqlparser.TruncateTable:
+		if streamID := resolveTableName(schema, stmt.Table); rs.captureTables[streamID] {
+			return fmt.Errorf("unsupported TRUNCATE TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
+		}
+	case *sqlparser.RenameTable:
+		for _, pair := range stmt.TablePairs {
+			if streamID := resolveTableName(schema, pair.FromTable); rs.captureTables[streamID] {
+				return fmt.Errorf("unsupported RENAME TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
+			}
+			if streamID := resolveTableName(schema, pair.ToTable); rs.captureTables[streamID] {
+				return fmt.Errorf("unsupported RENAME TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
+			}
+		}
+	default:
+		return fmt.Errorf("unsupported query %q (go.estuary.dev/eVVwet)", query)
+	}
+
+	return nil
+}
+
+func resolveTableName(defaultSchema string, name sqlparser.TableName) string {
+	var schema, table = name.Qualifier.String(), name.Name.String()
+	if schema == "" {
+		schema = defaultSchema
+	}
+	return sqlcapture.JoinStreamID(schema, table)
 }
 
 func (rs *mysqlReplicationStream) Events() <-chan sqlcapture.ChangeEvent {
