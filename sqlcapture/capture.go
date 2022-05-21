@@ -97,13 +97,12 @@ const (
 )
 
 // Run is the top level entry point of the capture process.
-func (c *Capture) Run(ctx context.Context) error {
+func (c *Capture) Run(ctx context.Context) (err error) {
 	// Perform discovery and cache the result. This is used at startup when
 	// updating the state to reflect catalog changes, and then later it is
 	// plumbed through so that value translation can take column types into
 	// account.
 	logrus.Info("discovering tables")
-	var err error
 	c.discovery, err = c.Database.DiscoverTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
@@ -125,7 +124,11 @@ func (c *Capture) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
-	defer replStream.Close(ctx)
+	defer func() {
+		if streamErr := replStream.Close(ctx); streamErr != nil {
+			err = streamErr
+		}
+	}()
 
 	// Backfill any tables which require it
 	var results *resultSet
