@@ -15,3 +15,9 @@
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"RECORD","record":{"stream":"test_generic_tailing","data":{"_meta":{"op":"u","source":{"schema":"public","table":"test_generic_tailing"}},"data":"updated","id":30},"emitted_at":1234,"namespace":"public"}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
+
+========
+
+Capture Terminated With Error:
+
+    replication stream closed before reaching watermark
