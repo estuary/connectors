@@ -67,6 +67,7 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 		events: make(chan sqlcapture.ChangeEvent, replicationBufferSize),
+		errCh:  make(chan error),
 	}
 
 	// Create the publication and replication slot, ignoring the inevitable errors
@@ -88,11 +89,13 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 	var streamCtx, streamCancel = context.WithCancel(ctx)
 	stream.cancel = streamCancel
 	go func() {
-		defer close(stream.events)
-		defer stream.conn.Close(ctx)
-		if err := stream.run(streamCtx); err != nil && !errors.Is(err, context.Canceled) {
-			logrus.WithField("err", err).Fatal("replication stream error")
+		var err = stream.run(streamCtx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
 		}
+		stream.conn.Close(ctx)
+		close(stream.events)
+		stream.errCh <- err
 	}()
 
 	return stream, nil
@@ -142,6 +145,7 @@ func (s *postgresSource) Cursor() string {
 type replicationStream struct {
 	ackLSN          uint64                      // The most recently Ack'd LSN, passed to startReplication or updated via CommitLSN.
 	cancel          context.CancelFunc          // Cancel function for the replication goroutine's context
+	errCh           chan error                  // Error channel for the final exit status of the replication goroutine
 	conn            *pgconn.PgConn              // The PostgreSQL replication connection
 	eventBuf        *sqlcapture.ChangeEvent     // A single-element buffer used in between 'receiveMessage' and the output channel
 	events          chan sqlcapture.ChangeEvent // The channel to which replication events will be written
@@ -547,5 +551,5 @@ func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 func (s *replicationStream) Close(ctx context.Context) error {
 	logrus.Debug("replication stream close requested")
 	s.cancel()
-	return nil
+	return <-s.errCh
 }
