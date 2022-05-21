@@ -1,0 +1,12 @@
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_altertable_ccc":{"mode":"Backfill","key_columns":["id"],"scanned":null}}},"estuary.dev/merge":true}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_altertable_ccc":{"mode":"Backfill","key_columns":["id"],"scanned":null,"metadata":{"schema":{"columns":["id","data","extra","evenmore"],"types":{"data":"text","evenmore":"text","extra":"text","id":"int"}}}}}},"estuary.dev/merge":true}}
+{"type":"RECORD","record":{"stream":"test_altertable_ccc","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_altertable_ccc"}},"data":"mno","evenmore":null,"extra":null,"id":5},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_altertable_ccc","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_altertable_ccc"}},"data":"pqr","evenmore":null,"extra":null,"id":6},"emitted_at":1234,"namespace":"test"}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_altertable_ccc":{"mode":"Backfill","key_columns":["id"],"scanned":"FQY=","metadata":{"schema":{"columns":["id","data","extra","evenmore"],"types":{"data":"text","evenmore":"text","extra":"text","id":"int"}}}}}},"estuary.dev/merge":true}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_altertable_ccc":{"mode":"Active","key_columns":["id"],"scanned":null,"metadata":{"schema":{"columns":["id","data","extra","evenmore"],"types":{"data":"text","evenmore":"text","extra":"text","id":"int"}}}}}},"estuary.dev/merge":true}}
+
+========
+
+Capture Terminated With Error:
+
+    error processing query event: unsupported ALTER TABLE operation on "test.test_altertable_ccc" (go.estuary.dev/eVVwet)
