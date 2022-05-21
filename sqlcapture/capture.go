@@ -115,8 +115,10 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	var captureTables = make(map[string]bool)
 	var tableMetadata = make(map[string]json.RawMessage)
 	for streamID, state := range c.State.Streams {
-		tableMetadata[streamID] = state.Metadata
-		captureTables[streamID] = true
+		if state.Mode != TableModeIgnore {
+			tableMetadata[streamID] = state.Metadata
+			captureTables[streamID] = true
+		}
 	}
 	captureTables[c.Database.WatermarksTable()] = true
 
