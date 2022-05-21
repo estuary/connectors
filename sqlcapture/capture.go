@@ -384,7 +384,7 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 			return fmt.Errorf("error patching resultset for %q: %w", streamID, err)
 		}
 	}
-	return nil
+	return fmt.Errorf("replication stream closed before reaching watermark")
 }
 
 func (c *Capture) emitBuffered(results *resultSet) error {
