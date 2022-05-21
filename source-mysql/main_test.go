@@ -66,6 +66,51 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+func TestAlterTable(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	var catalogA = tests.ConfiguredCatalog(ctx, t, tb, tableA)
+	var catalogAB = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB)
+	var catalogABC = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB, tableC)
+	var state = sqlcapture.PersistentState{}
+	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "abc"}, {2, "def"}})
+	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ghi"}, {4, "jkl"}})
+	tb.Insert(ctx, t, tableC, [][]interface{}{{5, "mno"}, {6, "pqr"}})
+	tests.VerifiedCapture(ctx, t, tb, &catalogAB, &state, "init")
+
+	// Altering tableC, which is not being captured, should be fine
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableC))
+	tests.VerifiedCapture(ctx, t, tb, &catalogAB, &state, "capture1")
+
+	// Altering tableB, which is being captured, should result in an error
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableB))
+	tests.VerifiedCapture(ctx, t, tb, &catalogAB, &state, "capture2_fails")
+
+	// Restarting the capture won't fix this
+	tests.VerifiedCapture(ctx, t, tb, &catalogAB, &state, "capture3_fails")
+
+	// But removing the problematic table should fix it
+	tests.VerifiedCapture(ctx, t, tb, &catalogA, &state, "capture4")
+
+	// And we can then re-add the table and it should start over after the problem
+	tests.VerifiedCapture(ctx, t, tb, &catalogAB, &state, "capture5")
+
+	// Finally we exercise the trickiest edge case, in which a new table (C)
+	// is added to the capture *when it was also altered after the last state
+	// checkpoint*.
+	//
+	// Currently this one fails because we have a static concept of 'tables
+	// that we care about' which is set when replication begins. Fixing this
+	// to not produce an error requires that we first perform streaming to
+	// the first watermark after connector restart, and *then* begin processing
+	// replication events for any newly added capture bindings.
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN evenmore TEXT;", tableC))
+	tests.VerifiedCapture(ctx, t, tb, &catalogABC, &state, "capture6_fails")
+}
+
 type mysqlTestBackend struct {
 	conn *client.Conn
 	cfg  Config
