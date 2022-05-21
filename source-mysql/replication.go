@@ -85,13 +85,16 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		metadata:      parsedMetadata,
 		events:        make(chan sqlcapture.ChangeEvent, replicationBufferSize),
 		cancel:        streamCancel,
+		errCh:         make(chan error),
 	}
 	go func() {
-		defer close(stream.events)
-		defer syncer.Close()
-		if err := stream.run(streamCtx); err != nil && !errors.Is(err, context.Canceled) {
-			logrus.WithField("err", err).Fatal("replication stream error")
+		var err = stream.run(streamCtx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
 		}
+		syncer.Close()
+		close(stream.events)
+		stream.errCh <- err
 	}()
 
 	return stream, nil
@@ -129,6 +132,7 @@ type mysqlReplicationStream struct {
 	metadata      map[string]*mysqlTableMetadata
 	events        chan sqlcapture.ChangeEvent
 	cancel        context.CancelFunc
+	errCh         chan error
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
 }
 
@@ -406,5 +410,5 @@ func (rs *mysqlReplicationStream) Acknowledge(ctx context.Context, cursor string
 
 func (rs *mysqlReplicationStream) Close(ctx context.Context) error {
 	rs.cancel()
-	return nil
+	return <-rs.errCh
 }

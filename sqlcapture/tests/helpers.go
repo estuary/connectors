@@ -41,7 +41,7 @@ func PerformCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog *
 	buf.MergeBase = copyState(*state)
 	var initState = copyState(*state)
 	if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), catalog, &initState, buf); err != nil {
-		t.Fatal(err)
+		fmt.Fprintf(&buf.Snapshot, "\n========\nCapture Terminated With Error: %s\n", err.Error())
 	}
 
 	var result, states = buf.Output()
