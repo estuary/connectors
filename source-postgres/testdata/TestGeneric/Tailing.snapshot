@@ -1,3 +1,5 @@
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_tailing":{"mode":"Pending","key_columns":["id"],"scanned":null}}},"estuary.dev/merge":true}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_tailing":{"mode":"Backfill","key_columns":["id"],"scanned":null}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"RECORD","record":{"stream":"test_generic_tailing","data":{"_meta":{"op":"c","source":{"schema":"public","snapshot":true,"table":"test_generic_tailing"}},"data":"A","id":0},"emitted_at":1234,"namespace":"public"}}

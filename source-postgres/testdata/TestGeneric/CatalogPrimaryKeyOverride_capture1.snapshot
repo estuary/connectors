@@ -1,3 +1,5 @@
+{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_catalogprimarykeyoverride":{"mode":"Pending","key_columns":["fullname","year"],"scanned":null}}},"estuary.dev/merge":true}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_catalogprimarykeyoverride":{"mode":"Backfill","key_columns":["fullname","year"],"scanned":null}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"RECORD","record":{"stream":"test_generic_catalogprimarykeyoverride","data":{"_meta":{"op":"c","source":{"schema":"public","snapshot":true,"table":"test_generic_catalogprimarykeyoverride"}},"fullname":"Alabama","population":1830000,"state":"AL","year":1900},"emitted_at":1234,"namespace":"public"}}

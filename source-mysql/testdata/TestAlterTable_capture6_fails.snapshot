@@ -1,7 +1,0 @@
-{"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_altertable_ccc":{"mode":"Backfill","key_columns":["id"],"scanned":null}}},"estuary.dev/merge":true}}
-
-========
-
-Capture Terminated With Error:
-
-    error processing query event: unsupported ALTER TABLE operation on "test.test_altertable_ccc" (go.estuary.dev/eVVwet)
