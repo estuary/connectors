@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 
 // StartReplication opens a connection to the database and returns a ReplicationStream
 // from which a neverending sequence of change events can be read.
-func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor string, captureTables map[string]bool, discovery map[string]sqlcapture.TableInfo, metadata map[string]json.RawMessage) (sqlcapture.ReplicationStream, error) {
+func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor string, activeTables map[string]bool, discovery map[string]sqlcapture.TableInfo, metadata map[string]json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	// Replication database connection used for event streaming
 	connConfig, err := pgconn.ParseConfig(db.config.ToURI())
 	if err != nil {
@@ -63,7 +64,7 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 		nextTxnMillis:   0,
 		conn:            conn,
 		connInfo:        pgtype.NewConnInfo(),
-		captureTables:   captureTables,
+		activeTables:    activeTables,
 		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 		events: make(chan sqlcapture.ChangeEvent, replicationBufferSize),
@@ -169,10 +170,13 @@ type replicationStream struct {
 	// and other information about the table structure at a particular moment.
 	relations map[uint32]*pglogrepl.RelationMessage
 
-	// captureTables keeps track of what tables we actually care about
+	// tablesMutex guards access to the 'active tables' set and associated
+	// table metadata.
+	tablesMutex sync.RWMutex
+	// activeTables keeps track of what tables we actually care about
 	// capturing, so that replication can stop processing events from
 	// other tables early.
-	captureTables map[string]bool
+	activeTables map[string]bool
 }
 
 const standbyStatusInterval = 10 * time.Second
@@ -357,7 +361,7 @@ func (s *replicationStream) decodeChangeEvent(
 	// If this change event is on a table we're not capturing, skip doing any
 	// further processing on it.
 	var streamID = sqlcapture.JoinStreamID(rel.Namespace, rel.RelationName)
-	if !s.captureTables[streamID] {
+	if !s.tableActive(streamID) {
 		return nil, nil
 	}
 
@@ -504,6 +508,19 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.LSN, 
 			return 0, nil, fmt.Errorf("unexpected message: %v", msg)
 		}
 	}
+}
+
+func (s *replicationStream) tableActive(streamID string) bool {
+	s.tablesMutex.RLock()
+	defer s.tablesMutex.RUnlock()
+	return s.activeTables[streamID]
+}
+
+func (s *replicationStream) ActivateTable(streamID string) error {
+	s.tablesMutex.Lock()
+	s.activeTables[streamID] = true
+	s.tablesMutex.Unlock()
+	return nil
 }
 
 // AcknowledgeLSN informs the ReplicationStream that all messages up to the specified
