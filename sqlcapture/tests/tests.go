@@ -183,7 +183,7 @@ func testComplexDataset(ctx context.Context, t *testing.T, tb TestBackend) {
 
 	LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
 	var states = VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
-	state = states[21] // Restart in between (1960, 'IA') and (1960, 'ID')
+	state = states[22] // Restart in between (1960, 'IA') and (1960, 'ID')
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{1930, "XX", "No Such State", 1234},   // An insert in the already-scanned portion, which will be reported before backfilling resumes.

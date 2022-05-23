@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
@@ -22,7 +23,7 @@ import (
 // likely to exercise blocking sends and backpressure.
 var replicationBufferSize = 1024
 
-func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor string, captureTables map[string]bool, discovery map[string]sqlcapture.TableInfo, metadata map[string]json.RawMessage) (sqlcapture.ReplicationStream, error) {
+func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor string, activeTables map[string]bool, discovery map[string]sqlcapture.TableInfo, metadata map[string]json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	var parsedMetadata = make(map[string]*mysqlTableMetadata)
 	for streamID, metadataJSON := range metadata {
 		var parsed *mysqlTableMetadata
@@ -78,14 +79,14 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 
 	var streamCtx, streamCancel = context.WithCancel(ctx)
 	var stream = &mysqlReplicationStream{
-		syncer:        syncer,
-		streamer:      streamer,
-		captureTables: captureTables,
-		discovery:     discovery,
-		metadata:      parsedMetadata,
-		events:        make(chan sqlcapture.ChangeEvent, replicationBufferSize),
-		cancel:        streamCancel,
-		errCh:         make(chan error),
+		syncer:       syncer,
+		streamer:     streamer,
+		events:       make(chan sqlcapture.ChangeEvent, replicationBufferSize),
+		cancel:       streamCancel,
+		errCh:        make(chan error),
+		activeTables: activeTables,
+		discovery:    discovery,
+		metadata:     parsedMetadata,
 	}
 	go func() {
 		var err = stream.run(streamCtx)
@@ -127,13 +128,19 @@ func splitHostPort(addr string) (string, int64, error) {
 type mysqlReplicationStream struct {
 	syncer        *replication.BinlogSyncer
 	streamer      *replication.BinlogStreamer
-	captureTables map[string]bool
-	discovery     map[string]sqlcapture.TableInfo
-	metadata      map[string]*mysqlTableMetadata
 	events        chan sqlcapture.ChangeEvent
 	cancel        context.CancelFunc
 	errCh         chan error
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
+
+	// Mutex protecting the table activity and metadata maps, so
+	// that they can be modified from the main thread but still
+	// read by the replication thread.
+	tablesMutex   sync.RWMutex
+	activeTables  map[string]bool
+	discovery     map[string]sqlcapture.TableInfo
+	metadata      map[string]*mysqlTableMetadata
+	dirtyMetadata []string
 }
 
 type mysqlTableMetadata struct {
@@ -146,50 +153,46 @@ type mysqlTableSchema struct {
 }
 
 func (rs *mysqlReplicationStream) run(ctx context.Context) error {
-	// Initialize metadata for any tables that don't already have some.
-	for streamID, capture := range rs.captureTables {
+	// Initialize metadata (as necessary) for all active tables.
+	for streamID, capture := range rs.activeTables {
 		if !capture {
 			continue
-		}
-		if metadata := rs.metadata[streamID]; metadata != nil {
-			continue
-		}
-
-		// Construct table metadata for the new table
-		logrus.WithField("stream", streamID).Debug("initializing table metadata")
-		var metadata = new(mysqlTableMetadata)
-		if discovery, ok := rs.discovery[streamID]; ok {
-			var colTypes = make(map[string]string)
-			for colName, colInfo := range discovery.Columns {
-				colTypes[colName] = colInfo.DataType
-			}
-
-			metadata.Schema.Columns = discovery.ColumnNames
-			metadata.Schema.ColumnTypes = colTypes
-
-			logrus.WithFields(logrus.Fields{
-				"stream":  streamID,
-				"columns": metadata.Schema.Columns,
-				"types":   metadata.Schema.ColumnTypes,
-			}).Debug("initialized table metadata")
-		}
-
-		// Set the new table metadata and inform the change event consumer
-		rs.metadata[streamID] = metadata
-		bs, err := json.Marshal(metadata)
-		if err != nil {
-			return fmt.Errorf("error serializing metadata JSON for %q: %w", streamID, err)
-		}
-		rs.events <- sqlcapture.ChangeEvent{
-			Operation: sqlcapture.MetadataOp,
-			Metadata: &sqlcapture.MetadataChangeEvent{
-				StreamID: streamID,
-				Metadata: json.RawMessage(bs),
-			},
+		} else if err := rs.ActivateTable(streamID); err != nil {
+			return fmt.Errorf("error activating %q at replication start: %w", streamID, err)
 		}
 	}
 
 	for {
+		// Send "Metadata Change" events to the consumer where applicable.
+		//
+		// Note that the work is divided in two here so that the mutex-acquiring
+		// part cannot block and the blocking send doesn't hold the mutex. This
+		// helps avoid a (very unlikely) deadlock with the main thread calling
+		// ActivateTable() while the events buffer is full.
+		var metadataEvents []sqlcapture.ChangeEvent
+		rs.tablesMutex.RLock()
+		if rs.dirtyMetadata != nil {
+			for _, streamID := range rs.dirtyMetadata {
+				var bs, err = json.Marshal(rs.metadata[streamID])
+				if err != nil {
+					return fmt.Errorf("error serializing metadata JSON for %q: %w", streamID, err)
+				}
+				metadataEvents = append(metadataEvents, sqlcapture.ChangeEvent{
+					Operation: sqlcapture.MetadataOp,
+					Metadata: &sqlcapture.MetadataChangeEvent{
+						StreamID: streamID,
+						Metadata: json.RawMessage(bs),
+					},
+				})
+			}
+			rs.dirtyMetadata = nil
+		}
+		rs.tablesMutex.RUnlock()
+		for _, metadataEvent := range metadataEvents {
+			rs.events <- metadataEvent
+		}
+
+		// Process the next binlog event from the database.
 		var event, err = rs.streamer.GetEvent(ctx)
 		if err != nil {
 			return fmt.Errorf("error getting next event: %w", err)
@@ -200,7 +203,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			var schema, table = string(data.Table.Schema), string(data.Table.Table)
 			var streamID = sqlcapture.JoinStreamID(schema, table)
 			// Skip change events from tables which aren't being captured
-			if !rs.captureTables[streamID] {
+			if !rs.tableActive(streamID) {
 				continue
 			}
 
@@ -214,7 +217,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 
 			// Get column names and types from persistent metadata. If available, allow
 			// override the persistent column name tracking using binlog row metadata.
-			var metadata, ok = rs.metadata[streamID]
+			var metadata, ok = rs.tableMetadata(streamID)
 			if !ok {
 				return fmt.Errorf("missing metadata for stream %q", streamID)
 			}
@@ -360,25 +363,25 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	case *sqlparser.CreateTable:
 		logrus.WithField("query", query).Trace("ignoring benign query")
 	case *sqlparser.AlterTable:
-		if streamID := resolveTableName(schema, stmt.Table); rs.captureTables[streamID] {
+		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
 			return fmt.Errorf("unsupported ALTER TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
 		}
 	case *sqlparser.DropTable:
 		for _, table := range stmt.FromTables {
-			if streamID := resolveTableName(schema, table); rs.captureTables[streamID] {
+			if streamID := resolveTableName(schema, table); rs.tableActive(streamID) {
 				return fmt.Errorf("unsupported DROP TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
 			}
 		}
 	case *sqlparser.TruncateTable:
-		if streamID := resolveTableName(schema, stmt.Table); rs.captureTables[streamID] {
+		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
 			return fmt.Errorf("unsupported TRUNCATE TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
 		}
 	case *sqlparser.RenameTable:
 		for _, pair := range stmt.TablePairs {
-			if streamID := resolveTableName(schema, pair.FromTable); rs.captureTables[streamID] {
+			if streamID := resolveTableName(schema, pair.FromTable); rs.tableActive(streamID) {
 				return fmt.Errorf("unsupported RENAME TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
 			}
-			if streamID := resolveTableName(schema, pair.ToTable); rs.captureTables[streamID] {
+			if streamID := resolveTableName(schema, pair.ToTable); rs.tableActive(streamID) {
 				return fmt.Errorf("unsupported RENAME TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
 			}
 		}
@@ -397,14 +400,67 @@ func resolveTableName(defaultSchema string, name sqlparser.TableName) string {
 	return sqlcapture.JoinStreamID(schema, table)
 }
 
+func (rs *mysqlReplicationStream) tableMetadata(streamID string) (*mysqlTableMetadata, bool) {
+	rs.tablesMutex.RLock()
+	defer rs.tablesMutex.RUnlock()
+	var meta, ok = rs.metadata[streamID]
+	return meta, ok
+}
+
+func (rs *mysqlReplicationStream) tableActive(streamID string) bool {
+	rs.tablesMutex.RLock()
+	defer rs.tablesMutex.RUnlock()
+	return rs.activeTables[streamID]
+}
+
+func (rs *mysqlReplicationStream) ActivateTable(streamID string) error {
+	rs.tablesMutex.Lock()
+	defer rs.tablesMutex.Unlock()
+
+	// Mark the table active. This is redundant for `ActivateTable()` calls
+	// during replication stream startup, but doesn't hurt anything and helps
+	// keep the control flow simpler.
+	rs.activeTables[streamID] = true
+
+	// Do nothing if metadata is already initialized for this stream.
+	if metadata := rs.metadata[streamID]; metadata != nil {
+		return nil
+	}
+
+	// Otherwise construct new metadata based on discovery info.
+	logrus.WithField("stream", streamID).Debug("initializing table metadata")
+	var metadata = new(mysqlTableMetadata)
+	if discovery, ok := rs.discovery[streamID]; ok {
+		var colTypes = make(map[string]string)
+		for colName, colInfo := range discovery.Columns {
+			colTypes[colName] = colInfo.DataType
+		}
+
+		metadata.Schema.Columns = discovery.ColumnNames
+		metadata.Schema.ColumnTypes = colTypes
+
+		logrus.WithFields(logrus.Fields{
+			"stream":  streamID,
+			"columns": metadata.Schema.Columns,
+			"types":   metadata.Schema.ColumnTypes,
+		}).Debug("initialized table metadata")
+	}
+	rs.metadata[streamID] = metadata
+	rs.dirtyMetadata = append(rs.dirtyMetadata, streamID)
+	return nil
+}
+
 func (rs *mysqlReplicationStream) Events() <-chan sqlcapture.ChangeEvent {
 	return rs.events
 }
 
 func (rs *mysqlReplicationStream) Acknowledge(ctx context.Context, cursor string) error {
-	// TODO(wgd): Figure out how MySQL advances whatever WAL-reserving cursor it has.
-	// I assume it's associated with the Server ID stuff, but I'm not sure if we're
-	// expected to explicitly advance it?
+	// No acknowledgements are necessary or possible in MySQL. The binlog is just
+	// a series of logfiles on disk which get erased after log rotation according
+	// to a time-based retention policy, without any server-side "have all clients
+	// consumed these events" tracking.
+	//
+	// See also: The 'Binlog Retention Sanity Check' logic in source-mysql/main.go
 	return nil
 }
 
