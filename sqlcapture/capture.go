@@ -26,17 +26,17 @@ func (ps *PersistentState) Validate() error {
 	return nil
 }
 
-// PendingStreams returns the IDs of all streams which still need to be backfilled,
-// in sorted order for reproducibility.
-func (ps *PersistentState) PendingStreams() []string {
-	var pending []string
+// StreamsInState returns the IDs of all streams in a particular
+// state, in sorted order for reproducibility.
+func (ps *PersistentState) StreamsInState(mode string) []string {
+	var streams []string
 	for id, tableState := range ps.Streams {
-		if tableState.Mode == TableModeBackfill {
-			pending = append(pending, id)
+		if tableState.Mode == mode {
+			streams = append(streams, id)
 		}
 	}
-	sort.Strings(pending)
-	return pending
+	sort.Strings(streams)
+	return streams
 }
 
 // TableState represents the serializable/resumable state of a particular table's capture.
@@ -62,11 +62,13 @@ type TableState struct {
 }
 
 // The table's mode can be one of:
+//   Ignore: The table is being deliberately ignored.
+//   Pending: The table is new, and will start being backfilled soon.
 //   Backfill: The table's rows are being backfilled and replication events will only be emitted for the already-backfilled portion.
 //   Active: The table finished backfilling and replication events are emitted for the entire table.
-//   Ignore: The table is being deliberately ignored.
 const (
 	TableModeIgnore   = "Ignore"
+	TableModePending  = "Pending"
 	TableModeBackfill = "Backfill"
 	TableModeActive   = "Active"
 )
@@ -115,7 +117,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	var captureTables = make(map[string]bool)
 	var tableMetadata = make(map[string]json.RawMessage)
 	for streamID, state := range c.State.Streams {
-		if state.Mode != TableModeIgnore {
+		if state.Mode != TableModeIgnore && state.Mode != TableModePending {
 			tableMetadata[streamID] = state.Metadata
 			captureTables[streamID] = true
 		}
@@ -132,9 +134,31 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 	}()
 
+	// Perform an initial "catch-up" stream-to-watermark before transitioning
+	// any "Pending" streams into the "Backfill" state. This helps ensure that
+	// a given stream only ever observes replication events which occur *after*
+	// the connector was started.
+	var watermark = uuid.New().String()
+	if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
+		return fmt.Errorf("error writing next watermark: %w", err)
+	}
+	if err := c.streamToWatermark(replStream, watermark, nil); err != nil {
+		return fmt.Errorf("error streaming until watermark: %w", err)
+	}
+	for _, streamID := range c.State.StreamsInState(TableModePending) {
+		logrus.WithField("stream", streamID).Info("activating replication for stream")
+		if err := replStream.ActivateTable(streamID); err != nil {
+			return fmt.Errorf("error activating %q for replication: %w", streamID, err)
+		}
+		var state = c.State.Streams[streamID]
+		state.Mode = TableModeBackfill
+		state.dirty = true
+		c.State.Streams[streamID] = state
+	}
+
 	// Backfill any tables which require it
 	var results *resultSet
-	for c.State.PendingStreams() != nil {
+	for c.State.StreamsInState(TableModeBackfill) != nil {
 		var watermark = uuid.New().String()
 		if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
 			return fmt.Errorf("error writing next watermark: %w", err)
@@ -144,7 +168,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		} else if err := c.emitBuffered(results); err != nil {
 			return fmt.Errorf("error emitting buffered results: %w", err)
 		}
-		results, err = c.backfillStreams(ctx, c.State.PendingStreams())
+		results, err = c.backfillStreams(ctx, c.State.StreamsInState(TableModeBackfill))
 		if err != nil {
 			return fmt.Errorf("error performing backfill: %w", err)
 		}
@@ -228,7 +252,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 		// See if the stream is already initialized. If it's not, then create it.
 		var streamState, ok = c.State.Streams[streamID]
 		if !ok || streamState.Mode == TableModeIgnore {
-			c.State.Streams[streamID] = TableState{Mode: TableModeBackfill, KeyColumns: primaryKey, dirty: true}
+			c.State.Streams[streamID] = TableState{Mode: TableModePending, KeyColumns: primaryKey, dirty: true}
 			continue
 		}
 
