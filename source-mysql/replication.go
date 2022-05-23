@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -339,6 +340,12 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 	return fields, nil
 }
 
+// Query Events in the MySQL binlog are normalized enough that we can use
+// prefix matching to detect many types of query that we just completely
+// don't care about. This is good, because the Vitess SQL parser disagrees
+// with the binlog Query Events for some statements like GRANT and CREATE USER.
+var ignoreQueriesRe = regexp.MustCompile(`^(BEGIN|GRANT|CREATE USER|DROP USER)`)
+
 func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	// There are basically three types of query events we might receive:
 	//   * An INSERT/UPDATE/DELETE query is an error, we should never receive
@@ -354,14 +361,18 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	//     by some other means.
 	logrus.WithField("query", query).Debug("handling query event")
 
-	var stmt, err = sqlparser.ParseStrictDDL(query)
+	if ignoreQueriesRe.MatchString(query) {
+		logrus.WithField("query", query).Trace("ignoring safe query without parsing")
+		return nil
+	}
+
+	var stmt, err = sqlparser.Parse(query)
 	if err != nil {
 		return fmt.Errorf("error parsing query: %w", err)
 	}
 	logrus.WithField("stmt", fmt.Sprintf("%#v", stmt)).Debug("parsed query")
 
 	switch stmt := stmt.(type) {
-	case *sqlparser.Begin:
 	case *sqlparser.CreateDatabase:
 	case *sqlparser.CreateTable:
 		logrus.WithField("query", query).Trace("ignoring benign query")
