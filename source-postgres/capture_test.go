@@ -93,7 +93,7 @@ func TestComplexDataset(t *testing.T) {
 
 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
 	var states = tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
-	state = states[20] // Restart in between (1960, 'IA') and (1960, 'ID')
+	state = states[22] // Restart in between (1960, 'IA') and (1960, 'ID')
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{1930, "XX", "No Such State", 1234},   // An insert prior to the first restart, which will be reported once replication begins
