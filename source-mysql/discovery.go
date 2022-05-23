@@ -103,17 +103,20 @@ func translateRecordField(columnType string, val interface{}) (interface{}, erro
 	if columnType == "" {
 		return nil, fmt.Errorf("unknown column type")
 	}
+	if str, ok := val.(string); ok {
+		val = []byte(str)
+	}
 	switch val := val.(type) {
-	case string:
+	case []byte:
 		switch columnType {
 		case "binary", "varbinary":
-			return []byte(val), nil
+			return val, nil
 		case "blob", "tinyblob", "mediumblob", "longblob":
-			return []byte(val), nil
+			return val, nil
 		case "json":
 			return json.RawMessage(val), nil
 		default:
-			return val, nil
+			return string(val), nil
 		}
 	}
 	return val, nil

@@ -326,11 +326,7 @@ func decodeRow(streamID string, colNames []string, row []interface{}) map[string
 				"actual":   len(row),
 			}).Warn("row change event contains more values than expected (go.estuary.dev/sCSfKS)")
 		} else {
-			var name = colNames[idx]
-			if bs, ok := val.([]byte); ok {
-				val = string(bs)
-			}
-			fields[name] = val
+			fields[colNames[idx]] = val
 		}
 	}
 	return fields
