@@ -226,14 +226,14 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			if len(columnNames) == 0 {
 				columnNames = metadata.Schema.Columns
 			}
-			if len(columnNames) == 0 {
-				return fmt.Errorf("unknown column names for stream %q (go.estuary.dev/eiKbOh)", streamID)
-			}
 
 			switch event.Header.EventType {
 			case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
-					var after = decodeRow(streamID, columnNames, row)
+					var after, err = decodeRow(streamID, columnNames, row)
+					if err != nil {
+						return fmt.Errorf("error decoding row values: %w", err)
+					}
 					if err := translateRecordFields(columnTypes, after); err != nil {
 						return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 					}
@@ -247,8 +247,14 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				for rowIdx := range data.Rows {
 					// Update events contain alternating (before, after) pairs of rows
 					if rowIdx%2 == 1 {
-						var before = decodeRow(streamID, columnNames, data.Rows[rowIdx-1])
-						var after = decodeRow(streamID, columnNames, data.Rows[rowIdx])
+						before, err := decodeRow(streamID, columnNames, data.Rows[rowIdx-1])
+						if err != nil {
+							return fmt.Errorf("error decoding row values: %w", err)
+						}
+						after, err := decodeRow(streamID, columnNames, data.Rows[rowIdx])
+						if err != nil {
+							return fmt.Errorf("error decoding row values: %w", err)
+						}
 						if err := translateRecordFields(columnTypes, before); err != nil {
 							return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
 						}
@@ -265,7 +271,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				}
 			case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
-					var before = decodeRow(streamID, columnNames, row)
+					var before, err = decodeRow(streamID, columnNames, row)
+					if err != nil {
+						return fmt.Errorf("error decoding row values: %w", err)
+					}
 					if err := translateRecordFields(columnTypes, before); err != nil {
 						return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
 					}
@@ -311,25 +320,23 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 	}
 }
 
-func decodeRow(streamID string, colNames []string, row []interface{}) map[string]interface{} {
+func decodeRow(streamID string, colNames []string, row []interface{}) (map[string]interface{}, error) {
+	// If we have more or fewer values than expected, something has gone wrong
+	// with our metadata tracking and it's best to die immediately. The fix in
+	// this case is almost always going to be deleting and recreating the
+	// capture binding for a particular table.
+	if len(row) != len(colNames) {
+		if len(colNames) == 0 {
+			return nil, fmt.Errorf("metadata error (go.estuary.dev/eiKbOh): unknown column names for stream %q", streamID)
+		}
+		return nil, fmt.Errorf("metadata error (go.estuary.dev/eiKbOh): change event on stream %q contains %d values, expected %d", streamID, len(row), len(colNames))
+	}
+
 	var fields = make(map[string]interface{})
 	for idx, val := range row {
-		// If change events contain more values than we have column names,
-		// something may have gone wrong. However, that "something" could
-		// be benign, for instance during catchup streaming when a stream
-		// is newly added and a column was deleted since the last binlog
-		// offset checkpoint.
-		if idx >= len(colNames) {
-			logrus.WithFields(logrus.Fields{
-				"stream":   streamID,
-				"expected": len(colNames),
-				"actual":   len(row),
-			}).Warn("row change event contains more values than expected (go.estuary.dev/sCSfKS)")
-		} else {
-			fields[colNames[idx]] = val
-		}
+		fields[colNames[idx]] = val
 	}
-	return fields
+	return fields, nil
 }
 
 func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
@@ -360,29 +367,31 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 		logrus.WithField("query", query).Trace("ignoring benign query")
 	case *sqlparser.AlterTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
-			return fmt.Errorf("unsupported ALTER TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
+			return fmt.Errorf("unsupported operation ALTER TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
 		}
 	case *sqlparser.DropTable:
 		for _, table := range stmt.FromTables {
 			if streamID := resolveTableName(schema, table); rs.tableActive(streamID) {
-				return fmt.Errorf("unsupported DROP TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
+				return fmt.Errorf("unsupported operation DROP TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
 			}
 		}
 	case *sqlparser.TruncateTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
-			return fmt.Errorf("unsupported TRUNCATE TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
+			return fmt.Errorf("unsupported operation TRUNCATE TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
 		}
 	case *sqlparser.RenameTable:
 		for _, pair := range stmt.TablePairs {
 			if streamID := resolveTableName(schema, pair.FromTable); rs.tableActive(streamID) {
-				return fmt.Errorf("unsupported RENAME TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
+				return fmt.Errorf("unsupported operation RENAME TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
 			}
 			if streamID := resolveTableName(schema, pair.ToTable); rs.tableActive(streamID) {
-				return fmt.Errorf("unsupported RENAME TABLE operation on %q (go.estuary.dev/eVVwet)", streamID)
+				return fmt.Errorf("unsupported operation RENAME TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
 			}
 		}
+	case *sqlparser.Insert, *sqlparser.Update, *sqlparser.Delete:
+		return fmt.Errorf("unsupported DML query %q (go.estuary.dev/IK5EVx)", query)
 	default:
-		return fmt.Errorf("unsupported query %q (go.estuary.dev/eVVwet)", query)
+		return fmt.Errorf("unhandled query %q (go.estuary.dev/ceqr74)", query)
 	}
 
 	return nil
