@@ -30,16 +30,11 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "boolean", ExpectType: `{"type":["integer","null"]}`, InputValue: true, ExpectValue: `1`},
 		{ColumnType: "boolean", ExpectType: `{"type":["integer","null"]}`, InputValue: false, ExpectValue: `0`},
 
-		// TODO(wgd): MySQL's handling of the BIT(n) type is frustrating:
-		//   * Internally it appears to be implemented as nothing more than an unsigned integer with some range-
-		//     checking on inserts, and even the MySQL CLI will normally just use integer notation -- the b'101'
-		//     style syntax is just an alternate way of writing an integer constant.
-		//   * Replication events will thus report new values of a BIT(n) column as integers like any other.
-		//   * However for some baffling reason backfill queries, at least via the current MySQL client library,
-		//     instead get back a []byte value.
-		//   * So producing a consistent output will require more intelligence in the type-translation logic
-		//     than we currently have.
-		// {ColumnType: "bit(5)", ExpectType: `{"type":["integer","null"]}`, InputValue: 31, ExpectValue: `31`},
+		// MySQL `BIT(n)` acts like an integer most of the time, but binlog replication sees
+		// them as a `[]byte`. We translate this, and the `bit(14)` test case is intended to
+		// verify correct endianness for multi-byte representations.
+		{ColumnType: "bit(5)", ExpectType: `{"type":["integer","null"]}`, InputValue: 0b11010, ExpectValue: `26`},
+		{ColumnType: "bit(14)", ExpectType: `{"type":["integer","null"]}`, InputValue: 0b11010101101111, ExpectValue: `13679`},
 
 		// Floating-Point Types
 		{ColumnType: "float", ExpectType: `{"type":["number","null"]}`, InputValue: 123.456, ExpectValue: `123.456`},
