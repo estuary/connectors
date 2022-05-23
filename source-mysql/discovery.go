@@ -109,6 +109,12 @@ func translateRecordField(columnType string, val interface{}) (interface{}, erro
 	switch val := val.(type) {
 	case []byte:
 		switch columnType {
+		case "bit":
+			var acc uint64
+			for _, x := range val {
+				acc = (acc << 8) | uint64(x)
+			}
+			return acc, nil
 		case "binary", "varbinary":
 			return val, nil
 		case "blob", "tinyblob", "mediumblob", "longblob":
@@ -220,7 +226,7 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"mediumint": {type_: "integer"},
 	"int":       {type_: "integer"},
 	"bigint":    {type_: "integer"},
-	// "bit":       {type_: "integer"}, // TODO(wgd): Enable after fixing translation so BIT(n) colums actually work consistently
+	"bit":       {type_: "integer"},
 
 	"float":   {type_: "number"},
 	"double":  {type_: "number"},
