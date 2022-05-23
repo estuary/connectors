@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/estuary/connectors/filesource"
-	"github.com/estuary/connectors/parser"
+	"github.com/estuary/flow/go/parser"
 )
 
 type config struct {
