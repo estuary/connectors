@@ -10,12 +10,10 @@ COPY go.* ./
 RUN go mod download
 
 # Build the connector projects we depend on.
-COPY parser/*.go ./parser/
 COPY filesource ./filesource
 COPY source-gcs ./source-gcs
 
 # Run the unit tests.
-RUN go test -v ./parser/...
 RUN go test -v ./filesource/...
 RUN go test -v ./source-gcs/...
 

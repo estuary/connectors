@@ -9,7 +9,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/estuary/connectors/filesource"
-	"github.com/estuary/connectors/parser"
+	"github.com/estuary/flow/go/parser"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
