@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/estuary/connectors/parser"
+	"github.com/estuary/flow/go/parser"
 	"github.com/estuary/flow/go/protocols/airbyte"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
