@@ -100,15 +100,10 @@ func TestAlterTable(t *testing.T) {
 
 	// Finally we exercise the trickiest edge case, in which a new table (C)
 	// is added to the capture *when it was also altered after the last state
-	// checkpoint*.
-	//
-	// Currently this one fails because we have a static concept of 'tables
-	// that we care about' which is set when replication begins. Fixing this
-	// to not produce an error requires that we first perform streaming to
-	// the first watermark after connector restart, and *then* begin processing
-	// replication events for any newly added capture bindings.
+	// checkpoint*. This should still work, because tables only become active
+	// after the first stream-to-watermark operation.
 	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN evenmore TEXT;", tableC))
-	tests.VerifiedCapture(ctx, t, tb, &catalogABC, &state, "capture6_fails")
+	tests.VerifiedCapture(ctx, t, tb, &catalogABC, &state, "capture6")
 }
 
 type mysqlTestBackend struct {
