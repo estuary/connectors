@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/sirupsen/logrus"
 )
 
@@ -52,22 +51,8 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, schema, table strin
 	var events []sqlcapture.ChangeEvent
 	for _, row := range results.Values {
 		var fields = make(map[string]interface{})
-		// TODO(wgd): Maybe use 'val.Value()' for this, if we can figure out
-		// the []byte vs string decision better elsewhere.
 		for idx, val := range row {
-			var name = string(results.Fields[idx].Name)
-			switch val.Type {
-			case mysql.FieldValueTypeUnsigned:
-				fields[name] = val.AsUint64()
-			case mysql.FieldValueTypeSigned:
-				fields[name] = val.AsInt64()
-			case mysql.FieldValueTypeFloat:
-				fields[name] = val.AsFloat64()
-			case mysql.FieldValueTypeString:
-				fields[name] = string(val.AsString())
-			default: // FieldValueTypeNull
-				fields[name] = nil
-			}
+			fields[string(results.Fields[idx].Name)] = val.Value()
 		}
 		if err := translateRecordFields(columnTypes, fields); err != nil {
 			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
