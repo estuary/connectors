@@ -29,7 +29,7 @@ type config struct {
 	Bucket           string `json:"bucket"`
 	BucketPath       string `json:"bucket_path"`
 	CredentialsFile  string `json:"credentials_file,omitempty"`
-	CredentialsJSON  []byte `json:"credentials_json,omitempty"`
+	CredentialsJSON  string `json:"credentials_json,omitempty"`
 }
 
 func (*config) GetFieldDocString(fieldname string) string {
@@ -140,7 +140,7 @@ func newBigQueryDriver() *sqlDriver.Driver {
 			if parsed.CredentialsFile != "" {
 				clientOpts = append(clientOpts, option.WithCredentialsFile(parsed.CredentialsFile))
 			} else if len(parsed.CredentialsJSON) != 0 {
-				clientOpts = append(clientOpts, option.WithCredentialsJSON(parsed.CredentialsJSON))
+				clientOpts = append(clientOpts, option.WithCredentialsJSON([]byte(parsed.CredentialsJSON)))
 			}
 
 			// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.

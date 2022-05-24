@@ -30,10 +30,7 @@
         "type": "string"
       },
       "credentials_json": {
-        "type": "string",
-        "media": {
-          "binaryEncoding": "base64"
-        }
+        "type": "string"
       }
     },
     "additionalProperties": false,
