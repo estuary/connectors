@@ -32,6 +32,29 @@ type config struct {
 	CredentialsJSON  []byte `json:"credentials_json,omitempty"`
 }
 
+func (*config) GetFieldDocString(fieldname string) string {
+	switch fieldname {
+	case "BillingProjectID":
+		return "Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."
+	case "ProjectID":
+		return "Google Cloud Project ID that owns the BigQuery dataset."
+	case "Dataset":
+		return "BigQuery dataset that will be used to store the materialization output."
+	case "Region":
+		return "Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."
+	case "Bucket":
+		return "Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery."
+	case "BucketPath":
+		return "A prefix that will be used to store objects to Google Cloud Storage's bucket."
+	case "CredentialsFile":
+		return "URI that points to a JSON Credentials for Google Clouse Service."
+	case "CredentialsJSON":
+		return "Google Cloud Service Account JSON credentials in base64 format."
+	default:
+		return ""
+	}
+}
+
 func (c *config) Validate() error {
 	if c.ProjectID == "" {
 		return fmt.Errorf("expected project_id")
@@ -65,6 +88,17 @@ func (c *tableConfig) Validate() error {
 		return fmt.Errorf("expected table")
 	}
 	return nil
+}
+
+func (*tableConfig) GetFieldDocString(fieldname string) string {
+	switch fieldname {
+	case "Table":
+		return "Table in the BigQuery dataset to store materialized result in."
+	case "Delta":
+		return "Should updates to this table be done via delta updates. Defaults is false."
+	default:
+		return ""
+	}
 }
 
 // Path returns the sqlDriver.ResourcePath for a table.
