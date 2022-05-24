@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -140,7 +141,11 @@ func newBigQueryDriver() *sqlDriver.Driver {
 			if parsed.CredentialsFile != "" {
 				clientOpts = append(clientOpts, option.WithCredentialsFile(parsed.CredentialsFile))
 			} else if len(parsed.CredentialsJSON) != 0 {
-				clientOpts = append(clientOpts, option.WithCredentialsJSON([]byte(parsed.CredentialsJSON)))
+				credentials, err := base64.StdEncoding.DecodeString(parsed.CredentialsJSON)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode the JSON Credentials. Expected base64 content: %w", err)
+				}
+				clientOpts = append(clientOpts, option.WithCredentialsJSON(credentials))
 			}
 
 			// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
