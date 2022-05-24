@@ -114,7 +114,7 @@ func (c tableConfig) DeltaUpdates() bool {
 // newBigQueryDriver creates a new Driver for BigQuery.
 func newBigQueryDriver() *sqlDriver.Driver {
 	return &sqlDriver.Driver{
-		DocumentationURL: "https://docs.estuary.dev/#FIXME",
+		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
 		EndpointSpecType: &config{},
 		ResourceSpecType: &tableConfig{},
 		NewResource: func(endpoint sqlDriver.Endpoint) sqlDriver.Resource {

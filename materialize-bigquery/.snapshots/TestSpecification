@@ -52,5 +52,5 @@
     "additionalProperties": false,
     "type": "object"
   },
-  "documentation_url": "https://docs.estuary.dev/#FIXME"
+  "documentation_url": "https://go.estuary.dev/materialize-bigquery"
 }
