@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
+	"github.com/alecthomas/jsonschema"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -21,39 +22,30 @@ func main() {
 	boilerplate.RunMain(newBigQueryDriver())
 }
 
-// Config represents the endpoint configuration for BigQuery.
-type config struct {
-	BillingProjectID string `json:"billing_project_id,omitempty"`
-	ProjectID        string `json:"project_id"`
-	Dataset          string `json:"dataset"`
-	Region           string `json:"region,omitempty"`
-	Bucket           string `json:"bucket"`
-	BucketPath       string `json:"bucket_path"`
-	CredentialsFile  string `json:"credentials_file,omitempty"`
-	CredentialsJSON  string `json:"credentials_json,omitempty"`
+type credential string
+
+func (credential) JSONSchemaType() *jsonschema.Type {
+	ty := &jsonschema.Type{
+		Type:        "string",
+		Title:       "Credentials",
+		Description: "Google Cloud Service Account JSON credentials in base64 format.",
+		Extras: map[string]interface{}{
+			"secret": true,
+		},
+	}
+
+	return ty
 }
 
-func (*config) GetFieldDocString(fieldname string) string {
-	switch fieldname {
-	case "BillingProjectID":
-		return "Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."
-	case "ProjectID":
-		return "Google Cloud Project ID that owns the BigQuery dataset."
-	case "Dataset":
-		return "BigQuery dataset that will be used to store the materialization output."
-	case "Region":
-		return "Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."
-	case "Bucket":
-		return "Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery."
-	case "BucketPath":
-		return "A prefix that will be used to store objects to Google Cloud Storage's bucket."
-	case "CredentialsFile":
-		return "URI that points to a JSON Credentials for Google Clouse Service."
-	case "CredentialsJSON":
-		return "Google Cloud Service Account JSON credentials in base64 format."
-	default:
-		return ""
-	}
+// Config represents the endpoint configuration for BigQuery.
+type config struct {
+	BillingProjectID string     `json:"billing_project_id" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."`
+	ProjectID        string     `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset."`
+	Dataset          string     `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset that will be used to store the materialization output."`
+	Region           string     `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."`
+	Bucket           string     `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery."`
+	BucketPath       string     `json:"bucket_path" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket."`
+	CredentialsJSON  credential `json:"credentials_json"`
 }
 
 func (c *config) Validate() error {
@@ -80,8 +72,8 @@ func (c *config) DatasetPath(path ...string) sqlDriver.ResourcePath {
 type tableConfig struct {
 	base *config
 
-	Table string `json:"table"`
-	Delta bool   `json:"delta_updates,omitempty"`
+	Table string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in."`
+	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false."`
 }
 
 func (c *tableConfig) Validate() error {
@@ -89,17 +81,6 @@ func (c *tableConfig) Validate() error {
 		return fmt.Errorf("expected table")
 	}
 	return nil
-}
-
-func (*tableConfig) GetFieldDocString(fieldname string) string {
-	switch fieldname {
-	case "Table":
-		return "Table in the BigQuery dataset to store materialized result in."
-	case "Delta":
-		return "Should updates to this table be done via delta updates. Defaults is false."
-	default:
-		return ""
-	}
 }
 
 // Path returns the sqlDriver.ResourcePath for a table.
@@ -116,7 +97,7 @@ func (c tableConfig) DeltaUpdates() bool {
 func newBigQueryDriver() *sqlDriver.Driver {
 	return &sqlDriver.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
-		EndpointSpecType: &config{},
+		EndpointSpecType: config{},
 		ResourceSpecType: &tableConfig{},
 		NewResource: func(endpoint sqlDriver.Endpoint) sqlDriver.Resource {
 			return &tableConfig{base: endpoint.(*Endpoint).config}
@@ -137,16 +118,11 @@ func newBigQueryDriver() *sqlDriver.Driver {
 
 			var clientOpts []option.ClientOption
 
-			// Pick one of the credentials options. It's plausible you could use machine credentials in which case neither option is present.
-			if parsed.CredentialsFile != "" {
-				clientOpts = append(clientOpts, option.WithCredentialsFile(parsed.CredentialsFile))
-			} else if len(parsed.CredentialsJSON) != 0 {
-				credentials, err := base64.StdEncoding.DecodeString(parsed.CredentialsJSON)
-				if err != nil {
-					return nil, fmt.Errorf("failed to decode the JSON Credentials. Expected base64 content: %w", err)
-				}
-				clientOpts = append(clientOpts, option.WithCredentialsJSON(credentials))
+			credentials, err := base64.StdEncoding.DecodeString(string(parsed.CredentialsJSON))
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode the JSON Credentials. Expected base64 content: %w", err)
 			}
+			clientOpts = append(clientOpts, option.WithCredentialsJSON(credentials))
 
 			// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
 			var billingProjectID = parsed.BillingProjectID
