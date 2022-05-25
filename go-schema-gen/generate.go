@@ -18,6 +18,31 @@ func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 	}
 	var schema = reflector.ReflectFromType(reflect.TypeOf(configObject))
 	schema.AdditionalProperties = json.RawMessage("true")
+	schema.Definitions = nil // Since no references are used, these definitions are just noise
 	schema.Title = title
+	fixSchemaFlagBools(schema.Type, "secret", "advanced")
 	return schema
+}
+
+func fixSchemaFlagBools(t *jsonschema.Type, flagKeys ...string) {
+	if t.Properties != nil {
+		for _, key := range t.Properties.Keys() {
+			if p, ok := t.Properties.Get(key); ok {
+				if p, ok := p.(*jsonschema.Type); ok {
+					fixSchemaFlagBools(p, flagKeys...)
+				}
+			}
+		}
+	}
+	for key, val := range t.Extras {
+		for _, flag := range flagKeys {
+			if key != flag {
+				continue
+			} else if val == "true" {
+				t.Extras[key] = true
+			} else if val == "false" {
+				t.Extras[key] = false
+			}
+		}
+	}
 }
