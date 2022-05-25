@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -29,7 +30,30 @@ type config struct {
 	Bucket           string `json:"bucket"`
 	BucketPath       string `json:"bucket_path"`
 	CredentialsFile  string `json:"credentials_file,omitempty"`
-	CredentialsJSON  []byte `json:"credentials_json,omitempty"`
+	CredentialsJSON  string `json:"credentials_json,omitempty"`
+}
+
+func (*config) GetFieldDocString(fieldname string) string {
+	switch fieldname {
+	case "BillingProjectID":
+		return "Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."
+	case "ProjectID":
+		return "Google Cloud Project ID that owns the BigQuery dataset."
+	case "Dataset":
+		return "BigQuery dataset that will be used to store the materialization output."
+	case "Region":
+		return "Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."
+	case "Bucket":
+		return "Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery."
+	case "BucketPath":
+		return "A prefix that will be used to store objects to Google Cloud Storage's bucket."
+	case "CredentialsFile":
+		return "URI that points to a JSON Credentials for Google Clouse Service."
+	case "CredentialsJSON":
+		return "Google Cloud Service Account JSON credentials in base64 format."
+	default:
+		return ""
+	}
 }
 
 func (c *config) Validate() error {
@@ -67,6 +91,17 @@ func (c *tableConfig) Validate() error {
 	return nil
 }
 
+func (*tableConfig) GetFieldDocString(fieldname string) string {
+	switch fieldname {
+	case "Table":
+		return "Table in the BigQuery dataset to store materialized result in."
+	case "Delta":
+		return "Should updates to this table be done via delta updates. Defaults is false."
+	default:
+		return ""
+	}
+}
+
 // Path returns the sqlDriver.ResourcePath for a table.
 func (c tableConfig) Path() sqlDriver.ResourcePath {
 	return c.base.DatasetPath(c.Table)
@@ -80,7 +115,7 @@ func (c tableConfig) DeltaUpdates() bool {
 // newBigQueryDriver creates a new Driver for BigQuery.
 func newBigQueryDriver() *sqlDriver.Driver {
 	return &sqlDriver.Driver{
-		DocumentationURL: "https://docs.estuary.dev/#FIXME",
+		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
 		EndpointSpecType: &config{},
 		ResourceSpecType: &tableConfig{},
 		NewResource: func(endpoint sqlDriver.Endpoint) sqlDriver.Resource {
@@ -106,7 +141,11 @@ func newBigQueryDriver() *sqlDriver.Driver {
 			if parsed.CredentialsFile != "" {
 				clientOpts = append(clientOpts, option.WithCredentialsFile(parsed.CredentialsFile))
 			} else if len(parsed.CredentialsJSON) != 0 {
-				clientOpts = append(clientOpts, option.WithCredentialsJSON(parsed.CredentialsJSON))
+				credentials, err := base64.StdEncoding.DecodeString(parsed.CredentialsJSON)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode the JSON Credentials. Expected base64 content: %w", err)
+				}
+				clientOpts = append(clientOpts, option.WithCredentialsJSON(credentials))
 			}
 
 			// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
