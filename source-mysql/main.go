@@ -67,35 +67,37 @@ func fixMysqlLogging() {
 // Config tells the connector how to connect to the source database and
 // capture changes from it.
 type Config struct {
-	Address  string `json:"address" jsonschema:"default=127.0.0.1:3306,description=Database host:port to connect to."`
-	User     string `json:"user" jsonschema:"default=flow_capture,description=Database user to connect as."`
-	Password string `json:"password" jsonschema:"description=Password for the specified database user."`
-	DBName   string `json:"dbname" jsonschema:"description=Name of the database to connect to."`
-	ServerID int    `json:"server_id" jsonschema:"description=Server ID for replication (each node in a cluster should have a unique ID)."`
+	Address  string         `json:"address" jsonschema:"title=Server Address and Port,default=127.0.0.1:3306,description=The host:port at which the database can be reached."`
+	Login    loginConfig    `json:"login" jsonschema:"title=Login Configuration"`
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+}
 
-	WatermarksTable string `json:"watermarks_table,omitempty" jsonschema:"default=flow.watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+type loginConfig struct {
+	User     string `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as."`
+	Password string `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true"`
+}
 
-	SkipBinlogRetentionCheck bool `json:"skip_binlog_retention_check,omitempty" jsonschema:"default=false,description=For advanced users only. Bypasses the 'dangerously short binlog retention' sanity check at startup."`
+type advancedConfig struct {
+	WatermarksTable          string `json:"watermarks_table,omitempty" jsonschema:"title=Watermarks Table Name,default=flow.watermarks,description=The name of the table used for watermark writes. Must be fully-qualified in '<schema>.<table>' form."`
+	DBName                   string `json:"dbname,omitempty" jsonschema:"title=Database Name,default=mysql,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
+	SkipBinlogRetentionCheck bool   `json:"skip_binlog_retention_check,omitempty" jsonschema:"title=Skip Binlog Retention Sanity Check,default=false,description=Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need."`
+	NodeID                   uint32 `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
 }
 
 // Validate checks that the configuration possesses all required properties.
 func (c *Config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
-		{"user", c.User},
-		{"password", c.Password},
-		{"dbname", c.DBName},
+		{"user", c.Login.User},
+		{"password", c.Login.Password},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
-	if c.WatermarksTable != "" && !strings.Contains(c.WatermarksTable, ".") {
-		return fmt.Errorf("config parameter 'watermarksTable' must be fully-qualified as '<schema>.<table>': %q", c.WatermarksTable)
-	}
-	if c.ServerID == 0 {
-		return fmt.Errorf("missing 'server_id'")
+	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
+		return fmt.Errorf("config parameter 'watermarksTable' must be fully-qualified as '<schema>.<table>': %q", c.Advanced.WatermarksTable)
 	}
 	return nil
 }
@@ -104,8 +106,14 @@ func (c *Config) Validate() error {
 func (c *Config) SetDefaults() {
 	// Note these are 1:1 with 'omitempty' in Config field tags,
 	// which cause these fields to be emitted as non-required.
-	if c.WatermarksTable == "" {
-		c.WatermarksTable = "flow.watermarks"
+	if c.Advanced.WatermarksTable == "" {
+		c.Advanced.WatermarksTable = "flow.watermarks"
+	}
+	if c.Advanced.DBName == "" {
+		c.Advanced.DBName = "mysql"
+	}
+	if c.Advanced.NodeID == 0 {
+		c.Advanced.NodeID = 0x476C6F77 // "Flow"
 	}
 }
 
@@ -118,13 +126,13 @@ type mysqlDatabase struct {
 func (db *mysqlDatabase) Connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"addr":     db.config.Address,
-		"user":     db.config.User,
-		"dbName":   db.config.DBName,
-		"serverID": db.config.ServerID,
+		"dbName":   db.config.Advanced.DBName,
+		"user":     db.config.Login.User,
+		"serverID": db.config.Advanced.NodeID,
 	}).Info("initializing connector")
 
 	// Normal database connection used for table scanning
-	var conn, err = client.Connect(db.config.Address, db.config.User, db.config.Password, db.config.DBName)
+	var conn, err = client.Connect(db.config.Address, db.config.Login.User, db.config.Login.Password, db.config.Advanced.DBName)
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
@@ -134,7 +142,7 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 	// By doing this during the Connect operation it will occur both during
 	// actual captures and when performing discovery/config validation, which
 	// is likely what we want.
-	if !db.config.SkipBinlogRetentionCheck {
+	if !db.config.Advanced.SkipBinlogRetentionCheck {
 		expiryTime, err := db.getBinlogExpiry()
 		if err != nil {
 			return fmt.Errorf("error querying binlog expiry time: %w", err)

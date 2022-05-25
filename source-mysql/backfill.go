@@ -13,17 +13,17 @@ import (
 func (db *mysqlDatabase) WriteWatermark(ctx context.Context, watermark string) error {
 	logrus.WithField("watermark", watermark).Debug("writing watermark")
 
-	var query = fmt.Sprintf(`REPLACE INTO %s (slot, watermark) VALUES (?,?);`, db.config.WatermarksTable)
-	var results, err = db.conn.Execute(query, db.config.ServerID, watermark)
+	var query = fmt.Sprintf(`REPLACE INTO %s (slot, watermark) VALUES (?,?);`, db.config.Advanced.WatermarksTable)
+	var results, err = db.conn.Execute(query, db.config.Advanced.NodeID, watermark)
 	if err != nil {
-		return fmt.Errorf("error upserting new watermark for slot %q: %w", db.config.ServerID, err)
+		return fmt.Errorf("error upserting new watermark for slot %q: %w", db.config.Advanced.NodeID, err)
 	}
 	results.Close()
 	return nil
 }
 
 func (db *mysqlDatabase) WatermarksTable() string {
-	return db.config.WatermarksTable
+	return db.config.Advanced.WatermarksTable
 }
 
 func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, schema, table string, keyColumns []string, resumeKey []interface{}) ([]sqlcapture.ChangeEvent, error) {

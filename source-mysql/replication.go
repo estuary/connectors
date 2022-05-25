@@ -26,12 +26,12 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		return nil, fmt.Errorf("invalid mysql address: %w", err)
 	}
 	var syncer = replication.NewBinlogSyncer(replication.BinlogSyncerConfig{
-		ServerID: uint32(db.config.ServerID),
+		ServerID: uint32(db.config.Advanced.NodeID),
 		Flavor:   "mysql", // TODO(wgd): See what happens if we change this and run against MariaDB?
 		Host:     host,
 		Port:     uint16(port),
-		User:     db.config.User,
-		Password: db.config.Password,
+		User:     db.config.Login.User,
+		Password: db.config.Login.Password,
 	})
 
 	var pos mysql.Position
