@@ -1,6 +1,7 @@
 package schemagen
 
 import (
+	"encoding/json"
 	"reflect"
 
 	"github.com/alecthomas/jsonschema"
@@ -16,6 +17,7 @@ func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 		DoNotReference: true,
 	}
 	var schema = reflector.ReflectFromType(reflect.TypeOf(configObject))
+	schema.AdditionalProperties = json.RawMessage("true")
 	schema.Title = title
 	return schema
 }
