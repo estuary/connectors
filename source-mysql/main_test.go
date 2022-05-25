@@ -21,7 +21,6 @@ var (
 	dbUser     = flag.String("db_user", "root", "Connect as the specified user for tests")
 	dbPassword = flag.String("db_password", "flow", "Password for the specified database test user")
 	dbName     = flag.String("db_name", "test", "Connect to the named database for tests")
-	dbServerID = flag.Int("db_serverid", 12345, "Unique server ID for replication")
 )
 
 var (
@@ -40,19 +39,21 @@ func TestMain(m *testing.M) {
 
 	// Initialize test config and database connection
 	var cfg = Config{
-		Address:         *dbAddress,
-		User:            *dbUser,
-		Password:        *dbPassword,
-		DBName:          *dbName,
-		WatermarksTable: "flow.watermarks",
-		ServerID:        *dbServerID,
+		Address: *dbAddress,
+		Login: loginConfig{
+			User:     *dbUser,
+			Password: *dbPassword,
+		},
+		Advanced: advancedConfig{
+			DBName: *dbName,
+		},
 	}
 	if err := cfg.Validate(); err != nil {
 		logrus.WithFields(logrus.Fields{"err": err, "config": cfg}).Fatal("error validating test config")
 	}
 	cfg.SetDefaults()
 
-	var conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.DBName)
+	var conn, err = client.Connect(cfg.Address, cfg.Login.User, cfg.Login.Password, cfg.Advanced.DBName)
 	if err != nil {
 		logrus.WithField("err", err).Fatal("error connecting to database")
 	}
@@ -197,7 +198,7 @@ func TestBinlogExpirySanityCheck(t *testing.T) {
 			// Connect to the database, which may run the sanity-check
 			db := TestBackend.GetDatabase()
 			if tc.SkipCheck {
-				db.(*mysqlDatabase).config.SkipBinlogRetentionCheck = true
+				db.(*mysqlDatabase).config.Advanced.SkipBinlogRetentionCheck = true
 			}
 			err := db.Connect(ctx)
 			db.Close(ctx)
