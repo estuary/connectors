@@ -63,10 +63,10 @@ Example:
 
 ```json
 {
-    "type": "boolean",
-    "title": "Do the thing",
-    "description": "whether or not to do the thing",
-    "default": false
+  "type": "boolean",
+  "title": "Do the thing",
+  "description": "whether or not to do the thing",
+  "default": false
 }
 ```
 
@@ -110,45 +110,45 @@ Example:
 
 ```json
 {
-    "type": "object",
-    "title": "My connector config",
-    "properties": {
-        "commonFields": {
-            "title": "Common fields that most users need to consider",
-            "type": "object",
-            "properties": {
-                "commonFieldA": {
-                    "type": "string",
-                    "title": "Some Common Config"
-                },
-                "commonFieldB": {
-                    "type": "integer",
-                    "title": "Common int field"
-                }
-            }
+  "type": "object",
+  "title": "My connector config",
+  "properties": {
+    "commonFields": {
+      "title": "Common fields that most users need to consider",
+      "type": "object",
+      "properties": {
+        "commonFieldA": {
+          "type": "string",
+          "title": "Some Common Config"
         },
-        "uncommonFields": {
-            "title": "Uncommon fields that might be overwhelming to users",
-            "advanced": true,
-            "type": "object",
-            "properties": {
-                "uncommonFieldA": {
-                    "type": "string",
-                    "title": "Some Uncommon Config"
-                },
-                "uncommonFieldB": {
-                    "type": "integer",
-                    "title": "Uncommon int field"
-                }
-            }
+        "commonFieldB": {
+          "type": "integer",
+          "title": "Common int field"
         }
+      }
+    },
+    "uncommonFields": {
+      "title": "Uncommon fields that might be overwhelming to users",
+      "advanced": true,
+      "type": "object",
+      "properties": {
+        "uncommonFieldA": {
+          "type": "string",
+          "title": "Some Uncommon Config"
+        },
+        "uncommonFieldB": {
+          "type": "integer",
+          "title": "Uncommon int field"
+        }
+      }
     }
+  }
 }
 ```
 
 ### Use `multiline` annotation for long strings
 
-If a `string` field is allowed to contain newline characters, then you need to set 
+If a `string` field is allowed to contain newline characters, then you need to set
 `"multiline": true` in order for the input to allow them. This will also cause the input to
 dynamically expand as lines of text are added, so that the entire value can be shown.
 
@@ -156,9 +156,29 @@ Example:
 
 ```json
 {
-    "type": "string",
-    "title": "Some long string value",
-    "multiline": true
+  "type": "string",
+  "title": "Some long string value",
+  "multiline": true
 }
 ```
 
+### Include enum `type` for `array` properties
+
+If there is a list of allowed values the user can choose from to build up a list we need to provide the type of those options.
+
+Example:
+
+```json
+{
+  "type": "array",
+  "items": {
+    "enum": ["foo", "bar", "buz"],
+    "type": "string",
+    "title": "Possible Choices",
+    "description": "These are your choices"
+  },
+  "title": "Fields",
+  "default": [],
+  "description": "A list of selectable properties"
+}
+```
