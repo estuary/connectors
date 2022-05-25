@@ -2,14 +2,14 @@
 
 set -e
 export TEST_STREAM="estuary_test_$(shuf -zer -n6 {a..z} | tr -d '\0')"
-export RESOURCE="{ stream: ${TEST_STREAM} }"
+export RESOURCE="{ \"namespace\": \"test\", \"stream\": \"${TEST_STREAM}\" }"
 
 config_json_template='{
     "address": "$MYSQL_HOST:$MYSQL_PORT",
-    "user": "$MYSQL_USER",
-    "password": "$MYSQL_PWD",
-    "dbname": "$MYSQL_DATABASE",
-    "server_id": $MYSQL_SERVERID
+    "login": {
+      "user": "$MYSQL_USER",
+      "password": "$MYSQL_PWD"
+    }
 }'
 
 export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
