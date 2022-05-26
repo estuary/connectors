@@ -234,7 +234,9 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 	}
 
 	for _, pipe := range pipes {
-		pipe.Close()
+		if pipe != nil {
+			pipe.Close()
+		}
 	}
 
 	if err := g.Wait(); err != nil {
