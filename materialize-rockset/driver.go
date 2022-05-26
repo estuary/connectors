@@ -222,9 +222,9 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 
 // pm.DriverServer interface.
 func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	var cfg config = config{}
-	if err := pf.UnmarshalStrict(req.Materialization.EndpointSpecJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing Rockset config: %w", err)
+	var cfg, err = ResolveEndpointConfig(req.Materialization.EndpointSpecJson)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey))
@@ -260,9 +260,74 @@ func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (
 	return response, nil
 }
 
+// ApplyDelete implements pm.DriverServer and deletes all the rockset collections for all bindings.
+// It does not attempt to delete any workspaces, even if they would be left empty. This is because
+// deletion of collections is asynchronous and takes a while, and the workspace can't be deleted
+// until all the deletions complete.
 func (d *rocksetDriver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	// TODO: delete Rockset resources now that we can clean this up as part of the real protocol.
-	return nil, nil
+	var cfg, err = ResolveEndpointConfig(req.Materialization.EndpointSpecJson)
+	if err != nil {
+		return nil, err
+	}
+	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey))
+	if err != nil {
+		return nil, err
+	}
+
+	var actionDescription strings.Builder
+	if req.DryRun {
+		actionDescription.WriteString("Dry Run (skipping all actions):\n")
+	}
+
+	for i, binding := range req.Materialization.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
+		}
+		res.SetDefaults()
+		// I think it's appropriate to ignore validation errors here, since we're in the process of
+		// deleting this thing anyway. But we should only try to delete the rockset collection if
+		// the resource validation is successful, since otherwise it's likely to result in a bad
+		// request.
+		if validationErr := res.Validate(); validationErr != nil {
+			log.WithFields(log.Fields{
+				"resource": binding.ResourceSpecJson,
+				"error":    validationErr,
+			}).Warn("Will skip deleting the Rockset collection for this binding because the resource spec failed validation")
+			fmt.Fprintf(&actionDescription, "skipping deletion due to failed validation of resource: '%s', error: %s\n", string(binding.ResourceSpecJson), validationErr)
+			continue
+		}
+
+		fmt.Fprintf(&actionDescription, "Deleting Rockset Collection: '%s', Workspace: '%s'\n", res.Collection, res.Workspace)
+		if req.DryRun {
+			continue
+		}
+		var logEntry = log.WithFields(log.Fields{
+			"rocksetCollection": res.Collection,
+			"rocksetWorkspace":  res.Workspace,
+		})
+		var delErr = client.DeleteCollection(ctx, res.Workspace, res.Collection)
+		if delErr != nil {
+			if typedErr, ok := delErr.(rockset.Error); ok && typedErr.IsNotFoundError() {
+				logEntry.Info("Did not delete the collection because it does not exist")
+			} else {
+				logEntry.WithField("error", delErr).Error("Failed to delete rockset collection")
+				// We'll return the first deletion error we encounter, but only after deleting
+				// the rest of the collections.
+				if err == nil {
+					err = delErr
+				}
+			}
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &pm.ApplyResponse{
+		ActionDescription: actionDescription.String(),
+	}, nil
 }
 
 // pm.DriverServer interface.
@@ -318,10 +383,14 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 		client:   client,
 		bindings: bindings,
 	}
-	// If any bindings have an integration named as part of their resource spec, then await them now, before returning
-	// the opened response. It's important that we await _all_ bindings that are bulk loading before continuing, since
-	// the flow checkpoint that's embedded in the driver checkpoint will be cleared on the first successful transaction.
-	transactor.awaitAllIntegrationIngestCompletions(stream.Context())
+	// Ensure that all the collections are ready to accept writes before returning the opened
+	// response. It's important that we await _all_ bindings before continuing, since the flow
+	// checkpoint that's embedded in the driver checkpoint (when there's an s3 integration) will be
+	// cleared on the first successful transaction. Even collections without any integrations may
+	// still take a while to become ready after they've been created, so this also ensures that
+	// those are ready before we proceed (the error that's returned when attempting to write to a
+	// non-ready collection is not considered retryable by the client library).
+	transactor.awaitAllRocksetCollectionsReady(stream.Context())
 
 	if err = stream.Send(&pm.TransactionResponse{
 		Opened: &pm.TransactionResponse_Opened{FlowCheckpoint: flowCheckpoint},

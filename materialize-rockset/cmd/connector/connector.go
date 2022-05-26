@@ -14,6 +14,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetFormatter(&log.JSONFormatter{})
 	log.SetOutput(os.Stderr)
+	log.SetLevel(log.DebugLevel)
 
 	boilerplate.RunMain(connector.NewRocksetDriver())
 }
