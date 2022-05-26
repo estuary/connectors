@@ -27,7 +27,6 @@
         "type": "integer"
       }
     },
-    "additionalProperties": true,
     "type": "object",
     "oneOf": [
       {
@@ -58,7 +57,6 @@
         "type": "string"
       }
     },
-    "additionalProperties": true,
     "type": "object",
     "title": "S3 Prefix"
   },

@@ -1,7 +1,6 @@
 package schemagen
 
 import (
-	"encoding/json"
 	"reflect"
 
 	"github.com/alecthomas/jsonschema"
@@ -17,8 +16,8 @@ func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 		DoNotReference: true,
 	}
 	var schema = reflector.ReflectFromType(reflect.TypeOf(configObject))
-	schema.AdditionalProperties = json.RawMessage("true")
-	schema.Definitions = nil // Since no references are used, these definitions are just noise
+	schema.AdditionalProperties = nil // Unset means additional properties are permitted on the root object, as they should be
+	schema.Definitions = nil          // Since no references are used, these definitions are just noise
 	schema.Title = title
 	fixSchemaFlagBools(schema.Type, "secret", "advanced")
 	return schema
