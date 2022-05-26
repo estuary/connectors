@@ -99,6 +99,8 @@ github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3
 github.com/alecthomas/jsonschema v0.0.0-20210818095345-1014919a589c/go.mod h1:/n6+1/DWPltRLWL/VKyUxg6tzsl5kHUCcraimt4vr60=
 github.com/alecthomas/jsonschema v0.0.0-20210920000243-787cd8204a0d h1:sUHuJQ3zwLmUgKM1v51WLWRtoy9r+hc/m7DoNftpUdA=
 github.com/alecthomas/jsonschema v0.0.0-20210920000243-787cd8204a0d/go.mod h1:/n6+1/DWPltRLWL/VKyUxg6tzsl5kHUCcraimt4vr60=
+github.com/alecthomas/jsonschema v0.0.0-20220216202328-9eeeec9d044b h1:doCpXjVwui6HUN+xgNsNS3SZ0/jUZ68Eb+mJRNOZfog=
+github.com/alecthomas/jsonschema v0.0.0-20220216202328-9eeeec9d044b/go.mod h1:/n6+1/DWPltRLWL/VKyUxg6tzsl5kHUCcraimt4vr60=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
@@ -250,6 +252,8 @@ github.com/estuary/flow v0.1.1-0.20220526012241-3f310a1eafcc h1:Zr6yb03tlO2vlCBE
 github.com/estuary/flow v0.1.1-0.20220526012241-3f310a1eafcc/go.mod h1:PfpyhbLq6VHP8JebEhXNr/L8NBKNPnopSFXwIQQ+NvQ=
 github.com/estuary/flow v0.1.1-0.20220526174542-91509348dd3f h1:388nz1bX6vqG4uLPkiiKgrMO2rtMojCt8q5he32VBSM=
 github.com/estuary/flow v0.1.1-0.20220526174542-91509348dd3f/go.mod h1:PfpyhbLq6VHP8JebEhXNr/L8NBKNPnopSFXwIQQ+NvQ=
+github.com/estuary/flow v0.1.1-0.20220526200915-42138b240c1f h1:boY1vdjuxxVuA4/XigupM1A1zVC7uG013aNvbAkDq0U=
+github.com/estuary/flow v0.1.1-0.20220526200915-42138b240c1f/go.mod h1:y5iYgzMczu/oTtxYkkpRM/HQZPXwG0+TkP2OGqlR7nc=
 github.com/evanphx/json-patch v4.2.0+incompatible h1:fUDGZCv/7iAN7u0puUVhvKCcsR6vRfwrJatElLBEf0I=
 github.com/evanphx/json-patch v4.2.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.6.0 h1:b91NhWfaz02IuVxO9faSllyAtNXHMPkC5J8sJCLunww=
