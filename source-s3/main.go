@@ -206,7 +206,7 @@ func main() {
 		ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
 			return json.RawMessage(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
-		"title":   "S3 Source Spec",
+		"title":   "S3 Source",
 		"type":    "object",
 		"required": [
 			"bucket",
@@ -216,14 +216,13 @@ func main() {
 			"awsAccessKeyId": {
 				"type":        "string",
 				"title":       "AWS Access Key ID",
-				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
-				"default":     "example-aws-access-key-id"
+				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads."
 			},
 			"awsSecretAccessKey": {
 				"type":        "string",
 				"title":       "AWS Secret Access Key",
 				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
-				"default":     "example-aws-secret-access-key"
+				"secret":      true
 			},
 			"ascendingKeys": {
 				"type":        "boolean",
@@ -239,7 +238,7 @@ func main() {
 			"endpoint": {
 				"type":        "string",
 				"title":       "AWS Endpoint",
-				"description": "The AWS endpoint URI to connect to, useful if you're capturing from a S3-compatible API that isn't provided by AWS"
+				"description": "The AWS endpoint URI to connect to. Use if you're capturing from a S3-compatible API that isn't provided by AWS"
 			},
 			"matchKeys": {
 				"type":        "string",
@@ -257,7 +256,8 @@ func main() {
 				"title":       "AWS Region",
 				"description": "The name of the AWS region where the S3 bucket is located. \"us-east-1\" is a popular default you can try, if you're unsure what to put here.",
 				"default":     "us-east-1"
-			}
+			},
+			"parser": ` + string(parserSchema) + `
 		}
     }`)
 		},

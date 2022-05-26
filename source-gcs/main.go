@@ -134,7 +134,7 @@ func main() {
 		ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
 			return json.RawMessage(`{
 		"$schema": "http://json-schema.org/draft-07/schema#",
-		"title":   "GCS Source Specification",
+		"title":   "GCS Source",
 		"type":    "object",
 		"required": [
 			"bucket"
@@ -154,7 +154,9 @@ func main() {
 			"googleCredentials": {
 				"type":        "object",
 				"title":       "Google Service Account",
-				"description": "Service account JSON file to use as Application Default Credentials"
+				"description": "Service account JSON file to use as Application Default Credentials",
+				"multiline":   true,
+				"secret":      true
 			},
 			"matchKeys": {
 				"type":        "string",
@@ -166,7 +168,8 @@ func main() {
 				"type":        "string",
 				"title":       "Prefix",
 				"description": "Prefix within the bucket to capture from"
-			}
+			},
+			"parser": ` + string(parserSchema) + `
 		}
     }`)
 		},
