@@ -18,14 +18,13 @@ pub enum Error {
 }
 
 /// # Kafka Source Configuration
-#[derive(Deserialize, Default, JsonSchema, Serialize)]
+#[derive(Deserialize, Default, Serialize)]
 pub struct Configuration {
     /// # Bootstrap Servers
     ///
     /// The initial servers in the Kafka cluster to initially connect to. The Kafka
     /// client will be informed of the rest of the cluster nodes by connecting to
     /// one of these nodes.
-    #[schemars(with = "Vec<String>")]
     pub bootstrap_servers: Vec<BootstrapServer>,
 
     /// # Authentication
@@ -55,6 +54,103 @@ impl Configuration {
             (Some(_), TlsSettings::SystemCertificates) => "SASL_SSL",
             (Some(_), TlsSettings::Cleartext) => "SASL_PLAINTEXT",
         }
+    }
+}
+
+impl JsonSchema for Configuration {
+    fn schema_name() -> String {
+        "Configuration".to_owned()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        serde_json::from_value(serde_json::json!({
+            "title": "Kafka Source Configuration",
+            "type": "object",
+            "required": [
+                "bootstrap_servers",
+                "tls"
+            ],
+            "properties": {
+                "bootstrap_servers": {
+                    "title": "Bootstrap Servers",
+                    "description": "The initial servers in the Kafka cluster to initially connect to. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.",
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "default": ["localhost:9092"],
+                    },
+                    "order": 0,
+                },
+                "authentication": {
+                    "title": "Authentication",
+                    "description":  "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments.",
+                    "oneOf": [
+                        { "title": "Enabled", "$ref": "#/definitions/Authentication" },
+                        { "title": "Disabled", "type": "null" }
+                    ],
+                    "order": 1,
+                },
+                "tls": {
+                    "title": "TLS Settings",
+                    "description": "Controls how should TLS certificates be found or used.",
+                    "$ref": "#/definitions/TlsSettings",
+                    "order": 2,
+                }
+            },
+            "definitions": {
+                "Authentication": {
+                    "title": "Authentication",
+                    "description": "The information necessary to connect to Kafka.",
+                    "type": "object",
+                    "required": [
+                        "mechanism",
+                        "password",
+                        "username",
+                    ],
+                    "properties": {
+                        "mechanism": {
+                            "title": "Sasl Mechanism",
+                            "allOf": [
+                                { "$ref": "#/definitions/SaslMechanism" }
+                            ],
+                            "order": 0,
+                        },
+                        "username": {
+                            "title": "Username",
+                            "type": "string",
+                            "secret": true,
+                            "order": 1,
+                        },
+                        "password": {
+                            "title": "Password",
+                            "type": "string",
+                            "secret": true,
+                            "order": 2,
+                        },
+                    }
+                },
+                "SaslMechanism": {
+                    "title": "SASL Mechanism",
+                    "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
+                    "type": "string",
+                    "enum": [
+                        "PLAIN",
+                        "SCRAM-SHA-256",
+                        "SCRAM-SHA-512",
+                    ]
+                },
+                "TlsSettings": {
+                    "title": "TLS Settings",
+                    "description": "Controls how should TLS certificates be found or used.",
+                    "type": "string",
+                    "enum": [
+                        "system_certificates",
+                        "cleartext",
+                    ]
+                }
+            }
+        }))
+        .unwrap()
     }
 }
 
@@ -153,7 +249,7 @@ impl<'de> Visitor<'de> for BootstrapServerVisitor {
 /// For more information about Salted Challenge Response Authentication
 /// Mechanism (SCRAM), see RFC 7677.
 /// https://datatracker.ietf.org/doc/html/rfc7677
-#[derive(Debug, Deserialize, JsonSchema, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING-KEBAB-CASE")]
 pub enum SaslMechanism {
     /// The username and password are sent to the server in the clear.
@@ -179,7 +275,7 @@ impl Display for SaslMechanism {
 /// # Authentication
 ///
 /// The information necessary to connect to Kafka.
-#[derive(Debug, Deserialize, JsonSchema, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Authentication {
     /// # Sasl Mechanism
     pub mechanism: SaslMechanism,
@@ -192,7 +288,7 @@ pub struct Authentication {
 /// # TLS Settings
 ///
 /// Controls how should TLS certificates be found or used.
-#[derive(Debug, Deserialize, JsonSchema, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TlsSettings {
     /// Use the TLS certificates found on the system by openssl.
