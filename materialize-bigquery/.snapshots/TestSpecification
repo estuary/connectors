@@ -48,7 +48,15 @@
       }
     },
     "additionalProperties": false,
-    "type": "object"
+    "type": "object",
+    "definitions": {
+      "credential": {
+        "type": "string",
+        "title": "Credentials",
+        "description": "Google Cloud Service Account JSON credentials in base64 format.",
+        "secret": true
+      }
+    }
   },
   "resource_spec_schema_json": {
     "$schema": "http://json-schema.org/draft-04/schema#",

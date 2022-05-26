@@ -26,15 +26,18 @@ type credential string
 
 func (credential) JSONSchemaType() *jsonschema.Type {
 	ty := &jsonschema.Type{
-		Type:        "string",
-		Title:       "Credentials",
-		Description: "Google Cloud Service Account JSON credentials in base64 format.",
+		Type:  "string",
+		Title: "Credentials",
 		Extras: map[string]interface{}{
 			"secret": true,
 		},
 	}
 
 	return ty
+}
+
+func (credential) Name() string {
+	return "credential"
 }
 
 // Config represents the endpoint configuration for BigQuery.
@@ -45,7 +48,7 @@ type config struct {
 	Region           string     `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."`
 	Bucket           string     `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery."`
 	BucketPath       string     `json:"bucket_path" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket."`
-	CredentialsJSON  credential `json:"credentials_json"`
+	CredentialsJSON  credential `json:"credentials_json" jsonschema_description:"Google Cloud Service Account JSON credentials in base64 format."`
 }
 
 func (c *config) Validate() error {
