@@ -167,12 +167,12 @@ func awaitCollectionReady(ctx context.Context, client *rockset.RockClient, works
 			"rocksetCollection": collection,
 		})
 		if ready {
-			logEntry.Info("Rockset collection has completed bulk ingestion")
+			logEntry.Info("Rockset collection is ready to accept writes")
 			return nil
 		} else if bulkIngestStalled {
 			logEntry.Warn("Rockset collection integration has not made any progress. Is your Rockset virtual instance large enough to support bulk ingestion?")
 		} else {
-			logEntry.Info("Rockset collection integration has not yet caught up (will retry)")
+			logEntry.Info("Rockset collection is not yet ready to accept writes (will retry)")
 		}
 
 		time.Sleep(nextIngestCompletionBackoff(collectionAge))
