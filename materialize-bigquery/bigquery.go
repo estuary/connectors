@@ -39,7 +39,7 @@ func (credential) JSONSchemaType() *jsonschema.Type {
 
 // Config represents the endpoint configuration for BigQuery.
 type config struct {
-	BillingProjectID string     `json:"billing_project_id" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."`
+	BillingProjectID string     `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."`
 	ProjectID        string     `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset."`
 	Dataset          string     `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset that will be used to store the materialization output."`
 	Region           string     `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."`

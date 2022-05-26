@@ -2,7 +2,6 @@
   "endpoint_spec_schema_json": {
     "$schema": "http://json-schema.org/draft-04/schema#",
     "required": [
-      "billing_project_id",
       "project_id",
       "dataset",
       "region",
