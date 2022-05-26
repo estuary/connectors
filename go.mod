@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/compute v1.5.0 // indirect
 	cloud.google.com/go/iam v0.3.0 // indirect
 	cloud.google.com/go/storage v1.18.2
-	github.com/alecthomas/jsonschema v0.0.0-20210920000243-787cd8204a0d
+	github.com/alecthomas/jsonschema v0.0.0-20220216202328-9eeeec9d044b
 	github.com/apache/arrow/go/arrow v0.0.0-20211012085237-157d48ccd47a // indirect
 	github.com/apache/thrift v0.15.0 // indirect
 	github.com/aws/aws-sdk-go v1.41.0
@@ -16,7 +16,7 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/brianvoe/gofakeit/v6 v6.9.0
 	github.com/elastic/go-elasticsearch/v7 v7.15.2-0.20211104170009-caf202868441
-	github.com/estuary/flow v0.1.1-0.20220526174542-91509348dd3f
+	github.com/estuary/flow v0.1.1-0.20220526200915-42138b240c1f
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.4.0
 	github.com/gogo/protobuf v1.3.2
@@ -33,7 +33,7 @@ require (
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/prometheus/common v0.31.1 // indirect
-	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed // indirect
+	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed
 	github.com/sirupsen/logrus v1.8.1
 	github.com/snowflakedb/gosnowflake v1.6.2
 	github.com/stretchr/testify v1.7.0
