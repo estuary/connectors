@@ -16,7 +16,7 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/brianvoe/gofakeit/v6 v6.9.0
 	github.com/elastic/go-elasticsearch/v7 v7.15.2-0.20211104170009-caf202868441
-	github.com/estuary/flow v0.1.1-0.20220412155258-453bb0e503ea
+	github.com/estuary/flow v0.1.1-0.20220526012241-3f310a1eafcc
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.4.0
 	github.com/gogo/protobuf v1.3.2
@@ -39,7 +39,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/xitongsys/parquet-go v1.6.1
 	github.com/xitongsys/parquet-go-source v0.0.0-20211010230925-397910c5e371
-	go.gazette.dev/core v0.89.1-0.20220212151322-e7c18c1b78cc
+	go.gazette.dev/core v0.89.1-0.20220422210424-fa37e21e0464
 	golang.org/x/crypto v0.0.0-20211209193657-4570a0811e8b // indirect
 	golang.org/x/net v0.0.0-20220412020605-290c469a71a5 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
