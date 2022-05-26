@@ -246,6 +246,8 @@ github.com/estuary/flow v0.1.1-0.20220325144111-c94a73c3acac h1:IYMmtK/4Gj3oK8cu
 github.com/estuary/flow v0.1.1-0.20220325144111-c94a73c3acac/go.mod h1:VztgR4Yn2WUzsKR1cYmc8/SzqcmSm/sd1VkUCwKgdmY=
 github.com/estuary/flow v0.1.1-0.20220412155258-453bb0e503ea h1:1u8vFk1eo+uPTDJnVkQG8qKz8LJEPSMsQ5C/lzCJs8E=
 github.com/estuary/flow v0.1.1-0.20220412155258-453bb0e503ea/go.mod h1:VztgR4Yn2WUzsKR1cYmc8/SzqcmSm/sd1VkUCwKgdmY=
+github.com/estuary/flow v0.1.1-0.20220526012241-3f310a1eafcc h1:Zr6yb03tlO2vlCBEBrEpHx+Oi8lfbmEZ4XF1zHHg8zM=
+github.com/estuary/flow v0.1.1-0.20220526012241-3f310a1eafcc/go.mod h1:PfpyhbLq6VHP8JebEhXNr/L8NBKNPnopSFXwIQQ+NvQ=
 github.com/evanphx/json-patch v4.2.0+incompatible h1:fUDGZCv/7iAN7u0puUVhvKCcsR6vRfwrJatElLBEf0I=
 github.com/evanphx/json-patch v4.2.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.6.0 h1:b91NhWfaz02IuVxO9faSllyAtNXHMPkC5J8sJCLunww=
@@ -694,6 +696,8 @@ go.gazette.dev/core v0.89.1-0.20211118163301-f0ff6cd8fce4 h1:pgGLbrM/TiKVrEhuzh+
 go.gazette.dev/core v0.89.1-0.20211118163301-f0ff6cd8fce4/go.mod h1:c/5g5752X3AH+g1ItiQaq9x+gmCFRmdTCFSkp5hypVQ=
 go.gazette.dev/core v0.89.1-0.20220212151322-e7c18c1b78cc h1:GyR68JB114+qvRCqqD4Isnm8wedXq3DTmYkdr9x+9g8=
 go.gazette.dev/core v0.89.1-0.20220212151322-e7c18c1b78cc/go.mod h1:c/5g5752X3AH+g1ItiQaq9x+gmCFRmdTCFSkp5hypVQ=
+go.gazette.dev/core v0.89.1-0.20220422210424-fa37e21e0464 h1:AgpjL3XZc5huCsPPQ7GA2vxmesZcWffInWYkQyahGLo=
+go.gazette.dev/core v0.89.1-0.20220422210424-fa37e21e0464/go.mod h1:c/5g5752X3AH+g1ItiQaq9x+gmCFRmdTCFSkp5hypVQ=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
