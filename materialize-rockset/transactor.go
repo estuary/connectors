@@ -52,28 +52,26 @@ type transactor struct {
 	errGroup *errgroup.Group
 }
 
-// awaitAllIntegrationIngestCompletions will block until all the Rockset collections named in the bindings
+// awaitAllRocksetCollectionsReady will block until all the Rockset collections named in the bindings
 // are in `READY` status and have completed any pending bulk ingestions. Specifically, this waits until the
 // number of objects in the bucket (as reported by rockset) and the number of successfully imported objects
 // is the same.
-func (t *transactor) awaitAllIntegrationIngestCompletions(ctx context.Context) error {
+func (t *transactor) awaitAllRocksetCollectionsReady(ctx context.Context) error {
 	group, ctx := errgroup.WithContext(ctx)
 	for _, binding := range t.bindings {
-		if binding.res.InitializeFromS3 != nil {
-			group.Go(func() error {
-				var err = awaitCollectionReady(
-					ctx,
-					t.client,
-					binding.res.Workspace,
-					binding.res.Collection,
-					binding.res.InitializeFromS3.Integration,
-				)
-				if err != nil {
-					return fmt.Errorf("awaiting bulk ingestion completion for rockset collection '%s': %w", binding.res.Collection, err)
-				}
-				return nil
-			})
-		}
+		group.Go(func() error {
+			var err = awaitCollectionReady(
+				ctx,
+				t.client,
+				binding.res.Workspace,
+				binding.res.Collection,
+				binding.res.InitializeFromS3.Integration,
+			)
+			if err != nil {
+				return fmt.Errorf("awaiting bulk ingestion completion for rockset collection '%s': %w", binding.res.Collection, err)
+			}
+			return nil
+		})
 	}
 	return group.Wait()
 }
@@ -182,7 +180,6 @@ func buildDocument(b *binding, keys, values tuple.Tuple) map[string]interface{} 
 }
 
 func (t *transactor) sendAllDocuments(ctx context.Context, b *binding, addDocsCh <-chan map[string]interface{}) error {
-
 	var docs = make([]interface{}, 0, storeBatchSize)
 
 	var docCount = 0
@@ -198,6 +195,7 @@ func (t *transactor) sendAllDocuments(ctx context.Context, b *binding, addDocsCh
 				logrus.WithFields(logrus.Fields{
 					"rocksetCollection": b.rocksetCollection(),
 				}).Debug("store channel closed")
+				// Set channel to nil so that we don't try to read from it again
 				addDocsCh = nil
 			}
 		}
