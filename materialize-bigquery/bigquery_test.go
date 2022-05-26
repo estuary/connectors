@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -68,6 +69,7 @@ func TestSpecification(t *testing.T) {
 		Spec(context.Background(), &pm.SpecRequest{EndpointType: pf.EndpointType_AIRBYTE_SOURCE})
 	require.NoError(t, err)
 
+	log.Print(resp)
 	formatted, err := json.MarshalIndent(resp, "", "  ")
 	require.NoError(t, err)
 

@@ -44,7 +44,7 @@
         "type": "string",
         "title": "Credentials",
         "description": "Google Cloud Service Account JSON credentials in base64 format.",
-        "secret": "true"
+        "secret": true
       }
     },
     "additionalProperties": false,
