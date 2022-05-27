@@ -55,6 +55,15 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]sqlcapt
 			}).Debug("discovered table")
 		}
 	}
+
+	// If there are zero tables, or there's one table but it's the
+	// watermarks table, log a warning.
+	var _, watermarksPresent = tableMap[db.WatermarksTable()]
+	if len(tableMap) == 0 || len(tableMap) == 1 && watermarksPresent {
+		logrus.Warn("no tables discovered")
+		logrus.Warn("note that source-mysql will not discover tables in the system schemas 'information_schema', 'mysql', 'performance_schema', or 'sys'")
+	}
+
 	return tableMap, nil
 }
 
