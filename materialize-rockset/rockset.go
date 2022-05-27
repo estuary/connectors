@@ -13,7 +13,7 @@ import (
 )
 
 // Only creates the named collection if it does not already exist.
-func createNewWorkspace(ctx context.Context, client *rockset.RockClient, workspace string) (*rtypes.Workspace, error) {
+func ensureWorkspaceExists(ctx context.Context, client *rockset.RockClient, workspace string) (*rtypes.Workspace, error) {
 	if res, err := getWorkspace(ctx, client, workspace); err != nil {
 		return nil, err
 	} else if res != nil {
@@ -47,22 +47,22 @@ func createWorkspace(ctx context.Context, client *rockset.RockClient, workspaceN
 
 // Only creates the named collection if it does not already exist. The returned boolean indicates whether it was
 // actually created. It will be false if the collection already exists or if an error is returned.
-func createNewCollection(ctx context.Context, client *rockset.RockClient, workspace string, collection string, integration *cloudStorageIntegration) (bool, error) {
-	if res, err := getCollection(ctx, client, workspace, collection); err != nil {
+func ensureCollectionExists(ctx context.Context, client *rockset.RockClient, resource *resource) (bool, error) {
+	if existingCollection, err := getCollection(ctx, client, resource.Workspace, resource.Collection); err != nil {
 		return false, err
-	} else if res != nil {
+	} else if existingCollection != nil {
 		// This collection exists within Rockset already, so just validate that
 		// it has the required integration.  Collection definitions in Rockset
 		// are immutable, so there's no way to add an integration to an existing
 		// collection.  Thus, if the integration named in the resource
 		// configuration does not exist, it must be returned as an error.
-		if integration != nil && GetS3IntegrationSource(res, integration.Integration) == nil {
-			return false, fmt.Errorf("expected collection '%s' to have a source with an integration named '%s', but no such integration source exists", collection, integration)
+		if resource.InitializeFromS3 != nil && GetS3IntegrationSource(existingCollection, resource.InitializeFromS3.Integration) == nil {
+			return false, fmt.Errorf("expected collection '%s' to have a source with an integration named '%s', but no such integration source exists", resource.Collection, resource.InitializeFromS3.Integration)
 		}
 		return false, nil
 	} else {
 		// This collection does not exist within Rockset yet, so we should create it.
-		var err = createCollection(ctx, client, workspace, collection, integration)
+		var err = createCollection(ctx, client, resource)
 		return err == nil, err
 	}
 }
@@ -88,9 +88,10 @@ func getCollection(ctx context.Context, client *rockset.RockClient, workspace st
 	}
 }
 
-func createCollection(ctx context.Context, client *rockset.RockClient, workspace string, collectionName string, integration *cloudStorageIntegration) error {
-	collection := rtypes.CreateCollectionRequest{Name: collectionName}
-	if integration != nil {
+func createCollection(ctx context.Context, client *rockset.RockClient, resource *resource) error {
+	collection := rtypes.CreateCollectionRequest{Name: resource.Collection}
+	if resource.InitializeFromS3 != nil {
+		var integration = resource.InitializeFromS3
 		collection.Sources = []rtypes.Source{{
 			IntegrationName: integration.Integration,
 			S3: &rtypes.SourceS3{
@@ -101,9 +102,27 @@ func createCollection(ctx context.Context, client *rockset.RockClient, workspace
 			},
 		}}
 	}
-	_, err := client.CreateCollection(ctx, workspace, collectionName, &collection)
+	if resource.AdvancedCollectionSettings != nil {
+		var settings = resource.AdvancedCollectionSettings
+		// These are all nullable on both the AdvancedCollectionSettings and the request
+		collection.RetentionSecs = settings.RetentionSecs
+
+		for _, field := range settings.ClusteringKey {
+			collection.ClusteringKey = append(collection.ClusteringKey, field.ToRocksetFieldPartition())
+		}
+
+		if settings.EventTimeInfo != nil {
+			collection.EventTimeInfo = &rtypes.EventTimeInfo{
+				Field:    settings.EventTimeInfo.Field,
+				Format:   settings.EventTimeInfo.Format,
+				TimeZone: settings.EventTimeInfo.TimeZone,
+			}
+		}
+	}
+	log.WithField("request", collection).Info("Will create a new Rockset collection")
+	_, err := client.CreateCollection(ctx, resource.Workspace, resource.Collection, &collection)
 	if err != nil {
-		return fmt.Errorf("failed to create collection `%s`: %w", collectionName, err)
+		return fmt.Errorf("failed to create collection `%s`: %w", resource.Collection, err)
 	}
 	return nil
 }

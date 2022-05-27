@@ -1,0 +1,1 @@
+{"$schema":"http://json-schema.org/draft-04/schema#","required":["api_key"],"properties":{"api_key":{"type":"string","title":"Rockset API Key","description":"The key used to authenticate to the Rockset API","secret":true}},"type":"object","title":"Rockset Endpoint"}
