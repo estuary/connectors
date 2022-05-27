@@ -167,10 +167,13 @@ func (e *Endpoint) CreateTableStatement(table *sqlDriver.Table) (string, error) 
 	if table.Temporary {
 		builder.WriteString("TEMPORARY ")
 	}
-	builder.WriteString("TABLE ")
-	if table.IfNotExists {
-		builder.WriteString("IF NOT EXISTS ")
-	}
+
+	// Ignoring the table.IfNotExists because we need to
+	// include it here otherwise, the statement would fail if the table exists
+	// and since create gets called multiple time, if one table exists and another doesn't,
+	// bigquery's table aren't fully configured and the connector fails when starting the transactor.
+	builder.WriteString("TABLE IF NOT EXISTS")
+
 	builder.WriteString(table.Identifier)
 	builder.WriteString(" (\n\t")
 
