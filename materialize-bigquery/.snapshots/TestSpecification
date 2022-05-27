@@ -4,37 +4,59 @@
     "required": [
       "project_id",
       "dataset",
+      "region",
       "bucket",
-      "bucket_path"
+      "bucket_path",
+      "credentials_json"
     ],
     "properties": {
       "billing_project_id": {
-        "type": "string"
+        "type": "string",
+        "title": "Billing Project ID",
+        "description": "Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."
       },
       "project_id": {
-        "type": "string"
+        "type": "string",
+        "title": "Project ID",
+        "description": "Google Cloud Project ID that owns the BigQuery dataset."
       },
       "dataset": {
-        "type": "string"
+        "type": "string",
+        "title": "Dataset",
+        "description": "BigQuery dataset that will be used to store the materialization output."
       },
       "region": {
-        "type": "string"
+        "type": "string",
+        "title": "Region",
+        "description": "Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."
       },
       "bucket": {
-        "type": "string"
+        "type": "string",
+        "title": "Bucket",
+        "description": "Google Cloud Storage bucket that is going to be used to store specfications \u0026 temporary data before merging into BigQuery."
       },
       "bucket_path": {
-        "type": "string"
-      },
-      "credentials_file": {
-        "type": "string"
+        "type": "string",
+        "title": "Bucket Path",
+        "description": "A prefix that will be used to store objects to Google Cloud Storage's bucket."
       },
       "credentials_json": {
-        "type": "string"
+        "type": "string",
+        "title": "Credentials",
+        "description": "Google Cloud Service Account JSON credentials in base64 format.",
+        "secret": true
       }
     },
     "additionalProperties": false,
-    "type": "object"
+    "type": "object",
+    "definitions": {
+      "credential": {
+        "type": "string",
+        "title": "Credentials",
+        "description": "Google Cloud Service Account JSON credentials in base64 format.",
+        "secret": true
+      }
+    }
   },
   "resource_spec_schema_json": {
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -43,10 +65,14 @@
     ],
     "properties": {
       "table": {
-        "type": "string"
+        "type": "string",
+        "title": "Table",
+        "description": "Table in the BigQuery dataset to store materialized result in."
       },
       "delta_updates": {
-        "type": "boolean"
+        "type": "boolean",
+        "title": "Delta Update",
+        "description": "Should updates to this table be done via delta updates. Defaults is false."
       }
     },
     "additionalProperties": false,
