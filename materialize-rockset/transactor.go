@@ -60,15 +60,19 @@ func (t *transactor) awaitAllRocksetCollectionsReady(ctx context.Context) error 
 	group, ctx := errgroup.WithContext(ctx)
 	for _, binding := range t.bindings {
 		group.Go(func() error {
+			var integration = ""
+			if binding.res.InitializeFromS3 != nil {
+				integration = binding.res.InitializeFromS3.Integration
+			}
 			var err = awaitCollectionReady(
 				ctx,
 				t.client,
 				binding.res.Workspace,
 				binding.res.Collection,
-				binding.res.InitializeFromS3.Integration,
+				integration,
 			)
 			if err != nil {
-				return fmt.Errorf("awaiting bulk ingestion completion for rockset collection '%s': %w", binding.res.Collection, err)
+				return fmt.Errorf("awaiting readiness of rockset collection '%s': %w", binding.res.Collection, err)
 			}
 			return nil
 		})
