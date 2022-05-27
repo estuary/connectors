@@ -162,11 +162,21 @@ Example:
 }
 ```
 
-### Include enum `type` for `array` properties
+### Include `type` when using `enum`
 
-If there is a list of allowed values the user can choose from to build up a list we need to provide the type of those options.
+Anytime you are using an enum in your schema you will need to include a type for it. This is for either simple cases (example 1) and for nested ones like example 2.
 
-Example:
+Example 1:
+
+```json
+{
+  "type": "string",
+  "enum": ["foo", "bar", "baz"],
+  "title": "A single selection field"
+}
+```
+
+Example 1:
 
 ```json
 {
