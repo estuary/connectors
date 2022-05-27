@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bradleyjkemp/cupaloy"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	rockset "github.com/rockset/rockset-go-client"
@@ -20,7 +21,7 @@ func TestRocksetConfig(t *testing.T) {
 	var invalid = config{}
 	require.NotNil(t, invalid.Validate())
 
-	var valid = config{ApiKey: fetchApiKey(), MaxConcurrentRequests: 1}
+	var valid = config{ApiKey: fetchApiKey()}
 	require.Nil(t, valid.Validate())
 }
 
@@ -37,19 +38,21 @@ func TestRocksetResource(t *testing.T) {
 
 func TestRocksetDriverSpec(t *testing.T) {
 	var driver = new(rocksetDriver)
-	// This isn't the right Endpoint type, but this is just a test.
 	var specReq = pm.SpecRequest{}
 	var response, err = driver.Spec(context.Background(), &specReq)
-
 	require.NoError(t, err)
-	require.NotNil(t, response.EndpointSpecSchemaJson)
-	require.NotNil(t, response.ResourceSpecSchemaJson)
-	require.NotNil(t, response.DocumentationUrl)
+
+	t.Run("TestEndpointSpecSchema", func(t *testing.T) {
+		cupaloy.SnapshotT(t, string(response.EndpointSpecSchemaJson))
+	})
+	t.Run("TestResourceSpecSchema", func(t *testing.T) {
+		cupaloy.SnapshotT(t, string(response.ResourceSpecSchemaJson))
+	})
 }
 
 func TestRocksetDriverValidate(t *testing.T) {
 	driver := new(rocksetDriver)
-	config := config{ApiKey: fetchApiKey(), MaxConcurrentRequests: 1}
+	config := config{ApiKey: fetchApiKey()}
 	var endpointSpecJson []byte
 
 	endpointSpecJson, err := json.Marshal(config)
@@ -121,7 +124,7 @@ func TestRocksetDriverValidate(t *testing.T) {
 
 	var binding = response.Bindings[0]
 	require.Len(t, binding.Constraints, 2)
-	require.Equal(t, binding.ResourcePath, []string{"testing", "widgets", "1000"})
+	require.Equal(t, binding.ResourcePath, []string{"testing", "widgets"})
 	require.True(t, binding.DeltaUpdates)
 }
 
@@ -130,7 +133,7 @@ func TestRocksetDriverApply(t *testing.T) {
 	collectionName := randCollection()
 
 	driver := new(rocksetDriver)
-	config := config{ApiKey: fetchApiKey(), MaxConcurrentRequests: 1}
+	config := config{ApiKey: fetchApiKey()}
 
 	var endpointSpecJson []byte
 	endpointSpecJson, err := json.Marshal(config)

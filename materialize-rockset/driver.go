@@ -9,24 +9,23 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
+	// importing tzdata is required so that time.LoadLocation can be used to validate timezones
+	// without requiring timezone packages to be installed on the system.
+	_ "time/tzdata"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	"github.com/estuary/connectors/materialize-s3-parquet/checkpoint"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	rockset "github.com/rockset/rockset-go-client"
+	rtypes "github.com/rockset/rockset-go-client/openapi"
 	log "github.com/sirupsen/logrus"
 )
 
 type config struct {
 	// Credentials used to authenticate with the Rockset API.
-	ApiKey string `json:"api_key"`
-	// TODO: remove HttpLogging
-	// Enable verbose logging of the HTTP calls to the Rockset API.
-	HttpLogging bool `json:"http_logging"`
-	// TODO: remove MaxConcurrentRequests
-	// The upper limit on how many concurrent requests will be sent to Rockset.
-	MaxConcurrentRequests int `json:"max_concurrent_requests" jsonschema:"default=1"`
+	ApiKey string `json:"api_key" jsonschema:"title=Rockset API Key,description=The key used to authenticate to the Rockset API" jsonschema_extras:"secret=true"`
 }
 
 func (c *config) Validate() error {
@@ -38,40 +37,100 @@ func (c *config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+	return nil
+}
 
-	if c.MaxConcurrentRequests < 1 {
-		return fmt.Errorf("max_concurrent_requests must be a positive integer. got: %v", c.MaxConcurrentRequests)
+// eventTimeInfo is copied from rtypes.EventTimeInfo and modified to customize the JSON schema.
+type eventTimeInfo struct {
+	Field    string  `json:"field" jsonschema:"title=Field Name,description=Name of the field containing the event time"`
+	Format   *string `json:"format,omitempty" jsonschema:"title=Format,description=Format of the time field,enum=milliseconds_since_epoch,enum=seconds_since_epoch"`
+	TimeZone *string `json:"time_zone,omitempty" jsonschema:"title=Timezone,description=Default timezone, in IANA format"`
+}
+
+func (e *eventTimeInfo) Validate() error {
+	if e.Field == "" {
+		return fmt.Errorf("Event Time Info: Field Name is empty")
+	}
+	if e.TimeZone != nil {
+		if _, err := time.LoadLocation(*e.TimeZone); err != nil {
+			return fmt.Errorf("Event Time Info: invalid Timezone: %w", err)
+		}
 	}
 
+	var validFormats = map[string]bool{
+		"milliseconds_since_epoch": true,
+		"seconds_since_epoch":      true,
+	}
+	if e.Format != nil {
+		if !validFormats[*e.Format] {
+			return fmt.Errorf("Event Time Info: Format is invalid")
+		}
+	}
+	return nil
+}
+
+// fieldPartition was copied from rtypes.FieldPartition and modified both to customize the json
+// schema and to remove unnecessary fields. Turns out that all the fields except for `FieldName` are
+// seemingly unnecessary, beucause the only supported `type` is `AUTO`, and the
+// [docs](https://rockset.com/docs/rest-api/#createcollection) say that the `keys` are not needed if
+// type is `AUTO`.
+type fieldPartition struct {
+	FieldName *string `json:"field_name,omitempty" jsonschema:"title=Field Name,description=The name of a field\u002C parsed as a SQL qualified name"`
+}
+
+func (fp *fieldPartition) ToRocksetFieldPartition() rtypes.FieldPartition {
+	// Go does not let you take the address of a constant directly :/
+	// AUTO is listed in the docs as the only permissible value for Type, so we might as well set it
+	// automatically.
+	var partitionType = "AUTO"
+	return rtypes.FieldPartition{
+		FieldName: fp.FieldName,
+		Type:      &partitionType,
+	}
+}
+
+// collectionSettings exposes a subset of the "advanced" options on rtypes.CreateCollectionRequest
+type collectionSettings struct {
+	RetentionSecs *int64           `json:"retention_secs,omitempty" jsonschema:"title=Retention Period,description=Number of seconds after which data is purged based on event time"`
+	EventTimeInfo *eventTimeInfo   `json:"event_time_info,omitempty" jsonschema:"title=Event Time Info"`
+	ClusteringKey []fieldPartition `json:"clustering_key,omitempty" jsonschema:"title=Clustering Key,description=List of clustering fields"`
+}
+
+func (s *collectionSettings) Validate() error {
+	if s.RetentionSecs != nil && *s.RetentionSecs < 0 {
+		return fmt.Errorf("Retention Period cannot be negative")
+	}
+	if s.EventTimeInfo != nil {
+		return s.EventTimeInfo.Validate()
+	}
+	// nothing to validate on ClusteringKey
 	return nil
 }
 
 type resource struct {
-	Workspace  string `json:"workspace,omitempty"`
-	Collection string `json:"collection,omitempty"`
-	// Configures the rockset collection to bulk load an initial data set from an S3 bucket, before transitioning to
-	// using the write API for ongoing data.
-	// If a previous version of this materialization wrote files into S3 in order to more quickly backfill historical
-	// data, then this value should contain configuration about the integration.  See: https://go.estuary.dev/rock-bulk
-	// If a bulk loading integration is not being used, then this should be undefined.
-	InitializeFromS3 *cloudStorageIntegration `json:"initializeFromS3,omitempty"`
-	MaxBatchSize     int                      `json:"maxBatchSize,omitempty"`
+	Workspace string `json:"workspace,omitempty" jsonschema:"title=Workspace,description=The name of the Rockset workspace (will be created if it does not exist)"`
+	// The name of the Rockset collection (will be created if it does not exist)
+	Collection string `json:"collection,omitempty" jsonschema:"title=Rockset Collection,description=The name of the Rockset collection (will be created if it does not exist)"`
+	// Configures the rockset collection to bulk load an initial data set from an S3 bucket, before
+	// transitioning to using the write API for ongoing data. If a previous version of this
+	// materialization wrote files into S3 in order to more quickly backfill historical data, then
+	// this value should contain configuration about the integration.  See:
+	// https://go.estuary.dev/rock-bulk If a bulk loading integration is not being used, then this
+	// should be undefined.
+	InitializeFromS3 *cloudStorageIntegration `json:"initializeFromS3,omitempty" jsonschema:"title=Backfill from S3" jsonschema_extras:"advanced=true"`
+
+	AdvancedCollectionSettings *collectionSettings `json:"advancedCollectionSettings,omitempty" jsonschema:"title=Advanced Collection Settings" jsonschema_extras:"advanced=true"`
+	// TODO: add advanced annotation to collectionSettings and InitializeFromS3
+	// TODO: set insert_only when creating collections, based on presence of delta_updates
 }
 
 // Configuration for bulk loading data into the new Rockset collection from a cloud storage bucket.
 type cloudStorageIntegration struct {
-	// The name of the integration in Rockset, which would have been created in the Rockset UI.
-	Integration string `json:"integration"`
-	// The name of the S3 bucket to load data from.
-	Bucket string `json:"bucket"`
-	// The region of the S3 bucket. Optional.
-	Region string `json:"region,omitempty"`
-	// A regex that is used to match objects to be ingested, according to the rules specified in the [rockset
-	// docs](https://rockset.com/docs/amazon-s3/#specifying-s3-path). Optional. Must not be set if 'prefix' is defined.
-	Pattern string `json:"pattern,omitempty"`
-	// Prefix of the data within the S3 bucket. All files under this prefix will be loaded. Optional. Must not be set if
-	// 'pattern' is defined.
-	Prefix string `json:"prefix,omitempty"`
+	Integration string `json:"integration" jsonschema:"title=Integration Name,description=The name of the integration that was previously created in the Rockset UI"`
+	Bucket      string `json:"bucket" jsonschema:"title=Bucket,description=The name of the S3 bucket to load data from."`
+	Region      string `json:"region,omitempty" jsonschema:"title=Region,description=The AWS region in which the bucket resides. Optional."`
+	Pattern     string `json:"pattern,omitempty" jsonschema:"title=Pattern,description=A regex that is used to match objects to be ingested, according to the rules specified in the rockset docs (https://rockset.com/docs/amazon-s3/#specifying-s3-path). Optional. Must not be set if 'prefix' is defined"`
+	Prefix      string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Prefix of the data within the S3 bucket. All files under this prefix will be loaded. Optional. Must not be set if 'pattern' is defined."`
 }
 
 func (c *cloudStorageIntegration) Validate() error {
@@ -115,12 +174,6 @@ func (r *resource) Validate() error {
 	}
 
 	return nil
-}
-
-func (r *resource) SetDefaults() {
-	if r.MaxBatchSize == 0 {
-		r.MaxBatchSize = 1000
-	}
 }
 
 func validateRocksetName(field string, value string) error {
@@ -179,10 +232,9 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 	var bindings = []*pm.ValidateResponse_Binding{}
 	for i, binding := range req.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if res, err = ResolveResourceConfig(binding.ResourceSpecJson); err != nil {
 			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
-		res.SetDefaults()
 		rocksetCollection, err := getCollection(ctx, client, res.Workspace, res.Collection)
 		if err != nil {
 			return nil, fmt.Errorf("requesting rockset collection: %w", err)
@@ -211,7 +263,7 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 
 		bindings = append(bindings, &pm.ValidateResponse_Binding{
 			Constraints:  constraints,
-			ResourcePath: []string{res.Workspace, res.Collection, fmt.Sprintf("%v", res.MaxBatchSize)},
+			ResourcePath: []string{res.Workspace, res.Collection},
 			DeltaUpdates: true,
 		})
 	}
@@ -235,18 +287,17 @@ func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (
 	actionLog := []string{}
 	for i, binding := range req.Materialization.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if res, err = ResolveResourceConfig(binding.ResourceSpecJson); err != nil {
 			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
-		res.SetDefaults()
 
-		if createdWorkspace, err := createNewWorkspace(ctx, client, res.Workspace); err != nil {
+		if createdWorkspace, err := ensureWorkspaceExists(ctx, client, res.Workspace); err != nil {
 			return nil, err
 		} else if createdWorkspace != nil {
 			actionLog = append(actionLog, fmt.Sprintf("created %s workspace", *createdWorkspace.Name))
 		}
 
-		if createdCollection, err := createNewCollection(ctx, client, res.Workspace, res.Collection, res.InitializeFromS3); err != nil {
+		if createdCollection, err := ensureCollectionExists(ctx, client, &res); err != nil {
 			return nil, err
 		} else if createdCollection {
 			actionLog = append(actionLog, fmt.Sprintf("created %s collection", res.Collection))
@@ -279,22 +330,18 @@ func (d *rocksetDriver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (
 		actionDescription.WriteString("Dry Run (skipping all actions):\n")
 	}
 
-	for i, binding := range req.Materialization.Bindings {
+	for _, binding := range req.Materialization.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
-			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
-		}
-		res.SetDefaults()
 		// I think it's appropriate to ignore validation errors here, since we're in the process of
 		// deleting this thing anyway. But we should only try to delete the rockset collection if
 		// the resource validation is successful, since otherwise it's likely to result in a bad
 		// request.
-		if validationErr := res.Validate(); validationErr != nil {
+		if res, err = ResolveResourceConfig(binding.ResourceSpecJson); err != nil {
 			log.WithFields(log.Fields{
 				"resource": binding.ResourceSpecJson,
-				"error":    validationErr,
+				"error":    err,
 			}).Warn("Will skip deleting the Rockset collection for this binding because the resource spec failed validation")
-			fmt.Fprintf(&actionDescription, "skipping deletion due to failed validation of resource: '%s', error: %s\n", string(binding.ResourceSpecJson), validationErr)
+			fmt.Fprintf(&actionDescription, "skipping deletion due to failed validation of resource: '%s', error: %s\n", string(binding.ResourceSpecJson), err)
 			continue
 		}
 
@@ -370,12 +417,11 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 
 	var bindings = make([]*binding, 0, len(open.Open.Materialization.Bindings))
 	for i, spec := range open.Open.Materialization.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(spec.ResourceSpecJson, &res); err != nil {
+		if res, err := ResolveResourceConfig(spec.ResourceSpecJson); err != nil {
 			return fmt.Errorf("building resource for binding %v: %w", i, err)
+		} else {
+			bindings = append(bindings, NewBinding(spec, &res))
 		}
-		res.SetDefaults()
-		bindings = append(bindings, NewBinding(spec, &res))
 	}
 
 	transactor := transactor{
@@ -405,6 +451,14 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 
 func ResolveEndpointConfig(specJson json.RawMessage) (config, error) {
 	var cfg = config{}
+	if err := pf.UnmarshalStrict(specJson, &cfg); err != nil {
+		return cfg, fmt.Errorf("parsing Rockset config: %w", err)
+	}
+	return cfg, cfg.Validate()
+}
+
+func ResolveResourceConfig(specJson json.RawMessage) (resource, error) {
+	var cfg = resource{}
 	if err := pf.UnmarshalStrict(specJson, &cfg); err != nil {
 		return cfg, fmt.Errorf("parsing Rockset config: %w", err)
 	}
