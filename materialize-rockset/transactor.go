@@ -58,7 +58,9 @@ type transactor struct {
 // is the same.
 func (t *transactor) awaitAllRocksetCollectionsReady(ctx context.Context) error {
 	group, ctx := errgroup.WithContext(ctx)
-	for _, binding := range t.bindings {
+	for _, b := range t.bindings {
+		// Assignment here is required because we capture this in the goroutine function
+		var binding = b
 		group.Go(func() error {
 			var integration = ""
 			if binding.res.InitializeFromS3 != nil {
