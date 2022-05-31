@@ -4,8 +4,10 @@ set -e
 export TEST_BUCKET="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
 export RESOURCE="{ stream: ${TEST_BUCKET} }"
 
+export GCP_SERVICE_ACCOUNT_KEY_QUOTED=$(echo ${GCP_SERVICE_ACCOUNT_KEY} | jq 'tojson')
+
 config_json_template='{
-    "googleCredentials": $GCP_SERVICE_ACCOUNT_KEY,
+    "googleCredentials": ${GCP_SERVICE_ACCOUNT_KEY_QUOTED},
     "bucket": "${TEST_BUCKET}"
 }'
 
