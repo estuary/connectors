@@ -68,7 +68,7 @@ func fixMysqlLogging() {
 // Config tells the connector how to connect to the source database and
 // capture changes from it.
 type Config struct {
-	Address  string         `json:"address" jsonschema:"title=Server Address and Port,default=127.0.0.1:3306,description=The host:port at which the database can be reached."`
+	Address  string         `json:"address" jsonschema:"title=Server Address,default=127.0.0.1:3306,description=The host or host:port at which the database can be reached."`
 	Login    loginConfig    `json:"login" jsonschema:"title=Login Configuration"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
@@ -115,6 +115,13 @@ func (c *Config) SetDefaults() {
 	}
 	if c.Advanced.NodeID == 0 {
 		c.Advanced.NodeID = 0x476C6F77 // "Flow"
+	}
+
+	// The address config property should accept a host or host:port
+	// value, and if the port is unspecified it should be the MySQL
+	// default 3306.
+	if !strings.Contains(c.Address, ":") {
+		c.Address += ":3306"
 	}
 }
 
