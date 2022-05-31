@@ -132,6 +132,10 @@ func (c *Client) Query(query string) (*QueryResponse, error) {
 		return nil, fmt.Errorf("reading response of query failed: %w", err)
 	}
 
+	if resp.StatusCode == 503 {
+		return nil, fmt.Errorf("Received 503 error when trying to connect to the engine. Please make sure your engine `%s` is up and running. It is advised that you set your engine to \"Always On\" in Firebolt to avoid auto-stopping of your engine.", c.config.EngineURL)
+	}
+
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf)
 	}
