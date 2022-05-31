@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,12 +14,12 @@ import (
 )
 
 type config struct {
-	AscendingKeys     bool            `json:"ascendingKeys"`
-	Bucket            string          `json:"bucket"`
-	GoogleCredentials json.RawMessage `json:"googleCredentials"`
-	MatchKeys         string          `json:"matchKeys"`
-	Parser            *parser.Config  `json:"parser"`
-	Prefix            string          `json:"prefix"`
+	AscendingKeys     bool           `json:"ascendingKeys"`
+	Bucket            string         `json:"bucket"`
+	GoogleCredentials string         `json:"googleCredentials"`
+	MatchKeys         string         `json:"matchKeys"`
+	Parser            *parser.Config `json:"parser"`
+	Prefix            string         `json:"prefix"`
 }
 
 func (c *config) Validate() error {
@@ -50,7 +49,7 @@ type gcStore struct {
 func newGCStore(ctx context.Context, cfg *config) (*gcStore, error) {
 
 	var opt option.ClientOption
-	if !bytes.Equal(cfg.GoogleCredentials, []byte("null")) {
+	if cfg.GoogleCredentials != "" {
 		opt = option.WithCredentialsJSON([]byte(cfg.GoogleCredentials))
 	} else {
 		opt = option.WithoutAuthentication()
@@ -152,9 +151,9 @@ func main() {
 				"description": "Name of the Google Cloud Storage bucket"
 			},
 			"googleCredentials": {
-				"type":        "object",
+				"type":        "string",
 				"title":       "Google Service Account",
-				"description": "Service account JSON file to use as Application Default Credentials",
+				"description": "Service account JSON key to use as Application Default Credentials",
 				"multiline":   true,
 				"secret":      true
 			},
