@@ -211,7 +211,7 @@ func (d *rocksetDriver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.Spec
 	return &pm.SpecResponse{
 		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
 		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://docs.estuary.dev",
+		DocumentationUrl:       "https://go.estuary.dev/materialize-rockset",
 	}, nil
 }
 
