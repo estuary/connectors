@@ -8,9 +8,9 @@ type config struct {
 	EngineURL    string `json:"engine_url" jsonschema:"title=Engine URL,example=engine-name.organisation.region.app.firebolt.io"`
 	Database     string `json:"database" jsonschema:"title=Database"`
 	Username     string `json:"username" jsonschema:"title=Username"`
-	Password     string `json:"password" jsonschema:"title=Password"`
+	Password     string `json:"password" jsonschema_extras:"secret=true" jsonschema:"title=Password"`
 	AWSKeyId     string `json:"aws_key_id,omitempty" jsonschema:"title=AWS Key ID"`
-	AWSSecretKey string `json:"aws_secret_key,omitempty" jsonschema:"title=AWS Secret Key"`
+	AWSSecretKey string `json:"aws_secret_key,omitempty" jsonschema_extras:"secret=true" jsonschema:"title=AWS Secret Key"`
 	AWSRegion    string `json:"aws_region,omitempty" jsonschema:"title=AWS Region"`
 	S3Bucket     string `json:"s3_bucket" jsonschema:"title=S3 Bucket"`
 	S3Prefix     string `json:"s3_prefix,omitempty" jsonschema:"title=S3 Prefix"`
