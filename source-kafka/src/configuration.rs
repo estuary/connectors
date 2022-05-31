@@ -35,7 +35,7 @@ pub struct Configuration {
     pub authentication: Option<Authentication>,
 
     /// # TLS connection settings.
-    pub tls: TlsSettings,
+    pub tls: Option<TlsSettings>,
 }
 
 impl Configuration {
@@ -49,10 +49,10 @@ impl Configuration {
 
     pub fn security_protocol(&self) -> &'static str {
         match (&self.authentication, &self.tls) {
-            (None, TlsSettings::SystemCertificates) => "SSL",
-            (None, TlsSettings::Cleartext) => "PLAINTEXT",
-            (Some(_), TlsSettings::SystemCertificates) => "SASL_SSL",
-            (Some(_), TlsSettings::Cleartext) => "SASL_PLAINTEXT",
+            (None, Some(TlsSettings::SystemCertificates)) => "SSL",
+            (None, None) => "PLAINTEXT",
+            (Some(_), Some(TlsSettings::SystemCertificates)) => "SASL_SSL",
+            (Some(_), None) => "SASL_PLAINTEXT",
         }
     }
 }
@@ -68,7 +68,6 @@ impl JsonSchema for Configuration {
             "type": "object",
             "required": [
                 "bootstrap_servers",
-                "tls"
             ],
             "properties": {
                 "bootstrap_servers": {
@@ -86,14 +85,17 @@ impl JsonSchema for Configuration {
                     "description":  "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments.",
                     "oneOf": [
                         { "title": "Enabled", "$ref": "#/definitions/Authentication" },
-                        { "title": "Disabled", "type": "null" }
+                        { "title": "Disabled", "type": "null" },
                     ],
                     "order": 1,
                 },
                 "tls": {
                     "title": "TLS Settings",
                     "description": "Controls how should TLS certificates be found or used.",
-                    "$ref": "#/definitions/TlsSettings",
+                    "oneOf": [
+                        { "title": "Enabled", "$ref": "#/definitions/TlsSettings" },
+                        { "title": "Disabled", "type": "null" },
+                    ],
                     "order": 2,
                 }
             },
@@ -143,9 +145,9 @@ impl JsonSchema for Configuration {
                     "title": "TLS Settings",
                     "description": "Controls how should TLS certificates be found or used.",
                     "type": "string",
+                    "default": "system_certificates",
                     "enum": [
                         "system_certificates",
-                        "cleartext",
                     ]
                 }
             }
@@ -291,11 +293,8 @@ pub struct Authentication {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TlsSettings {
-    /// Use the TLS certificates found on the system by openssl.
+    /// Use the TLS certificates bundled with openssl.
     SystemCertificates,
-    /// Disable TLS and use an insecure connection to the Kafka brokers. This
-    /// should only be used for dev/test environments.
-    Cleartext,
     // TODO: allow the user to specify custom TLS certs, authorities, etc.
     // CustomCertificates(CustomTlsSettings),
 }
@@ -359,7 +358,7 @@ mod test {
                 "username": "user",
                 "password": "password"
             },
-            "tls": "cleartext"
+            "tls": null
         }
         "#,
         );

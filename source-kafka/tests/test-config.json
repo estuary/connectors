@@ -5,5 +5,5 @@
     "username": "alice",
     "password": "alice-pass"
   },
-  "tls": "cleartext"
+  "tls": null
 }
