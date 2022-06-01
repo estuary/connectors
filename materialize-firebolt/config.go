@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 )
 
 type config struct {
@@ -50,7 +51,7 @@ func (config) GetFieldDocString(fieldName string) string {
 	case "S3Bucket":
 		return "Name of S3 bucket where the intermediate files for external table will be stored."
 	case "S3Prefix":
-		return "A prefix for files stored in the bucket, must not have a trailing slash. Example: /my-prefix."
+		return "A prefix for files stored in the bucket. Example: my-prefix."
 	case "AWSKeyId":
 		return "AWS Key ID for accessing the S3 bucket."
 	case "AWSSecretKey":
@@ -89,4 +90,9 @@ func (resource) GetFieldDocString(fieldName string) string {
 	default:
 		return ""
 	}
+}
+
+// Removes leading and trailing slashes from prefix
+func CleanPrefix(prefix string) string {
+	return strings.TrimRight(strings.TrimLeft(prefix, "/"), "/")
 }
