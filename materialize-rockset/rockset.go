@@ -106,6 +106,7 @@ func createCollection(ctx context.Context, client *rockset.RockClient, resource 
 		var settings = resource.AdvancedCollectionSettings
 		// These are all nullable on both the AdvancedCollectionSettings and the request
 		collection.RetentionSecs = settings.RetentionSecs
+		collection.InsertOnly = settings.InsertOnly
 
 		for _, field := range settings.ClusteringKey {
 			collection.ClusteringKey = append(collection.ClusteringKey, field.ToRocksetFieldPartition())

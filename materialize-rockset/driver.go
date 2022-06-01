@@ -94,6 +94,7 @@ type collectionSettings struct {
 	RetentionSecs *int64           `json:"retention_secs,omitempty" jsonschema:"title=Retention Period,description=Number of seconds after which data is purged based on event time"`
 	EventTimeInfo *eventTimeInfo   `json:"event_time_info,omitempty" jsonschema:"title=Event Time Info"`
 	ClusteringKey []fieldPartition `json:"clustering_key,omitempty" jsonschema:"title=Clustering Key,description=List of clustering fields"`
+	InsertOnly    *bool            `json:"insert_only,omitempty" jsonschema:"title=Insert Only,description=If true disallows updates and deletes. The materialization will fail if there are documents with duplicate keys.,default=false"`
 }
 
 func (s *collectionSettings) Validate() error {
