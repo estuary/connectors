@@ -81,7 +81,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		awsSecretKey: cfg.AWSSecretKey,
 		awsRegion:    cfg.AWSRegion,
 		bucket:       cfg.S3Bucket,
-		prefix:       strings.TrimLeft(fmt.Sprintf("%s/%s/", cfg.S3Prefix, open.Open.Materialization.Materialization.String()), "/"),
+		prefix:       fmt.Sprintf("%s/%s/", CleanPrefix(cfg.S3Prefix), open.Open.Materialization.Materialization.String()),
 	}
 
 	if err = stream.Send(&pm.TransactionResponse{
