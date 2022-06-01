@@ -119,10 +119,8 @@ type resource struct {
 	// https://go.estuary.dev/rock-bulk If a bulk loading integration is not being used, then this
 	// should be undefined.
 	InitializeFromS3 *cloudStorageIntegration `json:"initializeFromS3,omitempty" jsonschema:"title=Backfill from S3" jsonschema_extras:"advanced=true"`
-
+	// Additional settings for creating the Rockset collection, which are likely to be rarely used.
 	AdvancedCollectionSettings *collectionSettings `json:"advancedCollectionSettings,omitempty" jsonschema:"title=Advanced Collection Settings" jsonschema_extras:"advanced=true"`
-	// TODO: add advanced annotation to collectionSettings and InitializeFromS3
-	// TODO: set insert_only when creating collections, based on presence of delta_updates
 }
 
 // Configuration for bulk loading data into the new Rockset collection from a cloud storage bucket.
