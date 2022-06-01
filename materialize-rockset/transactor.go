@@ -11,7 +11,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	rockset "github.com/rockset/rockset-go-client"
-	//rtypes "github.com/rockset/rockset-go-client/openapi"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -245,8 +244,7 @@ func (t *transactor) sendReq(ctx context.Context, b *binding, docs []interface{}
 				errMsg = *e.Message // ugh
 			}
 			logrus.WithFields(logrus.Fields{
-				"error": errMsg,
-				// TODO: hopefully logrus is ok with a string pointer?
+				"error":             errMsg,
 				"rocksetErrorType":  e.Type,
 				"rocksetTraceId":    e.TraceId,
 				"rocksetErrorId":    e.ErrorId,
@@ -262,45 +260,6 @@ func (t *transactor) sendReq(ctx context.Context, b *binding, docs []interface{}
 	}
 	return err
 }
-
-/*
-func commitCollection(ctx context.Context, t *transactor, b *binding) error {
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("transactor context cancelled")
-	default:
-		// Keep going!
-	}
-
-	totalUpserts := b.pendingUpserts.Len()
-
-	defer logElapsedTime(time.Now(), fmt.Sprintf("commit completed: %d documents added", totalUpserts))
-
-	numWorkers := workerPoolSize(t.config.MaxConcurrentRequests, totalUpserts, b.res.MaxBatchSize)
-	workQueue, errors := newWorkerPool(ctx, numWorkers, func(ctx context.Context, data []json.RawMessage, worker int) error {
-		return t.client.AddDocuments(ctx, b.rocksetWorkspace(), b.rocksetCollection(), data)
-	})
-
-	go func() {
-		defer close(workQueue)
-
-		for _, batch := range b.pendingUpserts.SplitN(numWorkers) {
-			if len(batch) > 0 {
-				workQueue <- batch
-			}
-		}
-	}()
-
-	err := errors.Wait()
-	b.pendingUpserts.Clear()
-
-	if err != nil {
-		return fmt.Errorf("committing documents to rockset: %w", err)
-	}
-
-	return nil
-}
-*/
 
 func logElapsedTime(start time.Time, msg string) {
 	elapsed := time.Since(start)
