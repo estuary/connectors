@@ -269,7 +269,6 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	if err != nil {
 		return err
 	}
-	logrus.WithField("bindings", bindings).Info("loaded bindings")
 
 	var transactor = &transactor{
 		bindings:      bindings,
