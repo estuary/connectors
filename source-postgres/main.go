@@ -43,7 +43,7 @@ func main() {
 type Config struct {
 	Database        string `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
 	Host            string `json:"host" jsonschema:"description=Host name of the database to connect to."`
-	Password        string `json:"password" jsonschema:"description=User password configured within the database."`
+	Password        string `json:"password" jsonschema:"description=User password configured within the database." jsonschema_extras:"secret=true"`
 	Port            uint16 `json:"port" jsonschema:"default=5432" jsonschema:"description=Port to the DB connection. If SshForwardingConfig is enabled, a dynamic port is allocated if Port is unspecified."`
 	PublicationName string `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
 	SlotName        string `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
