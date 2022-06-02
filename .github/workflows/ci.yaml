@@ -24,6 +24,7 @@ jobs:
           - materialize-bigquery
           - materialize-elasticsearch
           - materialize-firebolt
+          - materialize-google-sheets
           - materialize-postgres
           - materialize-rockset
           - materialize-s3-parquet
@@ -143,8 +144,11 @@ jobs:
         if: |
           contains('
             materialize-elasticsearch
+            materialize-google-sheets
             materialize-s3-parquet
             ', matrix.connector)
+        env:
+          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
         run: CONNECTOR=${{ matrix.connector }} VERSION=local-test-tag tests/materialize/run.sh;
 
       - name: Push ${{ matrix.connector }} image

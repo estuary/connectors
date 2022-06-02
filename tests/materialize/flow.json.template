@@ -24,7 +24,7 @@
        },
        "key": ["/id"]
     },
- 
+
     "${TEST_COLLECTION_MULTIPLE_DATATYPES}": {
        "schema": {
        "properties": {
@@ -59,7 +59,7 @@
       "endpoint": {
         "flowSink": {
           "image": "${CONNECTOR_IMAGE}",
-          "config": "CONNECTOR_CONFIG_PLACEHOLDER"
+          "config": ${CONNECTOR_CONFIG}
         }
       },
       "bindings": ${RESOURCES_CONFIG}

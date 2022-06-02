@@ -145,10 +145,8 @@ if [[ -z "${RESOURCES_CONFIG}" ]]; then
 fi
 
 echo -e "\ngenerating catalog"
-escaped_connector_config=$(echo "${CONNECTOR_CONFIG}" | sed 's/\//\\\//g')
-envsubst < ${ROOT_DIR}/tests/materialize/flow.json.template | yq eval -P | \
-sed "s/CONNECTOR_CONFIG_PLACEHOLDER/${escaped_connector_config}/g" \
-> "${TEST_DIR}/${CATALOG}" || bail "generating ${CATALOG} failed."
+envsubst < ${ROOT_DIR}/tests/materialize/flow.json.template > "${TEST_DIR}/${CATALOG}" \
+    || bail "generating ${CATALOG} failed."
 
 echo -e "\nstarting temp data plane"
 runFlowctl temp-data-plane.sh "" true || bail "starting temp data plane."
