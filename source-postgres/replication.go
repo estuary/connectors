@@ -170,7 +170,7 @@ const standbyStatusInterval = 10 * time.Second
 // replicationStream before it stops receiving further events from PostgreSQL.
 // In normal use it's a constant, it's just a variable so that tests are more
 // likely to exercise blocking sends and backpressure.
-var replicationBufferSize = 1024
+var replicationBufferSize = 1000000
 
 func (s *replicationStream) Events() <-chan sqlcapture.ChangeEvent {
 	return s.events
