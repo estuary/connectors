@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-google-sheets/sheets_util"
@@ -136,9 +137,12 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 			case projection.IsPrimaryKey:
 				constraint.Type = pm.Constraint_LOCATION_REQUIRED
 				constraint.Reason = "Components of the collection key must be materialized"
+			case strings.HasPrefix(projection.Field, "_meta"):
+				constraint.Type = pm.Constraint_FIELD_OPTIONAL
+				constraint.Reason = "Metadata fields are optional"
 			case projection.Inference.IsSingleScalarType():
 				constraint.Type = pm.Constraint_LOCATION_RECOMMENDED
-				constraint.Reason = "Scalar types are recommeneded for materialization"
+				constraint.Reason = "Scalar types are recommended for materialization"
 			default:
 				constraint.Type = pm.Constraint_FIELD_OPTIONAL
 				constraint.Reason = "Field is optional"
