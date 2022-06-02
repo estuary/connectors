@@ -48,7 +48,7 @@ func (r *resultSet) Buffer(streamID string, keyColumns []string, events []Change
 	for _, event := range events {
 		var bs, err = encodeRowKey(chunk.keyColumns, event.After, db)
 		if err != nil {
-			return fmt.Errorf("error encoding row key: %w", err)
+			return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 		}
 		if chunk.scanned != nil && compareTuples(chunk.scanned, bs) >= 0 {
 			// It's important for correctness that the ordering of serialized primary keys matches

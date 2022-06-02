@@ -329,7 +329,7 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 		}
 		if tableState.Mode == TableModeActive {
 			if err := c.handleChangeEvent(streamID, event); err != nil {
-				return fmt.Errorf("error handling replication event: %w", err)
+				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 			}
 			continue
 		}
@@ -342,14 +342,14 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 		// the buffered resultSet.
 		var rowKey, err = encodeRowKey(tableState.KeyColumns, event.KeyFields(), c.Database)
 		if err != nil {
-			return fmt.Errorf("error encoding row key: %w", err)
+			return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 		}
 		if compareTuples(rowKey, tableState.Scanned) <= 0 {
 			if err := c.handleChangeEvent(streamID, event); err != nil {
-				return fmt.Errorf("error handling replication event: %w", err)
+				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 			}
 		} else if err := results.Patch(streamID, event, rowKey); err != nil {
-			return fmt.Errorf("error patching resultset: %w", err)
+			return fmt.Errorf("error patching resultset for %q: %w", streamID, err)
 		}
 	}
 	return nil
