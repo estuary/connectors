@@ -1,16 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
-	"time"
+	"sort"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"google.golang.org/api/googleapi"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -24,16 +23,16 @@ type transactor struct {
 	spreadsheetId string
 }
 
+type transactorRow struct {
+	PackedKey string
+	Doc       json.RawMessage
+	Round     int64
+}
+
 type transactorBinding struct {
-	// All documents of this materialization binding.
-	Docs []json.RawMessage
+	rows []transactorRow
 	// Fields materialized by this binding.
 	Fields pf.FieldSelection
-	// Column index of the `flow_internal` sheet for even/odd rounds,
-	// into which documents are persisted.
-	StateColumn [2]int64
-	// Sheet ID of the `flow_internal` sheet.
-	StateSheetId int64
 	// Sheet ID of the user-facing sheet for this binding.
 	UserSheetId int64
 	// User-facing sheet name for this binding.
@@ -42,21 +41,21 @@ type transactorBinding struct {
 
 func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
-		// We always return all documents of all bindings each transaction.
-		// and don't much care which specific keys are involved.
-	}
-	if it.Err() != nil {
-		return it.Err()
-	}
+		var needle = string(it.Key.Pack())
+		var rows = d.bindings[it.Binding].rows
 
-	for ind, binding := range d.bindings {
-		for _, doc := range binding.Docs {
-			if err := loaded(ind, doc); err != nil {
-				return fmt.Errorf("sending loaded: %w", err)
-			}
+		var ind = sort.Search(len(rows), func(i int) bool {
+			return rows[i].PackedKey >= needle
+		})
+
+		if ind == len(rows) || rows[ind].PackedKey != needle || rows[ind].Round == 0 {
+			// Key is not matched or is a rolled-back placeholder.
+		} else if err := loaded(it.Binding, rows[ind].Doc); err != nil {
+			return fmt.Errorf("sending loaded: %w", err)
 		}
 	}
-	return nil
+
+	return it.Err()
 }
 
 func (d *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
@@ -74,128 +73,195 @@ func (d *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare)
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) error {
-	// We'll rebuild the full data-grid of each user-facing sheet from the StoreIterator.
-	var userSheets = make([][]*sheets.RowData, len(d.bindings))
-
-	for ind := range d.bindings {
-		d.bindings[ind].Docs = d.bindings[ind].Docs[:0] // Truncate.
-
-		// Marshal row of column headers.
-		var headers []*sheets.CellData
-		for i := range d.bindings[ind].Fields.Keys {
-			headers = append(headers, &sheets.CellData{UserEnteredValue: &sheets.ExtendedValue{
-				StringValue: &d.bindings[ind].Fields.Keys[i]}})
-		}
-		for i := range d.bindings[ind].Fields.Values {
-			headers = append(headers, &sheets.CellData{UserEnteredValue: &sheets.ExtendedValue{
-				StringValue: &d.bindings[ind].Fields.Values[i]}})
-		}
-		userSheets[ind] = append(userSheets[ind], &sheets.RowData{Values: headers})
+	type storedRow struct {
+		RowState
+		cells []*sheets.CellData
 	}
+	var stores = make([][]storedRow, len(d.bindings))
 
+	// Gather all of the stored rows on a per-binding basis.
 	for it.Next() {
-		d.bindings[it.Binding].Docs = append(d.bindings[it.Binding].Docs, it.RawJSON)
-
-		// Build sheet row update.
-		var row = make([]*sheets.CellData, len(it.Key)+len(it.Values))
-
+		// Marshal key and value fields into cells of the row.
+		// cells[0] is a placeholder for internal state that's written later.
+		var cells = make([]*sheets.CellData, 1, 1+len(it.Key)+len(it.Values))
 		for _, e := range it.Key {
-			row = append(row, valueToCell(e))
+			cells = append(cells, valueToCell(e))
 		}
 		for _, e := range it.Values {
-			row = append(row, valueToCell(e))
+			cells = append(cells, valueToCell(e))
 		}
 
-		userSheets[it.Binding] = append(userSheets[it.Binding], &sheets.RowData{Values: row})
-	}
-
-	var requests []*sheets.Request
-	for ind, binding := range d.bindings {
-
-		// Update to user-facing sheet.
-		requests = append(requests, &sheets.Request{
-			UpdateCells: &sheets.UpdateCellsRequest{
-				Range: &sheets.GridRange{
-					SheetId: binding.UserSheetId,
-				},
-				Rows:   userSheets[ind],
-				Fields: "userEnteredValue",
+		stores[it.Binding] = append(stores[it.Binding], storedRow{
+			RowState: RowState{
+				PackedKey: it.Key.Pack(),
+				NextRound: d.round,
+				NextDoc:   it.RawJSON,
 			},
-		})
-
-		// We also must update documents tracked in `flow_internal`.
-		// Marshal the column header...
-		var header = fmt.Sprintf("%s:%d", binding.UserSheetName, d.round)
-		var rows = []*sheets.RowData{
-			{
-				Values: []*sheets.CellData{
-					{UserEnteredValue: &sheets.ExtendedValue{StringValue: &header}},
-				},
-			},
-		}
-		// ...then marshal current documents states.
-		for _, rawJSON := range binding.Docs {
-			var s = string(rawJSON)
-			rows = append(rows, &sheets.RowData{
-				Values: []*sheets.CellData{
-					{UserEnteredValue: &sheets.ExtendedValue{StringValue: &s}},
-				},
-			})
-		}
-
-		// Update (only) the current (even vs odd) column of this binding.
-		requests = append(requests, &sheets.Request{
-			UpdateCells: &sheets.UpdateCellsRequest{
-				Range: &sheets.GridRange{
-					SheetId:          binding.StateSheetId,
-					StartColumnIndex: binding.StateColumn[d.round%2],
-					EndColumnIndex:   binding.StateColumn[d.round%2] + 1,
-				},
-				Rows:   rows,
-				Fields: "userEnteredValue",
-			},
+			cells: cells,
 		})
 	}
 
-	// Apply all subRequests in a single batch, wrapped in a retry loop
-	// which handles rate limit errors from the sheets API.
-	for attempt := 1; true; attempt++ {
-		var _, err = d.client.Spreadsheets.BatchUpdate(d.spreadsheetId,
-			&sheets.BatchUpdateSpreadsheetRequest{Requests: requests}).
-			Context(it.Context()).
-			Do()
+	// batchRequests collects all sub-requests made to each sheet.
+	var batchRequests []*sheets.Request
 
-		if err == nil {
-			return nil
-		}
+	for bindInd := range d.bindings {
+		var stores = stores[bindInd]
 
-		// If we encounter a rate limit error, retry after exponential back-off.
-		if e, ok := err.(*googleapi.Error); ok && e.Code == 429 {
-			var dur = time.Duration(1<<attempt) * time.Second
-			log.Println("rate limit exceeded. backing off for ", dur)
-			time.Sleep(dur)
+		if len(stores) == 0 {
 			continue
 		}
 
-		// All other errors bail out.
-		return fmt.Errorf("while updating sheets: %w", err)
+		// Ensure `stored` is in sorted order.
+		// A precondition is that `prevRows` is already sorted,
+		// as its always produced through a merge-join.
+		sort.Slice(stores, func(i, j int) bool { return bytes.Compare(stores[i].PackedKey, stores[j].PackedKey) == -1 })
+
+		// We'll do an ordered merge of `prev` and `stores`, producing new rows into `next`.
+		var pi, si int
+		var prev = d.bindings[bindInd].rows
+		var next = make([]transactorRow, 0, len(prev)+len(stores))
+
+		// As we go we'll build up batches of requests which first add rows as required
+		// for keys, and which then update cells to stored values using their after-add
+		// adjusted row indexes.
+		var addRows, updateCells []*sheets.Request
+
+		for pi != len(prev) || si != len(stores) {
+
+			// Compare next `prev` vs `stores`.
+			var cmp int
+			if si == len(stores) {
+				cmp = -1 // Implicit less.
+			} else if pi == len(prev) {
+				cmp = 1 // Implicit greater.
+			} else if prev[pi].PackedKey < string(stores[si].PackedKey) {
+				cmp = -1
+			} else if prev[pi].PackedKey > string(stores[si].PackedKey) {
+				cmp = 1
+			}
+
+			if cmp == -1 {
+				// Prev row is not changed by this round.
+				next = append(next, prev[pi])
+				pi++
+				continue
+			}
+
+			// Row is being updated or inserted.
+			// It's sheet row index is 1-indexed (due to its header).
+			var rowInd = int64(len(next) + 1)
+			var s = stores[si]
+			si++
+
+			next = append(next, transactorRow{
+				PackedKey: string(s.PackedKey),
+				Doc:       s.NextDoc,
+				Round:     s.NextRound,
+			})
+
+			// Does a `prev` row exist? If so include its prior version in the prior state.
+			if cmp == 0 {
+				s.PrevDoc = prev[pi].Doc
+				s.PrevRound = prev[pi].Round
+				pi++
+			} else if l := len(addRows); l != 0 && addRows[l-1].InsertRange.Range.EndRowIndex == rowInd {
+				// We're inserting a new row, and we can extend a current run of added rows.
+				addRows[l-1].InsertRange.Range.EndRowIndex++
+			} else {
+				// We must start a new run of added rows.
+				addRows = append(addRows, &sheets.Request{
+					InsertRange: &sheets.InsertRangeRequest{
+						ShiftDimension: "ROWS",
+						Range: &sheets.GridRange{
+							SheetId:       d.bindings[bindInd].UserSheetId,
+							StartRowIndex: rowInd,
+							EndRowIndex:   rowInd + 1,
+						},
+					},
+				})
+			}
+
+			// Marshal internal prev / next document state into cells[0].
+			var col0, err = json.Marshal(s)
+			if err != nil {
+				panic(err)
+			}
+			s.cells[0] = valueToCell(col0)
+
+			// We're updating a row. Can we extend a current row run?
+			if l := len(updateCells); l != 0 && updateCells[l-1].UpdateCells.Range.EndRowIndex == rowInd {
+				updateCells[l-1].UpdateCells.Rows = append(
+					updateCells[l-1].UpdateCells.Rows,
+					&sheets.RowData{Values: s.cells})
+				updateCells[l-1].UpdateCells.Range.EndRowIndex++
+			} else {
+				// We must start a new run of updated rows.
+				updateCells = append(updateCells, &sheets.Request{
+					UpdateCells: &sheets.UpdateCellsRequest{
+						Range: &sheets.GridRange{
+							SheetId:       d.bindings[bindInd].UserSheetId,
+							StartRowIndex: rowInd,
+							EndRowIndex:   rowInd + 1,
+						},
+						Rows:   []*sheets.RowData{{Values: s.cells}},
+						Fields: "userEnteredValue",
+					},
+				})
+			}
+
+		} // Done with merge of `prev` and `stored` into `next`.
+
+		d.bindings[bindInd].rows = next
+		batchRequests = append(batchRequests, addRows...)
+		batchRequests = append(batchRequests, updateCells...)
 	}
-	panic("not reached")
+
+	return batchRequestWithRetry(
+		it.Context(),
+		d.client,
+		d.spreadsheetId,
+		batchRequests,
+	)
 }
 
 func valueToCell(e tuple.TupleElement) *sheets.CellData {
-	if e == nil {
+	switch ee := e.(type) {
+	case nil:
 		return &sheets.CellData{}
-	} else if b, ok := e.([]byte); ok {
-		var s = string(b) // This is a JSON array or object.
+	case []byte:
+		var s = string(ee) // This is a JSON array or object.
 		return &sheets.CellData{
 			UserEnteredValue: &sheets.ExtendedValue{StringValue: &s},
 		}
-	} else {
-		var s = fmt.Sprintf("%v", e) // This is a JSON scalar.
+	case string:
 		return &sheets.CellData{
-			UserEnteredValue: &sheets.ExtendedValue{StringValue: &s},
+			UserEnteredValue: &sheets.ExtendedValue{StringValue: &ee},
 		}
+	case int64:
+		var f = float64(ee)
+		return &sheets.CellData{
+			UserEnteredValue: &sheets.ExtendedValue{NumberValue: &f},
+		}
+	case uint64:
+		var f = float64(ee)
+		return &sheets.CellData{
+			UserEnteredValue: &sheets.ExtendedValue{NumberValue: &f},
+		}
+	case float32:
+		var f = float64(ee)
+		return &sheets.CellData{
+			UserEnteredValue: &sheets.ExtendedValue{NumberValue: &f},
+		}
+	case float64:
+		return &sheets.CellData{
+			UserEnteredValue: &sheets.ExtendedValue{NumberValue: &ee},
+		}
+	case bool:
+		return &sheets.CellData{
+			UserEnteredValue: &sheets.ExtendedValue{BoolValue: &ee},
+		}
+	default:
+		panic(fmt.Sprintf("unhandled type %#v", e))
 	}
 }
 
@@ -204,15 +270,6 @@ func (d *transactor) Commit(ctx context.Context) error {
 	return nil
 }
 
-// Acknowledge is a no-op because we have already written documents into
-// `flow_internal` (keyed by even/odd round) and fields into the user-facing
-// sheet.
-//
-// We'll Recover the correct even/odd set of documents depending on the persisted
-// `round`, and we over-write the entirety of the user-facing sheet each transaction.
-// This WOULD NOT be safe to do if we were applying partial updates to the user-facing
-// sheet, as it could reflect a transaction which ultimately failed to commit and was
-// rolled back. But, since we simply overwrite its contents anyway, we don't care.
 func (d *transactor) Acknowledge(context.Context) error {
 	return nil
 }
