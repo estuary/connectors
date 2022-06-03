@@ -31,9 +31,10 @@ func main() {
 		log.Fatal(fmt.Errorf("building sheets service: %w", err))
 	}
 
+	// Fetch all rows, and all columns except the internal state column (A).
 	resp, err := client.Spreadsheets.
 		Get(spreadsheetID).
-		Ranges(sheetName).
+		Ranges(fmt.Sprintf("'%s'!B:Z", sheetName)).
 		Fields("sheets(data(startColumn,startRow,rowData(values(userEnteredValue))))").
 		Do()
 
