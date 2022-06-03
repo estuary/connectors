@@ -103,7 +103,7 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 			}
 		}
 		}`),
-		DocumentationUrl: "https://docs.estuary.dev",
+		DocumentationUrl: "https://go.estuary.dev/materialize-google-sheets",
 	}, nil
 }
 

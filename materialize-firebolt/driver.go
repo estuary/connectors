@@ -31,7 +31,7 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 	return &pm.SpecResponse{
 		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
 		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/Gpy680",
+		DocumentationUrl:       "https://go.estuary.dev/materialize-firebolt",
 	}, nil
 }
 
