@@ -124,5 +124,5 @@
     "type": "object",
     "title": "Elasticsearch Index"
   },
-  "documentation_url": "https://docs.estuary.dev#FIXME"
+  "documentation_url": "https://go.estuary.dev/materialize-elasticsearch"
 }

@@ -60,5 +60,5 @@
     "type": "object",
     "title": "S3 Prefix"
   },
-  "documentation_url": "https://docs.estuary.dev#FIXME"
+  "documentation_url": "https://go.estuary.dev/materialize-s3-parquet"
 }
