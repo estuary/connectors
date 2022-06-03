@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -185,6 +186,7 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 
 	var actions []*sheets.Request
 	var description string
+	var rand = rand.New(rand.NewSource(time.Now().UnixMicro()))
 
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
