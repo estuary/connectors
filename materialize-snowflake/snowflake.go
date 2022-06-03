@@ -87,7 +87,7 @@ var trueString = "true"
 // newSnowflakeDriver creates a new Driver for Snowflake.
 func newSnowflakeDriver() *sqlDriver.Driver {
 	return &sqlDriver.Driver{
-		DocumentationURL: "https://docs.estuary.dev/#FIXME",
+		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
 		NewResource: func(endpoint sqlDriver.Endpoint) sqlDriver.Resource {

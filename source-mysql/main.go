@@ -32,7 +32,7 @@ func main() {
 	var spec = airbyte.Spec{
 		SupportsIncremental:     true,
 		ConnectionSpecification: json.RawMessage(configSchema),
-		DocumentationURL:        "https://docs.estuary.dev/reference/Connectors/capture-connectors/MySQL/",
+		DocumentationURL:        "https://go.estuary.dev/source-mysql",
 	}
 
 	sqlcapture.AirbyteMain(spec, func(configFile airbyte.ConfigFile) (sqlcapture.Database, error) {

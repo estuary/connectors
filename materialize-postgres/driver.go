@@ -82,7 +82,7 @@ func (c tableConfig) DeltaUpdates() bool {
 
 func newPostgresDriver() pm.DriverServer {
 	return &sqlDriver.Driver{
-		DocumentationURL: "https://docs.estuary.dev/#FIXME",
+		DocumentationURL: "https://go.estuary.dev/materialize-postgresql",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
 		NewResource:      func(sqlDriver.Endpoint) sqlDriver.Resource { return new(tableConfig) },

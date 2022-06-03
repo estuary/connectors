@@ -141,7 +141,7 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 	return &pm.SpecResponse{
 		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
 		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://docs.estuary.dev#FIXME",
+		DocumentationUrl:       "https://go.estuary.dev/materialize-s3-parquet",
 	}, nil
 }
 
