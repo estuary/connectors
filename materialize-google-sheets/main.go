@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	"github.com/estuary/connectors/materialize-google-sheets/sheets_util"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/sirupsen/logrus"
@@ -115,7 +115,7 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 	var svc, err = cfg.buildService()
 	if err != nil {
 		return nil, err
-	} else if _, err = sheets_util.LoadSheetIDMapping(svc, cfg.SpreadsheetID); err != nil {
+	} else if _, err = loadSheetIDMapping(svc, cfg.SpreadsheetID); err != nil {
 		return nil, fmt.Errorf("verifying credentials: %w", err)
 	}
 
@@ -178,43 +178,60 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 	if err != nil {
 		return nil, err
 	}
-	sheetIDs, err := sheets_util.LoadSheetIDMapping(svc, cfg.SpreadsheetID)
+	sheetIDs, err := loadSheetIDMapping(svc, cfg.SpreadsheetID)
 	if err != nil {
 		return nil, err
-	}
-
-	var allSheets = []string{"flow_internal"}
-	for _, binding := range req.Materialization.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		allSheets = append(allSheets, res.Sheet)
 	}
 
 	var actions []*sheets.Request
 	var description string
 
-	for _, sheet := range allSheets {
-		var _, exists = sheetIDs[sheet]
+	for _, binding := range req.Materialization.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+			return nil, fmt.Errorf("parsing resource config: %w", err)
+		}
+		var _, exists = sheetIDs[res.Sheet]
 
 		if !exists && !isDelete {
-			description += fmt.Sprintf("Created sheet %q.\n", sheet)
+			description += fmt.Sprintf("Created sheet %q.\n", res.Sheet)
 
-			actions = append(actions, &sheets.Request{
-				AddSheet: &sheets.AddSheetRequest{
-					Properties: &sheets.SheetProperties{
-						Title: sheet,
+			// Marshal row of column headers. First column is internal state.
+			var headers = []*sheets.CellData{{}}
+			for i := range binding.FieldSelection.Keys {
+				headers = append(headers, &sheets.CellData{UserEnteredValue: &sheets.ExtendedValue{
+					StringValue: &binding.FieldSelection.Keys[i]}})
+			}
+			for i := range binding.FieldSelection.Values {
+				headers = append(headers, &sheets.CellData{UserEnteredValue: &sheets.ExtendedValue{
+					StringValue: &binding.FieldSelection.Values[i]}})
+			}
+
+			// Create a new sheet and append its column headers.
+			var sheetID = int64(rand.Int31())
+			actions = append(actions,
+				&sheets.Request{
+					AddSheet: &sheets.AddSheetRequest{
+						Properties: &sheets.SheetProperties{
+							Title:   res.Sheet,
+							SheetId: sheetID,
+						},
 					},
 				},
-			})
+				&sheets.Request{
+					AppendCells: &sheets.AppendCellsRequest{
+						SheetId: sheetID,
+						Fields:  "userEnteredValue",
+						Rows:    []*sheets.RowData{{Values: headers}},
+					},
+				},
+			)
 		} else if exists && isDelete {
-			description += fmt.Sprintf("Deleted sheet %q.\n", sheet)
+			description += fmt.Sprintf("Deleted sheet %q.\n", res.Sheet)
 
 			actions = append(actions, &sheets.Request{
 				DeleteSheet: &sheets.DeleteSheetRequest{
-					SheetId: sheetIDs[sheet],
+					SheetId: sheetIDs[res.Sheet],
 				},
 			})
 		}
@@ -222,15 +239,8 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 
 	if req.DryRun || len(actions) == 0 {
 		// Nothing to do.
-	} else {
-		var batchUpdate = svc.Spreadsheets.BatchUpdate(cfg.SpreadsheetID,
-			&sheets.BatchUpdateSpreadsheetRequest{
-				Requests: actions,
-			},
-		)
-		if _, err = batchUpdate.Do(); err != nil {
-			return nil, fmt.Errorf("while updated sheets: %w", err)
-		}
+	} else if err = batchRequestWithRetry(ctx, svc, cfg.SpreadsheetID, actions); err != nil {
+		return nil, fmt.Errorf("while updated sheets: %w", err)
 	}
 
 	return &pm.ApplyResponse{ActionDescription: description}, nil
@@ -259,16 +269,20 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	if err != nil {
 		return err
 	}
-	sheetIDs, err := sheets_util.LoadSheetIDMapping(svc, cfg.SpreadsheetID)
-	if err != nil {
-		return err
-	}
-	bindings, err := loadBindingStates(
+
+	states, err := loadSheetStates(
+		open.Open.Materialization.Bindings,
 		svc,
 		cfg.SpreadsheetID,
-		sheetIDs,
+	)
+	if err != nil {
+		return fmt.Errorf("recovering sheet states: %w", err)
+	}
+
+	bindings, err := buildTransactorBindings(
 		open.Open.Materialization.Bindings,
 		checkpoint.Round,
+		states,
 	)
 	if err != nil {
 		return err
@@ -288,79 +302,6 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	}
 
 	return pm.RunTransactions(stream, transactor, logrus.NewEntry(logrus.StandardLogger()))
-}
-
-// loadBindingStates fetches documents of each binding for the committed `round`,
-// and returns bindings ready for use within the transactor.
-func loadBindingStates(
-	client *sheets.Service,
-	spreadsheetID string,
-	sheetIDs map[string]int64,
-	bindings []*pf.MaterializationSpec_Binding,
-	loadRound int64,
-) ([]transactorBinding, error) {
-	var states, err = sheets_util.LoadInternalStates(client, spreadsheetID)
-	if err != nil {
-		return nil, err
-	}
-
-	var out []transactorBinding
-	for _, binding := range bindings {
-		var sheetName = binding.ResourcePath[0]
-		var sheetID, ok = sheetIDs[sheetName]
-		if !ok {
-			return nil, fmt.Errorf("required sheet %q doesn't exist", sheetName)
-		}
-
-		out = append(out, transactorBinding{
-			Docs:          []json.RawMessage(nil),
-			Fields:        binding.FieldSelection,
-			StateColumn:   [2]int64{-1, -1},
-			StateSheetId:  states.SheetID,
-			UserSheetId:   sheetID,
-			UserSheetName: sheetName,
-		})
-	}
-
-	for _, state := range states.Columns {
-		for bindInd := range out {
-			if state.UserSheetName != out[bindInd].UserSheetName {
-				continue
-			}
-
-			// Track the sheet column in which even/odd state lives for each binding.
-			out[bindInd].StateColumn[state.Round%2] = state.ColInd
-
-			switch {
-			case state.Round+1 == loadRound:
-				continue // This is a prior transaction to the one being loaded.
-			case state.Round == loadRound+1:
-				continue // This transaction was attempted but was rolled back prior to committing.
-			case state.Round == loadRound:
-				// Fall through.
-				out[bindInd].Docs = state.Docs
-			default:
-				return nil, fmt.Errorf("column %d with sheet %q has an unexpected round %d (loading %d)",
-					state.ColInd, state.UserSheetName, state.Round, loadRound)
-			}
-		}
-	}
-
-	// Assign sheet columns for even/odd states which are not yet in the `flow_internal` sheet.
-	var nextCol = int64(len(states.Columns))
-
-	for ind := range out {
-		if out[ind].StateColumn[0] == -1 {
-			out[ind].StateColumn[0] = nextCol
-			nextCol++
-		}
-		if out[ind].StateColumn[1] == -1 {
-			out[ind].StateColumn[1] = nextCol
-			nextCol++
-		}
-	}
-
-	return out, nil
 }
 
 func main() { boilerplate.RunMain(new(driver)) }
