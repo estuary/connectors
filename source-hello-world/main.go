@@ -61,6 +61,7 @@ var spec = airbyte.Spec{
 	SupportsIncremental:           true,
 	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
 	ConnectionSpecification:       json.RawMessage(configSchema),
+	DocumentationURL:              "https://go.estuary.dev/source-hello-world",
 }
 
 func doCheck(args airbyte.CheckCmd) error {

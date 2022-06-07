@@ -41,17 +41,24 @@ pub enum DestinationSyncMode {
 pub struct Spec<C: JsonSchema> {
     #[serde(rename = "connectionSpecification")]
     connection_specification: ConnectionSpecification<C>,
+    #[serde(rename = "documentationUrl")]
+    documentation_url: String,
     #[serde(rename = "supportsIncremental")]
     supports_incremental: bool,
     supported_destination_sync_modes: Vec<DestinationSyncMode>,
 }
 
 impl<C: JsonSchema> Spec<C> {
-    pub fn new(incremental: bool, sync_modes: Vec<DestinationSyncMode>) -> Self {
+    pub fn new(
+        documentation_url: impl Into<String>,
+        incremental: bool,
+        sync_modes: Vec<DestinationSyncMode>,
+    ) -> Self {
         Self {
             connection_specification: ConnectionSpecification::default(),
             supports_incremental: incremental,
             supported_destination_sync_modes: sync_modes,
+            documentation_url: documentation_url.into(),
         }
     }
 }
@@ -243,7 +250,7 @@ mod test {
     #[test]
     fn serialize_spec_test() {
         let spec: Envelope<Spec<SampleConfig>> =
-            Spec::new(true, vec![DestinationSyncMode::Append]).into();
+            Spec::new("example.com", true, vec![DestinationSyncMode::Append]).into();
 
         let serialized = serde_json::to_string(&spec).expect("to serialize spec to json");
         // TODO: replace with serde_test assertions instead.

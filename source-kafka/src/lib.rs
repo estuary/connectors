@@ -19,7 +19,8 @@ impl connector::Connector for KafkaConnector {
     type State = state::CheckpointSet;
 
     fn spec(output: &mut dyn Write) -> eyre::Result<()> {
-        let message: airbyte::Spec<configuration::Configuration> = airbyte::Spec::new(true, vec![]);
+        let message: airbyte::Spec<configuration::Configuration> =
+            airbyte::Spec::new("https://go.estuary.dev/source-kafka", true, vec![]);
 
         connector::write_message(output, message)?;
         Ok(())
