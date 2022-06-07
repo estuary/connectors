@@ -114,15 +114,15 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error updating capture state: %w", err)
 	}
 
-	var captureTables = make(map[string]bool)
+	var captureTables = make(map[string]struct{})
 	var tableMetadata = make(map[string]json.RawMessage)
 	for streamID, state := range c.State.Streams {
-		if state.Mode != TableModeIgnore && state.Mode != TableModePending {
+		if state.Mode == TableModeBackfill || state.Mode == TableModeActive {
 			tableMetadata[streamID] = state.Metadata
-			captureTables[streamID] = true
+			captureTables[streamID] = struct{}{}
 		}
 	}
-	captureTables[c.Database.WatermarksTable()] = true
+	captureTables[c.Database.WatermarksTable()] = struct{}{}
 
 	replStream, err := c.Database.StartReplication(ctx, c.State.Cursor, captureTables, c.discovery, tableMetadata)
 	if err != nil {
@@ -460,25 +460,25 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 		if streamState.Scanned != nil {
 			resumeKey, err = unpackTuple(streamState.Scanned, c.Database)
 			if err != nil {
-				return nil, fmt.Errorf("error unpacking resume key: %w", err)
+				return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
 			}
 			if len(resumeKey) != len(streamState.KeyColumns) {
 				return nil, fmt.Errorf("expected %d resume-key values but got %d", len(streamState.KeyColumns), len(resumeKey))
 			}
 		}
 
-		var tableInfo *TableInfo
-		if discoveryInfo, ok := c.discovery[streamID]; ok {
-			tableInfo = &discoveryInfo
+		discoveryInfo, ok := c.discovery[streamID]
+		if !ok {
+			return nil, fmt.Errorf("unknown table %q", streamID)
 		}
-		events, err := c.Database.ScanTableChunk(ctx, schema, table, tableInfo, streamState.KeyColumns, resumeKey)
+		events, err := c.Database.ScanTableChunk(ctx, schema, table, &discoveryInfo, streamState.KeyColumns, resumeKey)
 		if err != nil {
-			return nil, fmt.Errorf("error scanning table: %w", err)
+			return nil, fmt.Errorf("error scanning table %q: %w", streamID, err)
 		}
 
 		// Translate the resulting list of entries into a backfillChunk
 		if err := results.Buffer(streamID, streamState.KeyColumns, events, c.Database); err != nil {
-			return nil, fmt.Errorf("error buffering scan results: %w", err)
+			return nil, fmt.Errorf("error buffering scan results for %q: %w", streamID, err)
 		}
 	}
 	return results, nil
