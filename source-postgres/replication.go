@@ -45,7 +45,7 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 		startLSN = sysident.XLogPos
 	}
 
-	var slot, publication = db.config.SlotName, db.config.PublicationName
+	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
 
 	logrus.WithFields(logrus.Fields{
 		"startLSN":    startLSN,

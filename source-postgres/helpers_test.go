@@ -63,13 +63,13 @@ func TestMain(m *testing.M) {
 	}
 
 	// Initialize test config and database connection
-	TestDefaultConfig.Database = replConnConfig.Database
 	TestDefaultConfig.Address = fmt.Sprintf("%s:%d", replConnConfig.Host, replConnConfig.Port)
-	TestDefaultConfig.Password = replConnConfig.Password
+	TestDefaultConfig.Database = replConnConfig.Database
 	TestDefaultConfig.User = replConnConfig.User
+	TestDefaultConfig.Password = replConnConfig.Password
 
-	TestDefaultConfig.SlotName = *TestReplicationSlot
-	TestDefaultConfig.PublicationName = *TestPublicationName
+	TestDefaultConfig.Advanced.SlotName = *TestReplicationSlot
+	TestDefaultConfig.Advanced.PublicationName = *TestPublicationName
 
 	if err := TestDefaultConfig.Validate(); err != nil {
 		logrus.WithFields(logrus.Fields{"err": err, "config": TestDefaultConfig}).Fatal("error validating test config")
