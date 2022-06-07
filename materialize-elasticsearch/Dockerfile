@@ -38,4 +38,6 @@ COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
+LABEL FLOW_RUNTIME_PROTOCOL=materialize
+
 ENTRYPOINT ["/connector/connector"]
