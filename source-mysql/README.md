@@ -52,10 +52,7 @@ This corresponds to the following example `config.json`:
 {
     "address": "127.0.0.1:3306",
     "user": "flow_capture",
-    "pass": "secret",
-    "dbname": "test",
-    "server_id": 12345,
-    "watermarks_table": "flow.watermarks"
+    "password": "secret"
 }
 ```
 
@@ -80,14 +77,14 @@ this test database. The easy way to build the connector and run those tests is v
 `docker build`:
 
 ```bash
-docker build --network=host -f source-mysql/Dockerfile -t ghcr.io/estuary/source-mysql:dev .
+docker build --network=host -f source-mysql/Dockerfile -t ghcr.io/estuary/source-mysql:local .
 ```
 
 You can also run the resulting connector image manually:
 
 ```bash
 docker run --rm -it --network=host -v <configsDir>:/cfg \
-  ghcr.io/estuary/source-mysql:dev read \
+  ghcr.io/estuary/source-mysql:local read \
   --config=/cfg/config.json \
   --catalog=/cfg/catalog.json \
   --state=/cfg/state.json
@@ -107,12 +104,6 @@ The `go test` suite only tests the connector in isolation. There's another test
 which runs it as part of a Flow catalog:
 
 ```bash
-MYSQL_DATABASE=test \
-MYSQL_HOST=127.0.0.1 \
-MYSQL_PORT=3306 \
-MYSQL_USER=root \
-MYSQL_PWD=flow \
-CONNECTOR=source-mysql \
-VERSION=dev \
-./tests/run.sh
+$ docker build -t ghcr.io/estuary/source-mysql:local -f source-mysql/Dockerfile . --network=host
+$ MYSQL_DATABASE=test MYSQL_HOST=127.0.0.1 MYSQL_PORT=3306 MYSQL_USER=root MYSQL_PWD=flow CONNECTOR=source-mysql VERSION=local ./tests/run.sh
 ```
