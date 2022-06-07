@@ -56,7 +56,10 @@ func doDiscover(args airbyte.DiscoverCmd) error {
 	}
 	log.Infof("Discover completed with %d streams", len(catalog.Streams))
 	var encoder = airbyte.NewStdoutEncoder()
-	return encoder.Encode(catalog)
+	return encoder.Encode(airbyte.Message{
+		Type:    airbyte.MessageTypeCatalog,
+		Catalog: catalog,
+	})
 }
 
 func discoverCatalog(config airbyte.ConfigFile) (*airbyte.Catalog, error) {
