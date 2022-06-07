@@ -6,10 +6,8 @@ export RESOURCE="{ \"namespace\": \"test\", \"stream\": \"${TEST_STREAM}\" }"
 
 config_json_template='{
     "address": "$MYSQL_HOST:$MYSQL_PORT",
-    "login": {
-      "user": "$MYSQL_USER",
-      "password": "$MYSQL_PWD"
-    }
+    "user": "$MYSQL_USER",
+    "password": "$MYSQL_PWD"
 }'
 
 export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
