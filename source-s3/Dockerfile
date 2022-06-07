@@ -28,6 +28,8 @@ FROM gcr.io/distroless/base-debian10
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
+COPY --from=busybox:latest /bin/sh /bin/sh
+
 # Grab the statically-built parser cli.
 COPY flow-bin/flow-parser ./
 
