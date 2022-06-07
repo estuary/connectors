@@ -70,10 +70,9 @@ A minimal `config.json` consists solely of the database connection parameters:
 
 ```json
 {
+  "address": "localhost:5432",
   "database": "flow",
-  "host": "localhost",
   "password": "flow_capture",
-  "port": 5432,
   "user": "flow_capture"
 }
 ```
@@ -129,14 +128,14 @@ this test database. The easy way to build the connector and run those tests is v
 `docker build`:
 
 ```bash
-docker build --network=host -f source-postgres/Dockerfile -t ghcr.io/estuary/source-postgres:dev .
+docker build --network=host -f source-postgres/Dockerfile -t ghcr.io/estuary/source-postgres:local .
 ```
 
 You can also run the resulting connector image manually:
 
 ```bash
 docker run --rm -it --network=host -v <configsDir>:/cfg \
-  ghcr.io/estuary/source-postgres:dev read \
+  ghcr.io/estuary/source-postgres:local read \
   --config=/cfg/config.json \
   --catalog=/cfg/catalog.json \
   --state=/cfg/state.json
@@ -156,12 +155,6 @@ The `go test` suite only tests the connector in isolation. There's another test
 which runs it as part of a Flow catalog:
 
 ```bash
-PGDATABASE=flow \
-PGHOST=localhost \
-PGPASSWORD=flow \
-PGPORT=5432 \
-PGUSER=flow \
-CONNECTOR=source-postgres \
-VERSION=dev \
-./tests/run.sh
+$ docker build -t ghcr.io/estuary/source-postgres:local -f source-postgres/Dockerfile . --network=host
+$ PGDATABASE=flow PGHOST=localhost PGPASSWORD=flow PGPORT=5432 PGUSER=flow CONNECTOR=source-postgres VERSION=local ./tests/run.sh
 ```
