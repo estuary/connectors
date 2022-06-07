@@ -34,4 +34,6 @@ COPY --from=builder /builder/connector ./connector
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
+LABEL FLOW_RUNTIME_PROTOCOL=materialize
+
 ENTRYPOINT ["/connector/connector"]
