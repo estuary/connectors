@@ -4,38 +4,12 @@ set -e
 export TEST_STREAM="estuary_test_$(shuf -zer -n6 {a..z} | tr -d '\0')"
 export RESOURCE="{ stream: ${TEST_STREAM} }"
 
-if [[ "${SSH_FORWARDING_ENABLED}" == "true" ]]
-then
-    if [[ ! -f "${PRIVATE_KEY_FILE_PATH}" ]]; then
-        bail "${PRIVATE_KEY_FILE_PATH} does not exists."
-    fi
-    export PRIVATE_KEY="$(awk '{printf "%s\\n", $0}' ${PRIVATE_KEY_FILE_PATH})"
-    config_json_template='{
-        "database": "$PGDATABASE",
-        "host":     "localhost",
-        "port":     $LOCALPORT,
-        "password": "$PGPASSWORD",
-        "user":     "$PGUSER",
-        "networkTunnel": {
-            "sshForwarding": {
-              "sshEndpoint": "$SSHENDPOINT",
-              "user": "$SSHUSER",
-              "forwardHost": "$PGHOST",
-              "forwardPort": $PGPORT,
-              "privateKey": "$PRIVATE_KEY",
-              "localPort": $LOCALPORT
-            }
-        }
-    }'
-else
-    config_json_template='{
-       "database": "$PGDATABASE",
-       "host":     "$PGHOST",
-       "password": "$PGPASSWORD",
-       "port":     $PGPORT,
-       "user":     "$PGUSER"
-     }'
-fi
+config_json_template='{
+   "address":  "$PGHOST:$PGPORT",
+   "database": "$PGDATABASE",
+   "password": "$PGPASSWORD",
+   "user":     "$PGUSER"
+}'
 
 export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
 echo "Connector configuration is: ${CONNECTOR_CONFIG}".
