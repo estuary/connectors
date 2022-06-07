@@ -41,10 +41,9 @@ func main() {
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
+	Address         string `json:"address" jsonschema:"title=Server Address,default=127.0.0.1:5432,description=The host or host:port at which the database can be reached."`
 	Database        string `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
-	Host            string `json:"host" jsonschema:"description=Host name of the database to connect to."`
 	Password        string `json:"password" jsonschema:"description=User password configured within the database." jsonschema_extras:"secret=true"`
-	Port            uint16 `json:"port" jsonschema:"default=5432" jsonschema:"description=Port to the DB connection. If SshForwardingConfig is enabled, a dynamic port is allocated if Port is unspecified."`
 	PublicationName string `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
 	SlotName        string `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
 	User            string `json:"user" jsonschema:"default=postgres,description=Database user to use."`
@@ -54,7 +53,7 @@ type Config struct {
 // Validate checks that the configuration possesses all required properties.
 func (c *Config) Validate() error {
 	var requiredProperties = [][]string{
-		{"host", c.Host},
+		{"address", c.Address},
 		{"user", c.User},
 		{"password", c.Password},
 	}
@@ -84,17 +83,20 @@ func (c *Config) SetDefaults() {
 	if c.WatermarksTable == "" {
 		c.WatermarksTable = "public.flow_watermarks"
 	}
+
+	// The address config property should accept a host or host:port
+	// value, and if the port is unspecified it should be the PostgreSQL
+	// default 5432.
+	if !strings.Contains(c.Address, ":") {
+		c.Address += ":5432"
+	}
 }
 
 // ToURI converts the Config to a DSN string.
 func (c *Config) ToURI() string {
-	var host = c.Host
-	if c.Port != 0 {
-		host = fmt.Sprintf("%s:%d", host, c.Port)
-	}
 	var uri = url.URL{
 		Scheme: "postgres",
-		Host:   host,
+		Host:   c.Address,
 		User:   url.UserPassword(c.User, c.Password),
 	}
 	if c.Database != "" {
@@ -110,8 +112,7 @@ type postgresDatabase struct {
 
 func (db *postgresDatabase) Connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
-		"host":     db.config.Host,
-		"port":     db.config.Port,
+		"address":  db.config.Address,
 		"user":     db.config.User,
 		"database": db.config.Database,
 		"slot":     db.config.SlotName,
