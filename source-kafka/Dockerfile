@@ -38,6 +38,8 @@ FROM gcr.io/distroless/cc-debian10
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
+COPY --from=busybox:latest /bin/sh /bin/sh
+
 # Copy in the shared library files we linked against.
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libdb-5.3.so* /usr/lib/x86_64-linux-gnu/
 COPY --from=builder /usr/lib/x86_64-linux-gnu/sasl2/libsasldb.so* /usr/lib/x86_64-linux-gnu/sasl2/

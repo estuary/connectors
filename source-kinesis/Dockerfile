@@ -26,6 +26,8 @@ FROM gcr.io/distroless/base-debian10
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
+COPY --from=busybox:latest /bin/sh /bin/sh
+
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./connector
 
