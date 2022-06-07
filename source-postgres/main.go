@@ -41,12 +41,16 @@ func main() {
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address         string `json:"address" jsonschema:"title=Server Address,default=127.0.0.1:5432,description=The host or host:port at which the database can be reached."`
-	Database        string `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
-	Password        string `json:"password" jsonschema:"description=User password configured within the database." jsonschema_extras:"secret=true"`
+	Address  string         `json:"address" jsonschema:"title=Server Address,default=127.0.0.1:5432,description=The host or host:port at which the database can be reached."`
+	Database string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
+	User     string         `json:"user" jsonschema:"default=postgres,description=Database user to use."`
+	Password string         `json:"password" jsonschema:"description=User password configured within the database." jsonschema_extras:"secret=true"`
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+}
+
+type advancedConfig struct {
 	PublicationName string `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
 	SlotName        string `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
-	User            string `json:"user" jsonschema:"default=postgres,description=Database user to use."`
 	WatermarksTable string `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 }
 
@@ -63,8 +67,8 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.WatermarksTable != "" && !strings.Contains(c.WatermarksTable, ".") {
-		return fmt.Errorf("config parameter 'watermarksTable' must be fully-qualified as '<schema>.<table>': %q", c.WatermarksTable)
+	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
+		return fmt.Errorf("config parameter 'watermarksTable' must be fully-qualified as '<schema>.<table>': %q", c.Advanced.WatermarksTable)
 	}
 
 	return nil
@@ -74,14 +78,14 @@ func (c *Config) Validate() error {
 func (c *Config) SetDefaults() {
 	// Note these are 1:1 with 'omitempty' in Config field tags,
 	// which cause these fields to be emitted as non-required.
-	if c.SlotName == "" {
-		c.SlotName = "flow_slot"
+	if c.Advanced.SlotName == "" {
+		c.Advanced.SlotName = "flow_slot"
 	}
-	if c.PublicationName == "" {
-		c.PublicationName = "flow_publication"
+	if c.Advanced.PublicationName == "" {
+		c.Advanced.PublicationName = "flow_publication"
 	}
-	if c.WatermarksTable == "" {
-		c.WatermarksTable = "public.flow_watermarks"
+	if c.Advanced.WatermarksTable == "" {
+		c.Advanced.WatermarksTable = "public.flow_watermarks"
 	}
 
 	// The address config property should accept a host or host:port
@@ -115,7 +119,7 @@ func (db *postgresDatabase) Connect(ctx context.Context) error {
 		"address":  db.config.Address,
 		"user":     db.config.User,
 		"database": db.config.Database,
-		"slot":     db.config.SlotName,
+		"slot":     db.config.Advanced.SlotName,
 	}).Info("initializing connector")
 
 	// Normal database connection used for table scanning
