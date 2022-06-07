@@ -39,11 +39,9 @@ func TestMain(m *testing.M) {
 
 	// Initialize test config and database connection
 	var cfg = Config{
-		Address: *dbAddress,
-		Login: loginConfig{
-			User:     *dbUser,
-			Password: *dbPassword,
-		},
+		Address:  *dbAddress,
+		User:     *dbUser,
+		Password: *dbPassword,
 		Advanced: advancedConfig{
 			DBName: *dbName,
 		},
@@ -53,7 +51,7 @@ func TestMain(m *testing.M) {
 	}
 	cfg.SetDefaults()
 
-	var conn, err = client.Connect(cfg.Address, cfg.Login.User, cfg.Login.Password, cfg.Advanced.DBName)
+	var conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName)
 	if err != nil {
 		logrus.WithField("err", err).Fatal("error connecting to database")
 	}
