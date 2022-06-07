@@ -64,9 +64,8 @@ func TestMain(m *testing.M) {
 
 	// Initialize test config and database connection
 	TestDefaultConfig.Database = replConnConfig.Database
-	TestDefaultConfig.Host = replConnConfig.Host
+	TestDefaultConfig.Address = fmt.Sprintf("%s:%d", replConnConfig.Host, replConnConfig.Port)
 	TestDefaultConfig.Password = replConnConfig.Password
-	TestDefaultConfig.Port = replConnConfig.Port
 	TestDefaultConfig.User = replConnConfig.User
 
 	TestDefaultConfig.SlotName = *TestReplicationSlot
