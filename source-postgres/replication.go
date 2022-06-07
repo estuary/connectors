@@ -19,7 +19,7 @@ import (
 
 // StartReplication opens a connection to the database and returns a ReplicationStream
 // from which a neverending sequence of change events can be read.
-func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor string, activeTables map[string]bool, discovery map[string]sqlcapture.TableInfo, metadata map[string]json.RawMessage) (sqlcapture.ReplicationStream, error) {
+func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor string, activeTables map[string]struct{}, discovery map[string]sqlcapture.TableInfo, metadata map[string]json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	// Replication database connection used for event streaming
 	connConfig, err := pgconn.ParseConfig(db.config.ToURI())
 	if err != nil {
@@ -64,12 +64,12 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 		nextTxnMillis:   0,
 		conn:            conn,
 		connInfo:        pgtype.NewConnInfo(),
-		activeTables:    activeTables,
 		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 		events: make(chan sqlcapture.ChangeEvent, replicationBufferSize),
 		errCh:  make(chan error),
 	}
+	stream.tables.active = activeTables
 
 	// Create the publication and replication slot, ignoring the inevitable errors
 	// when they already exist. We could in theory add some extra logic to check,
@@ -170,13 +170,12 @@ type replicationStream struct {
 	// and other information about the table structure at a particular moment.
 	relations map[uint32]*pglogrepl.RelationMessage
 
-	// tablesMutex guards access to the 'active tables' set and associated
-	// table metadata.
-	tablesMutex sync.RWMutex
-	// activeTables keeps track of what tables we actually care about
-	// capturing, so that replication can stop processing events from
-	// other tables early.
-	activeTables map[string]bool
+	// The 'active tables' set, guarded by a mutex so it can be modified from
+	// the main goroutine while it's read by the replication goroutine.
+	tables struct {
+		sync.RWMutex
+		active map[string]struct{}
+	}
 }
 
 const standbyStatusInterval = 10 * time.Second
@@ -511,15 +510,16 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.LSN, 
 }
 
 func (s *replicationStream) tableActive(streamID string) bool {
-	s.tablesMutex.RLock()
-	defer s.tablesMutex.RUnlock()
-	return s.activeTables[streamID]
+	s.tables.RLock()
+	defer s.tables.RUnlock()
+	var _, ok = s.tables.active[streamID]
+	return ok
 }
 
 func (s *replicationStream) ActivateTable(streamID string) error {
-	s.tablesMutex.Lock()
-	s.activeTables[streamID] = true
-	s.tablesMutex.Unlock()
+	s.tables.Lock()
+	s.tables.active[streamID] = struct{}{}
+	s.tables.Unlock()
 	return nil
 }
 
