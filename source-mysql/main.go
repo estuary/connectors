@@ -69,13 +69,9 @@ func fixMysqlLogging() {
 // capture changes from it.
 type Config struct {
 	Address  string         `json:"address" jsonschema:"title=Server Address,default=127.0.0.1:3306,description=The host or host:port at which the database can be reached."`
-	Login    loginConfig    `json:"login" jsonschema:"title=Login Configuration"`
+	User     string         `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as."`
+	Password string         `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
-}
-
-type loginConfig struct {
-	User     string `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as."`
-	Password string `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true"`
 }
 
 type advancedConfig struct {
@@ -89,8 +85,8 @@ type advancedConfig struct {
 func (c *Config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
-		{"user", c.Login.User},
-		{"password", c.Login.Password},
+		{"user", c.User},
+		{"password", c.Password},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -135,12 +131,12 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"addr":     db.config.Address,
 		"dbName":   db.config.Advanced.DBName,
-		"user":     db.config.Login.User,
+		"user":     db.config.User,
 		"serverID": db.config.Advanced.NodeID,
 	}).Info("initializing connector")
 
 	// Normal database connection used for table scanning
-	var conn, err = client.Connect(db.config.Address, db.config.Login.User, db.config.Login.Password, db.config.Advanced.DBName)
+	var conn, err = client.Connect(db.config.Address, db.config.User, db.config.Password, db.config.Advanced.DBName)
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}

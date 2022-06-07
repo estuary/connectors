@@ -30,8 +30,8 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		Flavor:   "mysql", // TODO(wgd): See what happens if we change this and run against MariaDB?
 		Host:     host,
 		Port:     uint16(port),
-		User:     db.config.Login.User,
-		Password: db.config.Login.Password,
+		User:     db.config.User,
+		Password: db.config.Password,
 	})
 
 	var pos mysql.Position
