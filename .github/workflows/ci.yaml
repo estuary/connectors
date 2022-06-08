@@ -1,5 +1,9 @@
 name: CI
 
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
@@ -166,4 +170,4 @@ jobs:
           context: .
           file: ${{ matrix.connector }}/Dockerfile
           push: true # See 'if' above
-          tags: ghcr.io/estuary/${{ matrix.connector }}:dev
+          tags: ghcr.io/estuary/${{ matrix.connector }}:dev,ghcr.io/estuary/${{ matrix.connector }}:v1
