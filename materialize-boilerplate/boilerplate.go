@@ -14,6 +14,7 @@ import (
 	protoio "github.com/gogo/protobuf/io"
 	"github.com/gogo/protobuf/proto"
 	"github.com/jessevdk/go-flags"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -157,7 +158,8 @@ func (c applyDeleteCmd) Execute(args []string) error {
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
 	} else if resp, err := c.srv.ApplyDelete(c.ctx, &req); err != nil {
-		return err
+		logrus.WithFields(logrus.Fields{"error": err}).
+			Error("failed to delete the materialization from the endpoint")
 	} else if err = c.w.WriteMsg(resp); err != nil {
 		return fmt.Errorf("writing response: %w", err)
 	}
