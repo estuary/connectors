@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"time"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -210,4 +211,16 @@ func batchRequestWithRetry(
 		return err
 	}
 	panic("not reached")
+}
+
+// Example: https://docs.google.com/spreadsheets/d/1s7S1Abp8kAJEkReV10omef_ETZXKB2vHKPook49HpFk/edit#gid=1649530432
+const sheetsLinkRe = `^https://docs.google.com/spreadsheets/d/([\w\d_\-]+)/`
+
+func parseSheetsID(sheetsURL string) (string, error) {
+	var matches = regexp.MustCompile(sheetsLinkRe).FindStringSubmatch(sheetsURL)
+
+	if len(matches) != 2 || len(matches[1]) == 0 {
+		return "", fmt.Errorf("invalid Google Sheets URL: %s", sheetsURL)
+	}
+	return matches[1], nil
 }
