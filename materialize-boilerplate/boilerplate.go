@@ -157,10 +157,19 @@ func (c applyDeleteCmd) Execute(args []string) error {
 
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
-	} else if resp, err := c.srv.ApplyDelete(c.ctx, &req); err != nil {
+	}
+
+	// TODO(johnny): Individual connectors need to be better behaved around deletion.
+	// This is a stop-gap measure to get task deletion unblocked in the control plane.
+	var resp, err = c.srv.ApplyDelete(c.ctx, &req)
+	if err != nil {
+		resp = &pm.ApplyResponse{ActionDescription: err.Error()}
+
 		logrus.WithFields(logrus.Fields{"error": err}).
 			Error("failed to delete the materialization from the endpoint")
-	} else if err = c.w.WriteMsg(resp); err != nil {
+	}
+
+	if err = c.w.WriteMsg(resp); err != nil {
 		return fmt.Errorf("writing response: %w", err)
 	}
 
