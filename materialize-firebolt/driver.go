@@ -12,6 +12,7 @@ import (
 	"github.com/estuary/connectors/materialize-firebolt/schemalate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 )
 
 // driver implements the DriverServer interface.
@@ -209,12 +210,24 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		if !req.DryRun {
 			_, err := fb.Query(bundle.DropTable)
 			if err != nil {
-				return nil, fmt.Errorf("running table drop query: %w", err)
+				if strings.Contains(err.Error(), "Did not find a table") {
+					log.WithFields(log.Fields{
+						"query": bundle.DropTable,
+					}).Warn("could not drop table because it does not exist.")
+				} else {
+					return nil, fmt.Errorf("running table drop query: %w", err)
+				}
 			}
 
 			_, err = fb.Query(bundle.DropExternalTable)
 			if err != nil {
-				return nil, fmt.Errorf("running external table drop query: %w", err)
+				if strings.Contains(err.Error(), "Did not find a table") {
+					log.WithFields(log.Fields{
+						"query": bundle.DropExternalTable,
+					}).Warn("could not drop table because it does not exist.")
+				} else {
+					return nil, fmt.Errorf("running external table drop query: %w", err)
+				}
 			}
 		}
 
