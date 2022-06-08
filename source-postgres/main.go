@@ -41,7 +41,7 @@ func main() {
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address  string         `json:"address" jsonschema:"title=Server Address,default=127.0.0.1:5432,description=The host or host:port at which the database can be reached."`
+	Address  string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached."`
 	Database string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
 	User     string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as."`
 	Password string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true"`
