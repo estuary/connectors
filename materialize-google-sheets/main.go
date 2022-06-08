@@ -21,18 +21,25 @@ type driver struct{}
 
 type config struct {
 	CredentialsJSON string `json:"googleCredentials"`
-	SpreadsheetID   string `json:"spreadsheetId"`
+	SpreadsheetURL  string `json:"spreadsheetUrl"`
 }
 
 // Validate returns an error if the config is not well-formed.
 func (c config) Validate() error {
 	if c.CredentialsJSON == "" {
 		return fmt.Errorf("missing required Google service account credentials")
-	}
-	if c.SpreadsheetID == "" {
-		return fmt.Errorf("missing required spreadsheet ID")
+	} else if _, err := parseSheetsID(c.SpreadsheetURL); err != nil {
+		return err
 	}
 	return nil
+}
+
+func (c config) spreadsheetID() string {
+	var id, err = parseSheetsID(c.SpreadsheetURL)
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 func (c config) buildService() (*sheets.Service, error) {
@@ -71,7 +78,7 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 		"type":    "object",
 		"required": [
 			"googleCredentials",
-			"spreadsheetId"
+			"spreadsheetUrl"
 		],
 		"properties": {
 			"googleCredentials": {
@@ -81,10 +88,10 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 				"multiline":   true,
 				"secret":      true
 			},
-			"spreadsheetId": {
+			"spreadsheetUrl": {
 				"type":        "string",
-				"title":       "Spreadsheet ID",
-				"description": "ID of the spreadsheet to materialize, which is shared with the service account."
+				"title":       "Spreadsheet URL",
+				"description": "URL of the spreadsheet to materialize into, which is shared with the service account."
 			}
 		}
 		}`),
@@ -116,7 +123,7 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 	var svc, err = cfg.buildService()
 	if err != nil {
 		return nil, err
-	} else if _, err = loadSheetIDMapping(svc, cfg.SpreadsheetID); err != nil {
+	} else if _, err = loadSheetIDMapping(svc, cfg.spreadsheetID()); err != nil {
 		return nil, fmt.Errorf("verifying credentials: %w", err)
 	}
 
@@ -179,7 +186,7 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 	if err != nil {
 		return nil, err
 	}
-	sheetIDs, err := loadSheetIDMapping(svc, cfg.SpreadsheetID)
+	sheetIDs, err := loadSheetIDMapping(svc, cfg.spreadsheetID())
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +248,7 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 
 	if req.DryRun || len(actions) == 0 {
 		// Nothing to do.
-	} else if err = batchRequestWithRetry(ctx, svc, cfg.SpreadsheetID, actions); err != nil {
+	} else if err = batchRequestWithRetry(ctx, svc, cfg.spreadsheetID(), actions); err != nil {
 		return nil, fmt.Errorf("while updated sheets: %w", err)
 	}
 
@@ -275,7 +282,7 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	states, err := loadSheetStates(
 		open.Open.Materialization.Bindings,
 		svc,
-		cfg.SpreadsheetID,
+		cfg.spreadsheetID(),
 	)
 	if err != nil {
 		return fmt.Errorf("recovering sheet states: %w", err)
@@ -294,7 +301,7 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		bindings:      bindings,
 		client:        svc,
 		round:         checkpoint.Round,
-		spreadsheetId: cfg.SpreadsheetID,
+		spreadsheetId: cfg.spreadsheetID(),
 	}
 
 	if err = stream.Send(&pm.TransactionResponse{
