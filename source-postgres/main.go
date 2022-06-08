@@ -43,8 +43,8 @@ func main() {
 type Config struct {
 	Address  string         `json:"address" jsonschema:"title=Server Address,default=127.0.0.1:5432,description=The host or host:port at which the database can be reached."`
 	Database string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from."`
-	User     string         `json:"user" jsonschema:"default=postgres,description=Database user to use."`
-	Password string         `json:"password" jsonschema:"description=User password configured within the database." jsonschema_extras:"secret=true"`
+	User     string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as."`
+	Password string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
 
