@@ -68,7 +68,7 @@ func fixMysqlLogging() {
 // Config tells the connector how to connect to the source database and
 // capture changes from it.
 type Config struct {
-	Address  string         `json:"address" jsonschema:"title=Server Address,default=127.0.0.1:3306,description=The host or host:port at which the database can be reached."`
+	Address  string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached."`
 	User     string         `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as."`
 	Password string         `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
