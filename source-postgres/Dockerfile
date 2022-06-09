@@ -24,7 +24,7 @@ RUN go build -o ./connector -v ./source-postgres/...
 
 # Runtime Stage
 ################################################################################
-FROM gcr.io/distroless/base-debian10
+FROM ghcr.io/estuary/base-image:v1
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

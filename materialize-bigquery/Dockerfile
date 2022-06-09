@@ -23,14 +23,11 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/...
 
 # Runtime Stage
 ################################################################################
-FROM debian:bullseye-slim
+FROM ghcr.io/estuary/base-image:v1
 
 RUN apt-get update -y \
  && apt-get install --no-install-recommends -y ca-certificates \
  && rm -rf /var/lib/apt/lists/*
-
-# Create a non-privileged "nonroot" user.
-RUN useradd nonroot --create-home --shell /usr/sbin/nologin
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
