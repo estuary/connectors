@@ -22,14 +22,14 @@ import (
 // config represents the endpoint configuration for snowflake.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Account   string `json:"account"`
-	User      string `json:"user"`
-	Password  string `json:"password"`
-	Database  string `json:"database"`
-	Schema    string `json:"schema"`
-	Warehouse string `json:"warehouse,omitempty"`
-	Role      string `json:"role,omitempty"`
-	Region    string `json:"region,omitempty"`
+	Account   string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier."`
+	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name."`
+	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user."`
+	Database  string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to."`
+	Schema    string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use."`
+	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virutal warehouse used to execute queries."`
+	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions."`
+	Region    string `json:"region" jsonschema:"title=Region,description=The cloud region containing the Snowflake endpoint."`
 }
 
 func (c *config) asSnowflakeConfig() sf.Config {
