@@ -32,7 +32,7 @@ type config struct {
 	Region    string `json:"region,omitempty"`
 }
 
-func (c config) asSnowflakeConfig() sf.Config {
+func (c *config) asSnowflakeConfig() sf.Config {
 	return sf.Config{
 		Account:   c.Account,
 		User:      c.User,
@@ -45,15 +45,19 @@ func (c config) asSnowflakeConfig() sf.Config {
 	}
 }
 
-func (c config) Validate() error {
-	if c.Account == "" {
-		return fmt.Errorf("expected account")
+func (c *config) Validate() error {
+	var requiredProperties = [][]string{
+		{"account", c.Account},
+		{"user", c.User},
+		{"password", c.Password},
+		{"database", c.Database},
+		{"schema", c.Schema},
+		{"region", c.Region},
 	}
-	if c.Database == "" {
-		return fmt.Errorf("expected database")
-	}
-	if c.Schema == "" {
-		return fmt.Errorf("expected schema")
+	for _, req := range requiredProperties {
+		if req[1] == "" {
+			return fmt.Errorf("missing '%s'", req[0])
+		}
 	}
 	return nil
 }
