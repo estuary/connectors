@@ -7,6 +7,7 @@
       "password",
       "database",
       "schema",
+      "cloud_provider",
       "region"
     ],
     "properties": {
@@ -44,6 +45,16 @@
         "type": "string",
         "title": "Role",
         "description": "The user role used to perform actions."
+      },
+      "cloud_provider": {
+        "enum": [
+          "aws",
+          "azure",
+          "gcp"
+        ],
+        "type": "string",
+        "title": "Cloud Provider",
+        "description": "The cloud provider where the Snowflake endpoint is hosted."
       },
       "region": {
         "type": "string",

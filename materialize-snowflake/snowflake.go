@@ -22,14 +22,15 @@ import (
 // config represents the endpoint configuration for snowflake.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Account   string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier."`
-	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name."`
-	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user."`
-	Database  string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to."`
-	Schema    string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use."`
-	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virutal warehouse used to execute queries."`
-	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions."`
-	Region    string `json:"region" jsonschema:"title=Region,description=The cloud region containing the Snowflake endpoint."`
+	Account       string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier."`
+	User          string `json:"user" jsonschema:"title=User,description=The Snowflake user login name."`
+	Password      string `json:"password" jsonschema:"title=Password,description=The password for the provided user."`
+	Database      string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to."`
+	Schema        string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use."`
+	Warehouse     string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virutal warehouse used to execute queries."`
+	Role          string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions."`
+	CloudProvider string `json:"cloud_provider" jsonschema:"enum=aws,enum=azure,enum=gcp,title=Cloud Provider,description=The cloud provider where the Snowflake endpoint is hosted."`
+	Region        string `json:"region" jsonschema:"title=Region,description=The cloud region containing the Snowflake endpoint."`
 }
 
 func (c *config) asSnowflakeConfig() sf.Config {
@@ -41,7 +42,7 @@ func (c *config) asSnowflakeConfig() sf.Config {
 		Schema:    c.Schema,
 		Warehouse: c.Warehouse,
 		Role:      c.Role,
-		Region:    c.Region,
+		Region:    c.Region + "." + c.CloudProvider,
 	}
 }
 
@@ -53,6 +54,7 @@ func (c *config) Validate() error {
 		{"database", c.Database},
 		{"schema", c.Schema},
 		{"region", c.Region},
+		{"cloud_provider", c.CloudProvider},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
