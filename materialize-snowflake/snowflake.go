@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -490,11 +489,6 @@ func newScratchFile(tempdir string) (*scratchFile, error) {
 	}, nil
 }
 
-// TODO(johnny): gosnowflake introduced support for PUT,
-// but it's currently broken due to:
-// https://github.com/snowflakedb/gosnowflake/issues/478
-// (... seriously?).
-// When it's not broken, then switch to it.
 func (f *scratchFile) put(ctx context.Context, conn *sql.Conn, cfg *config) error {
 	if err := f.bw.Flush(); err != nil {
 		return fmt.Errorf("scratch.Flush: %w", err)
@@ -505,35 +499,11 @@ func (f *scratchFile) put(ctx context.Context, conn *sql.Conn, cfg *config) erro
 		f.file.Name(),
 	)
 
-	/*
-		// Use me instead of exec.Command when snowflakedb/gosnowflake#478 is resolved.
-		var rows, err = conn.QueryContext(ctx, query)
-		if err != nil {
-			return fmt.Errorf("PUT to stage: %w", err)
-		} else {
-			rows.Close()
-		}
-	*/
-
-	var cmd = exec.Command(
-		"snowsql",
-		fmt.Sprintf("--accountname=%s", cfg.Account),
-		fmt.Sprintf("--username=%s", cfg.User),
-		fmt.Sprintf("--dbname=%s", cfg.Database),
-		fmt.Sprintf("--schemaname=%s", cfg.Schema),
-		fmt.Sprintf("--rolename=%s", cfg.Role),
-		fmt.Sprintf("--warehouse=%s", cfg.Warehouse),
-		fmt.Sprintf("--query=%s", query),
-		"--noup", // Don't auto-upgrade.
-		"--option=quiet=True",
-		"--option=friendly=False",
-	)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("SNOWSQL_PWD=%s", cfg.Password))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("snowsql failed: %w", err)
+	var rows, err = conn.QueryContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("PUT to stage: %w", err)
+	} else {
+		rows.Close()
 	}
 
 	if err := f.file.Truncate(0); err != nil {
