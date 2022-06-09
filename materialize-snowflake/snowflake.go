@@ -24,7 +24,7 @@ import (
 type config struct {
 	Account       string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier."`
 	User          string `json:"user" jsonschema:"title=User,description=The Snowflake user login name."`
-	Password      string `json:"password" jsonschema:"title=Password,description=The password for the provided user."`
+	Password      string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true"`
 	Database      string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to."`
 	Schema        string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use."`
 	Warehouse     string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virutal warehouse used to execute queries."`

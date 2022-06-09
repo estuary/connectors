@@ -24,7 +24,8 @@
       "password": {
         "type": "string",
         "title": "Password",
-        "description": "The password for the provided user."
+        "description": "The password for the provided user.",
+        "secret": "true"
       },
       "database": {
         "type": "string",
