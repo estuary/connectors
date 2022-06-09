@@ -29,7 +29,7 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-rockset/cmd/connector/
 
 # Runtime Stage
 ################################################################################
-FROM gcr.io/distroless/base-debian11
+FROM ghcr.io/estuary/base-image:v1
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

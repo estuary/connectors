@@ -33,7 +33,7 @@ RUN touch src/main.rs \
 
 # Runtime Stage
 ################################################################################
-FROM gcr.io/distroless/cc-debian10
+FROM ghcr.io/estuary/base-image:v1
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

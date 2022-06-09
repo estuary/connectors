@@ -25,7 +25,7 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-elasticsearch
 
 # Runtime Stage
 ################################################################################
-FROM gcr.io/distroless/cc-debian11
+FROM ghcr.io/estuary/base-image:v1
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

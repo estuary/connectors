@@ -18,14 +18,12 @@ COPY materialize-postgres    ./materialize-postgres
 COPY testsupport             ./testsupport
 
 # Test and build the connector.
-#RUN go test  -tags nozstd -v ./materialize-postgres/...
+RUN go test  -tags nozstd -v ./materialize-postgres/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-postgres/...
 
 # Runtime Stage
 ################################################################################
-FROM --platform=linux/amd64 debian:stable-slim as debian
-
-RUN apt-get update && apt-get install -y openssh-client
+FROM ghcr.io/estuary/base-image:v1
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
@@ -33,8 +31,6 @@ ENV PATH="/connector:$PATH"
 COPY --from=builder /builder/connector ./connector
 
 # Avoid running the connector as root.
-COPY --from=gcr.io/distroless/cc-debian11 /etc/passwd /etc/passwd
-COPY --from=gcr.io/distroless/cc-debian11 /etc/group /etc/group
 USER nonroot:nonroot
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
