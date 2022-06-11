@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Greetings int  `json:"greetings"`
 	SkipState bool `json:"skip_state"`
+	FailAfter int  `json:"fail_after"`
 }
 
 type State struct {
@@ -47,6 +48,11 @@ const configSchema = `{
       "title": "Skip sending an Airbyte state message",
       "description": "Some Airbyte connectors do not send a state message. This option can be used to emulate those cases",
       "default": false
+    },
+    "fail_after": {
+      "type": ["integer", "null"],
+      "title": "Fail after sending N number of greetings",
+      "description": "Fail after sending N number of greetings"
     }
 	}
 }`
@@ -127,6 +133,9 @@ func doRead(args airbyte.ReadCmd) error {
 	var enc = airbyte.NewStdoutEncoder()
 	var now = time.Now()
 	for {
+		if config.FailAfter != 0 && state.Cursor >= config.FailAfter {
+			return fmt.Errorf("a horrible, no good error!")
+		}
 		if state.Cursor >= config.Greetings && !catalog.Tail {
 			return nil // All done.
 		}
