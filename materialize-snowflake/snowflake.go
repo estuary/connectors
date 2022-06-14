@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -23,17 +22,18 @@ import (
 // config represents the endpoint configuration for snowflake.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Account   string `json:"account"`
-	User      string `json:"user"`
-	Password  string `json:"password"`
-	Database  string `json:"database"`
-	Schema    string `json:"schema"`
-	Warehouse string `json:"warehouse,omitempty"`
-	Role      string `json:"role,omitempty"`
-	Region    string `json:"region,omitempty"`
+	Account       string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier."`
+	User          string `json:"user" jsonschema:"title=User,description=The Snowflake user login name."`
+	Password      string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true"`
+	Database      string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to."`
+	Schema        string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use."`
+	Warehouse     string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virutal warehouse used to execute queries."`
+	Role          string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions."`
+	CloudProvider string `json:"cloud_provider" jsonschema:"enum=aws,enum=azure,enum=gcp,title=Cloud Provider,description=The cloud provider where the Snowflake endpoint is hosted."`
+	Region        string `json:"region" jsonschema:"title=Region,description=The cloud region containing the Snowflake endpoint."`
 }
 
-func (c config) asSnowflakeConfig() sf.Config {
+func (c *config) asSnowflakeConfig() sf.Config {
 	return sf.Config{
 		Account:   c.Account,
 		User:      c.User,
@@ -42,19 +42,24 @@ func (c config) asSnowflakeConfig() sf.Config {
 		Schema:    c.Schema,
 		Warehouse: c.Warehouse,
 		Role:      c.Role,
-		Region:    c.Region,
+		Region:    c.Region + "." + c.CloudProvider,
 	}
 }
 
-func (c config) Validate() error {
-	if c.Account == "" {
-		return fmt.Errorf("expected account")
+func (c *config) Validate() error {
+	var requiredProperties = [][]string{
+		{"account", c.Account},
+		{"user", c.User},
+		{"password", c.Password},
+		{"database", c.Database},
+		{"schema", c.Schema},
+		{"region", c.Region},
+		{"cloud_provider", c.CloudProvider},
 	}
-	if c.Database == "" {
-		return fmt.Errorf("expected database")
-	}
-	if c.Schema == "" {
-		return fmt.Errorf("expected schema")
+	for _, req := range requiredProperties {
+		if req[1] == "" {
+			return fmt.Errorf("missing '%s'", req[0])
+		}
 	}
 	return nil
 }
@@ -490,11 +495,6 @@ func newScratchFile(tempdir string) (*scratchFile, error) {
 	}, nil
 }
 
-// TODO(johnny): gosnowflake introduced support for PUT,
-// but it's currently broken due to:
-// https://github.com/snowflakedb/gosnowflake/issues/478
-// (... seriously?).
-// When it's not broken, then switch to it.
 func (f *scratchFile) put(ctx context.Context, conn *sql.Conn, cfg *config) error {
 	if err := f.bw.Flush(); err != nil {
 		return fmt.Errorf("scratch.Flush: %w", err)
@@ -505,35 +505,11 @@ func (f *scratchFile) put(ctx context.Context, conn *sql.Conn, cfg *config) erro
 		f.file.Name(),
 	)
 
-	/*
-		// Use me instead of exec.Command when snowflakedb/gosnowflake#478 is resolved.
-		var rows, err = conn.QueryContext(ctx, query)
-		if err != nil {
-			return fmt.Errorf("PUT to stage: %w", err)
-		} else {
-			rows.Close()
-		}
-	*/
-
-	var cmd = exec.Command(
-		"snowsql",
-		fmt.Sprintf("--accountname=%s", cfg.Account),
-		fmt.Sprintf("--username=%s", cfg.User),
-		fmt.Sprintf("--dbname=%s", cfg.Database),
-		fmt.Sprintf("--schemaname=%s", cfg.Schema),
-		fmt.Sprintf("--rolename=%s", cfg.Role),
-		fmt.Sprintf("--warehouse=%s", cfg.Warehouse),
-		fmt.Sprintf("--query=%s", query),
-		"--noup", // Don't auto-upgrade.
-		"--option=quiet=True",
-		"--option=friendly=False",
-	)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("SNOWSQL_PWD=%s", cfg.Password))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("snowsql failed: %w", err)
+	var rows, err = conn.QueryContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("PUT to stage: %w", err)
+	} else {
+		rows.Close()
 	}
 
 	if err := f.file.Truncate(0); err != nil {
