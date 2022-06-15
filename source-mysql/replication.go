@@ -402,8 +402,21 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 				return fmt.Errorf("unsupported operation RENAME TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
 			}
 		}
-	case *sqlparser.Insert, *sqlparser.Update, *sqlparser.Delete:
+	case *sqlparser.Insert:
+		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
+			return fmt.Errorf("unsupported DML query %q (go.estuary.dev/IK5EVx)", query)
+		}
+	case *sqlparser.Update:
+		// TODO(wgd): It would be nice to only halt on UPDATE statements impacting
+		// active tables. Unfortunately UPDATE queries are complicated and it's not
+		// as simple to implement that check as for INSERT and DELETE.
 		return fmt.Errorf("unsupported DML query %q (go.estuary.dev/IK5EVx)", query)
+	case *sqlparser.Delete:
+		for _, target := range stmt.Targets {
+			if streamID := resolveTableName(schema, target); rs.tableActive(streamID) {
+				return fmt.Errorf("unsupported DML query %q (go.estuary.dev/IK5EVx)", query)
+			}
+		}
 	default:
 		return fmt.Errorf("unhandled query %q (go.estuary.dev/ceqr74)", query)
 	}
