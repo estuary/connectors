@@ -172,6 +172,7 @@ func main() {
 		}
     }`)
 		},
+		DocumentationURL: "https://go.estuary.dev/source-gcs",
 	}
 
 	src.Main()

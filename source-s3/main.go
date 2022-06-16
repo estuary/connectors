@@ -261,6 +261,7 @@ func main() {
 		}
     }`)
 		},
+		DocumentationURL: "https://go.estuary.dev/source-s3",
 	}
 
 	src.Main()
