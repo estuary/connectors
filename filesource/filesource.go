@@ -44,6 +44,8 @@ type Source struct {
 	NewConfig func() Config
 	// Connect using to the Source's Store using the decoded and validated Config.
 	Connect func(context.Context, Config) (Store, error)
+	// DocumentationURL links to the Source's extended user documentation.
+	DocumentationURL string
 }
 
 // Store is a minimal interface of an binary large object storage service.
@@ -142,6 +144,7 @@ func (src Source) Main() {
 		SupportsIncremental:           true,
 		SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
 		ConnectionSpecification:       src.ConfigSchema(parserSpec),
+		DocumentationURL:              src.DocumentationURL,
 	}
 	airbyte.RunMain(spec, src.Check, src.Discover, src.Read)
 }

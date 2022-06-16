@@ -23,6 +23,7 @@ var spec = airbyte.Spec{
 	SupportsIncremental:           true,
 	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
 	ConnectionSpecification:       json.RawMessage(configJSONSchema),
+	DocumentationURL:              "https://go.estuary.dev/source-kinesis",
 }
 
 func doCheck(args airbyte.CheckCmd) error {
