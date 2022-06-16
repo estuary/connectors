@@ -118,9 +118,6 @@ func doRead(args airbyte.ReadCmd) error {
 	var enc = airbyte.NewStdoutEncoder()
 	var now = time.Now()
 	for {
-		if state.Cursor >= config.Greetings {
-			return fmt.Errorf("a horrible, no good error was returned!")
-		}
 		if state.Cursor >= config.Greetings && !catalog.Tail {
 			return nil // All done.
 		}
