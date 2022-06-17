@@ -152,7 +152,7 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 			return fmt.Errorf("error querying binlog expiry time: %w", err)
 		}
 		if expiryTime < minimumExpiryTime {
-			return fmt.Errorf("binlog retention period is too short (go.estuary.dev/PoMlNf): server reports %s but at least %s is required (and 30+ days is preferred)", expiryTime.String(), minimumExpiryTime.String())
+			return fmt.Errorf("binlog retention period is too short (go.estuary.dev/PoMlNf): server reports %s but at least %s is required (and 30 days is preferred wherever possible)", expiryTime.String(), minimumExpiryTime.String())
 		}
 	}
 
@@ -160,11 +160,15 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 }
 
 func (db *mysqlDatabase) getBinlogExpiry() (time.Duration, error) {
-	// TODO(wgd): Test whether this works on Amazon RDS, and add additional logic
-	// to use the appropriate `mysql.rds_show_configuration` incantation if needed.
+	// When running on Amazon RDS MySQL there's an RDS-specific configuration
+	// for binlog retention, so that takes precedence if it exists.
+	rdsRetentionHours, err := db.queryIntegerVariable(`SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
+	if err == nil {
+		return time.Duration(rdsRetentionHours) * time.Hour, nil
+	}
 
 	// The new 'binlog_expire_logs_seconds' variable takes priority
-	expireLogsSeconds, err := db.getIntegerSystemVariable("binlog_expire_logs_seconds")
+	expireLogsSeconds, err := db.queryIntegerVariable(`SHOW VARIABLES LIKE 'binlog_expire_logs_seconds';`)
 	if err != nil {
 		return 0, err
 	}
@@ -173,7 +177,7 @@ func (db *mysqlDatabase) getBinlogExpiry() (time.Duration, error) {
 	}
 
 	// However 'expire_logs_days' will be used instead if 'seconds' was zero
-	expireLogsDays, err := db.getIntegerSystemVariable("expire_logs_days")
+	expireLogsDays, err := db.queryIntegerVariable(`SHOW VARIABLES LIKE 'expire_logs_days';`)
 	if err != nil {
 		return 0, err
 	}
@@ -188,32 +192,33 @@ func (db *mysqlDatabase) getBinlogExpiry() (time.Duration, error) {
 	return 365 * 24 * time.Hour, nil
 }
 
-func (db *mysqlDatabase) getIntegerSystemVariable(name string) (int64, error) {
-	var results, err = db.conn.Execute(fmt.Sprintf("SHOW VARIABLES LIKE '%s';", name))
+func (db *mysqlDatabase) queryIntegerVariable(query string) (int64, error) {
+	var results, err = db.conn.Execute(query)
 	if err != nil {
-		return 0, fmt.Errorf("error querying system variables: %w", err)
+		return 0, fmt.Errorf("error executing query %q: %w", query, err)
 	}
-	for _, row := range results.Values {
-		var rowName, rowValue = string(row[0].AsString()), &row[1]
-		logrus.WithFields(logrus.Fields{"name": rowName, "value": rowValue.Value()}).Debug("got system variable")
-		if rowName == name {
-			switch rowValue.Type {
-			case mysql.FieldValueTypeString:
-				var n, err = strconv.ParseInt(string(rowValue.AsString()), 10, 64)
-				if err != nil {
-					return 0, fmt.Errorf("couldn't parse string value as decimal number: %w", err)
-				}
-				return n, nil
-			case mysql.FieldValueTypeFloat:
-				return int64(rowValue.AsFloat64()), nil
-			case mysql.FieldValueTypeUnsigned:
-				return int64(rowValue.AsUint64()), nil
-			default:
-				return rowValue.AsInt64(), nil
-			}
+	if len(results.Values) == 0 {
+		return 0, fmt.Errorf("no results from query %q", query)
+	}
+
+	// Return the second column of the first row. It has to be the second
+	// column because that's how the `SHOW VARIABLES LIKE` query does it.
+	var value = &results.Values[0][1]
+	switch value.Type {
+	case mysql.FieldValueTypeNull:
+		return 0, nil
+	case mysql.FieldValueTypeString:
+		var n, err = strconv.ParseInt(string(value.AsString()), 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("couldn't parse string value as decimal number: %w", err)
 		}
+		return n, nil
+	case mysql.FieldValueTypeFloat:
+		return int64(value.AsFloat64()), nil
+	case mysql.FieldValueTypeUnsigned:
+		return int64(value.AsUint64()), nil
 	}
-	return 0, fmt.Errorf("no value found for '%s'", name)
+	return value.AsInt64(), nil
 }
 
 func (db *mysqlDatabase) Close(ctx context.Context) error {
