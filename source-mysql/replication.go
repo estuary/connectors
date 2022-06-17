@@ -347,7 +347,7 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 // prefix matching to detect many types of query that we just completely
 // don't care about. This is good, because the Vitess SQL parser disagrees
 // with the binlog Query Events for some statements like GRANT and CREATE USER.
-var ignoreQueriesRe = regexp.MustCompile(`^(BEGIN|GRANT|CREATE USER|DROP USER)`)
+var ignoreQueriesRe = regexp.MustCompile(`^(BEGIN|COMMIT|GRANT|CREATE USER|DROP USER)`)
 
 func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	// There are basically three types of query events we might receive:
