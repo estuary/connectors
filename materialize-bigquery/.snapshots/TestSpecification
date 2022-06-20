@@ -44,19 +44,12 @@
         "type": "string",
         "title": "Credentials",
         "description": "Google Cloud Service Account JSON credentials in base64 format.",
+        "multiline": true,
         "secret": true
       }
     },
-    "additionalProperties": false,
     "type": "object",
-    "definitions": {
-      "credential": {
-        "type": "string",
-        "title": "Credentials",
-        "description": "Google Cloud Service Account JSON credentials in base64 format.",
-        "secret": true
-      }
-    }
+    "title": "SQL Connection"
   },
   "resource_spec_schema_json": {
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -75,8 +68,8 @@
         "description": "Should updates to this table be done via delta updates. Defaults is false."
       }
     },
-    "additionalProperties": false,
-    "type": "object"
+    "type": "object",
+    "title": "SQL Table"
   },
   "documentation_url": "https://go.estuary.dev/materialize-bigquery"
 }

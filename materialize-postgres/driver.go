@@ -21,11 +21,11 @@ import (
 // config represents the endpoint configuration for postgres.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Host     string `json:"host"`
-	Port     uint16 `json:"port,omitempty"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	Database string `json:"database,omitempty"`
+	Host     string `json:"host" jsonschema:"title=Host,description=Host name of the database."`
+	Port     uint16 `json:"port,omitempty" jsonschema:"title=Port,description=Port on which to connect to the database."`
+	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as."`
+	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true"`
+	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to."`
 }
 
 // Validate the configuration.

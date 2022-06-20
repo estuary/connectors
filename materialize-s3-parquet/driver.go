@@ -19,16 +19,16 @@ import (
 )
 
 type config struct {
-	AWSAccessKeyID     string `json:"awsAccessKeyId"`
-	AWSSecretAccessKey string `json:"awsSecretAccessKey"`
-	Bucket             string `json:"bucket"`
-	Endpoint           string `json:"endpoint,omitempty" jsonschema:"oneof_required=endpoint"`
-	Region             string `json:"region,omitempty" jsonschema:"oneof_required=region"`
+	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS credential used to connect to S3."`
+	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS credential used to connect to S3." jsonschema_extras:"secret=true"`
+	Bucket             string `json:"bucket" jsonschema:"title=Bucket,description=Name of the S3 bucket."`
+	Endpoint           string `json:"endpoint,omitempty" jsonschema:"oneof_required=endpoint,title=Endpoint,description=The AWS endpoint URI to connect to, useful if you're capturing from a S3-compatible API that isn't provided by AWS."`
+	Region             string `json:"region,omitempty" jsonschema:"oneof_required=region,title=Region,description=The name of the AWS region where the S3 bucket is located."`
 	// The driver batches materialization results to local files first,
 	// and uploads the local files to cloud (S3) on a schedule specified by
 	// UploadIntervalInSeconds, which is the mimimal wait time (in seconds) between two
 	// consecutive upload-to-cloud actions.
-	UploadIntervalInSeconds int `json:"uploadIntervalInSeconds"`
+	UploadIntervalInSeconds int `json:"uploadIntervalInSeconds" jsonschema:"title=Upload Interval in Seconds,description=Time interval, in seconds, at which to upload data from Flow to S3."`
 }
 
 // Validate returns an error if the config is not well-formed.

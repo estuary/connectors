@@ -9,22 +9,35 @@
     ],
     "properties": {
       "awsAccessKeyId": {
-        "type": "string"
+        "type": "string",
+        "title": "Access Key ID",
+        "description": "AWS credential used to connect to S3."
       },
       "awsSecretAccessKey": {
-        "type": "string"
+        "type": "string",
+        "title": "Secret Access Key",
+        "description": "AWS credential used to connect to S3.",
+        "secret": true
       },
       "bucket": {
-        "type": "string"
+        "type": "string",
+        "title": "Bucket",
+        "description": "Name of the S3 bucket."
       },
       "endpoint": {
-        "type": "string"
+        "type": "string",
+        "title": "Endpoint",
+        "description": "The AWS endpoint URI to connect to"
       },
       "region": {
-        "type": "string"
+        "type": "string",
+        "title": "Region",
+        "description": "The name of the AWS region where the S3 bucket is located."
       },
       "uploadIntervalInSeconds": {
-        "type": "integer"
+        "type": "integer",
+        "title": "Upload Interval in Seconds",
+        "description": "Time interval"
       }
     },
     "type": "object",

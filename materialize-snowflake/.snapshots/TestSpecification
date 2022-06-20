@@ -25,7 +25,7 @@
         "type": "string",
         "title": "Password",
         "description": "The password for the provided user.",
-        "secret": "true"
+        "secret": true
       },
       "database": {
         "type": "string",
@@ -63,8 +63,8 @@
         "description": "The cloud region containing the Snowflake endpoint."
       }
     },
-    "additionalProperties": false,
-    "type": "object"
+    "type": "object",
+    "title": "SQL Connection"
   },
   "resource_spec_schema_json": {
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -79,8 +79,8 @@
         "type": "boolean"
       }
     },
-    "additionalProperties": false,
-    "type": "object"
+    "type": "object",
+    "title": "SQL Table"
   },
   "documentation_url": "https://go.estuary.dev/materialize-snowflake"
 }
