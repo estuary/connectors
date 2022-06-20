@@ -6,13 +6,20 @@
     ],
     "properties": {
       "endpoint": {
-        "type": "string"
+        "type": "string",
+        "title": "Endpoint",
+        "description": "Endpoint host or URL. If using Elastic Cloud"
       },
       "username": {
-        "type": "string"
+        "type": "string",
+        "title": "Username",
+        "description": "User to connect to the endpoint."
       },
       "password": {
-        "type": "string"
+        "type": "string",
+        "title": "Password",
+        "description": "Password to connect to the endpoint.",
+        "secret": true
       }
     },
     "type": "object",
