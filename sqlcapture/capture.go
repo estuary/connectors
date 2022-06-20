@@ -452,7 +452,6 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 	// for synchronization.
 	for _, streamID := range streams {
 		var streamState = c.State.Streams[streamID]
-		var schema, table = splitStreamID(streamID)
 
 		// Fetch a chunk of entries from the specified stream
 		var err error
@@ -471,7 +470,7 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 		if !ok {
 			return nil, fmt.Errorf("unknown table %q", streamID)
 		}
-		events, err := c.Database.ScanTableChunk(ctx, schema, table, &discoveryInfo, streamState.KeyColumns, resumeKey)
+		events, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState.KeyColumns, resumeKey)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning table %q: %w", streamID, err)
 		}
@@ -556,10 +555,4 @@ func (c *Capture) emitState() error {
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
 func JoinStreamID(namespace, stream string) string {
 	return strings.ToLower(namespace + "." + stream)
-}
-
-// splitStreamID decomposes a dotted name like "public.foo_table" into separate schema and table components.
-func splitStreamID(streamID string) (string, string) {
-	var parts = strings.SplitN(streamID, ".", 2)
-	return parts[0], parts[1]
 }

@@ -110,7 +110,7 @@ type Database interface {
 	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
 	WatermarksTable() string
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-	ScanTableChunk(ctx context.Context, schema, table string, info *TableInfo, keyColumns []string, resumeKey []interface{}) ([]ChangeEvent, error)
+	ScanTableChunk(ctx context.Context, info TableInfo, keyColumns []string, resumeKey []interface{}) ([]ChangeEvent, error)
 	// DiscoverTables queries the database for information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[string]TableInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
