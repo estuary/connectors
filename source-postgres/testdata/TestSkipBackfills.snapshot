@@ -1,0 +1,13 @@
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
+{"type":"RECORD","record":{"stream":"test_skipbackfills_aaa","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_skipbackfills_aaa"}},"data":"ten","id":10},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_skipbackfills_aaa","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_skipbackfills_aaa"}},"data":"eleven","id":11},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_skipbackfills_aaa","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_skipbackfills_aaa"}},"data":"twelve","id":12},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
+{"type":"RECORD","record":{"stream":"test_skipbackfills_bbb","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_skipbackfills_bbb"}},"data":"thirteen","id":13},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_skipbackfills_bbb","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_skipbackfills_bbb"}},"data":"fourteen","id":14},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_skipbackfills_bbb","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_skipbackfills_bbb"}},"data":"fifteen","id":15},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
+{"type":"RECORD","record":{"stream":"test_skipbackfills_ccc","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_skipbackfills_ccc"}},"data":"sixteen","id":16},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_skipbackfills_ccc","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_skipbackfills_ccc"}},"data":"seventeen","id":17},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_skipbackfills_ccc","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_skipbackfills_ccc"}},"data":"eighteen","id":18},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}

@@ -254,3 +254,28 @@ func TestBinlogExpirySanityCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestSkipBackfills(t *testing.T) {
+	// Set up three tables with some data in them, a catalog which captures all three,
+	// but a configuration which specifies that tables A and C should skip backfilling
+	// and only capture new changes.
+	var tb, ctx = &mysqlTestBackend{conn: TestBackend.conn, cfg: TestBackend.cfg}, context.Background()
+	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "one"}, {2, "two"}, {3, "three"}})
+	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
+	tb.Insert(ctx, t, tableC, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
+	tb.cfg.Advanced.SkipBackfills = fmt.Sprintf("test.%s,test.%s", tableA, tableC)
+
+	// Run an initial capture, which should only backfill events from table B
+	var catalog = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB, tableC)
+	var state = sqlcapture.PersistentState{}
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
+
+	// Insert additional data and verify that all three tables report new events
+	tb.Insert(ctx, t, tableA, [][]interface{}{{10, "ten"}, {11, "eleven"}, {12, "twelve"}})
+	tb.Insert(ctx, t, tableB, [][]interface{}{{13, "thirteen"}, {14, "fourteen"}, {15, "fifteen"}})
+	tb.Insert(ctx, t, tableC, [][]interface{}{{16, "sixteen"}, {17, "seventeen"}, {18, "eighteen"}})
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "")
+}
