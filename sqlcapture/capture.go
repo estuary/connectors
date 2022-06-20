@@ -156,6 +156,33 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		c.State.Streams[streamID] = state
 	}
 
+	// Transition streams from "Backfill" to "Active" if we're supposed to skip
+	// backfilling that one. Combined with the previous Pending->Backfill logic
+	// this may cause a newly-added stream to go Pending->Backfill->Active, but
+	// it can also terminate a partially-completed backfill if the connector was
+	// restarted with a changed configuration after the backfill began.
+	//
+	// This means that a backfill can still be terminated/skipped, even after the
+	// user starts their capture and only then realizes that it's going to take days
+	// to backfill their multiple-terabyte table.
+	for _, streamID := range c.State.StreamsInState(TableModeBackfill) {
+		if !c.Database.ShouldBackfill(streamID) {
+			var state = c.State.Streams[streamID]
+			if state.Scanned == nil {
+				logrus.WithField("stream", streamID).Info("skipping backfill for stream")
+			} else {
+				logrus.WithFields(logrus.Fields{
+					"stream":  streamID,
+					"scanned": state.Scanned,
+				}).Info("terminating backfill early for stream")
+			}
+			state.Mode = TableModeActive
+			state.Scanned = nil
+			state.dirty = true
+			c.State.Streams[streamID] = state
+		}
+	}
+
 	// Backfill any tables which require it
 	var results *resultSet
 	for c.State.StreamsInState(TableModeBackfill) != nil {
