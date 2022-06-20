@@ -1,5 +1,5 @@
 {
-  "name": "test_generic_simplediscovery",
+  "name": "test_Generic_SimpleDiscovery",
   "json_schema": {
     "allOf": [
       {
@@ -15,7 +15,7 @@
             "type": "object",
             "properties": {
               "before": {
-                "$ref": "#TestTest_generic_simplediscovery",
+                "$ref": "#TestTest_Generic_SimpleDiscovery",
                 "description": "Record state immediately before this change was applied.",
                 "reduce": {
                   "strategy": "firstWriteWins"
@@ -70,16 +70,16 @@
         }
       },
       {
-        "$ref": "#TestTest_generic_simplediscovery"
+        "$ref": "#TestTest_Generic_SimpleDiscovery"
       }
     ],
     "definitions": {
-      "TestTest_generic_simplediscovery": {
+      "TestTest_Generic_SimpleDiscovery": {
         "required": [
           "a"
         ],
         "type": "object",
-        "$anchor": "TestTest_generic_simplediscovery",
+        "$anchor": "TestTest_Generic_SimpleDiscovery",
         "properties": {
           "a": {
             "type": "integer"

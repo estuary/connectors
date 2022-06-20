@@ -2,8 +2,8 @@
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_altertable_bbb":{"mode":"Backfill","key_columns":["id"],"scanned":null,"metadata":{"schema":{"columns":["id","data","extra"],"types":{"data":"text","extra":"text","id":"int"}}}}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
-{"type":"RECORD","record":{"stream":"test_altertable_bbb","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_altertable_bbb"}},"data":"ghi","extra":null,"id":3},"emitted_at":1234,"namespace":"test"}}
-{"type":"RECORD","record":{"stream":"test_altertable_bbb","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_altertable_bbb"}},"data":"jkl","extra":null,"id":4},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_AlterTable_bbb","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_AlterTable_bbb"}},"data":"ghi","extra":null,"id":3},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_AlterTable_bbb","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_AlterTable_bbb"}},"data":"jkl","extra":null,"id":4},"emitted_at":1234,"namespace":"test"}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_altertable_bbb":{"mode":"Backfill","key_columns":["id"],"scanned":"FQQ=","metadata":{"schema":{"columns":["id","data","extra"],"types":{"data":"text","extra":"text","id":"int"}}}}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_altertable_bbb":{"mode":"Active","key_columns":["id"],"scanned":null,"metadata":{"schema":{"columns":["id","data","extra"],"types":{"data":"text","extra":"text","id":"int"}}}}}},"estuary.dev/merge":true}}

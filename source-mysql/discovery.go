@@ -12,31 +12,44 @@ import (
 )
 
 func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]sqlcapture.TableInfo, error) {
+	// Enumerate every column of every table, and then aggregate into a
+	// map from StreamID to TableInfo structs.
 	var columns, err = getColumns(ctx, db.conn)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering columns: %w", err)
 	}
-	primaryKeys, err := getPrimaryKeys(ctx, db.conn)
-	if err != nil {
-		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
-	}
-
-	// Aggregate column and primary key information into TableInfo structs
-	// using a map from fully-qualified "<schema>.<name>" table names to
-	// the corresponding TableInfo.
 	var tableMap = make(map[string]sqlcapture.TableInfo)
 	for _, column := range columns {
-		var id = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
-		var info, ok = tableMap[id]
+		// Create or look up the appropriate TableInfo struct for a given schema+name
+		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
+		var info, ok = tableMap[streamID]
 		if !ok {
 			info = sqlcapture.TableInfo{Schema: column.TableSchema, Name: column.TableName}
 		}
+
+		// The 'Stream IDs' used for table info lookup are case insensitive, so we
+		// need to double-check that there isn't a collision between two case variants
+		// of the same name.
+		if info.Schema != column.TableSchema || info.Name != column.TableName {
+			var nameA = fmt.Sprintf("%s.%s", info.Schema, info.Name)
+			var nameB = fmt.Sprintf("%s.%s", column.TableSchema, column.TableName)
+			return nil, fmt.Errorf("table name collision between %q and %q", nameA, nameB)
+		}
+
+		// Finally we can add to the column info map and column-name-ordering list
 		if info.Columns == nil {
 			info.Columns = make(map[string]sqlcapture.ColumnInfo)
 		}
 		info.Columns[column.Name] = column
 		info.ColumnNames = append(info.ColumnNames, column.Name)
-		tableMap[id] = info
+		tableMap[streamID] = info
+	}
+
+	// Enumerate the primary key of every table and add that information
+	// into the table map.
+	primaryKeys, err := getPrimaryKeys(ctx, db.conn)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
 	}
 	for id, key := range primaryKeys {
 		// The `getColumns()` query implements the "exclude system schemas" logic,
@@ -48,6 +61,7 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]sqlcapt
 		info.PrimaryKey = key
 		tableMap[id] = info
 	}
+
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {
 		for id, info := range tableMap {
 			logrus.WithFields(logrus.Fields{
