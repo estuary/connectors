@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -121,7 +120,6 @@ func (tb *mysqlTestBackend) CreateTable(ctx context.Context, t *testing.T, suffi
 	for _, str := range []string{"/", "=", "(", ")"} {
 		tableName = strings.ReplaceAll(tableName, str, "_")
 	}
-	tableName = strings.ToLower(tableName)
 
 	logrus.WithFields(logrus.Fields{"table": tableName, "cols": tableDef}).Debug("creating test table")
 	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
@@ -180,21 +178,6 @@ func (tb *mysqlTestBackend) Query(ctx context.Context, t *testing.T, query strin
 		t.Fatalf("error executing query %q: %v", query, err)
 	}
 	defer result.Close()
-
-	// At tracing level, attempt to print result rows readably
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		for _, row := range result.Values {
-			var vals []string
-			for _, val := range row {
-				var str = string(val.AsString())
-				if str == "" {
-					str = strconv.FormatInt(val.AsInt64(), 10)
-				}
-				vals = append(vals, str)
-			}
-			logrus.WithField("values", vals).Trace("query result row")
-		}
-	}
 }
 
 func (tb *mysqlTestBackend) GetDatabase() sqlcapture.Database {

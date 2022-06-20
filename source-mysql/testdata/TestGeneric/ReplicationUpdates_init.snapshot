@@ -2,9 +2,9 @@
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_generic_replicationupdates":{"mode":"Backfill","key_columns":["id"],"scanned":null,"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
-{"type":"RECORD","record":{"stream":"test_generic_replicationupdates","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_generic_replicationupdates"}},"data":"A","id":0},"emitted_at":1234,"namespace":"test"}}
-{"type":"RECORD","record":{"stream":"test_generic_replicationupdates","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_generic_replicationupdates"}},"data":"bbb","id":1},"emitted_at":1234,"namespace":"test"}}
-{"type":"RECORD","record":{"stream":"test_generic_replicationupdates","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_generic_replicationupdates"}},"data":"CDEFGHIJKLMNOP","id":2},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_Generic_ReplicationUpdates","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_Generic_ReplicationUpdates"}},"data":"A","id":0},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_Generic_ReplicationUpdates","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_Generic_ReplicationUpdates"}},"data":"bbb","id":1},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_Generic_ReplicationUpdates","data":{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"test_Generic_ReplicationUpdates"}},"data":"CDEFGHIJKLMNOP","id":2},"emitted_at":1234,"namespace":"test"}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_generic_replicationupdates":{"mode":"Backfill","key_columns":["id"],"scanned":"FQI=","metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_generic_replicationupdates":{"mode":"Active","key_columns":["id"],"scanned":null,"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}}}},"estuary.dev/merge":true}}

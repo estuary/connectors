@@ -1,5 +1,5 @@
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
-{"type":"RECORD","record":{"stream":"test_generic_ignoredstreams_one","data":{"_meta":{"op":"c","source":{"schema":"test","table":"test_generic_ignoredstreams_one"}},"data":"six","id":6},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_Generic_IgnoredStreams_one","data":{"_meta":{"op":"c","source":{"schema":"test","table":"test_Generic_IgnoredStreams_one"}},"data":"six","id":6},"emitted_at":1234,"namespace":"test"}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
-{"type":"RECORD","record":{"stream":"test_generic_ignoredstreams_one","data":{"_meta":{"op":"c","source":{"schema":"test","table":"test_generic_ignoredstreams_one"}},"data":"eight","id":8},"emitted_at":1234,"namespace":"test"}}
+{"type":"RECORD","record":{"stream":"test_Generic_IgnoredStreams_one","data":{"_meta":{"op":"c","source":{"schema":"test","table":"test_Generic_IgnoredStreams_one"}},"data":"eight","id":8},"emitted_at":1234,"namespace":"test"}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
