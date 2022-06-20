@@ -19,7 +19,7 @@ func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 	schema.AdditionalProperties = nil // Unset means additional properties are permitted on the root object, as they should be
 	schema.Definitions = nil          // Since no references are used, these definitions are just noise
 	schema.Title = title
-	fixSchemaFlagBools(schema.Type, "secret", "advanced")
+	fixSchemaFlagBools(schema.Type, "secret", "advanced", "multiline")
 	return schema
 }
 
