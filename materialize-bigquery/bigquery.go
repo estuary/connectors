@@ -48,7 +48,7 @@ type config struct {
 	Region           string     `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."`
 	Bucket           string     `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery."`
 	BucketPath       string     `json:"bucket_path" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket."`
-	CredentialsJSON  credential `json:"credentials_json" jsonschema_description:"Google Cloud Service Account JSON credentials in base64 format."`
+	CredentialsJSON  credential `json:"credentials_json" jsonschema:"title=Credentials,description=Google Cloud Service Account JSON credentials in base64 format." jsonschema_extras:"secret=true,multiline=true"`
 }
 
 func (c *config) Validate() error {
