@@ -79,6 +79,7 @@ type advancedConfig struct {
 	DBName                   string `json:"dbname,omitempty" jsonschema:"title=Database Name,default=mysql,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
 	SkipBinlogRetentionCheck bool   `json:"skip_binlog_retention_check,omitempty" jsonschema:"title=Skip Binlog Retention Sanity Check,default=false,description=Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need."`
 	NodeID                   uint32 `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
+	SkipBackfills            string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -94,7 +95,14 @@ func (c *Config) Validate() error {
 		}
 	}
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
-		return fmt.Errorf("config parameter 'watermarksTable' must be fully-qualified as '<schema>.<table>': %q", c.Advanced.WatermarksTable)
+		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
+	}
+	if c.Advanced.SkipBackfills != "" {
+		for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
+			if !strings.Contains(skipStreamID, ".") {
+				return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
+			}
+		}
 	}
 	return nil
 }
@@ -254,6 +262,19 @@ func (db *mysqlDatabase) EncodeKeyFDB(key interface{}) (tuple.TupleElement, erro
 
 func (db *mysqlDatabase) DecodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
 	return t, nil
+}
+
+func (db *mysqlDatabase) ShouldBackfill(streamID string) bool {
+	if db.config.Advanced.SkipBackfills != "" {
+		// This repeated splitting is a little inefficient, but this check is done at
+		// most once per table during connector startup and isn't really worth caching.
+		for _, skipStreamID := range strings.Split(db.config.Advanced.SkipBackfills, ",") {
+			if strings.EqualFold(streamID, skipStreamID) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // mysqlSourceInfo is source metadata for data capture events.

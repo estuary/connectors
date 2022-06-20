@@ -125,6 +125,8 @@ type Database interface {
 	EncodeKeyFDB(key interface{}) (tuple.TupleElement, error)
 	// DecodeKeyFDB decodes the result of `EncodeKeyFDB` to its original form.
 	DecodeKeyFDB(t tuple.TupleElement) (interface{}, error)
+	// ShouldBackfill returns true if a given table's contents should be backfilled.
+	ShouldBackfill(streamID string) bool
 }
 
 // ReplicationStream represents the process of receiving change events

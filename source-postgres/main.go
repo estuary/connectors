@@ -52,6 +52,7 @@ type advancedConfig struct {
 	PublicationName string `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
 	SlotName        string `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
 	WatermarksTable string `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	SkipBackfills   string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -68,7 +69,14 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
-		return fmt.Errorf("config parameter 'watermarksTable' must be fully-qualified as '<schema>.<table>': %q", c.Advanced.WatermarksTable)
+		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
+	}
+	if c.Advanced.SkipBackfills != "" {
+		for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
+			if !strings.Contains(skipStreamID, ".") {
+				return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
+			}
+		}
 	}
 
 	return nil
@@ -166,4 +174,17 @@ func (db *postgresDatabase) DecodeKeyFDB(t tuple.TupleElement) (interface{}, err
 	default:
 		return t, nil
 	}
+}
+
+func (db *postgresDatabase) ShouldBackfill(streamID string) bool {
+	if db.config.Advanced.SkipBackfills != "" {
+		// This repeated splitting is a little inefficient, but this check is done at
+		// most once per table during connector startup and isn't really worth caching.
+		for _, skipStreamID := range strings.Split(db.config.Advanced.SkipBackfills, ",") {
+			if streamID == strings.ToLower(skipStreamID) {
+				return false
+			}
+		}
+	}
+	return true
 }
