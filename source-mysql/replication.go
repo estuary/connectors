@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,6 +48,8 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		Port:     uint16(port),
 		User:     db.config.User,
 		Password: db.config.Password,
+		// TODO(wgd): Maybe add 'serverName' checking as described over in Connect()
+		TLSConfig: &tls.Config{InsecureSkipVerify: true},
 	})
 
 	var pos mysql.Position
