@@ -444,11 +444,6 @@ func (r *reader) makeParseConfig(obj ObjectInfo) *parser.Config {
 	if cfg.AddValues == nil {
 		cfg.AddValues = make(map[parser.JsonPointer]interface{})
 	}
-	if cfg.Schema == nil {
-		cfg.Schema = r.schema
-	}
-	cfg.Projections = r.projections
-
 	cfg.AddValues[metaFileLocation] = obj.Path
 	return cfg
 }
