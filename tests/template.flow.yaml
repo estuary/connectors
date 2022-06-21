@@ -2,7 +2,7 @@ collections:
   tests/${CONNECTOR}/data:
     schema:
       properties:
-        id: { type: integer }
+        id: { type: ${ID_TYPE} }
         canary: {type: string}
       required: [id, canary]
       type: object
