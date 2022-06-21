@@ -4,6 +4,8 @@ set -e
 
 export TEST_BUCKET="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
 export RESOURCE="{ stream: ${TEST_BUCKET} }"
+# set ID_TYPE to string because parsing CSV files will always result in string values.
+export ID_TYPE=string
 
 config_json_template='{
     "awsAccessKeyId": "$AWS_ACCESS_KEY_ID",
@@ -18,7 +20,9 @@ aws s3api create-bucket --bucket $TEST_BUCKET --create-bucket-configuration Loca
 
 root_dir="$(git rev-parse --show-toplevel)"
 
-for file in $(find ${root_dir}/tests/files -type f); do
+# We need to exclude the json file from the test because the `id` property there is an integer, and
+# this connector expects it to be a string.
+for file in $(find ${root_dir}/tests/files -type f -name '*.csv*'); do
     aws s3 cp ${file} s3://${TEST_BUCKET}/testprefix/$(basename $file)
 done
 
