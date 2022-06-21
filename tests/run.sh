@@ -83,6 +83,12 @@ if [[ -z "$CONNECTOR_CONFIG" ]]; then
 fi
 trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${CONNECTOR}/cleanup.sh" EXIT
 
+# The source-s3 and source-gcs connectors need the collection schema to use a string for the id
+# property because the parser treats all CSV columns as strings. Their setup.sh scripts will set
+# ID_TYPE to 'string', and the template uses this variable in the schema. We default the variable to
+# integer here so that not all setup scripts need to export it.
+export ID_TYPE="${ID_TYPE:-integer}"
+
 # Generate the test-specific catalog source.
 cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
 
