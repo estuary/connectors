@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -136,7 +137,13 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 	}).Info("initializing connector")
 
 	// Normal database connection used for table scanning
-	var conn, err = client.Connect(db.config.Address, db.config.User, db.config.Password, db.config.Advanced.DBName)
+	var conn, err = client.Connect(db.config.Address, db.config.User, db.config.Password, db.config.Advanced.DBName, func(c *client.Conn) {
+		// TODO(wgd): Consider adding an optional 'serverName' config parameter which
+		// if set makes this false and sets 'ServerName' so it will be verified properly.
+		c.SetTLSConfig(&tls.Config{
+			InsecureSkipVerify: true,
+		})
+	})
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
