@@ -172,56 +172,45 @@ func (src Source) Discover(args airbyte.DiscoverCmd) error {
 		return err
 	}
 	var ctx = context.Background()
+	var root = conn.config.DiscoverRoot()
 
-	// Breadth-first search.
-	var stack = []string{conn.config.DiscoverRoot()}
-	var streams []airbyte.Stream
+	listing, err := conn.store.List(ctx, Query{
+		Prefix:    root,
+		StartAt:   "",
+		Recursive: false,
+	})
+	if err != nil {
+		return fmt.Errorf("listing bucket: %w", err)
+	}
 
-	for len(stack) != 0 && len(streams) < 10 {
-		var prefix = stack[0]
-
-		var listing, err = conn.store.List(ctx, Query{
-			Prefix:    prefix,
-			Recursive: false,
-		})
-		if err != nil {
-			return fmt.Errorf("starting listing %q: %w", prefix, err)
+	var objectCount = 0
+	for {
+		if _, err = listing.Next(); err == io.EOF {
+			break
+		} else if err != nil {
+			return fmt.Errorf("reading bucket listing: %w", err)
 		}
+		objectCount++
+		// nothin else to do here
+		// Eventually, we'll actually read some of these objects in order to do schema inference.
+	}
+	log.WithFields(log.Fields{
+		"objectCount": objectCount,
+		"stream":      root,
+	}).Info("bucket listing successful")
 
-		var hasObjects bool
-		for i := 0; i != discoverListLimit; i++ {
-			var entry, err = listing.Next()
-			if err == io.EOF {
-				break
-			} else if err != nil {
-				return fmt.Errorf("during listing %q: %w", prefix, err)
-			} else if entry.IsPrefix {
-				stack = append(stack, entry.Path)
-			} else {
-				hasObjects = true
-			}
-		}
-
-		// Make streams of non-empty directories and the discovery root,
-		// even if the latter is empty.
-		if hasObjects || len(streams) == 0 {
-			streams = append(streams, airbyte.Stream{
-				Name:               prefix,
+	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
+		Type: airbyte.MessageTypeCatalog,
+		Catalog: &airbyte.Catalog{
+			Streams: []airbyte.Stream{{
+				Name:               root,
 				JSONSchema:         json.RawMessage(discoverDocumentSchema),
 				SupportedSyncModes: airbyte.AllSyncModes,
 				SourceDefinedPrimaryKey: [][]string{
 					{"_meta", "file"},
 					{"_meta", "offset"},
 				},
-			})
-		}
-		stack = stack[1:]
-	}
-
-	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
-		Type: airbyte.MessageTypeCatalog,
-		Catalog: &airbyte.Catalog{
-			Streams: streams,
+			}},
 		},
 	})
 }
