@@ -26,6 +26,9 @@ FROM ghcr.io/estuary/base-image:v1
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
+# Grab the statically-built schema-inference cli.
+COPY flow-bin/flow-schema-inference ./
+
 COPY --from=busybox:latest /bin/sh /bin/sh
 
 # Bring in the compiled connector artifact from the builder.
