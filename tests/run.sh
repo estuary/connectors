@@ -79,6 +79,7 @@ source "tests/${CONNECTOR}/setup.sh" || bail "${CONNECTOR}/setup.sh failed"
 if [[ -z "$RESOURCE" ]]; then
     bail "setup did not set RESOURCE"
 fi
+
 if [[ -z "$CONNECTOR_CONFIG" ]]; then
     bail "setup did not set CONNECTOR_CONFIG"
 fi
@@ -89,6 +90,14 @@ trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${C
 # ID_TYPE to 'string', and the template uses this variable in the schema. We default the variable to
 # integer here so that not all setup scripts need to export it.
 export ID_TYPE="${ID_TYPE:-integer}"
+
+# Verify discover works
+${TESTDIR}/flowctl api discover --image="${CONNECTOR_IMAGE}" --log.level=debug --config=<(echo ${CONNECTOR_CONFIG}) > ${TESTDIR}/discover_output.json || bail "Discover failed."
+cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" > ${TESTDIR}/bindings.json
+
+if [[ -f "tests/${CONNECTOR}/bindings.json" ]]; then
+  diff --side-by-side ${TESTDIR}/bindings.json "tests/${CONNECTOR}/bindings.json" || bail "Discovered bindings are wrong"
+fi
 
 # Generate the test-specific catalog source.
 cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
