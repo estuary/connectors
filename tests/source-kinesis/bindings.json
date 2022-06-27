@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "canary",
+    "foo",
+    "id"
+  ],
+  "properties": {
+    "canary": {
+      "type": "string"
+    },
+    "foo": {
+      "type": [
+        "boolean",
+        "integer",
+        "string"
+      ]
+    },
+    "id": {
+      "type": "integer"
+    }
+  }
+}

@@ -25,4 +25,3 @@ do
         --partition-key "$(head -c 12 /dev/urandom | base64)" \
         --data "$(echo "$doc" | base64)"
 done < tests/files/d.jsonl
-
