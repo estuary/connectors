@@ -279,6 +279,13 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 	case *pglogrepl.RelationMessage:
 		s.relations[msg.RelationID] = msg
 		return nil, nil
+	case *pglogrepl.TypeMessage:
+		logrus.WithFields(logrus.Fields{
+			"dataType":  msg.DataType,
+			"namespace": msg.Namespace,
+			"name":      msg.Name,
+		}).Debug("got type message")
+		return nil, nil
 	case *pglogrepl.BeginMessage:
 		if s.nextTxnFinalLSN != 0 {
 			return nil, fmt.Errorf("got BEGIN message while another transaction in progress")

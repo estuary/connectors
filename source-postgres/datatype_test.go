@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 )
 
@@ -118,4 +119,28 @@ func TestDatatypes(t *testing.T) {
 
 		// TODO(wgd): Add enumeration test case?
 	})
+}
+
+func TestEnums(t *testing.T) {
+	// Set up three tables with some data in them, a catalog which captures all three,
+	// but a configuration which specifies that tables A and C should skip backfilling
+	// and only capture new changes.
+	var tb, ctx = TestBackend, context.Background()
+
+	// Create Type
+	tb.Query(ctx, t, `DROP TYPE IF EXISTS size;`)
+	tb.Query(ctx, t, `CREATE TYPE size AS ENUM ('small', 'medium', 'large', 'extra large');`)
+	t.Cleanup(func() { tb.Query(ctx, t, `DROP TYPE IF EXISTS size;`) })
+
+	// Create table and catalog
+	var table = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, val size)")
+	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, table), sqlcapture.PersistentState{}
+
+	// Backfill
+	tb.Insert(ctx, t, table, [][]interface{}{{1, "small"}, {2, "large"}, {3, "small"}, {4, "extra large"}, {5, "medium"}})
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "capture1")
+
+	// Replication
+	tb.Insert(ctx, t, table, [][]interface{}{{6, "small"}, {7, "large"}, {8, "small"}, {9, "extra large"}, {10, "medium"}})
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "capture2")
 }

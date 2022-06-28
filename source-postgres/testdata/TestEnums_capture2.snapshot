@@ -1,0 +1,7 @@
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
+{"type":"RECORD","record":{"stream":"test_enums","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_enums"}},"id":6,"val":"small"},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_enums","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_enums"}},"id":7,"val":"large"},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_enums","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_enums"}},"id":8,"val":"small"},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_enums","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_enums"}},"id":9,"val":"extra large"},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_enums","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_enums"}},"id":10,"val":"medium"},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
