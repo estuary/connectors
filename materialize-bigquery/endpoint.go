@@ -158,6 +158,7 @@ func (e *Endpoint) CreateTableStatement(table *sqlDriver.Table) (string, error) 
 	// is the very first part of a statement, the whole statement will be excluded from
 	// a transaction.
 	builder.WriteString(bigQueryOmitFromTransactionComment)
+	builder.WriteRune('\n')
 
 	if len(table.Comment) > 0 {
 		_, _ = e.generator.CommentRenderer.Write(&builder, table.Comment, "")
@@ -219,6 +220,11 @@ func (e *Endpoint) CreateTableStatement(table *sqlDriver.Table) (string, error) 
 // NewFence installs and returns a new *Fence. On return, all older fences of
 // this |shardFqn| have been fenced off from committing further transactions.
 func (ep *Endpoint) NewFence(ctx context.Context, materialization pf.Materialization, keyBegin, keyEnd uint32) (sqlDriver.Fence, error) {
+	log.WithFields(log.Fields{
+		"keyBegin":        keyBegin,
+		"keyEnd":          keyEnd,
+		"materialization": materialization.String(),
+	}).Info("Creating new fence")
 
 	job, err := ep.query(ctx, fmt.Sprintf(`
 	-- Our desired fence
@@ -285,6 +291,9 @@ func (ep *Endpoint) NewFence(ctx context.Context, materialization pf.Materializa
 		base64.StdEncoding.EncodeToString(pm.ExplicitZeroCheckpoint),
 	)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Error("Bigquery job failed")
 		return nil, fmt.Errorf("query fence: %w", err)
 	}
 
