@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/bigquery"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 )
@@ -16,7 +17,6 @@ var (
 
 // query executes a query against BigQuery and returns the completed job.
 func (ep *Endpoint) query(ctx context.Context, queryString string, parameters ...interface{}) (*bigquery.Job, error) {
-
 	return ep.runQuery(ctx, ep.newQuery(queryString, parameters...))
 
 }
@@ -36,29 +36,69 @@ func (ep *Endpoint) newQuery(queryString string, parameters ...interface{}) *big
 
 }
 
-// runQuery will run a query and return the compelted job.
+// runQuery will run a query and return the completed job.
 func (ep *Endpoint) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.Job, error) {
-
-	job, err := query.Run(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("run: %w", err)
-	}
-	status, err := job.Wait(ctx)
-	if err != nil {
-		if e, ok := err.(*googleapi.Error); ok && e.Code == 404 {
-			return nil, errNotFound // The table wasn't found
+	var maxAttempts = 5
+	for attempt := 0; true; attempt++ {
+		job, err := query.Run(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("run: %w", err)
 		}
-		return job, fmt.Errorf("wait: %w", err)
-	}
-	if err := status.Err(); err != nil {
-		return job, fmt.Errorf("status: %w", err)
-	}
-	if !status.Done() {
-		return job, fmt.Errorf("query not done")
-	}
 
-	return job, nil
+		// Weirdness ahead: if `err != nil`, then `status` might be nil. But if `err == nil`, then
+		// there might still have been an error reported by `status.Err()`. We always want both the
+		// err and the status so that we can check both. When `err != nil`, the status may still
+		// have some helpful info to log.
+		status, err := job.Wait(ctx)
+		if status == nil {
+			status = job.LastStatus()
+		}
+		if err == nil {
+			err = status.Err()
+		}
 
+		var logEntry = log.WithFields(log.Fields{
+			"attempt":   attempt,
+			"jobStatus": status,
+			"error":     err,
+		})
+		if err != nil {
+			// Is this a terminal error?
+			// We need to retry errors due to concurrent updates to the same table, but
+			// unfortunately there's no good way to identify such errors. The status code of
+			// that error is 400, but that also applies to many other errors. So we'll retry
+			// anything with a 400 status, but with a fairly low limit on the number of attempts,
+			// since these errors may actually be terminal.
+			if e, ok := err.(*googleapi.Error); ok {
+				if e.Code == 404 {
+					logEntry.Warn("project, dataset, or table was not found")
+					return nil, errNotFound
+				} else if e.Code != 400 {
+					logEntry.Error("job failed")
+					return nil, err // The error isn't considered retryable
+				}
+			}
+
+			if attempt == maxAttempts {
+				logEntry.Error("job failed")
+				return job, fmt.Errorf("exausted retries: %w", err)
+			} else {
+				logEntry.Warn("job failed (will retry)")
+				// There doesn't seem to be any benefit to waiting before retrying, at least not
+				// when testing locally.
+				continue
+			}
+		}
+
+		// I think this is just documenting the assumption that the job must always be Done after
+		// Wait returns. I don't think we should ever hit this condition.
+		if !status.Done() {
+			return job, fmt.Errorf("query not done")
+		}
+
+		return job, nil
+	}
+	panic("unreachable")
 }
 
 // fetchOne will fetch one row of data from a job and scan it into dest.
