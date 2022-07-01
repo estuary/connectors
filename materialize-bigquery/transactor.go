@@ -169,7 +169,6 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 }
 
 func (t *transactor) Commit(ctx context.Context) error {
-
 	// Build the slice of transactions required for a commit.
 	var subqueries []string
 	var args []interface{}
@@ -243,13 +242,7 @@ func (t *transactor) Commit(ctx context.Context) error {
 	// Complete the transaction and return the appropriate error.
 	subqueries = append(subqueries, `
 	COMMIT TRANSACTION;
-
-	SELECT '' AS error;
-
-	EXCEPTION WHEN ERROR THEN
-		ROLLBACK TRANSACTION;
-		SELECT @@error.message AS error;
-	END;
+    END;
 	`)
 
 	// Build the bigquery query of the combined subqueries.
@@ -262,20 +255,15 @@ func (t *transactor) Commit(ctx context.Context) error {
 		return fmt.Errorf("load query: %w", err)
 	}
 
-	// Fetch te query status from the transaction
-	var queryStatus struct {
-		Error string `bigquery:"error"`
+	if err != nil {
+		log.WithFields(log.Fields{
+			"job":   job,
+			"error": err,
+		}).Error("Bigquery job failed")
+		return fmt.Errorf("merge error: %s", err)
+	} else {
+		return nil
 	}
-
-	if err := t.ep.fetchOne(ctx, job, &queryStatus); err != nil {
-		return fmt.Errorf("fetch one: %w", err)
-	}
-
-	if queryStatus.Error != "" {
-		return fmt.Errorf("merge error: %s", queryStatus.Error)
-	}
-
-	return nil
 }
 
 func (t *transactor) Acknowledge(context.Context) error {
