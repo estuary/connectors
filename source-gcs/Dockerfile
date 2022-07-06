@@ -10,6 +10,7 @@ COPY go.* ./
 RUN go mod download
 
 # Build the connector projects we depend on.
+COPY schema_inference ./schema_inference
 COPY filesource ./filesource
 COPY source-gcs ./source-gcs
 
