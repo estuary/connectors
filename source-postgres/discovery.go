@@ -84,7 +84,10 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]sqlc
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
 func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
 	// If the column type looks like `_foo` then it's an array of elements of type `foo`.
-	var columnType = column.DataType
+	var columnType, ok = column.DataType.(string)
+	if !ok {
+		return nil, fmt.Errorf("unhandled PostgreSQL type %q", columnType)
+	}
 	var arrayColumn = false
 	if strings.HasPrefix(columnType, "_") {
 		columnType = strings.TrimPrefix(columnType, "_")
@@ -92,7 +95,7 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 	}
 
 	// Translate the basic value/element type into a JSON Schema type
-	var colSchema, ok = postgresTypeToJSON[columnType]
+	colSchema, ok := postgresTypeToJSON[columnType]
 	if !ok {
 		return nil, fmt.Errorf("unhandled PostgreSQL type %q", columnType)
 	}
