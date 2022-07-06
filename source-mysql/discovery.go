@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/client"
@@ -83,20 +85,37 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]sqlcapt
 }
 
 func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
-	var colSchema, ok = mysqlTypeToJSON[column.DataType]
-	if !ok {
-		return nil, fmt.Errorf("unhandled MySQL type %q", column.DataType)
+	var schema columnSchema
+	if typeName, ok := column.DataType.(string); ok {
+		schema, ok = mysqlTypeToJSON[typeName]
+		if !ok {
+			return nil, fmt.Errorf("unhandled MySQL type %q", typeName)
+		}
+		schema.nullable = column.IsNullable
+	} else if columnType, ok := column.DataType.(*mysqlColumnType); ok {
+		schema, ok = mysqlTypeToJSON[columnType.Type]
+		if !ok {
+			return nil, fmt.Errorf("unhandled MySQL type %q", typeName)
+		}
+		schema.nullable = column.IsNullable
+		schema.extras = make(map[string]interface{})
+		if columnType.Type == "enum" {
+			schema.extras["enum"] = columnType.EnumValues
+		}
+		// TODO(wgd): Is there a good way to describe possible SET values
+		// as a JSON schema? Currently discovery just says 'string'.
+	} else {
+		return nil, fmt.Errorf("unhandled MySQL type %#v", column.DataType)
 	}
-	colSchema.nullable = column.IsNullable
 
 	// Pass-through the column description.
 	if column.Description != nil {
-		colSchema.description = *column.Description
+		schema.description = *column.Description
 	}
-	return colSchema.toType(), nil
+	return schema.toType(), nil
 }
 
-func translateRecordFields(columnTypes map[string]string, f map[string]interface{}) error {
+func translateRecordFields(columnTypes map[string]interface{}, f map[string]interface{}) error {
 	if columnTypes == nil {
 		return fmt.Errorf("unknown column types")
 	}
@@ -113,37 +132,41 @@ func translateRecordFields(columnTypes map[string]string, f map[string]interface
 	return nil
 }
 
-func translateRecordField(columnType string, val interface{}) (interface{}, error) {
-	if columnType == "" {
+func translateRecordField(columnType interface{}, val interface{}) (interface{}, error) {
+	if columnType == nil {
 		return nil, fmt.Errorf("unknown column type")
 	}
 	if str, ok := val.(string); ok {
 		val = []byte(str)
 	}
+	if columnType, ok := columnType.(*mysqlColumnType); ok {
+		return columnType.translateRecordField(val)
+	}
 	switch val := val.(type) {
 	case []byte:
-		switch columnType {
-		case "bit":
-			var acc uint64
-			for _, x := range val {
-				acc = (acc << 8) | uint64(x)
+		if typeName, ok := columnType.(string); ok {
+			switch typeName {
+			case "bit":
+				var acc uint64
+				for _, x := range val {
+					acc = (acc << 8) | uint64(x)
+				}
+				return acc, nil
+			case "binary", "varbinary":
+				return val, nil
+			case "blob", "tinyblob", "mediumblob", "longblob":
+				return val, nil
+			case "json":
+				return json.RawMessage(val), nil
 			}
-			return acc, nil
-		case "binary", "varbinary":
-			return val, nil
-		case "blob", "tinyblob", "mediumblob", "longblob":
-			return val, nil
-		case "json":
-			return json.RawMessage(val), nil
-		default:
-			return string(val), nil
 		}
+		return string(val), nil
 	}
 	return val, nil
 }
 
 const queryDiscoverColumns = `
-  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type
+  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type
   FROM information_schema.columns
   WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
     AND table_schema != 'mysql' AND table_schema != 'sys'
@@ -158,16 +181,105 @@ func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo
 
 	var columns []sqlcapture.ColumnInfo
 	for _, row := range results.Values {
+		var typeName = string(row[5].AsString())
+		var dataType interface{}
+		if typeName == "enum" {
+			dataType = &mysqlColumnType{Type: "enum", EnumValues: parseEnumValues(string(row[6].AsString()))}
+		} else if typeName == "set" {
+			dataType = &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(string(row[6].AsString()))}
+		} else {
+			dataType = typeName
+		}
 		columns = append(columns, sqlcapture.ColumnInfo{
 			TableSchema: string(row[0].AsString()),
 			TableName:   string(row[1].AsString()),
 			Index:       int(row[2].AsInt64()),
 			Name:        string(row[3].AsString()),
 			IsNullable:  string(row[4].AsString()) != "NO",
-			DataType:    string(row[5].AsString()),
+			DataType:    dataType,
 		})
 	}
 	return columns, err
+}
+
+type mysqlColumnType struct {
+	Type       string   `json:"type" mapstructure:"type"`           // The basic name of the column type.
+	EnumValues []string `json:"enum,omitempty" mapstructure:"enum"` // The list of values which an enum (or set) column can contain.
+}
+
+func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, error) {
+	logrus.WithFields(logrus.Fields{
+		"type":  fmt.Sprintf("%#v", t),
+		"value": fmt.Sprintf("%#v", val),
+	}).Info("translating record field")
+
+	switch t.Type {
+	case "enum":
+		if index, ok := val.(int64); ok {
+			if 1 <= index && index <= int64(len(t.EnumValues)) {
+				return t.EnumValues[index-1], nil
+			}
+		} else if bs, ok := val.([]byte); ok {
+			return string(bs), nil
+		}
+		return val, nil
+	case "set":
+		if bitfield, ok := val.(int64); ok {
+			var acc strings.Builder
+			for idx := 0; idx < len(t.EnumValues); idx++ {
+				if bitfield&(1<<idx) != 0 {
+					if acc.Len() > 0 {
+						acc.WriteByte(',')
+					}
+					acc.WriteString(t.EnumValues[idx])
+				}
+			}
+			return acc.String(), nil
+		} else if bs, ok := val.([]byte); ok {
+			return string(bs), nil
+		}
+		return val, nil
+	}
+	return val, fmt.Errorf("error translating value of complex column type %q", t.Type)
+}
+
+var enumValuesRegexp = regexp.MustCompile(`'((?:''|\\.|[^'])+)'(?:,|$)`)
+var enumValueReplacements = map[string]string{
+	`''`: "'",
+	`\0`: "\x00",
+	`\'`: "'",
+	`\"`: `"`,
+	`\b`: "\b",
+	`\n`: "\n",
+	`\r`: "\r",
+	`\t`: "\t",
+	`\Z`: "\x1A",
+	`\\`: "\\",
+	`\%`: "%",
+	`\_`: "_",
+}
+
+func parseEnumValues(details string) []string {
+	// The detailed type description looks something like `enum('foo', 'bar,baz', 'asdf')`
+	// so we start by extracting the parenthesized portion.
+	if i := strings.Index(details, "("); i >= 0 {
+		if j := strings.Index(details, ")"); j > i {
+			details = details[i+1 : j]
+		}
+	}
+
+	// Apply a regex which matches each `'foo',` clause in the enum/set description,
+	// while correctly handling internal commas, `''` and backslash-escaping inside
+	// individual strings. Submatch #1 is the body of each string.
+	var opts []string
+	for _, match := range enumValuesRegexp.FindAllStringSubmatch(details, -1) {
+		var opt = match[1]
+		for old, new := range enumValueReplacements {
+			opt = strings.ReplaceAll(opt, old, new)
+		}
+		opts = append(opts, opt)
+	}
+	return opts
 }
 
 const queryDiscoverPrimaryKeys = `
@@ -210,6 +322,7 @@ type columnSchema struct {
 	description     string
 	format          string
 	nullable        bool
+	extras          map[string]interface{}
 	type_           string
 }
 
@@ -218,6 +331,9 @@ func (s columnSchema) toType() *jsonschema.Schema {
 		Format:      s.format,
 		Description: s.description,
 		Extras:      make(map[string]interface{}),
+	}
+	for k, v := range s.extras {
+		out.Extras[k] = v
 	}
 
 	if s.contentEncoding != "" {
@@ -261,8 +377,8 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"mediumblob": {type_: "string", contentEncoding: "base64"},
 	"longblob":   {type_: "string", contentEncoding: "base64"},
 
-	// "enum": {type_: "string"}, // TODO(wgd): Enable after fixing translation for enum columns
-	// "set": {type_: "string"}, // TODO(wgd): Enable after fixing translation for set columns
+	"enum": {type_: "string"},
+	"set":  {type_: "string"},
 
 	"date":     {type_: "string"},
 	"datetime": {type_: "string"},
