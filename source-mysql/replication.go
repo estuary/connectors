@@ -15,6 +15,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
+	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	"vitess.io/vitess/go/vt/sqlparser"
 )
@@ -32,6 +33,16 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		if metadataJSON != nil {
 			if err := json.Unmarshal(metadataJSON, &parsed); err != nil {
 				return nil, fmt.Errorf("error parsing metadata JSON: %w", err)
+			}
+			// Fix up complex (non-string) column types, since the JSON round-trip
+			// will turn *mysqlColumnType values into map[string]interface{}.
+			for column, columnType := range parsed.Schema.ColumnTypes {
+				if columnType, ok := columnType.(map[string]interface{}); ok {
+					var parsedType mysqlColumnType
+					if err := mapstructure.Decode(columnType, &parsedType); err == nil {
+						parsed.Schema.ColumnTypes[column] = &parsedType
+					}
+				}
 			}
 		}
 		parsedMetadata[streamID] = parsed
@@ -154,8 +165,8 @@ type mysqlTableMetadata struct {
 }
 
 type mysqlTableSchema struct {
-	Columns     []string          `json:"columns"`
-	ColumnTypes map[string]string `json:"types"`
+	Columns     []string               `json:"columns"`
+	ColumnTypes map[string]interface{} `json:"types"`
 }
 
 func (rs *mysqlReplicationStream) run(ctx context.Context) error {
@@ -467,7 +478,7 @@ func (rs *mysqlReplicationStream) ActivateTable(streamID string) error {
 	logrus.WithField("stream", streamID).Debug("initializing table metadata")
 	var metadata = new(mysqlTableMetadata)
 	if discovery, ok := rs.tables.discovery[streamID]; ok {
-		var colTypes = make(map[string]string)
+		var colTypes = make(map[string]interface{})
 		for colName, colInfo := range discovery.Columns {
 			colTypes[colName] = colInfo.DataType
 		}
