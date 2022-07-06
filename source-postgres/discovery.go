@@ -60,11 +60,19 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]sqlc
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
 func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Type, error) {
-	// If the column type looks like `_foo` then it's an array of elements of type `foo`.
+	if columnType, ok := column.DataType.(*postgresColumnType); ok {
+		if columnType.UserDefined {
+			return nil, fmt.Errorf("discovery cannot produce a useful schema for user-defined type %q", columnType.UserTypeName)
+		}
+		return nil, fmt.Errorf("unhandled PostgreSQL type %#v", columnType)
+	}
+
 	var columnType, ok = column.DataType.(string)
 	if !ok {
-		return nil, fmt.Errorf("unhandled PostgreSQL type %q", columnType)
+		return nil, fmt.Errorf("unhandled PostgreSQL type %#v", columnType)
 	}
+
+	// If the column type looks like `_foo` then it's an array of elements of type `foo`.
 	var arrayColumn = false
 	if strings.HasPrefix(columnType, "_") {
 		columnType = strings.TrimPrefix(columnType, "_")
@@ -292,7 +300,8 @@ const queryDiscoverColumns = `
 		c.ordinal_position,
 		c.column_name,
 		c.is_nullable::boolean,
-		c.udt_name
+		c.udt_name,
+		c.data_type
   FROM information_schema.columns c
   JOIN information_schema.tables t ON (c.table_schema = t.table_schema AND c.table_name = t.table_name)
   WHERE
@@ -312,9 +321,19 @@ const queryColumnDescription = `SELECT pg_catalog.col_description($1::regclass::
 func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, error) {
 	var columns []sqlcapture.ColumnInfo
 	var sc sqlcapture.ColumnInfo
+	var dataType string
 	var _, err = conn.QueryFunc(ctx, queryDiscoverColumns, nil,
-		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType},
+		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType, &dataType},
 		func(r pgx.QueryFuncRow) error {
+			// Normally the `udt_name` field is more useful to us, but for user-defined
+			// types it's very useful to know that they are in fact user-defined.
+			if dataType == "USER-DEFINED" {
+				var typeName, ok = sc.DataType.(string)
+				if !ok {
+					typeName = ""
+				}
+				sc.DataType = &postgresColumnType{UserDefined: true, UserTypeName: typeName}
+			}
 			columns = append(columns, sc)
 			return nil
 		})
@@ -327,6 +346,11 @@ func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, e
 			func(r pgx.QueryFuncRow) error { return nil })
 	}
 	return columns, err
+}
+
+type postgresColumnType struct {
+	UserDefined  bool
+	UserTypeName string
 }
 
 // Query copied from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with
