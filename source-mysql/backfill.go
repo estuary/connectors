@@ -34,7 +34,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.Tab
 		"resumeKey":  resumeKey,
 	}).Debug("scanning table chunk")
 
-	var columnTypes = make(map[string]string)
+	var columnTypes = make(map[string]interface{})
 	for name, column := range info.Columns {
 		columnTypes[name] = column.DataType
 	}

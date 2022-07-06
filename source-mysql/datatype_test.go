@@ -66,13 +66,12 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "mediumblob", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
 		{ColumnType: "longblob", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
 
-		// TODO(wgd): Enums are reported differently in backfills vs replication. Backfill queries return
-		// the string value of the column, while replicated change events appear to hold an integer index.
-		// {ColumnType: "enum('small', 'medium', 'large')", ExpectType: `{"type":["string","null"]}`, InputValue: "medium", ExpectValue: `"medium"`},
+		{ColumnType: `enum('sm', 'med', 'lg')`, ExpectType: `{"type":["string","null"],"enum":["sm","med","lg"]}`, InputValue: nil, ExpectValue: `null`},
+		{ColumnType: `enum('sm', 'med', 'lg')`, ExpectType: `{"type":["string","null"],"enum":["sm","med","lg"]}`, InputValue: "sm", ExpectValue: `"sm"`},
+		{ColumnType: `enum('s,m', 'med', '\'lg\'')`, ExpectType: `{"type":["string","null"],"enum":["s,m","med","'lg'"]}`, InputValue: `'lg'`, ExpectValue: `"'lg'"`},
 
-		// TODO(wgd): Sets are reported differently in backfills vs replication. Backfill queries return
-		// the string value of the column, while replicated change events appear to hold a bitfield integer.
-		// {ColumnType: "SET('one', 'two')", ExpectType: `{"type":["string","null"]}`, InputValue: "one,two", ExpectValue: `"one,two"`},
+		{ColumnType: "set('a', 'b', 'c')", ExpectType: `{"type":["string","null"]}`, InputValue: "b", ExpectValue: `"b"`},
+		{ColumnType: "set('a', 'b', 'c')", ExpectType: `{"type":["string","null"]}`, InputValue: "a,c", ExpectValue: `"a,c"`},
 
 		{ColumnType: "date", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31", ExpectValue: `"1991-08-31"`},
 		{ColumnType: "datetime", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31 12:34:56"`},
