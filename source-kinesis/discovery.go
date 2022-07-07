@@ -18,12 +18,19 @@ import (
 // to process more possibly-redundant documents.
 const DISCOVER_MAX_DOCS_PER_STREAM = 100
 
+// How long should we allow reading from each stream to run. Note: empty streams
+// will wait for documents until this timeout triggers.
+const DISCOVER_READ_TIMEOUT = time.Second * 10
+
+// How long should we allow schema inference to run.
+const DISCOVER_INFER_TIMEOUT = time.Second * 5
+
 // Provides a default schema to use when we encounter an issue with schema inference.
-var DISCOVER_FALLBACK_SCHEMA = json.RawMessage(`{"type":"object"}`)
+var DISCOVER_FALLBACK_SCHEMA = schema_inference.Schema(`{"type":"object"}`)
 
 func discoverStreams(ctx context.Context, client *kinesis.Kinesis, streamNames []string) []airbyte.Stream {
 	var waitGroup = new(sync.WaitGroup)
-	var streams = make([]airbyte.Stream, len(streamNames))
+	var streams = make(chan airbyte.Stream, len(streamNames))
 
 	for i, name := range streamNames {
 		waitGroup.Add(1)
@@ -31,17 +38,21 @@ func discoverStreams(ctx context.Context, client *kinesis.Kinesis, streamNames [
 		go func(i int, name string) {
 			defer waitGroup.Done()
 
-			schema, err := discoverSchema(ctx, client, name)
-			if err != nil {
-				// If we encounter an error discovering the schema, output a
-				// very basic schema rather than failing discovery. If this
-				// looks wrong to the user, they can investigate, but ultimately
-				// not every stream will contain json documents.
-				log.WithField("stream", name).Error(err.Error())
+			schema, err := runInference(ctx, client, name)
+			if err == schema_inference.NO_DOCUMENTS_FOUND {
+				// An empty stream is a world full of possibilities.
 				schema = DISCOVER_FALLBACK_SCHEMA
+			} else if err != nil {
+				// If we encounter an error discovering the schema we skip the
+				// stream. If the user expects it to be there, they'll need to
+				// investigate what is causing the stream to be causing errors.
+				// Otherwise, this simply omits unreadable streams from the
+				// discover output.
+				log.WithField("stream", name).Error(err.Error())
+				return
 			}
 
-			streams[i] = airbyte.Stream{
+			streams <- airbyte.Stream{
 				Name:                name,
 				JSONSchema:          schema,
 				SupportedSyncModes:  []airbyte.SyncMode{airbyte.SyncModeIncremental},
@@ -51,22 +62,33 @@ func discoverStreams(ctx context.Context, client *kinesis.Kinesis, streamNames [
 	}
 
 	waitGroup.Wait()
+	close(streams)
 
-	return streams
+	return collect(streams, len(streamNames))
 }
 
-func discoverSchema(ctx context.Context, client *kinesis.Kinesis, streamName string) (json.RawMessage, error) {
-	schema, err := schema_inference.Run(ctx, streamName, func(ctx context.Context, logEntry *log.Entry) (<-chan json.RawMessage, uint, error) {
-		return peekAtStream(ctx, client, streamName, DISCOVER_MAX_DOCS_PER_STREAM)
-	})
+func runInference(ctx context.Context, client *kinesis.Kinesis, streamName string) (schema_inference.Schema, error) {
+	var logEntry = log.WithField("stream", streamName)
+	var peekCtx, cancelPeek = context.WithTimeout(ctx, DISCOVER_READ_TIMEOUT)
+	defer cancelPeek()
+
+	docCh, docCount, err := peekAtStream(peekCtx, client, streamName, DISCOVER_MAX_DOCS_PER_STREAM)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to infer schema for stream `%s`: %w", streamName, err)
+		return nil, fmt.Errorf("schema discovery for stream `%s` failed: %w", streamName, err)
+	} else if docCount == 0 {
+		return nil, schema_inference.NO_DOCUMENTS_FOUND
 	}
 
-	return schema, nil
+	logEntry.WithField("count", docCount).Info("Got documents for stream")
+
+	var inferCtx, cancelInfer = context.WithTimeout(ctx, DISCOVER_INFER_TIMEOUT)
+	defer cancelInfer()
+
+	return schema_inference.Run(inferCtx, logEntry, docCh)
 }
 
-func peekAtStream(ctx context.Context, client *kinesis.Kinesis, streamName string, peekAtMost uint) (<-chan json.RawMessage, uint, error) {
+func peekAtStream(ctx context.Context, client *kinesis.Kinesis, streamName string, peekAtMost uint) (<-chan schema_inference.Document, uint, error) {
 	var (
 		err         error
 		cancel      context.CancelFunc
@@ -75,7 +97,7 @@ func peekAtStream(ctx context.Context, client *kinesis.Kinesis, streamName strin
 		stopAt      time.Time            = time.Now()
 		streamState map[string]string    = make(map[string]string)
 		waitGroup   *sync.WaitGroup      = new(sync.WaitGroup)
-		docs        chan json.RawMessage = make(chan json.RawMessage, peekAtMost)
+		docs        chan json.RawMessage = make(chan schema_inference.Document, peekAtMost)
 		docCount    uint                 = 0
 	)
 
@@ -121,4 +143,12 @@ outerLoop:
 	}
 
 	return docs, docCount, err
+}
+
+func collect(ch <-chan airbyte.Stream, size int) []airbyte.Stream {
+	var collected = make([]airbyte.Stream, 0, size)
+	for stream := range ch {
+		collected = append(collected, stream)
+	}
+	return collected
 }
