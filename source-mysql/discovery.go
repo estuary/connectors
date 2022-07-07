@@ -243,7 +243,16 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 	return val, fmt.Errorf("error translating value of complex column type %q", t.Type)
 }
 
+// enumValuesRegexp matches a MySQL-format single-quoted string followed by
+// a comma or EOL. It uses non-capturing groups for the alternations on string
+// body characters and terminator so that submatch #1 is the full string body.
+// The options for string body characters are, in order, two successive quotes,
+// anything backslash-escaped, and anything that isn't a single-quote.
 var enumValuesRegexp = regexp.MustCompile(`'((?:''|\\.|[^'])+)'(?:,|$)`)
+
+// enumValueReplacements contains the complete list of MySQL string escapes from
+// https://dev.mysql.com/doc/refman/8.0/en/string-literals.html#character-escape-sequences
+// plus the `''` repeated-single-quote mechanism.
 var enumValueReplacements = map[string]string{
 	`''`: "'",
 	`\0`: "\x00",
@@ -269,8 +278,7 @@ func parseEnumValues(details string) []string {
 	}
 
 	// Apply a regex which matches each `'foo',` clause in the enum/set description,
-	// while correctly handling internal commas, `''` and backslash-escaping inside
-	// individual strings. Submatch #1 is the body of each string.
+	// and take submatch #1 which is the body of each string.
 	var opts []string
 	for _, match := range enumValuesRegexp.FindAllStringSubmatch(details, -1) {
 		var opt = match[1]
