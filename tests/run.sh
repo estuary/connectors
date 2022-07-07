@@ -60,6 +60,7 @@ curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/release
 # --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
 ${TESTDIR}/flowctl temp-data-plane \
     --log.level info \
+    --network=host \
     --poll \
     --sigterm \
     --tempdir ${TESTDIR} \
@@ -93,10 +94,10 @@ export ID_TYPE="${ID_TYPE:-integer}"
 cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
 
 # Build the catalog.
-${TESTDIR}/flowctl api build --directory ${TESTDIR}/builds --build-id test-build-id --source ${CATALOG_SOURCE} --ts-package || bail "Build failed."
+${TESTDIR}/flowctl api build --directory ${TESTDIR}/builds --build-id test-build-id --source ${CATALOG_SOURCE} --ts-package --network=host || bail "Build failed."
 
 # Activate the catalog.
-${TESTDIR}/flowctl api activate --build-id test-build-id --all --log.level info || bail "Activate failed."
+${TESTDIR}/flowctl api activate --build-id test-build-id --all --network=host --log.level info || bail "Activate failed."
 # Wait for a data-flow pass to finish.
 ${TESTDIR}/flowctl api await --build-id test-build-id --log.level info || bail "Await failed."
 # Read out materialization results.
