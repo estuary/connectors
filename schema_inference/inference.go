@@ -6,48 +6,22 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
-// How long should we allow reading from each stream to run. Note: empty streams
-// will wait for documents until this timeout triggers.
-const DISCOVER_READ_TIMEOUT = time.Second * 10
-
-// How long should we allow schema inference to run.
-const DISCOVER_INFER_TIMEOUT = time.Second * 5
+var NO_DOCUMENTS_FOUND = fmt.Errorf("no documents discovered for stream")
 
 type Schema = json.RawMessage
 type Document = json.RawMessage
 type DocumentSource = func(ctx context.Context, logEntry *log.Entry) (docCh <-chan Document, count uint, err error)
 
-func Run(ctx context.Context, streamName string, peekFunc DocumentSource) (Schema, error) {
-	var logEntry = log.WithField("stream", streamName)
-	var peekCtx, cancelPeek = context.WithTimeout(ctx, DISCOVER_READ_TIMEOUT)
-	defer cancelPeek()
-
-	docCh, docCount, err := peekFunc(peekCtx, logEntry)
-	if err != nil {
-		return nil, fmt.Errorf("schema discovery for stream `%s` failed: %w", streamName, err)
-	} else if docCount == 0 {
-		return nil, fmt.Errorf("no documents discovered for stream: %v", streamName)
-	}
-
-	logEntry.WithField("count", docCount).Info("Got documents for stream")
-
-	var inferCtx, cancelInfer = context.WithTimeout(ctx, DISCOVER_INFER_TIMEOUT)
-	defer cancelInfer()
-
-	return infer(inferCtx, logEntry, docCh)
-}
-
-func infer(ctx context.Context, logEntry *log.Entry, docsCh <-chan Document) (Schema, error) {
+func Run(ctx context.Context, logEntry *log.Entry, docsCh <-chan Document) (Schema, error) {
 	var (
 		err      error
 		errGroup *errgroup.Group
-		schema   = json.RawMessage{}
+		schema   = Schema{}
 		cmd      *exec.Cmd
 		stdin    io.WriteCloser
 		stdout   io.ReadCloser

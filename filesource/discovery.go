@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"sync"
 
 	"github.com/estuary/connectors/schema_inference"
 	"github.com/estuary/flow/go/parser"
@@ -15,14 +14,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	// How many files should we sample to run inference against.
-	DISCOVER_FILE_READ_LIMIT = 10
-	// How many documents should we read from an individual file during discovery.
-	DISCOVER_MAX_DOCS_PER_FILE = 100
-	// Baseline document schema for resource streams we discover if we fail
-	// during the schema-inference step.
-	DISCOVER_FALLBACK_SCHEMA = `{
+// How many documents should we read from an individual file during discovery.
+const DISCOVER_DOC_LIMIT = 1000
+
+// Baseline document schema for resource streams we discover if we fail
+// during the schema-inference step.
+var DISCOVER_FALLBACK_SCHEMA = schema_inference.Schema(`{
 		"type": "object",
 		"properties": {
 			"_meta": {
@@ -38,8 +35,7 @@ const (
 			}
 		},
 		"required": ["_meta"]
-	}`
-)
+	}`)
 
 func (src Source) Discover(args airbyte.DiscoverCmd) error {
 	var conn, err = newConnector(src, args.ConfigFile)
@@ -49,43 +45,55 @@ func (src Source) Discover(args airbyte.DiscoverCmd) error {
 	var ctx = context.Background()
 	var root = conn.config.DiscoverRoot()
 
-	schema, err := schema_inference.Run(ctx, root, func(ctx context.Context, logEntry *log.Entry) (<-chan json.RawMessage, uint, error) {
-		return peekDocuments(ctx, logEntry, conn, root)
-	})
-
+	schema, err := discoverSchema(ctx, conn, root)
 	if err != nil {
-		// Failing schema inference isn't a fatal error. It just means we can't
-		// auto-generate a schema from the files in this bucket and it's up to
-		// the user to craft their own schema.
-		log.WithField("err", err).Error("failed to infer schema from documents")
-		schema = json.RawMessage(DISCOVER_FALLBACK_SCHEMA)
+		return err
 	}
 
 	return writeCatalogMessage(newStream(root, schema))
 }
 
-func peekDocuments(ctx context.Context, logEntry *log.Entry, conn *connector, root string) (<-chan json.RawMessage, uint, error) {
+func discoverSchema(ctx context.Context, conn *connector, streamName string) (schema_inference.Schema, error) {
+	var logEntry = log.WithField("stream", streamName)
+
+	docCh, docCount, err := peekDocuments(ctx, logEntry, conn, streamName)
+	if err != nil {
+		return nil, fmt.Errorf("schema discovery for stream `%s` failed: %w", streamName, err)
+	} else if docCount == 0 {
+		return DISCOVER_FALLBACK_SCHEMA, nil
+	}
+
+	logEntry.WithField("count", docCount).Info("Got documents for stream")
+
+	schema, err := schema_inference.Run(ctx, logEntry, docCh)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer schema: %w", err)
+	}
+
+	return schema, nil
+}
+
+func peekDocuments(ctx context.Context, logEntry *log.Entry, conn *connector, root string) (<-chan schema_inference.Document, uint, error) {
 	var (
-		err         error
-		listing     Listing
-		waitGroup   *sync.WaitGroup      = new(sync.WaitGroup)
-		documents   chan json.RawMessage = make(chan json.RawMessage, DISCOVER_FILE_READ_LIMIT*DISCOVER_MAX_DOCS_PER_FILE)
-		objectCount uint                 = 0
+		err       error
+		listing   Listing
+		fileCount uint              = 0
+		documents *documentSampling = NewDocumentSampling(DISCOVER_DOC_LIMIT)
 	)
 
 	listing, err = conn.store.List(ctx, Query{Prefix: root, StartAt: "", Recursive: true})
 	if err != nil {
-		return nil, objectCount, fmt.Errorf("listing bucket: %w", err)
+		return nil, fileCount, fmt.Errorf("listing bucket: %w", err)
 	}
 
 	for {
 		obj, err := listing.Next()
-		var logEntry = logEntry.WithField("objCount", objectCount).WithField("path", obj.Path)
+		var logEntry = logEntry.WithField("fileCount", fileCount).WithField("path", obj.Path)
 
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return nil, objectCount, fmt.Errorf("reading bucket listing: %w", err)
+			return nil, fileCount, fmt.Errorf("reading bucket listing: %w", err)
 		} else if obj.IsPrefix {
 			logEntry.Trace("Skipping prefix")
 			continue
@@ -94,35 +102,34 @@ func peekDocuments(ctx context.Context, logEntry *log.Entry, conn *connector, ro
 			continue
 		}
 
-		objectCount++
+		fileCount++
 		logEntry.Debug("Discovered object")
 
-		if objectCount < DISCOVER_FILE_READ_LIMIT {
-			waitGroup.Add(1)
-			go peekAtFile(ctx, waitGroup, conn, obj, documents)
+		if documents.open {
+			err = peekAtFile(ctx, conn, obj, documents)
+			if err != nil {
+				return nil, 0, fmt.Errorf("reading file `%s`: %w", obj.Path, err)
+			}
 		} else {
 			logEntry.Info("Reached sampling limit")
 			break
 		}
 	}
-	waitGroup.Wait()
-	close(documents)
-	logEntry.WithField("objectCount", objectCount).Info("bucket sampling successful")
 
-	return documents, objectCount, nil
+	documents.Close()
+	logEntry.WithField("fileCount", fileCount).Info("bucket sampling successful")
+
+	return documents.ch, fileCount, nil
 }
 
-func peekAtFile(ctx context.Context, waitGroup *sync.WaitGroup, conn *connector, file ObjectInfo, docCh chan<- json.RawMessage) {
-	defer waitGroup.Done()
-
+func peekAtFile(ctx context.Context, conn *connector, file ObjectInfo, documents *documentSampling) error {
 	var logEntry = log.WithField("path", file.Path)
 	logEntry.Infof("Peeking at file")
 
 	// Download file
 	rr, file, err := conn.store.Read(ctx, file)
 	if err != nil {
-		logEntry.WithField("err", err).Error("Failed to download file")
-		return
+		return fmt.Errorf("Failed to download file: %w", err)
 	}
 	defer rr.Close()
 
@@ -136,37 +143,66 @@ func peekAtFile(ctx context.Context, waitGroup *sync.WaitGroup, conn *connector,
 	// Create the parser config file
 	tmp, err := ioutil.TempFile("", "parser-config-*.json")
 	if err != nil {
-		logEntry.WithField("err", err).Error("Failed creating parser config")
-		return
+		return fmt.Errorf("Failed creating parser config: %w", err)
 	}
 	defer os.Remove(tmp.Name())
 
 	if err = cfg.WriteToFile(tmp); err != nil {
-		logEntry.WithField("err", err).Error("Failed writing parser config")
-		return
+		return fmt.Errorf("Failed writing parser config: %w", err)
 	}
 
 	// Parse documents from the downloaded file
-	var docsSeen = 0
 	err = parser.ParseStream(ctx, tmp.Name(), rr, func(docs []json.RawMessage) error {
-		logEntry.WithField("docsSeen", docsSeen).WithField("count", len(docs)).Debug("Parser produced more documents")
+		logEntry.WithField("docsSeen", documents.count).WithField("count", len(docs)).Debug("Parser produced more documents")
 
 		for _, doc := range docs {
-			docsSeen++
-			if docsSeen < DISCOVER_MAX_DOCS_PER_FILE {
-				docCh <- copyJson(doc)
+			if documents.open {
+				documents.Add(copyJson(doc))
 			} else {
+				// The document channel is now full. We've seen enough.
 				return closeParser
 			}
 		}
 		return nil
 	})
 	if err != nil && err != closeParser {
-		logEntry.WithField("err", err).Error("Failed parsing")
-		return
+		return fmt.Errorf("Failed parsing: %w", err)
 	}
 
 	logEntry.Info("Done peeking at file")
+	return nil
+}
+
+type documentSampling struct {
+	capacity uint
+	ch       chan schema_inference.Document
+	count    uint
+	open     bool
+}
+
+func NewDocumentSampling(capacity uint) *documentSampling {
+	return &documentSampling{
+		capacity: capacity,
+		ch:       make(chan schema_inference.Document, capacity),
+		count:    0,
+		open:     true,
+	}
+}
+
+func (d *documentSampling) Add(doc schema_inference.Document) {
+	if d.count < d.capacity {
+		d.count++
+		d.ch <- doc
+	} else {
+		d.Close()
+	}
+}
+
+func (d *documentSampling) Close() {
+	if d.open {
+		d.open = false
+		close(d.ch)
+	}
 }
 
 var closeParser = fmt.Errorf("caller closed")
@@ -185,7 +221,7 @@ func writeCatalogMessage(streams ...airbyte.Stream) error {
 	})
 }
 
-func newStream(name string, discoveredSchema json.RawMessage) airbyte.Stream {
+func newStream(name string, discoveredSchema schema_inference.Schema) airbyte.Stream {
 	return airbyte.Stream{
 		Name:               name,
 		JSONSchema:         discoveredSchema,
