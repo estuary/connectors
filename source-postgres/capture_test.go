@@ -230,3 +230,26 @@ func TestSkipBackfills(t *testing.T) {
 	tb.Insert(ctx, t, tableC, [][]interface{}{{16, "sixteen"}, {17, "seventeen"}, {18, "eighteen"}})
 	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "")
 }
+
+func TestTruncatedTables(t *testing.T) {
+	// Set up two tables with some data in them
+	var tb, ctx = TestBackend, context.Background()
+	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "one"}, {2, "two"}, {3, "three"}})
+	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
+
+	// Set up and run a capture of Table A only
+	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableA), sqlcapture.PersistentState{}
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
+
+	// Add data to table A and truncate table B. Captures should still succeed because we
+	// don't care about truncates to non-active tables.
+	tb.Insert(ctx, t, tableA, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
+	tb.Query(ctx, t, fmt.Sprintf("TRUNCATE TABLE %s;", tableB))
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "capture1")
+
+	// Truncating table A will cause the capture to fail though, as it should.
+	tb.Query(ctx, t, fmt.Sprintf("TRUNCATE TABLE %s;", tableA))
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "capture2_fails")
+}
