@@ -1,0 +1,5 @@
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
+{"type":"RECORD","record":{"stream":"test_truncatedtables_aaa","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_truncatedtables_aaa"}},"data":"seven","id":7},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_truncatedtables_aaa","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_truncatedtables_aaa"}},"data":"eight","id":8},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_truncatedtables_aaa","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_truncatedtables_aaa"}},"data":"nine","id":9},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}

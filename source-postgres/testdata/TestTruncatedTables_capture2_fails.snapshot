@@ -1,0 +1,7 @@
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
+
+========
+
+Capture Terminated With Error:
+
+    failed to relay messages: error decoding message: unsupported operation TRUNCATE on table "public.test_truncatedtables_aaa"
