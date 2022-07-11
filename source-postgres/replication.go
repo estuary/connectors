@@ -310,6 +310,15 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 			},
 		}
 		return event, nil
+	case *pglogrepl.TruncateMessage:
+		for _, relID := range msg.RelationIDs {
+			var relation = s.relations[relID]
+			var streamID = sqlcapture.JoinStreamID(relation.Namespace, relation.RelationName)
+			if s.tableActive(streamID) {
+				return nil, fmt.Errorf("unsupported operation TRUNCATE on table %q", streamID)
+			}
+		}
+		return nil, nil
 	}
 
 	// Unhandled messages are considered a fatal error. There are a bunch of
