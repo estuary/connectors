@@ -53,6 +53,35 @@ const configSchema = `{
       "type": ["integer", "null"],
       "title": "Fail after sending N number of greetings",
       "description": "Fail after sending N number of greetings"
+    },
+    "credentials": {
+      "type": "object",
+      "title": "Authentication",
+      "description": "Google API Credentials",
+      "x-oauth2-provider": "google",
+      "required": ["auth_type", "client_id", "client_secret", "refresh_token"],
+      "properties": {
+        "client_id": {
+          "title": "Client ID",
+          "type": "string",
+          "secret": true
+        },
+        "client_secret": {
+          "title": "Client Secret",
+          "type": "string",
+          "secret": true
+        },
+        "access_token": {
+          "title": "Access Token",
+          "type": "string",
+          "secret": true
+        },
+        "refresh_token": {
+          "title": "Refresh Token",
+          "type": "string",
+          "secret": true
+        }
+      }
     }
 	}
 }`
