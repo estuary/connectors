@@ -99,7 +99,8 @@ const oauthSpec = `{
   "provider": "google",
   "authUrlTemplate": "https://accounts.google.com/o/oauth2/auth?access_type=offline&client_id={{ client_id }}&redirect_uri={{ redirect_uri }}&response_type=code&scope=email&state={{ state }}",
   "accessTokenUrlTemplate": "https://oauth2.googleapis.com/token",
-  "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"client_id\": \"{{ client_id }}\", \"client_secret\": \"{{ client_secret }}\", \"redirect_uri\": \"{{ redirect_uri }}\", \"code\": \"{{ code }}\"}"
+  "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"client_id\": \"{{ client_id }}\", \"client_secret\": \"{{ client_secret }}\", \"redirect_uri\": \"{{ redirect_uri }}\", \"code\": \"{{ code }}\"}",
+  "accessTokenResponseMap": "{\"refresh_token\": \"/refresh_token\",\"testing\": \"/access_token\"}"
 }`
 
 func main() {
