@@ -71,6 +71,7 @@ jobs:
         connector:
           - source-gcs
           - source-hello-world
+          - source-http-file
           - source-test
           - source-kafka
           - source-kinesis
