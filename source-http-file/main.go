@@ -85,7 +85,15 @@ func newHttpSource(ctx context.Context, cfg *config) (*httpSource, error) {
 	var pathPieces = strings.Split(parsedURL.Path, "/")
 
 	var client = http.Client{}
-	resp, err := client.Head(cfg.URL)
+	var req = http.Request{
+		Method: "HEAD",
+		URL:    parsedURL,
+		Header: http.Header{},
+	}
+	if cfg.Credentials != nil {
+		req.SetBasicAuth(cfg.Credentials.User, cfg.Credentials.Password)
+	}
+	resp, err := client.Do(&req)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch HEAD %s: %w", cfg.URL, err)
 	}
@@ -131,7 +139,15 @@ func (s *httpSource) List(ctx context.Context, query filesource.Query) (filesour
 }
 
 func (s *httpSource) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-	var resp, err = s.client.Get(s.cfg.URL)
+	var req = http.Request{
+		Method: "GET",
+		URL:    s.parsedURL,
+		Header: http.Header{},
+	}
+	if s.cfg.Credentials != nil {
+		req.SetBasicAuth(s.cfg.Credentials.User, s.cfg.Credentials.Password)
+	}
+	var resp, err = s.client.Do(&req)
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
