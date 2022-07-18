@@ -64,7 +64,7 @@ func discoverSchema(ctx context.Context, conn *connector, streamName string) (sc
 		return DISCOVER_FALLBACK_SCHEMA, nil
 	}
 
-	logEntry.WithField("count", docCount).Info("Got documents for stream")
+	logEntry.WithField("documentCount", docCount).Info("Got documents for stream")
 
 	schema, err := schema_inference.Run(ctx, logEntry, docCh)
 	if err != nil {
@@ -126,9 +126,9 @@ func peekDocuments(ctx context.Context, logEntry *log.Entry, conn *connector, ro
 	}
 
 	documents.Close()
-	logEntry.WithField("fileCount", fileCount).Info("bucket sampling successful")
+	logEntry.WithField("fileCount", fileCount).Info("Bucket sampling successful")
 
-	return documents.ch, fileCount, nil
+	return documents.ch, documents.count, nil
 }
 
 func peekAtFile(ctx context.Context, conn *connector, file ObjectInfo, documents *documentSampling) error {
@@ -165,14 +165,19 @@ func peekAtFile(ctx context.Context, conn *connector, file ObjectInfo, documents
 		logEntry.WithField("docsSeen", documents.count).WithField("count", len(docs)).Debug("Parser produced more documents")
 
 		for _, doc := range docs {
-			if documents.open {
-				documents.Add(copyJson(doc))
+			if documents.Add(copyJson(doc)) {
+				continue
 			} else {
 				// The document channel is now full. We've seen enough.
 				return closeParser
 			}
 		}
-		return nil
+
+		if documents.open {
+			return nil
+		} else {
+			return closeParser
+		}
 	})
 	if err != nil && err != closeParser {
 		return fmt.Errorf("Failed parsing: %w", err)
@@ -198,13 +203,16 @@ func NewDocumentSampling(capacity uint) *documentSampling {
 	}
 }
 
-func (d *documentSampling) Add(doc schema_inference.Document) {
-	if d.count < d.capacity {
+func (d *documentSampling) Add(doc schema_inference.Document) (more bool) {
+	if d.open {
 		d.count++
 		d.ch <- doc
-	} else {
-		d.Close()
+
+		if d.count >= d.capacity {
+			d.Close()
+		}
 	}
+	return d.open
 }
 
 func (d *documentSampling) Close() {
