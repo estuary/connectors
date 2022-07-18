@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"regexp"
 
 	"github.com/estuary/connectors/schema_inference"
 	"github.com/estuary/flow/go/parser"
@@ -77,9 +78,14 @@ func peekDocuments(ctx context.Context, logEntry *log.Entry, conn *connector, ro
 	var (
 		err       error
 		listing   Listing
+		pathRegex *regexp.Regexp
 		fileCount uint              = 0
 		documents *documentSampling = NewDocumentSampling(DISCOVER_DOC_LIMIT)
 	)
+	pathRegex, err = initPathRegex(conn.config.PathRegex())
+	if err != nil {
+		return nil, 0, err
+	}
 
 	listing, err = conn.store.List(ctx, Query{Prefix: root, StartAt: "", Recursive: true})
 	if err != nil {
@@ -94,6 +100,9 @@ func peekDocuments(ctx context.Context, logEntry *log.Entry, conn *connector, ro
 			break
 		} else if err != nil {
 			return nil, fileCount, fmt.Errorf("reading bucket listing: %w", err)
+		} else if pathRegex != nil && !pathRegex.MatchString(obj.Path) {
+			logEntry.Trace("Skipping path that does not match PathRegex")
+			continue
 		} else if obj.IsPrefix {
 			logEntry.Trace("Skipping prefix")
 			continue
@@ -231,4 +240,16 @@ func newStream(name string, discoveredSchema schema_inference.Schema) airbyte.St
 			{"_meta", "offset"},
 		},
 	}
+}
+
+func initPathRegex(regexStr string) (*regexp.Regexp, error) {
+	if regexStr == "" {
+		return nil, nil
+	}
+
+	pathRegex, err := regexp.Compile(regexStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid PathRegex: %w", err)
+	}
+	return pathRegex, nil
 }
