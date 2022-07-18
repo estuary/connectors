@@ -341,12 +341,8 @@ github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0/go.m
 github.com/envoyproxy/go-control-plane v0.9.10-0.20210907150352-cf90f659a021/go.mod h1:AFq3mo9L8Lqqiid3OhADV3RfLJnjiw63cSpi+fDTRC0=
 github.com/envoyproxy/go-control-plane v0.10.2-0.20220325020618-49ff273808a1/go.mod h1:KJwIaB5Mv44NWtYuAOFCVOjcI94vtpEz2JU/D2v6IjE=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
-github.com/estuary/flow v0.1.1-0.20220620170023-ad059626d543 h1:L2UEDCeVXdpvzpIXfQnWxOP9oc8gbKwc8eEODrpRDLE=
-github.com/estuary/flow v0.1.1-0.20220620170023-ad059626d543/go.mod h1:y5iYgzMczu/oTtxYkkpRM/HQZPXwG0+TkP2OGqlR7nc=
-github.com/estuary/flow v0.1.1-0.20220620190230-ad8e29404bc9 h1:q8+qFmpGHdJdx4eE3oKCmAFyaUvN5IZbVvWksjljVnA=
-github.com/estuary/flow v0.1.1-0.20220620190230-ad8e29404bc9/go.mod h1:y5iYgzMczu/oTtxYkkpRM/HQZPXwG0+TkP2OGqlR7nc=
-github.com/estuary/flow v0.1.1-0.20220621175215-bcd2ad59f15b h1:/haYr9PDZG+niNeXlrjYphwSpbkosUupvRT5EYlXOfw=
-github.com/estuary/flow v0.1.1-0.20220621175215-bcd2ad59f15b/go.mod h1:y5iYgzMczu/oTtxYkkpRM/HQZPXwG0+TkP2OGqlR7nc=
+github.com/estuary/flow v0.1.1-0.20220719165323-5c9a6a5308d6 h1:8+KAZ/F30K4Ls2lHahCR6W8PmEYt9HNgS10t/SB+74w=
+github.com/estuary/flow v0.1.1-0.20220719165323-5c9a6a5308d6/go.mod h1:7NlH7dQWZWv2qJsdZqeYLAz2EhMa5EVArEuGR62YjvM=
 github.com/evanphx/json-patch v4.2.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch v4.9.0+incompatible h1:kLcOMZeuLAJvL2BPWLMIj5oaZQobrkAqrL+WFZwQses=
 github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
