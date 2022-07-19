@@ -166,55 +166,6 @@ func (src Source) Check(args airbyte.CheckCmd) error {
 	})
 }
 
-func (src Source) Discover(args airbyte.DiscoverCmd) error {
-	var conn, err = newConnector(src, args.ConfigFile)
-	if err != nil {
-		return err
-	}
-	var ctx = context.Background()
-	var root = conn.config.DiscoverRoot()
-
-	listing, err := conn.store.List(ctx, Query{
-		Prefix:    root,
-		StartAt:   "",
-		Recursive: false,
-	})
-	if err != nil {
-		return fmt.Errorf("listing bucket: %w", err)
-	}
-
-	var objectCount = 0
-	for {
-		if _, err = listing.Next(); err == io.EOF {
-			break
-		} else if err != nil {
-			return fmt.Errorf("reading bucket listing: %w", err)
-		}
-		objectCount++
-		// nothin else to do here
-		// Eventually, we'll actually read some of these objects in order to do schema inference.
-	}
-	log.WithFields(log.Fields{
-		"objectCount": objectCount,
-		"stream":      root,
-	}).Info("bucket listing successful")
-
-	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
-		Type: airbyte.MessageTypeCatalog,
-		Catalog: &airbyte.Catalog{
-			Streams: []airbyte.Stream{{
-				Name:               root,
-				JSONSchema:         json.RawMessage(discoverDocumentSchema),
-				SupportedSyncModes: airbyte.AllSyncModes,
-				SourceDefinedPrimaryKey: [][]string{
-					{"_meta", "file"},
-					{"_meta", "offset"},
-				},
-			}},
-		},
-	})
-}
-
 func (src Source) Read(args airbyte.ReadCmd) error {
 	var conn, err = newConnector(src, args.ConfigFile)
 	if err != nil {
@@ -419,22 +370,7 @@ func (r *reader) makeParseConfig(obj ObjectInfo) *parser.Config {
 		*cfg = c.Copy()
 	}
 
-	cfg.Filename = obj.Path
-	if obj.ContentType != "" {
-		cfg.ContentType = obj.ContentType
-	}
-	if obj.ContentEncoding != "" {
-		cfg.ContentEncoding = obj.ContentEncoding
-	}
-	// If the user supplied a location for this, then we'll use that. Otherwise, use the default
-	if cfg.AddRecordOffset == "" {
-		cfg.AddRecordOffset = metaOffsetLocation
-	}
-	if cfg.AddValues == nil {
-		cfg.AddValues = make(map[parser.JsonPointer]interface{})
-	}
-	cfg.AddValues[metaFileLocation] = obj.Path
-	return cfg
+	return configureParser(cfg, obj)
 }
 
 func (r *reader) emit(lines []json.RawMessage) error {
@@ -480,36 +416,33 @@ func (r *reader) emit(lines []json.RawMessage) error {
 	return nil
 }
 
+func configureParser(cfg *parser.Config, obj ObjectInfo) *parser.Config {
+	cfg.Filename = obj.Path
+	if obj.ContentType != "" {
+		cfg.ContentType = obj.ContentType
+	}
+	if obj.ContentEncoding != "" {
+		cfg.ContentEncoding = obj.ContentEncoding
+	}
+	// If the user supplied a location for this, then we'll use that. Otherwise, use the default
+	if cfg.AddRecordOffset == "" {
+		cfg.AddRecordOffset = metaOffsetLocation
+	}
+	if cfg.AddValues == nil {
+		cfg.AddValues = make(map[parser.JsonPointer]interface{})
+	}
+	cfg.AddValues[metaFileLocation] = obj.Path
+	return cfg
+}
+
 const (
 	// horizonDelta is the time horizon used to bound modification times we'll examine
 	// in a given sweep of the Store. Given a sampled wall-time T, we presume (hope)
 	// that no files will appear in the store after T having a modification time of
 	// T - horizonDelta.
 	horizonDelta = time.Second * 30
-	// How many prefix or object listing to examine in a given prefix walked by discover.
-	discoverListLimit = 256
 	// Location of the filename in produced documents.
 	metaFileLocation = "/_meta/file"
 	// Location of the record offset in produced documents.
 	metaOffsetLocation = "/_meta/offset"
-	// Baseline document schema for resource streams we discover.
-	// This could be improved by attempting to infer schema of store documents
-	// from actual file content.
-	discoverDocumentSchema = `{
-		"type": "object",
-		"properties": {
-			"_meta": {
-				"type": "object",
-				"properties": {
-					"file": { "type": "string" },
-					"offset": {
-						"type": "integer",
-						"minimum": 0
-					}
-				},
-				"required": ["file", "offset"]
-			}
-		},
-		"required": ["_meta"]
-	}`
 )

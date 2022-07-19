@@ -68,24 +68,16 @@ func discoverCatalog(config airbyte.ConfigFile) (*airbyte.Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var ctx = context.Background()
 	streamNames, err := listAllStreams(ctx, client)
 	if err != nil {
 		return nil, err
 	}
 
-	var catalog = &airbyte.Catalog{
-		Streams: make([]airbyte.Stream, len(streamNames)),
-	}
-	for i, name := range streamNames {
-		catalog.Streams[i] = airbyte.Stream{
-			Name:                name,
-			JSONSchema:          json.RawMessage(`{"type":"object"}`),
-			SupportedSyncModes:  []airbyte.SyncMode{airbyte.SyncModeIncremental},
-			SourceDefinedCursor: true,
-		}
-	}
-	return catalog, nil
+	streams := discoverStreams(ctx, client, streamNames)
+
+	return &airbyte.Catalog{Streams: streams}, nil
 }
 
 func updateState(state map[string]map[string]string, source *recordSource, sequenceNumber string) {

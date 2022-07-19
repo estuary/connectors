@@ -10,6 +10,7 @@ COPY go.* ./
 RUN go mod download
 
 # Build the connector projects we depend on.
+COPY schema_inference ./schema_inference
 COPY filesource ./filesource
 COPY source-gcs ./source-gcs
 
@@ -29,6 +30,8 @@ ENV PATH="/connector:$PATH"
 
 # Grab the statically-built parser cli.
 COPY flow-bin/flow-parser ./
+# Grab the statically-built schema-inference cli.
+COPY flow-bin/flow-schema-inference ./
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./connector
