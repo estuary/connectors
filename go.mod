@@ -58,3 +58,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	vitess.io/vitess v0.13.1
 )
+
+replace github.com/estuary/flow => github.com/estuary/flow v0.1.1-0.20220719165323-5c9a6a5308d6
