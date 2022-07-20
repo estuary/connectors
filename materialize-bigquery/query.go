@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	log "github.com/sirupsen/logrus"
@@ -39,7 +41,9 @@ func (ep *Endpoint) newQuery(queryString string, parameters ...interface{}) *big
 // runQuery will run a query and return the completed job.
 func (ep *Endpoint) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.Job, error) {
 	var maxAttempts = 5
-	for attempt := 0; true; attempt++ {
+	var job *bigquery.Job
+	var err error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
 		job, err := query.Run(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("run: %w", err)
@@ -78,16 +82,11 @@ func (ep *Endpoint) runQuery(ctx context.Context, query *bigquery.Query) (*bigqu
 					return nil, err // The error isn't considered retryable
 				}
 			}
-
-			if attempt == maxAttempts {
-				logEntry.Error("job failed")
-				return job, fmt.Errorf("exausted retries: %w", err)
-			} else {
-				logEntry.Warn("job failed (will retry)")
-				// There doesn't seem to be any benefit to waiting before retrying, at least not
-				// when testing locally.
-				continue
-			}
+			logEntry.Warn("job failed (will retry)")
+			// Wait between 50-150 milliseconds before continuing, so we have at least a little bit
+			// of jitter applied to retries.
+			time.Sleep(time.Duration(rand.Intn(100)+50) * time.Millisecond)
+			continue
 		}
 
 		// I think this is just documenting the assumption that the job must always be Done after
@@ -98,7 +97,8 @@ func (ep *Endpoint) runQuery(ctx context.Context, query *bigquery.Query) (*bigqu
 
 		return job, nil
 	}
-	panic("unreachable")
+	log.WithField("error", err).Error("job failed, exausted retries")
+	return job, fmt.Errorf("exausted retries: %w", err)
 }
 
 // fetchOne will fetch one row of data from a job and scan it into dest.
