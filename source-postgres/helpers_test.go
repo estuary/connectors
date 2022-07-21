@@ -109,7 +109,7 @@ type postgresTestBackend struct {
 // CreateTable is a test helper for creating a new database table and returning the
 // name of the new table. The table is named "test_<testName>", or "test_<testName>_<suffix>"
 // if the suffix is non-empty.
-func (tb *postgresTestBackend) CreateTable(ctx context.Context, t *testing.T, suffix string, tableDef string) string {
+func (tb *postgresTestBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
 	var tableName = "test_" + strings.TrimPrefix(t.Name(), "Test")
@@ -130,7 +130,7 @@ func (tb *postgresTestBackend) CreateTable(ctx context.Context, t *testing.T, su
 	return tableName
 }
 
-func (tb *postgresTestBackend) Insert(ctx context.Context, t *testing.T, table string, rows [][]interface{}) {
+func (tb *postgresTestBackend) Insert(ctx context.Context, t testing.TB, table string, rows [][]interface{}) {
 	t.Helper()
 
 	if len(rows) < 1 {
@@ -158,17 +158,17 @@ func (tb *postgresTestBackend) Insert(ctx context.Context, t *testing.T, table s
 	}
 }
 
-func (tb *postgresTestBackend) Update(ctx context.Context, t *testing.T, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
+func (tb *postgresTestBackend) Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
 	t.Helper()
 	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET %s = $1 WHERE %s = $2;", table, setCol, whereCol), setVal, whereVal)
 }
 
-func (tb *postgresTestBackend) Delete(ctx context.Context, t *testing.T, table string, whereCol string, whereVal interface{}) {
+func (tb *postgresTestBackend) Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}) {
 	t.Helper()
 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE %s = $1;", table, whereCol), whereVal)
 }
 
-func (tb *postgresTestBackend) Query(ctx context.Context, t *testing.T, query string, args ...interface{}) {
+func (tb *postgresTestBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {
 	t.Helper()
 	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 	var rows, err = tb.conn.Query(ctx, query, args...)

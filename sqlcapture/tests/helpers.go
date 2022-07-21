@@ -38,8 +38,8 @@ func PerformCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog *
 	t.Helper()
 
 	var buf = new(CaptureOutputBuffer)
-	buf.MergeBase = copyState(*state)
-	var initState = copyState(*state)
+	buf.MergeBase = CopyState(*state)
+	var initState = CopyState(*state)
 	if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), catalog, &initState, buf); err != nil {
 		fmt.Fprintf(&buf.Snapshot, "\n========\n\nCapture Terminated With Error:\n\n    %s\n", err.Error())
 	}
@@ -52,7 +52,7 @@ func PerformCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog *
 }
 
 // ConfiguredCatalog is a test helper for constructing a ConfiguredCatalog from stream names
-func ConfiguredCatalog(ctx context.Context, t *testing.T, tb TestBackend, streamNames ...string) airbyte.ConfiguredCatalog {
+func ConfiguredCatalog(ctx context.Context, t testing.TB, tb TestBackend, streamNames ...string) airbyte.ConfiguredCatalog {
 	// Perform discovery and construct a map from names to discovered streams
 	var discoveredCatalog, err = sqlcapture.DiscoverCatalog(ctx, tb.GetDatabase())
 	if err != nil {
@@ -242,9 +242,9 @@ func (buf *CaptureOutputBuffer) Encode(v interface{}) error {
 	return fmt.Errorf("unhandled message type: %#v", msg.Type)
 }
 
-// copyState returns a copy of the input PersistentState which doesn't share
+// CopyState returns a copy of the input PersistentState which doesn't share
 // any mutable pointers with the original.
-func copyState(x sqlcapture.PersistentState) sqlcapture.PersistentState {
+func CopyState(x sqlcapture.PersistentState) sqlcapture.PersistentState {
 	var streams = make(map[string]sqlcapture.TableState)
 	for streamID, state := range x.Streams {
 		streams[streamID] = sqlcapture.TableState{
@@ -294,7 +294,7 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	for streamID, state := range inputState.Streams {
 		buf.MergeBase.Streams[streamID] = state
 	}
-	buf.States = append(buf.States, copyState(buf.MergeBase))
+	buf.States = append(buf.States, CopyState(buf.MergeBase))
 
 	// Finally buffer the sanitized state update so it can be part of the test results.
 	return buf.bufferMessage(airbyte.Message{
