@@ -12,6 +12,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,7 +32,7 @@ var (
 
 var (
 	TestDefaultConfig Config
-	TestDatabase      *pgx.Conn
+	TestDatabase      *pgxpool.Pool
 	TestBackend       *postgresTestBackend
 )
 
@@ -86,13 +87,13 @@ func TestMain(m *testing.M) {
 	}
 	TestDefaultConfig.SetDefaults()
 
-	conn, err := pgx.Connect(ctx, *TestConnectionURI)
+	pool, err := pgxpool.Connect(ctx, *TestConnectionURI)
 	if err != nil {
 		logrus.WithField("err", err).Fatal("error connecting to database")
 	}
-	defer conn.Close(ctx)
-	TestDatabase = conn
-	TestBackend = &postgresTestBackend{conn: conn, cfg: TestDefaultConfig}
+	defer pool.Close()
+	TestDatabase = pool
+	TestBackend = &postgresTestBackend{pool: pool, cfg: TestDefaultConfig}
 
 	var exitCode = m.Run()
 	if err := replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, *TestReplicationSlot)).Close(); err != nil {
@@ -101,8 +102,22 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+func lowerTuningParameters(t testing.TB) {
+	t.Helper()
+
+	// Within the scope of a single test, adjust some tuning parameters so that it's
+	// easier to exercise backfill chunking and replication buffering behavior.
+	var prevChunkSize = backfillChunkSize
+	t.Cleanup(func() { backfillChunkSize = prevChunkSize })
+	backfillChunkSize = 16
+
+	var prevBufferSize = replicationBufferSize
+	t.Cleanup(func() { replicationBufferSize = prevBufferSize })
+	replicationBufferSize = 0
+}
+
 type postgresTestBackend struct {
-	conn *pgx.Conn
+	pool *pgxpool.Pool
 	cfg  Config
 }
 
@@ -136,7 +151,7 @@ func (tb *postgresTestBackend) Insert(ctx context.Context, t testing.TB, table s
 	if len(rows) < 1 {
 		t.Fatalf("must insert at least one row")
 	}
-	var tx, err = tb.conn.BeginTx(ctx, pgx.TxOptions{})
+	var tx, err = tb.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		t.Fatalf("unable to begin transaction: %v", err)
 	}
@@ -171,7 +186,7 @@ func (tb *postgresTestBackend) Delete(ctx context.Context, t testing.TB, table s
 func (tb *postgresTestBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {
 	t.Helper()
 	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
-	var rows, err = tb.conn.Query(ctx, query, args...)
+	var rows, err = tb.pool.Query(ctx, query, args...)
 	if err != nil {
 		t.Fatalf("unable to execute query: %v", err)
 	}

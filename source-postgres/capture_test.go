@@ -210,7 +210,7 @@ func TestSkipBackfills(t *testing.T) {
 	// Set up three tables with some data in them, a catalog which captures all three,
 	// but a configuration which specifies that tables A and C should skip backfilling
 	// and only capture new changes.
-	var tb, ctx = &postgresTestBackend{conn: TestDatabase, cfg: TestDefaultConfig}, context.Background()
+	var tb, ctx = &postgresTestBackend{pool: TestDatabase, cfg: TestDefaultConfig}, context.Background()
 	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
