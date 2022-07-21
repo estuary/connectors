@@ -141,7 +141,7 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 
-		// Check to see if we have a keyFile open already in gcs for this binding and if not, create one.
+		// Check to see if we have a mergeFile open already in gcs for this binding and if not, create one.
 		if b.store.mergeFile == nil {
 			b.store.mergeFile, err = t.ep.NewExternalDataConnectionFile(
 				ctx,

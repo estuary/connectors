@@ -6,7 +6,6 @@
       "dataset",
       "region",
       "bucket",
-      "bucket_path",
       "credentials_json"
     ],
     "properties": {
