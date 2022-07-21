@@ -27,6 +27,13 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]sqlc
 		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
 	}
 
+	// Column descriptions just add a bit of user-friendliness. They're so unimportant
+	// that failure to list them shouldn't even be a fatal error.
+	columnDescriptions, err := getColumnDescriptions(ctx, db.conn)
+	if err != nil {
+		logrus.WithField("err", err).Warn("error fetching column descriptions")
+	}
+
 	// Aggregate column and primary key information into TableInfo structs
 	// using a map from fully-qualified "<schema>.<name>" table names to
 	// the corresponding TableInfo.
@@ -43,6 +50,22 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]sqlc
 		info.Columns[column.Name] = column
 		info.ColumnNames = append(info.ColumnNames, column.Name)
 		tableMap[id] = info
+	}
+	for _, desc := range columnDescriptions {
+		var id = desc.TableSchema + "." + desc.TableName
+		if info, ok := tableMap[id]; ok {
+			if column, ok := info.Columns[desc.ColumnName]; ok {
+				logrus.WithFields(logrus.Fields{
+					"table":  id,
+					"column": desc.ColumnName,
+					"desc":   desc.Description,
+				}).Debug("got column description")
+				var description = desc.Description
+				column.Description = &description
+				info.Columns[desc.ColumnName] = column
+			}
+			tableMap[id] = info
+		}
 	}
 	for id, key := range primaryKeys {
 		// The `getColumns()` query implements the "exclude system schemas" logic,
@@ -304,9 +327,8 @@ const queryDiscoverColumns = `
 		c.ordinal_position
 	;`
 
-const queryColumnDescription = `SELECT pg_catalog.col_description($1::regclass::oid, $2) AS description;`
-
 func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, error) {
+	logrus.Debug("listing all tables/columns in the database")
 	var columns []sqlcapture.ColumnInfo
 	var sc sqlcapture.ColumnInfo
 	var _, err = conn.QueryFunc(ctx, queryDiscoverColumns, nil,
@@ -315,14 +337,6 @@ func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, e
 			columns = append(columns, sc)
 			return nil
 		})
-	for idx := range columns {
-		var col = &columns[idx]
-		// Ignore errors when trying to get column descriptions, because failures are non-fatal.
-		conn.QueryFunc(ctx, queryColumnDescription,
-			[]interface{}{col.TableSchema + "." + col.TableName, col.Index},
-			[]interface{}{&col.Description},
-			func(r pgx.QueryFuncRow) error { return nil })
-	}
 	return columns, err
 }
 
@@ -353,6 +367,7 @@ const queryDiscoverPrimaryKeys = `
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
 func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, error) {
+	logrus.Debug("listing all primary-key columns in the database")
 	var keys = make(map[string][]string)
 	var tableSchema, tableName, columnName string
 	var columnIndex int
@@ -367,4 +382,34 @@ func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, e
 			return nil
 		})
 	return keys, err
+}
+
+const queryColumnDescriptions = `
+    SELECT * FROM (
+		SELECT
+		    isc.table_schema,
+			isc.table_name,
+			isc.column_name,
+			pg_catalog.col_description(format('%s.%s',isc.table_schema,isc.table_name)::regclass::oid,isc.ordinal_position) description
+		FROM information_schema.columns isc
+	) as descriptions WHERE description != '';
+`
+
+type columnDescription struct {
+	TableSchema string
+	TableName   string
+	ColumnName  string
+	Description string
+}
+
+func getColumnDescriptions(ctx context.Context, conn *pgx.Conn) ([]columnDescription, error) {
+	var descriptions []columnDescription
+	var desc columnDescription
+	var _, err = conn.QueryFunc(ctx, queryColumnDescriptions, nil,
+		[]interface{}{&desc.TableSchema, &desc.TableName, &desc.ColumnName, &desc.Description},
+		func(r pgx.QueryFuncRow) error {
+			descriptions = append(descriptions, desc)
+			return nil
+		})
+	return descriptions, err
 }
