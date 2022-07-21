@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/storage"
@@ -31,12 +32,15 @@ func (ep *Endpoint) NewExternalDataConnectionFile(ctx context.Context, file stri
 		return nil, fmt.Errorf("external data connection file only supports json at this time")
 	}
 
-	filePath := path.Join(ep.config.BucketPath, file)
+	// If BucketPath starts with a /, then so will the result of the Join. Trim the leading / so
+	// that we don't end up with repeated / chars in the URI and so that the object key does not
+	// start with a /.
+	objectKey := strings.TrimPrefix(path.Join(ep.config.BucketPath, file), "/")
 
 	f := &ExternalDataConnectionFile{
-		URI:       "gs:/" + fmt.Sprintf("/%s/%s", ep.config.Bucket, filePath),
+		URI:       fmt.Sprintf("gs://%s/%s", ep.config.Bucket, objectKey),
 		edc:       edc,
-		gcsObject: ep.cloudStorageClient.Bucket(ep.config.Bucket).Object(filePath),
+		gcsObject: ep.cloudStorageClient.Bucket(ep.config.Bucket).Object(objectKey),
 	}
 
 	// Make sure this ExternalDataConfig has no configured file already.
