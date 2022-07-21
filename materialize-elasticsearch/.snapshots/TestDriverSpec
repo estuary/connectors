@@ -29,8 +29,7 @@
     "$schema": "http://json-schema.org/draft-04/schema#",
     "required": [
       "index",
-      "delta_updates",
-      "field_overrides"
+      "delta_updates"
     ],
     "properties": {
       "index": {

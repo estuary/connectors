@@ -34,7 +34,7 @@ func (c config) Validate() error {
 type resource struct {
 	Index         string                        `json:"index"`
 	DeltaUpdates  bool                          `json:"delta_updates"`
-	FieldOverides []schemabuilder.FieldOverride `json:"field_overrides"`
+	FieldOverides []schemabuilder.FieldOverride `json:"field_overrides,omitempty"`
 
 	NumOfShards   int `json:"number_of_shards,omitempty" jsonschema:"default=1"`
 	NumOfReplicas int `json:"number_of_replicas,omitempty"`
