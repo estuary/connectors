@@ -33,6 +33,7 @@ require (
 	github.com/klauspost/compress v1.15.5 // indirect
 	github.com/mattn/go-ieproxy v0.0.6 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	github.com/mitchellh/mapstructure v1.4.1
 	github.com/pierrec/lz4/v4 v4.1.14 // indirect
 	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/common v0.34.0 // indirect
