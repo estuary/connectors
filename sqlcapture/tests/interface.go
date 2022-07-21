@@ -19,13 +19,13 @@ type TestBackend interface {
 	// name. If `suffix` is non-empty it should be included at the end of the new table's
 	// name. The table will be registered with `t.Cleanup()` to be deleted at the end of
 	// the current test.
-	CreateTable(ctx context.Context, t *testing.T, suffix string, tableDef string) string
+	CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string
 	// Insert adds all provided rows to the specified table in a single transaction.
-	Insert(ctx context.Context, t *testing.T, table string, rows [][]interface{})
+	Insert(ctx context.Context, t testing.TB, table string, rows [][]interface{})
 	// Update modifies preexisting rows to a new value.
-	Update(ctx context.Context, t *testing.T, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{})
+	Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{})
 	// Delete removes preexisting rows.
-	Delete(ctx context.Context, t *testing.T, table string, whereCol string, whereVal interface{})
+	Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{})
 	// GetDatabase returns a new sqlcapture.Database which can be used to perform
 	// discovery and captures.
 	GetDatabase() sqlcapture.Database

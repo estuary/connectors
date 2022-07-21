@@ -110,7 +110,7 @@ type mysqlTestBackend struct {
 	cfg  Config
 }
 
-func (tb *mysqlTestBackend) CreateTable(ctx context.Context, t *testing.T, suffix string, tableDef string) string {
+func (tb *mysqlTestBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
 	var tableName = "test_" + strings.TrimPrefix(t.Name(), "Test")
@@ -131,7 +131,7 @@ func (tb *mysqlTestBackend) CreateTable(ctx context.Context, t *testing.T, suffi
 	return tableName
 }
 
-func (tb *mysqlTestBackend) Insert(ctx context.Context, t *testing.T, table string, rows [][]interface{}) {
+func (tb *mysqlTestBackend) Insert(ctx context.Context, t testing.TB, table string, rows [][]interface{}) {
 	t.Helper()
 	if len(rows) == 0 {
 		return
@@ -160,17 +160,17 @@ func argsTuple(argc int) string {
 	return tuple + ")"
 }
 
-func (tb *mysqlTestBackend) Update(ctx context.Context, t *testing.T, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
+func (tb *mysqlTestBackend) Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
 	t.Helper()
 	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ?;", table, setCol, whereCol), setVal, whereVal)
 }
 
-func (tb *mysqlTestBackend) Delete(ctx context.Context, t *testing.T, table string, whereCol string, whereVal interface{}) {
+func (tb *mysqlTestBackend) Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}) {
 	t.Helper()
 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE %s = ?;", table, whereCol), whereVal)
 }
 
-func (tb *mysqlTestBackend) Query(ctx context.Context, t *testing.T, query string, args ...interface{}) {
+func (tb *mysqlTestBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {
 	t.Helper()
 	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 	var result, err = tb.conn.Execute(query, args...)
