@@ -14,6 +14,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -147,14 +148,41 @@ func populateTable(ctx context.Context, t testing.TB, tb tests.TestBackend, tabl
 			padding,                     // (0-256) Variable amount of padding
 		})
 		if len(buffer) >= chunkSize {
-			tb.Insert(ctx, t, table, columnNames, buffer)
+			bulkLoadData(ctx, t, table, columnNames, buffer)
 			buffer = nil
 		}
 	}
 	if len(buffer) > 0 {
-		tb.Insert(ctx, t, table, columnNames, buffer)
+		bulkLoadData(ctx, t, table, columnNames, buffer)
 	}
 	return nil
+}
+
+func bulkLoadData(ctx context.Context, t testing.TB, table string, columnNames []string, rows [][]interface{}) {
+	t.Helper()
+
+	if len(rows) < 1 {
+		return
+	}
+	var tx, err = TestBackend.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		t.Fatalf("unable to begin transaction: %v", err)
+	}
+
+	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows)}).Trace("inserting bulk data")
+	rowCount, err := tx.CopyFrom(ctx, pgx.Identifier{"public", strings.ToLower(table)}, columnNames, pgx.CopyFromRows(rows))
+	if err != nil {
+		t.Fatalf("error inserting bulk data: %v", err)
+	}
+	logrus.WithFields(logrus.Fields{"table": table, "count": rowCount}).Trace("inserted bulk data")
+
+	if rowCount != int64(len(rows)) {
+		t.Fatalf("copy inserted too few rows: expected %d, got %d", len(rows), rowCount)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("unable to commit insert transaction: %v", err)
+	}
 }
 
 type benchmarkMessageOutput struct {
