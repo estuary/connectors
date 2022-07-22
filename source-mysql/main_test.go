@@ -36,6 +36,7 @@ func TestMain(m *testing.M) {
 		}
 		logrus.SetLevel(level)
 	}
+	fixMysqlLogging()
 
 	// Initialize test config and database connection
 	var cfg = Config{
