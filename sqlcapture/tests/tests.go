@@ -66,7 +66,7 @@ func testTailing(ctx context.Context, t *testing.T, tb TestBackend) {
 	// Run the capture
 	var captureCtx, cancelCapture = context.WithCancel(ctx)
 	go VerifiedCapture(captureCtx, t, tb, &catalog, &state, "")
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// Some more changes occurring after the backfill completes
 	tb.Insert(ctx, t, tableName, [][]interface{}{{5, "asdf"}, {100, "lots"}})
