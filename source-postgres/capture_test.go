@@ -16,6 +16,7 @@ import (
 
 // TestGeneric runs the generic sqlcapture test suite.
 func TestGeneric(t *testing.T) {
+	lowerTuningParameters(t)
 	tests.Run(context.Background(), t, TestBackend)
 }
 
@@ -87,6 +88,7 @@ func TestToastColumns(t *testing.T) {
 // "chunks", two connector restarts at different points in the initial table scan, and
 // some concurrent modifications to row ranges already-scanned and not-yet-scanned.
 func TestComplexDataset(t *testing.T) {
+	lowerTuningParameters(t)
 	var tb, ctx = TestBackend, context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
 	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
