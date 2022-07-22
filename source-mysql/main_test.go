@@ -37,9 +37,6 @@ func TestMain(m *testing.M) {
 		logrus.SetLevel(level)
 	}
 
-	backfillChunkSize = 16
-	replicationBufferSize = 0
-
 	// Initialize test config and database connection
 	var cfg = Config{
 		Address:  *dbAddress,
@@ -63,6 +60,18 @@ func TestMain(m *testing.M) {
 
 	var exitCode = m.Run()
 	os.Exit(exitCode)
+}
+
+func lowerTuningParameters(t testing.TB) {
+	// Within the scope of a single test, adjust some tuning parameters so that it's
+	// easier to exercise backfill chunking and replication buffering behavior.
+	var prevChunkSize = backfillChunkSize
+	t.Cleanup(func() { backfillChunkSize = prevChunkSize })
+	backfillChunkSize = 16
+
+	var prevBufferSize = replicationBufferSize
+	t.Cleanup(func() { replicationBufferSize = prevBufferSize })
+	replicationBufferSize = 0
 }
 
 func TestAlterTable(t *testing.T) {
@@ -187,6 +196,7 @@ func (tb *mysqlTestBackend) GetDatabase() sqlcapture.Database {
 
 // TestGeneric runs the generic sqlcapture test suite.
 func TestGeneric(t *testing.T) {
+	lowerTuningParameters(t)
 	tests.Run(context.Background(), t, TestBackend)
 }
 
