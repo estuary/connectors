@@ -14,7 +14,6 @@ import (
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -33,9 +32,10 @@ import (
 // target of one second isn't nearly enough. Aim for at least 30 seconds to
 // get useful numbers (and 300 seconds for perfect accuracy):
 //
-//     $ LOG_LEVEL=warn go test -run=NoTests -bench=. -benchtime=30s ./source-postgres/
-//     $ LOG_LEVEL=warn go test -run=NoTests -bench=. -benchtime=30s -memprofile memprofile.out -cpuprofile profile.out ./source-postgres/
+//     $ LOG_LEVEL=warn go test -run=None -bench=. -benchtime=30s ./source-mysql/
+//     $ LOG_LEVEL=warn go test -run=None -bench=. -benchtime=30s -memprofile memprofile.out -cpuprofile profile.out ./source-mysql/
 //
+
 func BenchmarkBackfill(b *testing.B) { benchmarkBackfills(b, 1, 10, b.N*100) }
 
 func BenchmarkReplication(b *testing.B) { benchmarkReplication(b, 1, 10, b.N*100) }
@@ -57,7 +57,8 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 	for i := 0; i < numTables; i++ {
 		var table = tb.CreateTable(ctx, b, fmt.Sprintf("table%d", i), "(id INTEGER PRIMARY KEY, uid TEXT, name TEXT, status INTEGER, modified DATE, foo_id INTEGER, padding TEXT)")
 		tables = append(tables, table)
-		grp.Go(func() error { return populateTable(ctx, b, tb, table, rowsPerTable) })
+		//grp.Go(func() error { return populateTable(ctx, b, tb, table, rowsPerTable) })
+		populateTable(ctx, b, tb, table, rowsPerTable)
 	}
 	if err := grp.Wait(); err != nil {
 		b.Fatalf("error populating tables: %v", err)
@@ -102,7 +103,8 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 	var grp errgroup.Group
 	for _, table := range tables {
 		var table = table
-		grp.Go(func() error { return populateTable(ctx, b, tb, table, rowsPerTable) })
+		//grp.Go(func() error { return populateTable(ctx, b, tb, table, rowsPerTable) })
+		populateTable(ctx, b, tb, table, rowsPerTable)
 	}
 	grp.Wait()
 
@@ -124,12 +126,12 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 func populateTable(ctx context.Context, t testing.TB, tb tests.TestBackend, table string, numRows int) error {
 	t.Helper()
 
-	const chunkSize = 65536
+	const chunkSize = 8192
 
 	var columnNames = []string{"id", "uid", "name", "status", "modified", "foo_id", "padding"}
 	var buffer [][]interface{}
 	for i := 0; i < numRows; i++ {
-		var date = time.Unix(683640000+rand.Int63n(974764800), 0)
+		var date = time.Unix(683640000+rand.Int63n(974764800), 0).Format("2006-01-02")
 		var padding = strings.Repeat("PADDING.", rand.Intn(33))
 		buffer = append(buffer, []interface{}{
 			// Total size: 192 +/- 132 bytes per row
@@ -154,28 +156,32 @@ func populateTable(ctx context.Context, t testing.TB, tb tests.TestBackend, tabl
 
 func bulkLoadData(ctx context.Context, t testing.TB, table string, columnNames []string, rows [][]interface{}) {
 	t.Helper()
-
-	if len(rows) < 1 {
+	if len(rows) == 0 {
 		return
 	}
-	var tx, err = TestBackend.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		t.Fatalf("unable to begin transaction: %v", err)
+	if err := TestBackend.conn.Begin(); err != nil {
+		t.Fatalf("error beginning transaction: %v", err)
 	}
 
 	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows)}).Trace("inserting bulk data")
-	rowCount, err := tx.CopyFrom(ctx, pgx.Identifier{"public", strings.ToLower(table)}, columnNames, pgx.CopyFromRows(rows))
-	if err != nil {
-		t.Fatalf("error inserting bulk data: %v", err)
+	var argc = len(rows[0])
+	var placeholder = argsTuple(argc)
+	var placeholders []string
+	var values []interface{}
+	for _, row := range rows {
+		if len(row) != argc {
+			t.Fatalf("incorrect number of values in row %q (expected %d)", row, len(rows[0]))
+		}
+		placeholders = append(placeholders, placeholder)
+		values = append(values, row...)
 	}
-	logrus.WithFields(logrus.Fields{"table": table, "count": rowCount}).Trace("inserted bulk data")
 
-	if rowCount != int64(len(rows)) {
-		t.Fatalf("copy inserted too few rows: expected %d, got %d", len(rows), rowCount)
-	}
+	var query = fmt.Sprintf("INSERT INTO %s VALUES %s", table, strings.Join(placeholders, ","))
+	TestBackend.Query(ctx, t, query, values...)
+	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows)}).Trace("inserted bulk data")
 
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatalf("unable to commit insert transaction: %v", err)
+	if err := TestBackend.conn.Commit(); err != nil {
+		t.Fatalf("error committing transaction: %v", err)
 	}
 }
 
