@@ -87,7 +87,7 @@ The [materialize-s3-parquet](../materialize-s3-parquet/) connector can be used t
               prefix: example/s3-prefix/
           source: example/flow/collection
   ```
-5. When you activate the new materialization, the connector will create the Rockset collection using the given integration, and wait for it to ingest all of the data from S3 before it continues. During this time, the Flow shards will remain in `STANDBY` status, so `flowctl deploy` is expected to block until the bulk ingestion completes. Once this completes, the materialize-rockset connector will automatically switch over to using the write API.
+5. When you activate the new materialization, the connector will create the Rockset collection using the given integration, and wait for it to ingest all of the data from S3 before it continues. During this time, the Flow shards will remain in `STANDBY` status, so `flowctl-admin deploy` is expected to block until the bulk ingestion completes. Once this completes, the materialize-rockset connector will automatically switch over to using the write API.
 
 ## Potential improvements
 
