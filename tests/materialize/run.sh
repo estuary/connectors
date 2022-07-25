@@ -4,7 +4,7 @@ set -e
 
 # Flow image / container name used in testing.
 FLOW_IMAGE="ghcr.io/estuary/flow:dev"
-# Prefix of the containers running flowctl via Flow image.
+# Prefix of the containers running flowctl-admin via Flow image.
 FLOW_CONTAINER_NAME_PREFIX=flowctl-${CONNECTOR}
 
 # The docker image of the connector to be tested.
@@ -75,8 +75,8 @@ export BINDING_NUM_SIMPLE=0
 export BINDING_NUM_DUPLICATED_KEYS=1
 export BINDING_NUM_MULTIPLE_DATATYPES=2
 
-# Util function to run flowctl command via docker.
-function runFlowctl() {
+# Util function to run flowctl-admin command via docker.
+function runFlowctlAdmin() {
     local script="$1"
     local args=$2
     local detached
@@ -103,12 +103,12 @@ function runFlowctl() {
         --env CATALOG \
         --network=host \
         "${FLOW_IMAGE}" \
-        "${test_scripts_dir_target}/flowctl/${script}" \
+        "${test_scripts_dir_target}/flowctl-admin/${script}" \
         "${args}" \
         >/dev/null 2>&1
 }
 
-# Util function for running the `flowctl combine` to combine the results.
+# Util function for running the `flowctl-admin combine` to combine the results.
 function combineResults() {
     # The collection name specified in the catalog.
     local collection="$1"
@@ -116,7 +116,7 @@ function combineResults() {
     local input_file_name="$2"
     # The output jsonl file of the combined results.
     local output_file_name="$3"
-    runFlowctl "combine.sh" "${collection} ${input_file_name} ${output_file_name}" false || bail "combine results failed."
+    runFlowctlAdmin "combine.sh" "${collection} ${input_file_name} ${output_file_name}" false || bail "combine results failed."
 }
 # Export the function to be avialble to connector-specific testing scripts.
 export -f combineResults
@@ -124,7 +124,7 @@ export -f combineResults
 function cleanup() {
     echo -e "\nexecuting cleanup"
 
-    runFlowctl delete.sh "" false || true
+    runFlowctlAdmin delete.sh "" false || true
 
     source "${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" || true
     for name in $(docker ps -a -f name="${FLOW_CONTAINER_NAME_PREFIX}" -q); do
@@ -149,10 +149,10 @@ envsubst < ${ROOT_DIR}/tests/materialize/flow.json.template > "${TEST_DIR}/${CAT
     || bail "generating ${CATALOG} failed."
 
 echo -e "\nstarting temp data plane"
-runFlowctl temp-data-plane.sh "" true || bail "starting temp data plane."
+runFlowctlAdmin temp-data-plane.sh "" true || bail "starting temp data plane."
 
 echo -e "\nbuilding and activating test catalog"
-runFlowctl build-and-activate.sh "" false || bail "building and activating test catalog failed."
+runFlowctlAdmin build-and-activate.sh "" false || bail "building and activating test catalog failed."
 
 echo -e "\nexecuting ingest-data"
 source "${CONNECTOR_TEST_SCRIPTS_DIR}/ingest-data.sh" || bail "ingest data failed."
