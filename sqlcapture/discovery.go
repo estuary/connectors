@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/flow/go/protocols/airbyte"
+	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,7 +27,7 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 	var sourceSchema = (&jsonschema.Reflector{
 		ExpandedStruct: true,
 		DoNotReference: true,
-	}).Reflect(db.EmptySourceMetadata()).Type
+	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
 
 	var catalog = new(airbyte.Catalog)
@@ -42,7 +42,7 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 		var anchor = strings.Title(table.Schema) + strings.Title(table.Name)
 
 		// Build `properties` schemas for each table column.
-		var properties = make(map[string]*jsonschema.Type)
+		var properties = make(map[string]*jsonschema.Schema)
 		for _, column := range table.Columns {
 			var jsonType, err = db.TranslateDBToJSONType(column)
 			if err != nil {
@@ -53,7 +53,7 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 
 				// Logging an error from the connector is nice, but can be swallowed by `flowctl-admin`.
 				// Putting an error in the generated schema is ugly, but makes the failure visible.
-				properties[column.Name] = &jsonschema.Type{
+				properties[column.Name] = &jsonschema.Schema{
 					Description: fmt.Sprintf("ERROR: could not translate column type %q to JSON schema: %v", column.DataType, err),
 				}
 			} else {
@@ -66,7 +66,7 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 		// to generate the properties keyword with an inline map.
 		var schema = jsonschema.Schema{
 			Definitions: jsonschema.Definitions{
-				anchor: &jsonschema.Type{
+				anchor: &jsonschema.Schema{
 					Type: "object",
 					Extras: map[string]interface{}{
 						"$anchor":    anchor,
@@ -75,45 +75,43 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 					Required: table.PrimaryKey,
 				},
 			},
-			Type: &jsonschema.Type{
-				AllOf: []*jsonschema.Type{
-					{
-						Extras: map[string]interface{}{
-							"properties": map[string]*jsonschema.Type{
-								"_meta": {
-									Type: "object",
-									Extras: map[string]interface{}{
-										"properties": map[string]*jsonschema.Type{
-											"op": {
-												Enum:        []interface{}{"c", "d", "u"},
-												Description: "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
-											},
-											"source": sourceSchema,
-											"before": {
-												Ref:         "#" + anchor,
-												Description: "Record state immediately before this change was applied.",
-												Extras: map[string]interface{}{
-													"reduce": map[string]interface{}{
-														"strategy": "firstWriteWins",
-													},
+			AllOf: []*jsonschema.Schema{
+				{
+					Extras: map[string]interface{}{
+						"properties": map[string]*jsonschema.Schema{
+							"_meta": {
+								Type: "object",
+								Extras: map[string]interface{}{
+									"properties": map[string]*jsonschema.Schema{
+										"op": {
+											Enum:        []interface{}{"c", "d", "u"},
+											Description: "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+										},
+										"source": sourceSchema,
+										"before": {
+											Ref:         "#" + anchor,
+											Description: "Record state immediately before this change was applied.",
+											Extras: map[string]interface{}{
+												"reduce": map[string]interface{}{
+													"strategy": "firstWriteWins",
 												},
 											},
 										},
-										"reduce": map[string]interface{}{
-											"strategy": "merge",
-										},
 									},
-									Required: []string{"op", "source"},
+									"reduce": map[string]interface{}{
+										"strategy": "merge",
+									},
 								},
-							},
-							"reduce": map[string]interface{}{
-								"strategy": "merge",
+								Required: []string{"op", "source"},
 							},
 						},
-						Required: []string{"_meta"},
+						"reduce": map[string]interface{}{
+							"strategy": "merge",
+						},
 					},
-					{Ref: "#" + anchor},
+					Required: []string{"_meta"},
 				},
+				{Ref: "#" + anchor},
 			},
 		}
 
