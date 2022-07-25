@@ -9,10 +9,10 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/alecthomas/jsonschema"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 )
 

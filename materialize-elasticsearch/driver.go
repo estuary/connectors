@@ -56,6 +56,8 @@ func (resource) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Index":
 		return "Name of the ElasticSearch index to store the materialization results."
+	case "DeltaUpdates":
+		return "Should updates to this table be done via delta updates. Default is false."
 	case "NumOfShards":
 		return "The number of shards in ElasticSearch index. Must set to be greater than 0."
 	case "NumOfReplicas":

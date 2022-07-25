@@ -1,6 +1,35 @@
 {
   "name": "test_Generic_SimpleDiscovery",
   "json_schema": {
+    "$defs": {
+      "TestTest_Generic_SimpleDiscovery": {
+        "type": "object",
+        "required": [
+          "a"
+        ],
+        "$anchor": "TestTest_Generic_SimpleDiscovery",
+        "properties": {
+          "a": {
+            "type": "integer"
+          },
+          "b": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "c": {
+            "type": "number"
+          },
+          "d": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
     "allOf": [
       {
         "required": [
@@ -8,11 +37,11 @@
         ],
         "properties": {
           "_meta": {
+            "type": "object",
             "required": [
               "op",
               "source"
             ],
-            "type": "object",
             "properties": {
               "before": {
                 "$ref": "#TestTest_Generic_SimpleDiscovery",
@@ -30,10 +59,7 @@
                 "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
               },
               "source": {
-                "required": [
-                  "schema",
-                  "table"
-                ],
+                "$id": "https://github.com/estuary/connectors/source-mysql/mysql-source-info",
                 "properties": {
                   "ts_ms": {
                     "type": "integer",
@@ -57,7 +83,11 @@
                   }
                 },
                 "additionalProperties": false,
-                "type": "object"
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table"
+                ]
               }
             },
             "reduce": {
@@ -72,36 +102,7 @@
       {
         "$ref": "#TestTest_Generic_SimpleDiscovery"
       }
-    ],
-    "definitions": {
-      "TestTest_Generic_SimpleDiscovery": {
-        "required": [
-          "a"
-        ],
-        "type": "object",
-        "$anchor": "TestTest_Generic_SimpleDiscovery",
-        "properties": {
-          "a": {
-            "type": "integer"
-          },
-          "b": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "c": {
-            "type": "number"
-          },
-          "d": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      }
-    }
+    ]
   },
   "supported_sync_modes": [
     "incremental",

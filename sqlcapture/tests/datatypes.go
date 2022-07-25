@@ -52,7 +52,7 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 				var skimmed = struct {
 					Definitions map[string]struct {
 						Properties map[string]json.RawMessage
-					}
+					} `json:"$defs"`
 				}{}
 				require.NoError(t, json.Unmarshal(stream.JSONSchema, &skimmed))
 				require.Len(t, skimmed.Definitions, 1)

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/client"
+	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
 )
 
@@ -82,7 +82,7 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]sqlcapt
 	return tableMap, nil
 }
 
-func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Type, error) {
+func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
 	var colSchema, ok = mysqlTypeToJSON[column.DataType]
 	if !ok {
 		return nil, fmt.Errorf("unhandled MySQL type %q", column.DataType)
@@ -213,8 +213,8 @@ type columnSchema struct {
 	type_           string
 }
 
-func (s columnSchema) toType() *jsonschema.Type {
-	var out = &jsonschema.Type{
+func (s columnSchema) toType() *jsonschema.Schema {
+	var out = &jsonschema.Schema{
 		Format:      s.format,
 		Description: s.description,
 		Extras:      make(map[string]interface{}),

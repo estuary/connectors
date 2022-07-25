@@ -1,11 +1,20 @@
 {
   "endpoint_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "required": [
-      "awsAccessKeyId",
-      "awsSecretAccessKey",
-      "bucket",
-      "uploadIntervalInSeconds"
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-s3-parquet/config",
+    "oneOf": [
+      {
+        "required": [
+          "endpoint"
+        ],
+        "title": "endpoint"
+      },
+      {
+        "required": [
+          "region"
+        ],
+        "title": "region"
+      }
     ],
     "properties": {
       "awsAccessKeyId": {
@@ -41,27 +50,17 @@
       }
     },
     "type": "object",
-    "oneOf": [
-      {
-        "required": [
-          "endpoint"
-        ],
-        "title": "endpoint"
-      },
-      {
-        "required": [
-          "region"
-        ],
-        "title": "region"
-      }
+    "required": [
+      "awsAccessKeyId",
+      "awsSecretAccessKey",
+      "bucket",
+      "uploadIntervalInSeconds"
     ],
     "title": "S3 Connection"
   },
   "resource_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "required": [
-      "pathPrefix"
-    ],
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-s3-parquet/resource",
     "properties": {
       "pathPrefix": {
         "type": "string"
@@ -71,6 +70,9 @@
       }
     },
     "type": "object",
+    "required": [
+      "pathPrefix"
+    ],
     "title": "S3 Prefix"
   },
   "documentation_url": "https://go.estuary.dev/materialize-s3-parquet"
