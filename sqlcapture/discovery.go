@@ -51,7 +51,7 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 					"type":  column.DataType,
 				}).Warn("error translating column type to JSON schema")
 
-				// Logging an error from the connector is nice, but can be swallowed by `flowctl`.
+				// Logging an error from the connector is nice, but can be swallowed by `flowctl-admin`.
 				// Putting an error in the generated schema is ugly, but makes the failure visible.
 				properties[column.Name] = &jsonschema.Type{
 					Description: fmt.Sprintf("ERROR: could not translate column type %q to JSON schema: %v", column.DataType, err),
