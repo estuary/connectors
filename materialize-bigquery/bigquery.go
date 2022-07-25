@@ -9,7 +9,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
-	"github.com/alecthomas/jsonschema"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -22,33 +21,15 @@ func main() {
 	boilerplate.RunMain(newBigQueryDriver())
 }
 
-type credential string
-
-func (credential) JSONSchemaType() *jsonschema.Type {
-	ty := &jsonschema.Type{
-		Type:  "string",
-		Title: "Credentials",
-		Extras: map[string]interface{}{
-			"secret": true,
-		},
-	}
-
-	return ty
-}
-
-func (credential) Name() string {
-	return "credential"
-}
-
 // Config represents the endpoint configuration for BigQuery.
 type config struct {
-	BillingProjectID string     `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."`
-	ProjectID        string     `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset."`
-	Dataset          string     `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset that will be used to store the materialization output."`
-	Region           string     `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."`
-	Bucket           string     `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery."`
-	BucketPath       string     `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket."`
-	CredentialsJSON  credential `json:"credentials_json" jsonschema:"title=Credentials,description=Google Cloud Service Account JSON credentials in base64 format." jsonschema_extras:"secret=true,multiline=true"`
+	BillingProjectID string `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."`
+	ProjectID        string `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset."`
+	Dataset          string `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset that will be used to store the materialization output."`
+	Region           string `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."`
+	Bucket           string `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery."`
+	BucketPath       string `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket."`
+	CredentialsJSON  string `json:"credentials_json" jsonschema:"title=Credentials,description=Google Cloud Service Account JSON credentials in base64 format." jsonschema_extras:"secret=true,multiline=true"`
 }
 
 func (c *config) Validate() error {
@@ -76,7 +57,7 @@ type tableConfig struct {
 	base *config
 
 	Table string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in."`
-	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false."`
+	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false."`
 }
 
 func (c *tableConfig) Validate() error {

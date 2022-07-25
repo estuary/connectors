@@ -1,9 +1,7 @@
 {
   "endpoint_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "required": [
-      "endpoint"
-    ],
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-elasticsearch/config",
     "properties": {
       "endpoint": {
         "type": "string",
@@ -23,46 +21,38 @@
       }
     },
     "type": "object",
+    "required": [
+      "endpoint"
+    ],
     "title": "Elasticsearch Connection"
   },
   "resource_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "required": [
-      "index",
-      "delta_updates"
-    ],
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-elasticsearch/resource",
     "properties": {
       "index": {
         "type": "string",
         "description": "Name of the ElasticSearch index to store the materialization results."
       },
       "delta_updates": {
-        "type": "boolean"
+        "type": "boolean",
+        "description": "Should updates to this table be done via delta updates. Default is false.",
+        "default": false
       },
       "field_overrides": {
         "items": {
-          "required": [
-            "pointer",
-            "es_type"
-          ],
           "properties": {
             "pointer": {
               "type": "string",
               "description": "A '/'-delimitated json pointer to the location of the overridden field."
             },
             "es_type": {
-              "required": [
-                "field_type"
-              ],
               "properties": {
                 "field_type": {
                   "type": "string",
                   "description": "The elastic search field data types. Supported types include: boolean, date, double, geo_point, geo_shape, keyword, long, null, text."
                 },
                 "date_spec": {
-                  "required": [
-                    "format"
-                  ],
                   "properties": {
                     "format": {
                       "type": "string",
@@ -71,12 +61,12 @@
                   },
                   "additionalProperties": false,
                   "type": "object",
+                  "required": [
+                    "format"
+                  ],
                   "description": "Spec of the date field, effective if field_type is 'date'. See https://www.elastic.co/guide/en/elasticsearch/reference/current/date.html"
                 },
                 "keyword_spec": {
-                  "required": [
-                    "ignore_above"
-                  ],
                   "properties": {
                     "ignore_above": {
                       "type": "integer",
@@ -85,13 +75,12 @@
                   },
                   "additionalProperties": false,
                   "type": "object",
+                  "required": [
+                    "ignore_above"
+                  ],
                   "description": "Spec of the keyword field, effective if field_type is 'keyword'. See https://www.elastic.co/guide/en/elasticsearch/reference/current/keyword.html"
                 },
                 "text_spec": {
-                  "required": [
-                    "dual_keyword",
-                    "keyword_ignore_above"
-                  ],
                   "properties": {
                     "dual_keyword": {
                       "type": "boolean",
@@ -104,16 +93,27 @@
                   },
                   "additionalProperties": false,
                   "type": "object",
+                  "required": [
+                    "dual_keyword",
+                    "keyword_ignore_above"
+                  ],
                   "description": "Spec of the text field, effective if field_type is 'text'."
                 }
               },
               "additionalProperties": false,
               "type": "object",
+              "required": [
+                "field_type"
+              ],
               "description": "The overriding elastic search data type of the field."
             }
           },
           "additionalProperties": false,
-          "type": "object"
+          "type": "object",
+          "required": [
+            "pointer",
+            "es_type"
+          ]
         },
         "type": "array"
       },
@@ -128,6 +128,10 @@
       }
     },
     "type": "object",
+    "required": [
+      "index",
+      "delta_updates"
+    ],
     "title": "Elasticsearch Index"
   },
   "documentation_url": "https://go.estuary.dev/materialize-elasticsearch"
