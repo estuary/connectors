@@ -10,7 +10,7 @@ COPY go.* ./
 RUN go mod download
 
 # Copy in a recent `flowctl` for usage by tests.
-COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl /usr/local/bin/flowctl
+COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl-admin /usr/local/bin/flowctl-admin
 
 # Build the connector projects we depend on.
 COPY materialize-boilerplate   ./materialize-boilerplate

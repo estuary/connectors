@@ -20,7 +20,7 @@ func CatalogExtract(t *testing.T, sourcePath string, fn func(*sql.DB) error) err
 
 	var tempdir = t.TempDir()
 	var cmd = exec.Command(
-		"flowctl",
+		"flowctl-admin",
 		"api",
 		"build",
 		"--build-id", "catalog",

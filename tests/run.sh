@@ -44,7 +44,7 @@ mkdir -p "${TESTDIR}"
 # Map to an absolute directory.
 export TESTDIR=$(realpath ${TESTDIR})
 
-# `flowctl` commands which interact with the data plane look for *_ADDRESS
+# `flowctl-admin` commands which interact with the data plane look for *_ADDRESS
 # variables, which are created by the temp-data-plane we're about to start.
 export BROKER_ADDRESS=unix://localhost${TESTDIR}/gazette.sock
 export CONSUMER_ADDRESS=unix://localhost${TESTDIR}/consumer.sock
@@ -58,7 +58,7 @@ curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/release
 # --sigterm to verify we cleanly tear down the test catalog (otherwise it hangs).
 # --tempdir to use our known TESTDIR rather than creating a new temporary directory.
 # --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
-${TESTDIR}/flowctl temp-data-plane \
+${TESTDIR}/flowctl-admin temp-data-plane \
     --log.level info \
     --network=host \
     --poll \
@@ -92,7 +92,7 @@ trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${C
 export ID_TYPE="${ID_TYPE:-integer}"
 
 # Verify discover works
-${TESTDIR}/flowctl api discover --image="${CONNECTOR_IMAGE}" --network=host --log.level=debug --config=<(echo ${CONNECTOR_CONFIG}) > ${TESTDIR}/discover_output.json || bail "Discover failed."
+${TESTDIR}/flowctl-admin api discover --image="${CONNECTOR_IMAGE}" --network=host --log.level=debug --config=<(echo ${CONNECTOR_CONFIG}) > ${TESTDIR}/discover_output.json || bail "Discover failed."
 cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" > ${TESTDIR}/bindings.json
 
 if [[ -f "tests/${CONNECTOR}/bindings.json" ]]; then
@@ -103,16 +103,16 @@ fi
 cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
 
 # Build the catalog.
-${TESTDIR}/flowctl api build --directory ${TESTDIR}/builds --build-id test-build-id --source ${CATALOG_SOURCE} --ts-package --network=host || bail "Build failed."
+${TESTDIR}/flowctl-admin api build --directory ${TESTDIR}/builds --build-id test-build-id --source ${CATALOG_SOURCE} --ts-package --network=host || bail "Build failed."
 
 # Activate the catalog.
-${TESTDIR}/flowctl api activate --build-id test-build-id --all --network=host --log.level info || bail "Activate failed."
+${TESTDIR}/flowctl-admin api activate --build-id test-build-id --all --network=host --log.level info || bail "Activate failed."
 # Wait for a data-flow pass to finish.
-${TESTDIR}/flowctl api await --build-id test-build-id --log.level info || bail "Await failed."
+${TESTDIR}/flowctl-admin api await --build-id test-build-id --log.level info || bail "Await failed."
 # Read out materialization results.
 sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
 # Clean up the activated catalog.
-${TESTDIR}/flowctl api delete --build-id test-build-id --all --log.level info || bail "Delete failed."
+${TESTDIR}/flowctl-admin api delete --build-id test-build-id --all --log.level info || bail "Delete failed."
 
 # Verify actual vs expected results. `diff` will exit 1 if files are different
 diff --suppress-common-lines --side-by-side "${ACTUAL}" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"

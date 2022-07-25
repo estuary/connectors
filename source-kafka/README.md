@@ -4,7 +4,7 @@ This is an [Airbyte Specification-compatible](https://docs.airbyte.io/understand
 
 ## Getting Started
 
-To get started using this connector with Estuary Flow, run `flowctl discover --image ghcr.io/estuary/source-kafka:TAG`.
+To get started using this connector with Estuary Flow, run `flowctl-admin discover --image ghcr.io/estuary/source-kafka:TAG`.
 
 The remainder of this README is geared toward developers who wish to contribute or integrate the connector in other projects.
 
