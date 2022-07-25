@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/invopop/jsonschema"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
@@ -59,7 +59,7 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]sqlc
 }
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
-func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Type, error) {
+func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
 	// If the column type looks like `_foo` then it's an array of elements of type `foo`.
 	var columnType = column.DataType
 	var arrayColumn = false
@@ -79,13 +79,13 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 	// If the column is an array, wrap the element type in a multidimensional
 	// array structure.
 	if arrayColumn {
-		jsonType = &jsonschema.Type{
+		jsonType = &jsonschema.Schema{
 			Type: "object",
 			Extras: map[string]interface{}{
-				"properties": map[string]*jsonschema.Type{
+				"properties": map[string]*jsonschema.Schema{
 					"dimensions": {
 						Type:  "array",
-						Items: &jsonschema.Type{Type: "integer"},
+						Items: &jsonschema.Schema{Type: "integer"},
 					},
 					"elements": {
 						Type:  "array",
@@ -215,8 +215,8 @@ type columnSchema struct {
 	type_           string
 }
 
-func (s columnSchema) toType() *jsonschema.Type {
-	var out = &jsonschema.Type{
+func (s columnSchema) toType() *jsonschema.Schema {
+	var out = &jsonschema.Schema{
 		Format: s.format,
 		Extras: make(map[string]interface{}),
 	}

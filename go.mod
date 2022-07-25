@@ -8,7 +8,6 @@ require (
 	cloud.google.com/go/storage v1.22.1
 	github.com/Azure/azure-storage-blob-go v0.15.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
-	github.com/alecthomas/jsonschema v0.0.0-20220216202328-9eeeec9d044b
 	github.com/apache/thrift v0.16.0 // indirect
 	github.com/aws/aws-sdk-go v1.44.26
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.14 // indirect
@@ -24,6 +23,7 @@ require (
 	github.com/google/flatbuffers v2.0.6+incompatible // indirect
 	github.com/google/uuid v1.3.0
 	github.com/iancoleman/orderedmap v0.2.0 // indirect
+	github.com/invopop/jsonschema v0.5.0
 	github.com/jackc/pgconn v1.12.1
 	github.com/jackc/pglogrepl v0.0.0-20220516121607-70a00e46998b
 	github.com/jackc/pgproto3/v2 v2.3.0

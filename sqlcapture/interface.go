@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/alecthomas/jsonschema"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	"github.com/invopop/jsonschema"
 )
 
 // ChangeOp encodes a change operation type.
@@ -114,7 +114,7 @@ type Database interface {
 	// DiscoverTables queries the database for information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[string]TableInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
-	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Type, error)
+	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Schema, error)
 	// TODO(wgd): Document specific methods
 	DefaultSchema(ctx context.Context) (string, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
