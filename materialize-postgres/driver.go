@@ -21,8 +21,7 @@ import (
 // config represents the endpoint configuration for postgres.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Host     string `json:"host" jsonschema:"title=Host,description=Host name of the database."`
-	Port     uint16 `json:"port,omitempty" jsonschema:"title=Port,description=Port on which to connect to the database."`
+	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database."`
 	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as."`
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true"`
 	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to."`
@@ -31,7 +30,7 @@ type config struct {
 // Validate the configuration.
 func (c *config) Validate() error {
 	var requiredProperties = [][]string{
-		{"host", c.Host},
+		{"address", c.Address},
 		{"user", c.User},
 		{"password", c.Password},
 	}
@@ -45,13 +44,10 @@ func (c *config) Validate() error {
 
 // ToURI converts the Config to a DSN string.
 func (c *config) ToURI() string {
-	var host = c.Host
-	if c.Port != 0 {
-		host = fmt.Sprintf("%s:%d", host, c.Port)
-	}
+	var address = c.Address
 	var uri = url.URL{
 		Scheme: "postgres",
-		Host:   host,
+		Host:   address,
 		User:   url.UserPassword(c.User, c.Password),
 	}
 	if c.Database != "" {
@@ -94,8 +90,7 @@ func newPostgresDriver() pm.DriverServer {
 
 			log.WithFields(log.Fields{
 				"database": parsed.Database,
-				"host":     parsed.Host,
-				"port":     parsed.Port,
+				"address":  parsed.Address,
 				"user":     parsed.User,
 			}).Info("opening database")
 
