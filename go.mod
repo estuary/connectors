@@ -5,7 +5,9 @@ go 1.16
 require (
 	cloud.google.com/go v0.102.0 // indirect
 	cloud.google.com/go/bigquery v1.32.0
+	cloud.google.com/go/firestore v1.6.1 // indirect
 	cloud.google.com/go/storage v1.22.1
+	firebase.google.com/go v3.13.0+incompatible // indirect
 	github.com/Azure/azure-storage-blob-go v0.15.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/apache/thrift v0.16.0 // indirect
