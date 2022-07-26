@@ -175,17 +175,22 @@ func main() {
           },
           "credentials": {
             "title": "Credentials",
+            "description": "User credentials, if required to access the data at the HTTP URL.",
             "oneOf": [{
               "type": "object",
               "title": "Basic Authentication",
               "properties": {
                 "user": {
                   "type": "string",
+                  "title": "Username",
+                  "description":"Username, if required to access the HTTP endpoint.",
                   "secret": true
                 },
                 "password": {
                   "type": "string",
-                  "secret": true
+                  "secret": true,
+                  "description":"Password, if required to access the HTTP endpoint.",
+                  "title": "Password"
                 }
               }
             }]
