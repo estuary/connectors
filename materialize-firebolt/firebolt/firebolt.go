@@ -42,8 +42,10 @@ type loginResponse struct {
 const endpoint = "https://api.app.firebolt.io"
 const contentType = "application/json;charset=UTF-8"
 
-// TODO: do we need to refresh token when it expires?
-// tokens are valid for 24 hours. Can transactions last that long?
+// How many minutes before token expiry should
+// we attempt to refresh tokens?
+const tokenRefreshMinutes = 30
+
 func New(config Config) (*Client, error) {
 	httpClient := http.Client{}
 
@@ -113,7 +115,70 @@ type QueryResponse struct {
 	Statistics QueryStatistics
 }
 
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+type refreshResponse struct {
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int    `json:"expires_in"`
+	Scope       string `json:"scope"`
+	TokenType   string `json:"token_type"`
+}
+
+func (c *Client) RefreshToken() error {
+	var refreshRequest, err = json.Marshal(refreshRequest{RefreshToken: c.refreshToken})
+	if err != nil {
+		return fmt.Errorf("creating refresh request failed: %w", err)
+	}
+
+	var buf = strings.NewReader(string(refreshRequest[:]))
+	resp, err := c.httpClient.Post(fmt.Sprintf("%s/auth/v1/refresh", endpoint), contentType, buf)
+
+	if err != nil {
+		return fmt.Errorf("refresh request to refresh access token failed: %w", err)
+	}
+
+	var respBuf = new(strings.Builder)
+	_, err = io.Copy(respBuf, resp.Body)
+	resp.Body.Close()
+
+	if err != nil {
+		return fmt.Errorf("reading response body of refresh request to refresh access token failed: %w", err)
+	}
+
+	var response refreshResponse
+	err = json.Unmarshal([]byte(respBuf.String()), &response)
+
+	if err != nil {
+		return fmt.Errorf("parsing response body of login request to get access token failed: %s, %w", respBuf, err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("refresh request to get access token failed: %w", err)
+	}
+
+	expiryDuration, err := time.ParseDuration(fmt.Sprintf("%ds", response.ExpiresIn))
+
+	if err != nil {
+		return fmt.Errorf("parsing expiry duration failed: %w", err)
+	}
+	c.accessToken = response.AccessToken
+	c.tokenAcquired = time.Now()
+	c.tokenExpiresIn = time.Now().Add(expiryDuration)
+	c.tokenType = response.TokenType
+
+	return nil
+}
+
 func (c *Client) Query(query string) (*QueryResponse, error) {
+	if time.Until(c.tokenExpiresIn).Minutes() < tokenRefreshMinutes {
+		var err = c.RefreshToken()
+		if err != nil {
+			return nil, fmt.Errorf("refreshing token failed: %w", err)
+		}
+	}
+
 	var url = fmt.Sprintf("https://%s/?database=%s", c.config.EngineURL, c.config.Database)
 	var req, err = http.NewRequest("POST", url, strings.NewReader(query))
 	if err != nil {
