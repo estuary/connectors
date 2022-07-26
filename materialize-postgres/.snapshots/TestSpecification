@@ -2,20 +2,15 @@
   "endpoint_spec_schema_json": {
     "$schema": "http://json-schema.org/draft-04/schema#",
     "required": [
-      "host",
+      "address",
       "user",
       "password"
     ],
     "properties": {
-      "host": {
+      "address": {
         "type": "string",
-        "title": "Host",
-        "description": "Host name of the database."
-      },
-      "port": {
-        "type": "integer",
-        "title": "Port",
-        "description": "Port on which to connect to the database."
+        "title": "Address",
+        "description": "Host and port of the database."
       },
       "user": {
         "type": "string",
