@@ -13,8 +13,7 @@ import (
 
 func TestPostgresConfig(t *testing.T) {
 	var validConfig = config{
-		Host:     "post.toast",
-		Port:     1234,
+		Address:  "post.toast:1234",
 		User:     "youser",
 		Password: "shmassword",
 		Database: "namegame",
@@ -24,15 +23,14 @@ func TestPostgresConfig(t *testing.T) {
 	require.Equal(t, "postgres://youser:shmassword@post.toast:1234/namegame", uri)
 
 	var minimal = validConfig
-	minimal.Port = 0
 	minimal.Database = ""
 	require.NoError(t, minimal.Validate())
 	uri = minimal.ToURI()
-	require.Equal(t, "postgres://youser:shmassword@post.toast", uri)
+	require.Equal(t, "postgres://youser:shmassword@post.toast:1234", uri)
 
-	var noHost = validConfig
-	noHost.Host = ""
-	require.Error(t, noHost.Validate(), "expected validation error")
+	var noAddress = validConfig
+	noAddress.Address = ""
+	require.Error(t, noAddress.Validate(), "expected validation error")
 
 	var noUser = validConfig
 	noUser.User = ""
