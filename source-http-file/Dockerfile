@@ -23,7 +23,7 @@ RUN go build -o ./connector -v ./source-http-file/...
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:local
+FROM base-image:local
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

@@ -23,7 +23,7 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-snowflake/...
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:local
+FROM base-image:local
 
 RUN apt-get update -y \
  && apt-get install --no-install-recommends -y \

@@ -23,7 +23,7 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-webhook/...
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:local
+FROM base-image:local
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

@@ -45,7 +45,8 @@ jobs:
           context: .
           file: base-image/Dockerfile
           load: true
-          tags: ghcr.io/estuary/base-image:local
+          tags: ghcr.io/estuary/base-image:local,base-image:local
+          outputs: type=docker,dest=/tmp/base-image.tar
 
       - name: Push base-image image
         uses: docker/build-push-action@v2
@@ -63,6 +64,12 @@ jobs:
           file: base-image/Dockerfile
           push: true # See 'if' above
           tags: ghcr.io/estuary/base-image:dev,ghcr.io/estuary/base-image:${{ steps.prep.outputs.version }}
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: base-image
+          path: /tmp/base-image.tar
 
   build_connectors:
     runs-on: ubuntu-20.04
@@ -152,6 +159,17 @@ jobs:
         with:
           driver-opts: |
             network=host
+
+      - name: Download base-image artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: base-image
+          path: /tmp
+
+      - name: Load base-image Docker image
+        run: |
+          docker load --input /tmp/base-image.tar
+          docker image ls -a
 
       - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v2
