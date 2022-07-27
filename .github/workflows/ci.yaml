@@ -25,6 +25,8 @@ jobs:
         run: |
           TAG=$(echo $GITHUB_SHA | head -c7)
           echo ::set-output name=tag::${TAG}
+          VERSION=$(cat base-image/VERSION | tr -d '\n')
+          echo ::set-output name=version::${VERSION}
 
       - name: Login to GitHub package docker registry
         run: |
@@ -60,7 +62,7 @@ jobs:
           context: .
           file: base-image/Dockerfile
           push: true # See 'if' above
-          tags: ghcr.io/estuary/base-image:dev,ghcr.io/estuary/base-image:v1
+          tags: ghcr.io/estuary/base-image:dev,ghcr.io/estuary/base-image:${{ steps.prep.outputs.version }}
 
   build_connectors:
     runs-on: ubuntu-20.04
@@ -98,6 +100,8 @@ jobs:
         run: |
           TAG=$(echo $GITHUB_SHA | head -c7)
           echo ::set-output name=tag::${TAG}
+          VERSION=$(cat ${{ matrix.connector }}/VERSION | tr -d '\n')
+          echo ::set-output name=version::${VERSION}
 
       - name: Download latest Flow release binaries
         run: ./fetch-flow.sh
@@ -223,4 +227,4 @@ jobs:
           context: .
           file: ${{ matrix.connector }}/Dockerfile
           push: true # See 'if' above
-          tags: ghcr.io/estuary/${{ matrix.connector }}:dev,ghcr.io/estuary/${{ matrix.connector }}:v1
+          tags: ghcr.io/estuary/${{ matrix.connector }}:dev,ghcr.io/estuary/${{ matrix.connector }}:${{ steps.prep.outputs.version }}
