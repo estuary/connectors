@@ -33,7 +33,7 @@ RUN touch src/main.rs \
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v1
+FROM ghcr.io/estuary/base-image:local
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

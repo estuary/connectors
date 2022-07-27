@@ -29,7 +29,7 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-rockset/cmd/connector/
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v1
+FROM ghcr.io/estuary/base-image:local
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
