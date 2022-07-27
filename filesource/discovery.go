@@ -16,7 +16,7 @@ import (
 )
 
 // How many documents should we read from an individual file during discovery.
-const DISCOVER_DOC_LIMIT = 1000
+const DISCOVER_DOC_LIMIT = 40000
 
 // Baseline document schema for resource streams we discover if we fail
 // during the schema-inference step.
