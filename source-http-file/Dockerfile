@@ -1,3 +1,5 @@
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+
 # Build Stage
 ################################################################################
 FROM golang:1.17-buster as builder
@@ -23,7 +25,7 @@ RUN go build -o ./connector -v ./source-http-file/...
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v1
+FROM ${BASE_IMAGE}
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
