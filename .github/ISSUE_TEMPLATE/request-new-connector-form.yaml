@@ -7,6 +7,7 @@ body:
     attributes:
       value: |
         Please fill out this form with details about the system you'd like to connect to.
+        Check [this list](https://github.com/estuary/connectors/labels/new%20connector) first to see if there's already an issue for the connector you want. If so, then you can show your support by adding a 👍 to that issue. No need to create a new one.
   - type: input
     id: system-name
     attributes:
