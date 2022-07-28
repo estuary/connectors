@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/jackc/pgconn"
@@ -60,6 +61,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"uri": *TestConnectionURI, "err": err}).Fatal("error parsing connection config")
 	}
+	replConnConfig.ConnectTimeout = 30 * time.Second
 	replConnConfig.RuntimeParams["replication"] = "database"
 	replConn, err := pgconn.ConnectConfig(ctx, replConnConfig)
 	if err != nil {
