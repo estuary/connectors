@@ -25,6 +25,9 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 	if err != nil {
 		return nil, err
 	}
+	if connConfig.ConnectTimeout == 0 {
+		connConfig.ConnectTimeout = 30 * time.Second
+	}
 	connConfig.RuntimeParams["replication"] = "database"
 	conn, err := pgconn.ConnectConfig(ctx, connConfig)
 	if err != nil {
