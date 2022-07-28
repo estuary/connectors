@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	"github.com/estuary/connectors/sqlcapture"
@@ -131,7 +132,14 @@ func (db *postgresDatabase) Connect(ctx context.Context) error {
 	}).Info("initializing connector")
 
 	// Normal database connection used for table scanning
-	var conn, err = pgx.Connect(ctx, db.config.ToURI())
+	var config, err = pgx.ParseConfig(db.config.ToURI())
+	if err != nil {
+		return fmt.Errorf("error parsing database uri: %w", err)
+	}
+	if config.ConnectTimeout == 0 {
+		config.ConnectTimeout = 30 * time.Second
+	}
+	conn, err := pgx.ConnectConfig(ctx, config)
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
