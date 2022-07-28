@@ -159,6 +159,7 @@ jobs:
           context: .
           file: ${{ matrix.connector }}/Dockerfile
           load: true
+          build-args: BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector }}:local
           secrets: |
             "rockset_api_key=${{ secrets.ROCKSET_API_KEY }}"
@@ -216,6 +217,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
+          build-args: BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
           file: ${{ matrix.connector }}/Dockerfile
           push: true
           tags: ghcr.io/estuary/${{ matrix.connector }}:${{ steps.prep.outputs.tag }}
