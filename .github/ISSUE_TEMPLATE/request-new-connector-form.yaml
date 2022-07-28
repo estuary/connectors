@@ -1,8 +1,7 @@
 name: Request new connector
-about: Request connectivity to a system that isn't yet supported in Flow
+description: Request connectivity to a system that isn't yet supported in Flow
 title: Request a connector to [capture from | materialize to] [your favorite system]
-labels: new connector
-assignees: ''
+labels: ['new connector']
 body:
   - type: markdown
     attributes:
