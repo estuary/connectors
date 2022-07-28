@@ -1,3 +1,5 @@
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+
 # Build Stage
 ################################################################################
 FROM --platform=linux/amd64 golang:1.17-bullseye as builder
@@ -24,7 +26,7 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-firebolt
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v1
+FROM ${BASE_IMAGE}
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

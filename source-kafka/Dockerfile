@@ -1,3 +1,5 @@
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+
 # Build Stage
 ################################################################################
 FROM rust:1.54-slim-buster as builder
@@ -33,7 +35,7 @@ RUN touch src/main.rs \
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v1
+FROM ${BASE_IMAGE}
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

@@ -1,3 +1,5 @@
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+
 # Build Stage
 ################################################################################
 FROM golang:1.17-bullseye as builder
@@ -23,7 +25,7 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-snowflake/...
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v1
+FROM ${BASE_IMAGE}
 
 RUN apt-get update -y \
  && apt-get install --no-install-recommends -y \
