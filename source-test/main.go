@@ -59,7 +59,6 @@ const configSchema = `{
       "title": "Authentication",
       "description": "Google API Credentials",
       "x-oauth2-provider": "google",
-      "required": ["auth_type", "client_id", "client_secret", "refresh_token"],
       "properties": {
         "client_id": {
           "title": "Client ID",
