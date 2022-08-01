@@ -101,7 +101,7 @@ const (
 	streamProgressInterval = 60 * time.Second        // After `streamProgressInterval` the replication streaming code may log a progress report.
 )
 
-const emitterBufferSize = 1 * 1024 * 1024
+const emitterBufferSize = 4 * 1024 * 1024
 
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
