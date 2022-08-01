@@ -62,11 +62,23 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 	if err := grp.Wait(); err != nil {
 		b.Fatalf("error populating tables: %v", err)
 	}
+
 	var catalog = tests.ConfiguredCatalog(ctx, b, tb, tables...)
 	var dummyOutput = &benchmarkMessageOutput{Inner: json.NewEncoder(io.Discard)}
 
 	logrus.WithField("iterations", iterations).Info("running backfill benchmark")
 	for i := 0; i < iterations; i++ {
+		// Run a capture of a single empty table. This helps to ensure that the database
+		// has fully processed and flushed all of the bulk data loading before we begin
+		// timing the actual capture of data we care about.
+		var emptyTable = tb.CreateTable(ctx, b, "empty", "(id INTEGER PRIMARY KEY, data TEXT)")
+		var dummyCatalog = tests.ConfiguredCatalog(ctx, b, tb, emptyTable)
+		var dummyState = sqlcapture.PersistentState{}
+		if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), &dummyCatalog, &dummyState, dummyOutput); err != nil {
+			b.Fatalf("capture failed with error: %v", err)
+		}
+		dummyOutput.Reset()
+
 		var state = sqlcapture.PersistentState{}
 		b.StartTimer()
 		if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), &catalog, &state, dummyOutput); err != nil {

@@ -58,13 +58,13 @@ func (r *resultSet) Buffer(streamID string, keyColumns []string, events []Change
 		}
 		chunk.rows[string(bs)] = event
 		chunk.scanned = bs
-		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithFields(logrus.Fields{
 				"stream":   streamID,
 				"op":       event.Operation,
 				"rowKey":   base64.StdEncoding.EncodeToString(bs),
 				"chunkEnd": base64.StdEncoding.EncodeToString(chunk.scanned),
-			}).Debug("buffered scan result")
+			}).Trace("buffered scan result")
 		}
 	}
 	return nil
