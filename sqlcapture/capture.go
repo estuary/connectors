@@ -90,6 +90,9 @@ type Capture struct {
 	Database Database                   // The database-specific interface which is operated by the generic Capture logic
 
 	discovery map[string]TableInfo // Cached result of the most recent table discovery request
+
+	emitQueue chan interface{} // A large buffered channel containing messages to be serialized and emitted
+	emitError chan error       // A unit-buffered channel which contains the emitter goroutine's exit status after it terminates
 }
 
 const (
@@ -98,8 +101,19 @@ const (
 	streamProgressInterval = 60 * time.Second        // After `streamProgressInterval` the replication streaming code may log a progress report.
 )
 
+const emitterBufferSize = 1 * 1024 * 1024
+
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
+	// Start up the 'message emitter' goroutine and allocate associated channels.
+	// This goroutine exists so that output message serialization can take place
+	// in parallel with ongoing backfill/replication processing.
+	emitterCtx, emitterCancel := context.WithCancel(ctx)
+	defer emitterCancel()
+	c.emitQueue = make(chan interface{}, emitterBufferSize)
+	c.emitError = make(chan error, 1)
+	go emitWorker(emitterCtx, c.Encoder, c.emitQueue, c.emitError)
+
 	// Perform discovery and cache the result. This is used at startup when
 	// updating the state to reflect catalog changes, and then later it is
 	// plumbed through so that value translation can take column types into
@@ -212,7 +226,16 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 		targetWatermark = watermark
 	}
-	return c.streamToWatermark(replStream, targetWatermark, nil)
+	if err := c.streamToWatermark(replStream, targetWatermark, nil); err != nil {
+		return err
+	}
+
+	// Since the final 'streamToWatermark' terminated without an error, this must
+	// be a polling-mode connector run (and is probably an automated test run). So
+	// to finish up cleanly we need to close the emitter queue and wait for it to
+	// shut down properly.
+	close(c.emitQueue)
+	return <-c.emitError
 }
 
 func (c *Capture) updateState(ctx context.Context) error {
@@ -511,72 +534,113 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 }
 
 func (c *Capture) handleChangeEvent(streamID string, event ChangeEvent) error {
-	var out map[string]interface{}
-
-	var meta = struct {
-		Operation ChangeOp               `json:"op"`
-		Source    SourceMetadata         `json:"source"`
-		Before    map[string]interface{} `json:"before,omitempty"`
-	}{
-		Operation: event.Operation,
-		Source:    event.Source,
-		Before:    nil,
-	}
-
-	switch event.Operation {
-	case InsertOp:
-		out = event.After // Before is never used.
-	case UpdateOp:
-		meta.Before, out = event.Before, event.After
-	case DeleteOp:
-		out = event.Before // After is never used.
-	}
-	out["_meta"] = &meta
-
-	var rawData, err = json.Marshal(out)
-	if err != nil {
-		return fmt.Errorf("error encoding record data: %w", err)
-	}
-	var sourceCommon = event.Source.Common()
-	return c.Encoder.Encode(airbyte.Message{
-		Type: airbyte.MessageTypeRecord,
-		Record: &airbyte.Record{
-			Namespace: sourceCommon.Schema,
-			Stream:    sourceCommon.Table,
-			EmittedAt: time.Now().UnixNano() / int64(time.Millisecond),
-			Data:      json.RawMessage(rawData),
-		},
-	})
+	return c.emit(&event)
 }
 
 func (c *Capture) emitState() error {
 	// Put together an update which includes only those streams which have changed
 	// since the last state output. At the same time, clear the dirty flags on all
 	// those tables.
-	var stateUpdate = PersistentState{
-		Cursor:  c.State.Cursor,
-		Streams: make(map[string]TableState),
-	}
+	var streams = make(map[string]TableState)
 	for streamID, state := range c.State.Streams {
 		if state.dirty {
 			state.dirty = false
 			c.State.Streams[streamID] = state
-			stateUpdate.Streams[streamID] = state
+			streams[streamID] = state
 		}
 	}
-
-	var rawState, err = json.Marshal(stateUpdate)
-	if err != nil {
-		return fmt.Errorf("error encoding state message: %w", err)
-	}
-	logrus.WithField("state", string(rawState)).Trace("emitting state update")
-	return c.Encoder.Encode(airbyte.Message{
-		Type: airbyte.MessageTypeState,
-		State: &airbyte.State{
-			Data:  json.RawMessage(rawState),
-			Merge: true,
-		},
+	return c.emit(&PersistentState{
+		Cursor:  c.State.Cursor,
+		Streams: streams,
 	})
+}
+
+// Queue a message to be emitted by the worker goroutine, and at the same
+// time check for an error so that message output failures will cleanly
+// shut down the overall capture.
+func (c *Capture) emit(msg interface{}) error {
+	select {
+	case err := <-c.emitError:
+		return err
+	case c.emitQueue <- msg:
+		return nil
+	}
+}
+
+// Hang on now. How can we wait for the emit worker to cleanly shut down?
+// Ah,
+func emitWorker(ctx context.Context, enc MessageOutput, emitQueue <-chan interface{}, emitError chan<- error) {
+	for {
+		select {
+		case <-ctx.Done():
+			emitError <- fmt.Errorf("emitter context cancelled")
+			return
+		case msg, ok := <-emitQueue:
+			if !ok {
+				emitError <- nil
+				return
+			}
+			if err := emitMessage(enc, msg); err != nil {
+				emitError <- err
+				return
+			}
+		}
+	}
+}
+
+func emitMessage(enc MessageOutput, msg interface{}) error {
+	switch msg := msg.(type) {
+	case *ChangeEvent:
+		var out map[string]interface{}
+		var meta = struct {
+			Operation ChangeOp               `json:"op"`
+			Source    SourceMetadata         `json:"source"`
+			Before    map[string]interface{} `json:"before,omitempty"`
+		}{
+			Operation: msg.Operation,
+			Source:    msg.Source,
+			Before:    nil,
+		}
+		switch msg.Operation {
+		case InsertOp:
+			out = msg.After // Before is never used.
+		case UpdateOp:
+			meta.Before, out = msg.Before, msg.After
+		case DeleteOp:
+			out = msg.Before // After is never used.
+		}
+		out["_meta"] = &meta
+
+		var sourceCommon = msg.Source.Common()
+		var bs, err = json.Marshal(out)
+		if err != nil {
+			return fmt.Errorf("error serializing record data: %w", err)
+		}
+		return enc.Encode(airbyte.Message{
+			Type: airbyte.MessageTypeRecord,
+			Record: &airbyte.Record{
+				Namespace: sourceCommon.Schema,
+				Stream:    sourceCommon.Table,
+				EmittedAt: time.Now().UnixNano() / int64(time.Millisecond),
+				Data:      json.RawMessage(bs),
+			},
+		})
+	case *PersistentState:
+		var bs, err = json.Marshal(msg)
+		if err != nil {
+			return fmt.Errorf("error serializing state checkpoint: %w", err)
+		}
+		logrus.WithField("state", string(bs)).Trace("emitting state update")
+		return enc.Encode(airbyte.Message{
+			Type: airbyte.MessageTypeState,
+			State: &airbyte.State{
+				Data:  json.RawMessage(bs),
+				Merge: true,
+			},
+		})
+	default:
+		return fmt.Errorf("invalid message to emit: %#v", msg)
+	}
 }
 
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
