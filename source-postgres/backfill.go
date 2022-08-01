@@ -92,7 +92,7 @@ func (db *postgresDatabase) WatermarksTable() string {
 // backfillChunkSize controls how many rows will be read from the database in a
 // single query. In normal use it acts like a constant, it's just a variable here
 // so that it can be lowered in tests to exercise chunking behavior more easily.
-var backfillChunkSize = 4096
+var backfillChunkSize = 128 * 1024
 
 func buildScanQuery(start bool, keyColumns []string, schemaName, tableName string) string {
 	// Construct strings like `(foo, bar, baz)` and `($1, $2, $3)` for use in the query
