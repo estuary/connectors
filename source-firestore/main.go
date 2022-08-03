@@ -201,6 +201,7 @@ func doRead(args airbyte.ReadCmd) error {
 
 	var enc = airbyte.NewStdoutEncoder()
 	for {
+		var changes = false
 		var now = time.Now()
 		for _, stream := range catalog.Streams {
 			var streamName = stream.Stream.Name
@@ -213,7 +214,6 @@ func doRead(args airbyte.ReadCmd) error {
 			}
 
 			var collection = client.Collection(streamName)
-			// FIXME: DocumentID is not ordered, so the user must have a field for us to order the documents on
 			var query = collection.Query.OrderBy(streamCursor, firestore.Asc)
 			if streamState != "" {
 				query = query.StartAt(streamState)
@@ -246,18 +246,21 @@ func doRead(args airbyte.ReadCmd) error {
 				}
 
 				state.Snapshots[streamName] = data[streamCursor]
+				changes = true
 			}
 		}
 
-		newStateJson, err := json.Marshal(state)
-		if err != nil {
-			return err
-		}
-		if err = enc.Encode(airbyte.Message{
-			Type:  airbyte.MessageTypeState,
-			State: &airbyte.State{Data: newStateJson},
-		}); err != nil {
-			return err
+		if changes {
+			newStateJson, err := json.Marshal(state)
+			if err != nil {
+				return err
+			}
+			if err = enc.Encode(airbyte.Message{
+				Type:  airbyte.MessageTypeState,
+				State: &airbyte.State{Data: newStateJson},
+			}); err != nil {
+				return err
+			}
 		}
 
 		if !catalog.Tail {
