@@ -19,7 +19,7 @@ import (
 
 type State struct {
 	// Maps each collection to the latest DocumentSnapshot that we have received
-	Snapshots map[string]string
+	Snapshots map[string]interface{}
 }
 
 type config struct {
@@ -183,7 +183,7 @@ func doRead(args airbyte.ReadCmd) error {
 	}
 
 	if state.Snapshots == nil {
-		state.Snapshots = map[string]string{}
+		state.Snapshots = map[string]interface{}{}
 	}
 
 	ctx := context.Background()
@@ -205,10 +205,16 @@ func doRead(args airbyte.ReadCmd) error {
 		for _, stream := range catalog.Streams {
 			var streamName = stream.Stream.Name
 			var streamState = state.Snapshots[streamName]
+			var streamCursor string
+			if len(stream.CursorField) > 0 {
+				streamCursor = stream.CursorField[0]
+			} else {
+				return fmt.Errorf("Cursor is mandatory for all bindings. Binding %s does not have a cursorField.", streamName)
+			}
 
 			var collection = client.Collection(streamName)
 			// FIXME: DocumentID is not ordered, so the user must have a field for us to order the documents on
-			var query = collection.Query.OrderBy(firestore.DocumentID, firestore.Asc)
+			var query = collection.Query.OrderBy(streamCursor, firestore.Asc)
 			if streamState != "" {
 				query = query.StartAt(streamState)
 			}
@@ -239,7 +245,7 @@ func doRead(args airbyte.ReadCmd) error {
 					return err
 				}
 
-				state.Snapshots[streamName] = doc.Ref.ID
+				state.Snapshots[streamName] = data[streamCursor]
 			}
 		}
 
