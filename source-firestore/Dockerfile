@@ -18,7 +18,7 @@ COPY go-schema-gen  ./go-schema-gen
 RUN go test -v ./source-firestore/...
 
 # Build the connector.
-RUN GOARCH=amd64 GOOS=linux go build -o ./connector -v ./source-firestore/...
+RUN GOARCH=amd64 GOOS=linux go build -o ./connector -v ./source-firestore/*.go
 
 # Runtime Stage
 ################################################################################
