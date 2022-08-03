@@ -75,6 +75,7 @@ jobs:
           - source-hello-world
           - source-http-file
           - source-test
+          - source-firestore
           - source-kafka
           - source-kinesis
           - source-mysql
