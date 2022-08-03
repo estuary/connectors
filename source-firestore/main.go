@@ -216,7 +216,7 @@ func doRead(args airbyte.ReadCmd) error {
 			var collection = client.Collection(streamName)
 			var query = collection.Query.OrderBy(streamCursor, firestore.Asc)
 			if streamState != "" {
-				query = query.StartAt(streamState)
+				query = query.StartAfter(streamState)
 			}
 			var docs = query.Documents(ctx)
 
