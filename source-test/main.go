@@ -19,7 +19,6 @@ type oauthCredentials struct {
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
 }
 
 type State struct {
@@ -82,11 +81,6 @@ const configSchema = `{
           "title": "Access Token",
           "type": "string",
           "secret": true
-        },
-        "refresh_token": {
-          "title": "Refresh Token",
-          "type": "string",
-          "secret": true
         }
       }
     }
@@ -107,7 +101,7 @@ const oauthSpec = `{
   "authUrlTemplate": "https://accounts.google.com/o/oauth2/auth?access_type=offline&client_id={{ client_id }}&redirect_uri={{ redirect_uri }}&response_type=code&scope=email&state={{ state }}",
   "accessTokenUrlTemplate": "https://oauth2.googleapis.com/token",
   "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"client_id\": \"{{ client_id }}\", \"client_secret\": \"{{ client_secret }}\", \"redirect_uri\": \"{{ redirect_uri }}\", \"code\": \"{{ code }}\"}",
-  "accessTokenResponseMap": "{\"refresh_token\": \"/refresh_token\",\"testing\": \"/access_token\"}"
+  "accessTokenResponseMap": "{\"access_token\": \"/access_token\"}"
 }`
 
 func main() {
