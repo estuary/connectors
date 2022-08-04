@@ -15,7 +15,6 @@ import (
 	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 )
 
 // The benchmarks 'BenchmarkBackfill' and 'BenchmarkReplication' initialize
@@ -53,15 +52,10 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 
 	var tb, ctx = TestBackend, context.Background()
 	var tables []string
-	var grp errgroup.Group
 	for i := 0; i < numTables; i++ {
 		var table = tb.CreateTable(ctx, b, fmt.Sprintf("table%d", i), "(id INTEGER PRIMARY KEY, uid TEXT, name TEXT, status INTEGER, modified DATE, foo_id INTEGER, padding TEXT)")
 		tables = append(tables, table)
-		//grp.Go(func() error { return populateTable(ctx, b, tb, table, rowsPerTable) })
 		populateTable(ctx, b, tb, table, rowsPerTable)
-	}
-	if err := grp.Wait(); err != nil {
-		b.Fatalf("error populating tables: %v", err)
 	}
 	var catalog = tests.ConfiguredCatalog(ctx, b, tb, tables...)
 	var dummyOutput = &benchmarkMessageOutput{Inner: json.NewEncoder(io.Discard)}
@@ -100,13 +94,10 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 		b.Fatalf("capture failed with error: %v", err)
 	}
 
-	var grp errgroup.Group
 	for _, table := range tables {
 		var table = table
-		//grp.Go(func() error { return populateTable(ctx, b, tb, table, rowsPerTable) })
 		populateTable(ctx, b, tb, table, rowsPerTable)
 	}
-	grp.Wait()
 
 	for i := 0; i < iterations; i++ {
 		var state = tests.CopyState(initialState)
