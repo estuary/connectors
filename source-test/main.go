@@ -9,9 +9,17 @@ import (
 )
 
 type Config struct {
-	Greetings int  `json:"greetings"`
-	SkipState bool `json:"skip_state"`
-	FailAfter int  `json:"fail_after"`
+	Greetings        int              `json:"greetings"`
+	SkipState        bool             `json:"skip_state"`
+	FailAfter        int              `json:"fail_after"`
+	OAuthCredentials oauthCredentials `json:"credentials"`
+}
+
+type oauthCredentials struct {
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type State struct {
