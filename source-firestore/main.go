@@ -20,15 +20,18 @@ import (
 type State struct {
 	// Last time a full table scan was run, we use this to know if we need to do a full scan
 	// to reach eventual consistency
-	LastScan string
+	LastScan time.Time
 }
+
+const DEFAULT_SCAN_INTERVAL string = "12h"
+const SCAN_INTERVAL_NEVER string = "never"
 
 type config struct {
 	// Service account JSON key to use as Application Default Credentials
 	CredentialsJSON string `json:"googleCredentials" jsonschema:"title=Credentials,description=Google Cloud Service Account JSON credentials." jsonschema_extras:"secret=true,multiline=true"`
 
 	// How frequently should we scan all collections to ensure consistency
-	ScanInterval string `json:"scan_interval" jsonschema:"title=Scan Interval,description=How frequently should all collections be scanned to ensure consistency. See https://pkg.go.dev/time#ParseDuration for supported values.,default=12h"`
+	ScanInterval string `json:"scan_interval" jsonschema:"title=Scan Interval,description=How frequently should all collections be scanned to ensure consistency. See https://pkg.go.dev/time#ParseDuration for supported values. To turn off scans, use the value 'never'.,default=12h"`
 }
 
 func (c *config) Validate() error {
@@ -57,6 +60,7 @@ func main() {
 
 	var spec = airbyte.Spec{
 		SupportsIncremental:           true,
+		DocumentationURL:              "https://go.estuary.dev/source-firestore",
 		SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
 		ConnectionSpecification:       json.RawMessage(endpointSchema),
 	}
@@ -178,11 +182,19 @@ func doDiscover(args airbyte.DiscoverCmd) error {
 	})
 }
 
+type EncoderRequestType int8
+
+const (
+	EncodeDocument EncoderRequestType = 0
+	StateUpdate    EncoderRequestType = 1
+)
+
 // struct sent over channel to encoder
 type encDocument struct {
-	doc        []byte
-	streamName string
-	state      []byte
+	requestType EncoderRequestType
+	doc         []byte
+	streamName  string
+	state       []byte
 }
 
 func doRead(args airbyte.ReadCmd) error {
@@ -200,17 +212,10 @@ func doRead(args airbyte.ReadCmd) error {
 		}
 	}
 
-	var lastScan = time.UnixMilli(0)
-	if state.LastScan != "" {
-		var err error
-		lastScan, err = time.Parse(time.RFC3339, state.LastScan)
-		if err != nil {
-			return fmt.Errorf("parsing last scan checkpoint failed: %w", err)
-		}
-	}
+	var lastScan = state.LastScan
 
-	var scanInterval, _ = time.ParseDuration("12h")
-	if cfg.ScanInterval != "" {
+	var scanInterval, _ = time.ParseDuration(DEFAULT_SCAN_INTERVAL)
+	if cfg.ScanInterval != "" && cfg.ScanInterval != SCAN_INTERVAL_NEVER {
 		var err error
 		scanInterval, err = time.ParseDuration(cfg.ScanInterval)
 
@@ -247,9 +252,11 @@ func doRead(args airbyte.ReadCmd) error {
 		var streamName = stream.Stream.Name
 
 		var collection = client.Collection(streamName)
-		eg.Go(func() error {
-			return fullScan(ctx, lastScan, scanInterval, collection, docsCh, catalog.Tail)
-		})
+		if cfg.ScanInterval != SCAN_INTERVAL_NEVER {
+			eg.Go(func() error {
+				return fullScan(ctx, lastScan, scanInterval, collection, docsCh, catalog.Tail)
+			})
+		}
 
 		if catalog.Tail {
 			eg.Go(func() error {
@@ -277,7 +284,7 @@ func encodeDocs(docsCh chan encDocument) error {
 	for {
 		encDoc := <-docsCh
 
-		if len(encDoc.doc) != 0 {
+		if encDoc.requestType == EncodeDocument {
 			log.WithFields(log.Fields{
 				"doc":        string(encDoc.doc),
 				"streamName": encDoc.streamName,
@@ -299,13 +306,15 @@ func encodeDocs(docsCh chan encDocument) error {
 			}); err != nil {
 				return err
 			}
-		} else if len(encDoc.state) != 0 {
+		} else if encDoc.requestType == StateUpdate {
 			if err := enc.Encode(airbyte.Message{
 				Type:  airbyte.MessageTypeState,
 				State: &airbyte.State{Data: encDoc.state},
 			}); err != nil {
 				return err
 			}
+		} else {
+			panic(fmt.Sprintf("unknown EncoderRequestType %v", encDoc.requestType))
 		}
 	}
 }
@@ -346,8 +355,9 @@ func listenForChanges(ctx context.Context, collection *firestore.CollectionRef, 
 					"id":  change.Doc.Ref.ID,
 				}).Info("received change doc")
 				docsCh <- encDocument{
-					streamName: collection.ID,
-					doc:        docJson,
+					requestType: EncodeDocument,
+					streamName:  collection.ID,
+					doc:         docJson,
 				}
 			}
 		}
@@ -368,7 +378,7 @@ func fullScan(ctx context.Context, lastScan time.Time, scanInterval time.Duratio
 	var query = collection.Query
 	var docsIterator = query.Documents(ctx)
 
-	var scanTime, _ = time.Now().MarshalText()
+	var scanTime = time.Now()
 	for {
 		var doc, err = docsIterator.Next()
 
@@ -385,19 +395,21 @@ func fullScan(ctx context.Context, lastScan time.Time, scanInterval time.Duratio
 			return err
 		}
 		docsCh <- encDocument{
-			streamName: collection.ID,
-			doc:        docJson,
+			requestType: EncodeDocument,
+			streamName:  collection.ID,
+			doc:         docJson,
 		}
 	}
 
 	var newState, err = json.Marshal(State{
-		LastScan: string(scanTime),
+		LastScan: scanTime,
 	})
 	if err != nil {
 		return fmt.Errorf("marshalling state: %w", err)
 	}
 	docsCh <- encDocument{
-		state: newState,
+		requestType: StateUpdate,
+		state:       newState,
 	}
 
 	// If we are not tailing, we close the channel after the full scan
@@ -407,5 +419,5 @@ func fullScan(ctx context.Context, lastScan time.Time, scanInterval time.Duratio
 		return nil
 	}
 
-	return fullScan(ctx, time.Now(), scanInterval, collection, docsCh, tail)
+	return fullScan(ctx, scanTime, scanInterval, collection, docsCh, tail)
 }
