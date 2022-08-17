@@ -46,6 +46,11 @@ type Source struct {
 	Connect func(context.Context, Config) (Store, error)
 	// DocumentationURL links to the Source's extended user documentation.
 	DocumentationURL string
+	// TimeHorizonDelta is added to the current time in order to determine the upper time bound for
+	// a sweep of the store. The final upper time bound used to bound modification times we'll
+	// examine in a given sweep of the Store. Given a sampled wall-time T, we presume (hope) that no
+	// files will appear in the store after T having a modification time of T - horizonDelta.
+	TimeHorizonDelta time.Duration
 }
 
 // Store is a minimal interface of an binary large object storage service.
@@ -188,7 +193,7 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 	}
 
 	// Time horizon used for identifying files which fall within a modification time window.
-	var horizon = time.Now().Add(-horizonDelta).Round(time.Second).UTC()
+	var horizon = time.Now().Add(src.TimeHorizonDelta).Round(time.Second).UTC()
 
 	var sharedMu = new(sync.Mutex)
 	var enc = airbyte.NewStdoutEncoder()
@@ -436,11 +441,6 @@ func configureParser(cfg *parser.Config, obj ObjectInfo) *parser.Config {
 }
 
 const (
-	// horizonDelta is the time horizon used to bound modification times we'll examine
-	// in a given sweep of the Store. Given a sampled wall-time T, we presume (hope)
-	// that no files will appear in the store after T having a modification time of
-	// T - horizonDelta.
-	horizonDelta = time.Second * 30
 	// Location of the filename in produced documents.
 	metaFileLocation = "/_meta/file"
 	// Location of the record offset in produced documents.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/estuary/connectors/filesource"
@@ -173,6 +174,9 @@ func main() {
     }`)
 		},
 		DocumentationURL: "https://go.estuary.dev/source-gcs",
+		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
+		// timestamp that's equal to the `MinBound` in the state.
+		TimeHorizonDelta: time.Second * -30,
 	}
 
 	src.Main()
