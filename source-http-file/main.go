@@ -200,6 +200,13 @@ func main() {
       }`)
 		},
 		DocumentationURL: "https://go.estuary.dev/source-http-file",
+		// Set the delta to far in the future. The scenario that the the `MaxBound` protects agains
+		// is only possible when a listing can return multiple files, which is never the case for
+		// this connector. Setting it in the future allows this connector to fetch files where the
+		// server may set the `Last-Modified` header to the current time when the response is
+		// generated, which could otherwise fall after the `MaxBound`, which is computed prior to
+		// sending any requests.
+		TimeHorizonDelta: time.Hour,
 	}
 
 	src.Main()
