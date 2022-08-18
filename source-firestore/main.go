@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	firestore "cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
 	schemagen "github.com/estuary/connectors/go-schema-gen"
-	"github.com/estuary/connectors/schema_inference"
 	"github.com/estuary/flow/go/protocols/airbyte"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -102,18 +100,17 @@ func doCheck(args airbyte.CheckCmd) error {
 	})
 }
 
-const DISCOVER_DOC_LIMIT = 40000
 const PATH_FIELD = "__path__"
 
 // Firestore's original collection path is very verbose, and it includes the parent document ID
 // This function creates a path for a collection which only refers to its parent collections, not documents
 // e.g. projects/hello-flow-mahdi/databases/(default)/documents/group/OLgLVvZnykvFR4ZyqUuS/group
-// becomes group/group
-func collectionPath(collection *firestore.CollectionRef) string {
+// becomes group/*/group
+func collectionPath(collection string) string {
 	// the prefix up to the first "/documents" is unnecessary, so we remove that
-	var parts = strings.SplitN(collection.Path, "/documents/", 2)
+	var parts = strings.SplitN(collection, "/documents/", 2)
 	if len(parts) < 2 {
-		panic(fmt.Sprintf("collection path does not match expectations: %s", collection.Path))
+		panic(fmt.Sprintf("collection path does not match expectations: %s", collection))
 	}
 	var after = parts[1]
 
@@ -128,72 +125,6 @@ func collectionPath(collection *firestore.CollectionRef) string {
 	}
 
 	return strings.Trim(cleanedPath, "/*/")
-}
-
-// Recursively discover collections
-func discoverCollection(ctx context.Context, catalog *airbyte.Catalog, collection *firestore.CollectionRef) error {
-	var docsCh = make(chan schema_inference.Document)
-	var logEntry = log.WithField("collection", collection.Path)
-
-	var eg = new(errgroup.Group)
-	var schema schema_inference.Schema
-
-	var query = collection.Query.Limit(DISCOVER_DOC_LIMIT)
-	var docs = query.Documents(ctx)
-
-	eg.Go(func() error {
-		var err error
-		schema, err = schema_inference.Run(ctx, logEntry, docsCh)
-		if err != nil {
-			return fmt.Errorf("schema inference: %w", err)
-		}
-		return nil
-	})
-
-	for {
-		var doc, err = docs.Next()
-		if err == iterator.Done {
-			break
-		} else if err != nil {
-			return err
-		}
-		var data = doc.Data()
-		data[firestore.DocumentID] = doc.Ref.ID
-		data[PATH_FIELD] = doc.Ref.Path
-		docJson, err := json.Marshal(data)
-		docsCh <- docJson
-
-		var docCollectionsIterator = doc.Ref.Collections(ctx)
-		for {
-			var docCol, err = docCollectionsIterator.Next()
-			if err == iterator.Done {
-				break
-			} else if err != nil {
-				return err
-			}
-
-			err = discoverCollection(ctx, catalog, docCol)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	close(docsCh)
-
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-
-	catalog.Streams = append(catalog.Streams, airbyte.Stream{
-		Name:                    collectionPath(collection),
-		JSONSchema:              schema,
-		SupportedSyncModes:      []airbyte.SyncMode{airbyte.SyncModeIncremental},
-		SourceDefinedCursor:     true,
-		SourceDefinedPrimaryKey: [][]string{{firestore.DocumentID}},
-	})
-
-	return nil
 }
 
 func doDiscover(args airbyte.DiscoverCmd) error {
@@ -216,20 +147,9 @@ func doDiscover(args airbyte.DiscoverCmd) error {
 	defer client.Close()
 
 	var catalog = new(airbyte.Catalog)
-	var collections = client.Collections(ctx)
-	for {
-		var collection, err = collections.Next()
-		if err == iterator.Done {
-			break
-		} else if err != nil {
-			return err
-		}
-
-		err = discoverCollection(ctx, catalog, collection)
-
-		if err != nil {
-			return err
-		}
+	err = discoverCollections(ctx, client, catalog)
+	if err != nil {
+		return err
 	}
 
 	var encoder = airbyte.NewStdoutEncoder()
@@ -415,7 +335,7 @@ func listenForChanges(ctx context.Context, collection *firestore.CollectionRef, 
 				}).Info("received change doc")
 				docsCh <- encDocument{
 					requestType: EncodeDocument,
-					streamName:  collectionPath(collection),
+					streamName:  collectionPath(collection.Path),
 					doc:         docJson,
 				}
 			}
@@ -456,7 +376,7 @@ func fullScan(ctx context.Context, lastScan time.Time, scanInterval time.Duratio
 		}
 		docsCh <- encDocument{
 			requestType: EncodeDocument,
-			streamName:  collectionPath(collection),
+			streamName:  collectionPath(collection.Path),
 			doc:         docJson,
 		}
 	}
