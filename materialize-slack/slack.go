@@ -128,13 +128,3 @@ func (api *slackAPI) request(httpMethod, funcName string, req, resp interface{})
 	}
 	return nil
 }
-
-// func main() {
-// 	var slack = &slackAPI{
-// 		Token: "xoxb-1068976371269-3960963951137-gMUrVV3qQhrMF6qDtMMRFkle",
-// 	}
-// 	if err := slack.PostMessage("id:U02BEN2RK7E", "Test message from code"); err != nil {
-// 		log.Fatalf("test failed: %v", err)
-// 	}
-// 	log.Println("test passed")
-// }

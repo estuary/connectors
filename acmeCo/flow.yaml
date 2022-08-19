@@ -1,0 +1,31 @@
+import:
+- source-clock.flow.yaml
+
+collections:
+  acmeCo/messages:
+    schema: messages.schema.yaml
+    key: [/ts]
+    derivation:
+      typescript:
+        module: messages.flow.ts
+      transform:
+        addMessage:
+          source:
+            name: acmeCo/tick1m
+          publish:
+            lambda: typescript
+
+materializations:
+  acmeCo/to-slack:
+    endpoint:
+      connector:
+        image: materialize-slack:local
+        config: materialize-slack.config.yaml
+    bindings:
+      - source: acmeCo/messages
+        resource:
+          channel: "id:U02BEN2RK7E"
+        fields:
+          recommended: true
+
+storageMappings: {"": {"stores": [{"bucket": "wgd-test-bucket", "prefix": "flow/", "provider": "GCS"}]}}

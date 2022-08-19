@@ -1,0 +1,29 @@
+collections:
+  acmeCo/tick1h:
+    schema: tick1h.schema.yaml
+    key: [/ts]
+  acmeCo/tick1m:
+    schema: tick1m.schema.yaml
+    key: [/ts]
+  acmeCo/tick5s:
+    schema: tick5s.schema.yaml
+    key: [/ts]
+captures:
+  acmeCo/source-clock:
+    endpoint:
+      connector:
+        image: source-clock:local
+        config: source-clock.config.yaml
+    bindings:
+      - resource:
+          stream: tick5s
+          syncMode: incremental
+        target: acmeCo/tick5s
+      - resource:
+          stream: tick1m
+          syncMode: incremental
+        target: acmeCo/tick1m
+      - resource:
+          stream: tick1h
+          syncMode: incremental
+        target: acmeCo/tick1h

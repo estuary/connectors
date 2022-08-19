@@ -1,0 +1,15 @@
+token_sops: ENC[AES256_GCM,data:9Ez8+fuNy0m7PVab7l9OteZttIToBcihrqDfjG+Lh5+YRV599gl090w5+VAvDSK43BIymCMi1kPd,iv:l6zjUB85rIwe/q02sevZzbmC4ndNWTET/hOXVaWpH7w=,tag:yq7TE2lFBMEdlYFId0SLPQ==,type:str]
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/catalog-sops/cryptoKeys/config-encryptor
+          created_at: "2022-07-26T18:34:23Z"
+          enc: CiQABM8p+4Y9kkZL00z2zw8jzSWP4l5THPOWvmzGbGRCtGmcRX0SSQDqeAqHNM1fUSIz30P9jeIrf5zfhKBqPuylK1+aW2j/B+yPmV2qYXApdlUTVGeGA/ncwUENd6b0lsmLbimoetEj99oARnw1k4E=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2022-08-22T00:57:41Z"
+    mac: ENC[AES256_GCM,data:PA6lWPubZA8j7cryov/AvZDIHl4cWV2t3dDCyJ4wcKOm+YRYUIxEc66+LK6pKFa4EfCuAUa7JsoKTzWQ0VdxT/YMSV8RswmesI/G9xWaJ4ESDp2FS4rilo96ObyQbWsaEydb2tCaZPNNCqnFKH189K309N7CZnopp1TeZBsICCY=,iv:ReDOliC36MjVOpGR4mtUMnqyWPxp1WMeal+pNCo9lXg=,tag:TrCBQABeigrL/uVg9rtYzQ==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3

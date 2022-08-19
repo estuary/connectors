@@ -1,0 +1,16 @@
+$schema: http://json-schema.org/draft/2020-12/schema
+properties:
+  message:
+    description: A human-readable message
+    title: Message Text
+    type: string
+  ts:
+    description: The timestamp at which this tick event was generated.
+    format: date-time
+    title: Event Timestamp
+    type: string
+required:
+  - message
+  - ts
+title: Messages
+type: object

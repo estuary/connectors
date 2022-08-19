@@ -1,0 +1,3 @@
+dummy: ""
+# Discovery does not like a completely empty config
+# [string]
