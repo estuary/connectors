@@ -1,6 +1,6 @@
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.17-buster as builder
+FROM golang:1.17-buster as builder
 
 WORKDIR /builder
 
@@ -11,14 +11,17 @@ RUN go mod download
 
 # Build the connector projects we depend on.
 COPY schema_inference ./schema_inference
-COPY source-firestore ./source-firestore
+COPY source-boilerplate ./source-boilerplate
 COPY go-schema-gen  ./go-schema-gen
+RUN go get -v ./source-boilerplate ./schema_inference ./go-schema-gen
+
+COPY source-firestore ./source-firestore
 
 # Run the unit tests.
 RUN go test -v ./source-firestore/...
 
 # Build the connector.
-RUN GOARCH=amd64 GOOS=linux go build -o ./connector -v ./source-firestore/*.go
+RUN go build -o ./connector -v ./source-firestore/...
 
 # Runtime Stage
 ################################################################################
@@ -34,6 +37,9 @@ COPY flow-bin/flow-schema-inference ./
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./connector
+
+LABEL FLOW_RUNTIME_PROTOCOL=capture
+LABEL CONNECTOR_PROTOCOL=flow-capture
 
 # Avoid running the connector as root.
 USER nonroot:nonroot

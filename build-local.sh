@@ -4,4 +4,4 @@ if [[ $# < 1 ]]; then
     echo "Usage: build-local.sh <connector_name>"
     exit 1
 fi
-docker build -t $1:local -f $1/Dockerfile .
+docker buildx build --platform linux/amd64 --load -t $1:local -f $1/Dockerfile .
