@@ -3,261 +3,210 @@ package filesource
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
+	"os/exec"
 	"regexp"
+	"time"
 
-	"github.com/estuary/connectors/schema_inference"
 	"github.com/estuary/flow/go/parser"
 	"github.com/estuary/flow/go/protocols/airbyte"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
-// How many documents should we read from an individual file during discovery.
-const DISCOVER_DOC_LIMIT = 40000
+// discoverBudget is:
+// * The maximum amount of time we'll list file objects for, and
+// * The maximum amount of time we'll read sampled file object bytes for.
+//
+// These budgets are cumulative, so we can list for the full budget,
+// and then read for the full budget. Note also that this is the duration
+// we'll _read_ for, but if we're reading (say) compressed zip files we may
+// produce a lot of input documents and spend yet more time crunching them
+// within the parser and schema inference tools, so the _total_ time can still
+// substantially exceed one minute (but empirically not, say, 10 minutes).
+//
+// NOTE(johnny): We'll probably rip all this out when we re-work when and how
+// we offer schema inference...
+const discoverBudget = time.Second * 30
 
-// Baseline document schema for resource streams we discover if we fail
-// during the schema-inference step.
-var DISCOVER_FALLBACK_SCHEMA = schema_inference.Schema(`{
-		"type": "object",
-		"properties": {
-			"_meta": {
-				"type": "object",
-				"properties": {
-					"file": { "type": "string" },
-					"offset": {
-						"type": "integer",
-						"minimum": 0
-					}
-				},
-				"required": ["file", "offset"]
-			}
-		},
-		"required": ["_meta"]
-	}`)
+// Number of file objects which we'll read in an attempt to get a representative
+// schema sample.
+const reservoirSize = 25
 
 func (src Source) Discover(args airbyte.DiscoverCmd) error {
 	var conn, err = newConnector(src, args.ConfigFile)
 	if err != nil {
 		return err
 	}
-	var ctx = context.Background()
-	var root = conn.config.DiscoverRoot()
+	var backgroundCtx = context.Background()
 
-	schema, err := discoverSchema(ctx, conn, root)
-	if err != nil {
-		return err
+	var pathRe *regexp.Regexp
+	if r := conn.config.PathRegex(); r != "" {
+		if pathRe, err = regexp.Compile(r); err != nil {
+			return fmt.Errorf("building regex: %w", err)
+		}
 	}
 
-	return writeCatalogMessage(newStream(root, schema))
-}
+	// Step 1: select up to N objects to read using reservoir sampling.
+	// List until we read EOF or exceed our time budget.
+	var reservoir = make([]ObjectInfo, 0, reservoirSize)
 
-func discoverSchema(ctx context.Context, conn *connector, streamName string) (schema_inference.Schema, error) {
-	var logEntry = log.WithField("stream", streamName)
+	var listCtx, listCancel = context.WithTimeout(backgroundCtx, discoverBudget)
+	defer listCancel()
 
-	docCh, docCount, err := peekDocuments(ctx, logEntry, conn, streamName)
+	listing, err := conn.store.List(listCtx, Query{
+		Prefix:    conn.config.DiscoverRoot(),
+		StartAt:   "",
+		Recursive: true,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("schema discovery for stream `%s` failed: %w", streamName, err)
-	} else if docCount == 0 {
-		return DISCOVER_FALLBACK_SCHEMA, nil
+		return fmt.Errorf("starting listing: %w", err)
 	}
+	logrus.Info("listing objects to select a sample set")
 
-	logEntry.WithField("documentCount", docCount).Info("Got documents for stream")
-
-	schema, err := schema_inference.Run(ctx, logEntry, docCh)
-	if err != nil {
-		return nil, fmt.Errorf("failed to infer schema: %w", err)
-	}
-
-	return schema, nil
-}
-
-func peekDocuments(ctx context.Context, logEntry *log.Entry, conn *connector, root string) (<-chan schema_inference.Document, uint, error) {
-	var (
-		err       error
-		listing   Listing
-		pathRegex *regexp.Regexp
-		fileCount uint              = 0
-		documents *documentSampling = NewDocumentSampling(DISCOVER_DOC_LIMIT)
-	)
-	pathRegex, err = initPathRegex(conn.config.PathRegex())
-	if err != nil {
-		return nil, 0, err
-	}
-
-	listing, err = conn.store.List(ctx, Query{Prefix: root, StartAt: "", Recursive: true})
-	if err != nil {
-		return nil, fileCount, fmt.Errorf("listing bucket: %w", err)
-	}
-
-	for {
-		obj, err := listing.Next()
-		var logEntry = logEntry.WithField("fileCount", fileCount).WithField("path", obj.Path)
-
+	for count := 0; true; count++ {
+		var obj, err = listing.Next()
 		if err == io.EOF {
+			logrus.Info("finished listing all files")
+			break
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			logrus.Info("ran of out allotted time while listing files")
 			break
 		} else if err != nil {
-			return nil, fileCount, fmt.Errorf("reading bucket listing: %w", err)
-		} else if pathRegex != nil && !pathRegex.MatchString(obj.Path) {
-			logEntry.Trace("Skipping path that does not match PathRegex")
-			continue
+			return fmt.Errorf("during listing: %w", err)
 		} else if obj.IsPrefix {
-			logEntry.Trace("Skipping prefix")
+			panic("implementation error (IsPrefix entry returned with Recursive: true Query)")
+		}
+
+		// Should we skip this file?
+		if obj.Size == 0 {
 			continue
-		} else if obj.Size == 0 {
-			logEntry.Trace("Skipping empty file")
+		} else if pathRe != nil && !pathRe.MatchString(obj.Path) {
 			continue
 		}
 
-		fileCount++
-		logEntry.Debug("Discovered object")
+		if len(reservoir) != cap(reservoir) {
+			reservoir = append(reservoir, obj) // Initial fill of reservoir.
+		} else if s := rand.Intn(count); s < len(reservoir) {
+			reservoir[s] = obj // Replace an previous sampled object.
+		}
+	}
 
-		if documents.open {
-			err = peekAtFile(ctx, conn, obj, documents)
+	if len(reservoir) == 0 {
+		return fmt.Errorf("found no file objects to sample for their schema")
+	}
+
+	// Step 2: fetch up to N objects in parallel, feeding parsed documents
+	// into a pipe. Concurrently dequeue documents from the pipe into the
+	// inference engine.
+
+	var pr, pw = io.Pipe()
+	var group, groupCtx = errgroup.WithContext(backgroundCtx)
+
+	var readCtx, readCancel = context.WithTimeout(groupCtx, discoverBudget)
+	defer readCancel()
+
+	for i := range reservoir {
+		var obj = reservoir[i]
+		logrus.WithField("path", obj.Path).Info("sampling from path")
+
+		group.Go(func() error {
+			var rr, _, err = conn.store.Read(readCtx, obj)
 			if err != nil {
-				return nil, 0, fmt.Errorf("reading file `%s`: %w", obj.Path, err)
+				return fmt.Errorf("reading path %s: %w", obj.Path, err)
 			}
-		} else {
-			logEntry.Info("Reached sampling limit")
-			break
-		}
-	}
+			defer rr.Close()
 
-	documents.Close()
-	logEntry.WithField("fileCount", fileCount).Info("Bucket sampling successful")
-
-	return documents.ch, documents.count, nil
-}
-
-func peekAtFile(ctx context.Context, conn *connector, file ObjectInfo, documents *documentSampling) error {
-	var logEntry = log.WithField("path", file.Path)
-	logEntry.Infof("Peeking at file")
-
-	// Download file
-	rr, file, err := conn.store.Read(ctx, file)
-	if err != nil {
-		return fmt.Errorf("Failed to download file: %w", err)
-	}
-	defer rr.Close()
-
-	// Configure the parser
-	var cfg = new(parser.Config)
-	if c := conn.config.ParserConfig(); c != nil {
-		*cfg = c.Copy()
-	}
-	cfg = configureParser(cfg, file)
-
-	// Create the parser config file
-	tmp, err := ioutil.TempFile("", "parser-config-*.json")
-	if err != nil {
-		return fmt.Errorf("Failed creating parser config: %w", err)
-	}
-	defer os.Remove(tmp.Name())
-
-	if err = cfg.WriteToFile(tmp); err != nil {
-		return fmt.Errorf("Failed writing parser config: %w", err)
-	}
-
-	// Parse documents from the downloaded file
-	err = parser.ParseStream(ctx, tmp.Name(), rr, func(docs []json.RawMessage) error {
-		logEntry.WithField("docsSeen", documents.count).WithField("count", len(docs)).Debug("Parser produced more documents")
-
-		for _, doc := range docs {
-			if documents.Add(copyJson(doc)) {
-				continue
-			} else {
-				// The document channel is now full. We've seen enough.
-				return closeParser
+			// Configure the parser
+			var parserCfg = new(parser.Config)
+			if c := conn.config.ParserConfig(); c != nil {
+				*parserCfg = c.Copy()
 			}
-		}
+			parserCfg = configureParser(parserCfg, obj)
 
-		if documents.open {
-			return nil
-		} else {
-			return closeParser
-		}
-	})
-	if err != nil && err != closeParser {
-		return fmt.Errorf("Failed parsing: %w", err)
+			return parseToPipe(groupCtx, parserCfg, rr, pw)
+		})
 	}
 
-	logEntry.Info("Done peeking at file")
-	return nil
-}
+	// Arrange for the pipe to close with the group's error (or nil on success).
+	go func() {
+		pw.CloseWithError(group.Wait())
+	}()
 
-type documentSampling struct {
-	capacity uint
-	ch       chan schema_inference.Document
-	count    uint
-	open     bool
-}
-
-func NewDocumentSampling(capacity uint) *documentSampling {
-	return &documentSampling{
-		capacity: capacity,
-		ch:       make(chan schema_inference.Document, capacity),
-		count:    0,
-		open:     true,
+	var inferOut, inferErr = inferSchema(backgroundCtx, pr)
+	if inferErr != nil {
+		return fmt.Errorf("during inference: %w", inferErr)
 	}
-}
 
-func (d *documentSampling) Add(doc schema_inference.Document) (more bool) {
-	if d.open {
-		d.count++
-		d.ch <- doc
-
-		if d.count >= d.capacity {
-			d.Close()
-		}
-	}
-	return d.open
-}
-
-func (d *documentSampling) Close() {
-	if d.open {
-		d.open = false
-		close(d.ch)
-	}
-}
-
-var closeParser = fmt.Errorf("caller closed")
-
-func copyJson(doc json.RawMessage) json.RawMessage {
-	var copy = append(json.RawMessage(nil), doc...)
-	return json.RawMessage(copy)
-}
-
-func writeCatalogMessage(streams ...airbyte.Stream) error {
 	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
 		Type: airbyte.MessageTypeCatalog,
 		Catalog: &airbyte.Catalog{
-			Streams: streams,
+			Streams: []airbyte.Stream{{
+				Name:               conn.config.DiscoverRoot(),
+				JSONSchema:         json.RawMessage(inferOut),
+				SupportedSyncModes: airbyte.AllSyncModes,
+				SourceDefinedPrimaryKey: [][]string{
+					{"_meta", "file"},
+					{"_meta", "offset"},
+				},
+			}},
 		},
 	})
 }
 
-func newStream(name string, discoveredSchema schema_inference.Schema) airbyte.Stream {
-	return airbyte.Stream{
-		Name:               name,
-		JSONSchema:         discoveredSchema,
-		SupportedSyncModes: airbyte.AllSyncModes,
-		SourceDefinedPrimaryKey: [][]string{
-			{"_meta", "file"},
-			{"_meta", "offset"},
-		},
-	}
+func inferSchema(ctx context.Context, docs io.ReadCloser) (schema json.RawMessage, _ error) {
+	defer docs.Close()
+
+	var cmd = exec.CommandContext(ctx, "flow-schema-inference", "analyze")
+	cmd.Stdin = docs
+	cmd.Stderr = os.Stderr // Pass through stderr.
+	var output, err = cmd.Output()
+
+	logrus.WithFields(logrus.Fields{
+		"cmd":    cmd.String(),
+		"error":  err,
+		"schema": string(schema),
+	}).Debug("inferred document schema")
+
+	return json.RawMessage(output), err
 }
 
-func initPathRegex(regexStr string) (*regexp.Regexp, error) {
-	if regexStr == "" {
-		return nil, nil
+func parseToPipe(ctx context.Context, parserCfg *parser.Config, r io.Reader, w io.Writer) error {
+	// Create the parser config file
+	tmp, err := ioutil.TempFile("", "parser-config-*.json")
+	if err != nil {
+		return fmt.Errorf("creating parser config tmpfile: %w", err)
+	}
+	defer os.Remove(tmp.Name())
+
+	if err = parserCfg.WriteToFile(tmp); err != nil {
+		return fmt.Errorf("writing parser config: %w", err)
 	}
 
-	pathRegex, err := regexp.Compile(regexStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid PathRegex: %w", err)
+	// Parse documents from the downloaded file.
+	var buffer []byte
+	err = parser.ParseStream(ctx, tmp.Name(), r, func(docs []json.RawMessage) error {
+		logrus.WithFields(logrus.Fields{
+			"docs": len(docs),
+		}).Debug("parser produced documents")
+
+		for _, doc := range docs {
+			buffer = append(buffer, doc...)
+			buffer = append(buffer, '\n')
+		}
+		if _, err := w.Write(buffer); err != nil {
+			return fmt.Errorf("writing to pipe: %w", err)
+		}
+		buffer = buffer[:0]
+		return nil
+	})
+	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("while parsing: %w", err)
 	}
-	return pathRegex, nil
+	return nil
 }
