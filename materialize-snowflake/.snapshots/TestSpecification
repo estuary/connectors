@@ -1,15 +1,7 @@
 {
   "endpoint_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "required": [
-      "account",
-      "user",
-      "password",
-      "database",
-      "schema",
-      "cloud_provider",
-      "region"
-    ],
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-snowflake/config",
     "properties": {
       "account": {
         "type": "string",
@@ -48,12 +40,12 @@
         "description": "The user role used to perform actions."
       },
       "cloud_provider": {
+        "type": "string",
         "enum": [
           "aws",
           "azure",
           "gcp"
         ],
-        "type": "string",
         "title": "Cloud Provider",
         "description": "The cloud provider where the Snowflake endpoint is hosted."
       },
@@ -64,13 +56,20 @@
       }
     },
     "type": "object",
+    "required": [
+      "account",
+      "user",
+      "password",
+      "database",
+      "schema",
+      "cloud_provider",
+      "region"
+    ],
     "title": "SQL Connection"
   },
   "resource_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "required": [
-      "table"
-    ],
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-snowflake/table-config",
     "properties": {
       "table": {
         "type": "string"
@@ -80,6 +79,9 @@
       }
     },
     "type": "object",
+    "required": [
+      "table"
+    ],
     "title": "SQL Table"
   },
   "documentation_url": "https://go.estuary.dev/materialize-snowflake"
