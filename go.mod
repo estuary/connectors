@@ -17,7 +17,7 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/brianvoe/gofakeit/v6 v6.16.0
 	github.com/elastic/go-elasticsearch/v7 v7.17.1
-	github.com/estuary/flow v0.1.1-0.20220621175215-bcd2ad59f15b
+	github.com/estuary/flow v0.1.1-0.20220817221148-d68d91a3b3c1
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/gogo/protobuf v1.3.2
@@ -60,5 +60,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	vitess.io/vitess v0.13.1
 )
-
-replace github.com/estuary/flow => github.com/estuary/flow v0.1.1-0.20220719165323-5c9a6a5308d6

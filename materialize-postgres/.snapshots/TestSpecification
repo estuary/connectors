@@ -1,11 +1,7 @@
 {
   "endpoint_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "required": [
-      "address",
-      "user",
-      "password"
-    ],
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-postgres/config",
     "properties": {
       "address": {
         "type": "string",
@@ -30,19 +26,25 @@
       }
     },
     "type": "object",
+    "required": [
+      "address",
+      "user",
+      "password"
+    ],
     "title": "SQL Connection"
   },
   "resource_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "required": [
-      "table"
-    ],
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-postgres/table-config",
     "properties": {
       "table": {
         "type": "string"
       }
     },
     "type": "object",
+    "required": [
+      "table"
+    ],
     "title": "SQL Table"
   },
   "documentation_url": "https://go.estuary.dev/materialize-postgresql"
