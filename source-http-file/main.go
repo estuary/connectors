@@ -20,10 +20,21 @@ type credentials struct {
 	Password string `json:"password"`
 }
 
+// headers is simply a list of headers. The only reason we wrap and nest in an
+// enclosing struct is to convince the UI to render headers as a separate tab
+// and not within the principal configuration.
+type headers struct {
+	Items []struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	} `json:"items"`
+}
+
 type config struct {
 	URL         string         `json:"url"`
 	Credentials *credentials   `json:"credentials"`
 	Parser      *parser.Config `json:"parser"`
+	Headers     headers        `json:"headers"`
 }
 
 func (c *config) Validate() error {
@@ -57,23 +68,10 @@ func (c *config) PathRegex() string {
 }
 
 type httpSource struct {
-	client    http.Client
-	cfg       *config
-	parsedURL *url.URL
-	head      *http.Response
-	modTime   time.Time
-	fileName  string
-}
-
-func ModTime(resp *http.Response) (time.Time, error) {
-	const LastModifiedHeaderLayout = "Mon, 02 Jan 2006 15:04:05 GMT"
-
-	var value = resp.Header.Get("Last-Modified")
-	if value == "" {
-		return time.Now(), fmt.Errorf("Could not find Last-Modified header in response of HEAD request")
-	}
-
-	return time.Parse(LastModifiedHeaderLayout, value)
+	cfg      *config
+	req      *http.Request
+	resp     *http.Response
+	fileName string
 }
 
 func newHttpSource(ctx context.Context, cfg *config) (*httpSource, error) {
@@ -81,78 +79,94 @@ func newHttpSource(ctx context.Context, cfg *config) (*httpSource, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse URL %s: %w", cfg.URL, err)
 	}
-
 	var pathPieces = strings.Split(parsedURL.Path, "/")
 
-	var client = http.Client{}
-	var req = http.Request{
-		Method: "HEAD",
+	// Prepare request.
+	var req = (&http.Request{
+		Method: "GET",
 		URL:    parsedURL,
-		Header: http.Header{},
+		Header: make(http.Header),
+	}).WithContext(ctx)
+
+	for _, header := range cfg.Headers.Items {
+		req.Header.Add(header.Key, header.Value)
 	}
 	if cfg.Credentials != nil {
 		req.SetBasicAuth(cfg.Credentials.User, cfg.Credentials.Password)
 	}
-	resp, err := client.Do(&req)
-	if err != nil {
-		return nil, fmt.Errorf("could not fetch HEAD %s: %w", cfg.URL, err)
-	}
 
-	modTime, err := ModTime(resp)
+	// Initiate, fetch headers, and queue body for future reading.
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("processing modification time: %w", err)
+		return nil, fmt.Errorf("could not GET %s: %w", cfg.URL, err)
 	}
 
 	return &httpSource{
-		client:    client,
-		cfg:       cfg,
-		head:      resp,
-		parsedURL: parsedURL,
-		fileName:  pathPieces[len(pathPieces)-1],
-		modTime:   modTime,
+		cfg:      cfg,
+		req:      req,
+		resp:     resp,
+		fileName: pathPieces[len(pathPieces)-1],
 	}, nil
 }
 
-func (s *httpSource) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
+func (s *httpSource) List(_ context.Context, query filesource.Query) (filesource.Listing, error) {
 	var emitted = false
 
 	return filesource.ListingFunc(func() (filesource.ObjectInfo, error) {
 		if emitted {
 			return filesource.ObjectInfo{}, io.EOF
-		} else {
-			var size, err = strconv.ParseInt(s.head.Header.Get("Content-Length"), 10, 64)
-			if err != nil {
-				return filesource.ObjectInfo{}, err
-			}
-			emitted = true
-			return filesource.ObjectInfo{
-				Path:            s.fileName,
-				IsPrefix:        false,
-				ContentEncoding: s.head.Header.Get("Content-Encoding"),
-				ContentSum:      s.head.Header.Get("ETag"),
-				ContentType:     s.head.Header.Get("Content-Type"),
-				ModTime:         s.modTime,
-				Size:            size,
-			}, nil
 		}
+		emitted = true
+
+		var err error
+		var modTime time.Time
+		var size int64
+
+		if mt := s.resp.Header.Get("Last-Modified"); mt == "" {
+			modTime = time.Now()
+		} else if modTime, err = http.ParseTime(mt); err != nil {
+			return filesource.ObjectInfo{}, fmt.Errorf("invalid Last-Modified: %w", err)
+		}
+
+		if cl := s.resp.Header.Get("Content-Length"); cl == "" {
+			size = -1 // Unbounded or unknown.
+		} else if size, err = strconv.ParseInt(cl, 10, 64); err != nil {
+			return filesource.ObjectInfo{}, fmt.Errorf("invalid Content-Length: %w", err)
+		}
+
+		return filesource.ObjectInfo{
+			Path:            s.fileName,
+			IsPrefix:        false,
+			ContentEncoding: s.resp.Header.Get("Content-Encoding"),
+			ContentSum:      s.resp.Header.Get("ETag"),
+			ContentType:     s.resp.Header.Get("Content-Type"),
+			ModTime:         modTime,
+			Size:            size,
+		}, nil
 	}), nil
 }
 
 func (s *httpSource) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-	var req = http.Request{
-		Method: "GET",
-		URL:    s.parsedURL,
-		Header: http.Header{},
-	}
-	if s.cfg.Credentials != nil {
-		req.SetBasicAuth(s.cfg.Credentials.User, s.cfg.Credentials.Password)
-	}
-	var resp, err = s.client.Do(&req)
-	if err != nil {
-		return nil, filesource.ObjectInfo{}, err
-	}
+	// We already started our read under a different parent context.
+	// Retain this Read `ctx` and wrap so that we cancel appropriately.
+	return &ctxReader{
+		ReadCloser: s.resp.Body,
+		ctx:        ctx,
+	}, obj, nil
+}
 
-	return resp.Body, obj, nil
+type ctxReader struct {
+	io.ReadCloser
+	ctx context.Context
+}
+
+func (r *ctxReader) Read(p []byte) (n int, err error) {
+	select {
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	default:
+		return r.ReadCloser.Read(p)
+	}
 }
 
 func main() {
@@ -168,45 +182,74 @@ func main() {
         "type":    "object",
         "required": ["url"],
         "properties": {
-          "url": {
-            "type":        "string",
-            "title":       "HTTP File URL",
-            "description": "A valid HTTP url for downloading the source file."
-          },
-          "credentials": {
-            "title": "Credentials",
-            "description": "User credentials, if required to access the data at the HTTP URL.",
-            "oneOf": [{
-              "type": "object",
-              "title": "Basic Authentication",
-              "properties": {
-                "user": {
-                  "type": "string",
-                  "title": "Username",
-                  "description":"Username, if required to access the HTTP endpoint.",
-                  "secret": true
-                },
-                "password": {
-                  "type": "string",
-                  "secret": true,
-                  "description":"Password, if required to access the HTTP endpoint.",
-                  "title": "Password"
-                }
-              }
-            }]
-          },
-          "parser": ` + string(parserSchema) + `
-        }
-      }`)
+			"url": {
+			"type":        "string",
+			"title":       "HTTP File URL",
+			"description": "A valid HTTP url for downloading the source file."
+			},
+			"credentials": {
+			"title": "Credentials",
+			"description": "User credentials, if required to access the data at the HTTP URL.",
+			"oneOf": [{
+				"type": "object",
+				"title": "Basic Authentication",
+				"properties": {
+				"user": {
+					"type": "string",
+					"title": "Username",
+					"description":"Username, if required to access the HTTP endpoint.",
+					"secret": true
+				},
+				"password": {
+					"type": "string",
+					"secret": true,
+					"description":"Password, if required to access the HTTP endpoint.",
+					"title": "Password"
+				}
+				}
+			}]
+			},
+			"parser": ` + string(parserSchema) + `,
+				"headers": {
+					"title": "Headers",
+					"type": "object",
+					"properties": {
+						"items": {
+							"title": "Additional HTTP Headers",
+							"description": "Additional HTTP headers when requesting the file. These are uncommon.",
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"key": {
+										"type": "string",
+										"title": "Header Key"
+									},
+									"value": {
+										"type": "string",
+										"title": "Header Value",
+										"secret": true
+									}
+								}
+							}
+						}
+					}
+				}
+       		}
+      	}`)
 		},
 		DocumentationURL: "https://go.estuary.dev/source-http-file",
-		// Set the delta to far in the future. The scenario that the the `MaxBound` protects agains
-		// is only possible when a listing can return multiple files, which is never the case for
-		// this connector. Setting it in the future allows this connector to fetch files where the
-		// server may set the `Last-Modified` header to the current time when the response is
-		// generated, which could otherwise fall after the `MaxBound`, which is computed prior to
-		// sending any requests.
-		TimeHorizonDelta: time.Hour,
+		// Set the delta slightly in the future to include modification times which
+		// are just after the sweep start, such as near-realtime file sources.
+		// The scenario that the the `MaxBound` protects against is only possible
+		// when a listing can return multiple files, which is never the case for
+		// this single-file connector.
+		//
+		// This value should not be very large. If it's too far in the future
+		// then a connector which is restarted part-way through a file will
+		// not re-process that file until it's modification time is greater
+		// than the prior invocation time plus this delta.
+		TimeHorizonDelta: 2 * time.Second,
 	}
 
 	src.Main()
