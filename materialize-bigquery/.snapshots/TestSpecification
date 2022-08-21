@@ -1,13 +1,7 @@
 {
   "endpoint_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "required": [
-      "project_id",
-      "dataset",
-      "region",
-      "bucket",
-      "credentials_json"
-    ],
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-bigquery/config",
     "properties": {
       "billing_project_id": {
         "type": "string",
@@ -48,13 +42,18 @@
       }
     },
     "type": "object",
+    "required": [
+      "project_id",
+      "dataset",
+      "region",
+      "bucket",
+      "credentials_json"
+    ],
     "title": "SQL Connection"
   },
   "resource_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "required": [
-      "table"
-    ],
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-bigquery/table-config",
     "properties": {
       "table": {
         "type": "string",
@@ -64,10 +63,14 @@
       "delta_updates": {
         "type": "boolean",
         "title": "Delta Update",
-        "description": "Should updates to this table be done via delta updates. Defaults is false."
+        "description": "Should updates to this table be done via delta updates. Defaults is false.",
+        "default": false
       }
     },
     "type": "object",
+    "required": [
+      "table"
+    ],
     "title": "SQL Table"
   },
   "documentation_url": "https://go.estuary.dev/materialize-bigquery"
