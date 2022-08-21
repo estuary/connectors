@@ -96,13 +96,13 @@ type ObjectInfo struct {
 	IsPrefix bool
 	// ContentSum is an implementation-defined content sum.
 	ContentSum string
-	// Size of the object, in bytes.
+	// Size of the object, in bytes, or -1 if unbounded or unknown.
 	Size int64
 	// ContentType of the object, if known.
 	ContentType string
 	// ContentEncoding of the object, if known.
 	ContentEncoding string
-	// ModTime of the objection.
+	// ModTime of the object.
 	ModTime time.Time
 }
 
@@ -214,16 +214,12 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 		state.startSweep(horizon)
 
 		var r = &reader{
-			connector:   conn,
-			pathRe:      pathRe,
-			prefix:      prefix,
-			projections: make(map[string]parser.JsonPointer),
-			range_:      catalog.Range,
-			schema:      stream.Stream.JSONSchema,
-			state:       state,
-		}
-		for k, v := range stream.Projections {
-			r.projections[k] = parser.JsonPointer(v)
+			connector: conn,
+			pathRe:    pathRe,
+			prefix:    prefix,
+			range_:    catalog.Range,
+			schema:    stream.Stream.JSONSchema,
+			state:     state,
 		}
 
 		r.shared.mu = sharedMu
@@ -244,12 +240,11 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 type reader struct {
 	*connector
 
-	pathRe      *regexp.Regexp
-	prefix      string
-	projections map[string]parser.JsonPointer
-	range_      airbyte.Range
-	schema      json.RawMessage
-	state       State
+	pathRe *regexp.Regexp
+	prefix string
+	range_ airbyte.Range
+	schema json.RawMessage
+	state  State
 
 	shared struct {
 		mu     *sync.Mutex
