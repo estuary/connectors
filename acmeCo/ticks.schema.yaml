@@ -1,5 +1,8 @@
 $schema: http://json-schema.org/draft/2020-12/schema
 properties:
+  dummyValue:
+    title: Dummy Value
+    type: string
   stream:
     title: Stream Name
     type: string
@@ -9,6 +12,7 @@ properties:
     title: Event Timestamp
     type: string
 required:
+  - dummyValue
   - stream
   - ts
 title: Clock Events

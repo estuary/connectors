@@ -28,8 +28,9 @@ func (c *state) Validate() error {
 }
 
 type event struct {
-	Stream string    `json:"stream" jsonschema:"title=Stream Name"`
-	Time   time.Time `json:"ts" jsonschema:"title=Event Timestamp,description=The timestamp at which this tick event was generated."`
+	DummyValue string    `json:"dummyValue" jsonschema:"title=Dummy Value"`
+	Stream     string    `json:"stream" jsonschema:"title=Stream Name"`
+	Time       time.Time `json:"ts" jsonschema:"title=Event Timestamp,description=The timestamp at which this tick event was generated."`
 }
 
 func main() {
@@ -134,7 +135,7 @@ func doRead(args airbyte.ReadCmd) error {
 			for {
 				select {
 				case ts := <-ticker.C:
-					var event = event{Stream: name, Time: ts.UTC()}
+					var event = event{DummyValue: config.Dummy, Stream: name, Time: ts.UTC()}
 					bs, err := json.Marshal(event)
 					if err != nil {
 						return fmt.Errorf("error marshalling tick event: %w", err)

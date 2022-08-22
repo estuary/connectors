@@ -1,28 +1,47 @@
-import:
-- source-clock.flow.yaml
-
 collections:
-  acmeCo/messages:
+  acmeCo/fake-data/ticks:
+    schema: ticks.schema.yaml
+    key: [/ts]
+  acmeCo/watchdog/messages:
     schema: messages.schema.yaml
     key: [/ts]
     derivation:
+      register:
+        schema: { type: [string, "null"] }
+        initial: null
       typescript:
-        module: messages.flow.ts
+        module: watchdog.flow.ts
       transform:
-        addMessage:
-          source:
-            name: acmeCo/tick1m
-          publish:
-            lambda: typescript
+        liveStats:
+          source: { name: ops/acmeCo/stats }
+          shuffle: { key: [/shard/name] }
+          update: { lambda: typescript }
+        delayedStats:
+          readDelay: "1m"
+          source: { name: ops/acmeCo/stats }
+          shuffle: { key: [/shard/name] }
+          publish: { lambda: typescript }
+
+captures:
+  acmeCo/fake-data/from-clock:
+    endpoint:
+      connector:
+        image: source-clock:local
+        config: source-clock.config.yaml
+    bindings:
+      - resource:
+          stream: tick1s
+          syncMode: incremental
+        target: acmeCo/fake-data/ticks
 
 materializations:
-  acmeCo/to-slack:
+  acmeCo/watchdog/to-slack:
     endpoint:
       connector:
         image: materialize-slack:local
         config: materialize-slack.config.yaml
     bindings:
-      - source: acmeCo/messages
+      - source: acmeCo/watchdog/messages
         resource:
           channel: "id:U02BEN2RK7E"
         fields:
