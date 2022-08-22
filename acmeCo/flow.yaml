@@ -30,7 +30,7 @@ captures:
         config: source-clock.config.yaml
     bindings:
       - resource:
-          stream: tick1s
+          stream: tick10s
           syncMode: incremental
         target: acmeCo/fake-data/ticks
 
@@ -43,7 +43,7 @@ materializations:
     bindings:
       - source: acmeCo/watchdog/messages
         resource:
-          channel: "id:U02BEN2RK7E"
+          channel: "flow-hack-a-thon"
         fields:
           recommended: true
 
