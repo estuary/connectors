@@ -154,6 +154,7 @@ func (c *capture) Capture(ctx context.Context) error {
 		if isRootCollection(binding.Path) {
 			query = client.Collection(binding.Path).Query
 		} else {
+			// See https://firebase.blog/posts/2019/06/understanding-collection-group-queries
 			query = client.CollectionGroup(getLastCollectionGroupID(binding.Path)).Query
 		}
 
