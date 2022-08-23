@@ -34,7 +34,6 @@ type EmitterRequestType int8
 
 const (
 	EncodeDocument EmitterRequestType = 0
-	StateUpdate    EmitterRequestType = 1
 )
 
 // struct sent over channel to emitter
@@ -120,8 +119,8 @@ func (c *capture) Run() error {
 }
 
 func (c *capture) Capture(ctx context.Context) error {
-	var scanInterval, _ = time.ParseDuration(DEFAULT_SCAN_INTERVAL)
-	if c.Config.ScanInterval != "" && c.Config.ScanInterval != SCAN_INTERVAL_NEVER {
+	var scanInterval, _ = time.ParseDuration(defaultScanInterval)
+	if c.Config.ScanInterval != "" && c.Config.ScanInterval != scanIntervalNever {
 		var err error
 		scanInterval, err = time.ParseDuration(c.Config.ScanInterval)
 
@@ -158,7 +157,7 @@ func (c *capture) Capture(ctx context.Context) error {
 			query = client.CollectionGroup(getLastCollectionGroupID(binding.Path)).Query
 		}
 
-		if c.Config.ScanInterval != SCAN_INTERVAL_NEVER {
+		if c.Config.ScanInterval != scanIntervalNever {
 			log.WithField("group", groupID).Debug("full scan")
 			eg.Go(func() error {
 				return c.FullScan(ctx, lastScan, scanInterval, query)
@@ -217,7 +216,7 @@ func (c *capture) ListenForChanges(ctx context.Context, query firestore.Query) e
 				var doc = change.Doc
 				var data = doc.Data()
 				data[firestore.DocumentID] = doc.Ref.ID
-				data[PATH_FIELD] = doc.Ref.Path
+				data[pathField] = doc.Ref.Path
 				docJson, err := json.Marshal(data)
 				if err != nil {
 					return err
@@ -262,7 +261,7 @@ func (c *capture) FullScan(ctx context.Context, lastScan time.Time, scanInterval
 
 		var data = doc.Data()
 		data[firestore.DocumentID] = doc.Ref.ID
-		data[PATH_FIELD] = doc.Ref.Path
+		data[pathField] = doc.Ref.Path
 		docJson, err := json.Marshal(data)
 		if err != nil {
 			return err
@@ -280,6 +279,7 @@ func (c *capture) FullScan(ctx context.Context, lastScan time.Time, scanInterval
 		return nil
 	}
 
+	// We start the next full scan using tail recursion
 	return c.FullScan(ctx, scanTime, scanInterval, query)
 }
 
@@ -301,15 +301,6 @@ func (c *capture) EmitDocuments() error {
 			if err := c.Stream.Send(&pc.PullResponse{
 				Checkpoint: &pf.DriverCheckpoint{
 					DriverCheckpointJson: []byte("{}"),
-					Rfc7396MergePatch:    true,
-				},
-			}); err != nil {
-				return err
-			}
-		} else if emitDoc.requestType == StateUpdate {
-			if err := c.Stream.Send(&pc.PullResponse{
-				Checkpoint: &pf.DriverCheckpoint{
-					DriverCheckpointJson: emitDoc.state,
 					Rfc7396MergePatch:    true,
 				},
 			}); err != nil {
