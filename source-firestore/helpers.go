@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-const DEFAULT_SCAN_INTERVAL string = "12h"
-const SCAN_INTERVAL_NEVER string = "never"
-const PATH_FIELD = "__path__"
+const defaultScanInterval string = "12h"
+const scanIntervalNever string = "never"
+const pathField = "__path__"
 
 // Nested collections are referred to by their parent document in Firestore
 // e.g. parent_collection/my_doc_id123/nested_collection

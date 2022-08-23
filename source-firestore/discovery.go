@@ -17,7 +17,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-const DISCOVER_DOC_LIMIT = 50
+const discoverDocLimit = 50
 
 type inferenceRequest struct {
 	document   schema_inference.Document
@@ -27,7 +27,8 @@ type inferenceRequest struct {
 type inferenceProcess struct {
 	docsCh chan schema_inference.Document
 	count  int
-	open   bool
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // Discover RPC
@@ -69,7 +70,7 @@ func collectionRecommendedName(name string) string {
 // Start a channel where we receive documents for each collection
 // if they match an existing collection (e.g. group/*/subgroup), we send the docs to the
 // existing inference channel, otherwise we create a new inference channel for it.
-// Once we receive DISCOVER_DOC_LIMIT documents for each collection, we close the channel for inference
+// Once we receive discoverDocLimit documents for each collection, we close the channel for inference
 // and stop writing to it.
 func discoveryRoutine(
 	ctx context.Context,
@@ -84,11 +85,14 @@ func discoveryRoutine(
 			var docsCh = make(chan schema_inference.Document)
 
 			var logEntry = log.WithField("collection", request.collection)
+			var pctx, cancel = context.WithCancel(ctx)
 			inferenceChannels[request.collection] = &inferenceProcess{
 				docsCh: docsCh,
 				count:  0,
-				open:   true,
+				ctx:    pctx,
+				cancel: cancel,
 			}
+			process = inferenceChannels[request.collection]
 
 			eg.Go(func() error {
 				var collection = request.collection
@@ -105,7 +109,7 @@ func discoveryRoutine(
 					return fmt.Errorf("serializing resource json: %w", err)
 				}
 
-				log.WithField("collection", collection).Debug("finished schema inference")
+				log.WithField("collection", collection).Info("finished schema inference")
 				response.Bindings = append(response.Bindings, &pc.DiscoverResponse_Binding{
 					RecommendedName:    pf.Collection(collectionRecommendedName(collection)),
 					ResourceSpecJson:   resourceJSON,
@@ -114,16 +118,20 @@ func discoveryRoutine(
 				})
 				return nil
 			})
+			eg.Go(func() error {
+				<-process.ctx.Done()
+				close(process.docsCh)
+				return nil
+			})
 
 			docsCh <- request.document
 		} else {
-			if process.open {
+			if process.ctx.Err() == nil {
 				log.WithField("collection", request.collection).WithField("count", process.count).Debug("channel exists, sending document")
 				process.docsCh <- request.document
 				process.count = process.count + 1
-				if process.count > DISCOVER_DOC_LIMIT {
-					process.open = false
-					close(process.docsCh)
+				if process.count > discoverDocLimit {
+					process.cancel()
 				}
 			} else {
 				log.WithField("collection", request.collection).Debug("channel is closed")
@@ -164,10 +172,9 @@ func discoverCollections(ctx context.Context, client *firestore.Client, response
 	}
 
 	close(ch)
+
 	for _, process := range inferenceChannels {
-		if process.open {
-			close(process.docsCh)
-		}
+		process.cancel()
 	}
 
 	if err := routineGroup.Wait(); err != nil {
@@ -187,16 +194,16 @@ func discoverCollection(
 ) error {
 	var process, exists = inferenceChannels[collectionToResourcePath(collection.Path)]
 	// if the channel is closed, don't bother reading more documents
-	if exists && !process.open {
+	if exists && process.ctx.Err() != nil {
 		return nil
 	}
 	log.WithField("collection", collectionToResourcePath(collection.Path)).Info("starting discovery of collection")
-	var query = collection.Query.Limit(DISCOVER_DOC_LIMIT)
+	var query = collection.Query.Limit(discoverDocLimit)
 	var docs = query.Documents(ctx)
 
 	for {
 		// If at any point the channel is closed, just exit
-		if exists && !process.open {
+		if exists && process.ctx.Err() != nil {
 			return nil
 		}
 
@@ -208,7 +215,7 @@ func discoverCollection(
 		}
 		var data = doc.Data()
 		data[firestore.DocumentID] = doc.Ref.ID
-		data[PATH_FIELD] = doc.Ref.Path
+		data[pathField] = doc.Ref.Path
 		docJson, err := json.Marshal(data)
 		log.WithField("collection", collectionToResourcePath(collection.Path)).Debug("sending inference request")
 		ch <- inferenceRequest{
