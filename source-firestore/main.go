@@ -31,7 +31,7 @@ func (c *config) Validate() error {
 	if c.CredentialsJSON == "" {
 		return fmt.Errorf("googleCredentials is required")
 	}
-	if c.ScanInterval != "" && c.ScanInterval != SCAN_INTERVAL_NEVER {
+	if c.ScanInterval != "" && c.ScanInterval != scanIntervalNever {
 		var _, err = time.ParseDuration(c.ScanInterval)
 
 		if err != nil {
