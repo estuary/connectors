@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
+	"sync"
 
 	firestore "cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
@@ -17,19 +19,33 @@ import (
 	"google.golang.org/api/option"
 )
 
-const discoverDocLimit = 50
+const (
+	// discoverMaxCollectionsPerResource bounds the number of distinct collections
+	// that an invocation of discoverResource will process. If more collections are
+	// discovered which map to a particular resource, the excess will first pile up
+	// in the buffered channel and then after that they will be silently discarded.
+	discoverMaxCollectionsPerResource = 10
 
-type inferenceRequest struct {
-	document   schema_inference.Document
-	collection string
-}
+	// discoverMaxDocumentsPerCollection bounds the number of documents which will
+	// be fetched by discoverResource from any one collection.
+	discoverMaxDocumentsPerCollection = 50
 
-type inferenceProcess struct {
-	docsCh chan schema_inference.Document
-	count  int
-	ctx    context.Context
-	cancel context.CancelFunc
-}
+	// discoverMaxConcurrentWorkers bounds the number of concurrent `discoverResource()`
+	// workers which can proceed at any given time.
+	discoverMaxConcurrentWorkers = 32
+)
+
+// placeholderSchema is the maximally-permissive schema that should be satisfied
+// by any Firestore document. It is returned if schema inference fails.
+const placeholderSchema = `{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["__name__", "__path__"],
+    "properties": {
+        "__name__": { "type": "string" },
+        "__path__": { "type": "string" }
+    }
+}`
 
 // Discover RPC
 func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.DiscoverResponse, error) {
@@ -50,195 +66,245 @@ func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Discov
 	}
 	defer client.Close()
 
-	var response = &pc.DiscoverResponse{
-		Bindings: []*pc.DiscoverResponse_Binding{},
-	}
-	err = discoverCollections(ctx, client, response)
+	bindings, err := discoverCollections(ctx, client)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("discovery error: %w", err)
 	}
-
-	return response, nil
+	return &pc.DiscoverResponse{
+		Bindings: bindings,
+	}, nil
 }
 
-// The collection name must not have slashes in it, otherwise we end up with parent
-// collections being a prefix of the child collections, which is prohibited by flow
-func collectionRecommendedName(name string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(name, "/*/", "_"), "/", "_")
-}
+type discoveryState struct {
+	// group contains all worker goroutines launched during discovery.
+	group *errgroup.Group
 
-// Start a channel where we receive documents for each collection
-// if they match an existing collection (e.g. group/*/subgroup), we send the docs to the
-// existing inference channel, otherwise we create a new inference channel for it.
-// Once we receive discoverDocLimit documents for each collection, we close the channel for inference
-// and stop writing to it.
-func discoveryRoutine(
-	ctx context.Context,
-	response *pc.DiscoverResponse,
-	eg *errgroup.Group,
-	ch chan inferenceRequest,
-	inferenceChannels map[string]*inferenceProcess,
-) error {
-	for request := range ch {
-		if process, exists := inferenceChannels[request.collection]; !exists {
-			log.WithField("collection", request.collection).Debug("created a new inference channel")
-			var docsCh = make(chan schema_inference.Document)
+	// workerLimit controls the number of concurrent discoverResource
+	// workers which may be active at any given time.
+	workerLimit chan struct{}
 
-			var logEntry = log.WithField("collection", request.collection)
-			var pctx, cancel = context.WithCancel(ctx)
-			inferenceChannels[request.collection] = &inferenceProcess{
-				docsCh: docsCh,
-				count:  0,
-				ctx:    pctx,
-				cancel: cancel,
-			}
-			process = inferenceChannels[request.collection]
-
-			eg.Go(func() error {
-				var collection = request.collection
-				var err error
-				var schema schema_inference.Schema
-				log.WithField("collection", collection).Debug("schema_inference.Run")
-				schema, err = schema_inference.Run(ctx, logEntry, docsCh)
-				if err != nil {
-					return fmt.Errorf("schema inference: %w", err)
-				}
-
-				resourceJSON, err := json.Marshal(resource{Path: collection})
-				if err != nil {
-					return fmt.Errorf("serializing resource json: %w", err)
-				}
-
-				log.WithField("collection", collection).Info("finished schema inference")
-				response.Bindings = append(response.Bindings, &pc.DiscoverResponse_Binding{
-					RecommendedName:    pf.Collection(collectionRecommendedName(collection)),
-					ResourceSpecJson:   resourceJSON,
-					DocumentSchemaJson: schema,
-					KeyPtrs:            []string{"/" + firestore.DocumentID},
-				})
-				return nil
-			})
-			eg.Go(func() error {
-				<-process.ctx.Done()
-				close(process.docsCh)
-				return nil
-			})
-
-			docsCh <- request.document
-		} else {
-			if process.ctx.Err() == nil {
-				log.WithField("collection", request.collection).WithField("count", process.count).Debug("channel exists, sending document")
-				process.docsCh <- request.document
-				process.count = process.count + 1
-				if process.count > discoverDocLimit {
-					process.cancel()
-				}
-			} else {
-				log.WithField("collection", request.collection).Debug("channel is closed")
-			}
-		}
+	// resources contains mutex-guarded state which may be modified from
+	// within the numerous discovery worker goroutines.
+	resources struct {
+		sync.Mutex
+		collections map[string]chan *firestore.CollectionRef
+		bindings    []*pc.DiscoverResponse_Binding
 	}
-
-	return nil
 }
 
-// Go through all collections and discover them recursively. Spawn a discoverRoutine for handling management
-// of inference channels
-func discoverCollections(ctx context.Context, client *firestore.Client, response *pc.DiscoverResponse) error {
+func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.DiscoverResponse_Binding, error) {
+	eg, ctx := errgroup.WithContext(ctx)
+	var state = &discoveryState{
+		group:       eg,
+		workerLimit: make(chan struct{}, discoverMaxConcurrentWorkers),
+	}
+	state.resources.collections = make(map[string]chan *firestore.CollectionRef)
+
+	// Request processing of all top-level collections.
 	var collections = client.Collections(ctx)
-	var ch = make(chan inferenceRequest)
-	var firestoreGroup = new(errgroup.Group)
-	var routineGroup = new(errgroup.Group)
-
-	var inferenceChannels = map[string]*inferenceProcess{}
-
 	for {
 		var collection, err = collections.Next()
 		if err == iterator.Done {
 			break
 		} else if err != nil {
-			return err
+			return nil, err
 		}
-
-		firestoreGroup.Go(func() error {
-			return discoverCollection(ctx, ch, inferenceChannels, response, collection)
-		})
+		var resourcePath = state.addCollection(ctx, collection)
+		state.closeResource(resourcePath)
 	}
 
-	routineGroup.Go(func() error { return discoveryRoutine(ctx, response, routineGroup, ch, inferenceChannels) })
-
-	if err := firestoreGroup.Wait(); err != nil {
-		return err
+	// Wait for all workers to terminate, and if they all did so without
+	// error then return the bindings list they put together.
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
 
-	close(ch)
-
-	for _, process := range inferenceChannels {
-		process.cancel()
-	}
-
-	if err := routineGroup.Wait(); err != nil {
-		return err
-	}
-
-	return nil
+	// Just to be extra nice, sort the bindings list by recommended name.
+	// Since prefixes sort before their longer versions this approximates
+	// a nice hierarchical interpretation.
+	var bindings = state.resources.bindings
+	sort.Slice(bindings, func(i, j int) bool {
+		return bindings[i].RecommendedName < bindings[j].RecommendedName
+	})
+	return bindings, nil
 }
 
-// Recursively discover collections
-func discoverCollection(
-	ctx context.Context,
-	ch chan inferenceRequest,
-	inferenceChannels map[string]*inferenceProcess,
-	response *pc.DiscoverResponse,
-	collection *firestore.CollectionRef,
-) error {
-	var process, exists = inferenceChannels[collectionToResourcePath(collection.Path)]
-	// if the channel is closed, don't bother reading more documents
-	if exists && process.ctx.Err() != nil {
-		return nil
+// addCollection is called for every new collection during the course of discovery.
+// It maps the new collection to the appropriate resource path (which is the collection
+// path, except with '*' in the place of each document ID portion) and then sends the
+// CollectionRef over a buffered channel to the goroutine tasked with handling that
+// resource.
+//
+// If there is not currently a channel (and goroutine) dedicated to this resource path,
+// a new one will be allocated and added to the map.
+func (ds *discoveryState) addCollection(ctx context.Context, collection *firestore.CollectionRef) string {
+	var resourcePath = collectionToResourcePath(collection.Path)
+	log.WithFields(log.Fields{
+		"fullpath": collection.Path,
+		"resource": resourcePath,
+	}).Trace("discovered collection of resource")
+
+	ds.resources.Lock()
+	defer ds.resources.Unlock()
+
+	// If this is the first collection we've observed which maps to this particular
+	// resource path, initialize process state and spawn a new discovery worker.
+	// Otherwise just reuse the already-started process.
+	collectionsCh, ok := ds.resources.collections[resourcePath]
+	if !ok {
+		log.WithField("resource", resourcePath).Info("discovered resource")
+		collectionsCh = make(chan *firestore.CollectionRef, discoverMaxCollectionsPerResource)
+		ds.resources.collections[resourcePath] = collectionsCh
+		ds.group.Go(func() error { return ds.discoverResource(ctx, resourcePath, collectionsCh) })
 	}
-	log.WithField("collection", collectionToResourcePath(collection.Path)).Info("starting discovery of collection")
-	var query = collection.Query.Limit(discoverDocLimit)
-	var docs = query.Documents(ctx)
 
-	for {
-		// If at any point the channel is closed, just exit
-		if exists && process.ctx.Err() != nil {
-			return nil
+	// Send the new collection to the process that's already handling this
+	// resource if possible. If not possible (the channel buffer is full)
+	// then we ignore this particular collection on the theory that we've
+	// already have plenty of other examples to work with.
+	select {
+	case collectionsCh <- collection:
+		log.WithField("resource", resourcePath).Trace("queued subcollection")
+	default:
+		log.WithField("resource", resourcePath).Trace("buffer full, ignoring subcollection")
+	}
+	return resourcePath
+}
+
+// closeResource is used to indicate that no further collections for a particular
+// resource path will be forthcoming.
+func (ds *discoveryState) closeResource(resourcePath string) {
+	log.WithFields(log.Fields{"resource": resourcePath}).Info("close resource")
+
+	ds.resources.Lock()
+	defer ds.resources.Unlock()
+	if collectionsCh, ok := ds.resources.collections[resourcePath]; ok {
+		close(collectionsCh)
+	}
+}
+
+// discoverResource iterates over each* document of each* collection which maps
+// to a particular resource path. In the process each document is fed into schema
+// inference and also checked for sub-collections, which may in turn be queued up for
+// another discoverResource worker thread (possibly freshly spawned) to process.
+//
+// A single invocation of discoverResource will handle the scanning of every collection
+// with that particular resource path, and so when it terminates we can be certain that
+// no further sub-resources of that path will be found. This allows everything to shut
+// down cleanly when done.
+//
+// *subject to limits
+func (ds *discoveryState) discoverResource(ctx context.Context, resourcePath string, collectionsCh <-chan *firestore.CollectionRef) error {
+	var collectionsCount, documentsCount int
+
+	// Only discoverMaxConcurrentWorkers instances of discoverResource may be
+	// active at any given time.
+	ds.workerLimit <- struct{}{}
+	defer func() { <-ds.workerLimit }()
+
+	// Launch a separate goroutine which will run schema inference while the
+	// main thread of execution in this function feeds it documents. When the
+	// discoverResource() invocation returns the documents channel will be
+	// closed, whereupon schema inference will finish, and the resulting
+	// schema will be added to a new binding for the discovery response.
+	var docsCh = make(chan json.RawMessage)
+	defer close(docsCh)
+	ds.group.Go(func() error {
+		var logEntry = log.WithField("resource", resourcePath)
+		var schema, err = schema_inference.Run(ctx, logEntry, docsCh)
+		if err != nil {
+			// Ideally schema inference shouldn't ever fail, but in the event that
+			// it does we should just use a maximally permissive Firestore document
+			// placeholder and keep going.
+			logEntry.WithField("err", err).Warn("schema inference failed")
+			schema = json.RawMessage(placeholderSchema)
 		}
+		resourceJSON, err := json.Marshal(resource{Path: resourcePath})
+		if err != nil {
+			return fmt.Errorf("error serializing resource json: %w", err)
+		}
+		var binding = &pc.DiscoverResponse_Binding{
+			RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
+			ResourceSpecJson:   resourceJSON,
+			DocumentSchemaJson: schema,
+			KeyPtrs:            []string{"/" + firestore.DocumentID},
+		}
+		ds.resources.Lock()
+		ds.resources.bindings = append(ds.resources.bindings, binding)
+		ds.resources.Unlock()
+		return nil
+	})
 
-		var doc, err = docs.Next()
-		if err == iterator.Done {
+	// Keep track of any resources nested under this one. After we're all done
+	// processing this resource the input channels to the sub-resource workers
+	// will be closed so that they, in turn, can shut down.
+	var subResources = make(map[string]struct{})
+	defer func() {
+		for subResource := range subResources {
+			ds.closeResource(subResource)
+		}
+	}()
+
+	for collection := range collectionsCh {
+		collectionsCount++
+		if collectionsCount > discoverMaxCollectionsPerResource {
 			break
-		} else if err != nil {
+		} else if err := ctx.Err(); err != nil {
 			return err
 		}
-		var data = doc.Data()
-		data[firestore.DocumentID] = doc.Ref.ID
-		data[pathField] = doc.Ref.Path
-		docJson, err := json.Marshal(data)
-		log.WithField("collection", collectionToResourcePath(collection.Path)).Debug("sending inference request")
-		ch <- inferenceRequest{
-			document:   docJson,
-			collection: collectionToResourcePath(collection.Path),
-		}
 
-		log.WithField("collection", collectionToResourcePath(collection.Path)).Debug("iterating over sub collections")
-		var docCollectionsIterator = doc.Ref.Collections(ctx)
+		log.WithFields(log.Fields{
+			"path":     collection.Path,
+			"resource": resourcePath,
+		}).Debug("scanning collection")
+
+		var docs = collection.Query.Limit(discoverMaxDocumentsPerCollection).Documents(ctx)
 		for {
-			var docCol, err = docCollectionsIterator.Next()
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
+			var doc, err = docs.Next()
 			if err == iterator.Done {
 				break
 			} else if err != nil {
 				return err
 			}
 
-			err = discoverCollection(ctx, ch, inferenceChannels, response, docCol)
+			var data = doc.Data()
+			data[firestore.DocumentID] = doc.Ref.ID
+			data[pathField] = doc.Ref.Path
+			docJSON, err := json.Marshal(data)
 			if err != nil {
-				return err
+				return fmt.Errorf("error marshalling document: %w", err)
+			}
+			docsCh <- docJSON
+			documentsCount++
+
+			var subcollections = doc.Ref.Collections(ctx)
+			for {
+				var subcollection, err = subcollections.Next()
+				if err == iterator.Done {
+					break
+				} else if err != nil {
+					return err
+				}
+				var resourcePath = ds.addCollection(ctx, subcollection)
+				subResources[resourcePath] = struct{}{}
 			}
 		}
 	}
 
+	log.WithFields(log.Fields{
+		"resource":    resourcePath,
+		"documents":   documentsCount,
+		"collections": collectionsCount,
+	}).Info("finished scanning resource")
 	return nil
+}
+
+// The collection name must not have slashes in it, otherwise we end up with parent
+// collections being a prefix of the child collections, which is prohibited by Flow.
+func collectionRecommendedName(name string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(name, "/*/", "_"), "/", "_")
 }

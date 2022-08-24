@@ -43,12 +43,14 @@ func Run(ctx context.Context, logEntry *log.Entry, docsCh <-chan Document) (Sche
 		defer stdin.Close()
 		encoder := json.NewEncoder(stdin)
 
+		var count int
 		for doc := range docsCh {
+			count++
 			if err := encoder.Encode(doc); err != nil {
 				return fmt.Errorf("failed to encode document: %w", err)
 			}
 		}
-		logEntry.Info("runInference: Done sending documents")
+		logEntry.WithField("count", count).Info("runInference: Done sending documents")
 
 		return nil
 	})
