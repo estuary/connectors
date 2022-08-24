@@ -255,3 +255,30 @@ func TestTruncatedTables(t *testing.T) {
 	tb.Query(ctx, t, fmt.Sprintf("TRUNCATE TABLE %s;", tableA))
 	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "capture2_fails")
 }
+
+func TestTrickyColumnNames(t *testing.T) {
+	// Create a table with some 'difficult' column names (a reserved word, a capitalized
+	// name, and one containing special characters which also happens to be the primary key).
+	var tb, ctx = TestBackend, context.Background()
+	var tableA = tb.CreateTable(ctx, t, "a", `("Meta/""wtf""/ID" INTEGER PRIMARY KEY, data TEXT)`)
+	var tableB = tb.CreateTable(ctx, t, "b", `("table" INTEGER PRIMARY KEY, data TEXT)`)
+	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "aaa"}, {2, "bbb"}})
+	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ccc"}, {4, "ddd"}})
+
+	// Discover the catalog and verify that the table's schema looks correct
+	var discovery, err = sqlcapture.DiscoverCatalog(ctx, tb.GetDatabase())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests.VerifyStream(t, "discovery_a", discovery, tableA)
+	tests.VerifyStream(t, "discovery_b", discovery, tableB)
+
+	// Perform an initial backfill
+	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB), sqlcapture.PersistentState{}
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "backfill")
+
+	// Add more data and read it via replication
+	tb.Insert(ctx, t, tableA, [][]interface{}{{5, "eee"}, {6, "fff"}})
+	tb.Insert(ctx, t, tableB, [][]interface{}{{7, "ggg"}, {8, "hhh"}})
+	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "replication")
+}

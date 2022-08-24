@@ -1,0 +1,7 @@
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
+{"type":"RECORD","record":{"stream":"test_trickycolumnnames_a","data":{"Meta/\"wtf\"/ID":5,"_meta":{"op":"c","source":{"schema":"public","table":"test_trickycolumnnames_a"}},"data":"eee"},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_trickycolumnnames_a","data":{"Meta/\"wtf\"/ID":6,"_meta":{"op":"c","source":{"schema":"public","table":"test_trickycolumnnames_a"}},"data":"fff"},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
+{"type":"RECORD","record":{"stream":"test_trickycolumnnames_b","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_trickycolumnnames_b"}},"data":"ggg","table":7},"emitted_at":1234,"namespace":"public"}}
+{"type":"RECORD","record":{"stream":"test_trickycolumnnames_b","data":{"_meta":{"op":"c","source":{"schema":"public","table":"test_trickycolumnnames_b"}},"data":"hhh","table":8},"emitted_at":1234,"namespace":"public"}}
+{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
