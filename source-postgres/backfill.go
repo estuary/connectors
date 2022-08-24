@@ -64,6 +64,14 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.
 	return events, nil
 }
 
+func quoteColumnNames(names []string) []string {
+	var out []string
+	for _, name := range names {
+		out = append(out, name)
+	}
+	return out
+}
+
 // WriteWatermark writes the provided string into the 'watermarks' table.
 func (db *postgresDatabase) WriteWatermark(ctx context.Context, watermark string) error {
 	logrus.WithField("watermark", watermark).Debug("writing watermark")
@@ -102,7 +110,7 @@ func buildScanQuery(start bool, keyColumns []string, schemaName, tableName strin
 			pkey += ", "
 			args += ", "
 		}
-		pkey += colName
+		pkey += quoteColumnName(colName)
 		args += fmt.Sprintf("$%d", idx+1)
 	}
 
@@ -115,4 +123,12 @@ func buildScanQuery(start bool, keyColumns []string, schemaName, tableName strin
 	fmt.Fprintf(query, " ORDER BY (%s)", pkey)
 	fmt.Fprintf(query, " LIMIT %d;", backfillChunkSize)
 	return query.String()
+}
+
+func quoteColumnName(name string) string {
+	// From https://www.postgresql.org/docs/14/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS:
+	//
+	//     Quoted identifiers can contain any character, except the character with code zero.
+	//     (To include a double quote, write two double quotes.)
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
