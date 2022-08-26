@@ -84,6 +84,7 @@ jobs:
           - materialize-bigquery
           - materialize-elasticsearch
           - materialize-firebolt
+          - materialize-google-pubsub
           - materialize-google-sheets
           - materialize-postgres
           - materialize-rockset
