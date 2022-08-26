@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -87,7 +88,7 @@ func (c *cmdCommon) readMsg(m protoValidator) error {
 		if _, err = c.r.Discard(len); err != nil {
 			panic(err)
 		}
-	} else if err != io.ErrShortBuffer {
+	} else if !errors.Is(err, bufio.ErrBufferFull) {
 		return fmt.Errorf("reading message (into buffer): %w", err)
 	} else {
 		// Non-garden path: we must allocate and read a larger buffer.
