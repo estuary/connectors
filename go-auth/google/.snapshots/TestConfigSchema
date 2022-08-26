@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/estuary/connectors/go-auth/google/credential-config",
+  "oneOf": [
+    {
+      "properties": {
+        "auth_type": {
+          "type": "string",
+          "const": "Client",
+          "default": "Client"
+        },
+        "client_id": {
+          "type": "string",
+          "secret": true
+        },
+        "client_secret": {
+          "type": "string",
+          "secret": true
+        },
+        "refresh_token": {
+          "type": "string",
+          "secret": true
+        }
+      },
+      "required": [
+        "auth_type",
+        "client_id",
+        "client_secret",
+        "refresh_token"
+      ],
+      "title": "Google OAuth",
+      "x-oauth2-provider": "google"
+    },
+    {
+      "properties": {
+        "auth_type": {
+          "type": "string",
+          "const": "Service",
+          "default": "Service"
+        },
+        "credentials_json": {
+          "type": "string",
+          "title": "Service Account JSON",
+          "description": "The JSON key of the service account to use for authorization.",
+          "examples": [
+            "{ \"type\": \"service_account\" \"project_id\": YOUR_PROJECT_ID, \"private_key_id\": YOUR_PRIVATE_KEY, ... }"
+          ],
+          "multiline": true,
+          "secret": true
+        }
+      },
+      "required": [
+        "auth_type",
+        "service_account_info"
+      ],
+      "title": "Service Account Key"
+    }
+  ],
+  "title": "Test Config Schema",
+  "description": "Google API Credentials",
+  "default": {
+    "auth_type": "Client"
+  },
+  "discriminator": {
+    "propertyName": "auth_type"
+  }
+}
