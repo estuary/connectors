@@ -75,30 +75,9 @@ func (c *cmdCommon) readMsg(m protoValidator) error {
 
 	var len = int(binary.LittleEndian.Uint32(lengthBytes[:]))
 
-	// Fetch next length-delimited message into a buffer.
-	// In the garden-path case, we decode directly from the
-	// bufio.Reader internal buffer without copying
-	// (having just read the length, the message itself
-	// is probably _already_ in the bufio.Reader buffer).
-	//
-	// If the message is larger than the internal buffer,
-	// we allocate and read it directly.
-	var b, err = c.r.Peek(len)
-
-	if err == nil {
-		// The Discard contract guarantees we won't error.
-		// It's safe to reference |b| until the next Peek.
-		if _, err = c.r.Discard(len); err != nil {
-			panic(err)
-		}
-	} else if !errors.Is(err, bufio.ErrBufferFull) {
-		return fmt.Errorf("reading message (into buffer): %w", err)
-	} else {
-		// Non-garden path: we must allocate and read a larger buffer.
-		b = make([]byte, len)
-		if _, err = io.ReadFull(c.r, b); err != nil {
-			return fmt.Errorf("reading message (directly): %w", err)
-		}
+	var b, err = peekMessage(c.r, len)
+	if err != nil {
+		return err
 	}
 
 	if err := proto.Unmarshal(b, m); err != nil {
@@ -108,6 +87,37 @@ func (c *cmdCommon) readMsg(m protoValidator) error {
 	}
 
 	return nil
+}
+
+func peekMessage(br *bufio.Reader, size int) ([]byte, error) {
+	// Fetch next length-delimited message into a buffer.
+	// In the garden-path case, we decode directly from the
+	// bufio.Reader internal buffer without copying
+	// (having just read the length, the message itself
+	// is probably _already_ in the bufio.Reader buffer).
+	//
+	// If the message is larger than the internal buffer,
+	// we allocate and read it directly.
+	var bs, err = br.Peek(size)
+	if err == nil {
+		// The Discard contract guarantees we won't error.
+		// It's safe to reference |bs| until the next Peek.
+		if _, err = br.Discard(size); err != nil {
+			panic(err)
+		}
+		return bs, nil
+	}
+
+	// Non-garden path: we must allocate and read a larger buffer.
+	if errors.Is(err, bufio.ErrBufferFull) {
+		bs = make([]byte, size)
+		if _, err = io.ReadFull(br, bs); err != nil {
+			return nil, fmt.Errorf("reading message (directly): %w", err)
+		}
+		return bs, nil
+	}
+
+	return nil, fmt.Errorf("reading message (into buffer): %w", err)
 }
 
 type specCmd struct{ cmdCommon }
