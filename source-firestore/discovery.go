@@ -24,11 +24,11 @@ const (
 	// that an invocation of discoverResource will process. If more collections are
 	// discovered which map to a particular resource, the excess will first pile up
 	// in the buffered channel and then after that they will be silently discarded.
-	discoverMaxCollectionsPerResource = 10
+	discoverMaxCollectionsPerResource = 50
 
 	// discoverMaxDocumentsPerCollection bounds the number of documents which will
 	// be fetched by discoverResource from any one collection.
-	discoverMaxDocumentsPerCollection = 50
+	discoverMaxDocumentsPerCollection = 100
 
 	// discoverMaxConcurrentWorkers bounds the number of concurrent `discoverResource()`
 	// workers which can proceed at any given time.
@@ -259,6 +259,7 @@ func (ds *discoveryState) discoverResource(ctx context.Context, resourcePath str
 		}).Debug("scanning collection")
 
 		var docs = collection.Query.Limit(discoverMaxDocumentsPerCollection).Documents(ctx)
+		defer docs.Stop()
 		for {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -293,6 +294,7 @@ func (ds *discoveryState) discoverResource(ctx context.Context, resourcePath str
 				subResources[resourcePath] = struct{}{}
 			}
 		}
+		docs.Stop()
 	}
 
 	log.WithFields(log.Fields{
