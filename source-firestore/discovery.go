@@ -227,7 +227,7 @@ func (ds *discoveryState) discoverResource(ctx context.Context, resourcePath str
 			RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
 			ResourceSpecJson:   resourceJSON,
 			DocumentSchemaJson: schema,
-			KeyPtrs:            []string{"/" + firestore.DocumentID},
+			KeyPtrs:            []string{"/" + pathField},
 		}
 		ds.resources.Lock()
 		ds.resources.bindings = append(ds.resources.bindings, binding)
