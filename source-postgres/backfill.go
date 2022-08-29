@@ -64,14 +64,6 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.
 	return events, nil
 }
 
-func quoteColumnNames(names []string) []string {
-	var out []string
-	for _, name := range names {
-		out = append(out, name)
-	}
-	return out
-}
-
 // WriteWatermark writes the provided string into the 'watermarks' table.
 func (db *postgresDatabase) WriteWatermark(ctx context.Context, watermark string) error {
 	logrus.WithField("watermark", watermark).Debug("writing watermark")
