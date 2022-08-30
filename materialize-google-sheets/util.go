@@ -101,6 +101,8 @@ type RowState struct {
 	NextDoc   json.RawMessage `json:"nd,omitempty"`
 }
 
+const sentinelValue = `{}`
+
 // loadSheetStates loads the SheetStates of all named `sheetNames`.
 func loadSheetStates(
 	bindings []*pf.MaterializationSpec_Binding,
@@ -151,6 +153,8 @@ func loadSheetStates(
 				return nil, fmt.Errorf("row %d of range %s is missing", rowInd, sheetRanges[sheetInd])
 			} else if uev := row.Values[0].UserEnteredValue; uev == nil || uev.StringValue == nil {
 				return nil, fmt.Errorf("row %d of range %s is not a string", rowInd, sheetRanges[sheetInd])
+			} else if *uev.StringValue == sentinelValue {
+				break // Sentinel value indicating the end of the materialization data
 			} else if err := json.Unmarshal([]byte(*uev.StringValue), &rowState); err != nil {
 				return nil, fmt.Errorf("row %d of range %s is not a valid state: %w", rowInd, sheetRanges[sheetInd], err)
 			} else {
@@ -161,6 +165,28 @@ func loadSheetStates(
 	}
 
 	return states, nil
+}
+
+func writeSheetSentinels(ctx context.Context, client *sheets.Service, spreadsheetID string, states []SheetState) error {
+	var updates []*sheets.Request
+	for _, state := range states {
+		// The sentinel should come after 1 header row and N data rows
+		var sentinelIndex = 1 + len(state.Rows)
+		updates = append(updates, &sheets.Request{
+			UpdateCells: &sheets.UpdateCellsRequest{
+				Range: &sheets.GridRange{
+					SheetId:       state.SheetID,
+					StartRowIndex: int64(sentinelIndex),
+					EndRowIndex:   int64(sentinelIndex + 1),
+				},
+				Rows: []*sheets.RowData{{
+					Values: []*sheets.CellData{valueToCell(sentinelValue)},
+				}},
+				Fields: "userEnteredValue",
+			},
+		})
+	}
+	return batchRequestWithRetry(ctx, client, spreadsheetID, updates)
 }
 
 // loadSheetIDMapping retrieves a mapping of sheet titles to their integer API IDs.
