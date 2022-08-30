@@ -80,6 +80,66 @@ func buildTransactorBindings(
 	return out, nil
 }
 
+func writeSheetHeaders(ctx context.Context, client *sheets.Service, spreadsheetID string, bindings []transactorBinding) error {
+	var actions []*sheets.Request
+	for _, binding := range bindings {
+		var headers = []*sheets.CellData{{}}
+		for i := range binding.Fields.Keys {
+			headers = append(headers, &sheets.CellData{
+				UserEnteredValue: &sheets.ExtendedValue{StringValue: &binding.Fields.Keys[i]},
+			})
+		}
+		for i := range binding.Fields.Values {
+			headers = append(headers, &sheets.CellData{
+				UserEnteredValue: &sheets.ExtendedValue{StringValue: &binding.Fields.Values[i]},
+			})
+		}
+		actions = append(actions,
+			// Resize horizontally to the correct number of fields, and freeze the header row
+			&sheets.Request{
+				UpdateSheetProperties: &sheets.UpdateSheetPropertiesRequest{
+					Fields: "gridProperties(columnCount,frozenRowCount)",
+					Properties: &sheets.SheetProperties{
+						SheetId: binding.UserSheetId,
+						GridProperties: &sheets.GridProperties{
+							ColumnCount:    int64(len(headers)),
+							FrozenRowCount: 1,
+						},
+					},
+				},
+			},
+			// Write header names to row 0
+			&sheets.Request{
+				UpdateCells: &sheets.UpdateCellsRequest{
+					Range: &sheets.GridRange{
+						SheetId:       binding.UserSheetId,
+						StartRowIndex: 0,
+						EndRowIndex:   1,
+					},
+					Rows:   []*sheets.RowData{{Values: headers}},
+					Fields: "userEnteredValue",
+				},
+			},
+			// Hide the first column, which contains Flow internal data
+			&sheets.Request{
+				UpdateDimensionProperties: &sheets.UpdateDimensionPropertiesRequest{
+					Range: &sheets.DimensionRange{
+						SheetId:    binding.UserSheetId,
+						Dimension:  "COLUMNS",
+						StartIndex: 0,
+						EndIndex:   1,
+					},
+					Properties: &sheets.DimensionProperties{
+						HiddenByUser: true,
+					},
+					Fields: "hiddenByUser",
+				},
+			})
+
+	}
+	return batchRequestWithRetry(ctx, client, spreadsheetID, actions)
+}
+
 // SheetState is the recovered state of a materialized sheet.
 type SheetState struct {
 	SheetID   int64
