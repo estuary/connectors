@@ -307,6 +307,10 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return fmt.Errorf("recovering sheet states: %w", err)
 	}
 
+	if err := writeSheetSentinels(stream.Context(), svc, cfg.spreadsheetID(), states); err != nil {
+		return fmt.Errorf("writing sheet sentinels: %w", err)
+	}
+
 	bindings, err := buildTransactorBindings(
 		open.Open.Materialization.Bindings,
 		checkpoint.Round,
