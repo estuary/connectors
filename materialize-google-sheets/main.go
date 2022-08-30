@@ -224,6 +224,10 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 						Properties: &sheets.SheetProperties{
 							Title:   res.Sheet,
 							SheetId: sheetID,
+							GridProperties: &sheets.GridProperties{
+								ColumnCount:    int64(len(headers)),
+								FrozenRowCount: 1,
+							},
 						},
 					},
 				},
