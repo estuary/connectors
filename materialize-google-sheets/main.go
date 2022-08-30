@@ -205,55 +205,16 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 		if !exists && !isDelete {
 			description += fmt.Sprintf("Created sheet %q.\n", res.Sheet)
 
-			// Marshal row of column headers. First column is internal state.
-			var headers = []*sheets.CellData{{}}
-			for i := range binding.FieldSelection.Keys {
-				headers = append(headers, &sheets.CellData{UserEnteredValue: &sheets.ExtendedValue{
-					StringValue: &binding.FieldSelection.Keys[i]}})
-			}
-			for i := range binding.FieldSelection.Values {
-				headers = append(headers, &sheets.CellData{UserEnteredValue: &sheets.ExtendedValue{
-					StringValue: &binding.FieldSelection.Values[i]}})
-			}
-
-			// Create a new sheet and append its column headers.
+			// Create a new sheet.
 			var sheetID = int64(rand.Int31())
-			actions = append(actions,
-				&sheets.Request{
-					AddSheet: &sheets.AddSheetRequest{
-						Properties: &sheets.SheetProperties{
-							Title:   res.Sheet,
-							SheetId: sheetID,
-							GridProperties: &sheets.GridProperties{
-								ColumnCount:    int64(len(headers)),
-								FrozenRowCount: 1,
-							},
-						},
-					},
-				},
-				&sheets.Request{
-					AppendCells: &sheets.AppendCellsRequest{
+			actions = append(actions, &sheets.Request{
+				AddSheet: &sheets.AddSheetRequest{
+					Properties: &sheets.SheetProperties{
+						Title:   res.Sheet,
 						SheetId: sheetID,
-						Fields:  "userEnteredValue",
-						Rows:    []*sheets.RowData{{Values: headers}},
 					},
 				},
-				// Hide the first column, which contains Flow internal data
-				&sheets.Request{
-					UpdateDimensionProperties: &sheets.UpdateDimensionPropertiesRequest{
-						Range: &sheets.DimensionRange{
-							SheetId:    sheetID,
-							Dimension:  "COLUMNS",
-							StartIndex: 0,
-							EndIndex:   1,
-						},
-						Properties: &sheets.DimensionProperties{
-							HiddenByUser: true,
-						},
-						Fields: "hiddenByUser",
-					},
-				},
-			)
+			})
 		} else if exists && isDelete {
 			description += fmt.Sprintf("Deleted sheet %q.\n", res.Sheet)
 
@@ -318,6 +279,10 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	)
 	if err != nil {
 		return err
+	}
+
+	if err := writeSheetHeaders(stream.Context(), svc, cfg.spreadsheetID(), bindings); err != nil {
+		return fmt.Errorf("writing sheet headers: %w", err)
 	}
 
 	var transactor = &transactor{
