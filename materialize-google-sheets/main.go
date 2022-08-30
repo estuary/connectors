@@ -238,6 +238,21 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 						Rows:    []*sheets.RowData{{Values: headers}},
 					},
 				},
+				// Hide the first column, which contains Flow internal data
+				&sheets.Request{
+					UpdateDimensionProperties: &sheets.UpdateDimensionPropertiesRequest{
+						Range: &sheets.DimensionRange{
+							SheetId:    sheetID,
+							Dimension:  "COLUMNS",
+							StartIndex: 0,
+							EndIndex:   1,
+						},
+						Properties: &sheets.DimensionProperties{
+							HiddenByUser: true,
+						},
+						Fields: "hiddenByUser",
+					},
+				},
 			)
 		} else if exists && isDelete {
 			description += fmt.Sprintf("Deleted sheet %q.\n", res.Sheet)
