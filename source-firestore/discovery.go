@@ -24,11 +24,11 @@ const (
 	// that an invocation of discoverResource will process. If more collections are
 	// discovered which map to a particular resource, the excess will first pile up
 	// in the buffered channel and then after that they will be silently discarded.
-	discoverMaxCollectionsPerResource = 50
+	discoverMaxCollectionsPerResource = 100
 
 	// discoverMaxDocumentsPerCollection bounds the number of documents which will
 	// be fetched by discoverResource from any one collection.
-	discoverMaxDocumentsPerCollection = 100
+	discoverMaxDocumentsPerCollection = 200
 
 	// discoverMaxConcurrentWorkers bounds the number of concurrent `discoverResource()`
 	// workers which can proceed at any given time.
