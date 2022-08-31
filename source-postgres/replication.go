@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,6 +17,8 @@ import (
 	"github.com/jackc/pgtype"
 	"github.com/sirupsen/logrus"
 )
+
+var slotInUseRe = regexp.MustCompile(`replication slot ".*" is active for PID`)
 
 // StartReplication opens a connection to the database and returns a ReplicationStream
 // from which a neverending sequence of change events can be read.
@@ -87,6 +90,14 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 		},
 	}); err != nil {
 		conn.Close(ctx)
+		// The number one source of errors at this point in the capture is that another
+		// capture task is already running, using the replication slot we want. We can
+		// give the user a more friendly error message to help them understand that.
+		if err, ok := err.(*pgconn.PgError); ok {
+			if slotInUseRe.MatchString(err.Message) {
+				return nil, fmt.Errorf("another capture is already running against this database: %s", err.Message)
+			}
+		}
 		return nil, fmt.Errorf("unable to start replication: %w", err)
 	}
 
