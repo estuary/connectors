@@ -164,18 +164,18 @@ func (d *transactor) Store(it *pm.StoreIterator) error {
 				s.PrevDoc = prev[pi].Doc
 				s.PrevRound = prev[pi].Round
 				pi++
-			} else if l := len(addRows); l != 0 && addRows[l-1].InsertRange.Range.EndRowIndex == rowInd {
+			} else if l := len(addRows); l != 0 && addRows[l-1].InsertDimension.Range.EndIndex == rowInd {
 				// We're inserting a new row, and we can extend a current run of added rows.
-				addRows[l-1].InsertRange.Range.EndRowIndex++
+				addRows[l-1].InsertDimension.Range.EndIndex++
 			} else {
 				// We must start a new run of added rows.
 				addRows = append(addRows, &sheets.Request{
-					InsertRange: &sheets.InsertRangeRequest{
-						ShiftDimension: "ROWS",
-						Range: &sheets.GridRange{
-							SheetId:       d.bindings[bindInd].UserSheetId,
-							StartRowIndex: rowInd,
-							EndRowIndex:   rowInd + 1,
+					InsertDimension: &sheets.InsertDimensionRequest{
+						Range: &sheets.DimensionRange{
+							SheetId:    d.bindings[bindInd].UserSheetId,
+							Dimension:  "ROWS",
+							StartIndex: rowInd,
+							EndIndex:   rowInd + 1,
 						},
 					},
 				})
