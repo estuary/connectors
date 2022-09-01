@@ -22,39 +22,37 @@ import (
 // config represents the endpoint configuration for snowflake.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Account       string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier."`
-	User          string `json:"user" jsonschema:"title=User,description=The Snowflake user login name."`
-	Password      string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true"`
-	Database      string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to."`
-	Schema        string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use."`
-	Warehouse     string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virutal warehouse used to execute queries."`
-	Role          string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions."`
-	CloudProvider string `json:"cloud_provider" jsonschema:"enum=aws,enum=azure,enum=gcp,title=Cloud Provider,description=The cloud provider where the Snowflake endpoint is hosted."`
-	Region        string `json:"region" jsonschema:"title=Region,description=The cloud region containing the Snowflake endpoint."`
+	Account   string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier."`
+	Host      string `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)."`
+	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name."`
+	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true"`
+	Database  string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to."`
+	Schema    string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use."`
+	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries."`
+	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions."`
 }
 
 func (c *config) asSnowflakeConfig() sf.Config {
 	return sf.Config{
 		Account:   c.Account,
+		Host:      c.Host,
 		User:      c.User,
 		Password:  c.Password,
 		Database:  c.Database,
 		Schema:    c.Schema,
 		Warehouse: c.Warehouse,
 		Role:      c.Role,
-		Region:    c.Region + "." + c.CloudProvider,
 	}
 }
 
 func (c *config) Validate() error {
 	var requiredProperties = [][]string{
 		{"account", c.Account},
+		{"host", c.Host},
 		{"user", c.User},
 		{"password", c.Password},
 		{"database", c.Database},
 		{"schema", c.Schema},
-		{"region", c.Region},
-		{"cloud_provider", c.CloudProvider},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -120,11 +118,10 @@ func newSnowflakeDriver() *sqlDriver.Driver {
 			}
 
 			log.WithFields(log.Fields{
-				"account":   parsed.Account,
-				"database":  parsed.Database,
-				"role":      parsed.Role,
-				"user":      parsed.User,
-				"warehouse": parsed.Warehouse,
+				"host":     parsed.Host,
+				"user":     parsed.User,
+				"database": parsed.Database,
+				"schema":   parsed.Schema,
 			}).Info("opening Snowflake")
 
 			db, err := sql.Open("snowflake", dsn)
