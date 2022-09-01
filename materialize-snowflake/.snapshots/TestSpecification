@@ -8,6 +8,11 @@
         "title": "Account",
         "description": "The Snowflake account identifier."
       },
+      "host": {
+        "type": "string",
+        "title": "Host URL",
+        "description": "The Snowflake Host used for the connection. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)."
+      },
       "user": {
         "type": "string",
         "title": "User",
@@ -32,38 +37,22 @@
       "warehouse": {
         "type": "string",
         "title": "Warehouse",
-        "description": "The Snowflake virutal warehouse used to execute queries."
+        "description": "The Snowflake virtual warehouse used to execute queries."
       },
       "role": {
         "type": "string",
         "title": "Role",
         "description": "The user role used to perform actions."
-      },
-      "cloud_provider": {
-        "type": "string",
-        "enum": [
-          "aws",
-          "azure",
-          "gcp"
-        ],
-        "title": "Cloud Provider",
-        "description": "The cloud provider where the Snowflake endpoint is hosted."
-      },
-      "region": {
-        "type": "string",
-        "title": "Region",
-        "description": "The cloud region containing the Snowflake endpoint."
       }
     },
     "type": "object",
     "required": [
       "account",
+      "host",
       "user",
       "password",
       "database",
-      "schema",
-      "cloud_provider",
-      "region"
+      "schema"
     ],
     "title": "SQL Connection"
   },
