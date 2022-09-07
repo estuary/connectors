@@ -333,6 +333,23 @@ func TestMonotonicChanges(t *testing.T) {
 	// Will process newer files.
 	skip, _ = s.shouldSkip("fff", *ts(33))
 	require.False(t, skip)
+
+	require.True(t, s.startPath("fff", *ts(33)))
+	s.finishPath()
+
+	// Switch back to monotonic
+	s.finishSweep(true)
+
+	// Continues to not re-process files.
+	skip, reason = s.shouldSkip("aaa", *ts(5))
+	require.True(t, skip)
+	require.Equal(t, "state.Path > obj.Path", reason)
+	skip, reason = s.shouldSkip("ccc", *ts(12))
+	require.True(t, skip)
+	require.Equal(t, "state.Path > obj.Path", reason)
+	skip, reason = s.shouldSkip("fff", *ts(33))
+	require.True(t, skip)
+	require.Equal(t, "state.Path == obj.Path && Complete", reason)
 }
 
 func ts(i int64) *time.Time {
