@@ -287,7 +287,7 @@ func TestMonotonicChanges(t *testing.T) {
 		Complete: true,
 	}, s)
 
-	// Next sweep will finish NOT in monotonic mode.
+	// Next sweep will finish in non-monotonic mode.
 	s.startSweep(*ts(30))
 
 	// Doesn't re-process files, because the state records the "highest" seen path.
@@ -350,6 +350,13 @@ func TestMonotonicChanges(t *testing.T) {
 	skip, reason = s.shouldSkip("fff", *ts(33))
 	require.True(t, skip)
 	require.Equal(t, "state.Path == obj.Path && Complete", reason)
+
+	// Edge case: Lexicographically later file with earlier mod time still does not get re-processed
+	// since MinBound is retained, even though it is not incremented.
+	skip, reason = s.shouldSkip("ggg", *ts(1))
+	require.True(t, skip)
+	require.Equal(t, "!modTime.After(MinBound)", reason)
+
 }
 
 func ts(i int64) *time.Time {
