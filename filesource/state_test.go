@@ -337,8 +337,15 @@ func TestMonotonicChanges(t *testing.T) {
 	require.True(t, s.startPath("fff", *ts(33)))
 	s.finishPath()
 
-	// Switch back to monotonic
+	// Switch back to monotonic.
 	s.finishSweep(true)
+	verify(t, State{
+		MinBound: *ts(23), // Min bound is still there, but not incremented.
+		MaxBound: nil,
+		MaxMod:   ts(33),
+		Path:     "fff",
+		Complete: true,
+	}, s)
 
 	// Continues to not re-process files.
 	skip, reason = s.shouldSkip("aaa", *ts(5))
@@ -356,7 +363,6 @@ func TestMonotonicChanges(t *testing.T) {
 	skip, reason = s.shouldSkip("ggg", *ts(1))
 	require.True(t, skip)
 	require.Equal(t, "!modTime.After(MinBound)", reason)
-
 }
 
 func ts(i int64) *time.Time {
