@@ -11,6 +11,8 @@ import (
 )
 
 func TestConfigSchema(t *testing.T) {
+	t.Parallel()
+
 	schema := schemagen.GenerateSchema("Test Config Schema", CredentialConfig{})
 	formatted, err := json.MarshalIndent(schema, "", "  ")
 	require.NoError(t, err)
