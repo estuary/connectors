@@ -1,0 +1,108 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "title": "Google Cloud Project ID",
+        "description": "Name of the project containing the PubSub topics for this materialization."
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "Client",
+                "default": "Client"
+              },
+              "client_id": {
+                "type": "string",
+                "secret": true
+              },
+              "client_secret": {
+                "type": "string",
+                "secret": true
+              },
+              "refresh_token": {
+                "type": "string",
+                "secret": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "client_id",
+              "client_secret",
+              "refresh_token"
+            ],
+            "title": "Google OAuth",
+            "x-oauth2-provider": "google"
+          },
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "Service",
+                "default": "Service"
+              },
+              "credentials_json": {
+                "type": "string",
+                "title": "Service Account JSON",
+                "description": "The JSON key of the service account to use for authorization.",
+                "examples": [
+                  "{ \"type\": \"service_account\" \"project_id\": YOUR_PROJECT_ID, \"private_key_id\": YOUR_PRIVATE_KEY, ... }"
+                ],
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "service_account_info"
+            ],
+            "title": "Service Account Key"
+          }
+        ],
+        "title": "Authentication",
+        "default": {
+          "auth_type": "Client"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        }
+      }
+    },
+    "type": "object",
+    "required": [
+      "project_id",
+      "credentials"
+    ],
+    "title": "Materialize Google PubSub Spec"
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-google-pubsub/resource",
+    "properties": {
+      "topic": {
+        "type": "string",
+        "title": "Topic Name",
+        "description": "Name of the topic to publish materialized results to."
+      }
+    },
+    "type": "object",
+    "required": [
+      "topic"
+    ],
+    "title": "Google PubSub Topic"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-google-pubsub",
+  "oauth2_spec": {
+    "provider": "google",
+    "auth_url_template": "https://accounts.google.com/o/oauth2/auth?access_type=offline\u0026prompt=consent\u0026client_id={{ client_id }}\u0026redirect_uri={{ redirect_uri }}\u0026response_type=code\u0026scope=https://www.googleapis.com/auth/pubsub\u0026state={{ state }}",
+    "access_token_url_template": "https://oauth2.googleapis.com/token",
+    "access_token_body": "{\"grant_type\": \"authorization_code\", \"client_id\": \"{{ client_id }}\", \"client_secret\": \"{{ client_secret }}\", \"redirect_uri\": \"{{ redirect_uri }}\", \"code\": \"{{ code }}\"}",
+    "access_token_response_map_json": {
+      "refresh_token": "/refresh_token"
+    }
+  }
+}
