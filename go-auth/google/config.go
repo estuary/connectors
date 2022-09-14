@@ -145,7 +145,7 @@ func (CredentialConfig) JSONSchema() *jsonschema.Schema {
 			},
 			{
 				Title:      "Service Account Key",
-				Required:   []string{"auth_type", "service_account_info"},
+				Required:   []string{"auth_type", "credentials_json"},
 				Properties: serviceAccountProps,
 			},
 		},
