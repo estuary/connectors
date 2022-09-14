@@ -58,7 +58,7 @@
             },
             "required": [
               "auth_type",
-              "service_account_info"
+              "credentials_json"
             ],
             "title": "Service Account Key"
           }
