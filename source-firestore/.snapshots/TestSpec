@@ -1,0 +1,43 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-firestore/config",
+    "properties": {
+      "googleCredentials": {
+        "type": "string",
+        "title": "Credentials",
+        "description": "Google Cloud Service Account JSON credentials.",
+        "multiline": true,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Optional name of the database to capture from. Leave blank to autodetect. Typically \"projects/$PROJECTID/databases/(default)\"."
+      }
+    },
+    "type": "object",
+    "required": [
+      "googleCredentials",
+      "database"
+    ],
+    "title": "Google Firestore"
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-firestore/resource",
+    "properties": {
+      "path": {
+        "type": "string",
+        "title": "Path to Collection",
+        "description": "Supports parent/*/nested to capture all nested collections of parent's children"
+      }
+    },
+    "type": "object",
+    "required": [
+      "path"
+    ],
+    "title": "Firestore Resource Spec"
+  },
+  "documentation_url": "https://go.estuary.dev/source-firestore"
+}
