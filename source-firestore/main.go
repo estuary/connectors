@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
+	"regexp"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
@@ -23,20 +23,18 @@ type config struct {
 	// Service account JSON key to use as Application Default Credentials
 	CredentialsJSON string `json:"googleCredentials" jsonschema:"title=Credentials,description=Google Cloud Service Account JSON credentials." jsonschema_extras:"secret=true,multiline=true"`
 
-	// How frequently should we scan all collections to ensure consistency
-	ScanInterval string `json:"scan_interval" jsonschema:"title=Scan Interval,description=How frequently should all collections be scanned to ensure consistency. See https://pkg.go.dev/time#ParseDuration for supported values. To turn off scans use the value 'never'.,default=12h"`
+	// Optional name of the database to capture from
+	DatabasePath string `json:"database" jsonschema:"title=Database,description=Optional name of the database to capture from. Leave blank to autodetect. Typically \"projects/$PROJECTID/databases/(default)\"."`
 }
+
+var databasePathRe = regexp.MustCompile(`^projects/[^/]+/databases/[^/]+$`)
 
 func (c *config) Validate() error {
 	if c.CredentialsJSON == "" {
 		return fmt.Errorf("googleCredentials is required")
 	}
-	if c.ScanInterval != "" && c.ScanInterval != scanIntervalNever {
-		var _, err = time.ParseDuration(c.ScanInterval)
-
-		if err != nil {
-			return fmt.Errorf("parsing scan interval failed: %w", err)
-		}
+	if c.DatabasePath != "" && !databasePathRe.MatchString(c.DatabasePath) {
+		return fmt.Errorf("invalid database path %q", c.DatabasePath)
 	}
 	return nil
 }
