@@ -66,3 +66,10 @@ func collectionToResourcePath(collection string) string {
 
 	return strings.Trim(cleanedPath, "/*/")
 }
+
+func documentToResourcePath(documentPath string) string {
+	if idx := strings.LastIndex(documentPath, "/"); idx >= 0 {
+		return collectionToResourcePath(documentPath[:idx])
+	}
+	return documentPath
+}
