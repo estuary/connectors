@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"cloud.google.com/go/pubsub"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -11,7 +12,13 @@ import (
 )
 
 type transactor struct {
-	topics []*pubsub.Topic
+	bindings []*topicBinding
+}
+
+type topicBinding struct {
+	identifier string
+	topicName  string
+	topic      *pubsub.Topic
 }
 
 // PubSub is delta-update only.
@@ -27,9 +34,11 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 	errGroup, ctx := errgroup.WithContext(it.Context())
 
 	for it.Next() {
-		topic := t.topics[it.Binding]
-		res := topic.Publish(ctx, &pubsub.Message{
-			Data:        it.RawJSON,
+		binding := t.bindings[it.Binding]
+		res := binding.topic.Publish(ctx, &pubsub.Message{
+			Data: it.RawJSON,
+			Attributes: map[string]string{
+				IDENTIFIER_ATTRIBUTE_KEY: fmt.Sprintf("%s/%s", binding.topicName, binding.identifier)},
 			OrderingKey: it.Key.String(), // Allows for reading of messages for the same key in order.
 		})
 
@@ -61,8 +70,8 @@ func (t *transactor) Acknowledge(context.Context) error {
 }
 
 func (t *transactor) Destroy() {
-	for _, topic := range t.topics {
+	for _, b := range t.bindings {
 		// Wait for all async messages to finished sending for each topic.
-		topic.Stop()
+		b.topic.Stop()
 	}
 }
