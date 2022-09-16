@@ -15,6 +15,10 @@ import (
 	"google.golang.org/api/option"
 )
 
+const (
+	IDENTIFIER_ATTRIBUTE_KEY = "identifier"
+)
+
 type config struct {
 	ProjectID   string                        `json:"project_id" jsonschema:"title=Google Cloud Project ID"`
 	Credentials *google_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
@@ -56,11 +60,15 @@ func (c *config) client(ctx context.Context) (*pubsub.Client, error) {
 }
 
 type resource struct {
-	TopicName string `json:"topic" jsonschema:"title=Topic Name"`
+	TopicName  string `json:"topic" jsonschema:"title=Topic Name"`
+	Identifier string `json:"identifier,omitempty" jsonschema:"title=Resource Binding Identifier"`
 }
 
 func (resource) GetFieldDocString(fieldName string) string {
 	switch fieldName {
+	case "Identifier":
+		return "Optional identifier for the resource binding. Each binding must have a unique topic & identifier pair. " +
+			fmt.Sprintf("Included as %q attribute in published messages if specified.", IDENTIFIER_ATTRIBUTE_KEY)
 	case "TopicName":
 		return "Name of the topic to publish materialized results to."
 	default:
@@ -119,6 +127,9 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 		return nil, err
 	}
 
+	// Bindings are uniquely identified by their topic & identifier, but may have duplicated topic
+	// names among bindings. Topic names are collected here in a set to be later verified.
+	topicNames := make(map[string]struct{})
 	var out []*pm.ValidateResponse_Binding
 	for _, b := range req.Bindings {
 		res, err := resolveResourceConfig(b.ResourceSpecJson)
@@ -126,13 +137,7 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 			return nil, err
 		}
 
-		// The topic may or may not exist yet, but we want to make sure this configuration can check
-		// without error. This confirms that the provided authentication credentials are valid to
-		// check for the existence of a topic.
-		_, err = client.Topic(res.TopicName).Exists(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("pubsub validation error: %w", err)
-		}
+		topicNames[res.TopicName] = struct{}{}
 
 		constraints := make(map[string]*pm.Constraint)
 		for _, projection := range b.Collection.Projections {
@@ -148,11 +153,27 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 			constraints[projection.Field] = constraint
 		}
 
+		// Include identifier in the resource path if configured.
+		resourcePath := []string{res.TopicName}
+		if res.Identifier != "" {
+			resourcePath = append(resourcePath, res.Identifier)
+		}
+
 		out = append(out, &pm.ValidateResponse_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: true,
-			ResourcePath: []string{res.TopicName},
+			ResourcePath: resourcePath,
 		})
+	}
+
+	for t := range topicNames {
+		// The topic may or may not exist yet, but we want to make sure this configuration can check
+		// without error. This confirms that the provided authentication credentials are valid to
+		// check for the existence of a topic.
+		_, err = client.Topic(t).Exists(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("pubsub validation error: %w", err)
+		}
 	}
 
 	return &pm.ValidateResponse{Bindings: out}, nil
@@ -174,12 +195,19 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		return nil, err
 	}
 
+	checkedTopics := make(map[string]struct{})
 	var newTopics []string
 	for _, b := range req.Materialization.Bindings {
 		res, err := resolveResourceConfig(b.ResourceSpecJson)
 		if err != nil {
 			return nil, err
 		}
+
+		// Do not check a topic that has already been checked.
+		if _, ok := checkedTopics[res.TopicName]; ok {
+			continue
+		}
+		checkedTopics[res.TopicName] = struct{}{}
 
 		exists, err := client.Topic(res.TopicName).Exists(ctx)
 		if err != nil {
@@ -227,12 +255,19 @@ func (d driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		return nil, err
 	}
 
+	checkedTopics := make(map[string]struct{})
 	var topicsToDelete []string
 	for _, b := range req.Materialization.Bindings {
 		res, err := resolveResourceConfig(b.ResourceSpecJson)
 		if err != nil {
 			return nil, err
 		}
+
+		// Do not check a topic that has already been checked.
+		if _, ok := checkedTopics[res.TopicName]; ok {
+			continue
+		}
+		checkedTopics[res.TopicName] = struct{}{}
 
 		exists, err := client.Topic(res.TopicName).Exists(ctx)
 		if err != nil {
@@ -280,7 +315,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return err
 	}
 
-	var topics []*pubsub.Topic
+	var topicBindings []*topicBinding
 	for _, b := range req.Open.Materialization.Bindings {
 		res, err := resolveResourceConfig(b.ResourceSpecJson)
 		if err != nil {
@@ -291,11 +326,14 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		// Allows for the reading of messages in-order with a provided ordering key. See
 		// https://cloud.google.com/pubsub/docs/ordering
 		t.EnableMessageOrdering = true
-		topics = append(topics, t)
+		topicBindings = append(topicBindings, &topicBinding{
+			identifier: res.Identifier,
+			topic:      t,
+		})
 	}
 
 	t := &transactor{
-		topics: topics,
+		bindings: topicBindings,
 	}
 
 	if err = stream.Send(&pm.TransactionResponse{
