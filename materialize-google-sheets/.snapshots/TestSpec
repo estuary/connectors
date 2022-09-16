@@ -1,0 +1,108 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "spreadsheetUrl": {
+        "type": "string",
+        "title": "Spreadsheet URL",
+        "description": "URL of the spreadsheet to materialize into."
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "Client",
+                "default": "Client"
+              },
+              "client_id": {
+                "type": "string",
+                "secret": true
+              },
+              "client_secret": {
+                "type": "string",
+                "secret": true
+              },
+              "refresh_token": {
+                "type": "string",
+                "secret": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "client_id",
+              "client_secret",
+              "refresh_token"
+            ],
+            "title": "Google OAuth",
+            "x-oauth2-provider": "google"
+          },
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "Service",
+                "default": "Service"
+              },
+              "credentials_json": {
+                "type": "string",
+                "title": "Service Account JSON",
+                "description": "The JSON key of the service account to use for authorization.",
+                "examples": [
+                  "{ \"type\": \"service_account\" \"project_id\": YOUR_PROJECT_ID, \"private_key_id\": YOUR_PRIVATE_KEY, ... }"
+                ],
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "credentials_json"
+            ],
+            "title": "Service Account Key"
+          }
+        ],
+        "title": "Authentication",
+        "default": {
+          "auth_type": "Client"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        }
+      }
+    },
+    "type": "object",
+    "required": [
+      "spreadsheetUrl",
+      "credentials"
+    ],
+    "title": "Google Sheets Materialization"
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-google-sheets/resource",
+    "properties": {
+      "sheet": {
+        "type": "string",
+        "title": "Sheet Name",
+        "description": "Name of the spreadsheet sheet to materialize into."
+      }
+    },
+    "type": "object",
+    "required": [
+      "sheet"
+    ],
+    "title": "Google Sheets Materialization Binding"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-google-sheets",
+  "oauth2_spec": {
+    "provider": "google",
+    "auth_url_template": "https://accounts.google.com/o/oauth2/auth?access_type=offline\u0026prompt=consent\u0026client_id={{ client_id }}\u0026redirect_uri={{ redirect_uri }}\u0026response_type=code\u0026scope=https://www.googleapis.com/auth/spreadsheets\u0026state={{ state }}",
+    "access_token_url_template": "https://oauth2.googleapis.com/token",
+    "access_token_body": "{\"grant_type\": \"authorization_code\", \"client_id\": \"{{ client_id }}\", \"client_secret\": \"{{ client_secret }}\", \"redirect_uri\": \"{{ redirect_uri }}\", \"code\": \"{{ code }}\"}",
+    "access_token_response_map_json": {
+      "refresh_token": "/refresh_token"
+    }
+  }
+}

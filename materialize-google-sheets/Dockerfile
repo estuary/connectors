@@ -19,6 +19,7 @@ COPY materialize-boilerplate   ./materialize-boilerplate
 COPY materialize-google-sheets ./materialize-google-sheets
 COPY testsupport               ./testsupport
 COPY go-schema-gen             ./go-schema-gen
+COPY go-auth                   ./go-auth
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-google-sheets/...
