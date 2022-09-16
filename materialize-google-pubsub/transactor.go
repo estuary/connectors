@@ -3,7 +3,6 @@ package connector
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"cloud.google.com/go/pubsub"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -17,7 +16,6 @@ type transactor struct {
 
 type topicBinding struct {
 	identifier string
-	topicName  string
 	topic      *pubsub.Topic
 }
 
@@ -35,12 +33,17 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 
 	for it.Next() {
 		binding := t.bindings[it.Binding]
-		res := binding.topic.Publish(ctx, &pubsub.Message{
-			Data: it.RawJSON,
-			Attributes: map[string]string{
-				IDENTIFIER_ATTRIBUTE_KEY: fmt.Sprintf("%s/%s", binding.topicName, binding.identifier)},
+
+		msg := &pubsub.Message{
+			Data:        it.RawJSON,
 			OrderingKey: it.Key.String(), // Allows for reading of messages for the same key in order.
-		})
+		}
+		// Only include an identifier attribute if an identifier has been configured.
+		if binding.identifier != "" {
+			msg.Attributes = map[string]string{IDENTIFIER_ATTRIBUTE_KEY: binding.identifier}
+		}
+
+		res := binding.topic.Publish(ctx, msg)
 
 		errGroup.Go(func() error {
 			// This will block until the individual publish call is complete.

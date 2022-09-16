@@ -16,8 +16,7 @@ import (
 )
 
 const (
-	IDENTIFIER_ATTRIBUTE_KEY    = "identifier"
-	DEFAULT_RESOURCE_IDENTIFIER = "default"
+	IDENTIFIER_ATTRIBUTE_KEY = "identifier"
 )
 
 type config struct {
@@ -68,11 +67,8 @@ type resource struct {
 func (resource) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Identifier":
-		return "Identifier for the resource binding. Each binding must have a unique topic & identifier pair. " +
-			fmt.Sprintf("Included as %q attribute in published messages as \"{topic}/{identifier}\". Defaults to %q.",
-				IDENTIFIER_ATTRIBUTE_KEY,
-				DEFAULT_RESOURCE_IDENTIFIER,
-			)
+		return "Optional identifier for the resource binding. Each binding must have a unique topic & identifier pair. " +
+			fmt.Sprintf("Included as %q attribute in published messages if specified.", IDENTIFIER_ATTRIBUTE_KEY)
 	case "TopicName":
 		return "Name of the topic to publish materialized results to."
 	default:
@@ -157,10 +153,16 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 			constraints[projection.Field] = constraint
 		}
 
+		// Include identifier in the resource path if configured.
+		resourcePath := []string{res.TopicName}
+		if res.Identifier != "" {
+			resourcePath = append(resourcePath, res.Identifier)
+		}
+
 		out = append(out, &pm.ValidateResponse_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: true,
-			ResourcePath: []string{res.TopicName, res.Identifier},
+			ResourcePath: resourcePath,
 		})
 	}
 
@@ -326,7 +328,6 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		t.EnableMessageOrdering = true
 		topicBindings = append(topicBindings, &topicBinding{
 			identifier: res.Identifier,
-			topicName:  res.TopicName,
 			topic:      t,
 		})
 	}
@@ -359,10 +360,6 @@ func resolveResourceConfig(specJson json.RawMessage) (resource, error) {
 	var res = resource{}
 	if err := pf.UnmarshalStrict(specJson, &res); err != nil {
 		return res, fmt.Errorf("parsing resource config: %w", err)
-	}
-
-	if res.Identifier == "" {
-		res.Identifier = DEFAULT_RESOURCE_IDENTIFIER
 	}
 
 	return res, nil

@@ -91,7 +91,7 @@
       "identifier": {
         "type": "string",
         "title": "Resource Binding Identifier",
-        "description": "Identifier for the resource binding. Each binding must have a unique topic \u0026 identifier pair. Included as \"identifier\" attribute in published messages as \"{topic}/{identifier}\". Defaults to \"default\"."
+        "description": "Optional identifier for the resource binding. Each binding must have a unique topic \u0026 identifier pair. Included as \"identifier\" attribute in published messages if specified."
       }
     },
     "type": "object",
