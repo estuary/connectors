@@ -11,7 +11,12 @@ import (
 )
 
 type transactor struct {
-	topics []*pubsub.Topic
+	bindings []*topicBinding
+}
+
+type topicBinding struct {
+	identifier string
+	topic      *pubsub.Topic
 }
 
 // PubSub is delta-update only.
@@ -27,11 +32,18 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 	errGroup, ctx := errgroup.WithContext(it.Context())
 
 	for it.Next() {
-		topic := t.topics[it.Binding]
-		res := topic.Publish(ctx, &pubsub.Message{
+		binding := t.bindings[it.Binding]
+
+		msg := &pubsub.Message{
 			Data:        it.RawJSON,
 			OrderingKey: it.Key.String(), // Allows for reading of messages for the same key in order.
-		})
+		}
+		// Only include an identifier attribute if an identifier has been configured.
+		if binding.identifier != "" {
+			msg.Attributes = map[string]string{IDENTIFIER_ATTRIBUTE_KEY: binding.identifier}
+		}
+
+		res := binding.topic.Publish(ctx, msg)
 
 		errGroup.Go(func() error {
 			// This will block until the individual publish call is complete.
@@ -61,8 +73,8 @@ func (t *transactor) Acknowledge(context.Context) error {
 }
 
 func (t *transactor) Destroy() {
-	for _, topic := range t.topics {
+	for _, b := range t.bindings {
 		// Wait for all async messages to finished sending for each topic.
-		topic.Stop()
+		b.topic.Stop()
 	}
 }
