@@ -112,7 +112,7 @@ func (s *s3Store) List(_ context.Context, query filesource.Query) (filesource.Li
 	}, nil
 }
 
-func (s *s3Store) Read(_ context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
+func (s *s3Store) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
 	var bucket, key = filesource.PathToParts(obj.Path)
 
 	var getInput = s3.GetObjectInput{
@@ -120,7 +120,7 @@ func (s *s3Store) Read(_ context.Context, obj filesource.ObjectInfo) (io.ReadClo
 		Key:               aws.String(key),
 		IfUnmodifiedSince: &obj.ModTime,
 	}
-	resp, err := s.s3.GetObject(&getInput)
+	resp, err := s.s3.GetObjectWithContext(ctx, &getInput)
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
