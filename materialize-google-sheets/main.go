@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	google_auth "github.com/estuary/connectors/go-auth/google"
+	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -16,22 +18,33 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
+// Scopes required for OAuth authentication
+var scopes = []string{sheets.SpreadsheetsScope}
+
 // driver implements the pm.DriverServer interface.
 type driver struct{}
 
 type config struct {
-	CredentialsJSON string `json:"googleCredentials"`
-	SpreadsheetURL  string `json:"spreadsheetUrl"`
+	SpreadsheetURL string                        `json:"spreadsheetUrl" jsonschema:"title=Spreadsheet URL"`
+	Credentials    *google_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
+}
+
+func (config) GetFieldDocString(fieldName string) string {
+	switch fieldName {
+	case "SpreadsheetURL":
+		return "URL of the spreadsheet to materialize into."
+	default:
+		return ""
+	}
 }
 
 // Validate returns an error if the config is not well-formed.
 func (c config) Validate() error {
-	if c.CredentialsJSON == "" {
-		return fmt.Errorf("missing required Google service account credentials")
-	} else if _, err := parseSheetsID(c.SpreadsheetURL); err != nil {
+	if _, err := parseSheetsID(c.SpreadsheetURL); err != nil {
 		return err
 	}
-	return nil
+
+	return c.Credentials.Validate()
 }
 
 func (c config) spreadsheetID() string {
@@ -42,9 +55,13 @@ func (c config) spreadsheetID() string {
 	return id
 }
 
-func (c config) buildService() (*sheets.Service, error) {
-	var client, err = sheets.NewService(context.Background(),
-		option.WithCredentialsJSON([]byte(c.CredentialsJSON)))
+func (c config) buildService(ctx context.Context) (*sheets.Service, error) {
+	creds, err := c.Credentials.GoogleCredentials(ctx, scopes...)
+	if err != nil {
+		return nil, fmt.Errorf("building sheets service: %w", err)
+	}
+
+	client, err := sheets.NewService(context.Background(), option.WithCredentials(creds))
 	if err != nil {
 		return nil, fmt.Errorf("building sheets service: %w", err)
 	}
@@ -52,7 +69,16 @@ func (c config) buildService() (*sheets.Service, error) {
 }
 
 type resource struct {
-	Sheet string `json:"sheet"`
+	Sheet string `json:"sheet" jsonschema:"title=Sheet Name"`
+}
+
+func (resource) GetFieldDocString(fieldName string) string {
+	switch fieldName {
+	case "Sheet":
+		return "Name of the spreadsheet sheet to materialize into."
+	default:
+		return ""
+	}
 }
 
 func (r resource) Validate() error {
@@ -71,46 +97,27 @@ func (c driverCheckpoint) Validate() error {
 }
 
 func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, fmt.Errorf("validating request: %w", err)
+	}
+
+	es := schemagen.GenerateSchema("Google Sheets Materialization", &config{})
+	es.ID = "" // Needed for config-encryption to work
+	endpointSchema, err := es.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("generating endpoint schema: %w", err)
+	}
+
+	resourceSchema, err := schemagen.GenerateSchema("Google Sheets Materialization Binding", &resource{}).MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("generating resource schema: %w", err)
+	}
+
 	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"title":   "Google Sheets Materialization",
-		"type":    "object",
-		"required": [
-			"googleCredentials",
-			"spreadsheetUrl"
-		],
-		"properties": {
-			"googleCredentials": {
-				"type":        "string",
-				"title":       "Google Service Account",
-				"description": "Service account JSON key to use as Application Default Credentials",
-				"multiline":   true,
-				"secret":      true
-			},
-			"spreadsheetUrl": {
-				"type":        "string",
-				"title":       "Spreadsheet URL",
-				"description": "URL of the spreadsheet to materialize into, which is shared with the service account."
-			}
-		}
-		}`),
-		ResourceSpecSchemaJson: json.RawMessage(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"title":   "Google Sheets Materialization Binding",
-		"type":    "object",
-		"required": [
-			"sheet"
-		],
-		"properties": {
-			"sheet": {
-				"type":        "string",
-				"title":       "Sheet Name",
-				"description": "Name of the spreadsheet sheet to materialize into"
-			}
-		}
-		}`),
-		DocumentationUrl: "https://go.estuary.dev/materialize-google-sheets",
+		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
+		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:       "https://go.estuary.dev/materialize-google-sheets",
+		Oauth2Spec:             google_auth.Spec(scopes...),
 	}, nil
 }
 
@@ -120,7 +127,7 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		return nil, err
 	}
 
-	var svc, err = cfg.buildService()
+	var svc, err = cfg.buildService(ctx)
 	if err != nil {
 		return nil, err
 	} else if _, err = loadSheetIDMapping(svc, cfg.spreadsheetID()); err != nil {
@@ -182,7 +189,7 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 		return nil, err
 	}
 
-	var svc, err = cfg.buildService()
+	var svc, err = cfg.buildService(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +261,7 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		return fmt.Errorf("parsing driver checkpoint: %w", err)
 	}
 
-	svc, err := cfg.buildService()
+	svc, err := cfg.buildService(stream.Context())
 	if err != nil {
 		return err
 	}
