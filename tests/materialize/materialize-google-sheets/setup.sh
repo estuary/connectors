@@ -9,8 +9,11 @@ export SPREADSHEET_URL="https://docs.google.com/spreadsheets/d/1aki_PfFU-RCXCvm4
 export GCP_SERVICE_ACCOUNT_KEY_QUOTED=$(echo ${GCP_SERVICE_ACCOUNT_KEY} | jq 'tojson')
 
 config_json_template='{
-    "googleCredentials": ${GCP_SERVICE_ACCOUNT_KEY_QUOTED},
-    "spreadsheetUrl": "${SPREADSHEET_URL}"
+    "spreadsheetUrl": "${SPREADSHEET_URL}",
+    "credentials": {
+      "auth_type": "Service",
+      "credentials_json": ${GCP_SERVICE_ACCOUNT_KEY_QUOTED}
+    }
 }'
 
 resources_json_template='[
