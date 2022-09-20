@@ -152,7 +152,7 @@ func collect(ch <-chan airbyte.Stream, size int) []airbyte.Stream {
 		collected = append(collected, stream)
 	}
 	sort.SliceStable(collected, func(i, j int) bool {
-		return collected[i].Name < collected[j].Name
+		return collected[i].Name > collected[j].Name
 	})
 	return collected
 }
