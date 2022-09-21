@@ -86,7 +86,7 @@ func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
 	return &s3Store{s3: s3.New(awsSession)}, nil
 }
 
-func (s *s3Store) List(_ context.Context, query filesource.Query) (filesource.Listing, error) {
+func (s *s3Store) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
 	var bucket, prefix = filesource.PathToParts(query.Prefix)
 
 	var input = s3.ListObjectsV2Input{
@@ -107,6 +107,7 @@ func (s *s3Store) List(_ context.Context, query filesource.Query) (filesource.Li
 	}
 
 	return &s3Listing{
+		ctx:   ctx,
 		s3:    s.s3,
 		input: input,
 	}, nil
@@ -132,6 +133,7 @@ func (s *s3Store) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadC
 }
 
 type s3Listing struct {
+	ctx    context.Context
 	s3     *s3.S3
 	input  s3.ListObjectsV2Input
 	output s3.ListObjectsV2Output
@@ -188,7 +190,7 @@ func (l *s3Listing) poll() error {
 		input.ContinuationToken = l.output.NextContinuationToken
 	}
 
-	if out, err := l.s3.ListObjectsV2(&input); err != nil {
+	if out, err := l.s3.ListObjectsV2WithContext(l.ctx, &input); err != nil {
 		return err
 	} else {
 		l.output = *out
