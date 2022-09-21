@@ -9,10 +9,10 @@ flowctl-admin api build \
   --build-id "${BUILD_ID}" \
   --source "file://${TEST_DIR}/${CATALOG}" \
   --network host \
-  --log.level debug
+  --log.level info
 
 flowctl-admin api activate \
   --build-id "${BUILD_ID}" \
   --network host \
-  --log.level debug \
+  --log.level info \
   --all
