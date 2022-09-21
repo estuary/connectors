@@ -187,7 +187,7 @@ for f in "${TEST_DIR}/${result_dir}"/*; do
     jq --sort-keys -c <"${f}" >"${f}.normalized" || bail "Failed to normalize ${f}."
 
     diff --suppress-common-lines --side-by-side "${f}.normalized" "${expected}" \
-    || bail "Test Failed"
+    || bail "Test Failed because ${expected} is different"
 done
 
 

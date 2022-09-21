@@ -8,4 +8,4 @@ flowctl-admin temp-data-plane \
     --sigterm \
     --tempdir "${TEST_DIR}" \
     --network host \
-    --log.level debug
+    --log.level info
