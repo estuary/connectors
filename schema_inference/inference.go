@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -58,11 +57,6 @@ func Run(ctx context.Context, logEntry *log.Entry, docsCh <-chan Document) (Sche
 
 	errGroup.Go(func() error {
 		decoder := json.NewDecoder(stdout)
-
-		// Simulate a delay to reliably reproduce the race condition - the async call to cmd.Wait
-		// below will have already closed stdout by the time the rest of this runs, resulting in an
-		// error trying to decode.
-		time.Sleep(5 * time.Second)
 
 		if err := decoder.Decode(&schema); err != nil {
 			return fmt.Errorf("failed to decode schema, %w", err)
