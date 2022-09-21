@@ -1,0 +1,13 @@
+version: "3.7"
+
+services:
+  postgres:
+    image: 'postgres:latest'
+    command: ["postgres"]
+    environment: {"POSTGRES_DB": "flow", "POSTGRES_USER": "flow", "POSTGRES_PASSWORD": "flow"}
+    network_mode: "host"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data: {}
