@@ -86,7 +86,7 @@ func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
 	return &s3Store{s3: s3.New(awsSession)}, nil
 }
 
-func (s *s3Store) List(_ context.Context, query filesource.Query) (filesource.Listing, error) {
+func (s *s3Store) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
 	var bucket, prefix = filesource.PathToParts(query.Prefix)
 
 	var input = s3.ListObjectsV2Input{
@@ -106,10 +106,14 @@ func (s *s3Store) List(_ context.Context, query filesource.Query) (filesource.Li
 		input.StartAfter = aws.String(startAt[:len(startAt)-1])
 	}
 
-	return &s3Listing{
+	l := &s3Listing{
 		s3:    s.s3,
 		input: input,
-	}, nil
+	}
+
+	return filesource.ListingFunc(func() (filesource.ObjectInfo, error) {
+		return l.next(ctx)
+	}), nil
 }
 
 func (s *s3Store) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
@@ -137,7 +141,7 @@ type s3Listing struct {
 	output s3.ListObjectsV2Output
 }
 
-func (l *s3Listing) Next() (filesource.ObjectInfo, error) {
+func (l *s3Listing) next(ctx context.Context) (filesource.ObjectInfo, error) {
 	var bucket = aws.StringValue(l.input.Bucket)
 
 	for {
@@ -170,13 +174,13 @@ func (l *s3Listing) Next() (filesource.ObjectInfo, error) {
 			}, nil
 		}
 
-		if err := l.poll(); err != nil {
+		if err := l.poll(ctx); err != nil {
 			return filesource.ObjectInfo{}, err
 		}
 	}
 }
 
-func (l *s3Listing) poll() error {
+func (l *s3Listing) poll(ctx context.Context) error {
 	var input = l.input
 
 	if l.output.Prefix == nil {
@@ -188,7 +192,7 @@ func (l *s3Listing) poll() error {
 		input.ContinuationToken = l.output.NextContinuationToken
 	}
 
-	if out, err := l.s3.ListObjectsV2(&input); err != nil {
+	if out, err := l.s3.ListObjectsV2WithContext(context.Background(), &input); err != nil {
 		return err
 	} else {
 		l.output = *out
