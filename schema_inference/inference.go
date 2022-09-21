@@ -57,7 +57,6 @@ func Run(ctx context.Context, logEntry *log.Entry, docsCh <-chan Document) (Sche
 	})
 
 	errGroup.Go(func() error {
-		defer stdout.Close()
 		decoder := json.NewDecoder(stdout)
 
 		// Simulate a delay to reliably reproduce the race condition - the async call to cmd.Wait
@@ -79,10 +78,11 @@ func Run(ctx context.Context, logEntry *log.Entry, docsCh <-chan Document) (Sche
 		return nil, fmt.Errorf("failed to run flow-schema-inference: %w", err)
 	}
 
-	errGroup.Go(cmd.Wait)
-
-	err = errGroup.Wait()
-	if err != nil {
+	// Wait for reading from stdout to complete before concluding the command. cmd.Wait() will close
+	// stdout.
+	if err := errGroup.Wait(); err != nil {
+		return nil, err
+	} else if err := cmd.Wait(); err != nil {
 		return nil, err
 	}
 
