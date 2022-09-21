@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -58,6 +59,10 @@ func Run(ctx context.Context, logEntry *log.Entry, docsCh <-chan Document) (Sche
 	errGroup.Go(func() error {
 		defer stdout.Close()
 		decoder := json.NewDecoder(stdout)
+
+		// This will probably cause the command to exit, which will also result in stdout being closed.
+		stdin.Close()
+		time.Sleep(5 * time.Second)
 
 		if err := decoder.Decode(&schema); err != nil {
 			return fmt.Errorf("failed to decode schema, %w", err)
