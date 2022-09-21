@@ -1,4 +1,5 @@
 # materialize-sql
 
-## v1, 2022-07-27
+## v1, 2022-09-20
+
 - Beginning of changelog.
