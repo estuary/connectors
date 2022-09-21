@@ -172,13 +172,13 @@ func (l *s3Listing) Next() (filesource.ObjectInfo, error) {
 			}, nil
 		}
 
-		if err := l.poll(l.ctx); err != nil {
+		if err := l.poll(); err != nil {
 			return filesource.ObjectInfo{}, err
 		}
 	}
 }
 
-func (l *s3Listing) poll(ctx context.Context) error {
+func (l *s3Listing) poll() error {
 	var input = l.input
 
 	if l.output.Prefix == nil {
@@ -190,7 +190,7 @@ func (l *s3Listing) poll(ctx context.Context) error {
 		input.ContinuationToken = l.output.NextContinuationToken
 	}
 
-	if out, err := l.s3.ListObjectsV2WithContext(ctx, &input); err != nil {
+	if out, err := l.s3.ListObjectsV2WithContext(l.ctx, &input); err != nil {
 		return err
 	} else {
 		l.output = *out
