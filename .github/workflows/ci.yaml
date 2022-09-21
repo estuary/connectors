@@ -71,27 +71,27 @@ jobs:
       fail-fast: false
       matrix:
         connector:
-          - source-gcs
-          - source-hello-world
-          - source-http-file
-          - source-test
-          - source-firestore
-          - source-kafka
+          # - source-gcs
+          # - source-hello-world
+          # - source-http-file
+          # - source-test
+          # - source-firestore
+          # - source-kafka
           - source-kinesis
-          - source-mysql
-          - source-postgres
-          - source-s3
-          - materialize-bigquery
-          - materialize-elasticsearch
-          - materialize-firebolt
-          - materialize-google-pubsub
-          - materialize-google-sheets
-          - materialize-postgres
-          - materialize-postgres-rc
-          - materialize-rockset
-          - materialize-s3-parquet
-          - materialize-snowflake
-          - materialize-webhook
+          # - source-mysql
+          # - source-postgres
+          # - source-s3
+          # - materialize-bigquery
+          # - materialize-elasticsearch
+          # - materialize-firebolt
+          # - materialize-google-pubsub
+          # - materialize-google-sheets
+          # - materialize-postgres
+          # - materialize-postgres-rc
+          # - materialize-rockset
+          # - materialize-s3-parquet
+          # - materialize-snowflake
+          # - materialize-webhook
 
     steps:
       - uses: actions/checkout@v2
