@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -151,8 +150,5 @@ func collect(ch <-chan airbyte.Stream, size int) []airbyte.Stream {
 	for stream := range ch {
 		collected = append(collected, stream)
 	}
-	sort.SliceStable(collected, func(i, j int) bool {
-		return collected[i].Name > collected[j].Name
-	})
 	return collected
 }

@@ -97,6 +97,7 @@ cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName 
 
 if [[ -f "tests/${CONNECTOR}/bindings.json" ]]; then
   diff --side-by-side ${TESTDIR}/bindings.json "tests/${CONNECTOR}/bindings.json" || bail "Discovered bindings are wrong"
+  echo "$(cat ${TESTDIR}/discover_output.json | jq)"
 fi
 
 # Generate the test-specific catalog source.
