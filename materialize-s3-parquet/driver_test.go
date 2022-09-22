@@ -20,16 +20,15 @@ func TestConfig(t *testing.T) {
 		AWSAccessKeyID:          "testKey",
 		AWSSecretAccessKey:      "testSecret",
 		Bucket:                  "testBucket",
-		Endpoint:                "",
 		Region:                  "us-east-1",
 		UploadIntervalInSeconds: 60,
 	}
 
 	require.NoError(t, validConfig.Validate())
 
-	var NoRegionOREndpoint = validConfig
-	NoRegionOREndpoint.Region = ""
-	require.Error(t, NoRegionOREndpoint.Validate(), "expected validation error")
+	var missingRegion = validConfig
+	missingRegion.Region = ""
+	require.Error(t, missingRegion.Validate(), "expected validation error")
 
 	var missingBucket = validConfig
 	missingBucket.Bucket = ""

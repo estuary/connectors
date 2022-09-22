@@ -19,22 +19,54 @@ import (
 )
 
 type config struct {
-	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS credential used to connect to S3."`
-	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS credential used to connect to S3." jsonschema_extras:"secret=true"`
-	Bucket             string `json:"bucket" jsonschema:"title=Bucket,description=Name of the S3 bucket."`
-	Endpoint           string `json:"endpoint,omitempty" jsonschema:"oneof_required=endpoint,title=Endpoint,description=The AWS endpoint URI to connect to, useful if you're capturing from a S3-compatible API that isn't provided by AWS."`
-	Region             string `json:"region,omitempty" jsonschema:"oneof_required=region,title=Region,description=The name of the AWS region where the S3 bucket is located."`
+	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID"`
+	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key" jsonschema_extras:"secret=true"`
+	Bucket             string `json:"bucket" jsonschema:"title=Bucket"`
+	Region             string `json:"region" jsonschema:"title=Region"`
 	// The driver batches materialization results to local files first,
 	// and uploads the local files to cloud (S3) on a schedule specified by
 	// UploadIntervalInSeconds, which is the mimimal wait time (in seconds) between two
 	// consecutive upload-to-cloud actions.
-	UploadIntervalInSeconds int `json:"uploadIntervalInSeconds" jsonschema:"title=Upload Interval in Seconds,description=Time interval, in seconds, at which to upload data from Flow to S3."`
+	UploadIntervalInSeconds int            `json:"uploadIntervalInSeconds" jsonschema:"title=Upload Interval in Seconds"`
+	Advanced                advancedConfig `json:"advanced,omitempty" jsonschema_extras:"advanced=true"`
+}
+
+type advancedConfig struct {
+	Endpoint string `json:"endpoint,omitempty" jsonschema:"title=Endpoint"`
+}
+
+func (config) GetFieldDocString(fieldName string) string {
+	switch fieldName {
+	case "AWSAccessKeyID":
+		return "AWS credential used to connect to S3."
+	case "AWSSecretAccessKey":
+		return "AWS credential used to connect to S3."
+	case "Bucket":
+		return "Name of the S3 bucket."
+	case "Region":
+		return "The name of the AWS region where the S3 bucket is located."
+	case "UploadIntervalInSeconds":
+		return "Time interval, in seconds, at which to upload data from Flow to S3."
+	case "Advanced":
+		return "Options for advanced users. You should not typically need to modify these."
+	default:
+		return ""
+	}
+}
+
+func (advancedConfig) GetFieldDocString(fieldName string) string {
+	switch fieldName {
+	case "Endpoint":
+		return "The endpoint URI to connect to. Useful if you're connecting to a S3-compatible API that isn't provided by AWS."
+	default:
+		return ""
+	}
 }
 
 // Validate returns an error if the config is not well-formed.
 func (c config) Validate() error {
-	if c.Region == "" && c.Endpoint == "" {
-		return fmt.Errorf("must supply one of 'region' or 'endpoint'")
+	if c.Region == "" {
+		return fmt.Errorf("missing region")
 	}
 	if c.Bucket == "" {
 		return fmt.Errorf("missing bucket")
