@@ -58,8 +58,8 @@ func NewS3Uploader(cfg config) (*S3Uploader, error) {
 		c = c.WithRegion(cfg.Region)
 	}
 
-	if cfg.Endpoint != "" {
-		c = c.WithEndpoint(cfg.Endpoint)
+	if cfg.Advanced.Endpoint != "" {
+		c = c.WithEndpoint(cfg.Advanced.Endpoint)
 	}
 
 	awsSession, err := session.NewSession(c)

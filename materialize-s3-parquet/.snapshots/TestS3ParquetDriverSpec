@@ -2,20 +2,6 @@
   "endpoint_spec_schema_json": {
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-s3-parquet/config",
-    "oneOf": [
-      {
-        "required": [
-          "endpoint"
-        ],
-        "title": "endpoint"
-      },
-      {
-        "required": [
-          "region"
-        ],
-        "title": "region"
-      }
-    ],
     "properties": {
       "awsAccessKeyId": {
         "type": "string",
@@ -33,11 +19,6 @@
         "title": "Bucket",
         "description": "Name of the S3 bucket."
       },
-      "endpoint": {
-        "type": "string",
-        "title": "Endpoint",
-        "description": "The AWS endpoint URI to connect to"
-      },
       "region": {
         "type": "string",
         "title": "Region",
@@ -46,7 +27,20 @@
       "uploadIntervalInSeconds": {
         "type": "integer",
         "title": "Upload Interval in Seconds",
-        "description": "Time interval"
+        "description": "Time interval, in seconds, at which to upload data from Flow to S3."
+      },
+      "advanced": {
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint",
+            "description": "The endpoint URI to connect to. Useful if you're connecting to a S3-compatible API that isn't provided by AWS."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
       }
     },
     "type": "object",
@@ -54,6 +48,7 @@
       "awsAccessKeyId",
       "awsSecretAccessKey",
       "bucket",
+      "region",
       "uploadIntervalInSeconds"
     ],
     "title": "S3 Connection"

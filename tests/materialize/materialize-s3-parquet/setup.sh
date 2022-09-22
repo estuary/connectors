@@ -24,7 +24,7 @@ function startLocalStack() {
       localstack/localstack
 
     for i in {1..20}; do
-        # Wait until the elastic search is ready for serving.
+        # Wait until the local stack is ready for serving.
         if aws s3 ls --endpoint-url "${LOCALSTACK_S3_ENDPOINT}";  then
             echo "localstack started successfully."
             return 0
@@ -43,7 +43,9 @@ aws s3 mb "s3://${TEST_BUCKET}" --endpoint "${LOCALSTACK_S3_ENDPOINT}"
 config_json_template='{
     "bucket": "${TEST_BUCKET}",
     "region": "${AWS_DEFAULT_REGION}",
-    "endpoint": "${LOCALSTACK_S3_ENDPOINT}",
+    "advanced": {
+      "endpoint": "${LOCALSTACK_S3_ENDPOINT}"
+    },
     "uploadIntervalInSeconds": 2
 }'
 
