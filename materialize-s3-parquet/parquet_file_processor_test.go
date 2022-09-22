@@ -9,7 +9,6 @@ import (
 
 	"github.com/benbjohnson/clock"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	"github.com/estuary/flow/go/protocols/flow"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
@@ -194,8 +193,8 @@ func TestFileProcessorProxy_TimerTriggered(t *testing.T) {
 
 func TestParquetFileProcessor_NoBinding(t *testing.T) {
 	var mockS3Uploader = newMockS3Uploader(t)
-	var open = &pm.TransactionRequest_Open{Materialization: &flow.MaterializationSpec{
-		Materialization: flow.Materialization("test_materialization"),
+	var open = &pm.TransactionRequest_Open{Materialization: &pf.MaterializationSpec{
+		Materialization: pf.Materialization("test_materialization"),
 	}}
 
 	fileProcessor, _ := NewParquetFileProcessor(context.Background(), mockS3Uploader, nil, open)
@@ -205,27 +204,27 @@ func TestParquetFileProcessor_NoBinding(t *testing.T) {
 }
 
 func buildTestOpenRequest(numOfBindings int) *pm.TransactionRequest_Open {
-	var bindings = make([]*flow.MaterializationSpec_Binding, 0, numOfBindings)
+	var bindings = make([]*pf.MaterializationSpec_Binding, 0, numOfBindings)
 	for i := 0; i < numOfBindings; i++ {
 		resourceSpecJSON, _ := json.Marshal(
 			resource{
 				PathPrefix: fmt.Sprintf("test_path_%d", i),
 			},
 		)
-		var binding = &flow.MaterializationSpec_Binding{
+		var binding = &pf.MaterializationSpec_Binding{
 			ResourceSpecJson: resourceSpecJSON,
-			FieldSelection:   flow.FieldSelection{Keys: []string{"Id"}, Values: []string{"Message"}},
-			Collection: flow.CollectionSpec{Projections: []flow.Projection{
-				{Field: "Id", Inference: flow.Inference{Types: []string{"integer"}, Exists: pf.Inference_MUST}},
-				{Field: "Message", Inference: flow.Inference{Types: []string{"string"}, Exists: pf.Inference_MUST}},
+			FieldSelection:   pf.FieldSelection{Keys: []string{"Id"}, Values: []string{"Message"}},
+			Collection: pf.CollectionSpec{Projections: []pf.Projection{
+				{Field: "Id", Inference: pf.Inference{Types: []string{"integer"}, Exists: pf.Inference_MUST}},
+				{Field: "Message", Inference: pf.Inference{Types: []string{"string"}, Exists: pf.Inference_MUST}},
 			}},
 		}
 
 		bindings = append(bindings, binding)
 	}
 	return &pm.TransactionRequest_Open{
-		Materialization: &flow.MaterializationSpec{
-			Materialization: flow.Materialization("test_materialization"),
+		Materialization: &pf.MaterializationSpec{
+			Materialization: pf.Materialization("test_materialization"),
 			Bindings:        bindings,
 		},
 		KeyBegin: 123,
