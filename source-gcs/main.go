@@ -15,15 +15,23 @@ import (
 )
 
 type config struct {
-	AscendingKeys     bool           `json:"ascendingKeys"`
 	Bucket            string         `json:"bucket"`
 	GoogleCredentials string         `json:"googleCredentials"`
 	MatchKeys         string         `json:"matchKeys"`
 	Parser            *parser.Config `json:"parser"`
 	Prefix            string         `json:"prefix"`
+	Advanced          advancedConfig `json:"advanced"`
+}
+
+type advancedConfig struct {
+	AscendingKeys bool `json:"ascendingKeys"`
 }
 
 func (c *config) Validate() error {
+	if c.Bucket == "" {
+		return fmt.Errorf("missing bucket")
+	}
+
 	return nil
 }
 
@@ -32,7 +40,7 @@ func (c *config) DiscoverRoot() string {
 }
 
 func (c *config) FilesAreMonotonic() bool {
-	return c.AscendingKeys
+	return c.Advanced.AscendingKeys
 }
 
 func (c *config) ParserConfig() *parser.Config {
@@ -140,12 +148,6 @@ func main() {
 			"bucket"
 		],
 		"properties": {
-			"ascendingKeys": {
-				"type":        "boolean",
-				"title":       "Ascending Keys",
-				"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
-				"default":     false
-			},
 			"bucket": {
 				"type":        "string",
 				"title":       "Bucket",
@@ -168,6 +170,20 @@ func main() {
 				"type":        "string",
 				"title":       "Prefix",
 				"description": "Prefix within the bucket to capture from"
+			},
+			"advanced": {
+				"properties": {
+				  "ascendingKeys": {
+					"type":        "boolean",
+					"title":       "Ascending Keys",
+					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
+					"default":     false
+				  }
+				},
+				"additionalProperties": false,
+				"type": "object",
+				"description": "Options for advanced users. You should not typically need to modify these.",
+				"advanced": true
 			},
 			"parser": ` + string(parserSchema) + `
 		}
