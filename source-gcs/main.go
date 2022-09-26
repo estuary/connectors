@@ -176,7 +176,7 @@ func main() {
 				  "ascendingKeys": {
 					"type":        "boolean",
 					"title":       "Ascending Keys",
-					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
+					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/fOMT4s.",
 					"default":     false
 				  }
 				},
