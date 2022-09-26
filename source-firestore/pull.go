@@ -450,11 +450,6 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 	}
 }
 
-// TODO(wgd): Can this fudge factor safely be set to zero? In theory if
-// we're performing safe updates to rtime we will never see documents with
-// mtime < rtime except during connector startups with prior state.
-const updateTimeFudgeFactor = 1 * time.Second
-
 // The only "true checkpoints" (ones which meaningfully update capture state)
 // are emitted when a consistent point is reached on some watch stream. However
 // the first consistent point is only reached after the initial state of the
@@ -485,16 +480,9 @@ func (c *capture) HandleDocument(ctx context.Context, resourcePath string, doc *
 		log.WithField("doc", doc.Name).Trace("ignoring document (resource not captured)")
 		return nil
 	}
-	if delta := mtime.Sub(rtime); delta < -updateTimeFudgeFactor {
+	if delta := mtime.Sub(rtime); delta < 0 {
 		log.WithField("doc", doc.Name).Trace("ignoring document (mtime < rtime)")
 		return nil
-	} else if delta < 0 {
-		log.WithFields(log.Fields{
-			"doc":   doc.Name,
-			"mtime": mtime.Format(time.RFC3339Nano),
-			"rtime": rtime.Format(time.RFC3339Nano),
-		}).Warn("document mtime is shortly before the current rtime")
-		return fmt.Errorf("causality error: mtime %s < rtime %s", mtime.Format(time.RFC3339Nano), rtime.Format(time.RFC3339Nano))
 	}
 
 	// Convert the document into a JSON-serializable map of fields
