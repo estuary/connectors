@@ -81,10 +81,6 @@ func TestSimpleCapture(t *testing.T) {
 		})
 		checkpoint = capture.Verify(ctx, t, checkpoint, sentinel(t))
 	})
-	// So the latest news in Firestore automated tests. It almost works now, and then
-	// I hooked up the 'readTime' resume plumbing correctly, and for some reason that
-	// made *subsequent* captures start returning results in random orders rather than
-	// sorted by document name. Grr.
 	t.Run("two", func(t *testing.T) {
 		upsertDocuments(ctx, t, map[string]string{
 			prefix + "/docs/7":   `{"data": 7}`,
@@ -94,6 +90,52 @@ func TestSimpleCapture(t *testing.T) {
 			prefix + "/docs/11":  `{"data": 11}`,
 			prefix + "/docs/12":  `{"data": 12}`,
 			prefix + "/docs/ZZZ": fmt.Sprintf(`{"data": %q}`, sentinel(t)),
+		})
+		checkpoint = capture.Verify(ctx, t, checkpoint, sentinel(t))
+	})
+}
+
+// The mapping from bindings to listen streams is many-to-one, with a
+// single listen stream serving all bindings with some final path element.
+// So for instance 'foo/*/bar' and 'asdf/*/fdsa/*/bar' are both fetched
+// by a listen stream for 'bar'.
+//
+// But when a new binding is added this means that we need to resume
+// from the earliest read time associated with any binding that maps
+// to a particular stream, and that in turn means that we'll receive
+// redundant (previously-captured) documents from the other bindings
+// and need to filter those out.
+//
+// This test verifies that the filtering process works correctly.
+func TestNewCollectionReadTime(t *testing.T) {
+	var ctx = testContext(t, 60*time.Second)
+	var capture = simpleCapture(t, "test/*/As/*/docs")
+	var prefix = fmt.Sprintf("test/TestRun%04X", rand.Intn(65536))
+	var checkpoint json.RawMessage
+	t.Cleanup(func() { deleteCollection(context.Background(), t, "test") })
+	deleteCollection(ctx, t, "test")
+
+	t.Run("one", func(t *testing.T) {
+		upsertDocuments(ctx, t, map[string]string{
+			prefix + "/As/1/docs/1":   `{"data": 1}`,
+			prefix + "/As/1/docs/2":   `{"data": 2}`,
+			prefix + "/As/1/docs/ZZZ": fmt.Sprintf(`{"data": %q}`, sentinel(t)),
+		})
+		checkpoint = capture.Verify(ctx, t, checkpoint, sentinel(t))
+	})
+
+	capture.Bindings = append(capture.Bindings, &flow.CaptureSpec_Binding{
+		ResourceSpecJson: json.RawMessage(fmt.Sprintf(`{"path": %q}`, "test/*/Bs/*/docs")),
+		ResourcePath:     []string{"test/*/Bs/*/docs"},
+	})
+
+	t.Run("two", func(t *testing.T) {
+		upsertDocuments(ctx, t, map[string]string{
+			prefix + "/As/1/docs/3":   `{"data": 3}`,
+			prefix + "/As/1/docs/4":   `{"data": 4}`,
+			prefix + "/Bs/2/docs/5":   `{"data": 5}`,
+			prefix + "/Bs/2/docs/6":   `{"data": 6}`,
+			prefix + "/Bs/2/docs/ZZZ": fmt.Sprintf(`{"data": %q}`, sentinel(t)),
 		})
 		checkpoint = capture.Verify(ctx, t, checkpoint, sentinel(t))
 	})
