@@ -1,6 +1,6 @@
 # source-s3
 
-## v2, 2022-26-23
+## v2, 2022-09-23
 
 - Changed "ascendingKeys" & "endpoint" to be advanced configuration options.
 
