@@ -1,15 +1,15 @@
 # ================================
-# Binding 0 ("test/*/docs")
+# Binding 0 ("flow_source_tests/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/ZZZ","data":"FLOW_TEST_SENTINEL('TestSimpleCapture/two')"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/10","data":10}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/11","data":11}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/12","data":12}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/7","data":7}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/8","data":8}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/9","data":9}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/ZZZ","data":"FLOW_TEST_SENTINEL(TestSimpleCapture/two)"}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/10","data":10}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/11","data":11}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/12","data":12}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/7","data":7}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/8","data":8}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/9","data":9}
 # ================================
 # Final State Checkpoint
 # ================================
-{"Resources":{"test/*/docs":{"ReadTime":"<TIMESTAMP>"}}}
+{"Resources":{"flow_source_tests/*/docs":{"ReadTime":"<TIMESTAMP>"}}}
 

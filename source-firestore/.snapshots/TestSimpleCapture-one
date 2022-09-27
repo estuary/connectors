@@ -1,15 +1,15 @@
 # ================================
-# Binding 0 ("test/*/docs")
+# Binding 0 ("flow_source_tests/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/1","data":1}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/2","data":2}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/3","data":3}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/4","data":4}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/5","data":5}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/6","data":6}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/docs/ZZZ","data":"FLOW_TEST_SENTINEL('TestSimpleCapture/one')"}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/1","data":1}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/2","data":2}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/3","data":3}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/4","data":4}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/5","data":5}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/6","data":6}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/ZZZ","data":"FLOW_TEST_SENTINEL(TestSimpleCapture/one)"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"Resources":{"test/*/docs":{"ReadTime":"<TIMESTAMP>"}}}
+{"Resources":{"flow_source_tests/*/docs":{"ReadTime":"<TIMESTAMP>"}}}
 
