@@ -18,18 +18,22 @@ import (
 type config struct {
 	AWSAccessKeyID     string         `json:"awsAccessKeyId"`
 	AWSSecretAccessKey string         `json:"awsSecretAccessKey"`
-	AscendingKeys      bool           `json:"ascendingKeys"`
 	Bucket             string         `json:"bucket"`
-	Endpoint           string         `json:"endpoint"`
 	MatchKeys          string         `json:"matchKeys"`
 	Parser             *parser.Config `json:"parser"`
 	Prefix             string         `json:"prefix"`
 	Region             string         `json:"region"`
+	Advanced           advancedConfig `json:"advanced"`
+}
+
+type advancedConfig struct {
+	AscendingKeys bool   `json:"ascendingKeys"`
+	Endpoint      string `json:"endpoint"`
 }
 
 func (c *config) Validate() error {
-	if c.Region == "" && c.Endpoint == "" {
-		return fmt.Errorf("must supply one of 'region' or 'endpoint'")
+	if c.Region == "" {
+		return fmt.Errorf("missing region")
 	}
 	if c.AWSAccessKeyID == "" && c.AWSSecretAccessKey != "" {
 		return fmt.Errorf("missing awsAccessKeyID")
@@ -45,7 +49,7 @@ func (c *config) DiscoverRoot() string {
 }
 
 func (c *config) FilesAreMonotonic() bool {
-	return c.AscendingKeys
+	return c.Advanced.AscendingKeys
 }
 
 func (c *config) ParserConfig() *parser.Config {
@@ -74,8 +78,8 @@ func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
 	if cfg.Region != "" {
 		c = c.WithRegion(cfg.Region)
 	}
-	if cfg.Endpoint != "" {
-		c = c.WithEndpoint(cfg.Endpoint)
+	if cfg.Advanced.Endpoint != "" {
+		c = c.WithEndpoint(cfg.Advanced.Endpoint)
 	}
 
 	awsSession, err := session.NewSession(c)
@@ -227,21 +231,10 @@ func main() {
 				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
 				"secret":      true
 			},
-			"ascendingKeys": {
-				"type":        "boolean",
-				"title":       "Ascending Keys",
-				"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
-				"default":     false
-			},
 			"bucket": {
 				"type":        "string",
 				"title":       "Bucket",
 				"description": "Name of the S3 bucket"
-			},
-			"endpoint": {
-				"type":        "string",
-				"title":       "AWS Endpoint",
-				"description": "The AWS endpoint URI to connect to. Use if you're capturing from a S3-compatible API that isn't provided by AWS"
 			},
 			"matchKeys": {
 				"type":        "string",
@@ -259,6 +252,25 @@ func main() {
 				"title":       "AWS Region",
 				"description": "The name of the AWS region where the S3 bucket is located. \"us-east-1\" is a popular default you can try, if you're unsure what to put here.",
 				"default":     "us-east-1"
+			},
+			"advanced": {
+				"properties": {
+				  "ascendingKeys": {
+					"type":        "boolean",
+					"title":       "Ascending Keys",
+					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/xKswdo.",
+					"default":     false
+				  },
+				  "endpoint": {
+					"type":        "string",
+					"title":       "AWS Endpoint",
+					"description": "The AWS endpoint URI to connect to. Use if you're capturing from a S3-compatible API that isn't provided by AWS"
+				  }
+				},
+				"additionalProperties": false,
+				"type": "object",
+				"description": "Options for advanced users. You should not typically need to modify these.",
+				"advanced": true
 			},
 			"parser": ` + string(parserSchema) + `
 		}
