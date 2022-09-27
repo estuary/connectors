@@ -15,6 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 	firestore_pb "google.golang.org/genproto/googleapis/firestore/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -248,9 +249,6 @@ func (out *captureOutput) Checkpoint(checkpoint json.RawMessage, merge bool) err
 	return nil
 }
 
-// DO NOT COMMIT : Hacks for testing
-var databaseName = "projects/helpful-kingdom-273219/databases/(default)"
-
 func (c *capture) Run(ctx context.Context) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
@@ -263,13 +261,24 @@ func (c *capture) Run(ctx context.Context) error {
 	}()
 
 	// Connect to Firestore
-	opts := []option.ClientOption{option.WithScopes(firebaseScopes...), option.WithCredentialsJSON([]byte(c.Config.CredentialsJSON))}
+	opts := []option.ClientOption{option.WithCredentialsJSON([]byte(c.Config.CredentialsJSON)), option.WithScopes(firebaseScopes...)}
 	client, err := firestore_v1.NewClient(ctx, opts...)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
-	ctx = metadata.AppendToOutgoingContext(ctx, "google-cloud-resource-prefix", databaseName)
+
+	// If the 'database' config property is unspecified, try to autodetect it from
+	// the provided credentials.
+	if c.Config.DatabasePath == "" {
+		var creds, _ = transport.Creds(ctx, opts[0])
+		if creds == nil || creds.ProjectID == "" {
+			return fmt.Errorf("unable to determine project ID (set 'database' config property)")
+		}
+		c.Config.DatabasePath = fmt.Sprintf("projects/%s/databases/(default)", creds.ProjectID)
+		log.WithField("path", c.Config.DatabasePath).Warn("using autodetected database path (set 'database' config property to override)")
+	}
+	ctx = metadata.AppendToOutgoingContext(ctx, "google-cloud-resource-prefix", c.Config.DatabasePath)
 
 	// Notify Flow that we're starting.
 	if err := c.Output.Ready(); err != nil {
@@ -279,7 +288,7 @@ func (c *capture) Run(ctx context.Context) error {
 	// Enumerate unique collection IDs in a map. Multiple distinct resource paths
 	// can still have the same collection ID, for example 'foo/*/asdf' and 'bar/*/asdf'
 	// both have collection ID 'asdf'.
-	c.State.RLock()
+	c.State.RLock() // Not strictly necessary as no concurrent workers exist yet
 	var watchCollections = make(map[string]time.Time)
 	for resourcePath, resourceState := range c.State.Resources {
 		var collectionID = getLastCollectionGroupID(resourcePath)
@@ -317,7 +326,7 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 	var target = &firestore_pb.Target{
 		TargetType: &firestore_pb.Target_Query{
 			Query: &firestore_pb.Target_QueryTarget{
-				Parent: databaseName + `/documents`,
+				Parent: c.Config.DatabasePath + `/documents`,
 				QueryType: &firestore_pb.Target_QueryTarget_StructuredQuery{
 					StructuredQuery: &firestore_pb.StructuredQuery{
 						From: []*firestore_pb.StructuredQuery_CollectionSelector{{
@@ -334,7 +343,6 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 			},
 		},
 		TargetId: watchTargetID,
-		// ResumeType: &pb.Target_ResumeToken{},
 	}
 	if !startTime.IsZero() {
 		target.ResumeType = &firestore_pb.Target_ReadTime{
@@ -342,7 +350,7 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 		}
 	}
 	var req = &firestore_pb.ListenRequest{
-		Database: databaseName,
+		Database: c.Config.DatabasePath,
 		TargetChange: &firestore_pb.ListenRequest_AddTarget{
 			AddTarget: target,
 		},
@@ -361,7 +369,9 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 			logEntry.Debug("context canceled, shutting down")
 			return nil
 		} else if err != nil {
-			// TODO(wgd): Some statuses are retryable: codes.Unknown, codes.DeadlineExceeded, codes.ResourceExhausted, codes.Internal, codes.Unavailable, codes.Unauthenticated
+			// TODO(wgd): Some statuses may be retryable. From skimming the Firestore client
+			// library code: codes.Unknown, codes.DeadlineExceeded, codes.ResourceExhausted,
+			// codes.Internal, codes.Unavailable, codes.Unauthenticated
 			return fmt.Errorf("recv error: %w", err)
 		}
 		logEntry.WithField("resp", resp).Trace("got response")
@@ -437,12 +447,6 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 				return err
 			}
 		case *firestore_pb.ListenResponse_Filter:
-			// TODO(wgd): Do we need to do anything with Filter responses?
-			// From the Firestore client library code it looks like this is
-			// essentially a sanity check, so if we maintained a running count
-			// of how many documents we expect to exist, it might be possible
-			// to use this to detect data corruption. But it doesn't look like
-			// we need to do anything else with it.
 			logEntry.WithField("filter", resp.Filter).Debug("ListenResponse.Filter")
 		default:
 			return fmt.Errorf("unhandled ListenResponse: %v", resp)
@@ -450,16 +454,16 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 	}
 }
 
-// The only "true checkpoints" (ones which meaningfully update capture state)
-// are emitted when a consistent point is reached on some watch stream. However
-// the first consistent point is only reached after the initial state of the
-// dataset is fully synced, and this could potentially be many gigabytes of
-// data.
+// When any watch stream reaches a consistent point a checkpoint is emitted to
+// update the 'Read Time' associated with the impacted bindings. However, the
+// first consistent point only occurs after the initial state of the dataset is
+// fully synced, and this could potentially be many gigabytes of data.
 //
-// By emptting "empty checkpoints" periodically during the capture we allow
-// Flow to persist documents and not have to buffer all that at once, at the
-// cost of possibly producing duplicate documents. I believe that this is
-// the best we can do.
+// By emitting empty checkpoints periodically during the capture we unblock Flow
+// to persist our capture output instead of buffering everything, at the cost of
+// potentially duplicating documents in the event of a connector restart. I think
+// this is the best we can do, given the Firestore APIs and the constraint of not
+// buffering the entire dataset locally.
 const emptyCheckpoint string = `{}`
 
 func (c *capture) HandleDocument(ctx context.Context, resourcePath string, doc *firestore_pb.Document) error {
@@ -495,11 +499,17 @@ func (c *capture) HandleDocument(ctx context.Context, resourcePath string, doc *
 		fields[id] = tval
 	}
 	// TODO(wgd): Should these properties be moved into /_meta or something?
+	// TODO(wgd): What's the distinction between __name__ and __path__? Do we want both?
 	fields["__path__"] = doc.Name
 	fields["__ctime__"] = doc.CreateTime.AsTime()
 	fields["__mtime__"] = doc.UpdateTime.AsTime()
 
 	if bindingIndex, ok := c.State.BindingIndex(resourcePath); !ok {
+		// Listen streams can be a bit over-broad. For instance if there are
+		// collections 'users/*/docs' and 'groups/*/docs' in the database, but
+		// only 'users/*/docs' is captured, we need to ignore any documents
+		// from paths like 'groups/*/docs' which don't map to any binding.
+		return nil
 	} else if docJSON, err := json.Marshal(fields); err != nil {
 		return fmt.Errorf("error serializing document %q: %w", doc.Name, err)
 	} else if err := c.Output.Documents(bindingIndex, docJSON); err != nil {
@@ -518,11 +528,23 @@ func (c *capture) HandleDelete(ctx context.Context, resourcePath string, docName
 			"res":   resourcePath,
 		}).Log(lvl, "document delete")
 	}
-	//var fields = map[string]interface{}{
-	//	"__path__":    resp.DocumentDelete.Document,
-	//	"__dtime__":   resp.DocumentDelete.ReadTime.AsTime(),
-	//	"__deleted__": true,
-	//}
+
+	var bindingIndex, ok = c.State.BindingIndex(resourcePath)
+	if !ok {
+		return nil
+	}
+	var fields = map[string]interface{}{
+		"__path__":    docName,
+		"__dtime__":   readTime,
+		"__deleted__": true,
+	}
+	if docJSON, err := json.Marshal(fields); err != nil {
+		return fmt.Errorf("error serializing deletion record %q: %w", docName, err)
+	} else if err := c.Output.Documents(bindingIndex, docJSON); err != nil {
+		return err
+	} else if err := c.Output.Checkpoint(json.RawMessage(emptyCheckpoint), true); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -543,8 +565,11 @@ func translateValue(val *firestore_pb.Value) (interface{}, error) {
 	case *firestore_pb.Value_BytesValue:
 		return val.BytesValue, nil
 	case *firestore_pb.Value_ReferenceValue:
-		// TODO(wgd): Emit as a string or as an object?
-		return nil, fmt.Errorf("reference values not yet handled")
+		// TODO(wgd): Is it okay/good to flatten the string-vs-reference distinction here?
+		// My gut says yes, in general we probably want to just coerce document references
+		// into the name/path of that document as a string, but I can see an argument for
+		// turning references into some sort of object instead.
+		return val.ReferenceValue, nil
 	case *firestore_pb.Value_GeoPointValue:
 		return val.GeoPointValue, nil
 	case *firestore_pb.Value_ArrayValue:

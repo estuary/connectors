@@ -1,11 +1,11 @@
 # ================================
-# Binding 0 ("test/*/As/*/docs")
+# Binding 0 ("flow_source_tests/*/users/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/As/1/docs/1","data":1}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/As/1/docs/2","data":2}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/helpful-kingdom-273219/databases/(default)/documents/test/TestRun####/As/1/docs/ZZZ","data":"FLOW_TEST_SENTINEL('TestNewCollectionReadTime/one')"}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/1","data":1}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/2","data":2}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/ZZZ","data":"FLOW_TEST_SENTINEL(TestNewCollectionReadTime/one)"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"Resources":{"test/*/As/*/docs":{"ReadTime":"<TIMESTAMP>"}}}
+{"Resources":{"flow_source_tests/*/users/*/docs":{"ReadTime":"<TIMESTAMP>"}}}
 

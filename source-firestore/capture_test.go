@@ -25,15 +25,16 @@ type testCaptureSpec struct {
 	Driver       pc.DriverServer
 	EndpointSpec interface{}
 	Bindings     []*flow.CaptureSpec_Binding
+	Checkpoint   json.RawMessage
 }
 
-func (cs *testCaptureSpec) Verify(ctx context.Context, t testing.TB, checkpointJSON json.RawMessage, sentinel string) json.RawMessage {
+func (cs *testCaptureSpec) Verify(ctx context.Context, t testing.TB, sentinel string) {
 	t.Helper()
 	if os.Getenv("RUN_CAPTURES") != "yes" {
 		t.Skipf("skipping %q capture: ${RUN_CAPTURES} != \"yes\"", t.Name())
 	}
 	log.WithFields(log.Fields{
-		"checkpoint": checkpointJSON,
+		"checkpoint": cs.Checkpoint,
 	}).Debug("running test capture")
 
 	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
@@ -41,7 +42,7 @@ func (cs *testCaptureSpec) Verify(ctx context.Context, t testing.TB, checkpointJ
 
 	var open = &pc.PullRequest{
 		Open: &pc.PullRequest_Open{
-			DriverCheckpointJson: checkpointJSON,
+			DriverCheckpointJson: cs.Checkpoint,
 			Capture: &flow.CaptureSpec{
 				Capture:          flow.Capture("acmeCo/" + strings.Replace(t.Name(), "/", "-", -1) + "capture"),
 				EndpointSpecJson: endpointSpecJSON,
@@ -55,19 +56,18 @@ func (cs *testCaptureSpec) Verify(ctx context.Context, t testing.TB, checkpointJ
 	var adapter = &testPullAdapter{
 		ctx:           ctx,
 		openReq:       open,
-		checkpoint:    checkpointJSON,
+		checkpoint:    cs.Checkpoint,
 		bindings:      cs.Bindings,
 		sentinelValue: sentinel,
 		shutdown:      shutdown,
 	}
 	err = cs.Driver.Pull(adapter)
 	cupaloy.SnapshotT(t, adapter.Summary(err))
-	return adapter.checkpoint
+	cs.Checkpoint = adapter.checkpoint
 }
 
 var SnapshotSanitizers = map[string]*regexp.Regexp{
 	`"<TIMESTAMP>"`: regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]*Z"`),
-	`TestRun####`:   regexp.MustCompile(`TestRun[0-9A-Fa-f]{4}`),
 }
 
 type testPullAdapter struct {
