@@ -1,0 +1,11 @@
+# ================================
+# Binding 0 ("flow_source_tests/*/docs")
+# ================================
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDeletions/docs/ZZZ","data":"FLOW_TEST_SENTINEL(TestDeletions/two)"}
+{"__deleted__":true,"__dtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDeletions/docs/3"}
+{"__deleted__":true,"__dtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDeletions/docs/4"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"Resources":{"flow_source_tests/*/docs":{"ReadTime":"<TIMESTAMP>"}}}
+

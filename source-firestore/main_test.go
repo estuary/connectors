@@ -6,8 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +23,7 @@ import (
 
 var testCredentialsPath = flag.String(
 	"creds_path",
-	"$HOME/.config/gcloud/application_default_credentials.json",
+	"~/.config/gcloud/application_default_credentials.json",
 	"Path to the credentials JSON to use for test authentication",
 )
 var testProjectID = flag.String(
@@ -44,6 +44,7 @@ func TestMain(m *testing.M) {
 		DataKey:  "data",
 		FieldMap: log.FieldMap{log.FieldKeyTime: "@ts"},
 	})
+	SnapshotSanitizers["project-id-123456"] = regexp.MustCompile(regexp.QuoteMeta(*testProjectID))
 	os.Exit(m.Run())
 }
 
@@ -58,40 +59,62 @@ func TestSpec(t *testing.T) {
 }
 
 func sentinel(t *testing.T) string {
-	return fmt.Sprintf("FLOW_TEST_SENTINEL('%s')", t.Name())
+	return fmt.Sprintf("%q", fmt.Sprintf("FLOW_TEST_SENTINEL(%s)", t.Name()))
 }
 
 func TestSimpleCapture(t *testing.T) {
 	var ctx = testContext(t, 60*time.Second)
-	var capture = simpleCapture(t, "test/*/docs")
-	var prefix = fmt.Sprintf("test/TestRun%04X", rand.Intn(65536))
-	var checkpoint json.RawMessage
-	t.Cleanup(func() { deleteCollection(context.Background(), t, "test") })
-	deleteCollection(ctx, t, "test")
-
+	var capture = simpleCapture(t, "docs")
+	var client = testFirestoreClient(ctx, t)
 	t.Run("one", func(t *testing.T) {
-		upsertDocuments(ctx, t, map[string]string{
-			prefix + "/docs/1":   `{"data": 1}`,
-			prefix + "/docs/2":   `{"data": 2}`,
-			prefix + "/docs/3":   `{"data": 3}`,
-			prefix + "/docs/4":   `{"data": 4}`,
-			prefix + "/docs/5":   `{"data": 5}`,
-			prefix + "/docs/6":   `{"data": 6}`,
-			prefix + "/docs/ZZZ": fmt.Sprintf(`{"data": %q}`, sentinel(t)),
+		client.Upsert(ctx, t, map[string]string{
+			"docs/1":   `{"data": 1}`,
+			"docs/2":   `{"data": 2}`,
+			"docs/3":   `{"data": 3}`,
+			"docs/4":   `{"data": 4}`,
+			"docs/5":   `{"data": 5}`,
+			"docs/6":   `{"data": 6}`,
+			"docs/ZZZ": fmt.Sprintf(`{"data": %s}`, sentinel(t)),
 		})
-		checkpoint = capture.Verify(ctx, t, checkpoint, sentinel(t))
+		capture.Verify(ctx, t, sentinel(t))
 	})
 	t.Run("two", func(t *testing.T) {
-		upsertDocuments(ctx, t, map[string]string{
-			prefix + "/docs/7":   `{"data": 7}`,
-			prefix + "/docs/8":   `{"data": 8}`,
-			prefix + "/docs/9":   `{"data": 9}`,
-			prefix + "/docs/10":  `{"data": 10}`,
-			prefix + "/docs/11":  `{"data": 11}`,
-			prefix + "/docs/12":  `{"data": 12}`,
-			prefix + "/docs/ZZZ": fmt.Sprintf(`{"data": %q}`, sentinel(t)),
+		client.Upsert(ctx, t, map[string]string{
+			"docs/7":   `{"data": 7}`,
+			"docs/8":   `{"data": 8}`,
+			"docs/9":   `{"data": 9}`,
+			"docs/10":  `{"data": 10}`,
+			"docs/11":  `{"data": 11}`,
+			"docs/12":  `{"data": 12}`,
+			"docs/ZZZ": fmt.Sprintf(`{"data": %s}`, sentinel(t)),
 		})
-		checkpoint = capture.Verify(ctx, t, checkpoint, sentinel(t))
+		capture.Verify(ctx, t, sentinel(t))
+	})
+}
+
+func TestDeletions(t *testing.T) {
+	var ctx = testContext(t, 60*time.Second)
+	var capture = simpleCapture(t, "docs")
+	var client = testFirestoreClient(ctx, t)
+	t.Run("one", func(t *testing.T) {
+		client.Upsert(ctx, t, map[string]string{
+			"docs/1": `{"data": 1}`,
+			"docs/2": `{"data": 2}`,
+			"docs/3": `{"data": 3}`,
+			"docs/4": `{"data": 4}`,
+		})
+		client.Delete(ctx, t, "docs/1", "docs/2")
+		client.Upsert(ctx, t, map[string]string{
+			"docs/ZZZ": fmt.Sprintf(`{"data": %s}`, sentinel(t)),
+		})
+		capture.Verify(ctx, t, sentinel(t))
+	})
+	t.Run("two", func(t *testing.T) {
+		client.Delete(ctx, t, "docs/3", "docs/4")
+		client.Upsert(ctx, t, map[string]string{
+			"docs/ZZZ": fmt.Sprintf(`{"data": %s}`, sentinel(t)),
+		})
+		capture.Verify(ctx, t, sentinel(t))
 	})
 }
 
@@ -109,35 +132,26 @@ func TestSimpleCapture(t *testing.T) {
 // This test verifies that the filtering process works correctly.
 func TestNewCollectionReadTime(t *testing.T) {
 	var ctx = testContext(t, 60*time.Second)
-	var capture = simpleCapture(t, "test/*/As/*/docs")
-	var prefix = fmt.Sprintf("test/TestRun%04X", rand.Intn(65536))
-	var checkpoint json.RawMessage
-	t.Cleanup(func() { deleteCollection(context.Background(), t, "test") })
-	deleteCollection(ctx, t, "test")
-
+	var capture = simpleCapture(t, "users/*/docs")
+	var client = testFirestoreClient(ctx, t)
 	t.Run("one", func(t *testing.T) {
-		upsertDocuments(ctx, t, map[string]string{
-			prefix + "/As/1/docs/1":   `{"data": 1}`,
-			prefix + "/As/1/docs/2":   `{"data": 2}`,
-			prefix + "/As/1/docs/ZZZ": fmt.Sprintf(`{"data": %q}`, sentinel(t)),
+		client.Upsert(ctx, t, map[string]string{
+			"users/1/docs/1":   `{"data": 1}`,
+			"users/1/docs/2":   `{"data": 2}`,
+			"users/1/docs/ZZZ": fmt.Sprintf(`{"data": %s}`, sentinel(t)),
 		})
-		checkpoint = capture.Verify(ctx, t, checkpoint, sentinel(t))
+		capture.Verify(ctx, t, sentinel(t))
 	})
-
-	capture.Bindings = append(capture.Bindings, &flow.CaptureSpec_Binding{
-		ResourceSpecJson: json.RawMessage(fmt.Sprintf(`{"path": %q}`, "test/*/Bs/*/docs")),
-		ResourcePath:     []string{"test/*/Bs/*/docs"},
-	})
-
+	capture.Bindings = append(capture.Bindings, simpleBindings(t, "groups/*/docs")...)
 	t.Run("two", func(t *testing.T) {
-		upsertDocuments(ctx, t, map[string]string{
-			prefix + "/As/1/docs/3":   `{"data": 3}`,
-			prefix + "/As/1/docs/4":   `{"data": 4}`,
-			prefix + "/Bs/2/docs/5":   `{"data": 5}`,
-			prefix + "/Bs/2/docs/6":   `{"data": 6}`,
-			prefix + "/Bs/2/docs/ZZZ": fmt.Sprintf(`{"data": %q}`, sentinel(t)),
+		client.Upsert(ctx, t, map[string]string{
+			"users/1/docs/3":    `{"data": 3}`,
+			"users/1/docs/4":    `{"data": 4}`,
+			"groups/2/docs/5":   `{"data": 5}`,
+			"groups/2/docs/6":   `{"data": 6}`,
+			"groups/2/docs/ZZZ": fmt.Sprintf(`{"data": %s}`, sentinel(t)),
 		})
-		checkpoint = capture.Verify(ctx, t, checkpoint, sentinel(t))
+		capture.Verify(ctx, t, sentinel(t))
 	})
 }
 
@@ -155,7 +169,7 @@ func simpleCapture(t testing.TB, names ...string) *testCaptureSpec {
 	t.Helper()
 
 	// Load credentials from disk and construct an endpoint spec
-	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "$HOME", os.Getenv("HOME"))
+	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
 	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
@@ -164,36 +178,59 @@ func simpleCapture(t testing.TB, names ...string) *testCaptureSpec {
 		DatabasePath:    fmt.Sprintf("projects/%s/databases/%s", *testProjectID, *testDatabaseName),
 	}
 
-	// Make a usable list of bindings out of the provided names
-	var bindings []*flow.CaptureSpec_Binding
-	for _, name := range names {
-		bindings = append(bindings, &flow.CaptureSpec_Binding{
-			ResourceSpecJson: json.RawMessage(fmt.Sprintf(`{"path": %q}`, name)),
-			ResourcePath:     []string{name},
-		})
-	}
-
 	return &testCaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: endpointSpec,
-		Bindings:     bindings,
+		Bindings:     simpleBindings(t, names...),
 	}
 }
 
-func deleteCollection(ctx context.Context, t testing.TB, collection string) {
+func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
+	var bindings []*flow.CaptureSpec_Binding
+	for _, name := range names {
+		var path = "flow_source_tests/*/" + name
+		bindings = append(bindings, &flow.CaptureSpec_Binding{
+			ResourceSpecJson: json.RawMessage(fmt.Sprintf(`{"path": %q}`, path)),
+			ResourcePath:     []string{path},
+		})
+	}
+	return bindings
+}
+
+type firestoreClient struct {
+	inner  *firestore.Client
+	prefix string
+}
+
+func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
 	t.Helper()
-	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "$HOME", os.Getenv("HOME"))
+
+	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
 	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
 	client, err := firestore.NewClient(ctx, *testProjectID, option.WithCredentialsJSON(credentialsJSON))
 	require.NoError(t, err)
-	defer client.Close()
 
-	deleteCollectionRecursive(ctx, t, client.Collection(collection))
+	var tfc = &firestoreClient{
+		inner:  client,
+		prefix: fmt.Sprintf("flow_source_tests/%s/", strings.ReplaceAll(t.Name(), "/", "_")),
+	}
+	t.Cleanup(func() {
+		tfc.deleteCollectionRecursive(context.Background(), t, tfc.inner.Collection("flow_source_tests"))
+		tfc.inner.Close()
+	})
+	tfc.deleteCollectionRecursive(ctx, t, tfc.inner.Collection("flow_source_tests"))
+
+	return tfc
 }
 
-func deleteCollectionRecursive(ctx context.Context, t testing.TB, ref *firestore.CollectionRef) {
+func (c *firestoreClient) DeleteCollection(ctx context.Context, t testing.TB, collection string) {
+	t.Helper()
+	c.deleteCollectionRecursive(ctx, t, c.inner.Collection(c.prefix+collection))
+}
+
+func (c *firestoreClient) deleteCollectionRecursive(ctx context.Context, t testing.TB, ref *firestore.CollectionRef) {
 	t.Helper()
 	docs, err := ref.DocumentRefs(ctx).GetAll()
 	require.NoError(t, err)
@@ -202,32 +239,36 @@ func deleteCollectionRecursive(ctx context.Context, t testing.TB, ref *firestore
 		subcolls, err := doc.Collections(ctx).GetAll()
 		require.NoError(t, err)
 		for _, subcoll := range subcolls {
-			deleteCollectionRecursive(ctx, t, subcoll)
+			c.deleteCollectionRecursive(ctx, t, subcoll)
 		}
 		_, err = doc.Delete(ctx)
 		require.NoError(t, err)
 	}
 }
 
-func upsertDocuments(ctx context.Context, t testing.TB, docs map[string]string) {
+func (c *firestoreClient) Upsert(ctx context.Context, t testing.TB, docs map[string]string) {
 	t.Helper()
 	log.WithField("count", len(docs)).Debug("upserting test documents")
 
-	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "$HOME", os.Getenv("HOME"))
-	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
-	require.NoError(t, err)
-
-	client, err := firestore.NewClient(ctx, *testProjectID, option.WithCredentialsJSON(credentialsJSON))
-	require.NoError(t, err)
-	defer client.Close()
-
-	var wb = client.Batch()
+	var wb = c.inner.Batch()
 	for docName, docData := range docs {
 		var fields = make(map[string]interface{})
 		var err = json.Unmarshal(json.RawMessage(docData), &fields)
 		require.NoError(t, err)
-		wb = wb.Set(client.Doc(docName), fields, firestore.MergeAll)
+		wb = wb.Set(c.inner.Doc(c.prefix+docName), fields, firestore.MergeAll)
 	}
-	_, err = wb.Commit(ctx)
+	var _, err = wb.Commit(ctx)
+	require.NoError(t, err)
+}
+
+func (c *firestoreClient) Delete(ctx context.Context, t testing.TB, names ...string) {
+	t.Helper()
+	log.WithField("count", len(names)).Debug("deleting test documents")
+
+	var wb = c.inner.Batch()
+	for _, docName := range names {
+		wb = wb.Delete(c.inner.Doc(c.prefix + docName))
+	}
+	var _, err = wb.Commit(ctx)
 	require.NoError(t, err)
 }
