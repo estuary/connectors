@@ -1,91 +1,91 @@
 # ================================
 # Binding 0 ("flow_source_tests/*/users/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/docs/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/docs/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/docs/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/docs/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/docs/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/docs/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/docs/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/docs/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/docs/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/docs/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/docs/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/docs/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/docs/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/docs/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/docs/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/4","data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 # ================================
 # Binding 1 ("flow_source_tests/*/users/*/notes")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/notes/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/notes/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/notes/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/notes/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/notes/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/notes/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/notes/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/notes/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/notes/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/notes/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/notes/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/notes/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/notes/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/notes/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/notes/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/4","data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/notes/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/notes/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/notes/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/notes/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/notes/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/notes/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/notes/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/notes/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/notes/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/notes/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/notes/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/notes/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/notes/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/notes/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/notes/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 # ================================
 # Binding 2 ("flow_source_tests/*/users/*/tasks")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/tasks/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/tasks/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/tasks/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/tasks/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/tasks/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/tasks/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/tasks/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/tasks/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/tasks/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/tasks/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/tasks/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/tasks/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/tasks/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/tasks/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/tasks/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/4","data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/tasks/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/tasks/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/tasks/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/tasks/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/6/tasks/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/tasks/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/tasks/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/tasks/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/tasks/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/7/tasks/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/tasks/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/tasks/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/tasks/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/tasks/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/8/tasks/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 # ================================
 # Binding 3 ("flow_source_tests/*/users/*/sentinels")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/999/sentinels/999","sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/999/sentinels/999","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 # ================================
 # Final State Checkpoint
 # ================================

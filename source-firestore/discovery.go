@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/estuary/connectors/schema_inference"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
@@ -36,26 +38,52 @@ const (
 	discoverMaxConcurrentWorkers = 32
 )
 
+const (
+	metaProperty = "_meta"
+	documentKey  = "/_meta/path"
+)
+
 type documentMetadata struct {
-	Path       string    `json:"path" jsonschema:"title=Document Path,description=Fully qualified document path including Project ID and database name."`
-	CreateTime time.Time `json:"ctime,omitempty" jsonschema:"title=Create Time,description=The time at which the document was first created."`
-	UpdateTime time.Time `json:"mtime,omitempty" jsonschema:"title=Update Time,description=The time at which the document was most recently updated."`
-	DeleteTime time.Time `json:"dtime,omitempty" jsonschema:"title=Delete Time,description=The time at which the document was deleted."`
-	Deleted    bool      `json:"delete,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted."`
+	Path       string     `json:"path" jsonschema:"title=Document Path,description=Fully qualified document path including Project ID and database name."`
+	CreateTime *time.Time `json:"ctime,omitempty" jsonschema:"title=Create Time,description=The time at which the document was first created."`
+	UpdateTime *time.Time `json:"mtime,omitempty" jsonschema:"title=Update Time,description=The time at which the document was most recently updated."`
+	DeleteTime *time.Time `json:"dtime,omitempty" jsonschema:"title=Delete Time,description=The time at which the document was deleted."`
+	Deleted    bool       `json:"delete,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted."`
 }
 
-// placeholderSchema is the maximally-permissive schema that should be satisfied
-// by any Firestore document. It is returned if schema inference fails.
-func placeholderSchema() json.RawMessage {
-	return json.RawMessage(`{
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "required": ["__name__", "__path__"],
-    "properties": {
-        "__name__": { "type": "string" },
-        "__path__": { "type": "string" }
-    }
-}`)
+// minimalSchema is the maximally-permissive schema which just specifies the
+// metadata our connector adds. If schema inference succeeds the discovered
+// schema is allOf(minimalSchema, inferredSchema) and if inference fails then
+// the discovered schema defaults to minimalSchema.
+var minimalSchema = generateMinimalSchema()
+
+func generateMinimalSchema() json.RawMessage {
+	// Generate schema for the metadata via reflection
+	var reflector = jsonschema.Reflector{
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}
+	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
+	metadataSchema.Definitions = nil
+
+	// Wrap metadata into an enclosing object schema with a /_meta property
+	var schema = &jsonschema.Schema{
+		Type:     "object",
+		Required: []string{metaProperty},
+		Extras: map[string]interface{}{
+			"additionalProperties": true,
+			"properties": map[string]*jsonschema.Schema{
+				metaProperty: metadataSchema,
+			},
+		},
+	}
+
+	// Marshal schema to JSON
+	bs, err := json.Marshal(schema)
+	if err != nil {
+		panic(fmt.Errorf("error generating schema: %v", err))
+	}
+	return json.RawMessage(bs)
 }
 
 // Discover RPC
@@ -222,14 +250,27 @@ func (ds *discoveryState) discoverResource(ctx context.Context, resourcePath str
 	defer close(docsCh)
 	ds.group.Go(func() error {
 		var logEntry = log.WithField("resource", resourcePath)
-		var schema, err = schema_inference.Run(ctx, logEntry, docsCh)
+		var inferredSchema, err = schema_inference.Run(ctx, logEntry, docsCh)
+		var documentSchema json.RawMessage
 		if err != nil {
 			// Ideally schema inference shouldn't ever fail, but in the event that
 			// it does we should just use a maximally permissive Firestore document
 			// placeholder and keep going.
 			logEntry.WithField("err", err).Warn("schema inference failed")
-			schema = placeholderSchema()
+			documentSchema = minimalSchema
+		} else {
+			// In the happy path when schema inference succeeds, we want to combine
+			// the inferred document schema with the minimal "just /_meta" schema to
+			// produce a schema which accurately describes the capture output.
+			combinedSchema, err := json.Marshal(map[string]interface{}{
+				"allOf": []interface{}{inferredSchema, minimalSchema},
+			})
+			if err != nil {
+				return fmt.Errorf("error serializing combined schema: %w", err)
+			}
+			documentSchema = combinedSchema
 		}
+
 		resourceJSON, err := json.Marshal(resource{Path: resourcePath})
 		if err != nil {
 			return fmt.Errorf("error serializing resource json: %w", err)
@@ -237,8 +278,8 @@ func (ds *discoveryState) discoverResource(ctx context.Context, resourcePath str
 		var binding = &pc.DiscoverResponse_Binding{
 			RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
 			ResourceSpecJson:   resourceJSON,
-			DocumentSchemaJson: schema,
-			KeyPtrs:            []string{"/" + pathField},
+			DocumentSchemaJson: documentSchema,
+			KeyPtrs:            []string{documentKey},
 		}
 		ds.resources.Lock()
 		ds.resources.bindings = append(ds.resources.bindings, binding)
@@ -283,10 +324,7 @@ func (ds *discoveryState) discoverResource(ctx context.Context, resourcePath str
 				return err
 			}
 
-			var data = doc.Data()
-			data[firestore.DocumentID] = doc.Ref.ID
-			data[pathField] = doc.Ref.Path
-			docJSON, err := json.Marshal(data)
+			docJSON, err := json.Marshal(doc.Data())
 			if err != nil {
 				return fmt.Errorf("error marshalling document: %w", err)
 			}
