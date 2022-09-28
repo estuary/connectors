@@ -264,6 +264,9 @@ func testContext(t testing.TB, duration time.Duration) context.Context {
 
 func simpleCapture(t testing.TB, names ...string) *testCaptureSpec {
 	t.Helper()
+	if os.Getenv("RUN_CAPTURES") != "yes" {
+		t.Skipf("skipping %q capture: ${RUN_CAPTURES} != \"yes\"", t.Name())
+	}
 
 	// Load credentials from disk and construct an endpoint spec
 	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
@@ -301,6 +304,9 @@ type firestoreClient struct {
 
 func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
 	t.Helper()
+	if os.Getenv("RUN_CAPTURES") != "yes" {
+		t.Skipf("skipping %q capture: ${RUN_CAPTURES} != \"yes\"", t.Name())
+	}
 
 	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
 	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
