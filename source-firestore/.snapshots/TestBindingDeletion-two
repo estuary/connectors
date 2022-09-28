@@ -1,0 +1,9 @@
+# ================================
+# Binding 0 ("flow_source_tests/*/other")
+# ================================
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/other/999","sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"Resources":{"flow_source_tests/*/other":{"ReadTime":"<TIMESTAMP>"}}}
+

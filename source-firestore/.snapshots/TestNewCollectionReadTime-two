@@ -8,7 +8,7 @@
 # ================================
 {"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/5","data":5}
 {"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/6","data":6}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/ZZZ","data":"FLOW_TEST_SENTINEL(TestNewCollectionReadTime/two)"}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/ZZZ","sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 # ================================
 # Final State Checkpoint
 # ================================

@@ -1,7 +1,7 @@
 # ================================
 # Binding 0 ("flow_source_tests/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/ZZZ","data":"FLOW_TEST_SENTINEL(TestSimpleCapture/two)"}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/ZZZ","sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 {"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/10","data":10}
 {"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/11","data":11}
 {"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/12","data":12}
