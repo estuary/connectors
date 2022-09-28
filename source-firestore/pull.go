@@ -498,11 +498,11 @@ func (c *capture) HandleDocument(ctx context.Context, resourcePath string, doc *
 		}
 		fields[id] = tval
 	}
-	// TODO(wgd): Should these properties be moved into /_meta or something?
-	// TODO(wgd): What's the distinction between __name__ and __path__? Do we want both?
-	fields["__path__"] = doc.Name
-	fields["__ctime__"] = doc.CreateTime.AsTime()
-	fields["__mtime__"] = doc.UpdateTime.AsTime()
+	fields[metaProperty] = &documentMetadata{
+		Path:       doc.Name,
+		CreateTime: &ctime,
+		UpdateTime: &mtime,
+	}
 
 	if bindingIndex, ok := c.State.BindingIndex(resourcePath); !ok {
 		// Listen streams can be a bit over-broad. For instance if there are
@@ -534,9 +534,11 @@ func (c *capture) HandleDelete(ctx context.Context, resourcePath string, docName
 		return nil
 	}
 	var fields = map[string]interface{}{
-		"__path__":    docName,
-		"__dtime__":   readTime,
-		"__deleted__": true,
+		metaProperty: &documentMetadata{
+			Path:       docName,
+			DeleteTime: &readTime,
+			Deleted:    true,
+		},
 	}
 	if docJSON, err := json.Marshal(fields); err != nil {
 		return fmt.Errorf("error serializing deletion record %q: %w", docName, err)

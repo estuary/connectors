@@ -1,9 +1,9 @@
 # ================================
 # Binding 0 ("flow_source_tests/*/users/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/1","data":1}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/2","data":2}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/ZZZ","sentinel":"5f91dae7-dc4d-48d9-bfec-2d3bfeec4164"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/ZZZ","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"5f91dae7-dc4d-48d9-bfec-2d3bfeec4164"}
 # ================================
 # Final State Checkpoint
 # ================================

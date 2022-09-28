@@ -1,27 +1,27 @@
 # ================================
 # Binding 0 ("flow_source_tests/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/0","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/1","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/2","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/3","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/4","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/5","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/6","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/7","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/8","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/9","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/10","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/11","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/12","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/13","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/14","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/15","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/16","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/17","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/18","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/19","data":"placeholder"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/999","sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/10","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/11","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/12","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/13","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/14","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/15","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/16","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/17","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/18","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/19","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/7","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/8","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/9","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/999","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 # ================================
 # Final State Checkpoint
 # ================================

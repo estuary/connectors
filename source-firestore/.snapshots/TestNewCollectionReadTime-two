@@ -1,14 +1,14 @@
 # ================================
 # Binding 0 ("flow_source_tests/*/users/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/3","data":3}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/4","data":4}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":3}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":4}
 # ================================
 # Binding 1 ("flow_source_tests/*/groups/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/5","data":5}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/6","data":6}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/ZZZ","sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":5}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":6}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/ZZZ","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 # ================================
 # Final State Checkpoint
 # ================================
