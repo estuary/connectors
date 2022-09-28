@@ -1,0 +1,227 @@
+Binding 0:
+{
+    "recommended_name": "flow_source_tests",
+    "resource_spec_json": {
+      "path": "flow_source_tests"
+    },
+    "document_schema_json": {
+      "allOf": [
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "testName"
+          ],
+          "properties": {
+            "testName": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "_meta"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "_meta": {
+              "$schema": "http://json-schema.org/draft/2020-12/schema",
+              "$id": "https://github.com/estuary/connectors/source-firestore/document-metadata",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "title": "Document Path",
+                  "description": "Fully qualified document path including Project ID and database name."
+                },
+                "ctime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Create Time",
+                  "description": "The time at which the document was first created."
+                },
+                "mtime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Update Time",
+                  "description": "The time at which the document was most recently updated."
+                },
+                "dtime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Delete Time",
+                  "description": "The time at which the document was deleted."
+                },
+                "delete": {
+                  "type": "boolean",
+                  "title": "Delete Flag",
+                  "description": "True if the document has been deleted."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "path"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "key_ptrs": [
+      "/_meta/path"
+    ]
+  }
+Binding 1:
+{
+    "recommended_name": "flow_source_tests_users",
+    "resource_spec_json": {
+      "path": "flow_source_tests/*/users"
+    },
+    "document_schema_json": {
+      "allOf": [
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "_meta"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "_meta": {
+              "$schema": "http://json-schema.org/draft/2020-12/schema",
+              "$id": "https://github.com/estuary/connectors/source-firestore/document-metadata",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "title": "Document Path",
+                  "description": "Fully qualified document path including Project ID and database name."
+                },
+                "ctime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Create Time",
+                  "description": "The time at which the document was first created."
+                },
+                "mtime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Update Time",
+                  "description": "The time at which the document was most recently updated."
+                },
+                "dtime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Delete Time",
+                  "description": "The time at which the document was deleted."
+                },
+                "delete": {
+                  "type": "boolean",
+                  "title": "Delete Flag",
+                  "description": "True if the document has been deleted."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "path"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "key_ptrs": [
+      "/_meta/path"
+    ]
+  }
+Binding 2:
+{
+    "recommended_name": "flow_source_tests_users_docs",
+    "resource_spec_json": {
+      "path": "flow_source_tests/*/users/*/docs"
+    },
+    "document_schema_json": {
+      "allOf": [
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "asdf",
+            "foo"
+          ],
+          "properties": {
+            "asdf": {
+              "type": "integer"
+            },
+            "foo": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "_meta"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "_meta": {
+              "$schema": "http://json-schema.org/draft/2020-12/schema",
+              "$id": "https://github.com/estuary/connectors/source-firestore/document-metadata",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "title": "Document Path",
+                  "description": "Fully qualified document path including Project ID and database name."
+                },
+                "ctime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Create Time",
+                  "description": "The time at which the document was first created."
+                },
+                "mtime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Update Time",
+                  "description": "The time at which the document was most recently updated."
+                },
+                "dtime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Delete Time",
+                  "description": "The time at which the document was deleted."
+                },
+                "delete": {
+                  "type": "boolean",
+                  "title": "Delete Flag",
+                  "description": "True if the document has been deleted."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "path"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "key_ptrs": [
+      "/_meta/path"
+    ]
+  }
+

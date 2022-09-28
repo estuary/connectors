@@ -1,13 +1,13 @@
 # ================================
 # Binding 0 ("flow_source_tests/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/ZZZ","sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/10","data":10}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/11","data":11}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/12","data":12}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/7","data":7}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/8","data":8}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/9","data":9}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/10","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":10}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/11","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":11}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/12","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":12}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/7","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":7}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/8","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":8}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/9","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":9}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/ZZZ","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 # ================================
 # Final State Checkpoint
 # ================================

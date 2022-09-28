@@ -1,32 +1,32 @@
 # ================================
 # Binding 0 ("flow_source_tests/*/users/*/docs")
 # ================================
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/999/docs/999","sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/5/docs/0","doc":0,"user":5}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/5/docs/1","doc":1,"user":5}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/5/docs/2","doc":2,"user":5}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/5/docs/3","doc":3,"user":5}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/5/docs/4","doc":4,"user":5}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/6/docs/0","doc":0,"user":6}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/6/docs/1","doc":1,"user":6}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/6/docs/2","doc":2,"user":6}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/6/docs/3","doc":3,"user":6}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/6/docs/4","doc":4,"user":6}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/7/docs/0","doc":0,"user":7}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/7/docs/1","doc":1,"user":7}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/7/docs/2","doc":2,"user":7}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/7/docs/3","doc":3,"user":7}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/7/docs/4","doc":4,"user":7}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/8/docs/0","doc":0,"user":8}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/8/docs/1","doc":1,"user":8}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/8/docs/2","doc":2,"user":8}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/8/docs/3","doc":3,"user":8}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/8/docs/4","doc":4,"user":8}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/9/docs/0","doc":0,"user":9}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/9/docs/1","doc":1,"user":9}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/9/docs/2","doc":2,"user":9}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/9/docs/3","doc":3,"user":9}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/9/docs/4","doc":4,"user":9}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/5/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":0,"user":5}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/5/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":1,"user":5}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/5/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":2,"user":5}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/5/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":3,"user":5}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/5/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":4,"user":5}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/6/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":0,"user":6}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/6/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":1,"user":6}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/6/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":2,"user":6}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/6/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":3,"user":6}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/6/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":4,"user":6}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/7/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":0,"user":7}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/7/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":1,"user":7}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/7/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":2,"user":7}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/7/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":3,"user":7}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/7/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":4,"user":7}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/8/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":0,"user":8}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/8/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":1,"user":8}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/8/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":2,"user":8}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/8/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":3,"user":8}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/8/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":4,"user":8}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/9/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":0,"user":9}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/9/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":1,"user":9}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/9/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":2,"user":9}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/9/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":3,"user":9}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/9/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":4,"user":9}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/999/docs/999","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 # ================================
 # Final State Checkpoint
 # ================================
