@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	firestore "cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
@@ -35,9 +36,18 @@ const (
 	discoverMaxConcurrentWorkers = 32
 )
 
+type documentMetadata struct {
+	Path       string    `json:"path" jsonschema:"title=Document Path,description=Fully qualified document path including Project ID and database name."`
+	CreateTime time.Time `json:"ctime,omitempty" jsonschema:"title=Create Time,description=The time at which the document was first created."`
+	UpdateTime time.Time `json:"mtime,omitempty" jsonschema:"title=Update Time,description=The time at which the document was most recently updated."`
+	DeleteTime time.Time `json:"dtime,omitempty" jsonschema:"title=Delete Time,description=The time at which the document was deleted."`
+	Deleted    bool      `json:"delete,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted."`
+}
+
 // placeholderSchema is the maximally-permissive schema that should be satisfied
 // by any Firestore document. It is returned if schema inference fails.
-const placeholderSchema = `{
+func placeholderSchema() json.RawMessage {
+	return json.RawMessage(`{
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "required": ["__name__", "__path__"],
@@ -45,7 +55,8 @@ const placeholderSchema = `{
         "__name__": { "type": "string" },
         "__path__": { "type": "string" }
     }
-}`
+}`)
+}
 
 // Discover RPC
 func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.DiscoverResponse, error) {
@@ -217,7 +228,7 @@ func (ds *discoveryState) discoverResource(ctx context.Context, resourcePath str
 			// it does we should just use a maximally permissive Firestore document
 			// placeholder and keep going.
 			logEntry.WithField("err", err).Warn("schema inference failed")
-			schema = json.RawMessage(placeholderSchema)
+			schema = placeholderSchema()
 		}
 		resourceJSON, err := json.Marshal(resource{Path: resourcePath})
 		if err != nil {

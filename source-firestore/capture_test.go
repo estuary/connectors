@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -26,6 +26,52 @@ type testCaptureSpec struct {
 	EndpointSpec interface{}
 	Bindings     []*flow.CaptureSpec_Binding
 	Checkpoint   json.RawMessage
+}
+
+func (cs *testCaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*regexp.Regexp) {
+	t.Helper()
+	if os.Getenv("RUN_CAPTURES") != "yes" {
+		t.Skipf("skipping %q capture: ${RUN_CAPTURES} != \"yes\"", t.Name())
+	}
+
+	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
+	require.NoError(t, err)
+
+	discovery, err := cs.Driver.Discover(ctx, &pc.DiscoverRequest{
+		EndpointSpecJson: endpointSpecJSON,
+	})
+	require.NoError(t, err)
+
+	var matchedBindings = make(map[string]*pc.DiscoverResponse_Binding)
+	var matchedNames []string
+	for _, binding := range discovery.Bindings {
+		if matchesAny(matchers, string(binding.ResourceSpecJson)) {
+			var name = binding.RecommendedName.String()
+			matchedNames = append(matchedNames, name)
+			matchedBindings[name] = binding
+		}
+	}
+	sort.Strings(matchedNames)
+
+	var summary = new(strings.Builder)
+	for idx, name := range matchedNames {
+		fmt.Fprintf(summary, "Binding %d:\n", idx)
+		bs, err := json.MarshalIndent(matchedBindings[name], "  ", "  ")
+		require.NoError(t, err)
+		io.Copy(summary, bytes.NewReader(bs))
+		fmt.Fprintf(summary, "\n")
+
+	}
+	cupaloy.SnapshotT(t, summary.String())
+}
+
+func matchesAny(matchers []*regexp.Regexp, text string) bool {
+	for _, matcher := range matchers {
+		if matcher.MatchString(text) {
+			return true
+		}
+	}
+	return false
 }
 
 func (cs *testCaptureSpec) Verify(ctx context.Context, t testing.TB, sentinel string) {
@@ -152,11 +198,17 @@ func (a *testPullAdapter) Send(m *pc.PullResponse) error {
 		} else {
 			return fmt.Errorf("test error merging checkpoint: %w", err)
 		}
-		if a.sentinelReached {
-			go func() {
-				time.Sleep(1 * time.Second)
-				a.shutdown()
-			}()
+		if logLevel := log.TraceLevel; log.IsLevelEnabled(logLevel) {
+			if !bytes.Equal(m.Checkpoint.DriverCheckpointJson, []byte("{}")) {
+				log.WithFields(log.Fields{
+					"checkpoint": m.Checkpoint.DriverCheckpointJson,
+					"patch":      m.Checkpoint.Rfc7396MergePatch,
+					"result":     json.RawMessage(a.checkpoint),
+				}).Log(logLevel, "checkpoint")
+			}
+		}
+		if a.sentinelReached && !bytes.Equal(m.Checkpoint.DriverCheckpointJson, []byte("{}")) {
+			a.shutdown()
 		}
 		return nil
 	} else if m.Documents != nil {
