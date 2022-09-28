@@ -3,7 +3,7 @@
 # ================================
 {"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/1","data":1}
 {"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/2","data":2}
-{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/ZZZ","data":"FLOW_TEST_SENTINEL(TestNewCollectionReadTime/one)"}
+{"__ctime__":"<TIMESTAMP>","__mtime__":"<TIMESTAMP>","__path__":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/ZZZ","sentinel":"5f91dae7-dc4d-48d9-bfec-2d3bfeec4164"}
 # ================================
 # Final State Checkpoint
 # ================================

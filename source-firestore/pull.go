@@ -167,16 +167,6 @@ func (s *captureState) ReadTime(resourcePath string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-func (s *captureState) SerializeCheckpoint() (json.RawMessage, error) {
-	s.RLock()
-	defer s.RUnlock()
-	var bs, err = json.Marshal(s)
-	if err != nil {
-		return nil, fmt.Errorf("error serializing state checkpoint: %w", err)
-	}
-	return json.RawMessage(bs), nil
-}
-
 // TODO(wgd): Move the whole captureOutput thing into source-boilerplate?
 type captureOutput struct {
 	sync.Mutex
@@ -285,10 +275,17 @@ func (c *capture) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Emit the initial state checkpoint, as this may differ from the previous
+	// state when bindings are removed.
+	if checkpointJSON, err := json.Marshal(c.State); err != nil {
+		return fmt.Errorf("error serializing state checkpoint: %w", err)
+	} else if err := c.Output.Checkpoint(checkpointJSON, false); err != nil {
+		return err
+	}
+
 	// Enumerate unique collection IDs in a map. Multiple distinct resource paths
 	// can still have the same collection ID, for example 'foo/*/asdf' and 'bar/*/asdf'
 	// both have collection ID 'asdf'.
-	c.State.RLock() // Not strictly necessary as no concurrent workers exist yet
 	var watchCollections = make(map[string]time.Time)
 	for resourcePath, resourceState := range c.State.Resources {
 		var collectionID = getLastCollectionGroupID(resourcePath)
@@ -296,8 +293,11 @@ func (c *capture) Run(ctx context.Context) error {
 			watchCollections[collectionID] = resourceState.ReadTime
 		}
 	}
-	c.State.RUnlock()
 
+	log.WithFields(log.Fields{
+		"bindings": len(c.State.Resources),
+		"watches":  len(watchCollections),
+	}).Info("capture starting")
 	for collectionID, startTime := range watchCollections {
 		var collectionID, startTime = collectionID, startTime // Copy the loop variables for each closure
 		log.WithField("collection", collectionID).Debug("starting worker")
@@ -378,7 +378,7 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 
 		switch resp := resp.ResponseType.(type) {
 		case *firestore_pb.ListenResponse_TargetChange:
-			logEntry.WithField("tc", resp.TargetChange).Debug("TargetChange Event")
+			logEntry.WithField("tc", resp.TargetChange).Trace("TargetChange Event")
 			switch tc := resp.TargetChange; tc.TargetChangeType {
 			case firestore_pb.TargetChange_NO_CHANGE:
 				var ts = tc.ReadTime.AsTime().Format(time.RFC3339Nano)
@@ -389,7 +389,7 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 					logEntry.WithField("readTime", ts).Debug("consistent point reached")
 					if checkpointJSON, err := c.State.UpdateReadTimes(collectionID, tc.ReadTime.AsTime()); err != nil {
 						return err
-					} else if err := c.Output.Checkpoint(checkpointJSON, false); err != nil {
+					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 						return err
 					}
 					// In polling mode (tests), shut down the capture once caught up
