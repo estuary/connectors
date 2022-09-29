@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -186,6 +187,7 @@ func (a *testPullAdapter) Recv() (*pc.PullRequest, error) {
 		a.openReq = nil
 		return msg, nil
 	}
+	time.Sleep(10 * time.Millisecond)
 	return &pc.PullRequest{Acknowledge: &pc.Acknowledge{}}, nil
 }
 
@@ -226,10 +228,6 @@ func (a *testPullAdapter) Send(m *pc.PullResponse) error {
 	}
 	return nil
 }
-
-// We want to shut down when a particular magic value is detected in the output. This
-// implies that testPullAdapter has to have some sort of "shutdown sentinel" value in
-// its state and compare against the document bytes.
 
 func (a *testPullAdapter) Context() context.Context     { return a.ctx }
 func (a *testPullAdapter) SendMsg(m interface{}) error  { return nil }

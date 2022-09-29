@@ -119,9 +119,6 @@ func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Discov
 	}, nil
 }
 
-type collectionGroupID = string
-type resourcePath = string
-
 type discoveryState struct {
 	client  *firestore.Client
 	workers *errgroup.Group // Contains all worker goroutines launched during discovery.
@@ -171,15 +168,23 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.D
 	return bindings, nil
 }
 
-func (ds *discoveryState) processCollection(ctx context.Context, coll *firestore.CollectionRef) error {
+func (ds *discoveryState) processCollection(ctx context.Context, coll *firestore.CollectionRef) {
 	ds.shared.Lock()
 	defer ds.shared.Unlock()
 	if _, ok := ds.shared.groups[coll.ID]; !ok {
 		log.WithField("group", coll.ID).Info("discovered new collection group")
 		ds.shared.groups[coll.ID] = struct{}{}
-		ds.workers.Go(func() error { return ds.discoverCollectionGroup(ctx, coll.ID) })
+		ds.workers.Go(func() error {
+			var err = ds.discoverCollectionGroup(ctx, coll.ID)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"group": coll.ID,
+					"error": err,
+				}).Error("error scanning documents")
+			}
+			return err
+		})
 	}
-	return nil
 }
 
 // discoverCollectionGroup iterates over every document of a "collection group" [1],
@@ -245,12 +250,14 @@ func (ds *discoveryState) processDocument(ctx context.Context, doc *firestore.Do
 		ds.workers.Go(func() error {
 			subcolls, err := doc.Ref.Collections(ctx).GetAll()
 			if err != nil {
+				log.WithFields(log.Fields{
+					"doc": doc.Ref.Path,
+					"err": err,
+				}).Error("error listing subcollections")
 				return fmt.Errorf("error listing subcollections: %w", err)
 			}
 			for _, subcoll := range subcolls {
-				if err := ds.processCollection(ctx, subcoll); err != nil {
-					return err
-				}
+				ds.processCollection(ctx, subcoll)
 			}
 			return nil
 		})
@@ -267,7 +274,16 @@ func (ds *discoveryState) inferenceChannel(ctx context.Context, resourcePath res
 
 	var ch = make(chan json.RawMessage)
 	ds.shared.channels[resourcePath] = ch
-	ds.workers.Go(func() error { return ds.inferenceWorker(ctx, resourcePath, ch) })
+	ds.workers.Go(func() error {
+		var err = ds.inferenceWorker(ctx, resourcePath, ch)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"resource": resourcePath,
+				"error":    err,
+			}).Error("inference error")
+		}
+		return err
+	})
 	return ch
 }
 
