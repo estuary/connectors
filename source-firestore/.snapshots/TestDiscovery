@@ -23,7 +23,6 @@ Binding 0:
           "required": [
             "_meta"
           ],
-          "additionalProperties": true,
           "properties": {
             "_meta": {
               "$schema": "http://json-schema.org/draft/2020-12/schema",
@@ -38,32 +37,33 @@ Binding 0:
                   "type": "string",
                   "format": "date-time",
                   "title": "Create Time",
-                  "description": "The time at which the document was first created."
+                  "description": "The time at which the document was created. Unset if the document is deleted."
                 },
                 "mtime": {
                   "type": "string",
                   "format": "date-time",
                   "title": "Update Time",
-                  "description": "The time at which the document was most recently updated."
-                },
-                "dtime": {
-                  "type": "string",
-                  "format": "date-time",
-                  "title": "Delete Time",
-                  "description": "The time at which the document was deleted."
+                  "description": "The time at which the document was most recently updated (or deleted)."
                 },
                 "delete": {
                   "type": "boolean",
                   "title": "Delete Flag",
-                  "description": "True if the document has been deleted."
+                  "description": "True if the document has been deleted"
                 }
               },
               "additionalProperties": false,
               "type": "object",
               "required": [
-                "path"
+                "path",
+                "mtime"
               ]
             }
+          },
+          "reduce": {
+            "key": [
+              "/_meta/mtime"
+            ],
+            "strategy": "maximize"
           }
         }
       ]
@@ -97,7 +97,6 @@ Binding 1:
           "required": [
             "_meta"
           ],
-          "additionalProperties": true,
           "properties": {
             "_meta": {
               "$schema": "http://json-schema.org/draft/2020-12/schema",
@@ -112,32 +111,33 @@ Binding 1:
                   "type": "string",
                   "format": "date-time",
                   "title": "Create Time",
-                  "description": "The time at which the document was first created."
+                  "description": "The time at which the document was created. Unset if the document is deleted."
                 },
                 "mtime": {
                   "type": "string",
                   "format": "date-time",
                   "title": "Update Time",
-                  "description": "The time at which the document was most recently updated."
-                },
-                "dtime": {
-                  "type": "string",
-                  "format": "date-time",
-                  "title": "Delete Time",
-                  "description": "The time at which the document was deleted."
+                  "description": "The time at which the document was most recently updated (or deleted)."
                 },
                 "delete": {
                   "type": "boolean",
                   "title": "Delete Flag",
-                  "description": "True if the document has been deleted."
+                  "description": "True if the document has been deleted"
                 }
               },
               "additionalProperties": false,
               "type": "object",
               "required": [
-                "path"
+                "path",
+                "mtime"
               ]
             }
+          },
+          "reduce": {
+            "key": [
+              "/_meta/mtime"
+            ],
+            "strategy": "maximize"
           }
         }
       ]
@@ -175,7 +175,6 @@ Binding 2:
           "required": [
             "_meta"
           ],
-          "additionalProperties": true,
           "properties": {
             "_meta": {
               "$schema": "http://json-schema.org/draft/2020-12/schema",
@@ -190,32 +189,33 @@ Binding 2:
                   "type": "string",
                   "format": "date-time",
                   "title": "Create Time",
-                  "description": "The time at which the document was first created."
+                  "description": "The time at which the document was created. Unset if the document is deleted."
                 },
                 "mtime": {
                   "type": "string",
                   "format": "date-time",
                   "title": "Update Time",
-                  "description": "The time at which the document was most recently updated."
-                },
-                "dtime": {
-                  "type": "string",
-                  "format": "date-time",
-                  "title": "Delete Time",
-                  "description": "The time at which the document was deleted."
+                  "description": "The time at which the document was most recently updated (or deleted)."
                 },
                 "delete": {
                   "type": "boolean",
                   "title": "Delete Flag",
-                  "description": "True if the document has been deleted."
+                  "description": "True if the document has been deleted"
                 }
               },
               "additionalProperties": false,
               "type": "object",
               "required": [
-                "path"
+                "path",
+                "mtime"
               ]
             }
+          },
+          "reduce": {
+            "key": [
+              "/_meta/mtime"
+            ],
+            "strategy": "maximize"
           }
         }
       ]
