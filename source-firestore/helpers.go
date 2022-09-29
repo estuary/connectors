@@ -29,8 +29,8 @@ func findBindingForCollectionPath(collectionPath string, bindings []resource) in
 // which operate on the name of the last collection. Note that this name might not be unique
 // so another check is necessary to make sure we do not mix documents from nested collections
 // that have the same ID, but different parent collections
-func getLastCollectionGroupID(resourcePath string) string {
-	var pieces = strings.Split(resourcePath, "/")
+func getLastCollectionGroupID(path resourcePath) collectionGroupID {
+	var pieces = strings.Split(path, "/")
 	return pieces[len(pieces)-1]
 }
 
@@ -42,7 +42,7 @@ func isRootCollection(resourcePath string) bool {
 // This function creates a path for a collection which only refers to its parent collections, not documents
 // e.g. projects/hello-flow-mahdi/databases/(default)/documents/group/OLgLVvZnykvFR4ZyqUuS/group
 // becomes group/*/group
-func collectionToResourcePath(collection string) string {
+func collectionToResourcePath(collection string) resourcePath {
 	// the prefix up to the first "/documents" is unnecessary, so we remove that
 	var parts = strings.SplitN(collection, "/documents/", 2)
 	if len(parts) < 2 {
