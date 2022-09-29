@@ -45,7 +45,7 @@ func (cs *testCaptureSpec) Discover(ctx context.Context, t testing.TB, matchers 
 	var matchedBindings = make(map[string]*pc.DiscoverResponse_Binding)
 	var matchedNames []string
 	for _, binding := range discovery.Bindings {
-		if matchesAny(matchers, string(binding.ResourceSpecJson)) {
+		if matchers == nil || matchesAny(matchers, string(binding.ResourceSpecJson)) {
 			var name = binding.RecommendedName.String()
 			matchedNames = append(matchedNames, name)
 			matchedBindings[name] = binding
