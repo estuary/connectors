@@ -23,13 +23,13 @@ func main() {
 
 // Config represents the endpoint configuration for BigQuery.
 type config struct {
-	BillingProjectID string `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."`
-	ProjectID        string `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset."`
-	Dataset          string `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset that will be used to store the materialization output."`
-	Region           string `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."`
-	Bucket           string `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery."`
-	BucketPath       string `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket."`
-	CredentialsJSON  string `json:"credentials_json" jsonschema:"title=Credentials,description=Google Cloud Service Account JSON credentials in base64 format." jsonschema_extras:"secret=true,multiline=true"`
+	ProjectID        string `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset." jsonschema_extras:"order=0"`
+	CredentialsJSON  string `json:"credentials_json" jsonschema:"title=Credentials,description=Google Cloud Service Account JSON credentials in base64 format." jsonschema_extras:"secret=true,multiline=true,order=1"`
+	Region           string `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region." jsonschema_extras:"order=2"`
+	Dataset          string `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset that will be used to store the materialization output." jsonschema_extras:"order=3"`
+	Bucket           string `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery." jsonschema_extras:"order=4"`
+	BucketPath       string `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket." jsonschema_extras:"order=5"`
+	BillingProjectID string `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. Defaults to Project ID if not specified." jsonschema_extras:"order=6"`
 }
 
 func (c *config) Validate() error {
