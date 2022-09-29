@@ -536,7 +536,7 @@ func (c *capture) HandleDelete(ctx context.Context, resourcePath string, docName
 	var fields = map[string]interface{}{
 		metaProperty: &documentMetadata{
 			Path:       docName,
-			DeleteTime: &readTime,
+			UpdateTime: &readTime,
 			Deleted:    true,
 		},
 	}
