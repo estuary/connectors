@@ -20,14 +20,15 @@ type DocumentSource = func(ctx context.Context, logEntry *log.Entry) (docCh <-ch
 func Run(ctx context.Context, logEntry *log.Entry, docsCh <-chan Document) (Schema, error) {
 	var (
 		err      error
-		errGroup *errgroup.Group
+		errGroup errgroup.Group
 		schema   = Schema{}
 		cmd      *exec.Cmd
 		stdin    io.WriteCloser
 		stdout   io.ReadCloser
 	)
 
-	errGroup, ctx = errgroup.WithContext(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	cmd = exec.CommandContext(ctx, "flow-schema-inference", "analyze")
 
 	stdin, err = cmd.StdinPipe()
