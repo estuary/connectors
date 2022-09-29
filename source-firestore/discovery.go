@@ -39,16 +39,16 @@ const (
 )
 
 const (
-	metaProperty = "_meta"
-	documentKey  = "/_meta/path"
+	metaProperty  = "_meta"
+	documentPath  = "/_meta/path"
+	documentMTime = "/_meta/mtime"
 )
 
 type documentMetadata struct {
 	Path       string     `json:"path" jsonschema:"title=Document Path,description=Fully qualified document path including Project ID and database name."`
-	CreateTime *time.Time `json:"ctime,omitempty" jsonschema:"title=Create Time,description=The time at which the document was first created."`
-	UpdateTime *time.Time `json:"mtime,omitempty" jsonschema:"title=Update Time,description=The time at which the document was most recently updated."`
-	DeleteTime *time.Time `json:"dtime,omitempty" jsonschema:"title=Delete Time,description=The time at which the document was deleted."`
-	Deleted    bool       `json:"delete,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted."`
+	CreateTime *time.Time `json:"ctime,omitempty" jsonschema:"title=Create Time,description=The time at which the document was created. Unset if the document is deleted."`
+	UpdateTime *time.Time `json:"mtime" jsonschema:"title=Update Time,description=The time at which the document was most recently updated (or deleted)."`
+	Deleted    bool       `json:"delete,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted, unset otherwise."`
 }
 
 // minimalSchema is the maximally-permissive schema which just specifies the
@@ -67,11 +67,16 @@ func generateMinimalSchema() json.RawMessage {
 	metadataSchema.Definitions = nil
 
 	// Wrap metadata into an enclosing object schema with a /_meta property
+	// and a 'maximize by timestamp' reduction strategy.
 	var schema = &jsonschema.Schema{
 		Type:                 "object",
 		Required:             []string{metaProperty},
 		AdditionalProperties: nil,
 		Extras: map[string]interface{}{
+			"reduce": map[string]interface{}{
+				"strategy": "maximize",
+				"key":      []string{documentMTime},
+			},
 			"properties": map[string]*jsonschema.Schema{
 				metaProperty: metadataSchema,
 			},
@@ -297,7 +302,7 @@ func (ds *discoveryState) inferenceWorker(ctx context.Context, resourcePath reso
 		RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
 		ResourceSpecJson:   resourceJSON,
 		DocumentSchemaJson: documentSchema,
-		KeyPtrs:            []string{documentKey},
+		KeyPtrs:            []string{documentPath},
 	}
 
 	ds.shared.Lock()
