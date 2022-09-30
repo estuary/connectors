@@ -3,51 +3,58 @@
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-bigquery/config",
     "properties": {
-      "billing_project_id": {
-        "type": "string",
-        "title": "Billing Project ID",
-        "description": "Billing Project ID connected to the BigQuery dataset. It can be the same value as Project ID."
-      },
       "project_id": {
         "type": "string",
         "title": "Project ID",
-        "description": "Google Cloud Project ID that owns the BigQuery dataset."
-      },
-      "dataset": {
-        "type": "string",
-        "title": "Dataset",
-        "description": "BigQuery dataset that will be used to store the materialization output."
-      },
-      "region": {
-        "type": "string",
-        "title": "Region",
-        "description": "Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region."
-      },
-      "bucket": {
-        "type": "string",
-        "title": "Bucket",
-        "description": "Google Cloud Storage bucket that is going to be used to store specfications \u0026 temporary data before merging into BigQuery."
-      },
-      "bucket_path": {
-        "type": "string",
-        "title": "Bucket Path",
-        "description": "A prefix that will be used to store objects to Google Cloud Storage's bucket."
+        "description": "Google Cloud Project ID that owns the BigQuery dataset.",
+        "order": "0"
       },
       "credentials_json": {
         "type": "string",
         "title": "Credentials",
         "description": "Google Cloud Service Account JSON credentials in base64 format.",
         "multiline": true,
+        "order": "1",
         "secret": true
+      },
+      "region": {
+        "type": "string",
+        "title": "Region",
+        "description": "Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region.",
+        "order": "2"
+      },
+      "dataset": {
+        "type": "string",
+        "title": "Dataset",
+        "description": "BigQuery dataset that will be used to store the materialization output.",
+        "order": "3"
+      },
+      "bucket": {
+        "type": "string",
+        "title": "Bucket",
+        "description": "Google Cloud Storage bucket that is going to be used to store specfications \u0026 temporary data before merging into BigQuery.",
+        "order": "4"
+      },
+      "bucket_path": {
+        "type": "string",
+        "title": "Bucket Path",
+        "description": "A prefix that will be used to store objects to Google Cloud Storage's bucket.",
+        "order": "5"
+      },
+      "billing_project_id": {
+        "type": "string",
+        "title": "Billing Project ID",
+        "description": "Billing Project ID connected to the BigQuery dataset. Defaults to Project ID if not specified.",
+        "order": "6"
       }
     },
     "type": "object",
     "required": [
       "project_id",
-      "dataset",
+      "credentials_json",
       "region",
-      "bucket",
-      "credentials_json"
+      "dataset",
+      "bucket"
     ],
     "title": "SQL Connection"
   },
