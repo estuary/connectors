@@ -22,14 +22,14 @@ import (
 // config represents the endpoint configuration for snowflake.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Account   string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier."`
-	Host      string `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)."`
-	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name."`
-	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true"`
-	Database  string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to."`
-	Schema    string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use."`
-	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries."`
-	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions."`
+	Host      string `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0"`
+	Account   string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier." jsonschema_extras:"order=1"`
+	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=2"`
+	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=3"`
+	Database  string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=4"`
+	Schema    string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use." jsonschema_extras:"order=5"`
+	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries." jsonschema_extras:"order=6"`
+	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=7"`
 }
 
 func (c *config) asSnowflakeConfig() sf.Config {
