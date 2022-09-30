@@ -155,6 +155,7 @@ func (s *captureState) BindingIndex(resourcePath string) (uint32, bool) {
 	if state := s.Resources[resourcePath]; state != nil {
 		return state.bindingIndex, true
 	}
+	// Return UINT32_MAX just to be extra clear that we're not capturing this resource
 	return ^uint32(0), false
 }
 

@@ -24,7 +24,7 @@ type config struct {
 	CredentialsJSON string `json:"googleCredentials" jsonschema:"title=Credentials,description=Google Cloud Service Account JSON credentials." jsonschema_extras:"secret=true,multiline=true"`
 
 	// Optional name of the database to capture from
-	DatabasePath string `json:"database" jsonschema:"title=Database,description=Optional name of the database to capture from. Leave blank to autodetect. Typically \"projects/$PROJECTID/databases/(default)\"."`
+	DatabasePath string `json:"database,omitempty" jsonschema:"title=Database,description=Optional name of the database to capture from. Leave blank to autodetect. Typically \"projects/$PROJECTID/databases/(default)\"."`
 }
 
 var databasePathRe = regexp.MustCompile(`^projects/[^/]+/databases/[^/]+$`)
