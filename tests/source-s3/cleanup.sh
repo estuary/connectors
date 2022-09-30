@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ -n "$TEST_BUCKET" ]]; then
-    echo "Cleaning up bucket: '$TEST_BUCKET'"
-    aws s3 rb "s3://${TEST_BUCKET}" --force
+if [[ -n "$TEST_STREAM" ]]; then
+    echo "Cleaning up bucket: '$TEST_STREAM'"
+    aws s3 rb "s3://${TEST_STREAM}" --force
 fi
 
