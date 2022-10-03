@@ -20,6 +20,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type tunnelConfig struct {
+	SshEndpoint string `json:"ssh_endpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling, in the form of ssh://user@hostname[:port]"`
+	PrivateKey  string `json:"private_key" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
+}
+
 // config represents the endpoint configuration for postgres.
 type config struct {
 	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database."`
@@ -27,6 +32,8 @@ type config struct {
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true"`
 	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to."`
 	Schema   string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables"`
+
+	NetworkTunnel tunnelConfig `json:"networkTunnel" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 // Validate the configuration.
