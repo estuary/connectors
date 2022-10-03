@@ -20,6 +20,7 @@ COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-postgres-rc    ./materialize-postgres-rc
 COPY materialize-sql         ./materialize-sql
 COPY testsupport             ./testsupport
+COPY go-network-tunnel       ./go-network-tunnel
 
 # Test and build the connector.
 RUN go test  -tags nozstd,nodb -v ./materialize-postgres-rc/...

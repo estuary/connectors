@@ -5,11 +5,13 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"text/template"
 	"time"
 
+	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -33,7 +35,7 @@ type config struct {
 	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to."`
 	Schema   string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables"`
 
-	NetworkTunnel tunnelConfig `json:"networkTunnel" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 // Validate the configuration.
@@ -54,6 +56,11 @@ func (c *config) Validate() error {
 // ToURI converts the Config to a DSN string.
 func (c *config) ToURI() string {
 	var address = c.Address
+	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
+	// to address through the bastion server, so we use the tunnel's address
+	if c.NetworkTunnel != nil && c.NetworkTunnel.SshEndpoint != "" {
+		address = "localhost:5432"
+	}
 	var uri = url.URL{
 		Scheme: "postgres",
 		Host:   address,
@@ -198,6 +205,8 @@ type transactor struct {
 		fence sql.Fence
 	}
 	bindings []*binding
+
+	tunnel networkTunnel.SshTunnel
 }
 
 func newTransactor(
@@ -209,11 +218,40 @@ func newTransactor(
 	var d = &transactor{}
 	d.store.fence = fence
 
+	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
+	var cfg = ep.Config.(config)
+	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshEndpoint != "" {
+		host, port, err := net.SplitHostPort(cfg.Address)
+		if err != nil {
+			return nil, fmt.Errorf("splitting address to host and port: %w", err)
+		}
+
+		var sshConfig = &networkTunnel.SshConfig{
+			SshEndpoint: cfg.NetworkTunnel.SshEndpoint,
+			PrivateKey:  []byte(cfg.NetworkTunnel.PrivateKey),
+			ForwardHost: host,
+			ForwardPort: port,
+			LocalPort:   "5432",
+		}
+		d.tunnel = sshConfig.CreateTunnel()
+
+		// TODO: better handle synchronisation of network-tunnel
+		go func() {
+			out, err := d.tunnel.Start()
+
+			if err != nil {
+				log.WithField("error", err).WithField("output", string(out)).Error("network tunnel error")
+			} else {
+				log.WithField("error", string(out)).Debug("network tunnel output")
+			}
+		}()
+	}
+
 	// Establish connections.
-	if d.load.conn, err = pgx.Connect(ctx, ep.Config.(*config).ToURI()); err != nil {
+	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
 		return nil, fmt.Errorf("load pgx.Connect: %w", err)
 	}
-	if d.store.conn, err = pgx.Connect(ctx, ep.Config.(*config).ToURI()); err != nil {
+	if d.store.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
 		return nil, fmt.Errorf("store pgx.Connect: %w", err)
 	}
 

@@ -29,6 +29,30 @@
         "title": "Database Schema",
         "description": "Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables",
         "default": "public"
+      },
+      "networkTunnel": {
+        "properties": {
+          "ssh_endpoint": {
+            "type": "string",
+            "title": "SSH Endpoint",
+            "description": "Endpoint of the remote SSH server that supports tunneling"
+          },
+          "private_key": {
+            "type": "string",
+            "title": "SSH Private Key",
+            "description": "Private key to connect to the remote SSH server.",
+            "multiline": true,
+            "secret": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ssh_endpoint",
+          "private_key"
+        ],
+        "title": "Network Tunnel",
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
       }
     },
     "type": "object",
