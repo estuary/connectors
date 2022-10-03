@@ -17,13 +17,13 @@ type SshConfig struct {
 }
 
 type SshTunnel struct {
-	Config SshConfig
+	Config *SshConfig
 	ctx    context.Context
 	cmd    *exec.Cmd
 	cancel context.CancelFunc
 }
 
-func (c SshConfig) CreateTunnel() SshTunnel {
+func (c *SshConfig) CreateTunnel() SshTunnel {
 	var ctx, cancel = context.WithCancel(context.Background())
 	return SshTunnel{
 		Config: c,
@@ -33,7 +33,8 @@ func (c SshConfig) CreateTunnel() SshTunnel {
 	}
 }
 
-func (t *SshTunnel) Start() ([]byte, error) {
+// TODO: wait until READY signal from tunnel
+func (t SshTunnel) Start() ([]byte, error) {
 	if t.cmd != nil {
 		return nil, errors.New("This tunnel has already been started.")
 	}
@@ -60,6 +61,6 @@ func (t *SshTunnel) Start() ([]byte, error) {
 	return t.cmd.CombinedOutput()
 }
 
-func (t *SshTunnel) Stop() {
+func (t SshTunnel) Stop() {
 	t.cancel()
 }
