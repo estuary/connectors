@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,16 +20,29 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+type Options struct {
+	LogLevel string `long:"log.level" description:"Log level, one of: error, warn, info, debug, trace" default:"info"`
+}
+
 // RunMain is the boilerplate main function of a materialization connector.
 func RunMain(srv pm.DriverServer) {
-	var parser = flags.NewParser(nil, flags.Default)
+	var opts = &Options{""}
+	var parser = flags.NewParser(opts, flags.Default)
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
+	// TODO: use TCP server instead of os.Stdin and os.Stdout
+	var server, err = net.Listen("tcp", ":2222")
+	conn, err := server.Accept()
+	if err != nil {
+		logrus.WithFields(logrus.Fields{"error": err}).
+			Error("failed to accept connection on tcp server")
+		os.Exit(1)
+	}
 	var cmd = cmdCommon{
 		ctx: ctx,
 		srv: srv,
-		r:   bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
-		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+		r:   bufio.NewReaderSize(conn, 1<<21), // 2MB buffer.
+		w:   protoio.NewUint32DelimitedWriter(conn, binary.LittleEndian),
 	}
 
 	parser.AddCommand("spec", "Write the connector specification",
@@ -42,7 +56,7 @@ func RunMain(srv pm.DriverServer) {
 	parser.AddCommand("transactions", "Run materialization transactions",
 		"Run a stream of transactions read from stdin", &transactionsCmd{cmd})
 
-	var _, err = parser.Parse()
+	_, err = parser.Parse()
 	if err != nil {
 		os.Exit(1)
 	}
