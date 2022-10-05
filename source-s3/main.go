@@ -223,40 +223,35 @@ func main() {
 			"awsAccessKeyId": {
 				"type":        "string",
 				"title":       "AWS Access Key ID",
-				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
-				"order": 0
+				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads."
 			},
 			"awsSecretAccessKey": {
 				"type":        "string",
 				"title":       "AWS Secret Access Key",
 				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
-				"secret":      true,
-				"order":       1
-			},
-			"region": {
-				"type":        "string",
-				"title":       "AWS Region",
-				"description": "The name of the AWS region where the S3 bucket is located.",
-				"order":       2
+				"secret":      true
 			},
 			"bucket": {
 				"type":        "string",
 				"title":       "Bucket",
-				"description": "Name of the S3 bucket",
-				"order":       3
-			},
-			"prefix": {
-				"type":        "string",
-				"title":       "Prefix",
-				"description": "Prefix within the bucket to capture from.",
-				"order":       4
+				"description": "Name of the S3 bucket"
 			},
 			"matchKeys": {
 				"type":        "string",
 				"title":       "Match Keys",
 				"format":      "regex",
-				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order":       5
+				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files."
+			},
+			"prefix": {
+				"type":        "string",
+				"title":       "Prefix",
+				"description": "Prefix within the bucket to capture from."
+			},
+			"region": {
+				"type":        "string",
+				"title":       "AWS Region",
+				"description": "The name of the AWS region where the S3 bucket is located. \"us-east-1\" is a popular default you can try, if you're unsure what to put here.",
+				"default":     "us-east-1"
 			},
 			"advanced": {
 				"properties": {

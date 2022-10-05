@@ -18,6 +18,7 @@ func main() {
 	airbyte.RunMain(spec, doCheck, doDiscover, doRead)
 }
 
+// TODO: update docs link to kinesis connector-specific docs after they are written
 var spec = airbyte.Spec{
 	SupportsIncremental:           true,
 	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
