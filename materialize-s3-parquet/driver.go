@@ -19,15 +19,15 @@ import (
 )
 
 type config struct {
-	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID" jsonschema_extras:"order=0"`
-	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key" jsonschema_extras:"secret=true,order=1"`
-	Region             string `json:"region" jsonschema:"title=Region" jsonschema_extras:"order=2"`
-	Bucket             string `json:"bucket" jsonschema:"title=Bucket" jsonschema_extras:"order=3"`
+	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID"`
+	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key" jsonschema_extras:"secret=true"`
+	Bucket             string `json:"bucket" jsonschema:"title=Bucket"`
+	Region             string `json:"region" jsonschema:"title=Region"`
 	// The driver batches materialization results to local files first,
 	// and uploads the local files to cloud (S3) on a schedule specified by
 	// UploadIntervalInSeconds, which is the mimimal wait time (in seconds) between two
 	// consecutive upload-to-cloud actions.
-	UploadIntervalInSeconds int            `json:"uploadIntervalInSeconds" jsonschema:"title=Upload Interval in Seconds" jsonschema_extras:"order=4"`
+	UploadIntervalInSeconds int            `json:"uploadIntervalInSeconds" jsonschema:"title=Upload Interval in Seconds"`
 	Advanced                advancedConfig `json:"advanced,omitempty" jsonschema_extras:"advanced=true"`
 }
 

@@ -6,20 +6,17 @@
       "endpoint": {
         "type": "string",
         "title": "Endpoint",
-        "description": "Endpoint host or URL. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
-        "order": "0"
+        "description": "Endpoint host or URL. If using Elastic Cloud"
       },
       "username": {
         "type": "string",
         "title": "Username",
-        "description": "User to connect to the endpoint.",
-        "order": "1"
+        "description": "User to connect to the endpoint."
       },
       "password": {
         "type": "string",
         "title": "Password",
         "description": "Password to connect to the endpoint.",
-        "order": "2",
         "secret": true
       }
     },
