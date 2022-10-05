@@ -148,32 +148,28 @@ func main() {
 			"bucket"
 		],
 		"properties": {
+			"bucket": {
+				"type":        "string",
+				"title":       "Bucket",
+				"description": "Name of the Google Cloud Storage bucket"
+			},
 			"googleCredentials": {
 				"type":        "string",
 				"title":       "Google Service Account",
 				"description": "Service account JSON key to use as Application Default Credentials",
 				"multiline":   true,
-				"secret":      true,
-				"order":       0
-			},
-			"bucket": {
-				"type":        "string",
-				"title":       "Bucket",
-				"description": "Name of the Google Cloud Storage bucket",
-				"order":       1
-			},
-			"prefix": {
-				"type":        "string",
-				"title":       "Prefix",
-				"description": "Prefix within the bucket to capture from",
-				"order":       2
+				"secret":      true
 			},
 			"matchKeys": {
 				"type":        "string",
 				"title":       "Match Keys",
 				"format":      "regex",
-				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose key (relative to the prefix) matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order":       3
+				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose key (relative to the prefix) matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files."
+			},
+			"prefix": {
+				"type":        "string",
+				"title":       "Prefix",
+				"description": "Prefix within the bucket to capture from"
 			},
 			"advanced": {
 				"properties": {

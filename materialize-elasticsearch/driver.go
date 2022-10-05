@@ -19,9 +19,9 @@ import (
 )
 
 type config struct {
-	Endpoint string `json:"endpoint" jsonschema:"title=Endpoint,description=Endpoint host or URL. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT" jsonschema_extras:"order=0"`
-	Username string `json:"username,omitempty" jsonschema:"title=Username,description=User to connect to the endpoint." jsonschema_extras:"order=1"`
-	Password string `json:"password,omitempty" jsonschema:"title=Password,description=Password to connect to the endpoint." jsonschema_extras:"secret=true,order=2"`
+	Endpoint string `json:"endpoint" jsonschema:"title=Endpoint,description=Endpoint host or URL. If using Elastic Cloud, this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT"`
+	Username string `json:"username,omitempty" jsonschema:"title=Username,description=User to connect to the endpoint."`
+	Password string `json:"password,omitempty" jsonschema:"title=Password,description=Password to connect to the endpoint." jsonschema_extras:"secret=true"`
 }
 
 func (c config) Validate() error {
