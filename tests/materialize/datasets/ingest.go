@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"time"
 
@@ -38,7 +39,11 @@ type pushRpc struct {
 }
 
 func newPushRpc(ctx context.Context, serverAddr string) (*pushRpc, error) {
-	if conn, err := grpc.Dial(serverAddr, grpc.WithInsecure()); err != nil {
+	dialer := func(addr string, t time.Duration) (net.Conn, error) {
+		return net.Dial("unix", addr)
+	}
+
+	if conn, err := grpc.Dial(serverAddr, grpc.WithInsecure(), grpc.WithDialer(dialer)); err != nil {
 		return nil, fmt.Errorf("fail to dial: %w", err)
 	} else if rpc, err := capture.NewRuntimeClient(conn).Push(ctx); err != nil {
 		return nil, fmt.Errorf("failed to create Push rpc: %w", err)

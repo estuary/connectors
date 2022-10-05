@@ -106,8 +106,10 @@ jobs:
           VERSION=$(cat ${{ matrix.connector }}/VERSION | tr -d '\n')
           echo ::set-output name=version::${VERSION}
 
-      - name: Download latest Flow release binaries
-        run: ./fetch-flow.sh
+      - name: Download latest Flow release binaries and add them to $PATH
+        run: |
+          ./fetch-flow.sh
+          echo "${PWD}/flow-bin" >> $GITHUB_PATH
 
       - name: Install kafkactl
         if: matrix.connector == 'source-kafka'
