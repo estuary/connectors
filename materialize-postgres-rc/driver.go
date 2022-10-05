@@ -245,7 +245,7 @@ func newTransactor(
 	var d = &transactor{}
 	d.store.fence = fence
 
-	var cfg = ep.Config.(config)
+	var cfg = ep.Config.(*config)
 	// Establish connections.
 	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
 		return nil, fmt.Errorf("load pgx.Connect: %w", err)
