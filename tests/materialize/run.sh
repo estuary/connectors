@@ -2,10 +2,10 @@
 
 set -e
 
-# Flow image / container name used in testing.
-FLOW_IMAGE="ghcr.io/estuary/flow:dev"
-# Prefix of the containers running flowctl-admin via Flow image.
-FLOW_CONTAINER_NAME_PREFIX=flowctl-${CONNECTOR}
+command -v flowctl-admin >/dev/null 2>&1 || { echo >&2 "flowctl-admin must be available via PATH, aborting."; exit 1; }
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
 
 # The docker image of the connector to be tested.
 # The connector image needs to be available to envsubst.
@@ -13,12 +13,6 @@ export CONNECTOR_IMAGE="ghcr.io/estuary/${CONNECTOR}:${VERSION}"
 
 function bail() {
     echo "$@" 1>&2
-    # Output logs for debugging if the execution fails for any reason.
-    for name in $(docker ps -a -f name=${FLOW_CONTAINER_NAME_PREFIX} -q); do
-        echo -e "\nlogs from container ${name}"
-        docker logs "${name}"
-    done
-
     echo "test failed..."
     exit 1
 }
@@ -27,26 +21,36 @@ export -f bail
 test -n "${CONNECTOR}" || bail "must specify CONNECTOR env variable"
 test -n "${VERSION}" || bail "must specify VERSION env variable"
 
-# The directory of the connectors github repo.
-ROOT_DIR="$(git rev-parse --show-toplevel)"
+# Directory under which the test runs.
+TEST_DIR=".build/tests/${CONNECTOR}"
 
 # The dir of materialize tests.
-TEST_SCRIPTS_DIR="${ROOT_DIR}/tests/materialize"
+TEST_BASE_DIR="${ROOT_DIR}/tests/materialize"
+
+# The dir containing various helper scripts.
+TEST_SCRIPT_DIR="${ROOT_DIR}/tests/materialize/flowctl-admin"
 
 # The dir containing test scripts of the connector.
-CONNECTOR_TEST_SCRIPTS_DIR="${TEST_SCRIPTS_DIR}/${CONNECTOR}"
+CONNECTOR_TEST_SCRIPTS_DIR="${TEST_BASE_DIR}/${CONNECTOR}"
 
 # Export envvars to be shared by all scripts.
 
-# A directory for hosting temp files generated during the test executions.
-export TEST_DIR="$(mktemp -d -t "${CONNECTOR}"-XXXXXX)"
+# Build ID to use for tests.
+export BUILD_ID=run-test-"${CONNECTOR}"
 
-# Broker and onsumer addresses of Flow services.
-export BROKER_ADDRESS=localhost:8080
-export CONSUMER_ADDRESS=localhost:9000
+# A directory for hosting temp files generated during the test executions.
+export TEST_DIR="$(mktemp -d /tmp/"${CONNECTOR}"-XXXXXX)"
+
+# `flowctl-admin` commands which interact with the data plane look for *_ADDRESS
+# variables, which are created by the temp-data-plane we're about to start.
+export BROKER_ADDRESS=unix://localhost${TEST_DIR}/gazette.sock
+export CONSUMER_ADDRESS=unix://localhost${TEST_DIR}/consumer.sock
+
+# Used for the ingestion client to build a unix socket dialer.
+export INGEST_SOCKET_PATH=${TEST_DIR}/consumer.sock
 
 # The path to the data ingestion go script.
-export DATA_INGEST_SCRIPT_PATH="${TEST_SCRIPTS_DIR}/datasets/ingest.go"
+export DATA_INGEST_SCRIPT_PATH="${TEST_BASE_DIR}/datasets/ingest.go"
 
 # The file name of catalog specification.
 # The file is located in ${TEST_DIR}
@@ -75,39 +79,6 @@ export BINDING_NUM_SIMPLE=0
 export BINDING_NUM_DUPLICATED_KEYS=1
 export BINDING_NUM_MULTIPLE_DATATYPES=2
 
-# Util function to run flowctl-admin command via docker.
-function runFlowctlAdmin() {
-    local script="$1"
-    local args=$2
-    local detached
-    if [[ "$3" == true ]]; then
-      detached="-d"
-    fi
-
-    local test_scripts_dir_target=/home/flow/scripts
-    # Run as root, not the flow user, since the user within the container needs to access the
-    # docker socket.
-
-    docker run ${detached:+"$detached"} \
-        --name "${FLOW_CONTAINER_NAME_PREFIX}-${script}-${EPOCHREALTIME}" \
-        --user 0  \
-        --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-        --mount type=bind,source="${TEST_SCRIPTS_DIR}",target=${test_scripts_dir_target} \
-        --mount type=bind,source="${TEST_DIR}",target=${TEST_DIR} \
-        --mount type=bind,source=/tmp,target=/tmp \
-        --env BROKER_ADDRESS="http://${BROKER_ADDRESS}" \
-        --env CONSUMER_ADDRESS="http://${CONSUMER_ADDRESS}" \
-        --env TEST_DIR \
-        --env BUILDS_ROOT="file://${TEST_DIR}/build/" \
-        --env BUILD_ID=run-test-"${CONNECTOR}" \
-        --env CATALOG \
-        --network=host \
-        "${FLOW_IMAGE}" \
-        "${test_scripts_dir_target}/flowctl-admin/${script}" \
-        "${args}" \
-        >/dev/null 2>&1
-}
-
 # Util function for running the `flowctl-admin combine` to combine the results.
 function combineResults() {
     # The collection name specified in the catalog.
@@ -116,22 +87,10 @@ function combineResults() {
     local input_file_name="$2"
     # The output jsonl file of the combined results.
     local output_file_name="$3"
-    runFlowctlAdmin "combine.sh" "${collection} ${input_file_name} ${output_file_name}" false || bail "combine results failed."
+    source "${TEST_SCRIPT_DIR}/combine.sh" "${collection} ${input_file_name} ${output_file_name}" false || bail "combine results failed."
 }
 # Export the function to be avialble to connector-specific testing scripts.
 export -f combineResults
-
-function cleanup() {
-    echo -e "\nexecuting cleanup"
-
-    runFlowctlAdmin delete.sh "" false || true
-
-    source "${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" || true
-    for name in $(docker ps -a -f name="${FLOW_CONTAINER_NAME_PREFIX}" -q); do
-        docker rm -f "${name}"
-    done
-}
-trap cleanup EXIT
 
 echo -e "\nexecuting setup"
 source "${CONNECTOR_TEST_SCRIPTS_DIR}/setup.sh" || bail "setup failed"
@@ -149,10 +108,21 @@ envsubst < ${ROOT_DIR}/tests/materialize/flow.json.template > "${TEST_DIR}/${CAT
     || bail "generating ${CATALOG} failed."
 
 echo -e "\nstarting temp data plane"
-runFlowctlAdmin temp-data-plane.sh "" true || bail "starting temp data plane."
+# Start an empty local data plane within our TESTDIR as a background job.
+# --tempdir to use our known TESTDIR rather than creating a new temporary directory.
+# --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
+flowctl-admin temp-data-plane \
+    --log.level info \
+    --network=host \
+    --tempdir ${TEST_DIR} \
+    --unix-sockets \
+    &
+DATA_PLANE_PID=$!
+# Arrange to stop the data plane on exit.
+trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" EXIT
 
 echo -e "\nbuilding and activating test catalog"
-runFlowctlAdmin build-and-activate.sh "" false || bail "building and activating test catalog failed."
+source "${TEST_SCRIPT_DIR}/build-and-activate.sh" false || bail "building and activating test catalog failed."
 
 echo -e "\nexecuting ingest-data"
 source "${CONNECTOR_TEST_SCRIPTS_DIR}/ingest-data.sh" || bail "ingest data failed."

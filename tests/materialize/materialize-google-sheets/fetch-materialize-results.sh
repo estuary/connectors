@@ -19,7 +19,7 @@ function exportToJsonl() {
     export SPREADSHEET_ID="1aki_PfFU-RCXCvm4-U0O4QoElZBIC7F9lfR-RBG0CTc"
     export SHEET_NAME="$1"
 
-    go run ${TEST_SCRIPTS_DIR}/materialize-google-sheets/fetch-sheets.go
+    go run ${TEST_BASE_DIR}/materialize-google-sheets/fetch-sheets.go
 }
 
 exportToJsonl "Simple" > "${TEST_DIR}/${result_dir}/simple.jsonl"
