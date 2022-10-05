@@ -22,9 +22,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type sshForwarding struct {
+	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling, in the form of ssh://user@hostname[:port]"`
+	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
+}
+
 type tunnelConfig struct {
-	SshEndpoint string `json:"ssh_endpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling, in the form of ssh://user@hostname[:port]"`
-	PrivateKey  string `json:"private_key" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
+	SshForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
 }
 
 // config represents the endpoint configuration for postgres.
@@ -58,7 +62,7 @@ func (c *config) ToURI() string {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
 	// to address through the bastion server, so we use the tunnel's address
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SshEndpoint != "" {
+	if c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "" {
 		address = "localhost:5432"
 	}
 	var uri = url.URL{
@@ -130,6 +134,29 @@ func newPostgresDriver() pm.DriverServer {
 				metaBase = append(metaBase, cfg.Schema)
 			}
 			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
+
+			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
+			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
+				host, port, err := net.SplitHostPort(cfg.Address)
+				if err != nil {
+					return nil, fmt.Errorf("splitting address to host and port: %w", err)
+				}
+
+				var sshConfig = &networkTunnel.SshConfig{
+					SshEndpoint: cfg.NetworkTunnel.SshForwarding.SshEndpoint,
+					PrivateKey:  []byte(cfg.NetworkTunnel.SshForwarding.PrivateKey),
+					ForwardHost: host,
+					ForwardPort: port,
+					LocalPort:   "5432",
+				}
+				var tunnel = sshConfig.CreateTunnel()
+
+				err = tunnel.Start()
+
+				if err != nil {
+					log.WithField("error", err).Error("network tunnel error")
+				}
+			}
 
 			return &sql.Endpoint{
 				Config:              cfg,
@@ -218,35 +245,7 @@ func newTransactor(
 	var d = &transactor{}
 	d.store.fence = fence
 
-	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	var cfg = ep.Config.(config)
-	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshEndpoint != "" {
-		host, port, err := net.SplitHostPort(cfg.Address)
-		if err != nil {
-			return nil, fmt.Errorf("splitting address to host and port: %w", err)
-		}
-
-		var sshConfig = &networkTunnel.SshConfig{
-			SshEndpoint: cfg.NetworkTunnel.SshEndpoint,
-			PrivateKey:  []byte(cfg.NetworkTunnel.PrivateKey),
-			ForwardHost: host,
-			ForwardPort: port,
-			LocalPort:   "5432",
-		}
-		d.tunnel = sshConfig.CreateTunnel()
-
-		// TODO: better handle synchronisation of network-tunnel
-		go func() {
-			out, err := d.tunnel.Start()
-
-			if err != nil {
-				log.WithField("error", err).WithField("output", string(out)).Error("network tunnel error")
-			} else {
-				log.WithField("error", string(out)).Debug("network tunnel output")
-			}
-		}()
-	}
-
 	// Establish connections.
 	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
 		return nil, fmt.Errorf("load pgx.Connect: %w", err)
