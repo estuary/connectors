@@ -15,7 +15,8 @@ result_dir="$1"
 sleep 2
 
 function exportToJsonl() {
-  docker exec -e PGUSER=$PGUSER \
+  docker exec \
+    -e PGUSER=$PGUSER \
     -e PGPASSWORD=$PGPASSWORD \
     -e PGDATABASE=$PGDATABASE \
     materialize-postgres-rc-postgres-1 psql \

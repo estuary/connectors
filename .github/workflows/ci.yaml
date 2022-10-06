@@ -149,6 +149,14 @@ jobs:
           driver-opts: |
             network=host
 
+      - name: Create docker network flow-test
+        run: docker network create flow-test
+
+      - name: Start Dockerized test infrastructure
+        if: matrix.connector == 'source-postgres' || matrix.connector == 'source-mysql'
+        run: |
+          docker-compose --file ${{ matrix.connector }}/docker-compose.yaml up --detach
+
       - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v2
         with:
@@ -165,9 +173,6 @@ jobs:
         run: |
           docker-compose --file infra/docker-compose.yaml up --detach zookeeper
           docker-compose --file infra/docker-compose.yaml up --detach kafka
-
-      - name: Create docker network flow-test
-        run: docker network create flow-test
 
       - name: Source connector ${{ matrix.connector }} integration tests
         if: |
@@ -187,17 +192,6 @@ jobs:
           AWS_DEFAULT_OUTPUT: json
           ROCKSET_API_KEY: ${{ secrets.ROCKSET_API_KEY }}
           MYSQL_DATABASE: test
-          MYSQL_HOST: 127.0.0.1
-          MYSQL_PORT: 3306
-          MYSQL_USER: root
-          MYSQL_PWD: flow
-          MYSQL_SERVERID: 12345
-          # Compare to: https://www.postgresql.org/docs/current/libpq-envars.html
-          PGDATABASE: flow
-          PGHOST: localhost
-          PGPASSWORD: flow
-          PGPORT: 5432
-          PGUSER: flow
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
 
