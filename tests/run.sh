@@ -58,9 +58,9 @@ export CONSUMER_ADDRESS=unix://localhost${TESTDIR}/consumer.sock
 # --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
 flowctl-admin temp-data-plane \
     --log.level info \
-    --network=host \
     --poll \
     --sigterm \
+    --network "flow-test" \
     --tempdir ${TESTDIR} \
     --unix-sockets \
     &
@@ -90,7 +90,7 @@ trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${C
 export ID_TYPE="${ID_TYPE:-integer}"
 
 # Verify discover works
-flowctl-admin api discover --image="${CONNECTOR_IMAGE}" --network=host --log.level=debug --config=<(echo ${CONNECTOR_CONFIG}) > ${TESTDIR}/discover_output.json || bail "Discover failed."
+flowctl-admin api discover --image="${CONNECTOR_IMAGE}" --network "flow-test" --log.level=debug --config=<(echo ${CONNECTOR_CONFIG}) > ${TESTDIR}/discover_output.json || bail "Discover failed."
 cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" > ${TESTDIR}/bindings.json
 
 if [[ -f "tests/${CONNECTOR}/bindings.json" ]]; then
@@ -101,10 +101,10 @@ fi
 cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
 
 # Build the catalog.
-flowctl-admin api build --directory ${TESTDIR}/builds --build-id test-build-id --source ${CATALOG_SOURCE} --ts-package --network=host || bail "Build failed."
+flowctl-admin api build --directory ${TESTDIR}/builds --build-id test-build-id --source ${CATALOG_SOURCE} --network "flow-test" --ts-package || bail "Build failed."
 
 # Activate the catalog.
-flowctl-admin api activate --build-id test-build-id --all --network=host --log.level info || bail "Activate failed."
+flowctl-admin api activate --build-id test-build-id --all --network "flow-test" --log.level info || bail "Activate failed."
 # Wait for a data-flow pass to finish.
 flowctl-admin api await --build-id test-build-id --log.level info || bail "Await failed."
 # Read out materialization results.

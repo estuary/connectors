@@ -138,16 +138,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
 
-      - name: Start ${{ matrix.connector }} Test Database
-        if: |
-          contains(fromJson('[
-            "materialize-postgres-rc",
-            "source-mysql",
-            "source-postgres"
-            ]'), matrix.connector)
-        run: |
-          docker-compose --file ${{ matrix.connector }}/docker-compose.yaml up --detach
-
       - name: Login to GitHub package docker registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | \
@@ -175,6 +165,9 @@ jobs:
         run: |
           docker-compose --file infra/docker-compose.yaml up --detach zookeeper
           docker-compose --file infra/docker-compose.yaml up --detach kafka
+
+      - name: Create docker network flow-test
+        run: docker network create flow-test
 
       - name: Source connector ${{ matrix.connector }} integration tests
         if: |
@@ -218,12 +211,6 @@ jobs:
             ]'), matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
-          # Compare to: https://www.postgresql.org/docs/current/libpq-envars.html
-          PGDATABASE: flow
-          PGHOST: localhost
-          PGPASSWORD: flow
-          PGPORT: 5432
-          PGUSER: flow
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
