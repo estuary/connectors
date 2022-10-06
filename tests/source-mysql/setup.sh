@@ -4,12 +4,14 @@ set -e
 export TEST_STREAM="estuary_test_$(shuf -zer -n6 {a..z} | tr -d '\0')"
 export RESOURCE="{ \"namespace\": \"test\", \"stream\": \"${TEST_STREAM}\" }"
 
+export MYSQL_DATABASE=test
 export MYSQL_HOST="${MYSQL_HOST:=source-mysql-db-1.flow-test}"
 export MYSQL_PORT="${MYSQL_PORT:=3306}"
-export MYSQL_USER="${MYSQL_USER:=flow}"
+export MYSQL_USER="${MYSQL_USER:=root}"
 export MYSQL_PASSWORD="${MYSQL_PASSWORD:=flow}"
 
 docker compose -f source-mysql/docker-compose.yaml up --detach
+sleep 5
 
 config_json_template='{
     "address": "$MYSQL_HOST:$MYSQL_PORT",
@@ -26,7 +28,13 @@ function sql {
     echo "mysql> " $@
     echo "$@" | docker exec -i \
       source-mysql-db-1 \
-      mysql $MYSQL_DATABASE --user=$MYSQL_USER --local-infile=1
+      mysql $MYSQL_DATABASE \
+      --user=$MYSQL_USER \
+      --port=$MYSQL_PORT \
+      --host=127.0.0.1 \
+      --protocol=tcp \
+      --password=$MYSQL_PASSWORD \
+      --local-infile=1
 }
 
 sql "DROP TABLE IF EXISTS test.${TEST_STREAM};"
