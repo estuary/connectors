@@ -6,9 +6,10 @@ services:
     command: ["postgres"]
     environment: {"POSTGRES_DB": "flow", "POSTGRES_USER": "flow", "POSTGRES_PASSWORD": "flow"}
     networks:
-      - "flow-test"
+      - flow-test
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
 networks:
   flow-test:
     name: flow-test

@@ -4,13 +4,25 @@ services:
   postgres:
     image: 'postgres:latest'
     command: ["postgres", "-c", "wal_level=logical"]
+    ports:
+      - "5432:5432"
     environment: {"POSTGRES_DB": "flow", "POSTGRES_USER": "flow", "POSTGRES_PASSWORD": "flow"}
-    network_mode: "host"
+    networks:
+      - flow-test
     volumes:
       - type: bind
         source: ./docker-entrypoint-initdb.d/init-user-db.sh
         target: /docker-entrypoint-initdb.d/init-user-db.sh
+      - type: bind
+        source: ../tests/files/b.csv
+        target: /b.csv
       - postgres_data:/var/lib/postgresql/data
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
 
 volumes:
   postgres_data: {}
+
