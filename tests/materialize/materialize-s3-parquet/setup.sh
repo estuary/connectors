@@ -18,8 +18,8 @@ function startLocalStack() {
     docker run -d \
       --rm \
       --user 0 \
+      --network "flow-test" \
       --name="${LOCALSTACK_CONTAINER_NAME}" \
-      --network=host \
       --env "SERVICES=s3" \
       localstack/localstack
 

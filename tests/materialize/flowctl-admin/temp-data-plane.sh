@@ -6,6 +6,6 @@ echo "starting a temp data plane via temp-data-plane.sh"
 
 flowctl-admin temp-data-plane \
     --sigterm \
+    --network "flow-test" \
     --tempdir "${TEST_DIR}" \
-    --network host \
     --log.level info
