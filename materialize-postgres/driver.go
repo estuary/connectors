@@ -485,5 +485,5 @@ func buildSQL(gen *sqlDriver.Generator, binding int, table *sqlDriver.Table, fie
 const tempTableName = "flow_load_key_tmp"
 
 func main() {
-	boilerplate.RunMain(newPostgresDriver())
+	boilerplate.RunMain(newPostgresDriver(), false)
 }

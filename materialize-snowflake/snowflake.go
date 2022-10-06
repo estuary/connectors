@@ -611,4 +611,4 @@ const createStageSQL = `
 			COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored documents'
 		;`
 
-func main() { boilerplate.RunMain(newSnowflakeDriver()) }
+func main() { boilerplate.RunMain(newSnowflakeDriver(), false) }

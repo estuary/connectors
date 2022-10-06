@@ -364,4 +364,4 @@ func documentId(tuple tuple.Tuple) string {
 
 func (t *transactor) Destroy() {}
 
-func main() { boilerplate.RunMain(new(driver)) }
+func main() { boilerplate.RunMain(new(driver), false) }

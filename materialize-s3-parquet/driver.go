@@ -362,4 +362,4 @@ func (t *transactor) Destroy() {
 	t.fileProcessor.Destroy()
 }
 
-func main() { boilerplate.RunMain(new(driver)) }
+func main() { boilerplate.RunMain(new(driver), false) }
