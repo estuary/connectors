@@ -30,14 +30,19 @@ func RunMain(srv pm.DriverServer) {
 	var parser = flags.NewParser(opts, flags.Default)
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
-	// TODO: use TCP server instead of os.Stdin and os.Stdout
-	var server, err = net.Listen("tcp", ":2222")
-	conn, err := server.Accept()
-	if err != nil {
+	var conn net.Conn
+	if server, err := net.Listen("tcp", ":2222"); err != nil {
 		logrus.WithFields(logrus.Fields{"error": err}).
-			Error("failed to accept connection on tcp server")
+			Error("failed to start tcp server")
 		os.Exit(1)
+	} else if conn, err = server.Accept(); err != nil {
+		if err != nil {
+			logrus.WithFields(logrus.Fields{"error": err}).
+				Error("failed to accept connection on tcp server")
+			os.Exit(1)
+		}
 	}
+
 	var cmd = cmdCommon{
 		ctx: ctx,
 		srv: srv,
@@ -56,7 +61,7 @@ func RunMain(srv pm.DriverServer) {
 	parser.AddCommand("transactions", "Run materialization transactions",
 		"Run a stream of transactions read from stdin", &transactionsCmd{cmd})
 
-	_, err = parser.Parse()
+	_, err := parser.Parse()
 	if err != nil {
 		os.Exit(1)
 	}

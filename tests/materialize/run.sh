@@ -113,7 +113,7 @@ echo -e "\nstarting temp data plane"
 # --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
 flowctl-admin temp-data-plane \
     --log.level info \
-    --network=host \
+    --network "flow-test" \
     --tempdir ${TEST_DIR} \
     --unix-sockets \
     &
