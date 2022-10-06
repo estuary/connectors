@@ -423,5 +423,5 @@ func (d *transactor) Destroy() {
 }
 
 func main() {
-	boilerplate.RunMain(newPostgresDriver())
+	boilerplate.RunMain(newPostgresDriver(), true)
 }

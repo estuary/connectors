@@ -265,4 +265,4 @@ func backoff(attempt int) time.Duration {
 	}
 }
 
-func main() { boilerplate.RunMain(new(driver)) }
+func main() { boilerplate.RunMain(new(driver), false) }

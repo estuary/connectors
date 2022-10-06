@@ -308,4 +308,4 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 	return pm.RunTransactions(stream, transactor, logrus.NewEntry(logrus.StandardLogger()))
 }
 
-func main() { boilerplate.RunMain(new(driver)) }
+func main() { boilerplate.RunMain(new(driver), false) }
