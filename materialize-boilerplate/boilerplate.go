@@ -25,29 +25,33 @@ type Options struct {
 }
 
 // RunMain is the boilerplate main function of a materialization connector.
-func RunMain(srv pm.DriverServer) {
+func RunMain(srv pm.DriverServer, tcpMode bool) {
 	var opts = &Options{""}
 	var parser = flags.NewParser(opts, flags.Default)
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
-	var conn net.Conn
-	if server, err := net.Listen("tcp", ":2222"); err != nil {
-		logrus.WithFields(logrus.Fields{"error": err}).
-			Error("failed to start tcp server")
-		os.Exit(1)
-	} else if conn, err = server.Accept(); err != nil {
-		if err != nil {
-			logrus.WithFields(logrus.Fields{"error": err}).
-				Error("failed to accept connection on tcp server")
-			os.Exit(1)
-		}
-	}
-
 	var cmd = cmdCommon{
 		ctx: ctx,
 		srv: srv,
-		r:   bufio.NewReaderSize(conn, 1<<21), // 2MB buffer.
-		w:   protoio.NewUint32DelimitedWriter(conn, binary.LittleEndian),
+		r:   bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
+		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+	}
+	if tcpMode {
+		var conn net.Conn
+		if server, err := net.Listen("tcp", ":2222"); err != nil {
+			logrus.WithFields(logrus.Fields{"error": err}).
+				Error("failed to start tcp server")
+			os.Exit(1)
+		} else if conn, err = server.Accept(); err != nil {
+			if err != nil {
+				logrus.WithFields(logrus.Fields{"error": err}).
+					Error("failed to accept connection on tcp server")
+				os.Exit(1)
+			}
+		}
+
+		cmd.r = bufio.NewReaderSize(conn, 1<<21)
+		cmd.w = protoio.NewUint32DelimitedWriter(conn, binary.LittleEndian)
 	}
 
 	parser.AddCommand("spec", "Write the connector specification",

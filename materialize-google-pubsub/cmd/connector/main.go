@@ -11,5 +11,5 @@ import (
 func main() {
 	logrus.SetOutput(os.Stderr)
 	logrus.SetLevel(logrus.InfoLevel)
-	boilerplate.RunMain(connector.Driver())
+	boilerplate.RunMain(connector.Driver(), false)
 }
