@@ -34,7 +34,7 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 COPY --from=builder /builder/connector ./connector
-COPY --from=ghcr.io/estuary/network-tunnel /flow-network-tunnel /usr/bin/flow-network-tunnel
+COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
