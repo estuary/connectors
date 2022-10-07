@@ -45,6 +45,9 @@ func (u *S3Uploader) Upload(key, localFileName string, contentType string) error
 // NewS3Uploader creates an uploader for s3 given input configs.
 func NewS3Uploader(cfg config) (*S3Uploader, error) {
 	var c = aws.NewConfig()
+	// We use localstack on a docker network for testing this connector, and so we
+	// need to use path style addressing of S3
+	c.S3ForcePathStyle = aws.Bool(true)
 
 	if cfg.AWSSecretAccessKey != "" {
 		var creds = credentials.NewStaticCredentials(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, "")
