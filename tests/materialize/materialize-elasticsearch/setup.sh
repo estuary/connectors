@@ -18,7 +18,8 @@ function startElasticsearch() {
       --rm \
       --name "${TEST_ES_CONTAINER_NAME}" \
       --env "discovery.type=single-node" \
-      --network=host \
+      --publish 9200:9200 \
+      --network=flow-test \
       docker.elastic.co/elasticsearch/elasticsearch:7.15.2
     for i in {1..20}; do
         # Wait until the elastic search is ready for serving.
