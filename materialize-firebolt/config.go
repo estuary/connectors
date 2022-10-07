@@ -6,15 +6,15 @@ import (
 )
 
 type config struct {
-	EngineURL    string `json:"engine_url" jsonschema:"title=Engine URL,example=engine-name.organisation.region.app.firebolt.io"`
-	Database     string `json:"database" jsonschema:"title=Database"`
-	Username     string `json:"username" jsonschema:"title=Username"`
-	Password     string `json:"password" jsonschema_extras:"secret=true" jsonschema:"title=Password"`
-	AWSKeyId     string `json:"aws_key_id,omitempty" jsonschema:"title=AWS Key ID"`
-	AWSSecretKey string `json:"aws_secret_key,omitempty" jsonschema_extras:"secret=true" jsonschema:"title=AWS Secret Key"`
-	AWSRegion    string `json:"aws_region,omitempty" jsonschema:"title=AWS Region"`
-	S3Bucket     string `json:"s3_bucket" jsonschema:"title=S3 Bucket"`
-	S3Prefix     string `json:"s3_prefix,omitempty" jsonschema:"title=S3 Prefix,default=/"`
+	EngineURL    string `json:"engine_url" jsonschema:"title=Engine URL,example=engine-name.organisation.region.app.firebolt.io" jsonschema_extras:"order=0"`
+	Username     string `json:"username" jsonschema:"title=Username" jsonschema_extras:"order=1"`
+	Password     string `json:"password" jsonschema:"title=Password" jsonschema_extras:"secret=true,order=2"`
+	Database     string `json:"database" jsonschema:"title=Database" jsonschema_extras:"order=3"`
+	S3Bucket     string `json:"s3_bucket" jsonschema:"title=S3 Bucket" jsonschema_extras:"order=4"`
+	S3Prefix     string `json:"s3_prefix,omitempty" jsonschema:"title=S3 Prefix,default=/" jsonschema_extras:"order=5"`
+	AWSKeyId     string `json:"aws_key_id,omitempty" jsonschema:"title=AWS Key ID" jsonschema_extras:"order=6"`
+	AWSSecretKey string `json:"aws_secret_key,omitempty" jsonschema:"title=AWS Secret Key" jsonschema_extras:"secret=true,order=7"`
+	AWSRegion    string `json:"aws_region,omitempty" jsonschema:"title=AWS Region" jsonschema_extras:"order=8"`
 }
 
 func (c config) Validate() error {
