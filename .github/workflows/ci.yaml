@@ -193,7 +193,10 @@ jobs:
           ROCKSET_API_KEY: ${{ secrets.ROCKSET_API_KEY }}
           MYSQL_DATABASE: test
 
-        run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
+        run: |
+          docker ps
+          docker logs infra-kafka-1
+          CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
 
       - name: Materialization connector ${{ matrix.connector }} integration tests
         if: |
