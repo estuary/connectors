@@ -6,28 +6,33 @@
       "awsAccessKeyId": {
         "type": "string",
         "title": "Access Key ID",
-        "description": "AWS credential used to connect to S3."
+        "description": "AWS credential used to connect to S3.",
+        "order": 0
       },
       "awsSecretAccessKey": {
         "type": "string",
         "title": "Secret Access Key",
         "description": "AWS credential used to connect to S3.",
+        "order": 1,
         "secret": true
-      },
-      "bucket": {
-        "type": "string",
-        "title": "Bucket",
-        "description": "Name of the S3 bucket."
       },
       "region": {
         "type": "string",
         "title": "Region",
-        "description": "The name of the AWS region where the S3 bucket is located."
+        "description": "The name of the AWS region where the S3 bucket is located.",
+        "order": 2
+      },
+      "bucket": {
+        "type": "string",
+        "title": "Bucket",
+        "description": "Name of the S3 bucket.",
+        "order": 3
       },
       "uploadIntervalInSeconds": {
         "type": "integer",
         "title": "Upload Interval in Seconds",
-        "description": "Time interval, in seconds, at which to upload data from Flow to S3."
+        "description": "Time interval, in seconds, at which to upload data from Flow to S3.",
+        "order": 4
       },
       "advanced": {
         "properties": {
@@ -47,8 +52,8 @@
     "required": [
       "awsAccessKeyId",
       "awsSecretAccessKey",
-      "bucket",
       "region",
+      "bucket",
       "uploadIntervalInSeconds"
     ],
     "title": "S3 Connection"

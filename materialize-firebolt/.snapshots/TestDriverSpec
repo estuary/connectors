@@ -1,0 +1,104 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-firebolt/config",
+    "properties": {
+      "engine_url": {
+        "type": "string",
+        "title": "Engine URL",
+        "description": "Engine URL of the Firebolt database, in the format: `\u003cengine-name\u003e.\u003corganisation\u003e.\u003cregion\u003e.app.firebolt.io`.",
+        "examples": [
+          "engine-name.organisation.region.app.firebolt.io"
+        ],
+        "order": 0
+      },
+      "username": {
+        "type": "string",
+        "title": "Username",
+        "description": "Firebolt username.",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "description": "Firebolt password.",
+        "order": 2,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Name of the Firebolt database.",
+        "order": 3
+      },
+      "s3_bucket": {
+        "type": "string",
+        "title": "S3 Bucket",
+        "description": "Name of S3 bucket where the intermediate files for external table will be stored.",
+        "order": 4
+      },
+      "s3_prefix": {
+        "type": "string",
+        "title": "S3 Prefix",
+        "description": "A prefix for files stored in the bucket. Example: my-prefix.",
+        "default": "/",
+        "order": 5
+      },
+      "aws_key_id": {
+        "type": "string",
+        "title": "AWS Key ID",
+        "description": "AWS Key ID for accessing the S3 bucket.",
+        "order": 6
+      },
+      "aws_secret_key": {
+        "type": "string",
+        "title": "AWS Secret Key",
+        "description": "AWS Secret Key for accessing the S3 bucket.",
+        "order": 7,
+        "secret": true
+      },
+      "aws_region": {
+        "type": "string",
+        "title": "AWS Region",
+        "description": "AWS Region the bucket is in.",
+        "order": 8
+      }
+    },
+    "type": "object",
+    "required": [
+      "engine_url",
+      "username",
+      "password",
+      "database",
+      "s3_bucket"
+    ],
+    "title": "Firebolt Connection"
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-firebolt/resource",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the Firebolt table to store materialized results in. The external table will be named after this table with an `_external` suffix."
+      },
+      "table_type": {
+        "type": "string",
+        "enum": [
+          "fact",
+          "dimension"
+        ],
+        "title": "Table Type",
+        "description": "Type of the Firebolt table to store materialized results in. See https://docs.firebolt.io/working-with-tables.html for more details."
+      }
+    },
+    "type": "object",
+    "required": [
+      "table",
+      "table_type"
+    ],
+    "title": "Firebolt Table"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-firebolt"
+}
