@@ -1,7 +1,7 @@
 contexts:
   alice:
     brokers:
-    - localhost:9092
+    - infra-kafka-1.flow-test:9092
     sasl:
       enabled: true
       mechanism: scram-sha256
