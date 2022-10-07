@@ -3,6 +3,7 @@ services:
   # Secured Kafka with SCRAM enabled
   kafka:
     image: 'bitnami/kafka:latest'
+    container_name: infra-kafka-1
     networks:
       - flow-test
     ports:
