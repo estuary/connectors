@@ -45,7 +45,7 @@ func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Proj
 		}
 
 		var source = "auto-generated"
-		if p.UserProvided {
+		if p.Explicit {
 			source = "user-provided"
 		}
 		p.Comment = fmt.Sprintf("%s projection of JSON at: %s with inferred types: %s",

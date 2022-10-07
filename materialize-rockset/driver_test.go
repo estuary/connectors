@@ -72,7 +72,7 @@ func TestRocksetDriverValidate(t *testing.T) {
 		{
 			Ptr:            "/id",
 			Field:          "id",
-			UserProvided:   true,
+			Explicit:       true,
 			IsPartitionKey: true,
 			IsPrimaryKey:   true,
 			Inference:      pf.Inference{Types: []string{"string"}},
@@ -80,7 +80,7 @@ func TestRocksetDriverValidate(t *testing.T) {
 		{
 			Ptr:            "/foo",
 			Field:          "foo",
-			UserProvided:   true,
+			Explicit:       true,
 			IsPartitionKey: true,
 			IsPrimaryKey:   true,
 			Inference:      pf.Inference{Types: []string{"object"}},
@@ -153,7 +153,7 @@ func TestRocksetDriverApply(t *testing.T) {
 		{
 			Ptr:            "/id",
 			Field:          "id",
-			UserProvided:   true,
+			Explicit:       true,
 			IsPartitionKey: true,
 			IsPrimaryKey:   true,
 			Inference:      pf.Inference{},
