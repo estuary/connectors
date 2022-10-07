@@ -3,6 +3,8 @@ services:
   # Secured Kafka with SCRAM enabled
   kafka:
     image: 'bitnami/kafka:latest'
+    networks:
+      - flow-test
     ports:
       - '9092:9092'
     volumes:
@@ -28,8 +30,8 @@ services:
 
       - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT
-      - KAFKA_CFG_LISTENERS=INTERNAL://:29092,EXTERNAL://:9092
-      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      - KAFKA_CFG_LISTENERS=INTERNAL://:29092,EXTERNAL://infra-kafka-1.flow-test:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka:29092,EXTERNAL://infra-kafka-1.flow-test:9092
 
       # These values are used by the Docker entrypoint script to create
       # users/passwords stored in Zookeeper. If we change the kafka_jaas.conf,
@@ -47,12 +49,20 @@ services:
 
   zookeeper:
     image: 'bitnami/zookeeper:latest'
+    networks:
+      - flow-test
     volumes:
       - zookeeper_data:/bitnami/zookeeper
     environment:
       - ZOO_ENABLE_AUTH=yes
       - ZOO_SERVER_USERS=zoo
       - ZOO_SERVER_PASSWORDS=keeper
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+
 volumes:
   kafka_data:
   zookeeper_data:
