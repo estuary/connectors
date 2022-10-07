@@ -9,7 +9,7 @@ export PGDATABASE="${PGDATABASE:=flow}"
 export PGPASSWORD="${PGPASSWORD:=flow}"
 export PGUSER="${PGUSER:=flow}"
 
-docker compose -f materialize/materialize-postgres-rc/docker-compose.yaml up --detach
+docker compose -f materialize-postgres-rc/docker-compose.yaml up --detach
 
 config_json_template='{
    "address":  "$PGHOST:$PGPORT",
