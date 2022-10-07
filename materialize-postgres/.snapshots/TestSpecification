@@ -7,26 +7,26 @@
         "type": "string",
         "title": "Address",
         "description": "Host and port of the database.",
-        "order": "0"
+        "order": 0
       },
       "user": {
         "type": "string",
         "title": "User",
         "description": "Database user to connect as.",
-        "order": "1"
+        "order": 1
       },
       "password": {
         "type": "string",
         "title": "Password",
         "description": "Password for the specified database user.",
-        "order": "2",
+        "order": 2,
         "secret": true
       },
       "database": {
         "type": "string",
         "title": "Database",
         "description": "Name of the logical database to materialize to.",
-        "order": "3"
+        "order": 3
       }
     },
     "type": "object",

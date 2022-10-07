@@ -7,50 +7,50 @@
         "type": "string",
         "title": "Host URL",
         "description": "The Snowflake Host used for the connection. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol).",
-        "order": "0"
+        "order": 0
       },
       "account": {
         "type": "string",
         "title": "Account",
         "description": "The Snowflake account identifier.",
-        "order": "1"
+        "order": 1
       },
       "user": {
         "type": "string",
         "title": "User",
         "description": "The Snowflake user login name.",
-        "order": "2"
+        "order": 2
       },
       "password": {
         "type": "string",
         "title": "Password",
         "description": "The password for the provided user.",
-        "order": "3",
+        "order": 3,
         "secret": true
       },
       "database": {
         "type": "string",
         "title": "Database",
         "description": "The SQL database to connect to.",
-        "order": "4"
+        "order": 4
       },
       "schema": {
         "type": "string",
         "title": "Schema",
         "description": "The SQL schema to use.",
-        "order": "5"
+        "order": 5
       },
       "warehouse": {
         "type": "string",
         "title": "Warehouse",
         "description": "The Snowflake virtual warehouse used to execute queries.",
-        "order": "6"
+        "order": 6
       },
       "role": {
         "type": "string",
         "title": "Role",
         "description": "The user role used to perform actions.",
-        "order": "7"
+        "order": 7
       }
     },
     "type": "object",

@@ -10,58 +10,58 @@
         "examples": [
           "engine-name.organisation.region.app.firebolt.io"
         ],
-        "order": "0"
+        "order": 0
       },
       "username": {
         "type": "string",
         "title": "Username",
         "description": "Firebolt username.",
-        "order": "1"
+        "order": 1
       },
       "password": {
         "type": "string",
         "title": "Password",
         "description": "Firebolt password.",
-        "order": "2",
+        "order": 2,
         "secret": true
       },
       "database": {
         "type": "string",
         "title": "Database",
         "description": "Name of the Firebolt database.",
-        "order": "3"
+        "order": 3
       },
       "s3_bucket": {
         "type": "string",
         "title": "S3 Bucket",
         "description": "Name of S3 bucket where the intermediate files for external table will be stored.",
-        "order": "4"
+        "order": 4
       },
       "s3_prefix": {
         "type": "string",
         "title": "S3 Prefix",
         "description": "A prefix for files stored in the bucket. Example: my-prefix.",
         "default": "/",
-        "order": "5"
+        "order": 5
       },
       "aws_key_id": {
         "type": "string",
         "title": "AWS Key ID",
         "description": "AWS Key ID for accessing the S3 bucket.",
-        "order": "6"
+        "order": 6
       },
       "aws_secret_key": {
         "type": "string",
         "title": "AWS Secret Key",
         "description": "AWS Secret Key for accessing the S3 bucket.",
-        "order": "7",
+        "order": 7,
         "secret": true
       },
       "aws_region": {
         "type": "string",
         "title": "AWS Region",
         "description": "AWS Region the bucket is in.",
-        "order": "8"
+        "order": 8
       }
     },
     "type": "object",
