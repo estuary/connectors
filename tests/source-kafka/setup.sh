@@ -39,7 +39,7 @@ for i in $(seq 1 10); do
       kctl config view
       exit 1
     fi
-    sleep 1
+    sleep 2
   fi
 done
 
