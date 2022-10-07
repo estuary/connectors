@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// TODO: handle the logger properly by setting the log level on logrus
 type Options struct {
 	LogLevel string `long:"log.level" description:"Log level, one of: error, warn, info, debug, trace" default:"info"`
 }
