@@ -19,7 +19,7 @@ function exportIndexToJsonl() {
     local sort_by="$2"
     local jsonl_path="$3"
 
-    curl -s "${TEST_ES_ENDPOINT}/${index}/_search" \
+    curl -s "${TEST_ES_LOCAL_ENDPOINT}/${index}/_search" \
     | jq -c "[.hits | .hits[] | ._source | del(._meta)] | sort_by(.${sort_by}) | .[]" \
     > "${jsonl_path}"
 }

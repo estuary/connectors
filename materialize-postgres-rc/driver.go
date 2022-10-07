@@ -151,6 +151,8 @@ func newPostgresDriver() pm.DriverServer {
 				}
 				var tunnel = sshConfig.CreateTunnel()
 
+				// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
+				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
 				err = tunnel.Start()
 
 				if err != nil {

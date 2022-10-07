@@ -10,7 +10,8 @@ export TEST_ES_INDEX_MULTIPLE_DATA_TYPES="index-multiple-data-types"
 export TEST_ES_CONTAINER_NAME=test-elastic-search
 
 # Endpoint to access elastic search.
-export TEST_ES_ENDPOINT=http://localhost:9200
+export TEST_ES_ENDPOINT=http://${TEST_ES_CONTAINER_NAME}.flow-test:9200
+export TEST_ES_LOCAL_ENDPOINT=http://localhost:9200
 
 # start local elasticsearch.
 function startElasticsearch() {
@@ -23,7 +24,7 @@ function startElasticsearch() {
       docker.elastic.co/elasticsearch/elasticsearch:7.15.2
     for i in {1..20}; do
         # Wait until the elastic search is ready for serving.
-        if curl -o /dev/null -s -I -f "${TEST_ES_ENDPOINT}";  then
+        if curl -o /dev/null -s -I -f "${TEST_ES_LOCAL_ENDPOINT}";  then
             echo "elastic server started successfully."
             return 0
         fi
