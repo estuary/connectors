@@ -155,7 +155,7 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: matrix.connector == 'source-postgres' || matrix.connector == 'source-mysql'
         run: |
-          docker-compose --file ${{ matrix.connector }}/docker-compose.yaml up --detach
+          docker compose --file ${{ matrix.connector }}/docker-compose.yaml up --wait
 
       - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v2
@@ -171,8 +171,8 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: matrix.connector == 'source-kafka'
         run: |
-          docker-compose --file infra/docker-compose.yaml up --detach zookeeper
-          docker-compose --file infra/docker-compose.yaml up --detach kafka
+          docker compose --file infra/docker-compose.yaml up --detach zookeeper
+          docker compose --file infra/docker-compose.yaml up --detach kafka
 
       - name: Source connector ${{ matrix.connector }} integration tests
         if: |
