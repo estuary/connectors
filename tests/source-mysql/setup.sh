@@ -10,8 +10,7 @@ export MYSQL_PORT="${MYSQL_PORT:=3306}"
 export MYSQL_USER="${MYSQL_USER:=root}"
 export MYSQL_PASSWORD="${MYSQL_PASSWORD:=flow}"
 
-docker compose -f source-mysql/docker-compose.yaml up --detach
-sleep 5
+docker compose -f source-mysql/docker-compose.yaml up --wait
 
 config_json_template='{
     "address": "$MYSQL_HOST:$MYSQL_PORT",

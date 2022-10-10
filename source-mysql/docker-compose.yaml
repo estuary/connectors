@@ -14,6 +14,8 @@ services:
         source: ../tests/files/b.csv
         target: /b.csv
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "--silent"]
     environment:
       MYSQL_DATABASE: test
       MYSQL_ROOT_PASSWORD: flow
