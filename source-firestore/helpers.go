@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type collectionGroupID = string
@@ -51,4 +54,13 @@ func collectionToResourcePath(collection string) resourcePath {
 //	=> "users/*/messages"
 func documentToResourcePath(documentPath string) resourcePath {
 	return collectionToResourcePath(documentPath)
+}
+
+func retryableStatus(err error) bool {
+	var code = status.Code(err)
+	return code == codes.Unknown ||
+		code == codes.DeadlineExceeded ||
+		code == codes.ResourceExhausted ||
+		code == codes.Internal ||
+		code == codes.Unavailable
 }
