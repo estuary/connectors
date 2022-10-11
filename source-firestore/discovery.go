@@ -205,6 +205,7 @@ func (ds *discoveryState) discoverCollectionGroup(ctx context.Context, group str
 		ds.closeInferenceGroup(group)
 	}()
 
+	var retries int
 	var docs = ds.client.CollectionGroup(group).Documents(ctx)
 	defer docs.Stop()
 	for {
@@ -214,9 +215,18 @@ func (ds *discoveryState) discoverCollectionGroup(ctx context.Context, group str
 		var doc, err = docs.Next()
 		if err == iterator.Done {
 			break
+		} else if err != nil && retryableStatus(err) {
+			// Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1.6s plus [0,100ms) jitter
+			retries++
+			if retryLimit := 5; retries >= retryLimit {
+				return fmt.Errorf("error fetching documents from group %q: retry limit (%d) reached: %w", group, retryLimit, err)
+			}
+			time.Sleep(time.Duration((1<<retries)*50+rand.Intn(100)) * time.Millisecond)
+			continue
 		} else if err != nil {
 			return fmt.Errorf("error fetching documents from group %q: %w", group, err)
 		}
+		retries = 0
 		if err := ds.processDocument(ctx, doc); err != nil {
 			return err
 		}
