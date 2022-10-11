@@ -114,6 +114,7 @@ func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Discov
 	if err != nil {
 		return nil, fmt.Errorf("discovery error: %w", err)
 	}
+	log.WithField("collections", len(bindings)).Info("discovery complete")
 	return &pc.DiscoverResponse{
 		Bindings: bindings,
 	}, nil
@@ -172,7 +173,7 @@ func (ds *discoveryState) processCollection(ctx context.Context, coll *firestore
 	ds.shared.Lock()
 	defer ds.shared.Unlock()
 	if _, ok := ds.shared.groups[coll.ID]; !ok {
-		log.WithField("group", coll.ID).Info("discovered new collection group")
+		log.WithField("group", coll.ID).Debug("discovered new collection group")
 		ds.shared.groups[coll.ID] = struct{}{}
 		ds.workers.Go(func() error {
 			var err = ds.discoverCollectionGroup(ctx, coll.ID)
@@ -197,10 +198,10 @@ func (ds *discoveryState) processCollection(ctx context.Context, coll *firestore
 // by groups rather than individual collections massively improves discovery speed.
 func (ds *discoveryState) discoverCollectionGroup(ctx context.Context, group string) error {
 	var logEntry = log.WithField("group", group)
-	logEntry.Info("scanning collection group")
+	logEntry.Debug("scanning collection group")
 
 	defer func() {
-		logEntry.Info("finished scanning group")
+		logEntry.Debug("finished scanning group")
 		ds.closeInferenceGroup(group)
 	}()
 
