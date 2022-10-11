@@ -216,9 +216,9 @@ func (ds *discoveryState) discoverCollectionGroup(ctx context.Context, group str
 		if err == iterator.Done {
 			break
 		} else if err != nil && retryableStatus(err) {
-			// Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1.6s plus [0,100ms) jitter
+			// Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1.6s, ..., 25.6s plus [0,100ms) jitter
 			retries++
-			if retryLimit := 5; retries >= retryLimit {
+			if retryLimit := 9; retries >= retryLimit {
 				return fmt.Errorf("error fetching documents from group %q: retry limit (%d) reached: %w", group, retryLimit, err)
 			}
 			time.Sleep(time.Duration((1<<retries)*50+rand.Intn(100)) * time.Millisecond)
