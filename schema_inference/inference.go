@@ -51,7 +51,7 @@ func Run(ctx context.Context, logEntry *log.Entry, docsCh <-chan Document) (Sche
 				return fmt.Errorf("failed to encode document: %w", err)
 			}
 		}
-		logEntry.WithField("count", count).Info("runInference: Done sending documents")
+		logEntry.WithField("count", count).Debug("runInference: Done sending documents")
 
 		return nil
 	})
@@ -67,7 +67,7 @@ func Run(ctx context.Context, logEntry *log.Entry, docsCh <-chan Document) (Sche
 		return nil
 	})
 
-	logEntry.Info("runInference: launching")
+	logEntry.Debug("runInference: launching")
 	err = cmd.Start()
 	if err != nil {
 		return nil, fmt.Errorf("failed to run flow-schema-inference: %w", err)
