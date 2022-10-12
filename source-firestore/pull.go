@@ -29,6 +29,10 @@ var firebaseScopes = []string{
 
 const watchTargetID = 1245678
 
+// Non-permanent failures like Unavailable or ResourceExhausted can be retried
+// after a little while.
+const retryInterval = 300 * time.Second
+
 func (driver) Pull(stream pc.Driver_PullServer) error {
 	log.Debug("connector started")
 
@@ -319,11 +323,6 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 	})
 	logEntry.WithField("startTime", startTime.Format(time.RFC3339)).Debug("capture collection")
 
-	listenClient, err := client.Listen(ctx)
-	if err != nil {
-		return fmt.Errorf("listen error: %w", err)
-	}
-
 	var target = &firestore_pb.Target{
 		TargetType: &firestore_pb.Target_Query{
 			Query: &firestore_pb.Target_QueryTarget{
@@ -333,11 +332,6 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 						From: []*firestore_pb.StructuredQuery_CollectionSelector{{
 							CollectionId:   collectionID,
 							AllDescendants: true,
-						}},
-						OrderBy: []*firestore_pb.StructuredQuery_Order{{
-							Field: &firestore_pb.StructuredQuery_FieldReference{
-								FieldPath: "__name__",
-							},
 						}},
 					},
 				},
@@ -356,12 +350,20 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 			AddTarget: target,
 		},
 	}
-	if err := listenClient.Send(req); err != nil {
-		return fmt.Errorf("send error: %w", err)
-	}
 
+	var listenClient firestore_pb.Firestore_ListenClient
+	var numDocuments int
 	var isCurrent = false
 	for {
+		if listenClient == nil {
+			var err error
+			listenClient, err = client.Listen(ctx)
+			if err != nil {
+				return fmt.Errorf("error opening Listen RPC client: %w", err)
+			} else if err := listenClient.Send(req); err != nil {
+				return fmt.Errorf("error sending Listen RPC: %w", err)
+			}
+		}
 		resp, err := listenClient.Recv()
 		if err == io.EOF {
 			logEntry.Debug("listen stream closed, shutting down")
@@ -369,10 +371,19 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 		} else if status.Code(err) == codes.Canceled {
 			logEntry.Debug("context canceled, shutting down")
 			return nil
+		} else if retryableStatus(err) {
+			logEntry.WithFields(log.Fields{
+				"err":  err,
+				"docs": numDocuments,
+			}).Errorf("temporary failure, retrying in %s", retryInterval)
+			if err := listenClient.CloseSend(); err != nil {
+				logEntry.WithField("err", err).Warn("error closing listen client")
+			}
+			listenClient = nil
+			numDocuments = 0
+			time.Sleep(retryInterval)
+			continue
 		} else if err != nil {
-			// TODO(wgd): Some statuses may be retryable. From skimming the Firestore client
-			// library code: codes.Unknown, codes.DeadlineExceeded, codes.ResourceExhausted,
-			// codes.Internal, codes.Unavailable, codes.Unauthenticated
 			return fmt.Errorf("recv error: %w", err)
 		}
 		logEntry.WithField("resp", resp).Trace("got response")
@@ -387,7 +398,10 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 					logEntry.WithField("readTime", ts).Trace("TargetChange.NO_CHANGE")
 				}
 				if len(tc.TargetIds) == 0 && tc.ReadTime != nil && isCurrent {
-					logEntry.WithField("readTime", ts).Debug("consistent point reached")
+					logEntry.WithFields(log.Fields{
+						"readTime": ts,
+						"docs":     numDocuments,
+					}).Debug("consistent point reached")
 					if checkpointJSON, err := c.State.UpdateReadTimes(collectionID, tc.ReadTime.AsTime()); err != nil {
 						return err
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
@@ -430,6 +444,7 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 				// the gRPC 'Listen' API works.
 				return fmt.Errorf("internal error: recieved document %q on listener for %q", doc.Name, collectionID)
 			}
+			numDocuments++
 			if err := c.HandleDocument(ctx, resourcePath, doc); err != nil {
 				return err
 			}
@@ -437,6 +452,7 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 			var doc = resp.DocumentDelete.Document
 			var readTime = resp.DocumentDelete.ReadTime.AsTime()
 			var resourcePath = documentToResourcePath(doc)
+			numDocuments++
 			if err := c.HandleDelete(ctx, resourcePath, doc, readTime); err != nil {
 				return err
 			}
@@ -444,6 +460,7 @@ func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, coll
 			var doc = resp.DocumentRemove.Document
 			var readTime = resp.DocumentRemove.ReadTime.AsTime()
 			var resourcePath = documentToResourcePath(doc)
+			numDocuments++
 			if err := c.HandleDelete(ctx, resourcePath, doc, readTime); err != nil {
 				return err
 			}
