@@ -245,4 +245,4 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("deleted tables: ", strings.Join(tables, ","))}, nil
 }
 
-func main() { boilerplate.RunMain(new(driver), false) }
+func main() { boilerplate.RunMain(new(driver)) }

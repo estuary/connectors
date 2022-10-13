@@ -41,5 +41,6 @@ ENV PATH="/connector:$PATH"
 COPY --from=builder /builder/connector ./connector
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
+LABEL FLOW_TCP_PORT=2222
 
 ENTRYPOINT ["/connector/connector"]
