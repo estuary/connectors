@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 	"time"
 
@@ -577,6 +578,9 @@ func translateValue(val *firestore_pb.Value) (interface{}, error) {
 	case *firestore_pb.Value_IntegerValue:
 		return val.IntegerValue, nil
 	case *firestore_pb.Value_DoubleValue:
+		if math.IsNaN(val.DoubleValue) {
+			return "NaN", nil
+		}
 		return val.DoubleValue, nil
 	case *firestore_pb.Value_TimestampValue:
 		return val.TimestampValue.AsTime(), nil
