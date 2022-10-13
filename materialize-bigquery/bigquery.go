@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	boilerplate.RunMain(newBigQueryDriver(), false)
+	boilerplate.RunMain(newBigQueryDriver())
 }
 
 // Config represents the endpoint configuration for BigQuery.
