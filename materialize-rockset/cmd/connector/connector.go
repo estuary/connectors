@@ -16,5 +16,5 @@ func main() {
 	log.SetOutput(os.Stderr)
 	log.SetLevel(log.DebugLevel)
 
-	boilerplate.RunMain(connector.NewRocksetDriver(), false)
+	boilerplate.RunMain(connector.NewRocksetDriver())
 }

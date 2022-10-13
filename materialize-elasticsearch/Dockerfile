@@ -41,5 +41,6 @@ COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 USER nonroot:nonroot
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
+LABEL FLOW_TCP_PORT=2222
 
 ENTRYPOINT ["/connector/connector"]
