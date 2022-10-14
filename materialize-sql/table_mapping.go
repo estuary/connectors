@@ -93,15 +93,21 @@ func convertTuple(in tuple.Tuple, columns []Column, out []interface{}) ([]interf
 // Columns returns all columns of the Table as a single slice,
 // ordered as Keys, then Values, then the Document.
 func (t *Table) Columns() []*Column {
-	var out []*Column
-	for i := range t.Keys {
-		out = append(out, &t.Keys[i])
-	}
+	out := t.KeyPtrs()
 	for i := range t.Values {
 		out = append(out, &t.Values[i])
 	}
 	if t.Document != nil {
 		out = append(out, t.Document)
+	}
+	return out
+}
+
+// KeyPtrs returns all keys of the Table as a single slice.
+func (t *Table) KeyPtrs() []*Column {
+	var out []*Column
+	for i := range t.Keys {
+		out = append(out, &t.Keys[i])
 	}
 	return out
 }

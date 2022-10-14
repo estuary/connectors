@@ -1,14 +1,14 @@
-package main
+package connector
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"text/template"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
@@ -16,9 +16,97 @@ import (
 )
 
 type transactor struct {
-	ep       *Endpoint
-	fence    *fence
+	ep    *sql.Endpoint
+	fence *sql.Fence
+
+	client     *client
+	bucketPath string
+	bucket     string
+
 	bindings []*binding
+}
+
+func newTransactor(
+	ctx context.Context,
+	ep *sql.Endpoint,
+	fence sql.Fence,
+	bindings []sql.Table,
+) (_ pm.Transactor, err error) {
+	cfg := ep.Config.(config)
+
+	client, err := cfg.client(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	t := &transactor{
+		ep:         ep,
+		fence:      &fence,
+		client:     client,
+		bucketPath: cfg.BucketPath,
+		bucket:     cfg.Bucket,
+	}
+
+	for _, binding := range bindings {
+		if err = t.addBinding(ctx, binding); err != nil {
+			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+		}
+	}
+
+	return t, nil
+}
+
+func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
+	var b = &binding{target: target}
+
+	var err error
+	if b.loadExtDataConfig, err = configForCols(target.KeyPtrs()); err != nil {
+		return err
+	}
+	if b.storeExtDataConfig, err = configForCols(target.Columns()); err != nil {
+		return err
+	}
+
+	for _, m := range []struct {
+		sql *string
+		tpl *template.Template
+	}{
+		{&b.tempTableName, tplTempTableName},
+		{&b.loadQuerySQL, tplLoadQuery},
+		{&b.storeInsertSQL, tplStoreInsert},
+		{&b.storeUpdateSQL, tplStoreUpdate},
+	} {
+		var err error
+		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
+			return err
+		}
+	}
+
+	t.bindings = append(t.bindings, b)
+	return nil
+}
+
+func configForCols(cols []*sql.Column) (*bigquery.ExternalDataConfig, error) {
+	config := &bigquery.ExternalDataConfig{
+		SourceFormat: bigquery.JSON,
+		Schema:       make([]*bigquery.FieldSchema, 0, len(cols)),
+	}
+
+	for _, col := range cols {
+		mt, err := bqTypeMapper.MapType(&col.Projection)
+		if err != nil {
+			return nil, fmt.Errorf("map type for external data config schema: %v", err)
+		}
+
+		config.Schema = append(config.Schema, &bigquery.FieldSchema{
+			Name:     col.Identifier,
+			Repeated: false,
+			Required: col.Inference.Exists == pf.Inference_MUST,
+			Type:     bigquery.FieldType(mt.DDL),
+		})
+	}
+
+	return config, nil
 }
 
 func (t *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
@@ -31,11 +119,11 @@ func (t *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 		var b = t.bindings[it.Binding]
 
 		// Check to see if we have a keyFile open already in gcs for this binding and if not, create one.
-		if b.load.keysFile == nil {
-			b.load.keysFile, err = t.ep.NewExternalDataConnectionFile(
+		if b.keysFile == nil {
+			b.keysFile, err = t.NewExternalDataConnectionFile(
 				ctx,
 				tmpFileName(),
-				b.load.extDataConfig,
+				b.loadExtDataConfig,
 			)
 			if err != nil {
 				return fmt.Errorf("new external data connection file: %v", err)
@@ -43,21 +131,21 @@ func (t *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 
 			// Clean up the temporary files when load complete (or we error out).
 			defer func() {
-				if err := b.load.keysFile.Delete(ctx); err != nil {
+				if err := b.keysFile.Delete(ctx); err != nil {
 					log.Errorf("could not delete load keyfile: %v", err)
 				}
-				b.load.keysFile = nil // blank it
+				b.keysFile = nil // blank it
 			}()
 		}
 
 		// Convert our key tuple into a slice of values appropriate for the database.
-		convertedKey, err := b.load.paramsConverter.Convert(it.Key)
+		convertedKey, err := b.target.ConvertKey(it.Key)
 		if err != nil {
-			return fmt.Errorf("converting key: %w", err)
+			return fmt.Errorf("converting load key: %w", err)
 		}
 
 		// Write our row of keys to the keyFile.
-		if err = b.load.keysFile.WriteRow(convertedKey); err != nil {
+		if err = b.keysFile.WriteRow(convertedKey); err != nil {
 			return fmt.Errorf("writing normalized key to keyfile: %w", err)
 		}
 
@@ -72,18 +160,18 @@ func (t *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
 	for _, b := range t.bindings {
 		// If we have a data file for this round.
-		if b.load.keysFile != nil {
 
+		if b.keysFile != nil {
 			// Flush and close the keyfile.
-			if err := b.load.keysFile.Close(); err != nil {
+			if err := b.keysFile.Close(); err != nil {
 				return fmt.Errorf("closing external data connection file: %w", err)
 			}
 
 			// Setup the tempTableName pointing to our cloud storage external table definition.
-			edcTableDefs[b.load.tempTableName] = b.load.extDataConfig
+			edcTableDefs[b.tempTableName] = b.loadExtDataConfig
 
 			// Append it to the document query list.
-			subqueries = append(subqueries, b.load.sql)
+			subqueries = append(subqueries, b.loadQuerySQL)
 		}
 	}
 
@@ -92,9 +180,9 @@ func (t *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 	}
 
 	// Build the query across all tables.
-	query := t.ep.newQuery(strings.Join(subqueries, "\nUNION ALL\n") + ";")
+	query := t.client.newQuery(strings.Join(subqueries, "\nUNION ALL\n") + ";")
 	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
-	job, err := t.ep.runQuery(ctx, query)
+	job, err := t.client.runQuery(ctx, query)
 	if err != nil {
 		return fmt.Errorf("load query: %w", err)
 	}
@@ -128,7 +216,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 func (t *transactor) Prepare(_ context.Context, prepare pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
 	// This is triggered to let you know that the loads have completed.
 	// It also tells us what checkpoint we are about to store.
-	t.fence.checkpoint = prepare.FlowCheckpoint
+	t.fence.Checkpoint = prepare.FlowCheckpoint
 	return pf.DriverCheckpoint{}, nil
 }
 
@@ -137,30 +225,27 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 
 	// Iterate through all the new values to store.
 	var err error
-	var vals []tuple.TupleElement
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 
 		// Check to see if we have a mergeFile open already in gcs for this binding and if not, create one.
-		if b.store.mergeFile == nil {
-			b.store.mergeFile, err = t.ep.NewExternalDataConnectionFile(
+		if b.mergeFile == nil {
+			b.mergeFile, err = t.NewExternalDataConnectionFile(
 				ctx,
 				tmpFileName(),
-				b.store.extDataConfig,
+				b.storeExtDataConfig,
 			)
 			if err != nil {
 				return fmt.Errorf("new external data connection file: %v", err)
 			}
 		}
 
-		// Convert all the values to database appropriate ones and store them in the GCS file.
-		vals = append(append(vals[:0], it.Key...), it.Values...)
-		if b.store.hasRootDocument {
-			vals = append(vals, it.RawJSON)
+		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		if err != nil {
+			return fmt.Errorf("converting store parameters: %w", err)
 		}
-		if converted, err := b.store.paramsConverter.Convert(vals); err != nil {
-			return fmt.Errorf("converting Store: %w", err)
-		} else if err = b.store.mergeFile.WriteRow(converted); err != nil {
+
+		if err = b.mergeFile.WriteRow(converted); err != nil {
 			return fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
 	}
@@ -171,70 +256,43 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 func (t *transactor) Commit(ctx context.Context) error {
 	// Build the slice of transactions required for a commit.
 	var subqueries []string
-	var args []interface{}
+
+	subqueries = append(subqueries, `
+	BEGIN
+	BEGIN TRANSACTION;
+	`)
 
 	// First we must validate the fence has not been modified.
-	subqueries = append(subqueries, fmt.Sprintf(`
-	DECLARE vCheckpoint STRING DEFAULT %s;
-	DECLARE vMaterialization STRING DEFAULT %s;
-	DECLARE vKeyBegin INT64 DEFAULT %s;
-	DECLARE vKeyEnd INT64 DEFAULT %s;
-	DECLARE vFence INT64 DEFAULT %s;
-
-	DECLARE curFence INT64;
-
-	BEGIN
-
-	BEGIN TRANSACTION;
-
-	-- See if the fence exists as expected
-	SET curFence = (SELECT fence FROM `+t.ep.flowTables.Checkpoints.Identifier+` WHERE
-		materialization=vMaterialization AND key_begin=vKeyBegin AND key_end=vKeyEnd AND fence=vFence
-	);
-	-- If fence missing/changed, force exception and abort
-	IF curFence IS NULL THEN
-		RAISE USING MESSAGE = 'fence not found';
-	END IF;
-
-	-- Update the checkpoint with the new value
-	UPDATE `+t.ep.flowTables.Checkpoints.Identifier+` SET checkpoint=vCheckpoint WHERE
-		materialization=vMaterialization AND key_begin=vKeyBegin AND key_end=vKeyEnd AND fence=vFence;
-	`,
-		t.ep.generator.Placeholder(0),
-		t.ep.generator.Placeholder(1),
-		t.ep.generator.Placeholder(2),
-		t.ep.generator.Placeholder(3),
-		t.ep.generator.Placeholder(4),
-	))
-	args = append(args,
-		base64.StdEncoding.EncodeToString(t.fence.checkpoint),
-		t.fence.materialization,
-		t.fence.keyBegin,
-		t.fence.keyEnd,
-		t.fence.fence,
-	)
+	var fenceUpdate strings.Builder
+	if err := tplUpdateFence.Execute(&fenceUpdate, t.fence); err != nil {
+		return fmt.Errorf("evaluating fence template: %w", err)
+	}
+	subqueries = append(subqueries, fenceUpdate.String())
 
 	// This is the map of external table references we will populate. Loop through the bindings and
 	// append the SQL for that table.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
 	for _, b := range t.bindings {
-
-		if b.store.mergeFile != nil {
-			if err := b.store.mergeFile.Close(); err != nil {
+		if b.mergeFile != nil {
+			if err := b.mergeFile.Close(); err != nil {
 				return fmt.Errorf("mergefile close: %w", err)
 			}
 
 			// Setup the tempTableName pointing to our cloud storage external table definition.
-			edcTableDefs[b.store.tempTableName] = b.store.extDataConfig
+			edcTableDefs[b.tempTableName] = b.storeExtDataConfig
 
-			subqueries = append(subqueries, b.store.sql)
+			if b.target.DeltaUpdates {
+				subqueries = append(subqueries, b.storeInsertSQL)
+			} else {
+				subqueries = append(subqueries, b.storeUpdateSQL)
+			}
 
 			// Clean up the temporary files when store complete (or we error out).
 			defer func(defb *binding) {
-				if err := defb.store.mergeFile.Delete(ctx); err != nil {
+				if err := defb.mergeFile.Delete(ctx); err != nil {
 					log.Errorf("could not delete store mergefile: %v", err)
 				}
-				defb.store.mergeFile = nil
+				defb.mergeFile = nil
 			}(b) // b is part of for loop, make sure you're referencing the right b.
 		}
 	}
@@ -246,13 +304,13 @@ func (t *transactor) Commit(ctx context.Context) error {
 	`)
 
 	// Build the bigquery query of the combined subqueries.
-	query := t.ep.newQuery(strings.Join(subqueries, "\n"), args...)
+	query := t.client.newQuery(strings.Join(subqueries, "\n"))
 	query.TableDefinitions = edcTableDefs // Tell the query where to get the external references in gcs.
 
 	// This returns a single row with the error status of the query.
-	job, err := t.ep.runQuery(ctx, query)
+	job, err := t.client.runQuery(ctx, query)
 	if err != nil {
-		return fmt.Errorf("load query: %w", err)
+		return fmt.Errorf("commit query: %w", err)
 	}
 
 	if err != nil {
@@ -271,6 +329,6 @@ func (t *transactor) Acknowledge(context.Context) error {
 }
 
 func (t *transactor) Destroy() {
-	_ = t.ep.bigQueryClient.Close()
-	_ = t.ep.cloudStorageClient.Close()
+	_ = t.client.bigqueryClient.Close()
+	_ = t.client.cloudStorageClient.Close()
 }
