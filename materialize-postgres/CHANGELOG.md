@@ -1,7 +1,7 @@
 # materialize-postgres
 
 ## v3, 2022-10-13
-- Switch to using TCP for communicating with Flow runtime
+- Switch to using TCP for communicating with Flow runtime and standalone network-tunnel
 
 ## v2, 2022-07-28
 - Merged `host` and `port` configuration fields into `address`. https://github.com/estuary/connectors/pull/297
