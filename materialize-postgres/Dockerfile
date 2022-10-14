@@ -18,6 +18,7 @@ RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/rel
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-postgres    ./materialize-postgres
 COPY testsupport             ./testsupport
+COPY go-network-tunnel       ./go-network-tunnel
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-postgres/...
@@ -31,6 +32,7 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 COPY --from=builder /builder/connector ./connector
+COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
