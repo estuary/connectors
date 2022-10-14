@@ -34,14 +34,10 @@ func RunMain(srv pm.DriverServer) {
 	var conn net.Conn
 	if server, err := net.Listen("tcp", ":2222"); err != nil {
 		logrus.WithFields(logrus.Fields{"error": err}).
-			Error("failed to start tcp server")
-		os.Exit(1)
+			Fatal("failed to start tcp server")
 	} else if conn, err = server.Accept(); err != nil {
-		if err != nil {
-			logrus.WithFields(logrus.Fields{"error": err}).
-				Error("failed to accept connection on tcp server")
-			os.Exit(1)
-		}
+		logrus.WithFields(logrus.Fields{"error": err}).
+			Fatal("failed to accept connection on tcp server")
 	}
 
 	var cmd = cmdCommon{
