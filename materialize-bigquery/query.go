@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -18,28 +18,26 @@ var (
 )
 
 // query executes a query against BigQuery and returns the completed job.
-func (ep *Endpoint) query(ctx context.Context, queryString string, parameters ...interface{}) (*bigquery.Job, error) {
-	return ep.runQuery(ctx, ep.newQuery(queryString, parameters...))
-
+func (c client) query(ctx context.Context, queryString string, parameters ...interface{}) (*bigquery.Job, error) {
+	return c.runQuery(ctx, c.newQuery(queryString, parameters...))
 }
 
 // newQuery returns a preconfigured *bigquery.Query.
-func (ep *Endpoint) newQuery(queryString string, parameters ...interface{}) *bigquery.Query {
+func (c client) newQuery(queryString string, parameters ...interface{}) *bigquery.Query {
 
 	// Create the query
-	query := ep.bigQueryClient.Query(queryString)
-	query.Location = ep.config.Region
+	query := c.bigqueryClient.Query(queryString)
+	query.Location = c.config.Region
 	// Add parameters
 	for _, p := range parameters {
 		query.Parameters = append(query.Parameters, bigquery.QueryParameter{Value: p})
 	}
 
 	return query
-
 }
 
 // runQuery will run a query and return the completed job.
-func (ep *Endpoint) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.Job, error) {
+func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.Job, error) {
 	var maxAttempts = 5
 	var job *bigquery.Job
 	var err error
@@ -97,12 +95,12 @@ func (ep *Endpoint) runQuery(ctx context.Context, query *bigquery.Query) (*bigqu
 
 		return job, nil
 	}
-	log.WithField("error", err).Error("job failed, exausted retries")
-	return job, fmt.Errorf("exausted retries: %w", err)
+	log.WithField("error", err).Error("job failed, exhausted retries")
+	return job, fmt.Errorf("exhausted retries: %w", err)
 }
 
 // fetchOne will fetch one row of data from a job and scan it into dest.
-func (ep *Endpoint) fetchOne(ctx context.Context, job *bigquery.Job, dest interface{}) error {
+func (c client) fetchOne(ctx context.Context, job *bigquery.Job, dest interface{}) error {
 
 	it, err := job.Read(ctx)
 	if err != nil {
