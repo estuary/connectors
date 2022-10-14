@@ -1,18 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "required": [
-    "_meta",
-    "canary",
-    "id"
-  ],
   "properties": {
     "_meta": {
-      "type": "object",
-      "required": [
-        "file",
-        "offset"
-      ],
       "properties": {
         "file": {
           "type": "string"
@@ -20,7 +9,12 @@
         "offset": {
           "type": "integer"
         }
-      }
+      },
+      "required": [
+        "file",
+        "offset"
+      ],
+      "type": "object"
     },
     "canary": {
       "type": "string"
@@ -28,5 +22,11 @@
     "id": {
       "type": "string"
     }
-  }
+  },
+  "required": [
+    "_meta",
+    "canary",
+    "id"
+  ],
+  "type": "object"
 }
