@@ -27,6 +27,37 @@
         "title": "Database",
         "description": "Name of the logical database to materialize to.",
         "order": 3
+      },
+      "networkTunnel": {
+        "properties": {
+          "sshForwarding": {
+            "properties": {
+              "sshEndpoint": {
+                "type": "string",
+                "title": "SSH Endpoint",
+                "description": "Endpoint of the remote SSH server that supports tunneling"
+              },
+              "privateKey": {
+                "type": "string",
+                "title": "SSH Private Key",
+                "description": "Private key to connect to the remote SSH server.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sshEndpoint",
+              "privateKey"
+            ],
+            "title": "SSH Forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Network Tunnel",
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
       }
     },
     "type": "object",
