@@ -10,7 +10,9 @@ import (
 	"sync"
 	"time"
 
+	firestore "cloud.google.com/go/firestore"
 	firestore_v1 "cloud.google.com/go/firestore/apiv1"
+	firebase "firebase.google.com/go"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -86,11 +88,16 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 		resourceBindings = append(resourceBindings, res)
 	}
 
+	updatedResourceStates, err := initResourceStates(prevState.Resources, resourceBindings)
+	if err != nil {
+		return fmt.Errorf("error initializing resource states: %w", err)
+	}
+
 	var capture = &capture{
 		Requests: pullRequests,
 		Config:   cfg,
 		State: &captureState{
-			Resources: initResourceStates(prevState.Resources, resourceBindings),
+			Resources: updatedResourceStates,
 		},
 		Output: &captureOutput{
 			Stream: stream,
@@ -114,26 +121,73 @@ type captureState struct {
 }
 
 type resourceState struct {
-	ReadTime     time.Time
-	bindingIndex uint32
+	ReadTime       time.Time
+	BackfillAsync  bool   `json:"backfill,omitempty"`
+	BackfillCursor string `json:"backfillCursor,omitempty"`
+	bindingIndex   uint32
 }
 
 // Given the prior resource states from the last DriverCheckpoint along with
 // the current capture bindings, compute a new set of resource states.
-func initResourceStates(prevStates map[string]*resourceState, resourceBindings []resource) map[string]*resourceState {
+func initResourceStates(prevStates map[string]*resourceState, resourceBindings []resource) (map[string]*resourceState, error) {
+	var now = time.Now()
 	var states = make(map[string]*resourceState)
 	for idx, resource := range resourceBindings {
 		var state = &resourceState{bindingIndex: uint32(idx)}
 		if prevState, ok := prevStates[resource.Path]; ok {
 			state.ReadTime = prevState.ReadTime
+			state.BackfillAsync = prevState.BackfillAsync
+			state.BackfillCursor = prevState.BackfillCursor
+		} else {
+			switch resource.BackfillMode {
+			case backfillModeNone:
+				state.ReadTime = now
+				state.BackfillAsync = false
+			case backfillModeAsync:
+				state.ReadTime = now
+				state.BackfillAsync = true
+			case backfillModeSync:
+				state.ReadTime = time.Time{}
+				state.BackfillAsync = false
+			default:
+				return nil, fmt.Errorf("invalid backfill mode %q for %q", resource.BackfillMode, resource.Path)
+			}
 		}
 		states[resource.Path] = state
 	}
-	return states
+	return states, nil
 }
 
 func (s *captureState) Validate() error {
 	return nil
+}
+
+func (s *captureState) BindingIndex(resourcePath string) (uint32, bool) {
+	s.RLock()
+	defer s.RUnlock()
+	if state := s.Resources[resourcePath]; state != nil {
+		return state.bindingIndex, true
+	}
+	// Return UINT32_MAX just to be extra clear that we're not capturing this resource
+	return ^uint32(0), false
+}
+
+func (s *captureState) ReadTime(resourcePath string) (time.Time, bool) {
+	s.RLock()
+	defer s.RUnlock()
+	if state := s.Resources[resourcePath]; state != nil {
+		return state.ReadTime, true
+	}
+	return time.Time{}, false
+}
+
+func (s *captureState) BackfillingAsync(rpath resourcePath) bool {
+	s.RLock()
+	defer s.RUnlock()
+	if state := s.Resources[rpath]; state != nil {
+		return state.BackfillAsync
+	}
+	return false
 }
 
 func (s *captureState) UpdateReadTimes(collectionID string, readTime time.Time) (json.RawMessage, error) {
@@ -154,23 +208,23 @@ func (s *captureState) UpdateReadTimes(collectionID string, readTime time.Time) 
 	return checkpointJSON, nil
 }
 
-func (s *captureState) BindingIndex(resourcePath string) (uint32, bool) {
-	s.RLock()
-	defer s.RUnlock()
-	if state := s.Resources[resourcePath]; state != nil {
-		return state.bindingIndex, true
+func (s *captureState) UpdateBackfillState(collectionID string, resumeDocumentPath string, inProgress bool) (json.RawMessage, error) {
+	s.Lock()
+	var updated = make(map[string]*resourceState)
+	for resourcePath, resourceState := range s.Resources {
+		if getLastCollectionGroupID(resourcePath) == collectionID {
+			resourceState.BackfillAsync = inProgress
+			resourceState.BackfillCursor = resumeDocumentPath
+			updated[resourcePath] = resourceState
+		}
 	}
-	// Return UINT32_MAX just to be extra clear that we're not capturing this resource
-	return ^uint32(0), false
-}
+	s.Unlock()
 
-func (s *captureState) ReadTime(resourcePath string) (time.Time, bool) {
-	s.RLock()
-	defer s.RUnlock()
-	if state := s.Resources[resourcePath]; state != nil {
-		return state.ReadTime, true
+	var checkpointJSON, err = json.Marshal(&captureState{Resources: updated})
+	if err != nil {
+		return nil, fmt.Errorf("error serializing state checkpoint: %w", err)
 	}
-	return time.Time{}, false
+	return checkpointJSON, nil
 }
 
 // TODO(wgd): Move the whole captureOutput thing into source-boilerplate?
@@ -256,18 +310,54 @@ func (c *capture) Run(ctx context.Context) error {
 		}
 	}()
 
-	// Connect to Firestore
-	opts := []option.ClientOption{option.WithCredentialsJSON([]byte(c.Config.CredentialsJSON)), option.WithScopes(firebaseScopes...)}
-	client, err := firestore_v1.NewClient(ctx, opts...)
+	// Enumerate the sets of watch streams and async backfills we'll need to perform.
+	// In both cases we map resource paths to collection IDs, because that's how the
+	// underlying API works (so for instance 'users/*/messages' and 'groups/*/messages'
+	// are both 'messages').
+	var watchCollections = make(map[collectionGroupID]time.Time)
+	var backfillCollections = make(map[collectionGroupID]string)
+	for resourcePath, resourceState := range c.State.Resources {
+		var collectionID = getLastCollectionGroupID(resourcePath)
+		if startTime, ok := watchCollections[collectionID]; !ok || resourceState.ReadTime.Before(startTime) {
+			watchCollections[collectionID] = resourceState.ReadTime
+		}
+		if !resourceState.BackfillAsync {
+			// Do nothing
+		} else if cursor, ok := backfillCollections[collectionID]; !ok {
+			backfillCollections[collectionID] = resourceState.BackfillCursor
+		} else if cursor != resourceState.BackfillCursor {
+			return fmt.Errorf("mismatched cursors %q and %q for async backfills from collection %q", cursor, resourceState.BackfillCursor, collectionID)
+		}
+	}
+
+	// Connect to Firestore gRPC API
+	var credsOpt = option.WithCredentialsJSON([]byte(c.Config.CredentialsJSON))
+	var scopesOpt = option.WithScopes(firebaseScopes...)
+	rpcClient, err := firestore_v1.NewClient(ctx, credsOpt, scopesOpt)
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer rpcClient.Close()
+
+	// If we're going to perform any async backfills, connect to Firestore via the client library too
+	var libraryClient *firestore.Client
+	if len(backfillCollections) > 0 {
+		log.WithField("backfills", len(backfillCollections)).Debug("opening second firestore client for async backfills")
+		app, err := firebase.NewApp(ctx, nil, credsOpt)
+		if err != nil {
+			return err
+		}
+		libraryClient, err = app.Firestore(ctx)
+		if err != nil {
+			return err
+		}
+		defer libraryClient.Close()
+	}
 
 	// If the 'database' config property is unspecified, try to autodetect it from
 	// the provided credentials.
 	if c.Config.DatabasePath == "" {
-		var creds, _ = transport.Creds(ctx, opts[0])
+		var creds, _ = transport.Creds(ctx, credsOpt)
 		if creds == nil || creds.ProjectID == "" {
 			return fmt.Errorf("unable to determine project ID (set 'database' config property)")
 		}
@@ -289,26 +379,23 @@ func (c *capture) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Enumerate unique collection IDs in a map. Multiple distinct resource paths
-	// can still have the same collection ID, for example 'foo/*/asdf' and 'bar/*/asdf'
-	// both have collection ID 'asdf'.
-	var watchCollections = make(map[string]time.Time)
-	for resourcePath, resourceState := range c.State.Resources {
-		var collectionID = getLastCollectionGroupID(resourcePath)
-		if startTime, ok := watchCollections[collectionID]; !ok || resourceState.ReadTime.Before(startTime) {
-			watchCollections[collectionID] = resourceState.ReadTime
-		}
-	}
-
 	log.WithFields(log.Fields{
-		"bindings": len(c.State.Resources),
-		"watches":  len(watchCollections),
+		"bindings":       len(c.State.Resources),
+		"watches":        len(watchCollections),
+		"asyncBackfills": len(backfillCollections),
 	}).Info("capture starting")
 	for collectionID, startTime := range watchCollections {
 		var collectionID, startTime = collectionID, startTime // Copy the loop variables for each closure
 		log.WithField("collection", collectionID).Debug("starting worker")
 		eg.Go(func() error {
-			return c.Capture(ctx, client, collectionID, startTime)
+			return c.StreamChanges(ctx, rpcClient, collectionID, startTime)
+		})
+	}
+	for collectionID, resumeDocumentPath := range backfillCollections {
+		var collectionID, resumeDocumentPath = collectionID, resumeDocumentPath // Copy loop variables for each closure
+		log.WithField("collection", collectionID).Debug("starting backfill worker")
+		eg.Go(func() error {
+			return c.BackfillAsync(ctx, libraryClient, collectionID, resumeDocumentPath)
 		})
 	}
 	defer log.Info("capture terminating")
@@ -318,11 +405,94 @@ func (c *capture) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *capture) Capture(ctx context.Context, client *firestore_v1.Client, collectionID string, startTime time.Time) error {
+const backfillChunkSize = 4096
+
+func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, collectionID string, resumeDocumentPath string) error {
+	var logEntry = log.WithFields(log.Fields{"collection": collectionID})
+
+	var cursor *firestore.DocumentSnapshot
+	if resumeDocumentPath == "" {
+		logEntry.Info("starting async backfill")
+	} else if resumeDocument, err := client.Doc(resumeDocumentPath).Get(ctx); err != nil {
+		logEntry.WithField("cursor", resumeDocumentPath).Warn("error fetching resume document -- backfill will restart from the beginning")
+	} else {
+		cursor = resumeDocument
+	}
+
+	var numDocuments int
+	for {
+		var query firestore.Query = client.CollectionGroup(collectionID).Query
+		if cursor != nil {
+			query = query.StartAfter(cursor)
+		}
+		query = query.Limit(backfillChunkSize)
+
+		var docs, err = query.Documents(ctx).GetAll()
+		if err != nil {
+			return fmt.Errorf("error backfilling %q: chunk query failed after %d documents: %w", collectionID, numDocuments, err)
+		}
+		if len(docs) == 0 {
+			break
+		}
+
+		logEntry.WithFields(log.Fields{
+			"total": numDocuments,
+			"chunk": len(docs),
+		}).Debug("processing backfill documents")
+		for _, doc := range docs {
+			logEntry.WithField("doc", doc.Ref.Path).Trace("got document")
+
+			// The 'CollectionGroup' query is potentially over-broad, so skip documents
+			// which aren't actually part of a resource being backfilled.
+			var resourcePath = documentToResourcePath(doc.Ref.Path)
+			if !c.State.BackfillingAsync(resourcePath) {
+				return nil
+			}
+
+			// Convert the document into JSON-serialiable form
+			var fields = doc.Data()
+			fields[metaProperty] = &documentMetadata{
+				Path:       doc.Ref.Path,
+				CreateTime: &doc.CreateTime,
+				UpdateTime: &doc.UpdateTime,
+			}
+
+			if bindingIndex, ok := c.State.BindingIndex(resourcePath); !ok {
+				return fmt.Errorf("internal error: no binding index for async backfill of resource %q", resourcePath)
+			} else if docJSON, err := json.Marshal(fields); err != nil {
+				return fmt.Errorf("error serializing document %q: %w", doc.Ref.Path, err)
+			} else if err := c.Output.Documents(bindingIndex, docJSON); err != nil {
+				return err
+			}
+			numDocuments++
+			cursor = doc
+		}
+
+		logEntry.WithFields(log.Fields{
+			"total":  numDocuments,
+			"cursor": cursor.Ref.Path,
+		}).Debug("updating backfill cursor")
+		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, cursor.Ref.Path, true); err != nil {
+			return err
+		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
+			return err
+		}
+	}
+
+	logEntry.WithField("docs", numDocuments).Info("backfill complete")
+	if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, "", false); err != nil {
+		return err
+	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client, collectionID string, startTime time.Time) error {
 	var logEntry = log.WithFields(log.Fields{
 		"collection": collectionID,
 	})
-	logEntry.WithField("startTime", startTime.Format(time.RFC3339)).Debug("capture collection")
+	logEntry.WithField("startTime", startTime.Format(time.RFC3339)).Info("streaming changes from collection")
 
 	var target = &firestore_pb.Target{
 		TargetType: &firestore_pb.Target_Query{
