@@ -11,11 +11,26 @@ import (
 	pc "github.com/estuary/flow/go/protocols/capture"
 )
 
+type backfillMode string
+
+const (
+	backfillModeSync  = backfillMode("sync")
+	backfillModeNone  = backfillMode("none")
+	backfillModeAsync = backfillMode("async")
+)
+
 type resource struct {
-	Path string `json:"path" jsonschema:"title=Path to Collection,description=Supports parent/*/nested to capture all nested collections of parent's children"`
+	Path         string       `json:"path" jsonschema:"title=Path to Collection,description=Supports parent/*/nested to capture all nested collections of parent's children"`
+	BackfillMode backfillMode `json:"backfillMode" jsonschema:"title=Backfill Mode,description=Configures the handling of data already in the collection. Options are sync/async/none."`
 }
 
 func (r resource) Validate() error {
+	if r.Path == "" {
+		return fmt.Errorf("resource path unspecified")
+	}
+	if r.BackfillMode != backfillModeSync && r.BackfillMode != backfillModeAsync && r.BackfillMode != backfillModeNone {
+		return fmt.Errorf("invalid backfill mode %q for %q", r.BackfillMode, r.Path)
+	}
 	return nil
 }
 

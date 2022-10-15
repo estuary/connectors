@@ -321,7 +321,10 @@ func (ds *discoveryState) inferenceWorker(ctx context.Context, resourcePath reso
 		documentSchema = combinedSchema
 	}
 
-	resourceJSON, err := json.Marshal(resource{Path: resourcePath})
+	resourceJSON, err := json.Marshal(resource{
+		Path:         resourcePath,
+		BackfillMode: backfillModeSync,
+	})
 	if err != nil {
 		return fmt.Errorf("error serializing resource json: %w", err)
 	}
