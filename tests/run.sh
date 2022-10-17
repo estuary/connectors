@@ -69,7 +69,7 @@ DATA_PLANE_PID=$!
 trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID}" EXIT
 
 # Get the spec from the connector and ensure it's valid json.
-flowctl-admin api spec --image "${CONNECTOR_IMAGE}" | jq -cM || bail "failed to validate spec"
+docker run --rm "${CONNECTOR_IMAGE}" spec | jq -cM || bail "failed to validate spec"
 
 # Execute test-specific setup steps.
 echo -e "\nexecuting setup"
