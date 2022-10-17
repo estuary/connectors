@@ -15,6 +15,7 @@ RUN go mod download
 COPY source-mysql  ./source-mysql
 COPY go-schema-gen ./go-schema-gen
 COPY sqlcapture    ./sqlcapture
+COPY go-network-tunnel       ./go-network-tunnel
 
 # Run the unit tests.
 RUN go test -v ./source-mysql/...
@@ -33,6 +34,7 @@ ENV PATH="/connector:$PATH"
 COPY --from=busybox:latest /bin/sh /bin/sh
 
 # Bring in the compiled connector artifact from the builder.
+COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 COPY --from=builder /builder/connector ./connector
 
 # Avoid running the connector as root.
