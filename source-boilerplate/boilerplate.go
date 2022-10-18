@@ -20,8 +20,6 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-const ListenTimeoutSeconds = 10
-
 // RunMain is the boilerplate main function of a capture connector.
 func RunMain(srv pc.DriverServer) {
 	var logConfig = &logConfig{}
@@ -29,10 +27,11 @@ func RunMain(srv pc.DriverServer) {
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
 	var cmd = cmdCommon{
-		ctx: ctx,
-		srv: srv,
-		r:   bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
-		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+		ctx:     ctx,
+		srv:     srv,
+		r:       bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
+		w:       protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+		logging: logConfig,
 	}
 
 	parser.AddCommand("spec", "Write the connector specification",
@@ -59,12 +58,31 @@ type cmdCommon struct {
 	srv pc.DriverServer
 	r   *bufio.Reader
 	w   protoio.Writer
+
+	logging *logConfig
 }
 
 // logConfig configures handling of application log events.
 type logConfig struct {
 	Level  string `long:"log.level" env:"LOG_LEVEL" default:"info" choice:"info" choice:"INFO" choice:"debug" choice:"DEBUG" choice:"warn" choice:"WARN" description:"Logging level"`
 	Format string `long:"log.format" env:"LOG_FORMAT" default:"text" choice:"json" choice:"text" choice:"color" description:"Logging output format"`
+}
+
+func (c *cmdCommon) Execute(args []string) error {
+	if c.logging.Format == "json" {
+		log.SetFormatter(&log.JSONFormatter{})
+	} else if c.logging.Format == "text" {
+		log.SetFormatter(&log.TextFormatter{})
+	} else if c.logging.Format == "color" {
+		log.SetFormatter(&log.TextFormatter{ForceColors: true})
+	}
+
+	if lvl, err := log.ParseLevel(c.logging.Level); err != nil {
+		log.WithField("err", err).Fatal("unrecognized log level")
+	} else {
+		log.SetLevel(lvl)
+	}
+	return nil
 }
 
 type protoValidator interface {
@@ -136,6 +154,10 @@ type applyDeleteCmd struct{ cmdCommon }
 type pullCmd struct{ cmdCommon }
 
 func (c specCmd) Execute(args []string) error {
+	if err := c.cmdCommon.Execute(args); err != nil {
+		return err
+	}
+
 	var req pc.SpecRequest
 	log.Debug("executing Spec subcommand")
 
@@ -150,6 +172,10 @@ func (c specCmd) Execute(args []string) error {
 }
 
 func (c validateCmd) Execute(args []string) error {
+	if err := c.cmdCommon.Execute(args); err != nil {
+		return err
+	}
+
 	var req pc.ValidateRequest
 	log.Debug("executing Validate subcommand")
 
@@ -164,6 +190,10 @@ func (c validateCmd) Execute(args []string) error {
 }
 
 func (c discoverCmd) Execute(args []string) error {
+	if err := c.cmdCommon.Execute(args); err != nil {
+		return err
+	}
+
 	var req pc.DiscoverRequest
 	log.Debug("executing Discover subcommand")
 
@@ -178,7 +208,12 @@ func (c discoverCmd) Execute(args []string) error {
 }
 
 func (c applyUpsertCmd) Execute(args []string) error {
+	if err := c.cmdCommon.Execute(args); err != nil {
+		return err
+	}
+
 	var req pc.ApplyRequest
+	log.Debug("executing ApplyUpsert subcommand")
 
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
@@ -192,7 +227,12 @@ func (c applyUpsertCmd) Execute(args []string) error {
 }
 
 func (c applyDeleteCmd) Execute(args []string) error {
+	if err := c.cmdCommon.Execute(args); err != nil {
+		return err
+	}
+
 	var req pc.ApplyRequest
+	log.Debug("executing ApplyDelete subcommand")
 
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
@@ -210,6 +250,10 @@ func (c applyDeleteCmd) Execute(args []string) error {
 }
 
 func (c pullCmd) Execute(args []string) error {
+	if err := c.cmdCommon.Execute(args); err != nil {
+		return err
+	}
+
 	log.Debug("executing Pull subcommand")
 	return c.srv.Pull(&pullAdapter{cmdCommon: c.cmdCommon})
 }
