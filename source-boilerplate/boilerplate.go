@@ -23,7 +23,8 @@ import (
 
 // RunMain is the boilerplate main function of a capture connector.
 func RunMain(srv pc.DriverServer) {
-	var parser = flags.NewParser(nil, flags.Default)
+	var logConfig = &logConfig{}
+	var parser = flags.NewParser(logConfig, flags.Default)
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
 	var conn net.Conn
@@ -67,6 +68,12 @@ type cmdCommon struct {
 	srv pc.DriverServer
 	r   *bufio.Reader
 	w   protoio.Writer
+}
+
+// logConfig configures handling of application log events.
+type logConfig struct {
+	Level  string `long:"log.level" env:"LOG_LEVEL" default:"info" choice:"info" choice:"INFO" choice:"debug" choice:"DEBUG" choice:"warn" choice:"WARN" description:"Logging level"`
+	Format string `long:"log.format" env:"LOG_FORMAT" default:"text" choice:"json" choice:"text" choice:"color" description:"Logging output format"`
 }
 
 type protoValidator interface {
