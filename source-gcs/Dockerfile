@@ -41,4 +41,6 @@ COPY --from=builder /builder/connector ./connector
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-ENTRYPOINT ["/connector/connector"]
+COPY --from=ghcr.io/estuary/airbyte-to-flow:dev /airbyte-to-flow ./airbyte-to-flow
+ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/connector"]
+LABEL FLOW_TCP_PORT=2222
