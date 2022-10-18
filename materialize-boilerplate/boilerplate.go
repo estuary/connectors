@@ -19,22 +19,18 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// TODO: handle the logger properly by setting the log level on logrus
-type Options struct {
-	LogLevel string `long:"log.level" description:"Log level, one of: error, warn, info, debug, trace" default:"info"`
-}
-
 // RunMain is the boilerplate main function of a materialization connector.
 func RunMain(srv pm.DriverServer) {
-	var opts = &Options{""}
-	var parser = flags.NewParser(opts, flags.Default)
+	var logConfig = &logConfig{}
+	var parser = flags.NewParser(logConfig, flags.Default)
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
 	var cmd = cmdCommon{
-		ctx: ctx,
-		srv: srv,
-		r:   bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
-		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+		ctx:     ctx,
+		srv:     srv,
+		r:       bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
+		w:       protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+		logging: logConfig,
 	}
 
 	parser.AddCommand("spec", "Write the connector specification",
@@ -59,6 +55,30 @@ type cmdCommon struct {
 	srv pm.DriverServer
 	r   *bufio.Reader
 	w   protoio.Writer
+
+	logging *logConfig
+}
+
+// logConfig configures handling of application log events.
+type logConfig struct {
+	Level  string `long:"log.level" env:"LOG_LEVEL" default:"info" choice:"info" choice:"INFO" choice:"debug" choice:"DEBUG" choice:"warn" choice:"WARN" description:"Logging level"`
+	Format string `long:"log.format" env:"LOG_FORMAT" default:"text" choice:"json" choice:"text" choice:"color" description:"Logging output format"`
+}
+
+func (c *logConfig) Configure() {
+	if c.Format == "json" {
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	} else if c.Format == "text" {
+		logrus.SetFormatter(&logrus.TextFormatter{})
+	} else if c.Format == "color" {
+		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
+	}
+
+	if lvl, err := logrus.ParseLevel(c.Level); err != nil {
+		logrus.WithField("err", err).Fatal("unrecognized log level")
+	} else {
+		logrus.SetLevel(lvl)
+	}
 }
 
 type protoValidator interface {
@@ -129,7 +149,10 @@ type applyDeleteCmd struct{ cmdCommon }
 type transactionsCmd struct{ cmdCommon }
 
 func (c specCmd) Execute(args []string) error {
+	c.cmdCommon.logging.Configure()
+
 	var req pm.SpecRequest
+	logrus.Debug("executing Spec subcommand")
 
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
@@ -142,7 +165,10 @@ func (c specCmd) Execute(args []string) error {
 }
 
 func (c validateCmd) Execute(args []string) error {
+	c.cmdCommon.logging.Configure()
+
 	var req pm.ValidateRequest
+	logrus.Debug("executing Validate subcommand")
 
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
@@ -155,7 +181,10 @@ func (c validateCmd) Execute(args []string) error {
 }
 
 func (c applyUpsertCmd) Execute(args []string) error {
+	c.cmdCommon.logging.Configure()
+
 	var req pm.ApplyRequest
+	logrus.Debug("executing ApplyUpsert subcommand")
 
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
@@ -169,7 +198,10 @@ func (c applyUpsertCmd) Execute(args []string) error {
 }
 
 func (c applyDeleteCmd) Execute(args []string) error {
+	c.cmdCommon.logging.Configure()
+
 	var req pm.ApplyRequest
+	logrus.Debug("executing ApplyDelete subcommand")
 
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
@@ -193,6 +225,9 @@ func (c applyDeleteCmd) Execute(args []string) error {
 }
 
 func (c transactionsCmd) Execute(args []string) error {
+	c.cmdCommon.logging.Configure()
+
+	logrus.Debug("executing Transactions subcommand")
 	return c.srv.Transactions(&txnAdapter{cmdCommon: c.cmdCommon})
 }
 
