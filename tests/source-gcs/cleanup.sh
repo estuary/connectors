@@ -2,8 +2,8 @@
 
 set -e
 
-if [[ -n "$TEST_BUCKET" ]]; then
-    echo "deleting bucket $TEST_BUCKET"
-    gsutil rm -r "gs://$TEST_BUCKET"
+if [[ -n "$TEST_STREAM" ]]; then
+    echo "deleting bucket $TEST_STREAM"
+    gsutil rm -r "gs://$TEST_STREAM"
     echo "successfully deleted bucket"
 fi
