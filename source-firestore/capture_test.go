@@ -27,6 +27,10 @@ type testCaptureSpec struct {
 	EndpointSpec interface{}
 	Bindings     []*flow.CaptureSpec_Binding
 	Checkpoint   json.RawMessage
+
+	Validator  captureValidator
+	Sanitizers map[string]*regexp.Regexp
+	Errors     []error
 }
 
 func (cs *testCaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*regexp.Regexp) {
@@ -75,7 +79,7 @@ func matchesAny(matchers []*regexp.Regexp, text string) bool {
 	return false
 }
 
-func (cs *testCaptureSpec) Verify(ctx context.Context, t testing.TB, sentinel string) {
+func (cs *testCaptureSpec) Capture(ctx context.Context, t testing.TB, sentinel string) *testCaptureSpec {
 	t.Helper()
 	if os.Getenv("RUN_CAPTURES") != "yes" {
 		t.Skipf("skipping %q capture: ${RUN_CAPTURES} != \"yes\"", t.Name())
@@ -105,81 +109,68 @@ func (cs *testCaptureSpec) Verify(ctx context.Context, t testing.TB, sentinel st
 		openReq:       open,
 		checkpoint:    cs.Checkpoint,
 		bindings:      cs.Bindings,
+		validator:     cs.Validator,
+		sanitizers:    cs.Sanitizers,
 		sentinelValue: sentinel,
 		shutdown:      shutdown,
 	}
-	err = cs.Driver.Pull(adapter)
-	cupaloy.SnapshotT(t, adapter.Summary(err))
+	if err := cs.Driver.Pull(adapter); err != nil {
+		cs.Errors = append(cs.Errors, err)
+	}
 	cs.Checkpoint = adapter.checkpoint
+	return cs
 }
 
-var SnapshotSanitizers = map[string]*regexp.Regexp{
-	`"<TIMESTAMP>"`: regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]*Z"`),
+func (cs *testCaptureSpec) Verify(t testing.TB) {
+	t.Helper()
+	cupaloy.SnapshotT(t, cs.Summary())
+	cs.Validator.Reset()
+	cs.Errors = nil
+}
+
+func (cs *testCaptureSpec) Summary() string {
+	var w = new(strings.Builder)
+
+	// Ask the output validator to summarize all observed output
+	if err := cs.Validator.Summarize(w); err != nil {
+		fmt.Fprintf(w, "# ================================\n")
+		fmt.Fprintf(w, "# Error Summarizing Capture Output\n")
+		fmt.Fprintf(w, "# ================================\n")
+		fmt.Fprintf(w, "%v\n", err)
+	}
+
+	// Append the final state checkpoint
+	fmt.Fprintf(w, "# ================================\n")
+	fmt.Fprintf(w, "# Final State Checkpoint\n")
+	fmt.Fprintf(w, "# ================================\n")
+	fmt.Fprintf(w, "%s\n", sanitize(cs.Sanitizers, cs.Checkpoint))
+
+	// If the error result is non-nil, add that to the summary as well
+	if len(cs.Errors) != 0 {
+		fmt.Fprintf(w, "# ================================\n")
+		fmt.Fprintf(w, "# Captures Terminated With Errors\n")
+		fmt.Fprintf(w, "# ================================\n")
+		for _, err := range cs.Errors {
+			fmt.Fprintf(w, "%v\n", err)
+		}
+	}
+	return w.String()
 }
 
 type testPullAdapter struct {
-	ctx        context.Context
-	openReq    *pc.PullRequest
-	checkpoint []byte
-	bindings   []*flow.CaptureSpec_Binding
-	documents  map[uint32][]json.RawMessage // Map from binding index to list of documents
+	ctx         context.Context
+	openReq     *pc.PullRequest
+	checkpoint  []byte
+	bindings    []*flow.CaptureSpec_Binding
+	validator   captureValidator
+	sanitizers  map[string]*regexp.Regexp
+	transaction []*pc.Documents
 
 	// After the sentinel value is observed in an output document, the next state
 	// checkpoint will cause the shutdown thunk to be invoked.
 	sentinelReached bool
 	sentinelValue   string
 	shutdown        func()
-}
-
-func (a *testPullAdapter) Summary(err error) string {
-	var out = new(strings.Builder)
-
-	// Accumulate the contents of each buffer, in order of binding index.
-	var indices []int
-	for bindingIndex := range a.documents {
-		indices = append(indices, int(bindingIndex))
-	}
-	sort.Ints(indices)
-	for _, bindingIndex := range indices {
-		var bindingName = "INVALID"
-		if 0 <= bindingIndex && bindingIndex < len(a.bindings) {
-			bindingName = strings.Join(a.bindings[bindingIndex].ResourcePath, "|")
-		}
-		fmt.Fprintf(out, "# ================================\n")
-		fmt.Fprintf(out, "# Binding %d (%q)\n", bindingIndex, bindingName)
-		fmt.Fprintf(out, "# ================================\n")
-		var docs = a.documents[uint32(bindingIndex)]
-		// Sort documents in lexicographic order
-		sort.Slice(docs, func(i, j int) bool {
-			return bytes.Compare(docs[i], docs[j]) < 0
-		})
-		for _, doc := range docs {
-			out.WriteString(string(doc))
-			out.WriteByte('\n')
-		}
-	}
-
-	// Append the final state checkpoint
-	fmt.Fprintf(out, "# ================================\n")
-	fmt.Fprintf(out, "# Final State Checkpoint\n")
-	fmt.Fprintf(out, "# ================================\n")
-	out.WriteString(string(a.checkpoint))
-	out.WriteByte('\n')
-
-	// If the error result is non-nil, add that to the summary as well
-	if err != nil {
-		fmt.Fprintf(out, "# ================================\n")
-		fmt.Fprintf(out, "# Capture Terminated With Error\n")
-		fmt.Fprintf(out, "# ================================\n")
-		out.WriteString(err.Error())
-	}
-
-	// Sanitize things like timestamps that might vary between test runs
-	var summary = out.String()
-	for sanitizeReplacement, sanitizeMatcher := range SnapshotSanitizers {
-		summary = sanitizeMatcher.ReplaceAllString(summary, sanitizeReplacement)
-	}
-	return summary
 }
 
 func (a *testPullAdapter) Recv() (*pc.PullRequest, error) {
@@ -192,6 +183,9 @@ func (a *testPullAdapter) Recv() (*pc.PullRequest, error) {
 }
 
 func (a *testPullAdapter) Send(m *pc.PullResponse) error {
+	if m.Documents != nil {
+		a.transaction = append(a.transaction, m.Documents)
+	}
 	if m.Checkpoint != nil {
 		if !m.Checkpoint.Rfc7396MergePatch || a.checkpoint == nil {
 			a.checkpoint = m.Checkpoint.DriverCheckpointJson
@@ -209,21 +203,26 @@ func (a *testPullAdapter) Send(m *pc.PullResponse) error {
 				}).Log(logLevel, "checkpoint")
 			}
 		}
+
+		for _, documents := range a.transaction {
+			for _, slice := range documents.DocsJson {
+				var doc = json.RawMessage(documents.Arena[slice.Begin:slice.End])
+				var binding string
+				if idx := documents.Binding; 0 <= idx && int(idx) < len(a.bindings) {
+					binding = strings.Join(a.bindings[idx].ResourcePath, "|")
+				} else {
+					binding = fmt.Sprintf("Invalid Binding %d", idx)
+				}
+				if !a.sentinelReached && bytes.Contains(doc, []byte(a.sentinelValue)) {
+					a.sentinelReached = true
+				}
+				a.validator.Output(binding, sanitize(a.sanitizers, doc))
+			}
+		}
+		a.transaction = nil
+
 		if a.sentinelReached && !bytes.Equal(m.Checkpoint.DriverCheckpointJson, []byte("{}")) {
 			a.shutdown()
-		}
-		return nil
-	} else if m.Documents != nil {
-		var binding = m.Documents.Binding
-		if a.documents == nil {
-			a.documents = make(map[uint32][]json.RawMessage)
-		}
-		for _, s := range m.Documents.DocsJson {
-			var doc = json.RawMessage(m.Documents.Arena[s.Begin:s.End])
-			a.documents[binding] = append(a.documents[binding], doc)
-			if !a.sentinelReached && bytes.Contains(doc, []byte(a.sentinelValue)) {
-				a.sentinelReached = true
-			}
 		}
 	}
 	return nil
@@ -235,3 +234,58 @@ func (a *testPullAdapter) RecvMsg(m interface{}) error  { panic("RecvMsg is not 
 func (a *testPullAdapter) SendHeader(metadata.MD) error { panic("SendHeader is not supported") }
 func (a *testPullAdapter) SetHeader(metadata.MD) error  { panic("SetHeader is not supported") }
 func (a *testPullAdapter) SetTrailer(metadata.MD)       { panic("SetTrailer is not supported") }
+
+type captureValidator interface {
+	Output(collection string, data json.RawMessage)
+	Summarize(w io.Writer) error
+	Reset()
+}
+
+type sortedCaptureValidator struct {
+	documents map[string][]json.RawMessage // Map from collection name to list of documents
+}
+
+func (v *sortedCaptureValidator) Output(collection string, data json.RawMessage) {
+	if v.documents == nil {
+		v.documents = make(map[string][]json.RawMessage)
+	}
+	v.documents[collection] = append(v.documents[collection], data)
+}
+
+func (v *sortedCaptureValidator) Summarize(w io.Writer) error {
+	var collections []string
+	for collection := range v.documents {
+		collections = append(collections, collection)
+	}
+	sort.Strings(collections)
+
+	for _, collection := range collections {
+		var docs = make([]json.RawMessage, len(v.documents[collection]))
+		copy(docs, v.documents[collection])
+		sort.Slice(docs, func(i, j int) bool { return bytes.Compare(docs[i], docs[j]) < 0 })
+
+		fmt.Fprintf(w, "# ================================\n")
+		fmt.Fprintf(w, "# Collection %q: %d Documents\n", collection, len(docs))
+		fmt.Fprintf(w, "# ================================\n")
+		for _, doc := range docs {
+			fmt.Fprintf(w, "%s\n", string(doc))
+		}
+	}
+	return nil
+}
+
+func (v *sortedCaptureValidator) Reset() {
+	v.documents = nil
+}
+
+func sanitize(sanitizers map[string]*regexp.Regexp, data json.RawMessage) json.RawMessage {
+	var bs = []byte(data)
+	for replacement, matcher := range sanitizers {
+		bs = matcher.ReplaceAll(bs, []byte(replacement))
+	}
+	return json.RawMessage(bs)
+}
+
+var DefaultSanitizers = map[string]*regexp.Regexp{
+	`"<TIMESTAMP>"`: regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]*Z"`),
+}

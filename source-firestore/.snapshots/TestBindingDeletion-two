@@ -1,5 +1,5 @@
 # ================================
-# Binding 0 ("flow_source_tests/*/other")
+# Collection "flow_source_tests/*/other": 1 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/other/999","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 # ================================
