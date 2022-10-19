@@ -2,7 +2,8 @@ Binding 0:
 {
     "recommended_name": "flow_source_tests",
     "resource_spec_json": {
-      "path": "flow_source_tests"
+      "path": "flow_source_tests",
+      "backfillMode": "sync"
     },
     "document_schema_json": {
       "allOf": [
@@ -76,7 +77,8 @@ Binding 1:
 {
     "recommended_name": "flow_source_tests_users",
     "resource_spec_json": {
-      "path": "flow_source_tests/*/users"
+      "path": "flow_source_tests/*/users",
+      "backfillMode": "sync"
     },
     "document_schema_json": {
       "allOf": [
@@ -150,7 +152,8 @@ Binding 2:
 {
     "recommended_name": "flow_source_tests_users_docs",
     "resource_spec_json": {
-      "path": "flow_source_tests/*/users/*/docs"
+      "path": "flow_source_tests/*/users/*/docs",
+      "backfillMode": "sync"
     },
     "document_schema_json": {
       "allOf": [

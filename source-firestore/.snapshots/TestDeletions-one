@@ -1,5 +1,5 @@
 # ================================
-# Binding 0 ("flow_source_tests/*/docs")
+# Collection "flow_source_tests/*/docs": 3 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDeletions/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":3}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDeletions/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":4}
