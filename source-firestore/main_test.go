@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 		DataKey:  "data",
 		FieldMap: log.FieldMap{log.FieldKeyTime: "@ts"},
 	})
-	SnapshotSanitizers["project-id-123456"] = regexp.MustCompile(regexp.QuoteMeta(*testProjectID))
+	DefaultSanitizers["project-id-123456"] = regexp.MustCompile(regexp.QuoteMeta(*testProjectID))
 	os.Exit(m.Run())
 }
 
@@ -85,7 +85,7 @@ func TestSimpleCapture(t *testing.T) {
 		)
 		time.Sleep(100 * time.Millisecond)
 		client.Upsert(ctx, t, "docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel))
-		capture.Verify(ctx, t, restartSentinel)
+		capture.Capture(ctx, t, restartSentinel).Verify(t)
 	})
 	t.Run("two", func(t *testing.T) {
 		client.Upsert(ctx, t,
@@ -98,7 +98,7 @@ func TestSimpleCapture(t *testing.T) {
 		)
 		time.Sleep(100 * time.Millisecond)
 		client.Upsert(ctx, t, "docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel))
-		capture.Verify(ctx, t, shutdownSentinel)
+		capture.Capture(ctx, t, shutdownSentinel).Verify(t)
 	})
 }
 
@@ -117,13 +117,13 @@ func TestDeletions(t *testing.T) {
 		client.Delete(ctx, t, "docs/1", "docs/2")
 		time.Sleep(100 * time.Millisecond)
 		client.Upsert(ctx, t, "docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel))
-		capture.Verify(ctx, t, restartSentinel)
+		capture.Capture(ctx, t, restartSentinel).Verify(t)
 	})
 	t.Run("two", func(t *testing.T) {
 		client.Delete(ctx, t, "docs/3", "docs/4")
 		time.Sleep(100 * time.Millisecond)
 		client.Upsert(ctx, t, "docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel))
-		capture.Verify(ctx, t, shutdownSentinel)
+		capture.Capture(ctx, t, shutdownSentinel).Verify(t)
 	})
 }
 
@@ -150,7 +150,7 @@ func TestNewCollectionReadTime(t *testing.T) {
 		)
 		time.Sleep(100 * time.Millisecond)
 		client.Upsert(ctx, t, "users/1/docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel))
-		capture.Verify(ctx, t, restartSentinel)
+		capture.Capture(ctx, t, restartSentinel).Verify(t)
 	})
 	capture.Bindings = append(capture.Bindings, simpleBindings(t, "groups/*/docs")...)
 	t.Run("two", func(t *testing.T) {
@@ -162,7 +162,7 @@ func TestNewCollectionReadTime(t *testing.T) {
 		)
 		time.Sleep(100 * time.Millisecond)
 		client.Upsert(ctx, t, "groups/2/docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel))
-		capture.Verify(ctx, t, shutdownSentinel)
+		capture.Capture(ctx, t, shutdownSentinel).Verify(t)
 	})
 }
 
@@ -191,8 +191,8 @@ func TestManySmallWrites(t *testing.T) {
 		)
 	}(ctx)
 
-	t.Run("one", func(t *testing.T) { capture.Verify(ctx, t, restartSentinel) })
-	t.Run("two", func(t *testing.T) { capture.Verify(ctx, t, shutdownSentinel) })
+	t.Run("one", func(t *testing.T) { capture.Capture(ctx, t, restartSentinel).Verify(t) })
+	t.Run("two", func(t *testing.T) { capture.Capture(ctx, t, shutdownSentinel).Verify(t) })
 }
 
 func TestMultipleWatches(t *testing.T) {
@@ -221,8 +221,8 @@ func TestMultipleWatches(t *testing.T) {
 		)
 	}(ctx)
 
-	t.Run("one", func(t *testing.T) { capture.Verify(ctx, t, restartSentinel) })
-	t.Run("two", func(t *testing.T) { capture.Verify(ctx, t, shutdownSentinel) })
+	t.Run("one", func(t *testing.T) { capture.Capture(ctx, t, restartSentinel).Verify(t) })
+	t.Run("two", func(t *testing.T) { capture.Capture(ctx, t, shutdownSentinel).Verify(t) })
 }
 
 func TestBindingDeletion(t *testing.T) {
@@ -236,11 +236,11 @@ func TestBindingDeletion(t *testing.T) {
 	client.Upsert(ctx, t, "other/999", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel))
 
 	var capture = simpleCapture(t, "docs")
-	t.Run("one", func(t *testing.T) { capture.Verify(ctx, t, shutdownSentinel) })
+	t.Run("one", func(t *testing.T) { capture.Capture(ctx, t, shutdownSentinel).Verify(t) })
 	capture.Bindings = simpleBindings(t, "other")
-	t.Run("two", func(t *testing.T) { capture.Verify(ctx, t, shutdownSentinel) })
+	t.Run("two", func(t *testing.T) { capture.Capture(ctx, t, shutdownSentinel).Verify(t) })
 	capture.Bindings = simpleBindings(t, "docs")
-	t.Run("three", func(t *testing.T) { capture.Verify(ctx, t, shutdownSentinel) })
+	t.Run("three", func(t *testing.T) { capture.Capture(ctx, t, shutdownSentinel).Verify(t) })
 }
 
 func TestDiscovery(t *testing.T) {
@@ -282,6 +282,8 @@ func simpleCapture(t testing.TB, names ...string) *testCaptureSpec {
 		Driver:       new(driver),
 		EndpointSpec: endpointSpec,
 		Bindings:     simpleBindings(t, names...),
+		Validator:    &sortedCaptureValidator{},
+		Sanitizers:   DefaultSanitizers,
 	}
 }
 
@@ -290,7 +292,7 @@ func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
 	for _, name := range names {
 		var path = "flow_source_tests/*/" + name
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
-			ResourceSpecJson: json.RawMessage(fmt.Sprintf(`{"path": %q}`, path)),
+			ResourceSpecJson: json.RawMessage(fmt.Sprintf(`{"path": %q, "backfillMode": "sync"}`, path)),
 			ResourcePath:     []string{path},
 		})
 	}

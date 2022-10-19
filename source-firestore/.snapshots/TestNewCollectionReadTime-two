@@ -1,14 +1,14 @@
 # ================================
-# Binding 0 ("flow_source_tests/*/users/*/docs")
-# ================================
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":3}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":4}
-# ================================
-# Binding 1 ("flow_source_tests/*/groups/*/docs")
+# Collection "flow_source_tests/*/groups/*/docs": 3 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":5}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":6}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/groups/2/docs/ZZZ","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
+# ================================
+# Collection "flow_source_tests/*/users/*/docs": 2 Documents
+# ================================
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":3}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestNewCollectionReadTime/users/1/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":4}
 # ================================
 # Final State Checkpoint
 # ================================

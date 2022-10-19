@@ -1,5 +1,5 @@
 # ================================
-# Binding 0 ("flow_source_tests/*/users/*/docs")
+# Collection "flow_source_tests/*/users/*/docs": 25 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
@@ -27,7 +27,7 @@
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 # ================================
-# Binding 1 ("flow_source_tests/*/users/*/notes")
+# Collection "flow_source_tests/*/users/*/notes": 25 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/notes/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
@@ -55,7 +55,11 @@
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/notes/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 # ================================
-# Binding 2 ("flow_source_tests/*/users/*/tasks")
+# Collection "flow_source_tests/*/users/*/sentinels": 1 Documents
+# ================================
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/999/sentinels/999","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
+# ================================
+# Collection "flow_source_tests/*/users/*/tasks": 25 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/5/tasks/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
@@ -82,10 +86,6 @@
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/9/tasks/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
-# ================================
-# Binding 3 ("flow_source_tests/*/users/*/sentinels")
-# ================================
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/999/sentinels/999","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 # ================================
 # Final State Checkpoint
 # ================================
