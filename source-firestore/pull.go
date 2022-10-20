@@ -478,11 +478,12 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 			cursor = doc
 		}
 
+		var resumeDocumentPath = trimDatabasePath(cursor.Ref.Path)
 		logEntry.WithFields(log.Fields{
 			"total":  numDocuments,
-			"cursor": cursor.Ref.Path,
+			"cursor": resumeDocumentPath,
 		}).Debug("updating backfill cursor")
-		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, cursor.Ref.Path); err != nil {
+		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, resumeDocumentPath); err != nil {
 			return err
 		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 			return err
