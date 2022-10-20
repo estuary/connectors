@@ -191,9 +191,9 @@ func TestMassiveBackfill(t *testing.T) {
 	}
 
 	// Set up a watchdog timeout which will terminate the overall context after nothing
-	// has been captured for 60s. The WDT will be fed via the `watchdogValidator` wrapper
+	// has been captured for 120s. The WDT will be fed via the `watchdogValidator` wrapper
 	// around the actual capture output validator.
-	const quiescentTimeout = 60 * time.Second
+	const quiescentTimeout = 120 * time.Second
 	var ctx, cancel = context.WithCancel(context.Background())
 	var wdt = time.AfterFunc(quiescentTimeout, func() {
 		log.WithField("timeout", quiescentTimeout.String()).Debug("capture watchdog timeout expired")
@@ -205,8 +205,16 @@ func TestMassiveBackfill(t *testing.T) {
 		resetPeriod: quiescentTimeout,
 	}
 
-	// Run the capture and verify the results.
-	capture.Capture(ctx, t, "THIS-SENTINEL-VALUE-SHOULD-NEVER-EXIST").Verify(t)
+	// Run the capture and verify the results. The capture is killed every 30s and
+	// then restarted from the previous checkpoint, in order to exercise incremental
+	// backfill resuming behavior. Since the backfill takes about 1500s to complete
+	// this should restart about 50 times along the way.
+	for ctx.Err() == nil {
+		var shortCtx, cancel = context.WithCancel(ctx)
+		time.AfterFunc(30*time.Second, cancel)
+		capture.Capture(shortCtx, t, "THIS-SENTINEL-VALUE-SHOULD-NEVER-EXIST")
+	}
+	capture.Verify(t)
 }
 
 type watchdogValidator struct {
