@@ -13,5 +13,5 @@ Checksum: 32e2ad431caa25ed058522d388bfcb8cb6072ac4518a644cbf62e65eaf38b2b1
 # ================================
 # Final State Checkpoint
 # ================================
-{"Resources":{"groups":{"ReadTime":"<TIMESTAMP>","Backfill":"[done]"},"groups/*/users":{"ReadTime":"<TIMESTAMP>","Backfill":"[done]"},"groups/*/users/*/events":{"ReadTime":"<TIMESTAMP>","Backfill":"[done]"}}}
+{"Resources":{"groups":{"ReadTime":"<TIMESTAMP>"},"groups/*/users":{"ReadTime":"<TIMESTAMP>","Backfill":null},"groups/*/users/*/events":{"ReadTime":"<TIMESTAMP>","Backfill":null}}}
 
