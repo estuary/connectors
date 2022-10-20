@@ -121,11 +121,20 @@ type captureState struct {
 }
 
 type resourceState struct {
-	ReadTime       time.Time
-	BackfillAsync  bool   `json:"backfill,omitempty"`
-	BackfillCursor string `json:"backfillCursor,omitempty"`
-	bindingIndex   uint32
+	ReadTime time.Time
+
+	// The Backfill property contains either a document path acting as a resume cursor,
+	// the sentinel value "[start]" to indicate that a backfill is required but has not
+	// yet been started, or else "" or "[done]" to indicate that no backfill is required.
+	Backfill     string `json:"Backfill,omitempty"`
+	bindingIndex uint32
 }
+
+const (
+	backfillCursorNone     = ""
+	backfillCursorStart    = "[start]"
+	backfillCursorComplete = "[done]"
+)
 
 // Given the prior resource states from the last DriverCheckpoint along with
 // the current capture bindings, compute a new set of resource states.
@@ -136,19 +145,18 @@ func initResourceStates(prevStates map[string]*resourceState, resourceBindings [
 		var state = &resourceState{bindingIndex: uint32(idx)}
 		if prevState, ok := prevStates[resource.Path]; ok {
 			state.ReadTime = prevState.ReadTime
-			state.BackfillAsync = prevState.BackfillAsync
-			state.BackfillCursor = prevState.BackfillCursor
+			state.Backfill = prevState.Backfill
 		} else {
 			switch resource.BackfillMode {
 			case backfillModeNone:
 				state.ReadTime = now
-				state.BackfillAsync = false
+				state.Backfill = backfillCursorNone
 			case backfillModeAsync:
 				state.ReadTime = now
-				state.BackfillAsync = true
+				state.Backfill = backfillCursorStart
 			case backfillModeSync:
 				state.ReadTime = time.Time{}
-				state.BackfillAsync = false
+				state.Backfill = backfillCursorNone
 			default:
 				return nil, fmt.Errorf("invalid backfill mode %q for %q", resource.BackfillMode, resource.Path)
 			}
@@ -185,7 +193,7 @@ func (s *captureState) BackfillingAsync(rpath resourcePath) bool {
 	s.RLock()
 	defer s.RUnlock()
 	if state := s.Resources[rpath]; state != nil {
-		return state.BackfillAsync
+		return state.Backfill != backfillCursorNone && state.Backfill != backfillCursorComplete
 	}
 	return false
 }
@@ -208,13 +216,12 @@ func (s *captureState) UpdateReadTimes(collectionID string, readTime time.Time) 
 	return checkpointJSON, nil
 }
 
-func (s *captureState) UpdateBackfillState(collectionID string, resumeDocumentPath string, inProgress bool) (json.RawMessage, error) {
+func (s *captureState) UpdateBackfillState(collectionID string, cursor string) (json.RawMessage, error) {
 	s.Lock()
 	var updated = make(map[string]*resourceState)
 	for resourcePath, resourceState := range s.Resources {
 		if getLastCollectionGroupID(resourcePath) == collectionID {
-			resourceState.BackfillAsync = inProgress
-			resourceState.BackfillCursor = resumeDocumentPath
+			resourceState.Backfill = cursor
 			updated[resourcePath] = resourceState
 		}
 	}
@@ -321,12 +328,12 @@ func (c *capture) Run(ctx context.Context) error {
 		if startTime, ok := watchCollections[collectionID]; !ok || resourceState.ReadTime.Before(startTime) {
 			watchCollections[collectionID] = resourceState.ReadTime
 		}
-		if !resourceState.BackfillAsync {
+		if resourceState.Backfill == backfillCursorNone || resourceState.Backfill == backfillCursorComplete {
 			// Do nothing
 		} else if cursor, ok := backfillCollections[collectionID]; !ok {
-			backfillCollections[collectionID] = resourceState.BackfillCursor
-		} else if cursor != resourceState.BackfillCursor {
-			return fmt.Errorf("mismatched cursors %q and %q for async backfills from collection %q", cursor, resourceState.BackfillCursor, collectionID)
+			backfillCollections[collectionID] = resourceState.Backfill
+		} else if cursor != resourceState.Backfill {
+			return fmt.Errorf("mismatched cursors %q and %q for async backfills from collection %q", cursor, resourceState.Backfill, collectionID)
 		}
 	}
 
@@ -411,7 +418,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 	var logEntry = log.WithFields(log.Fields{"collection": collectionID})
 
 	var cursor *firestore.DocumentSnapshot
-	if resumeDocumentPath == "" {
+	if resumeDocumentPath == backfillCursorStart {
 		logEntry.Info("starting async backfill")
 	} else if resumeDocument, err := client.Doc(resumeDocumentPath).Get(ctx); err != nil {
 		logEntry.WithField("cursor", resumeDocumentPath).Warn("error fetching resume document -- backfill will restart from the beginning")
@@ -429,6 +436,9 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 
 		var docs, err = query.Documents(ctx).GetAll()
 		if err != nil {
+			if status.Code(err) == codes.Canceled {
+				err = context.Canceled // Undo an awful bit of wrapping which breaks errors.Is()
+			}
 			return fmt.Errorf("error backfilling %q: chunk query failed after %d documents: %w", collectionID, numDocuments, err)
 		}
 		if len(docs) == 0 {
@@ -472,7 +482,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 			"total":  numDocuments,
 			"cursor": cursor.Ref.Path,
 		}).Debug("updating backfill cursor")
-		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, cursor.Ref.Path, true); err != nil {
+		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, cursor.Ref.Path); err != nil {
 			return err
 		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 			return err
@@ -480,7 +490,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 	}
 
 	logEntry.WithField("docs", numDocuments).Info("backfill complete")
-	if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, "", false); err != nil {
+	if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, backfillCursorComplete); err != nil {
 		return err
 	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 		return err
@@ -541,7 +551,7 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 			return nil
 		} else if status.Code(err) == codes.Canceled {
 			logEntry.Debug("context canceled, shutting down")
-			return nil
+			return context.Canceled // Undo an awful bit of wrapping which breaks errors.Is()
 		} else if retryableStatus(err) {
 			logEntry.WithFields(log.Fields{
 				"err":  err,
