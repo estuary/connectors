@@ -27,12 +27,7 @@ func getLastCollectionGroupID(path resourcePath) collectionGroupID {
 //	"projects/blissful-jet-364120/databases/(default)/documents/users/OLgLVvZnykvFR4ZyqUuS/messages"
 //	=> "users/*/messages"
 func collectionToResourcePath(collection string) resourcePath {
-	// the prefix up to the first "/documents" is unnecessary, so we remove that
-	var parts = strings.SplitN(collection, "/documents/", 2)
-	if len(parts) < 2 {
-		panic(fmt.Sprintf("collection path does not match expectations: %s", collection))
-	}
-	var after = parts[1]
+	var after = trimDatabasePath(collection)
 
 	// we now need to get rid of document references, which appear after every collection name
 	var pieces = strings.Split(after, "/")
@@ -45,6 +40,19 @@ func collectionToResourcePath(collection string) resourcePath {
 	}
 
 	return strings.Trim(cleanedPath, "/*/")
+}
+
+// Transforms a document or collection path by stripping off the database path
+// prefix. For example:
+//
+//	"projects/blissful-jet-364120/databases/(default)/documents/users/OLgLVvZnykvFR4ZyqUuS/messages/123"
+//	=> "users/OLgLVvZnykvFR4ZyqUuS/messages/123"
+func trimDatabasePath(path string) string {
+	var parts = strings.SplitN(path, "/documents/", 2)
+	if len(parts) != 2 {
+		panic(fmt.Sprintf("database path %q does not contain '/documents/' separator", path))
+	}
+	return parts[1]
 }
 
 // Transforms a document path to a "resource path" which abstracts over document
