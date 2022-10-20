@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
 	protoio "github.com/gogo/protobuf/io"
@@ -21,6 +22,8 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+const ListenTimeoutSeconds = 10
+
 // RunMain is the boilerplate main function of a capture connector.
 func RunMain(srv pc.DriverServer) {
 	var logConfig = &logConfig{}
@@ -28,10 +31,18 @@ func RunMain(srv pc.DriverServer) {
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
 	var conn net.Conn
-	if server, err := net.Listen("tcp", ":2222"); err != nil {
+	server, err := net.ListenTCP("tcp4", &net.TCPAddr{
+		IP:   net.IPv4(0, 0, 0, 0),
+		Port: 2222,
+	})
+
+	if err != nil {
 		logrus.WithFields(logrus.Fields{"error": err}).
 			Fatal("failed to start tcp server")
-	} else if conn, err = server.Accept(); err != nil {
+	}
+
+	server.SetDeadline(time.Now().Add(ListenTimeoutSeconds * time.Second))
+	if conn, err = server.Accept(); err != nil {
 		logrus.WithFields(logrus.Fields{"error": err}).
 			Fatal("failed to accept connection on tcp server")
 	}
@@ -56,7 +67,7 @@ func RunMain(srv pc.DriverServer) {
 	parser.AddCommand("pull", "Pull data from the target system",
 		"Connect to the target system and begin pulling data from the selected streams", &pullCmd{cmd})
 
-	var _, err = parser.Parse()
+	_, err = parser.Parse()
 	if err != nil {
 		os.Exit(1)
 	}
