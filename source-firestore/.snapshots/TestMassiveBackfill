@@ -1,0 +1,17 @@
+# ================================
+# Collection "groups": 1000 Documents
+# ================================
+Checksum: cbc04eddc482a563584233fe689c127a12284ed36f2c0f473e170332b67be9ce
+# ================================
+# Collection "groups/*/users": 500000 Documents
+# ================================
+Checksum: 04f0c2ed6c0489b45d47e2e093c006e429e31cf7633b1ce6803e512d7a8a63fa
+# ================================
+# Collection "groups/*/users/*/events": 5000000 Documents
+# ================================
+Checksum: 32e2ad431caa25ed058522d388bfcb8cb6072ac4518a644cbf62e65eaf38b2b1
+# ================================
+# Final State Checkpoint
+# ================================
+{"Resources":{"groups":{"ReadTime":"<TIMESTAMP>","Backfill":"[done]"},"groups/*/users":{"ReadTime":"<TIMESTAMP>","Backfill":"[done]"},"groups/*/users/*/events":{"ReadTime":"<TIMESTAMP>","Backfill":"[done]"}}}
+
