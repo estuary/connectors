@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -114,7 +115,7 @@ func (cs *testCaptureSpec) Capture(ctx context.Context, t testing.TB, sentinel s
 		sentinelValue: sentinel,
 		shutdown:      shutdown,
 	}
-	if err := cs.Driver.Pull(adapter); err != nil {
+	if err := cs.Driver.Pull(adapter); err != nil && !errors.Is(err, context.Canceled) {
 		cs.Errors = append(cs.Errors, err)
 	}
 	cs.Checkpoint = adapter.checkpoint
