@@ -264,9 +264,9 @@ func TestMassiveBackfill(t *testing.T) {
 	// backfill resuming behavior. Since the backfill takes about 1500s to complete
 	// this should restart about 50 times along the way.
 	for ctx.Err() == nil {
-		var shortCtx, cancel = context.WithCancel(ctx)
+		var ctx, cancel = context.WithCancel(ctx)
 		time.AfterFunc(30*time.Second, cancel)
-		capture.Capture(shortCtx, t, "THIS-SENTINEL-VALUE-SHOULD-NEVER-EXIST")
+		capture.Capture(ctx, t, "THIS-SENTINEL-VALUE-SHOULD-NEVER-EXIST")
 	}
 	capture.Verify(t)
 }
