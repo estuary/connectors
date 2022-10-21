@@ -420,6 +420,7 @@ func (c *capture) Run(ctx context.Context) error {
 	}
 	defer log.Info("capture terminating")
 	if err := eg.Wait(); err != nil && !errors.Is(err, io.EOF) {
+		log.WithField("err", err).Error("capture worker failed")
 		return err
 	}
 	return nil
@@ -432,16 +433,31 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 
 	var cursor *firestore.DocumentSnapshot
 	if resumeState == nil {
-		return nil // This should never happen since we only run BackfillAsync when there's a backfill to perform, but seemed safe enough to check anyway
+		// This should never happen since we only run BackfillAsync when there's a backfill to perform, but seemed safe enough to check anyway
+		return nil
 	} else if resumeState.Cursor == "" {
+		// If the cursor path is empty then we just leave the cursor document pointer nil
 		logEntry.Info("starting async backfill")
 	} else if resumeDocument, err := client.Doc(resumeState.Cursor).Get(ctx); err != nil {
-		logEntry.WithField("cursor", resumeState.Cursor).Warn("error fetching resume document -- backfill will restart from the beginning")
+		// If we fail to fetch the resume document, we clear the relevant backfill cursor and error out.
+		// This will cause the backfill to restart from the beginning after the capture gets restarted,
+		// and in the meantime it will show up as an error in the UI in case there's a persistent issue.
+		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, &backfillState{}); err != nil {
+			return err
+		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
+			return err
+		}
+		return fmt.Errorf("restarting backfill %q: error fetching resume document %q", collectionID, resumeState.Cursor)
 	} else if !resumeDocument.UpdateTime.Equal(resumeState.MTime) {
-		logEntry.WithFields(log.Fields{
-			"expected":  resumeState.MTime,
-			"retrieved": resumeDocument.UpdateTime,
-		}).Warn("resume document was modified during restart -- backfill will restart from the beginning")
+		// Just like if the resume document fetch fails, mtime mismatches cause us to error out, so
+		// we'll restart from the beginning when the connector gets restarted and in the meantime
+		// it'll show up red in the UI.
+		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, &backfillState{}); err != nil {
+			return err
+		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
+			return err
+		}
+		return fmt.Errorf("restarting backfill %q: resume document %q modified during backfill", collectionID, resumeState.Cursor)
 	} else {
 		cursor = resumeDocument
 	}
@@ -581,7 +597,7 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 			logEntry.WithFields(log.Fields{
 				"err":  err,
 				"docs": numDocuments,
-			}).Errorf("temporary failure, retrying in %s", retryInterval)
+			}).Errorf("retryable failure, will restart in %s", retryInterval)
 			if err := listenClient.CloseSend(); err != nil {
 				logEntry.WithField("err", err).Warn("error closing listen client")
 			}
@@ -590,7 +606,7 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 			time.Sleep(retryInterval)
 			continue
 		} else if err != nil {
-			return fmt.Errorf("recv error: %w", err)
+			return fmt.Errorf("error streaming %q changes: %w", collectionID, err)
 		}
 		logEntry.WithField("resp", resp).Trace("got response")
 
