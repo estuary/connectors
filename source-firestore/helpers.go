@@ -68,7 +68,6 @@ func retryableStatus(err error) bool {
 	var code = status.Code(err)
 	return code == codes.Unknown ||
 		code == codes.DeadlineExceeded ||
-		code == codes.ResourceExhausted ||
 		code == codes.Internal ||
 		code == codes.Unavailable
 }

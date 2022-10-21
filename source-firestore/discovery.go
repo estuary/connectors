@@ -323,7 +323,7 @@ func (ds *discoveryState) inferenceWorker(ctx context.Context, resourcePath reso
 
 	resourceJSON, err := json.Marshal(resource{
 		Path:         resourcePath,
-		BackfillMode: backfillModeSync,
+		BackfillMode: backfillModeAsync,
 	})
 	if err != nil {
 		return fmt.Errorf("error serializing resource json: %w", err)
