@@ -18,6 +18,7 @@ import (
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 )
 
@@ -41,13 +42,20 @@ import (
 //   about an hour per 1M documents, although it could probably be sped up by dividing
 //   it across multiple worker threads.
 //
+//   TestSyntheticClutter: Extends the dataset produced by TestSyntheticData by adding
+//   an absolute *ton* of 'clutter' objects. This increases the overall size of the
+//   dataset by another 10x, just to really stress-test things. The new objects are
+//   added to a nested collection 'groups/*/users/*/events/*/clutter', so the checksums
+//   of the other collections remain unchanged.
+//
 //   TestMassiveBackfill: Performs an asynchronous backfill of the synthetic dataset
 //   and verifies that it looks correct.
 
 const (
-	numGroups        = 1000 // 1k groups
-	numUsersPerGroup = 500  // 500k users
-	numEventsPerUser = 10   // 5M events
+	numGroups          = 1000 // 1k groups
+	numUsersPerGroup   = 500  // 500k users
+	numEventsPerUser   = 10   // 5M events
+	numClutterPerEvent = 10   // 50M clutter objects
 )
 
 func TestSyntheticData(t *testing.T) {
@@ -132,6 +140,52 @@ func TestSyntheticData(t *testing.T) {
 		}
 	}
 	batcher.Flush(ctx, t)
+}
+
+func TestSyntheticClutter(t *testing.T) {
+	if os.Getenv("DATASYNTH") != "yes" {
+		t.Skipf("skipping test %q: see datasynth_test.go for explanation", t.Name())
+	}
+
+	var ctx, cancel = context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
+	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
+	require.NoError(t, err)
+
+	client, err := firestore.NewClient(ctx, *testProjectID, option.WithCredentialsJSON(credentialsJSON))
+	require.NoError(t, err)
+
+	var eg = new(errgroup.Group)
+	eg.SetLimit(4)
+	for group := 0; group < numGroups; group++ {
+		group := group
+		log.WithField("group", group).Info("spawning worker")
+		eg.Go(func() error {
+			var batcher = &datasynthBatcher{inner: client}
+			for user := 0; user < numUsersPerGroup; user++ {
+				for event := 0; event < numEventsPerUser; event++ {
+					for clutter := 0; clutter < numClutterPerEvent; clutter++ {
+						batcher.Write(ctx, t, fmt.Sprintf(`groups/%d/users/%d/events/%d/clutter/%d`, group, user, event, clutter), map[string]interface{}{
+							"type":           "clutter",
+							"name":           fmt.Sprintf("Clutter Number %d", group),
+							"description":    fmt.Sprintf("A very nested object in a synthetic dataset. This one is clutter object %d of event %d of user %d of group %d.", clutter, event, user, group),
+							"sequenceNumber": clutter,
+							"version":        1,
+							"timestamp":      time.Now().Format(time.RFC3339Nano),
+							"foo":            rand.Intn(1024),
+							"bar":            strings.Repeat(string([]byte{byte('A' + rand.Intn(26))}), rand.Intn(16)) + strings.Repeat(string([]byte{byte('A' + rand.Intn(26))}), rand.Intn(16)),
+							"baz":            strings.Repeat(string([]byte{byte('A' + rand.Intn(26))}), rand.Intn(16)) + strings.Repeat(string([]byte{byte('A' + rand.Intn(26))}), rand.Intn(16)),
+						})
+					}
+				}
+			}
+			batcher.Flush(ctx, t)
+			return nil
+		})
+	}
+	eg.Wait()
 }
 
 const datasynthBatchSize = 500
