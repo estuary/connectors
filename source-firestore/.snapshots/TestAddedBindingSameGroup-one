@@ -1,0 +1,11 @@
+# ================================
+# Collection "flow_source_tests/*/users/*/docs": 3 Documents
+# ================================
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":2}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/ZZZ","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"5f91dae7-dc4d-48d9-bfec-2d3bfeec4164"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"Resources":{"flow_source_tests/*/users/*/docs":{"ReadTime":"<TIMESTAMP>"}}}
+
