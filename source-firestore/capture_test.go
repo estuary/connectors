@@ -167,12 +167,16 @@ type testPullAdapter struct {
 	sanitizers  map[string]*regexp.Regexp
 	transaction []*pc.Documents
 
-	// After the sentinel value is observed in an output document, the next state
-	// checkpoint will cause the shutdown thunk to be invoked.
+	// After the sentinel value is observed in an output document a shutdown
+	// WDT is activated, which will invoke the shutdown thunk after some time
+	// has passed with no further documents emitted.
 	sentinelReached bool
 	sentinelValue   string
 	shutdown        func()
+	wdt             *time.Timer
 }
+
+const shutdownHoldoffPeriod = 1000 * time.Millisecond
 
 func (a *testPullAdapter) Recv() (*pc.PullRequest, error) {
 	if msg := a.openReq; msg != nil {
@@ -206,25 +210,29 @@ func (a *testPullAdapter) Send(m *pc.PullResponse) error {
 		}
 
 		for _, documents := range a.transaction {
+			var binding string
+			if idx := documents.Binding; 0 <= idx && int(idx) < len(a.bindings) {
+				binding = strings.Join(a.bindings[idx].ResourcePath, "|")
+			} else {
+				binding = fmt.Sprintf("Invalid Binding %d", idx)
+			}
 			for _, slice := range documents.DocsJson {
 				var doc = json.RawMessage(documents.Arena[slice.Begin:slice.End])
-				var binding string
-				if idx := documents.Binding; 0 <= idx && int(idx) < len(a.bindings) {
-					binding = strings.Join(a.bindings[idx].ResourcePath, "|")
-				} else {
-					binding = fmt.Sprintf("Invalid Binding %d", idx)
-				}
+				a.validator.Output(binding, sanitize(a.sanitizers, doc))
 				if !a.sentinelReached && bytes.Contains(doc, []byte(a.sentinelValue)) {
 					a.sentinelReached = true
+					log.WithField("holdoff", shutdownHoldoffPeriod.String()).Debug("sentinel value observed")
+					a.wdt = time.AfterFunc(shutdownHoldoffPeriod, func() {
+						log.WithField("holdoff", shutdownHoldoffPeriod.String()).Debug("holdoff period expired, shutting down")
+						a.shutdown()
+					})
 				}
-				a.validator.Output(binding, sanitize(a.sanitizers, doc))
+				if a.wdt != nil {
+					a.wdt.Reset(shutdownHoldoffPeriod)
+				}
 			}
 		}
 		a.transaction = nil
-
-		if a.sentinelReached && !bytes.Equal(m.Checkpoint.DriverCheckpointJson, []byte("{}")) {
-			a.shutdown()
-		}
 	}
 	return nil
 }
@@ -261,15 +269,24 @@ func (v *sortedCaptureValidator) Summarize(w io.Writer) error {
 	sort.Strings(collections)
 
 	for _, collection := range collections {
-		var docs = make([]json.RawMessage, len(v.documents[collection]))
-		copy(docs, v.documents[collection])
-		sort.Slice(docs, func(i, j int) bool { return bytes.Compare(docs[i], docs[j]) < 0 })
+		// Take the original sequence of output documents, use a map to deduplicate them,
+		// and then put them back into a list in and sort it.
+		var inputDocs = v.documents[collection]
+		var uniqueDocs = make(map[string]struct{}, len(inputDocs))
+		for _, doc := range inputDocs {
+			uniqueDocs[string(doc)] = struct{}{}
+		}
+		var sortedDocs = make([]string, 0, len(uniqueDocs))
+		for doc := range uniqueDocs {
+			sortedDocs = append(sortedDocs, doc)
+		}
+		sort.Strings(sortedDocs)
 
 		fmt.Fprintf(w, "# ================================\n")
-		fmt.Fprintf(w, "# Collection %q: %d Documents\n", collection, len(docs))
+		fmt.Fprintf(w, "# Collection %q: %d Documents\n", collection, len(sortedDocs))
 		fmt.Fprintf(w, "# ================================\n")
-		for _, doc := range docs {
-			fmt.Fprintf(w, "%s\n", string(doc))
+		for _, doc := range sortedDocs {
+			fmt.Fprintf(w, "%s\n", doc)
 		}
 	}
 	return nil
@@ -288,5 +305,5 @@ func sanitize(sanitizers map[string]*regexp.Regexp, data json.RawMessage) json.R
 }
 
 var DefaultSanitizers = map[string]*regexp.Regexp{
-	`"<TIMESTAMP>"`: regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]*Z"`),
+	`"<TIMESTAMP>"`: regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`),
 }
