@@ -229,7 +229,7 @@ func (s *captureState) UpdateBackfillState(collectionID string, state *backfillS
 	s.Lock()
 	var updated = make(map[string]*resourceState)
 	for resourcePath, resourceState := range s.Resources {
-		if getLastCollectionGroupID(resourcePath) == collectionID {
+		if getLastCollectionGroupID(resourcePath) == collectionID && resourceState.Backfill != nil {
 			resourceState.Backfill = state
 			updated[resourcePath] = resourceState
 		}
@@ -477,22 +477,29 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 			}
 			return fmt.Errorf("error backfilling %q: chunk query failed after %d documents: %w", collectionID, numDocuments, err)
 		}
-		if len(docs) == 0 {
-			break
-		}
-
 		logEntry.WithFields(log.Fields{
 			"total": numDocuments,
 			"chunk": len(docs),
 		}).Debug("processing backfill documents")
+		if len(docs) == 0 {
+			break
+		}
+
 		for _, doc := range docs {
 			logEntry.WithField("doc", doc.Ref.Path).Trace("got document")
+
+			// We update the cursor before checking whether this document is being
+			// backfilled. This does, unfortunately, mean that it's possible for changes
+			// to a document which *isn't being captured* could break the ongoing backfill
+			// resume behavior, but that's just how Firestore collection group queries
+			// work.
+			cursor = doc
 
 			// The 'CollectionGroup' query is potentially over-broad, so skip documents
 			// which aren't actually part of a resource being backfilled.
 			var resourcePath = documentToResourcePath(doc.Ref.Path)
 			if !c.State.BackfillingAsync(resourcePath) {
-				return nil
+				continue
 			}
 
 			// Convert the document into JSON-serialiable form
@@ -511,7 +518,6 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 				return err
 			}
 			numDocuments++
-			cursor = doc
 		}
 
 		var state = &backfillState{

@@ -127,29 +127,22 @@ func TestDeletions(t *testing.T) {
 	})
 }
 
-// The mapping from bindings to listen streams is many-to-one, with a
-// single listen stream serving all bindings with some final path element.
-// So for instance 'foo/*/bar' and 'asdf/*/fdsa/*/bar' are both fetched
-// by a listen stream for 'bar'.
-//
-// But when a new binding is added this means that we need to resume
-// from the earliest read time associated with any binding that maps
-// to a particular stream, and that in turn means that we'll receive
-// redundant (previously-captured) documents from the other bindings
-// and need to filter those out.
-//
-// This test verifies that the filtering process works correctly.
-func TestNewCollectionReadTime(t *testing.T) {
-	var ctx = testContext(t, 10*time.Second)
+// This test exercises some behaviors around adding a new capture binding,
+// especially in the tricky edge case where the new binding maps to the
+// same collection group ID as a preexisting one.
+func TestAddedBindingSameGroup(t *testing.T) {
+	var ctx = testContext(t, 30*time.Second)
 	var capture = simpleCapture(t, "users/*/docs")
 	var client = testFirestoreClient(ctx, t)
 	t.Run("one", func(t *testing.T) {
 		client.Upsert(ctx, t,
 			"users/1/docs/1", `{"data": 1}`,
 			"users/1/docs/2", `{"data": 2}`,
+			"groups/3/docs/7", `{"data": 7}`,
+			"groups/3/docs/8", `{"data": 8}`,
+			"users/1/docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel),
 		)
-		time.Sleep(100 * time.Millisecond)
-		client.Upsert(ctx, t, "users/1/docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel))
+		time.Sleep(500 * time.Millisecond)
 		capture.Capture(ctx, t, restartSentinel).Verify(t)
 	})
 	capture.Bindings = append(capture.Bindings, simpleBindings(t, "groups/*/docs")...)
@@ -159,9 +152,9 @@ func TestNewCollectionReadTime(t *testing.T) {
 			"users/1/docs/4", `{"data": 4}`,
 			"groups/2/docs/5", `{"data": 5}`,
 			"groups/2/docs/6", `{"data": 6}`,
+			"groups/2/docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel),
 		)
-		time.Sleep(100 * time.Millisecond)
-		client.Upsert(ctx, t, "groups/2/docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel))
+		time.Sleep(500 * time.Millisecond)
 		capture.Capture(ctx, t, shutdownSentinel).Verify(t)
 	})
 }
@@ -207,15 +200,13 @@ func TestMultipleWatches(t *testing.T) {
 				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/notes/%d`, user, item), `{"data": "placeholder"}`)
 				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
 			}
-			time.Sleep(100 * time.Millisecond)
 			if user == 4 {
-				time.Sleep(900 * time.Millisecond)
 				client.Upsert(ctx, t,
 					"users/999/sentinels/999", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel),
 				)
+				time.Sleep(1500 * time.Millisecond)
 			}
 		}
-		time.Sleep(900 * time.Millisecond)
 		client.Upsert(ctx, t,
 			"users/999/sentinels/999", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel),
 		)
@@ -292,7 +283,7 @@ func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
 	for _, name := range names {
 		var path = "flow_source_tests/*/" + name
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
-			ResourceSpecJson: json.RawMessage(fmt.Sprintf(`{"path": %q, "backfillMode": "sync"}`, path)),
+			ResourceSpecJson: json.RawMessage(fmt.Sprintf(`{"path": %q, "backfillMode": "async"}`, path)),
 			ResourcePath:     []string{path},
 		})
 	}
