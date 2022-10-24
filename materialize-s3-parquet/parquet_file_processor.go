@@ -40,10 +40,13 @@ type FileProcessor interface {
 // FileProcessorProxy implements FileProcessor interface.
 // It proxies a file processor with the following additional logic:
 // a) It maintains a ticker, which triggers the Commit() command on the proxied file processor
-//      if no Commit call to the proxied file processor is observed over a given period of time.
-//      It makes sure that no local file remains in local without being uploaded to the cloud.
+//
+//	if no Commit call to the proxied file processor is observed over a given period of time.
+//	It makes sure that no local file remains in local without being uploaded to the cloud.
+//
 // b) It ensures the mutual exclusive access to the proxied file processor between the ticker
-//      and the transactor(via API calls to the proxy).
+//
+//	and the transactor(via API calls to the proxy).
 type FileProcessorProxy struct {
 	ctx context.Context
 
@@ -201,7 +204,7 @@ func NewParquetFileProcessor(
 		}
 
 		var nextSeqNum = 0
-		if nextSeqNumList != nil {
+		if nextSeqNumList != nil && len(nextSeqNumList) > i {
 			nextSeqNum = nextSeqNumList[i]
 		}
 
