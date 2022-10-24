@@ -7,11 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	protoio "github.com/gogo/protobuf/io"
@@ -26,34 +24,17 @@ type Options struct {
 	LogLevel string `long:"log.level" description:"Log level, one of: error, warn, info, debug, trace" default:"info"`
 }
 
-const ListenTimeoutSeconds = 10
-
 // RunMain is the boilerplate main function of a materialization connector.
 func RunMain(srv pm.DriverServer) {
 	var opts = &Options{""}
 	var parser = flags.NewParser(opts, flags.Default)
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
-	var conn net.Conn
-	server, err := net.ListenTCP("tcp", &net.TCPAddr{
-		IP:   net.IPv4(0, 0, 0, 0),
-		Port: 2222,
-	})
-	if err != nil {
-		logrus.WithFields(logrus.Fields{"error": err}).
-			Fatal("failed to start tcp server")
-	}
-	server.SetDeadline(time.Now().Add(ListenTimeoutSeconds * time.Second))
-	if conn, err = server.Accept(); err != nil {
-		logrus.WithFields(logrus.Fields{"error": err}).
-			Fatal("failed to accept connection on tcp server")
-	}
-
 	var cmd = cmdCommon{
 		ctx: ctx,
 		srv: srv,
-		r:   bufio.NewReaderSize(conn, 1<<21), // 2MB buffer.
-		w:   protoio.NewUint32DelimitedWriter(conn, binary.LittleEndian),
+		r:   bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
+		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
 	}
 
 	parser.AddCommand("spec", "Write the connector specification",
@@ -67,8 +48,7 @@ func RunMain(srv pm.DriverServer) {
 	parser.AddCommand("transactions", "Run materialization transactions",
 		"Run a stream of transactions read from stdin", &transactionsCmd{cmd})
 
-	_, err = parser.Parse()
-	if err != nil {
+	if _, err := parser.Parse(); err != nil {
 		os.Exit(1)
 	}
 	os.Exit(0)

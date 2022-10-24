@@ -7,11 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
 	protoio "github.com/gogo/protobuf/io"
@@ -30,28 +28,11 @@ func RunMain(srv pc.DriverServer) {
 	var parser = flags.NewParser(logConfig, flags.Default)
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 
-	var conn net.Conn
-	server, err := net.ListenTCP("tcp4", &net.TCPAddr{
-		IP:   net.IPv4(0, 0, 0, 0),
-		Port: 2222,
-	})
-
-	if err != nil {
-		logrus.WithFields(logrus.Fields{"error": err}).
-			Fatal("failed to start tcp server")
-	}
-
-	server.SetDeadline(time.Now().Add(ListenTimeoutSeconds * time.Second))
-	if conn, err = server.Accept(); err != nil {
-		logrus.WithFields(logrus.Fields{"error": err}).
-			Fatal("failed to accept connection on tcp server")
-	}
-
 	var cmd = cmdCommon{
 		ctx: ctx,
 		srv: srv,
-		r:   bufio.NewReaderSize(conn, 1<<21), // 2MB buffer.
-		w:   protoio.NewUint32DelimitedWriter(conn, binary.LittleEndian),
+		r:   bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
+		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
 	}
 
 	parser.AddCommand("spec", "Write the connector specification",
@@ -67,8 +48,7 @@ func RunMain(srv pc.DriverServer) {
 	parser.AddCommand("pull", "Pull data from the target system",
 		"Connect to the target system and begin pulling data from the selected streams", &pullCmd{cmd})
 
-	_, err = parser.Parse()
-	if err != nil {
+	if _, err := parser.Parse(); err != nil {
 		os.Exit(1)
 	}
 	os.Exit(0)

@@ -39,6 +39,5 @@ COPY --from=builder /builder/connector ./connector
 USER nonroot:nonroot
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
-LABEL FLOW_TCP_PORT=2222
 
 ENTRYPOINT ["/connector/connector"]
