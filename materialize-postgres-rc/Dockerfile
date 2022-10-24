@@ -40,6 +40,5 @@ COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flo
 USER nonroot:nonroot
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
-LABEL FLOW_TCP_PORT=2222
 
 ENTRYPOINT ["/connector/connector"]
