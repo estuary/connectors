@@ -14,34 +14,48 @@ associated with it.
 
 As a concrete example, there might be a `users` collection containing documents `users/alice` and
 `users/bob`, or possibly `users/1` and `users/2`. Those user documents could in turn have `messages`
-subcollections nested beneath them, like `users/alice/messages/123` and `users/bob/messages/456`.
+subcollections nested beneath them (like `users/alice/messages` and `users/bob/messages`), containing
+documents such as `users/alice/messages/1` and `users/bob/messages/1`).
 
-The `source-firestore` connector captures from patterns of nested subcollections across all documents,
-so in the above example the available resources to capture are `users` and `users/*/messages`.
+The `source-firestore` connector captures all documents with a particular sequence of collection
+names, so in the above example the available resources to capture are `users` and `users/*/messages`,
+where the latter will contain documents from all users. Captured documents have a property `/_meta/path`
+which contains the full path at which the document occurred.
 
 Configuration
 -------------
 
-TODO(wgd): Describe configuration and prerequisites better, include an example.
+In general you should only need to provide Google Cloud Service Account credentials in JSON
+form, and the database name will be inferred from the `project_id` property of those credentials.
+However it is possible to explicitly specify the database name if desired.
 
-The connector requires account credentials and that's pretty much it.
+Capture bindings need to specify a collection path/pattern such as `foo/*/bar/*/baz`, which
+will capture all documents with a path like `foo/<fooID>/bar/<barID>/baz/<bazID>`. In addition
+they need to specify a `backfillMode` selection. If you're not sure this should probably be set
+to `async`.
 
 ### Backfill Modes
 
-TODO(wgd): Describe backfill modes better.
-
 Each resource binding must specify a `backfillMode`. Allowed values are `none`, `sync`, and `async`:
 
-  - The `none` backfill mode skips preexisting data and just captures new documents
+  - The backfill mode `none` skips preexisting data and just captures new documents,
     and changes to existing documents which occur after the binding was added.
-  - The `async` backfill mode streams only new changes (like the `none` mode) and then
-    spawns another worker thread in parallel to query chunks of data.
+  - The backfill mode `async` streams only new changes (like the `none` mode) but then
+    spawns another worker thread in parallel to request chunks of preexisting data, one
+    at a time.
     - This mechanism has been tested to work reliably on collections of up to 50 million
       documents and to make progress even when restarted frequently (every 30s, in tests).
-    - The downside is that its guarantees about duplicated documents are necessarily laxer
-      than `sync` backfills, since backfilled data and new changes are interleaved without
-      any coordination. Automatic discovery specifies `{"strategy": "maximize", "key": "/_meta/mtime"}`
-      for all collections, so this will generally work out fine in practice.
+    - The downside is that backfilled data and new changes are interleaved without any
+      coordination, so any guarantees about duplicated or stale document reads are laxer
+      than for `sync` backfills.
+    - In addition, incremental progress across restarts works by serializing the path of
+      the last document backfilled in the connector state checkpoints, and if the document
+      is modified while the connector restarts the backfill will be forced to start over.
+      This only happens when the connector restarts, so if the backfill completes in a
+      single run of the connector there should be no danger of this happening.
+    - Automatic discovery specifies `{"strategy": "maximize", "key": "/_meta/mtime"}`
+      for all collections, so in general duplicated or stale reads of documents should
+      not alter the materialized outputs from a collection.
   - The `sync` backfill mode asks Firestore to stream document changes since the
     beginning of time, and relies on Firestore to make sure we end up with a
     consistent and up-to-date view of the dataset.
@@ -54,17 +68,30 @@ Each resource binding must specify a `backfillMode`. Allowed values are `none`, 
       be watching the capture to ensure that it becomes fully caught up within <30m.
   - If you're not sure you should probably use `async`.
 
-
 Developing
 ----------
 
-TODO(wgd): Describe how to run the automated tests, and the fact that most tests are gated by environment variables.
+The `source-firestore` connector has a fairly large suite of automated tests, however a bare
+run of `go test` will skip most of them:
 
-    ## Doesn't do much
+    ## Doesn't do much, only runs tests that don't hit the database
     $ go test -v ./source-firestore
+
+This is because the tests need to run against an actual Firestore instance, and the author
+doesn't trust the provided [emulator](https://firebase.google.com/docs/emulator-suite/connect_firestore)
+to accurately represent the actual behavior of Firestore databases. So you will have to provide
+some credentials and set the `RUN_CAPTURES` environment variable to `yes` for the tests to do
+anything:
 
     ## Actually runs the automated capture tests
     $ RUN_CAPTURES=yes go test -v ./source-firestore --project_id=some-project-123456 --creds_path=~/secrets/some-project-123456-12ab34cd45ef.json
+
+There's also another handfull of "automated tests" in `datasynth_test.go`, which aren't so much
+automated tests as they are tools for a human to run to stress-test capture behavior on massive
+datasets:
+
+    ## Generates an enormous quantity of synthetic data
+    $ DATASYNTH=yes LOG_LEVEL=debug RUN_CAPTURES=yes go test -v ./source-firestore -timeout=0 -run TestSyntheticData --project_id=some-project-123456 --creds_path=~/secrets/some-project-123456-12ab34cd45ef.json
 
     ## Tests a massive backfill
     $ DATASYNTH=yes LOG_LEVEL=debug RUN_CAPTURES=yes go test -v ./source-firestore -timeout=0 -run TestMassiveBackfill --project_id=some-project-123456 --creds_path=~/secrets/some-project-123456-12ab34cd45ef.json
