@@ -15,7 +15,6 @@ RUN go mod download
 COPY source-postgres        ./source-postgres
 COPY sqlcapture             ./sqlcapture
 COPY go-schema-gen          ./go-schema-gen
-COPY go-network-tunnel       ./go-network-tunnel
 
 ENV PATH="/builder/bin:$PATH"
 # Run the unit tests.
@@ -37,7 +36,6 @@ COPY --from=busybox:latest /bin/sh /bin/sh
 # Bring in the compiled connector artifacts from the builder.
 COPY --from=builder /builder/connector ./
 COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
-COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
