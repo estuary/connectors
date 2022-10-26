@@ -5,11 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
 
-	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -20,15 +18,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type sshForwarding struct {
-	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling, in the form of ssh://user@hostname[:port]"`
-	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
-}
-
-type tunnelConfig struct {
-	SshForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
-}
-
 // config represents the endpoint configuration for postgres.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
@@ -36,8 +25,6 @@ type config struct {
 	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 // Validate the configuration.
@@ -58,11 +45,6 @@ func (c *config) Validate() error {
 // ToURI converts the Config to a DSN string.
 func (c *config) ToURI() string {
 	var address = c.Address
-	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
-	// to address through the bastion server, so we use the tunnel's address
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-		address = "localhost:5432"
-	}
 	var uri = url.URL{
 		Scheme: "postgres",
 		Host:   address,
@@ -101,47 +83,22 @@ func newPostgresDriver() pm.DriverServer {
 		ResourceSpecType: new(tableConfig),
 		NewResource:      func(sqlDriver.Endpoint) sqlDriver.Resource { return new(tableConfig) },
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage) (sqlDriver.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
+			var parsed = new(config)
+			if err := pf.UnmarshalStrict(raw, parsed); err != nil {
 				return nil, fmt.Errorf("parsing Postgresql configuration: %w", err)
 			}
 
 			log.WithFields(log.Fields{
-				"database": cfg.Database,
-				"address":  cfg.Address,
-				"user":     cfg.User,
+				"database": parsed.Database,
+				"address":  parsed.Address,
+				"user":     parsed.User,
 			}).Info("opening database")
 
-			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-				host, port, err := net.SplitHostPort(cfg.Address)
-				if err != nil {
-					return nil, fmt.Errorf("splitting address to host and port: %w", err)
-				}
-
-				var sshConfig = &networkTunnel.SshConfig{
-					SshEndpoint: cfg.NetworkTunnel.SshForwarding.SshEndpoint,
-					PrivateKey:  []byte(cfg.NetworkTunnel.SshForwarding.PrivateKey),
-					ForwardHost: host,
-					ForwardPort: port,
-					LocalPort:   "5432",
-				}
-				var tunnel = sshConfig.CreateTunnel()
-
-				// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
-				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-				err = tunnel.Start()
-
-				if err != nil {
-					log.WithField("error", err).Error("network tunnel error")
-				}
-			}
-
-			db, err := sql.Open("pgx", cfg.ToURI())
+			db, err := sql.Open("pgx", parsed.ToURI())
 			if err != nil {
 				return nil, fmt.Errorf("opening Postgres database: %w", err)
 			}
-			return sqlDriver.NewStdEndpoint(cfg, db, PostgresSQLGenerator(), sqlDriver.DefaultFlowTables("")), nil
+			return sqlDriver.NewStdEndpoint(parsed, db, PostgresSQLGenerator(), sqlDriver.DefaultFlowTables("")), nil
 		},
 		NewTransactor: func(
 			ctx context.Context,
@@ -203,8 +160,6 @@ type transactor struct {
 		fence *sqlDriver.StdFence
 	}
 	bindings []*binding
-
-	tunnel networkTunnel.SshTunnel
 }
 
 type binding struct {
