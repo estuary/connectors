@@ -5,13 +5,11 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"net"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/airbyte"
@@ -22,15 +20,6 @@ import (
 
 	mysqlLog "github.com/siddontang/go-log/log"
 )
-
-type sshForwarding struct {
-	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling, in the form of ssh://user@hostname[:port]"`
-	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
-}
-
-type tunnelConfig struct {
-	SshForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
-}
 
 const minimumExpiryTime = 7 * 24 * time.Hour
 
@@ -53,32 +42,6 @@ func main() {
 			return nil, fmt.Errorf("error parsing config file: %w", err)
 		}
 		config.SetDefaults()
-
-		// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-		if config.NetworkTunnel != nil && config.NetworkTunnel.SshForwarding != nil && config.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-			host, port, err := net.SplitHostPort(config.Address)
-			if err != nil {
-				return nil, fmt.Errorf("splitting address to host and port: %w", err)
-			}
-
-			var sshConfig = &networkTunnel.SshConfig{
-				SshEndpoint: config.NetworkTunnel.SshForwarding.SshEndpoint,
-				PrivateKey:  []byte(config.NetworkTunnel.SshForwarding.PrivateKey),
-				ForwardHost: host,
-				ForwardPort: port,
-				LocalPort:   "3306",
-			}
-			var tunnel = sshConfig.CreateTunnel()
-
-			// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
-			// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-			err = tunnel.Start()
-
-			if err != nil {
-				logrus.WithField("error", err).Error("network tunnel error")
-			}
-		}
-
 		return &mysqlDatabase{config: &config}, nil
 	})
 }
@@ -110,8 +73,6 @@ type Config struct {
 	User     string         `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
 	Password string         `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
-
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
@@ -183,15 +144,8 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 		"serverID": db.config.Advanced.NodeID,
 	}).Info("initializing connector")
 
-	var address = db.config.Address
-	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
-	// to address through the bastion server, so we use the tunnel's address
-	if db.config.NetworkTunnel != nil && db.config.NetworkTunnel.SshForwarding != nil && db.config.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-		address = "localhost:3306"
-	}
-
 	// Normal database connection used for table scanning
-	var conn, err = client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, func(c *client.Conn) {
+	var conn, err = client.Connect(db.config.Address, db.config.User, db.config.Password, db.config.Advanced.DBName, func(c *client.Conn) {
 		// TODO(wgd): Consider adding an optional 'serverName' config parameter which
 		// if set makes this false and sets 'ServerName' so it will be verified properly.
 		c.SetTLSConfig(&tls.Config{
