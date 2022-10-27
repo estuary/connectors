@@ -191,17 +191,22 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 	}
 
 	// Normal database connection used for table scanning
-	var conn, err = client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, func(c *client.Conn) {
+	var conn *client.Conn
+	var err error
+	var withTLS = func(c *client.Conn) {
 		// TODO(wgd): Consider adding an optional 'serverName' config parameter which
 		// if set makes this false and sets 'ServerName' so it will be verified properly.
-		c.SetTLSConfig(&tls.Config{
-			InsecureSkipVerify: true,
-		})
-	})
-	if err != nil {
+		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
+	}
+	if conn, err = client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); err == nil {
+		logrus.WithField("addr", address).Debug("connected with TLS")
+		db.conn = conn
+	} else if conn, err = client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); err == nil {
+		logrus.WithField("addr", address).Warn("connected without TLS")
+		db.conn = conn
+	} else {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
-	db.conn = conn
 
 	// Sanity-check binlog retention and error out if it's insufficiently long.
 	// By doing this during the Connect operation it will occur both during

@@ -58,16 +58,6 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 	if err != nil {
 		return nil, fmt.Errorf("invalid mysql address: %w", err)
 	}
-	var syncer = replication.NewBinlogSyncer(replication.BinlogSyncerConfig{
-		ServerID: uint32(db.config.Advanced.NodeID),
-		Flavor:   "mysql", // TODO(wgd): See what happens if we change this and run against MariaDB?
-		Host:     host,
-		Port:     uint16(port),
-		User:     db.config.User,
-		Password: db.config.Password,
-		// TODO(wgd): Maybe add 'serverName' checking as described over in Connect()
-		TLSConfig: &tls.Config{InsecureSkipVerify: true},
-	})
 
 	var pos mysql.Position
 	if startCursor != "" {
@@ -92,10 +82,31 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		logrus.WithField("pos", pos).Debug("initialized binlog position")
 	}
 
+	var syncConfig = replication.BinlogSyncerConfig{
+		ServerID: uint32(db.config.Advanced.NodeID),
+		Flavor:   "mysql", // TODO(wgd): See what happens if we change this and run against MariaDB?
+		Host:     host,
+		Port:     uint16(port),
+		User:     db.config.User,
+		Password: db.config.Password,
+		// TODO(wgd): Maybe add 'serverName' checking as described over in Connect()
+		TLSConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
-	streamer, err := syncer.StartSync(pos)
-	if err != nil {
-		return nil, fmt.Errorf("error starting binlog sync: %w", err)
+	var streamer *replication.BinlogStreamer
+	var syncer = replication.NewBinlogSyncer(syncConfig)
+	if streamer, err = syncer.StartSync(pos); err == nil {
+		logrus.Debug("replication connected with TLS")
+	} else {
+		syncer.Close()
+		syncConfig.TLSConfig = nil
+		syncer = replication.NewBinlogSyncer(syncConfig)
+		if streamer, err = syncer.StartSync(pos); err == nil {
+			logrus.Warn("replication connected without TLS")
+		} else {
+			return nil, fmt.Errorf("error starting binlog sync: %w", err)
+		}
 	}
 
 	var streamCtx, streamCancel = context.WithCancel(ctx)
