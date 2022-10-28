@@ -9,6 +9,10 @@ import (
 	"github.com/estuary/connectors/sqlcapture/tests"
 )
 
+func TestConfigSchema(t *testing.T) {
+	tests.VerifySnapshot(t, "", string(configSchema()))
+}
+
 func TestDiscoveryComplex(t *testing.T) {
 	var tb, ctx = TestBackend, context.Background()
 
