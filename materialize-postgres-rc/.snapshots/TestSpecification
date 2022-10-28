@@ -37,7 +37,8 @@
               "sshEndpoint": {
                 "type": "string",
                 "title": "SSH Endpoint",
-                "description": "Endpoint of the remote SSH server that supports tunneling"
+                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                "pattern": "^ssh://.+@.+$"
               },
               "privateKey": {
                 "type": "string",
