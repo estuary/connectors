@@ -75,6 +75,10 @@ func lowerTuningParameters(t testing.TB) {
 	replicationBufferSize = 0
 }
 
+func TestConfigSchema(t *testing.T) {
+	tests.VerifySnapshot(t, "", string(configSchema()))
+}
+
 func TestAlterTable(t *testing.T) {
 	var tb, ctx = TestBackend, context.Background()
 	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
