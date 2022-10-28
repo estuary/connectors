@@ -30,14 +30,9 @@ type tunnelConfig struct {
 }
 
 func main() {
-	var schema = schemagen.GenerateSchema("PostgreSQL Connection", &Config{})
-	var configSchema, err = schema.MarshalJSON()
-	if err != nil {
-		panic(err)
-	}
 	var spec = airbyte.Spec{
 		SupportsIncremental:     true,
-		ConnectionSpecification: json.RawMessage(configSchema),
+		ConnectionSpecification: configSchema(),
 		DocumentationURL:        "https://go.estuary.dev/source-postgresql",
 	}
 
@@ -161,6 +156,15 @@ func (c *Config) ToURI() string {
 		uri.Path = "/" + c.Database
 	}
 	return uri.String()
+}
+
+func configSchema() json.RawMessage {
+	var schema = schemagen.GenerateSchema("PostgreSQL Connection", &Config{})
+	var configSchema, err = schema.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+	return json.RawMessage(configSchema)
 }
 
 type postgresDatabase struct {

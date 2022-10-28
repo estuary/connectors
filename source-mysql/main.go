@@ -36,14 +36,10 @@ const minimumExpiryTime = 7 * 24 * time.Hour
 
 func main() {
 	fixMysqlLogging()
-	var schema = schemagen.GenerateSchema("MySQL Connection", &Config{})
-	var configSchema, err = schema.MarshalJSON()
-	if err != nil {
-		panic(err)
-	}
+
 	var spec = airbyte.Spec{
 		SupportsIncremental:     true,
-		ConnectionSpecification: json.RawMessage(configSchema),
+		ConnectionSpecification: configSchema(),
 		DocumentationURL:        "https://go.estuary.dev/source-mysql",
 	}
 
@@ -167,6 +163,15 @@ func (c *Config) SetDefaults() {
 	if !strings.Contains(c.Address, ":") {
 		c.Address += ":3306"
 	}
+}
+
+func configSchema() json.RawMessage {
+	var schema = schemagen.GenerateSchema("MySQL Connection", &Config{})
+	var configSchema, err = schema.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+	return json.RawMessage(configSchema)
 }
 
 type mysqlDatabase struct {
