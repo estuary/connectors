@@ -24,7 +24,7 @@ func main() {
 // Config represents the endpoint configuration for BigQuery.
 type config struct {
 	ProjectID        string `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset." jsonschema_extras:"order=0"`
-	CredentialsJSON  string `json:"credentials_json" jsonschema:"title=Credentials,description=Google Cloud Service Account JSON credentials in base64 format." jsonschema_extras:"secret=true,multiline=true,order=1"`
+	CredentialsJSON  string `json:"credentials_json" jsonschema:"title=Service Account JSON,description=The JSON credentials of the service account to use for authorization." jsonschema_extras:"secret=true,multiline=true,order=1"`
 	Region           string `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region." jsonschema_extras:"order=2"`
 	Dataset          string `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset that will be used to store the materialization output." jsonschema_extras:"order=3"`
 	Bucket           string `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery." jsonschema_extras:"order=4"`
@@ -77,6 +77,23 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
+// decodeCredentials allows support for legacy credentials that were base64 encoded. Previously, the
+// connector required base64 encoding of JSON service account credentials. In the future, this
+// fallback can be removed when base64 encoded credentials are no longer supported and only
+// unencoded JSON is acceptable.
+func decodeCredentials(credentialString string) []byte {
+	decoded, err := base64.StdEncoding.DecodeString(credentialString)
+	if err == nil {
+		// If the provided credentials string was a valid base64 encoding, assume that it was base64
+		// encoded JSON and return the result of successfully decoding that.
+		return decoded
+	}
+
+	// Otherwise, assume that the credentials string was not base64 encoded.
+	return []byte(credentialString)
+
+}
+
 // newBigQueryDriver creates a new Driver for BigQuery.
 func newBigQueryDriver() *sqlDriver.Driver {
 	return &sqlDriver.Driver{
@@ -102,11 +119,7 @@ func newBigQueryDriver() *sqlDriver.Driver {
 
 			var clientOpts []option.ClientOption
 
-			credentials, err := base64.StdEncoding.DecodeString(string(parsed.CredentialsJSON))
-			if err != nil {
-				return nil, fmt.Errorf("failed to decode the JSON Credentials. Expected base64 content: %w", err)
-			}
-			clientOpts = append(clientOpts, option.WithCredentialsJSON(credentials))
+			clientOpts = append(clientOpts, option.WithCredentialsJSON(decodeCredentials(parsed.CredentialsJSON)))
 
 			// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
 			var billingProjectID = parsed.BillingProjectID
