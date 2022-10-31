@@ -11,8 +11,8 @@
       },
       "credentials_json": {
         "type": "string",
-        "title": "Credentials",
-        "description": "Google Cloud Service Account JSON credentials in base64 format.",
+        "title": "Service Account JSON",
+        "description": "The JSON credentials of the service account to use for authorization.",
         "multiline": true,
         "order": 1,
         "secret": true
