@@ -12,7 +12,7 @@
       "credentials_json": {
         "type": "string",
         "title": "Service Account JSON",
-        "description": "The JSON key of the service account to use for authorization.",
+        "description": "The JSON credentials of the service account to use for authorization.",
         "multiline": true,
         "order": 1,
         "secret": true
