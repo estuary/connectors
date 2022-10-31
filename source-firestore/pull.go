@@ -502,7 +502,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 				continue
 			}
 
-			// Convert the document into JSON-serialiable form
+			// Convert the document into JSON-serializable form
 			var fields = doc.Data()
 			fields[metaProperty] = &documentMetadata{
 				Path:       doc.Ref.Path,
