@@ -3,7 +3,10 @@ version: "3.7"
 services:
   db:
     image: 'mysql:latest'
-    command: ["--binlog-row-metadata=FULL"]
+    command: []
+    ## Alternative setup for testing MariaDB:
+    # image: 'mariadb:latest'
+    # command: [ "--log-bin", "--binlog-format=ROW" ]
     ports:
       - "3306:3306"
     volumes:

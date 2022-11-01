@@ -75,7 +75,10 @@ func TestDatatypes(t *testing.T) {
 
 		{ColumnType: "date", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31", ExpectValue: `"1991-08-31"`},
 		{ColumnType: "datetime", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31 12:34:56"`},
+
+		// This test fails on MariaDB because it truncates fractional seconds rather than rounding (see also: https://jira.mariadb.org/browse/MDEV-16991).
 		{ColumnType: "datetime", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31 12:34:57"`},
+
 		// TODO(wgd): Timestamps are reported differently in backfills vs replication because backfill
 		// queries do time-zone conversion while the replicated events appear to be un-converted.
 		// {ColumnType: "timestamp", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31 12:34:56"`},
@@ -83,6 +86,9 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "time", ExpectType: `{"type":["string","null"]}`, InputValue: "765:43:21", ExpectValue: `"765:43:21"`},
 		{ColumnType: "year", ExpectType: `{"type":["integer","null"]}`, InputValue: "2003", ExpectValue: `2003`},
 
+		// This test fails on MariaDB, because the 'JSON' column type is just an alias for LONGTEXT
+		// and will result in the original input JSON being captured as a string. See also:
+		// https://mariadb.com/kb/en/json-data-type/#differences-between-mysql-json-strings-and-mariadb-json-strings
 		{ColumnType: "json", ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
 	})
 }
