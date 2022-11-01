@@ -233,22 +233,19 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 func (db *mysqlDatabase) getBinlogExpiry() (time.Duration, error) {
 	// When running on Amazon RDS MySQL there's an RDS-specific configuration
 	// for binlog retention, so that takes precedence if it exists.
-	rdsRetentionHours, err := db.queryIntegerVariable(`SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
+	rdsRetentionHours, err := db.queryNumericVariable(`SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
 	if err == nil {
 		return time.Duration(rdsRetentionHours) * time.Hour, nil
 	}
 
-	// The new 'binlog_expire_logs_seconds' variable takes priority
-	expireLogsSeconds, err := db.queryIntegerVariable(`SHOW VARIABLES LIKE 'binlog_expire_logs_seconds';`)
-	if err != nil {
-		return 0, err
-	}
-	if expireLogsSeconds > 0 {
-		return time.Duration(expireLogsSeconds) * time.Second, nil
+	// The newer 'binlog_expire_logs_seconds' variable takes priority if it exists and is nonzero.
+	expireLogsSeconds, err := db.queryNumericVariable(`SHOW VARIABLES LIKE 'binlog_expire_logs_seconds';`)
+	if err == nil && expireLogsSeconds > 0 {
+		return time.Duration(expireLogsSeconds * float64(time.Second)), nil
 	}
 
-	// However 'expire_logs_days' will be used instead if 'seconds' was zero
-	expireLogsDays, err := db.queryIntegerVariable(`SHOW VARIABLES LIKE 'expire_logs_days';`)
+	// And as the final resort we'll check 'expire_logs_days' if 'seconds' was zero or nonexistent.
+	expireLogsDays, err := db.queryNumericVariable(`SHOW VARIABLES LIKE 'expire_logs_days';`)
 	if err != nil {
 		return 0, err
 	}
@@ -263,7 +260,7 @@ func (db *mysqlDatabase) getBinlogExpiry() (time.Duration, error) {
 	return 365 * 24 * time.Hour, nil
 }
 
-func (db *mysqlDatabase) queryIntegerVariable(query string) (int64, error) {
+func (db *mysqlDatabase) queryNumericVariable(query string) (float64, error) {
 	var results, err = db.conn.Execute(query)
 	if err != nil {
 		return 0, fmt.Errorf("error executing query %q: %w", query, err)
@@ -279,17 +276,17 @@ func (db *mysqlDatabase) queryIntegerVariable(query string) (int64, error) {
 	case mysql.FieldValueTypeNull:
 		return 0, nil
 	case mysql.FieldValueTypeString:
-		var n, err = strconv.ParseInt(string(value.AsString()), 10, 64)
+		var n, err = strconv.ParseFloat(string(value.AsString()), 64)
 		if err != nil {
-			return 0, fmt.Errorf("couldn't parse string value as decimal number: %w", err)
+			return 0, fmt.Errorf("couldn't parse string value as number: %w", err)
 		}
 		return n, nil
-	case mysql.FieldValueTypeFloat:
-		return int64(value.AsFloat64()), nil
 	case mysql.FieldValueTypeUnsigned:
-		return int64(value.AsUint64()), nil
+		return float64(value.AsUint64()), nil
+	case mysql.FieldValueTypeSigned:
+		return float64(value.AsInt64()), nil
 	}
-	return value.AsInt64(), nil
+	return value.AsFloat64(), nil
 }
 
 func (db *mysqlDatabase) Close(ctx context.Context) error {
