@@ -19,7 +19,6 @@ import (
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
 
@@ -36,6 +35,18 @@ const (
 	// picking a document to check every so often.
 	discoverSubresourceMinimum     = 100
 	discoverSubresourceProbability = 0.01
+
+	// discoverMaxDocumentsPerCollection limits the maximum number of documents which
+	// will be fetched from any specific collection.
+	discoverMaxDocumentsPerCollection = 1000
+
+	// discoverMaxDocumentsPerResource *approximately* limits the maximum number of
+	// documents which will be fetched from any specific resource path.
+	discoverMaxDocumentsPerResource = 10000
+
+	// discoverConcurrentScanners limits the number of scan worker goroutines which
+	// may execute concurrently.
+	discoverConcurrentScanners = 16
 )
 
 const (
@@ -121,13 +132,15 @@ func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Discov
 }
 
 type discoveryState struct {
-	client  *firestore.Client
-	workers *errgroup.Group // Contains all worker goroutines launched during discovery.
+	client        *firestore.Client
+	scanners      *errgroup.Group // Contains all scanner goroutines launched during discovery.
+	inference     *errgroup.Group // Contains all inference process goroutines launched during discovery.
+	inferenceCtx  context.Context // The context with which inference goroutines will be run.
+	scanSemaphore chan struct{}   // Semaphore channel used to limit number of concurrent scanners
 
 	// Mutex-guarded state which may be modified from within worker goroutines.
 	shared struct {
 		sync.Mutex
-		groups   map[collectionGroupID]struct{}        // Set tracking which 'Collection Groups' have already been seen.
 		channels map[resourcePath]chan json.RawMessage // Map from resource paths to inference worker input channels.
 		counts   map[resourcePath]int                  // Map from resource paths to the number of documents processed.
 		bindings []*pc.DiscoverResponse_Binding        // List of output bindings from inference workers which have terminated.
@@ -135,12 +148,15 @@ type discoveryState struct {
 }
 
 func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.DiscoverResponse_Binding, error) {
-	eg, ctx := errgroup.WithContext(ctx)
+	inference, inferenceCtx := errgroup.WithContext(ctx)
+	scanners, ctx := errgroup.WithContext(ctx)
 	var state = &discoveryState{
-		client:  client,
-		workers: eg,
+		client:        client,
+		scanners:      scanners,
+		inference:     inference,
+		inferenceCtx:  inferenceCtx,
+		scanSemaphore: make(chan struct{}, discoverConcurrentScanners),
 	}
-	state.shared.groups = make(map[collectionGroupID]struct{})
 	state.shared.channels = make(map[resourcePath]chan json.RawMessage)
 	state.shared.counts = make(map[resourcePath]int)
 
@@ -150,12 +166,20 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.D
 		return nil, err
 	}
 	for _, coll := range collections {
-		state.processCollection(ctx, coll)
+		state.handleCollection(ctx, coll)
 	}
 
-	// Wait for all workers to terminate, and if they all did so without
-	// error then return the bindings list they put together.
-	if err := eg.Wait(); err != nil {
+	// Wait for all scanners to terminate, then close all inference channels, and
+	// finally wait for the inference processes to terminate.
+	if err := state.scanners.Wait(); err != nil {
+		return nil, err
+	}
+	state.shared.Lock()
+	for _, ch := range state.shared.channels {
+		close(ch)
+	}
+	state.shared.Unlock()
+	if err := state.inference.Wait(); err != nil {
 		return nil, err
 	}
 
@@ -169,72 +193,57 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.D
 	return bindings, nil
 }
 
-func (ds *discoveryState) processCollection(ctx context.Context, coll *firestore.CollectionRef) {
+// discoverCollection iterates over every document of a collection, feeds each document
+// into the appropriate inference process, and recursively checks some of the documents
+// for subcollections.
+func (ds *discoveryState) discoverCollection(ctx context.Context, coll *firestore.CollectionRef) error {
+	var resourcePath = collectionToResourcePath(coll.Path)
+	var collectionPath = trimDatabasePath(coll.Path)
+	var logEntry = log.WithFields(log.Fields{
+		"collection": collectionPath,
+		"resource":   resourcePath,
+	})
+
+	// Acquire one of the scanner semaphores before doing any further work
+	ds.scanSemaphore <- struct{}{}
+	defer func() { <-ds.scanSemaphore }()
+
+	// Terminate immediately if the maximum number of documents has already been reached
 	ds.shared.Lock()
-	defer ds.shared.Unlock()
-	if _, ok := ds.shared.groups[coll.ID]; !ok {
-		log.WithField("group", coll.ID).Debug("discovered new collection group")
-		ds.shared.groups[coll.ID] = struct{}{}
-		ds.workers.Go(func() error {
-			var err = ds.discoverCollectionGroup(ctx, coll.ID)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"group": coll.ID,
-					"error": err,
-				}).Error("error scanning documents")
-			}
-			return err
-		})
+	if total := ds.shared.counts[resourcePath]; total >= discoverMaxDocumentsPerResource {
+		ds.shared.Unlock()
+		return nil
 	}
-}
+	ds.shared.Unlock()
 
-// discoverCollectionGroup iterates over every document of a "collection group" [1],
-// feeds each document into the appropriate inference process, and recursively checks
-// each one for subcollections.
-//
-// [1] A collection group is basically the set of all documents which share the same
-// penultimate path element. So for instance 'users/<userid>/events/<eventid>' and
-// 'groups/<groupid>/events/<eventid>' are in the 'events' collection group. Querying
-// by groups rather than individual collections massively improves discovery speed.
-func (ds *discoveryState) discoverCollectionGroup(ctx context.Context, group string) error {
-	var logEntry = log.WithField("group", group)
-	logEntry.Debug("scanning collection group")
-
+	var numDocuments int
+	logEntry.Debug("scanning collection")
 	defer func() {
-		logEntry.Debug("finished scanning group")
-		ds.closeInferenceGroup(group)
+		logEntry.WithField("count", numDocuments).Debug("done scanning collection")
 	}()
 
-	var retries int
-	var docs = ds.client.CollectionGroup(group).Documents(ctx)
-	defer docs.Stop()
-	for {
-		if err := ctx.Err(); err != nil {
+	var docs, err = coll.Limit(discoverMaxDocumentsPerCollection).Documents(ctx).GetAll()
+	if err != nil {
+		// Retryable error statuses generally mean that something went wrong over the network
+		// or internally to Firestore. We shouldn't take down the entire discovery run as this
+		// might only be an issue with the one collection query and it's best to provide the
+		// user with whatever degraded results we can.
+		if retryableStatus(err) {
+			logEntry.WithField("err", err).Warn("error scanning collection")
+			return nil
+		}
+		return fmt.Errorf("error fetching documents from collection %q: %w", collectionPath, err)
+	}
+	for _, doc := range docs {
+		if err := ds.handleDocument(ctx, doc); err != nil {
 			return err
 		}
-		var doc, err = docs.Next()
-		if err == iterator.Done {
-			break
-		} else if err != nil && retryableStatus(err) {
-			// Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1.6s, ..., 25.6s plus [0,100ms) jitter
-			retries++
-			if retryLimit := 9; retries >= retryLimit {
-				return fmt.Errorf("error fetching documents from group %q: retry limit (%d) reached: %w", group, retryLimit, err)
-			}
-			time.Sleep(time.Duration((1<<retries)*50+rand.Intn(100)) * time.Millisecond)
-			continue
-		} else if err != nil {
-			return fmt.Errorf("error fetching documents from group %q: %w", group, err)
-		}
-		retries = 0
-		if err := ds.processDocument(ctx, doc); err != nil {
-			return err
-		}
+		numDocuments++
 	}
 	return nil
 }
 
-func (ds *discoveryState) processDocument(ctx context.Context, doc *firestore.DocumentSnapshot) error {
+func (ds *discoveryState) handleDocument(ctx context.Context, doc *firestore.DocumentSnapshot) error {
 	// Marshal the document to JSON that we'll send to schema inference
 	var docJSON, err = json.Marshal(doc.Data())
 	if err != nil {
@@ -258,7 +267,7 @@ func (ds *discoveryState) processDocument(ctx context.Context, doc *firestore.Do
 	// according to an "Always check the first K and then randomly check P% of the rest"
 	// heuristic.
 	if count < discoverSubresourceMinimum || rand.Float64() < discoverSubresourceProbability {
-		ds.workers.Go(func() error {
+		ds.scanners.Go(func() error {
 			subcolls, err := doc.Ref.Collections(ctx).GetAll()
 			if err != nil {
 				log.WithFields(log.Fields{
@@ -268,12 +277,28 @@ func (ds *discoveryState) processDocument(ctx context.Context, doc *firestore.Do
 				return fmt.Errorf("error listing subcollections: %w", err)
 			}
 			for _, subcoll := range subcolls {
-				ds.processCollection(ctx, subcoll)
+				ds.handleCollection(ctx, subcoll)
 			}
 			return nil
 		})
 	}
 	return nil
+}
+
+func (ds *discoveryState) handleCollection(ctx context.Context, coll *firestore.CollectionRef) {
+	ds.shared.Lock()
+	defer ds.shared.Unlock()
+
+	ds.scanners.Go(func() error {
+		var err = ds.discoverCollection(ctx, coll)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"group": coll.ID,
+				"error": err,
+			}).Error("error scanning documents")
+		}
+		return err
+	})
 }
 
 func (ds *discoveryState) inferenceChannel(ctx context.Context, resourcePath resourcePath) chan json.RawMessage {
@@ -283,10 +308,11 @@ func (ds *discoveryState) inferenceChannel(ctx context.Context, resourcePath res
 		return ch
 	}
 
+	log.WithField("resource", resourcePath).Info("discovered resource")
 	var ch = make(chan json.RawMessage)
 	ds.shared.channels[resourcePath] = ch
-	ds.workers.Go(func() error {
-		var err = ds.inferenceWorker(ctx, resourcePath, ch)
+	ds.inference.Go(func() error {
+		var err = ds.inferenceWorker(ds.inferenceCtx, resourcePath, ch)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"resource": resourcePath,
@@ -339,16 +365,6 @@ func (ds *discoveryState) inferenceWorker(ctx context.Context, resourcePath reso
 	ds.shared.bindings = append(ds.shared.bindings, binding)
 	ds.shared.Unlock()
 	return nil
-}
-
-func (ds *discoveryState) closeInferenceGroup(group string) {
-	ds.shared.Lock()
-	defer ds.shared.Unlock()
-	for resourcePath, ch := range ds.shared.channels {
-		if getLastCollectionGroupID(resourcePath) == group {
-			close(ch)
-		}
-	}
 }
 
 // The collection name must not have slashes in it, otherwise we end up with parent
