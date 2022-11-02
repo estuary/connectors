@@ -95,7 +95,6 @@ func (d driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse
 	}
 
 	es := schemagen.GenerateSchema("Materialize Google PubSub Spec", &config{})
-	es.ID = "" // Needed for config-encryption to work
 	endpointSchema, err := es.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
