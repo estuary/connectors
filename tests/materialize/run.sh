@@ -120,7 +120,7 @@ DATA_PLANE_PID=$!
 function cleanup() {
     echo -e "\nexecuting cleanup"
 
-    "${TEST_SCRIPT_DIR}/delete.sh" "" false || true
+    source "${TEST_SCRIPT_DIR}/delete.sh" || true
     source "${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" || true
     kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} || true
 }

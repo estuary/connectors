@@ -2,19 +2,18 @@
 
 set -e
 
-# Ensure canonical Postgres environment variables are set.
 export PROJECT_ID="${GCP_BQ_PROJECT_ID}"
 export DATASET="${GCP_BQ_DATASET}"
 export REGION="${GCP_BQ_REGION}"
 export BUCKET="${GCP_BQ_BUCKET}"
-export BASE_64_CREDENTIALS_JSON=$(echo ${GCP_SERVICE_ACCOUNT_KEY} | base64)
+export GCP_SERVICE_ACCOUNT_KEY_QUOTED=$(echo ${GCP_SERVICE_ACCOUNT_KEY} | jq 'tojson')
 
 config_json_template='{
    "project_id":        "$PROJECT_ID",
    "dataset":           "$DATASET",
    "region":            "$REGION",
    "bucket":            "$BUCKET",
-   "credentials_json":  "$BASE_64_CREDENTIALS_JSON"
+   "credentials_json":  "$GCP_SERVICE_ACCOUNT_KEY_QUOTED"
 }'
 
 resources_json_template='[
