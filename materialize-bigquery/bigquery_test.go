@@ -21,8 +21,8 @@ import (
 
 var testCredentialsPath = flag.String(
 	"creds_path",
-	"/path/to/credentials.base64",
-	"Path to the base64-encoded credentials JSON to use for test authentication",
+	"/path/to/credentials",
+	"Path to the credentials JSON to use for test authentication",
 )
 var testProjectID = flag.String(
 	"project_id",

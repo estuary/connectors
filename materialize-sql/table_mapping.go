@@ -48,6 +48,12 @@ type Column struct {
 	Identifier string
 	// Placeholder for this column's converted value in parameterized statements.
 	Placeholder string
+	// Unquoted identifier for this column, for databases which have special requirements for
+	// identifiers used in certain circumstances, for example when loading to a cloud storage
+	// bucket.
+	// TODO(whb): When https://github.com/estuary/connectors/issues/295 is completed, we may be able
+	// to remove this as it is currently only required for a legacy work-around in bigquery.
+	UnquotedIdentifier string
 }
 
 // ConvertKey converts a key Tuple to database parameters.
@@ -137,6 +143,9 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 		}
 		col.Identifier = dialect.Identifier(col.Field)
 		col.Placeholder = dialect.Placeholder(index)
+		if dialect.UnquotedIdentifierer != nil {
+			col.UnquotedIdentifier = dialect.UnquotedIdentifier(col.Field)
+		}
 	}
 
 	return table, nil

@@ -12,8 +12,10 @@ import (
 // Bigquery only allows underscore, letters, numbers, and sometimes hyphens for identifiers. Convert everything else to underscore.
 var identifierSanitizerRegexp = regexp.MustCompile(`[^\-\._0-9a-zA-Z]`)
 
-func identifierSanitizer(text string) string {
-	return identifierSanitizerRegexp.ReplaceAllString(text, "_")
+func identifierSanitizer(delegate func(string) string) func(string) string {
+	return func(text string) string {
+		return delegate(identifierSanitizerRegexp.ReplaceAllString(text, "_"))
+	}
 }
 
 var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
@@ -52,14 +54,9 @@ var bqDialect = func() sql.Dialect {
 	}
 
 	return sql.Dialect{
-		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
-			sql.PassThroughTransform(
-				func(s string) bool {
-					return sql.IsSimpleIdentifier(s)
-				},
-				identifierSanitizer,
-			))),
-		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
+		Identifierer:         sql.IdentifierFn(sql.JoinTransform(".", identifierSanitizer(sql.QuoteTransform("`", "\\`")))),
+		UnquotedIdentifierer: sql.UnquotedIdentifierFn(sql.JoinTransform(".", identifierSanitizer(func(s string) string { return s }))),
+		Literaler:            sql.LiteralFn(sql.QuoteTransform("'", "\\'")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
@@ -73,7 +70,8 @@ var (
 flow_temp_table_{{ $.Binding }}
 {{- end }}
 
--- Templated creation of a materialized table definition and comments:
+-- Templated creation of a materialized table definition and comments.
+-- Note: BigQuery only allows a maximum of 4 columns for clustering.
 
 {{ define "createTargetTable" -}}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
@@ -83,8 +81,10 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- end }}
 )
 CLUSTER BY {{ range $ind, $key := $.Keys }}
-	{{- if $ind }}, {{end -}}
-		{{$key.Identifier}}
+	{{- if lt $ind 4 -}}
+		{{- if $ind }}, {{end -}}
+			{{$key.Identifier}}
+		{{- end -}}
 	{{- end}};
 {{ end }}
 
@@ -94,12 +94,12 @@ CLUSTER BY {{ range $ind, $key := $.Keys }}
 
 {{ define "loadQuery" -}}
 {{ if $.Document -}}
-SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
+SELECT {{ $.Binding }}, l.{{$.Document.UnquotedIdentifier}}
 	FROM {{ $.Identifier }} AS l
 	JOIN {{ template "tempTableName" . }} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
-		l.{{ $key.Identifier }} is not distinct from r.{{ $key.Identifier }}
+		l.{{ $key.UnquotedIdentifier }} is not distinct from r.{{ $key.UnquotedIdentifier }}
 	{{- end }}
 {{ else }}
 SELECT -1, NULL LIMIT 0
@@ -128,16 +128,16 @@ MERGE INTO {{ $.Identifier }} AS l
 USING {{ template "tempTableName" . }} AS r
 ON {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
-	l.{{$key.Identifier}} = r.{{$key.Identifier}}
+	l.{{$key.UnquotedIdentifier}} = r.{{$key.UnquotedIdentifier}}
 {{- end}}
-WHEN MATCHED AND r.{{$.Document.Identifier}} IS NULL THEN
+WHEN MATCHED AND r.{{$.Document.UnquotedIdentifier}} IS NULL THEN
 	DELETE
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $key := $.Values }}
 	{{- if $ind }}, {{end -}}
-		l.{{$key.Identifier}} = r.{{$key.Identifier}}
+		l.{{$key.UnquotedIdentifier}} = r.{{$key.UnquotedIdentifier}}
 	{{- end}} 
-	{{- if $.Document }}, l.{{$.Document.Identifier}} = r.{{$.Document.Identifier}} {{- end }}
+	{{- if $.Document }}, l.{{$.Document.UnquotedIdentifier}} = r.{{$.Document.UnquotedIdentifier}} {{- end }}
 WHEN NOT MATCHED THEN
 	INSERT (
 	{{- range $ind, $col := $.Columns }}
@@ -148,7 +148,7 @@ WHEN NOT MATCHED THEN
 	VALUES (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
-		r.{{$col.Identifier}}
+		r.{{$col.UnquotedIdentifier}}
 	{{- end -}}
 	);
 {{ end }}

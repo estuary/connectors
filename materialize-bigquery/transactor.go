@@ -99,7 +99,7 @@ func configForCols(cols []*sql.Column) (*bigquery.ExternalDataConfig, error) {
 		}
 
 		config.Schema = append(config.Schema, &bigquery.FieldSchema{
-			Name:     col.Identifier,
+			Name:     col.UnquotedIdentifier,
 			Repeated: false,
 			Required: col.Inference.Exists == pf.Inference_MUST,
 			Type:     bigquery.FieldType(mt.DDL),
