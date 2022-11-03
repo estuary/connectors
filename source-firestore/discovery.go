@@ -65,6 +65,7 @@ func generateMinimalSchema() json.RawMessage {
 	}
 	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
 	metadataSchema.Definitions = nil
+	metadataSchema.AdditionalProperties = nil
 
 	// Wrap metadata into an enclosing object schema with a /_meta property
 	// and a 'maximize by timestamp' reduction strategy.
