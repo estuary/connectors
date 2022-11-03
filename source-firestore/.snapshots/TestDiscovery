@@ -3,7 +3,7 @@ Binding 0:
     "recommended_name": "flow_source_tests",
     "resource_spec_json": {
       "path": "flow_source_tests",
-      "backfillMode": "sync"
+      "backfillMode": "async"
     },
     "document_schema_json": {
       "allOf": [
@@ -52,7 +52,6 @@ Binding 0:
                   "description": "True if the document has been deleted"
                 }
               },
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "path",
@@ -78,7 +77,7 @@ Binding 1:
     "recommended_name": "flow_source_tests_users",
     "resource_spec_json": {
       "path": "flow_source_tests/*/users",
-      "backfillMode": "sync"
+      "backfillMode": "async"
     },
     "document_schema_json": {
       "allOf": [
@@ -127,7 +126,6 @@ Binding 1:
                   "description": "True if the document has been deleted"
                 }
               },
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "path",
@@ -153,7 +151,7 @@ Binding 2:
     "recommended_name": "flow_source_tests_users_docs",
     "resource_spec_json": {
       "path": "flow_source_tests/*/users/*/docs",
-      "backfillMode": "sync"
+      "backfillMode": "async"
     },
     "document_schema_json": {
       "allOf": [
@@ -206,7 +204,6 @@ Binding 2:
                   "description": "True if the document has been deleted"
                 }
               },
-              "additionalProperties": false,
               "type": "object",
               "required": [
                 "path",
