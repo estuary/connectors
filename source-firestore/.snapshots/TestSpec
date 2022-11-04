@@ -33,8 +33,13 @@
       },
       "backfillMode": {
         "type": "string",
+        "enum": [
+          "async",
+          "none",
+          "sync"
+        ],
         "title": "Backfill Mode",
-        "description": "Configures the handling of data already in the collection. Options are sync/async/none."
+        "description": "Configures the handling of data already in the collection. Refer to go.estuary.dev/source-firestore for details or just stick with 'async'"
       }
     },
     "type": "object",

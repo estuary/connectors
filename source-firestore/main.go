@@ -21,7 +21,7 @@ const (
 
 type resource struct {
 	Path         string       `json:"path" jsonschema:"title=Path to Collection,description=Supports parent/*/nested to capture all nested collections of parent's children"`
-	BackfillMode backfillMode `json:"backfillMode" jsonschema:"title=Backfill Mode,description=Configures the handling of data already in the collection. Options are sync/async/none."`
+	BackfillMode backfillMode `json:"backfillMode" jsonschema:"title=Backfill Mode,description=Configures the handling of data already in the collection. Refer to go.estuary.dev/source-firestore for details or just stick with 'async',enum=async,enum=none,enum=sync"`
 }
 
 func (r resource) Validate() error {
