@@ -287,16 +287,13 @@ func (ds *discoveryState) handleDocument(ctx context.Context, doc *firestore.Doc
 }
 
 func (ds *discoveryState) handleCollection(ctx context.Context, coll *firestore.CollectionRef) {
-	ds.shared.Lock()
-	defer ds.shared.Unlock()
-
 	ds.scanners.Go(func() error {
 		var err = ds.discoverCollection(ctx, coll)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"group": coll.ID,
-				"error": err,
-			}).Error("error scanning documents")
+				"collection": trimDatabasePath(coll.Path),
+				"error":      err,
+			}).Error("error scanning collection")
 		}
 		return err
 	})
