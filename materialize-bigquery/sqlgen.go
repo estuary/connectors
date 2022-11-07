@@ -130,8 +130,10 @@ ON {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
 	l.{{$key.UnquotedIdentifier}} = r.{{$key.UnquotedIdentifier}}
 {{- end}}
+{{- if $.Document }}
 WHEN MATCHED AND r.{{$.Document.UnquotedIdentifier}} IS NULL THEN
 	DELETE
+{{- end }}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $key := $.Values }}
 	{{- if $ind }}, {{end -}}
