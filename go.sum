@@ -359,6 +359,8 @@ github.com/estuary/flow v0.1.5-0.20221007123219-9cea913c64cd h1:+4FZqQaHqoCq+EjC
 github.com/estuary/flow v0.1.5-0.20221007123219-9cea913c64cd/go.mod h1:dHlTdu5vRYgKgaqRZzjTWLqs7Z21xf41DvwEBlcD3KM=
 github.com/estuary/flow v0.1.5-0.20221007131251-5f24d1137ec0 h1:TST2UUylfokVB+4y3qh0rAPv473JdWBQj5SHtfYZklI=
 github.com/estuary/flow v0.1.5-0.20221007131251-5f24d1137ec0/go.mod h1:dHlTdu5vRYgKgaqRZzjTWLqs7Z21xf41DvwEBlcD3KM=
+github.com/estuary/flow v0.1.6-0.20221108191318-280052b31c5f h1:7JHOU+3PPQMcAWQCDKWq08yQ+dy4OS3Nk81/xS6ugwc=
+github.com/estuary/flow v0.1.6-0.20221108191318-280052b31c5f/go.mod h1:dHlTdu5vRYgKgaqRZzjTWLqs7Z21xf41DvwEBlcD3KM=
 github.com/evanphx/json-patch v4.2.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch v4.9.0+incompatible h1:kLcOMZeuLAJvL2BPWLMIj5oaZQobrkAqrL+WFZwQses=
 github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
