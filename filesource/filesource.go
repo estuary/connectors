@@ -189,7 +189,7 @@ func (src Source) Discover(args airbyte.DiscoverCmd) error {
 			Catalog: &airbyte.Catalog{
 				Streams: []airbyte.Stream{{
 					Name:               conn.config.DiscoverRoot(),
-					JSONSchema:         json.RawMessage(discoverDocumentSchema),
+					JSONSchema:         json.RawMessage(minimalDocumentSchema),
 					SupportedSyncModes: airbyte.AllSyncModes,
 					SourceDefinedPrimaryKey: [][]string{
 						{"_meta", "file"},
@@ -473,7 +473,7 @@ const (
 	// Location of the record offset in produced documents.
 	metaOffsetLocation = "/_meta/offset"
 	// Baseline document schema for resource streams we discover.
-	discoverDocumentSchema = `{
+	minimalDocumentSchema = `{
 		"type": "object",
 		"properties": {
 			"_meta": {
