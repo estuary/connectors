@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -66,9 +67,9 @@ func TestMain(m *testing.M) {
 func lowerTuningParameters(t testing.TB) {
 	// Within the scope of a single test, adjust some tuning parameters so that it's
 	// easier to exercise backfill chunking and replication buffering behavior.
-	var prevChunkSize = backfillChunkSize
-	t.Cleanup(func() { backfillChunkSize = prevChunkSize })
-	backfillChunkSize = 16
+	var prevChunkSize = TestBackend.cfg.Advanced.BackfillChunkSize
+	t.Cleanup(func() { TestBackend.cfg.Advanced.BackfillChunkSize = prevChunkSize })
+	TestBackend.cfg.Advanced.BackfillChunkSize = 16
 
 	var prevBufferSize = replicationBufferSize
 	t.Cleanup(func() { replicationBufferSize = prevBufferSize })
@@ -76,7 +77,12 @@ func lowerTuningParameters(t testing.TB) {
 }
 
 func TestConfigSchema(t *testing.T) {
-	tests.VerifySnapshot(t, "", string(configSchema()))
+	var schema = make(map[string]interface{})
+	var err = json.Unmarshal(configSchema(), &schema)
+	require.NoError(t, err)
+	bs, err := json.MarshalIndent(schema, "", "  ")
+	require.NoError(t, err)
+	tests.VerifySnapshot(t, "", string(bs))
 }
 
 func TestAlterTable(t *testing.T) {

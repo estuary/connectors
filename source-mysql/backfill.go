@@ -40,7 +40,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.Tab
 	}
 
 	// Build and execute a query to fetch the next `backfillChunkSize` rows from the database
-	var query = buildScanQuery(resumeKey == nil, keyColumns, schema, table)
+	var query = db.buildScanQuery(resumeKey == nil, keyColumns, schema, table)
 	logrus.WithFields(logrus.Fields{"query": query, "args": resumeKey}).Debug("executing query")
 	results, err := db.conn.Execute(query, resumeKey...)
 	if err != nil {
@@ -77,12 +77,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.Tab
 	return events, nil
 }
 
-// backfillChunkSize controls how many rows will be read from the database in a
-// single query. In normal use it acts like a constant, it's just a variable here
-// so that it can be lowered in tests to exercise chunking behavior more easily.
-var backfillChunkSize = 128 * 1024
-
-func buildScanQuery(start bool, keyColumns []string, schemaName, tableName string) string {
+func (db *mysqlDatabase) buildScanQuery(start bool, keyColumns []string, schemaName, tableName string) string {
 	// Construct strings like `(foo, bar, baz)` and `(?, ?, ?)` for use in the query
 	var pkey, args string
 	for idx, colName := range keyColumns {
@@ -101,6 +96,6 @@ func buildScanQuery(start bool, keyColumns []string, schemaName, tableName strin
 		fmt.Fprintf(query, " WHERE (%s) > (%s)", pkey, args)
 	}
 	fmt.Fprintf(query, " ORDER BY %s", pkey)
-	fmt.Fprintf(query, " LIMIT %d;", backfillChunkSize)
+	fmt.Fprintf(query, " LIMIT %d;", db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
