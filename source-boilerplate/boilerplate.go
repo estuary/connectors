@@ -4,14 +4,17 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	protoio "github.com/gogo/protobuf/io"
 	"github.com/gogo/protobuf/proto"
 	"github.com/jessevdk/go-flags"
@@ -277,4 +280,81 @@ func (a *pullAdapter) SetHeader(metadata.MD) error {
 }
 func (a *pullAdapter) SetTrailer(metadata.MD) {
 	panic("SetTrailer is not supported")
+}
+
+// PullOutput is a convenience wrapper around a pc.Driver_PullServer which makes it simpler
+// to emit documents and state checkpoints.
+type PullOutput struct {
+	sync.Mutex
+
+	Stream pc.Driver_PullServer
+}
+
+// Ready sends a PullResponse_Opened message to indicate that the capture has started.
+func (out *PullOutput) Ready() error {
+	log.Debug("sending PullResponse.Opened")
+	out.Lock()
+	defer out.Unlock()
+	if err := out.Stream.Send(&pc.PullResponse{Opened: &pc.PullResponse_Opened{}}); err != nil {
+		return fmt.Errorf("error sending PullResponse.Opened: %w", err)
+	}
+	return nil
+}
+
+// Documents emits one or more documents to the specified binding index.
+func (out *PullOutput) Documents(binding uint32, docs ...json.RawMessage) error {
+	// Concatenate multiple documents into the arena, with appropriate indices
+	var arena []byte
+	var slices []pf.Slice
+	for _, doc := range docs {
+		var begin = uint32(len(arena))
+		arena = append(arena, []byte(doc)...)
+		slices = append(slices, pf.Slice{Begin: begin, End: uint32(len(arena))})
+	}
+
+	// TODO(wgd): The logic of this function needs to be rewritten to support
+	//   splitting into multiple 'Documents' RPCs in order to keep the size of
+	//   any individual message bounded.
+	if len(arena) > 2*1024*1024 {
+		panic(fmt.Errorf("tried to emit %d bytes in a single Documents RPC, current limit %d (please implement proper chunking)", len(arena), 2*1024*1024))
+	}
+
+	var msg = &pc.PullResponse{
+		Documents: &pc.Documents{
+			Binding:  binding,
+			Arena:    arena,
+			DocsJson: slices,
+		},
+	}
+
+	out.Lock()
+	defer out.Unlock()
+	if err := out.Stream.Send(msg); err != nil {
+		log.WithField("err", err).Error("stream send error")
+		return fmt.Errorf("error emitting documents: %w", err)
+	}
+	return nil
+}
+
+// Checkpoint emits a state checkpoint, with or without RFC 7396 patch-merge semantics.
+func (out *PullOutput) Checkpoint(checkpoint json.RawMessage, merge bool) error {
+	log.WithFields(log.Fields{
+		"checkpoint": checkpoint,
+		"merge":      merge,
+	}).Trace("emitting checkpoint")
+
+	var msg = &pc.PullResponse{
+		Checkpoint: &pf.DriverCheckpoint{
+			DriverCheckpointJson: []byte(checkpoint),
+			Rfc7396MergePatch:    merge,
+		},
+	}
+
+	out.Lock()
+	defer out.Unlock()
+	if err := out.Stream.Send(msg); err != nil {
+		log.WithField("err", err).Error("stream send error")
+		return fmt.Errorf("error emitting checkpoint: %w", err)
+	}
+	return nil
 }
