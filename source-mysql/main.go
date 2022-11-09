@@ -116,6 +116,7 @@ type advancedConfig struct {
 	SkipBinlogRetentionCheck bool   `json:"skip_binlog_retention_check,omitempty" jsonschema:"title=Skip Binlog Retention Sanity Check,default=false,description=Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need."`
 	NodeID                   uint32 `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
 	SkipBackfills            string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	BackfillChunkSize        int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=131072,description=The number of rows which should be fetched from the database in a single backfill query."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -155,6 +156,9 @@ func (c *Config) SetDefaults() {
 	}
 	if c.Advanced.NodeID == 0 {
 		c.Advanced.NodeID = 0x476C6F77 // "Flow"
+	}
+	if c.Advanced.BackfillChunkSize <= 0 {
+		c.Advanced.BackfillChunkSize = 128 * 1024
 	}
 
 	// The address config property should accept a host or host:port
