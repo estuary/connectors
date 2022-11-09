@@ -196,7 +196,8 @@ func main() {
 		DocumentationURL: "https://go.estuary.dev/source-gcs",
 		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
 		// timestamp that's equal to the `MinBound` in the state.
-		TimeHorizonDelta: time.Second * -30,
+		TimeHorizonDelta:    time.Second * -30,
+		SkipSchemaInference: true,
 	}
 
 	src.Main()
