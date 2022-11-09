@@ -1,1 +1,107 @@
-{"$schema":"http://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-mysql/config","properties":{"address":{"type":"string","title":"Server Address","description":"The host or host:port at which the database can be reached.","order":0},"user":{"type":"string","title":"Login Username","description":"The database user to authenticate as.","default":"flow_capture","order":1},"password":{"type":"string","title":"Login Password","description":"Password for the specified database user.","order":2,"secret":true},"advanced":{"properties":{"watermarks_table":{"type":"string","title":"Watermarks Table Name","description":"The name of the table used for watermark writes. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form.","default":"flow.watermarks"},"dbname":{"type":"string","title":"Database Name","description":"The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access.","default":"mysql"},"skip_binlog_retention_check":{"type":"boolean","title":"Skip Binlog Retention Sanity Check","description":"Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need.","default":false},"node_id":{"type":"integer","title":"Node ID","description":"Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."},"skip_backfills":{"type":"string","title":"Skip Backfills","description":"A comma-separated list of fully-qualified table names which should not be backfilled."}},"additionalProperties":false,"type":"object","title":"Advanced Options","description":"Options for advanced users. You should not typically need to modify these."},"networkTunnel":{"properties":{"sshForwarding":{"properties":{"sshEndpoint":{"type":"string","title":"SSH Endpoint","description":"Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])","pattern":"^ssh://.+@.+$"},"privateKey":{"type":"string","title":"SSH Private Key","description":"Private key to connect to the remote SSH server.","multiline":true,"secret":true}},"additionalProperties":false,"type":"object","required":["sshEndpoint","privateKey"],"title":"SSH Forwarding"}},"additionalProperties":false,"type":"object","title":"Network Tunnel","description":"Connect to your system through an SSH server that acts as a bastion host for your network."}},"type":"object","required":["address","user","password"],"title":"MySQL Connection"}
+{
+  "$id": "https://github.com/estuary/connectors/source-mysql/config",
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "address": {
+      "description": "The host or host:port at which the database can be reached.",
+      "order": 0,
+      "title": "Server Address",
+      "type": "string"
+    },
+    "advanced": {
+      "additionalProperties": false,
+      "description": "Options for advanced users. You should not typically need to modify these.",
+      "properties": {
+        "backfill_chunk_size": {
+          "default": 131072,
+          "description": "The number of rows which should be fetched from the database in a single backfill query.",
+          "title": "Backfill Chunk Size",
+          "type": "integer"
+        },
+        "dbname": {
+          "default": "mysql",
+          "description": "The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access.",
+          "title": "Database Name",
+          "type": "string"
+        },
+        "node_id": {
+          "description": "Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value.",
+          "title": "Node ID",
+          "type": "integer"
+        },
+        "skip_backfills": {
+          "description": "A comma-separated list of fully-qualified table names which should not be backfilled.",
+          "title": "Skip Backfills",
+          "type": "string"
+        },
+        "skip_binlog_retention_check": {
+          "default": false,
+          "description": "Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need.",
+          "title": "Skip Binlog Retention Sanity Check",
+          "type": "boolean"
+        },
+        "watermarks_table": {
+          "default": "flow.watermarks",
+          "description": "The name of the table used for watermark writes. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form.",
+          "title": "Watermarks Table Name",
+          "type": "string"
+        }
+      },
+      "title": "Advanced Options",
+      "type": "object"
+    },
+    "networkTunnel": {
+      "additionalProperties": false,
+      "description": "Connect to your system through an SSH server that acts as a bastion host for your network.",
+      "properties": {
+        "sshForwarding": {
+          "additionalProperties": false,
+          "properties": {
+            "privateKey": {
+              "description": "Private key to connect to the remote SSH server.",
+              "multiline": true,
+              "secret": true,
+              "title": "SSH Private Key",
+              "type": "string"
+            },
+            "sshEndpoint": {
+              "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+              "pattern": "^ssh://.+@.+$",
+              "title": "SSH Endpoint",
+              "type": "string"
+            }
+          },
+          "required": [
+            "sshEndpoint",
+            "privateKey"
+          ],
+          "title": "SSH Forwarding",
+          "type": "object"
+        }
+      },
+      "title": "Network Tunnel",
+      "type": "object"
+    },
+    "password": {
+      "description": "Password for the specified database user.",
+      "order": 2,
+      "secret": true,
+      "title": "Login Password",
+      "type": "string"
+    },
+    "user": {
+      "default": "flow_capture",
+      "description": "The database user to authenticate as.",
+      "order": 1,
+      "title": "Login Username",
+      "type": "string"
+    }
+  },
+  "required": [
+    "address",
+    "user",
+    "password"
+  ],
+  "title": "MySQL Connection",
+  "type": "object"
+}
