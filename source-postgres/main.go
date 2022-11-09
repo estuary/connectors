@@ -12,9 +12,10 @@ import (
 
 	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
 	schemagen "github.com/estuary/connectors/go-schema-gen"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
@@ -30,46 +31,46 @@ type tunnelConfig struct {
 }
 
 func main() {
-	var spec = airbyte.Spec{
-		SupportsIncremental:     true,
-		ConnectionSpecification: configSchema(),
-		DocumentationURL:        "https://go.estuary.dev/source-postgresql",
+	boilerplate.RunMain(&sqlcapture.Driver{
+		ConfigSchema:     configSchema(),
+		DocumentationURL: "https://go.estuary.dev/source-postgresql",
+		Connect:          connectPostgres,
+	})
+}
+
+func connectPostgres(ctx context.Context, cfg json.RawMessage) (sqlcapture.Database, error) {
+	var config Config
+	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
+		return nil, fmt.Errorf("error parsing config json: %w", err)
+	}
+	config.SetDefaults()
+
+	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
+	if config.NetworkTunnel != nil && config.NetworkTunnel.SshForwarding != nil && config.NetworkTunnel.SshForwarding.SshEndpoint != "" {
+		host, port, err := net.SplitHostPort(config.Address)
+		if err != nil {
+			return nil, fmt.Errorf("splitting address to host and port: %w", err)
+		}
+
+		var sshConfig = &networkTunnel.SshConfig{
+			SshEndpoint: config.NetworkTunnel.SshForwarding.SshEndpoint,
+			PrivateKey:  []byte(config.NetworkTunnel.SshForwarding.PrivateKey),
+			ForwardHost: host,
+			ForwardPort: port,
+			LocalPort:   "5432",
+		}
+		var tunnel = sshConfig.CreateTunnel()
+
+		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
+		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
+		err = tunnel.Start()
+
+		if err != nil {
+			logrus.WithField("error", err).Error("network tunnel error")
+		}
 	}
 
-	sqlcapture.AirbyteMain(spec, func(configFile airbyte.ConfigFile) (sqlcapture.Database, error) {
-		var config Config
-		if err := configFile.Parse(&config); err != nil {
-			return nil, fmt.Errorf("error parsing config file: %w", err)
-		}
-		config.SetDefaults()
-
-		// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-		if config.NetworkTunnel != nil && config.NetworkTunnel.SshForwarding != nil && config.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-			host, port, err := net.SplitHostPort(config.Address)
-			if err != nil {
-				return nil, fmt.Errorf("splitting address to host and port: %w", err)
-			}
-
-			var sshConfig = &networkTunnel.SshConfig{
-				SshEndpoint: config.NetworkTunnel.SshForwarding.SshEndpoint,
-				PrivateKey:  []byte(config.NetworkTunnel.SshForwarding.PrivateKey),
-				ForwardHost: host,
-				ForwardPort: port,
-				LocalPort:   "5432",
-			}
-			var tunnel = sshConfig.CreateTunnel()
-
-			// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
-			// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-			err = tunnel.Start()
-
-			if err != nil {
-				logrus.WithField("error", err).Error("network tunnel error")
-			}
-		}
-
-		return &postgresDatabase{config: &config}, nil
-	})
+	return &postgresDatabase{config: &config}, nil
 }
 
 // Config tells the connector how to connect to and interact with the source database.
@@ -202,10 +203,6 @@ func (db *postgresDatabase) Close(ctx context.Context) error {
 		return fmt.Errorf("error closing database connection: %w", err)
 	}
 	return nil
-}
-
-func (db *postgresDatabase) DefaultSchema(ctx context.Context) (string, error) {
-	return "public", nil
 }
 
 func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/estuary/flow/go/protocols/airbyte"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -62,10 +62,11 @@ type TableState struct {
 }
 
 // The table's mode can be one of:
-//   Ignore: The table is being deliberately ignored.
-//   Pending: The table is new, and will start being backfilled soon.
-//   Backfill: The table's rows are being backfilled and replication events will only be emitted for the already-backfilled portion.
-//   Active: The table finished backfilling and replication events are emitted for the entire table.
+//
+//	Ignore: The table is being deliberately ignored.
+//	Pending: The table is new, and will start being backfilled soon.
+//	Backfill: The table's rows are being backfilled and replication events will only be emitted for the already-backfilled portion.
+//	Active: The table finished backfilling and replication events are emitted for the entire table.
 const (
 	TableModeIgnore   = "Ignore"
 	TableModePending  = "Pending"
@@ -73,21 +74,15 @@ const (
 	TableModeActive   = "Active"
 )
 
-// MessageOutput represents "the thing to which Capture writes records and state checkpoints".
-// A json.Encoder satisfies this interface in normal usage, but during tests a custom MessageOutput
-// is used which collects output in memory.
-type MessageOutput interface {
-	Encode(v interface{}) error
-}
-
 // Capture encapsulates the generic process of capturing data from a SQL database
 // via replication, backfilling preexisting table contents, and emitting records/state
 // updates. It uses the `Database` interface to interact with a specific database.
 type Capture struct {
-	Catalog  *airbyte.ConfiguredCatalog // The catalog read from `catalog.json`
-	State    *PersistentState           // State read from `state.json` and emitted as updates
-	Encoder  MessageOutput              // The encoder to which records and state updates are written
-	Database Database                   // The database-specific interface which is operated by the generic Capture logic
+	Bindings map[string]*Binding     // Map from fully-qualified stream IDs to the corresponding binding information
+	State    *PersistentState        // State read from `state.json` and emitted as updates
+	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
+	Database Database                // The database-specific interface which is operated by the generic Capture logic
+	Tail     bool                    // True if the connector is operating in tailing mode
 
 	discovery map[string]TableInfo // Cached result of the most recent table discovery request
 
@@ -112,7 +107,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	defer emitterCancel()
 	c.emitQueue = make(chan interface{}, emitterBufferSize)
 	c.emitError = make(chan error, 1)
-	go emitWorker(emitterCtx, c.Encoder, c.emitQueue, c.emitError)
+	go c.emitWorker(emitterCtx, c.Output, c.emitQueue, c.emitError)
 
 	// Perform discovery and cache the result. This is used at startup when
 	// updating the state to reflect catalog changes, and then later it is
@@ -219,7 +214,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
 	var targetWatermark = nonexistentWatermark
-	if !c.Catalog.Tail {
+	if !c.Tail {
 		var watermark = uuid.New().String()
 		if err = c.Database.WriteWatermark(ctx, watermark); err != nil {
 			return fmt.Errorf("error writing poll watermark: %w", err)
@@ -244,37 +239,10 @@ func (c *Capture) updateState(ctx context.Context) error {
 		c.State.Streams = make(map[string]TableState)
 	}
 
-	// Just to be a bit more forgiving, default unspecified namespaces to a
-	// reasonable value. This whole bit of logic, as well as the `DefaultSchema`
-	// method, could be removed but only if we're willing to let things break
-	// when the user's catalog fails to specify the namespace.
-	for idx := range c.Catalog.Streams {
-		if c.Catalog.Streams[idx].Stream.Namespace == "" {
-			var defaultSchema, err = c.Database.DefaultSchema(ctx)
-			if err != nil {
-				return fmt.Errorf("error querying default schema: %w", err)
-			}
-			c.Catalog.Streams[idx].Stream.Namespace = defaultSchema
-		}
-	}
-
 	// Streams may be added to the catalog at various times. We need to
 	// initialize new state entries for these streams, and while we're at
 	// it this is a good time to sanity-check the primary key configuration.
-	for _, catalogStream := range c.Catalog.Streams {
-		var streamID = JoinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
-
-		// In the catalog a primary key is an array of arrays of strings, but in the
-		// case of Postgres each of those sub-arrays must be length-1 because we're
-		// just naming a column and can't descend into individual fields.
-		var catalogPrimaryKey []string
-		for _, col := range catalogStream.PrimaryKey {
-			if len(col) != 1 {
-				return fmt.Errorf("stream %q: primary key element %q invalid", streamID, col)
-			}
-			catalogPrimaryKey = append(catalogPrimaryKey, col[0])
-		}
-
+	for streamID, binding := range c.Bindings {
 		// If the `PrimaryKey` property is specified in the catalog then use that,
 		// otherwise use the "native" primary key of this table in the database.
 		// Print a warning if the two are not the same.
@@ -285,15 +253,15 @@ func (c *Capture) updateState(ctx context.Context) error {
 				"key":   primaryKey,
 			}).Debug("queried primary key")
 		}
-		if len(catalogPrimaryKey) != 0 {
-			if strings.Join(primaryKey, ",") != strings.Join(catalogPrimaryKey, ",") {
+		if len(binding.Resource.PrimaryKey) != 0 {
+			if strings.Join(primaryKey, ",") != strings.Join(binding.Resource.PrimaryKey, ",") {
 				logrus.WithFields(logrus.Fields{
 					"stream":      streamID,
-					"catalogKey":  catalogPrimaryKey,
+					"catalogKey":  binding.Resource.PrimaryKey,
 					"databaseKey": primaryKey,
 				}).Warn("primary key in catalog differs from database table")
 			}
-			primaryKey = catalogPrimaryKey
+			primaryKey = binding.Resource.PrimaryKey
 		}
 		if len(primaryKey) == 0 {
 			return fmt.Errorf("stream %q: primary key unspecified in the catalog and no primary key found in database", streamID)
@@ -314,15 +282,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 	// Likewise streams may be removed from the catalog, and we need to forget
 	// the corresponding state information.
 	for streamID := range c.State.Streams {
-		// List membership checks are always a pain in Go, but that's all this loop is
-		var streamExistsInCatalog = false
-		for _, catalogStream := range c.Catalog.Streams {
-			var catalogStreamID = JoinStreamID(catalogStream.Stream.Namespace, catalogStream.Stream.Name)
-			if streamID == catalogStreamID {
-				streamExistsInCatalog = true
-			}
-		}
-
+		var _, streamExistsInCatalog = c.Bindings[streamID]
 		if !streamExistsInCatalog {
 			logrus.WithField("stream", streamID).Info("stream removed from catalog")
 			c.State.Streams[streamID] = TableState{Mode: TableModeIgnore, dirty: true}
@@ -458,6 +418,9 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 			return fmt.Errorf("error patching resultset for %q: %w", streamID, err)
 		}
 	}
+	if watermark == nonexistentWatermark {
+		return fmt.Errorf("replication stream closed")
+	}
 	return fmt.Errorf("replication stream closed before reaching watermark")
 }
 
@@ -569,7 +532,7 @@ func (c *Capture) emit(msg interface{}) error {
 
 // Hang on now. How can we wait for the emit worker to cleanly shut down?
 // Ah,
-func emitWorker(ctx context.Context, enc MessageOutput, emitQueue <-chan interface{}, emitError chan<- error) {
+func (c *Capture) emitWorker(ctx context.Context, out *boilerplate.PullOutput, emitQueue <-chan interface{}, emitError chan<- error) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -580,7 +543,7 @@ func emitWorker(ctx context.Context, enc MessageOutput, emitQueue <-chan interfa
 				emitError <- nil
 				return
 			}
-			if err := emitMessage(enc, msg); err != nil {
+			if err := c.emitMessage(out, msg); err != nil {
 				emitError <- err
 				return
 			}
@@ -588,10 +551,10 @@ func emitWorker(ctx context.Context, enc MessageOutput, emitQueue <-chan interfa
 	}
 }
 
-func emitMessage(enc MessageOutput, msg interface{}) error {
+func (c *Capture) emitMessage(out *boilerplate.PullOutput, msg interface{}) error {
 	switch msg := msg.(type) {
 	case *ChangeEvent:
-		var out map[string]interface{}
+		var record map[string]interface{}
 		var meta = struct {
 			Operation ChangeOp               `json:"op"`
 			Source    SourceMetadata         `json:"source"`
@@ -603,41 +566,33 @@ func emitMessage(enc MessageOutput, msg interface{}) error {
 		}
 		switch msg.Operation {
 		case InsertOp:
-			out = msg.After // Before is never used.
+			record = msg.After // Before is never used.
 		case UpdateOp:
-			meta.Before, out = msg.Before, msg.After
+			meta.Before, record = msg.Before, msg.After
 		case DeleteOp:
-			out = msg.Before // After is never used.
+			record = msg.Before // After is never used.
 		}
-		out["_meta"] = &meta
+		record["_meta"] = &meta
 
-		var sourceCommon = msg.Source.Common()
-		var bs, err = json.Marshal(out)
+		var bs, err = json.Marshal(record)
 		if err != nil {
 			return fmt.Errorf("error serializing record data: %w", err)
 		}
-		return enc.Encode(airbyte.Message{
-			Type: airbyte.MessageTypeRecord,
-			Record: &airbyte.Record{
-				Namespace: sourceCommon.Schema,
-				Stream:    sourceCommon.Table,
-				EmittedAt: time.Now().UnixNano() / int64(time.Millisecond),
-				Data:      json.RawMessage(bs),
-			},
-		})
+		// TODO(wgd): Compute the binding index for a particular message more intelligently
+		var sourceCommon = msg.Source.Common()
+		var streamID = JoinStreamID(sourceCommon.Schema, sourceCommon.Table)
+		var binding, ok = c.Bindings[streamID] // TODO(wgd): Unsynchronized access to this map from the worker goroutine should be fine since it's read-only after capture initialization?
+		if !ok {
+			return fmt.Errorf("capture output to invalid stream %q", streamID)
+		}
+		return out.Documents(binding.Index, bs)
 	case *PersistentState:
 		var bs, err = json.Marshal(msg)
 		if err != nil {
 			return fmt.Errorf("error serializing state checkpoint: %w", err)
 		}
 		logrus.WithField("state", string(bs)).Trace("emitting state update")
-		return enc.Encode(airbyte.Message{
-			Type: airbyte.MessageTypeState,
-			State: &airbyte.State{
-				Data:  json.RawMessage(bs),
-				Merge: true,
-			},
-		})
+		return out.Checkpoint(bs, true)
 	default:
 		return fmt.Errorf("invalid message to emit: %#v", msg)
 	}
