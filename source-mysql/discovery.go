@@ -218,7 +218,7 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 	logrus.WithFields(logrus.Fields{
 		"type":  fmt.Sprintf("%#v", t),
 		"value": fmt.Sprintf("%#v", val),
-	}).Info("translating record field")
+	}).Trace("translating record field")
 
 	switch t.Type {
 	case "enum":
