@@ -51,6 +51,12 @@ type Source struct {
 	// examine in a given sweep of the Store. Given a sampled wall-time T, we presume (hope) that no
 	// files will appear in the store after T having a modification time of T - horizonDelta.
 	TimeHorizonDelta time.Duration
+	// SkipSchemaInference allows connectors using the filesource framework to opt-in to bypass
+	// schema inference based on actual discovered documents during the discovery phase, and instead
+	// return a minimal baseline schema without analyzing discovered documents. This is a temporary
+	// measure for cloud storage connectors, and inference will be removed entirely when the new
+	// schema inference system is rolled out.
+	SkipSchemaInference bool
 }
 
 // Store is a minimal interface of an binary large object storage service.
@@ -169,6 +175,32 @@ func (src Source) Check(args airbyte.CheckCmd) error {
 		Type:             airbyte.MessageTypeConnectionStatus,
 		ConnectionStatus: result,
 	})
+}
+
+func (src Source) Discover(args airbyte.DiscoverCmd) error {
+	if src.SkipSchemaInference {
+		var conn, err = newConnector(src, args.ConfigFile)
+		if err != nil {
+			return err
+		}
+
+		return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
+			Type: airbyte.MessageTypeCatalog,
+			Catalog: &airbyte.Catalog{
+				Streams: []airbyte.Stream{{
+					Name:               conn.config.DiscoverRoot(),
+					JSONSchema:         json.RawMessage(discoverDocumentSchema),
+					SupportedSyncModes: airbyte.AllSyncModes,
+					SourceDefinedPrimaryKey: [][]string{
+						{"_meta", "file"},
+						{"_meta", "offset"},
+					},
+				}},
+			},
+		})
+	}
+
+	return src.discoverSchema(args)
 }
 
 func (src Source) Read(args airbyte.ReadCmd) error {
@@ -440,4 +472,26 @@ const (
 	metaFileLocation = "/_meta/file"
 	// Location of the record offset in produced documents.
 	metaOffsetLocation = "/_meta/offset"
+	// Baseline document schema for resource streams we discover.
+	discoverDocumentSchema = `{
+		"type": "object",
+		"properties": {
+			"_meta": {
+				"type": "object",
+				"properties": {
+					"file": { 
+						"description": "The key of the source file, added automatically by Flow",
+						"type": "string"
+					},
+					"offset": {
+						"description": "The offset of the record within the source file, added automatically by Flow",
+						"type": "integer",
+						"minimum": 0
+					}
+				},
+				"required": ["file", "offset"]
+			}
+		},
+		"required": ["_meta"]
+	}`
 )

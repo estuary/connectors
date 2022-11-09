@@ -38,7 +38,7 @@ const discoverBudget = time.Second * 30
 // schema sample.
 const reservoirSize = 25
 
-func (src Source) Discover(args airbyte.DiscoverCmd) error {
+func (src Source) discoverSchema(args airbyte.DiscoverCmd) error {
 	var conn, err = newConnector(src, args.ConfigFile)
 	if err != nil {
 		return err
