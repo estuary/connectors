@@ -33,7 +33,9 @@ const (
 // It's a subset of the corresponding Debezium message definition.
 // Our design goal is a high signal-to-noise representation which can be
 // trivially converted to a Debezium equivalent if desired. See:
-// 	https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-create-events
+//
+//	https://debezium.io/documentation/reference/stable/connectors/postgresql.html#postgresql-create-events
+//
 // TODO(johnny): Factor into a shared package.
 type SourceCommon struct {
 	Millis   int64  `json:"ts_ms,omitempty" jsonschema:"description=Unix timestamp (in millis) at which this event was recorded by the database."`
@@ -115,8 +117,6 @@ type Database interface {
 	DiscoverTables(ctx context.Context) (map[string]TableInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
 	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Schema, error)
-	// TODO(wgd): Document specific methods
-	DefaultSchema(ctx context.Context) (string, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
 	EmptySourceMetadata() SourceMetadata
 	// EncodeRowKeyForFDB converts a key as necessary to produce a TupleElement,

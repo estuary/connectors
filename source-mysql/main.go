@@ -13,9 +13,10 @@ import (
 
 	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
 	schemagen "github.com/estuary/connectors/go-schema-gen"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/sirupsen/logrus"
@@ -34,49 +35,50 @@ type tunnelConfig struct {
 
 const minimumExpiryTime = 7 * 24 * time.Hour
 
+var mysqlDriver = &sqlcapture.Driver{
+	ConfigSchema:     configSchema(),
+	DocumentationURL: "https://go.estuary.dev/source-mysql",
+	Connect:          connectMySQL,
+}
+
 func main() {
 	fixMysqlLogging()
+	boilerplate.RunMain(mysqlDriver)
+}
 
-	var spec = airbyte.Spec{
-		SupportsIncremental:     true,
-		ConnectionSpecification: configSchema(),
-		DocumentationURL:        "https://go.estuary.dev/source-mysql",
+func connectMySQL(ctx context.Context, cfg json.RawMessage) (sqlcapture.Database, error) {
+	var config Config
+	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
+		return nil, fmt.Errorf("error parsing config json: %w", err)
+	}
+	config.SetDefaults()
+
+	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
+	if config.NetworkTunnel != nil && config.NetworkTunnel.SshForwarding != nil && config.NetworkTunnel.SshForwarding.SshEndpoint != "" {
+		host, port, err := net.SplitHostPort(config.Address)
+		if err != nil {
+			return nil, fmt.Errorf("splitting address to host and port: %w", err)
+		}
+
+		var sshConfig = &networkTunnel.SshConfig{
+			SshEndpoint: config.NetworkTunnel.SshForwarding.SshEndpoint,
+			PrivateKey:  []byte(config.NetworkTunnel.SshForwarding.PrivateKey),
+			ForwardHost: host,
+			ForwardPort: port,
+			LocalPort:   "3306",
+		}
+		var tunnel = sshConfig.CreateTunnel()
+
+		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
+		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
+		err = tunnel.Start()
+
+		if err != nil {
+			logrus.WithField("error", err).Error("network tunnel error")
+		}
 	}
 
-	sqlcapture.AirbyteMain(spec, func(configFile airbyte.ConfigFile) (sqlcapture.Database, error) {
-		var config Config
-		if err := configFile.Parse(&config); err != nil {
-			return nil, fmt.Errorf("error parsing config file: %w", err)
-		}
-		config.SetDefaults()
-
-		// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-		if config.NetworkTunnel != nil && config.NetworkTunnel.SshForwarding != nil && config.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-			host, port, err := net.SplitHostPort(config.Address)
-			if err != nil {
-				return nil, fmt.Errorf("splitting address to host and port: %w", err)
-			}
-
-			var sshConfig = &networkTunnel.SshConfig{
-				SshEndpoint: config.NetworkTunnel.SshForwarding.SshEndpoint,
-				PrivateKey:  []byte(config.NetworkTunnel.SshForwarding.PrivateKey),
-				ForwardHost: host,
-				ForwardPort: port,
-				LocalPort:   "3306",
-			}
-			var tunnel = sshConfig.CreateTunnel()
-
-			// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
-			// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-			err = tunnel.Start()
-
-			if err != nil {
-				logrus.WithField("error", err).Error("network tunnel error")
-			}
-		}
-
-		return &mysqlDatabase{config: &config}, nil
-	})
+	return &mysqlDatabase{config: &config}, nil
 }
 
 // fixMysqlLogging works around some unfortunate defaults in the go-log package, which is used by
@@ -179,10 +181,9 @@ func configSchema() json.RawMessage {
 }
 
 type mysqlDatabase struct {
-	config        *Config
-	conn          *client.Conn
-	defaultSchema string
-	explained     map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
+	config    *Config
+	conn      *client.Conn
+	explained map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 }
 
 func (db *mysqlDatabase) Connect(ctx context.Context) error {
@@ -299,22 +300,6 @@ func (db *mysqlDatabase) Close(ctx context.Context) error {
 		return fmt.Errorf("error closing database connection: %w", err)
 	}
 	return nil
-}
-
-func (db *mysqlDatabase) DefaultSchema(ctx context.Context) (string, error) {
-	if db.defaultSchema == "" {
-		var results, err = db.conn.Execute("SELECT database();")
-		if err != nil {
-			return "", fmt.Errorf("error querying default schema: %w", err)
-		}
-		if len(results.Values) == 0 {
-			return "", fmt.Errorf("error querying default schema: no result rows")
-		}
-		db.defaultSchema = string(results.Values[0][0].AsString())
-		logrus.WithField("schema", db.defaultSchema).Debug("queried default schema")
-	}
-
-	return db.defaultSchema, nil
 }
 
 func (db *mysqlDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
