@@ -2,17 +2,19 @@ package sqlcapture
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/estuary/flow/go/protocols/airbyte"
+	pc "github.com/estuary/flow/go/protocols/capture"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
 )
 
 // DiscoverCatalog queries the database and generates an Airbyte Catalog
 // describing the available tables and their columns.
-func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error) {
+func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.DiscoverResponse_Binding, error) {
 	if err := db.Connect(ctx); err != nil {
 		return nil, err
 	}
@@ -30,7 +32,7 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
 
-	var catalog = new(airbyte.Catalog)
+	var catalog []*pc.DiscoverResponse_Binding
 	for _, table := range tables {
 		logrus.WithFields(logrus.Fields{
 			"table":      table.Name,
@@ -127,19 +129,32 @@ func DiscoverCatalog(ctx context.Context, db Database) (*airbyte.Catalog, error)
 			"schema":    string(rawSchema),
 		}).Debug("translated table schema")
 
-		var sourceDefinedPrimaryKey [][]string
+		var keyPointers []string
 		for _, colName := range table.PrimaryKey {
-			sourceDefinedPrimaryKey = append(sourceDefinedPrimaryKey, []string{colName})
+			keyPointers = append(keyPointers, "/"+colName)
 		}
 
-		catalog.Streams = append(catalog.Streams, airbyte.Stream{
-			Name:                    table.Name,
-			Namespace:               table.Schema,
-			JSONSchema:              rawSchema,
-			SupportedSyncModes:      airbyte.AllSyncModes,
-			SourceDefinedCursor:     true,
-			SourceDefinedPrimaryKey: sourceDefinedPrimaryKey,
+		var res = Resource{
+			Namespace: table.Schema,
+			Stream:    table.Name,
+		}
+		resourceSpecJSON, err := json.Marshal(res)
+		if err != nil {
+			return nil, fmt.Errorf("error serializing resource spec: %w", err)
+		}
+
+		catalog = append(catalog, &pc.DiscoverResponse_Binding{
+			RecommendedName:    pf.Collection(recommendedStreamName(table.Schema, table.Name)),
+			ResourceSpecJson:   resourceSpecJSON,
+			DocumentSchemaJson: rawSchema,
+			KeyPtrs:            keyPointers,
 		})
+
 	}
 	return catalog, err
+}
+
+func recommendedStreamName(schema, table string) string {
+	var streamID = JoinStreamID(schema, table)
+	return streamID
 }

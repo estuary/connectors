@@ -69,11 +69,11 @@ func unpackTuple(bs []byte, db Database) ([]interface{}, error) {
 	}
 	var xs []interface{}
 	for _, elem := range t {
-		if decoded, err := db.DecodeKeyFDB(elem); err != nil {
+		decoded, err := db.DecodeKeyFDB(elem)
+		if err != nil {
 			return nil, fmt.Errorf("unpack tuple: %w", err)
-		} else {
-			xs = append(xs, decoded)
 		}
+		xs = append(xs, decoded)
 	}
 
 	return xs, nil

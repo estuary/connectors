@@ -13,6 +13,7 @@ import (
 	firestore "cloud.google.com/go/firestore"
 	firestore_v1 "cloud.google.com/go/firestore/apiv1"
 	firebase "firebase.google.com/go"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -102,10 +103,8 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 		State: &captureState{
 			Resources: updatedResourceStates,
 		},
-		Output: &captureOutput{
-			Stream: stream,
-		},
-		Tail: open.Open.Tail,
+		Output: &boilerplate.PullOutput{Stream: stream},
+		Tail:   open.Open.Tail,
 	}
 	return capture.Run(stream.Context())
 }
@@ -114,7 +113,7 @@ type capture struct {
 	Requests chan *pc.PullRequest
 	Config   config
 	State    *captureState
-	Output   *captureOutput
+	Output   *boilerplate.PullOutput
 	Tail     bool
 }
 
@@ -251,78 +250,6 @@ func (s *captureState) UpdateBackfillState(collectionID string, state *backfillS
 		return nil, fmt.Errorf("error serializing state checkpoint: %w", err)
 	}
 	return checkpointJSON, nil
-}
-
-// TODO(wgd): Move the whole captureOutput thing into source-boilerplate?
-type captureOutput struct {
-	sync.Mutex
-
-	Stream pc.Driver_PullServer
-}
-
-func (out *captureOutput) Ready() error {
-	log.Debug("sending PullResponse.Opened")
-	out.Lock()
-	defer out.Unlock()
-	if err := out.Stream.Send(&pc.PullResponse{Opened: &pc.PullResponse_Opened{}}); err != nil {
-		return fmt.Errorf("error sending PullResponse.Opened: %w", err)
-	}
-	return nil
-}
-
-func (out *captureOutput) Documents(binding uint32, docs ...json.RawMessage) error {
-	// Concatenate multiple documents into the arena, with appropriate indices
-	//
-	// TODO(wgd): The Firestore capture actually emits documents one at a time, but
-	//   I'm trying to be a bit forward-looking towards making this generic capture
-	//   boilerplate code. So there should be some sort of automatic splitting into
-	//   multiple Documents messages if we try to emit a ton of messages in one call,
-	//   right?
-	var arena []byte
-	var slices []pf.Slice
-	for _, doc := range docs {
-		var begin = uint32(len(arena))
-		arena = append(arena, []byte(doc)...)
-		slices = append(slices, pf.Slice{Begin: begin, End: uint32(len(arena))})
-	}
-
-	var msg = &pc.PullResponse{
-		Documents: &pc.Documents{
-			Binding:  binding,
-			Arena:    arena,
-			DocsJson: slices,
-		},
-	}
-
-	out.Lock()
-	defer out.Unlock()
-	if err := out.Stream.Send(msg); err != nil {
-		log.WithField("err", err).Error("stream send error")
-		return fmt.Errorf("error emitting documents: %w", err)
-	}
-	return nil
-}
-
-func (out *captureOutput) Checkpoint(checkpoint json.RawMessage, merge bool) error {
-	log.WithFields(log.Fields{
-		"checkpoint": checkpoint,
-		"merge":      merge,
-	}).Trace("emitting checkpoint")
-
-	var msg = &pc.PullResponse{
-		Checkpoint: &pf.DriverCheckpoint{
-			DriverCheckpointJson: []byte(checkpoint),
-			Rfc7396MergePatch:    merge,
-		},
-	}
-
-	out.Lock()
-	defer out.Unlock()
-	if err := out.Stream.Send(msg); err != nil {
-		log.WithField("err", err).Error("stream send error")
-		return fmt.Errorf("error emitting checkpoint: %w", err)
-	}
-	return nil
 }
 
 func (c *capture) Run(ctx context.Context) error {
