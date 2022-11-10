@@ -168,8 +168,9 @@ func configSchema() json.RawMessage {
 }
 
 type postgresDatabase struct {
-	config *Config
-	conn   *pgx.Conn
+	config    *Config
+	conn      *pgx.Conn
+	explained map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 }
 
 func (db *postgresDatabase) Connect(ctx context.Context) error {
