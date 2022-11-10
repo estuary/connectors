@@ -15,8 +15,8 @@ func PostgresSQLGenerator() sql.Generator {
 			sql.INTEGER: sql.RawConstColumnType("BIGINT"),
 			sql.NUMBER:  sql.RawConstColumnType("DOUBLE PRECISION"),
 			sql.BOOLEAN: sql.RawConstColumnType("BOOLEAN"),
-			sql.OBJECT:  sql.RawConstColumnType("JSON"),
-			sql.ARRAY:   sql.RawConstColumnType("JSON"),
+			sql.OBJECT:  sql.RawConstColumnType("OBJECT"),
+			sql.ARRAY:   sql.RawConstColumnType("ARRAY"),
 			sql.BINARY:  sql.RawConstColumnType("BYTEA"),
 			sql.STRING: sql.StringTypeMapping{
 				Default: sql.RawConstColumnType("TEXT"),
