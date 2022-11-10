@@ -50,6 +50,11 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.Tab
 
 	// Process the results into `changeEvent` structs and return them
 	var events []sqlcapture.ChangeEvent
+	logrus.WithFields(logrus.Fields{
+		"schema": schema,
+		"table":  table,
+		"rows":   len(results.Values),
+	}).Debug("translating query rows to change events")
 	for _, row := range results.Values {
 		var fields = make(map[string]interface{})
 		for idx, val := range row {
