@@ -23,13 +23,13 @@ func TestSQLGeneration(t *testing.T) {
 	var gen = PostgresSQLGenerator()
 	var table = sqlDriver.TableForMaterialization("test_table", "", gen.IdentifierRenderer, spec.Bindings[0])
 
-	keyCreate, keyInsert, keyJoin, err := buildSQL(&gen, 123, table, spec.Bindings[0].FieldSelection)
+	keyCreate, keyInsert, keyJoin, keyCleanup, err := buildSQL(&gen, 123, table, spec.Bindings[0].FieldSelection)
 	require.NoError(t, err)
 
 	require.Equal(t, `
-		CREATE TEMPORARY TABLE flow_load_key_tmp_123 (
+		CREATE TABLE flow_load_key_tmp_123 (
 			key1 BIGINT NOT NULL, key2 BOOLEAN NOT NULL
-		) ON COMMIT DELETE ROWS
+		)
 		;`, keyCreate)
 
 	require.Equal(t, `
@@ -46,6 +46,8 @@ func TestSQLGeneration(t *testing.T) {
 			JOIN flow_load_key_tmp_123 AS r
 			ON l.key1 = r.key1 AND l.key2 = r.key2
 		`, keyJoin)
+
+	require.Equal(t, `DROP TABLE flow_load_key_tmp_123;`, keyCleanup)
 }
 
 func TestDateTimeColumn(t *testing.T) {

@@ -202,7 +202,8 @@ type transactor struct {
 		conn  *pgx.Conn
 		fence *sqlDriver.StdFence
 	}
-	bindings []*binding
+	bindings   []*binding
+	cleanupSQL string
 
 	tunnel networkTunnel.SshTunnel
 }
@@ -244,7 +245,7 @@ func (t *transactor) addBinding(ctx context.Context, spec *pf.MaterializationSpe
 
 	// Build all SQL statements and parameter converters.
 	var keyCreateSQL string
-	keyCreateSQL, bind.load.insert.sql, bind.load.query.sql, err = buildSQL(
+	keyCreateSQL, bind.load.insert.sql, bind.load.query.sql, t.cleanupSQL, err = buildSQL(
 		t.gen, index, target, spec.FieldSelection)
 	if err != nil {
 		return fmt.Errorf("building SQL: %w", err)
@@ -371,6 +372,10 @@ func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 	} else if err = txn.Commit(ctx); err != nil {
 		return fmt.Errorf("commiting Load transaction: %w", err)
 	}
+	// Cleanup the binding-scoped temporary table for staged keys to load.
+	if _, err = txn.Exec(ctx, d.cleanupSQL); err != nil {
+		return fmt.Errorf("Exec(%s): %w", d.cleanupSQL, err)
+	}
 
 	return nil
 }
@@ -459,7 +464,7 @@ func (d *transactor) Destroy() {
 
 // buildSQL builds SQL statements use for PostgreSQL materializations.
 func buildSQL(gen *sqlDriver.Generator, binding int, table *sqlDriver.Table, fields pf.FieldSelection) (
-	keyCreate, keyInsert, keyJoin string, err error) {
+	keyCreate, keyInsert, keyJoin, keyCleanup string, err error) {
 
 	var defs, keys, keyPH, joins []string
 	for idx, key := range fields.Keys {
@@ -487,9 +492,9 @@ func buildSQL(gen *sqlDriver.Generator, binding int, table *sqlDriver.Table, fie
 
 	// CREATE temporary table which stores keys to load.
 	keyCreate = fmt.Sprintf(`
-		CREATE TEMPORARY TABLE %s_%d (
+		CREATE TABLE %s_%d (
 			%s
-		) ON COMMIT DELETE ROWS
+		)
 		;`,
 		tempTableName,
 		binding,
@@ -523,6 +528,8 @@ func buildSQL(gen *sqlDriver.Generator, binding int, table *sqlDriver.Table, fie
 		binding,
 		strings.Join(joins, " AND "),
 	)
+
+	keyCleanup = fmt.Sprintf(`DROP TABLE %s_%d;`, tempTableName, binding)
 
 	return
 }
