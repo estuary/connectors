@@ -45,6 +45,10 @@ func (r *resultSet) Buffer(streamID string, keyColumns []string, events []Change
 	}
 
 	// Otherwise add the new row to the `rows` map and update `scanned`.
+	logrus.WithFields(logrus.Fields{
+		"stream": streamID,
+		"count":  len(events),
+	}).Debug("buffering chunk of backfill data")
 	for _, event := range events {
 		var bs, err = encodeRowKey(chunk.keyColumns, event.After, db)
 		if err != nil {
