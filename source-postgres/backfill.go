@@ -13,15 +13,19 @@ import (
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.TableInfo, keyColumns []string, resumeKey []interface{}) ([]sqlcapture.ChangeEvent, error) {
 	var schema, table = info.Schema, info.Name
+	var streamID = sqlcapture.JoinStreamID(schema, table)
 	logrus.WithFields(logrus.Fields{
-		"schema":     schema,
-		"table":      table,
+		"stream":     streamID,
 		"keyColumns": keyColumns,
 		"resumeKey":  resumeKey,
 	}).Debug("scanning table chunk")
 
-	// Build and execute a query to fetch the next `backfillChunkSize` rows from the database
-	var query = buildScanQuery(resumeKey == nil, keyColumns, schema, table)
+	// Build a query to fetch the next `backfillChunkSize` rows from the database.
+	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
+	var query = db.buildScanQuery(resumeKey == nil, keyColumns, schema, table)
+	db.explainQuery(ctx, streamID, query, resumeKey)
+
+	// Execute the backfill query to fetch rows from the database
 	logrus.WithFields(logrus.Fields{"query": query, "args": resumeKey}).Debug("executing query")
 	rows, err := db.conn.Query(ctx, query, resumeKey...)
 	if err != nil {
@@ -32,6 +36,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.
 	// Process the results into `changeEvent` structs and return them
 	var cols = rows.FieldDescriptions()
 	var events []sqlcapture.ChangeEvent
+	logrus.WithField("stream", streamID).Debug("translating query rows to change events")
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
 		var vals, err = rows.Values()
@@ -94,7 +99,7 @@ func (db *postgresDatabase) WatermarksTable() string {
 // so that it can be lowered in tests to exercise chunking behavior more easily.
 var backfillChunkSize = 128 * 1024
 
-func buildScanQuery(start bool, keyColumns []string, schemaName, tableName string) string {
+func (db *postgresDatabase) buildScanQuery(start bool, keyColumns []string, schemaName, tableName string) string {
 	// Construct strings like `(foo, bar, baz)` and `($1, $2, $3)` for use in the query
 	var pkey, args string
 	for idx, colName := range keyColumns {
@@ -123,4 +128,50 @@ func quoteColumnName(name string) string {
 	//     Quoted identifiers can contain any character, except the character with code zero.
 	//     (To include a double quote, write two double quotes.)
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+func (db *postgresDatabase) explainQuery(ctx context.Context, streamID, query string, args []interface{}) {
+	// Only EXPLAIN the backfill query once per connector invocation
+	if db.explained == nil {
+		db.explained = make(map[string]struct{})
+	}
+	if _, ok := db.explained[streamID]; ok {
+		return
+	}
+	db.explained[streamID] = struct{}{}
+
+	// Ask the database to EXPLAIN the backfill query
+	var explainQuery = "EXPLAIN " + query
+	logrus.WithFields(logrus.Fields{
+		"id":    streamID,
+		"query": explainQuery,
+	}).Info("explain backfill query")
+	explainResult, err := db.conn.Query(ctx, explainQuery, args...)
+	if err != nil {
+		logrus.WithField("id", streamID).Error("unable to execute query")
+		return
+	}
+	defer explainResult.Close()
+
+	// Log the response, doing a bit of extra work to make it readable
+	var keys = explainResult.FieldDescriptions()
+	for explainResult.Next() {
+		var vals, err = explainResult.Values()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"id":  streamID,
+				"err": err,
+			}).Error("error getting row value")
+			return
+		}
+
+		var result []string
+		for idx, val := range vals {
+			result = append(result, fmt.Sprintf("%s=%v", string(keys[idx].Name), val))
+		}
+		logrus.WithFields(logrus.Fields{
+			"id":       streamID,
+			"response": result,
+		}).Info("explain backfill query")
+	}
 }

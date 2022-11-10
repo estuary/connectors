@@ -182,6 +182,7 @@ type mysqlDatabase struct {
 	config        *Config
 	conn          *client.Conn
 	defaultSchema string
+	explained     map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 }
 
 func (db *mysqlDatabase) Connect(ctx context.Context) error {
