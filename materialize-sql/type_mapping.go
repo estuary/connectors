@@ -143,29 +143,15 @@ type StaticMapper MappedType
 
 var _ TypeMapper = StaticMapper{}
 
-type StaticMapperOption func(*StaticMapper)
-
 func (sm StaticMapper) MapType(*Projection) (MappedType, error) {
 	return (MappedType)(sm), nil
 }
 
-func NewStaticMapper(ddl string, opts ...StaticMapperOption) StaticMapper {
-	sm := StaticMapper{
+func NewStaticMapper(ddl string) StaticMapper {
+	return StaticMapper{
 		DDL:               ddl,
 		Converter:         func(te tuple.TupleElement) (interface{}, error) { return te, nil },
 		ParsedFieldConfig: nil,
-	}
-
-	for _, o := range opts {
-		o(&sm)
-	}
-
-	return sm
-}
-
-func WithElementConverter(converter ElementConverter) StaticMapperOption {
-	return func(sm *StaticMapper) {
-		sm.Converter = converter
 	}
 }
 

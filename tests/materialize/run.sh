@@ -21,6 +21,9 @@ export -f bail
 test -n "${CONNECTOR}" || bail "must specify CONNECTOR env variable"
 test -n "${VERSION}" || bail "must specify VERSION env variable"
 
+# Directory under which the test runs.
+TEST_DIR=".build/tests/${CONNECTOR}"
+
 # The dir of materialize tests.
 TEST_BASE_DIR="${ROOT_DIR}/tests/materialize"
 
@@ -115,16 +118,8 @@ flowctl-admin temp-data-plane \
     --unix-sockets \
     &
 DATA_PLANE_PID=$!
-
 # Arrange to stop the data plane on exit.
-function cleanup() {
-    echo -e "\nexecuting cleanup"
-
-    source "${TEST_SCRIPT_DIR}/delete.sh" || true
-    source "${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" || true
-    kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} || true
-}
-trap cleanup EXIT
+trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" EXIT
 
 echo -e "\nbuilding and activating test catalog"
 source "${TEST_SCRIPT_DIR}/build-and-activate.sh" false || bail "building and activating test catalog failed."

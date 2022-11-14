@@ -17,7 +17,6 @@ import (
 func RunFenceTestCases(
 	t *testing.T,
 	client Client,
-	checkpointsPath []string,
 	dialect Dialect,
 	createTableTpl *template.Template,
 	updateFence func(Table, Fence) error,
@@ -29,7 +28,7 @@ func RunFenceTestCases(
 	var runTest = func(t *testing.T, ranges ...uint32) {
 		var ctx = context.Background()
 
-		var metaShape = FlowCheckpointsTable(checkpointsPath...)
+		var metaShape = FlowCheckpointsTable("temp_test_fencing_checkpoints")
 		var metaTable, err = ResolveTable(metaShape, dialect)
 		require.NoError(t, err)
 

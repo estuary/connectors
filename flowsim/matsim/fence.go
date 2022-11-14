@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/flowsim/testcat"
+	"github.com/estuary/flow/go/protocols/materialize"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 )
@@ -36,7 +37,7 @@ func (c *FenceConfig) Execute(args []string) error {
 	materialization := materializationSpecs[0]
 
 	// Perform the connector setup (spec, validate, apply) and open the first transactions stream.
-	stream1, err := SetupConnectorOpenTransactions(c.ctx, materialization, pm.AdaptServerToClient(c.driverServer), false)
+	stream1, err := SetupConnectorOpenTransactions(c.ctx, materialization, materialize.AdaptServerToClient(c.driverServer), false)
 	if err != nil {
 		return err
 	}
@@ -83,13 +84,6 @@ func (c *FenceConfig) Execute(args []string) error {
 		return fmt.Errorf("stream2: opened error: %v received: %#v", err, opened)
 	} else {
 		log.WithFields(log.Fields{"checkpoint": string(opened.Opened.FlowCheckpoint)}).Info("stream2: connection opened")
-	}
-
-	// Not doing any loads, so send acknowledge prior to sending prepare.
-	if err := Acknowledge(stream1); err != nil {
-		return err
-	} else if err := Acknowledge(stream2); err != nil {
-		return err
 	}
 
 	// Send prepared to stream1.
