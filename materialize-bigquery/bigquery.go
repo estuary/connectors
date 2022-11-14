@@ -1,21 +1,25 @@
-package connector
+package main
 
 import (
 	"context"
-	dbSql "database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"regexp"
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
-	sql "github.com/estuary/connectors/materialize-sql"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 )
+
+func main() {
+	boilerplate.RunMain(newBigQueryDriver())
+}
 
 // Config represents the endpoint configuration for BigQuery.
 type config struct {
@@ -44,53 +48,19 @@ func (c *config) Validate() error {
 	return nil
 }
 
-func (c *config) client(ctx context.Context) (*client, error) {
-	var clientOpts []option.ClientOption
-
-	clientOpts = append(clientOpts, option.WithCredentialsJSON(decodeCredentials(c.CredentialsJSON)))
-
-	// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
-	var billingProjectID = c.BillingProjectID
-	if billingProjectID == "" {
-		billingProjectID = c.ProjectID
-	}
-	bigqueryClient, err := bigquery.NewClient(ctx, billingProjectID, clientOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("creating bigquery client: %w", err)
-	}
-
-	cloudStorageClient, err := storage.NewClient(ctx, clientOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("creating cloud storage client: %w", err)
-	}
-
-	return &client{
-		bigqueryClient:     bigqueryClient,
-		cloudStorageClient: cloudStorageClient,
-		config:             *c,
-	}, nil
-}
-
 // DatasetPath returns the sqlDriver.ResourcePath including the dataset.
-func (c *config) DatasetPath(path ...string) sql.TablePath {
+func (c *config) DatasetPath(path ...string) sqlDriver.ResourcePath {
 	return append([]string{c.ProjectID, c.Dataset}, path...)
 }
 
 type tableConfig struct {
-	Table     string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in."`
-	Delta     bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false."`
-	projectID string
-	dataset   string
+	base *config
+
+	Table string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in."`
+	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false."`
 }
 
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{
-		projectID: ep.Config.(config).ProjectID,
-		dataset:   ep.Config.(config).Dataset,
-	}
-}
-
-func (c tableConfig) Validate() error {
+func (c *tableConfig) Validate() error {
 	if c.Table == "" {
 		return fmt.Errorf("expected table")
 	}
@@ -98,8 +68,8 @@ func (c tableConfig) Validate() error {
 }
 
 // Path returns the sqlDriver.ResourcePath for a table.
-func (c tableConfig) Path() sql.TablePath {
-	return []string{c.projectID, c.dataset, c.Table}
+func (c tableConfig) Path() sqlDriver.ResourcePath {
+	return c.base.DatasetPath(c.Table)
 }
 
 // DeltaUpdates returns if BigQuery is in DeltaUpdates mode or not.
@@ -121,119 +91,136 @@ func decodeCredentials(credentialString string) []byte {
 
 	// Otherwise, assume that the credentials string was not base64 encoded.
 	return []byte(credentialString)
+
 }
 
-func Driver() pm.DriverServer {
-	return newBigQueryDriver()
-}
-
-func newBigQueryDriver() pm.DriverServer {
-	return &sql.Driver{
+// newBigQueryDriver creates a new Driver for BigQuery.
+func newBigQueryDriver() *sqlDriver.Driver {
+	return &sqlDriver.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
 		EndpointSpecType: config{},
-		ResourceSpecType: tableConfig{},
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage) (*sql.Endpoint, error) {
-			cfg := config{}
-			if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
-				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+		ResourceSpecType: &tableConfig{},
+		NewResource: func(endpoint sqlDriver.Endpoint) sqlDriver.Resource {
+			return &tableConfig{base: endpoint.(*Endpoint).config}
+		},
+		NewEndpoint: func(ctx context.Context, raw json.RawMessage) (sqlDriver.Endpoint, error) {
+			var parsed = new(config)
+			if err := pf.UnmarshalStrict(raw, parsed); err != nil {
+				return nil, fmt.Errorf("parsing BigQuery configuration: %w", err)
 			}
 
 			log.WithFields(log.Fields{
-				"project_id":  cfg.ProjectID,
-				"dataset":     cfg.Dataset,
-				"region":      cfg.Region,
-				"bucket":      cfg.Bucket,
-				"bucket_path": cfg.BucketPath,
+				"project_id":  parsed.ProjectID,
+				"dataset":     parsed.Dataset,
+				"region":      parsed.Region,
+				"bucket":      parsed.Bucket,
+				"bucket_path": parsed.BucketPath,
 			}).Info("opening bigquery")
 
-			var metaSpecs, metaCheckpoints = sql.MetaTables(cfg.DatasetPath())
+			var clientOpts []option.ClientOption
 
-			client, err := cfg.client(ctx)
+			clientOpts = append(clientOpts, option.WithCredentialsJSON(decodeCredentials(parsed.CredentialsJSON)))
+
+			// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
+			var billingProjectID = parsed.BillingProjectID
+			if billingProjectID == "" {
+				billingProjectID = parsed.ProjectID
+			}
+			bigQueryClient, err := bigquery.NewClient(ctx, billingProjectID, clientOpts...)
 			if err != nil {
-				return nil, fmt.Errorf("creating client: %w", err)
+				return nil, fmt.Errorf("creating bigquery client: %w", err)
 			}
 
-			return &sql.Endpoint{
-				Config:              cfg,
-				Dialect:             bqDialect,
-				MetaSpecs:           metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client,
-				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+			cloudStorageClient, err := storage.NewClient(ctx, clientOpts...)
+			if err != nil {
+				return nil, fmt.Errorf("creating cloud storage client: %w", err)
+			}
+
+			return &Endpoint{
+				config:             parsed,
+				bigQueryClient:     bigQueryClient,
+				cloudStorageClient: cloudStorageClient,
+				generator:          SQLGenerator(),
+				flowTables:         sqlDriver.DefaultFlowTables(parsed.ProjectID + "." + parsed.Dataset + "."), // Prefix with project ID and dataset
 			}, nil
+		},
+		NewTransactor: func(
+			ctx context.Context,
+			ep sqlDriver.Endpoint,
+			spec *pf.MaterializationSpec,
+			sdFence sqlDriver.Fence,
+			resources []sqlDriver.Resource,
+		) (_ pm.Transactor, err error) {
+			var t = &transactor{
+				ep:       ep.(*Endpoint),
+				fence:    sdFence.(*fence),
+				bindings: make([]*binding, len(spec.Bindings)),
+			}
+
+			// Create the bindings for this transactor
+			for bindingPos, spec := range spec.Bindings {
+				var target = sqlDriver.ResourcePath(spec.ResourcePath).Join()
+				t.bindings[bindingPos], err = newBinding(t.ep.generator, bindingPos, target, spec)
+				if err != nil {
+					return nil, fmt.Errorf("%s: %w", target, err)
+				}
+			}
+			return t, nil
 		},
 	}
 }
 
-// client implements the sql.Client interface.
-type client struct {
-	bigqueryClient     *bigquery.Client
-	cloudStorageClient *storage.Client
-	config             config
+// Bigquery only allows underscore, letters, numbers, and sometimes hyphens for identifiers. Convert everything else to underscore.
+var identifierSanitizerRegexp = regexp.MustCompile(`[^\-\._0-9a-zA-Z]`)
+
+func identifierSanitizer(text string) string {
+	return identifierSanitizerRegexp.ReplaceAllString(text, "_")
 }
 
-func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
-	job, err := c.query(ctx, fmt.Sprintf(
-		"SELECT version, spec FROM %s WHERE materialization=%s;",
-		specs.Identifier,
-		specs.Keys[0].Placeholder,
-	), materialization.String())
-
-	if err == errNotFound {
-		return "", "", dbSql.ErrNoRows
-	} else if err != nil {
-		return "", "", err
+// SQLGenerator returns a SQLGenerator for the BigQuery SQL dialect.
+func SQLGenerator() sqlDriver.Generator {
+	var jsonMapper = sqlDriver.ConstColumnType{
+		SQLType: "STRING",
+		ValueConverter: func(i interface{}) (interface{}, error) {
+			switch ii := i.(type) {
+			case []byte:
+				return string(ii), nil
+			case json.RawMessage:
+				return string(ii), nil
+			case nil:
+				return json.RawMessage(nil), nil
+			default:
+				return nil, fmt.Errorf("invalid type %#v for variant", i)
+			}
+		},
 	}
 
-	var data struct {
-		Version string `bigquery:"version"`
-		SpecB64 string `bigquery:"spec"`
+	var typeMappings = sqlDriver.ColumnTypeMapper{
+		sqlDriver.ARRAY:   jsonMapper,
+		sqlDriver.BINARY:  sqlDriver.RawConstColumnType("BYTES"),
+		sqlDriver.BOOLEAN: sqlDriver.RawConstColumnType("BOOL"),
+		sqlDriver.INTEGER: sqlDriver.RawConstColumnType("INT64"),
+		sqlDriver.NUMBER:  sqlDriver.RawConstColumnType("BIGNUMERIC"),
+		sqlDriver.OBJECT:  jsonMapper,
+		sqlDriver.STRING: sqlDriver.StringTypeMapping{
+			Default: sqlDriver.RawConstColumnType("STRING"),
+			ByFormat: map[string]sqlDriver.TypeMapper{
+				"date":      sqlDriver.RawConstColumnType("DATE"),
+				"date-time": sqlDriver.RawConstColumnType("TIMESTAMP"),
+			},
+		},
 	}
 
-	if err := c.fetchOne(ctx, job, &data); err == errNotFound {
-		return "", "", dbSql.ErrNoRows
-	} else if err != nil {
-		return "", "", err
+	var nullable sqlDriver.TypeMapper = sqlDriver.NullableTypeMapping{
+		NotNullText: "NOT NULL",
+		Inner:       typeMappings,
 	}
 
-	return data.SpecB64, data.Version, nil
-}
-
-func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	// We don't explicitly wrap `statements` in a transaction, as not all databases support
-	// transactional DDL statements, but we do run them through a single connection. This allows a
-	// driver to explicitly run `BEGIN;` and `COMMIT;` statements around a transactional operation.
-	_, err := c.query(ctx, strings.Join(statements, "\n"))
-	return err
-}
-
-func (c client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence) (sql.Fence, error) {
-	var query strings.Builder
-	if err := tplInstallFence.Execute(&query, fence); err != nil {
-		return fence, fmt.Errorf("evaluating fence template: %w", err)
+	return sqlDriver.Generator{
+		Placeholder:        sqlDriver.QuestionMarkPlaceholder,
+		CommentRenderer:    sqlDriver.LineCommentRenderer(),
+		IdentifierRenderer: sqlDriver.NewRenderer(identifierSanitizer, sqlDriver.BackticksWrapper(), nil),
+		ValueRenderer:      sqlDriver.NewRenderer(sqlDriver.DefaultQuoteSanitizer, sqlDriver.SingleQuotesWrapper(), nil),
+		TypeMappings:       nullable,
 	}
-
-	job, err := c.query(ctx, query.String())
-	if err != nil {
-		return fence, err
-	}
-	var bqFence struct {
-		Fence      int64  `bigquery:"fence"`
-		Checkpoint string `bigquery:"checkpoint"`
-	}
-	if err = c.fetchOne(ctx, job, &bqFence); err != nil {
-		return fence, fmt.Errorf("read fence: %w", err)
-	}
-
-	checkpoint, err := base64.StdEncoding.DecodeString(bqFence.Checkpoint)
-	if err != nil {
-		return fence, fmt.Errorf("base64.Decode(checkpoint): %w", err)
-	}
-
-	fence.Fence = bqFence.Fence
-	fence.Checkpoint = checkpoint
-
-	return fence, nil
 }

@@ -199,10 +199,6 @@ func (c *BasicConfig) Execute(args []string) error {
 
 	// Wait until the final commit has completed.
 	commitWait.Wait()
-	if err := Acknowledge(stream); err != nil {
-		return err
-	}
-
 	// Return the last pass items to the store for comparison.
 	store.Push((<-returnToStore).Range()...)
 
