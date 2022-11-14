@@ -9,8 +9,11 @@ collections:
         integer: { type: integer }
         number: { type: number }
         string: { type: string }
-      required: [key1, key2]
-    key: [/key1, /key2]
+        person@place!: { type: string }
+        source.name: { type: string }
+        with-dash: { type: string }
+      required: [key1, key2, boolean, integer, string]
+    key: [/key1, /key2, /boolean, /integer, /string]
 
 materializations:
   test/sqlite:

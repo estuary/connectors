@@ -15,21 +15,23 @@ RUN go mod download
 RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" | tar -zx -C /usr/local/bin/
 
 # Build the connector projects we depend on.
+COPY go-schema-gen           ./go-schema-gen
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-bigquery    ./materialize-bigquery
+COPY materialize-sql         ./materialize-sql
 COPY testsupport             ./testsupport
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-bigquery/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/cmd/connector
 
 # Runtime Stage
 ################################################################################
 FROM ${BASE_IMAGE}
 
 RUN apt-get update -y \
- && apt-get install --no-install-recommends -y ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+    && apt-get install --no-install-recommends -y ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
