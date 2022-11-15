@@ -268,7 +268,7 @@ var enumValuesRegexp = regexp.MustCompile(`'((?:''|\\.|[^'])+)'(?:,|$)`)
 
 // enumValueReplacements contains the complete list of MySQL string escapes from
 // https://dev.mysql.com/doc/refman/8.0/en/string-literals.html#character-escape-sequences
-// plus the `''` repeated-single-quote mechanism.
+// plus the `”` repeated-single-quote mechanism.
 var enumValueReplacements = map[string]string{
 	`''`: "'",
 	`\0`: "\x00",
@@ -347,7 +347,7 @@ type columnSchema struct {
 	format          string
 	nullable        bool
 	extras          map[string]interface{}
-	type_           string
+	jsonType        string
 }
 
 func (s columnSchema) toType() *jsonschema.Schema {
@@ -364,51 +364,51 @@ func (s columnSchema) toType() *jsonschema.Schema {
 		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.
 	}
 
-	if s.type_ == "" {
+	if s.jsonType == "" {
 		// No type constraint.
 	} else if s.nullable {
-		out.Extras["type"] = []string{s.type_, "null"} // Use variadic form.
+		out.Extras["type"] = []string{s.jsonType, "null"} // Use variadic form.
 	} else {
-		out.Type = s.type_
+		out.Type = s.jsonType
 	}
 	return out
 }
 
 var mysqlTypeToJSON = map[string]columnSchema{
-	"tinyint":   {type_: "integer"},
-	"smallint":  {type_: "integer"},
-	"mediumint": {type_: "integer"},
-	"int":       {type_: "integer"},
-	"bigint":    {type_: "integer"},
-	"bit":       {type_: "integer"},
+	"tinyint":   {jsonType: "integer"},
+	"smallint":  {jsonType: "integer"},
+	"mediumint": {jsonType: "integer"},
+	"int":       {jsonType: "integer"},
+	"bigint":    {jsonType: "integer"},
+	"bit":       {jsonType: "integer"},
 
-	"float":   {type_: "number"},
-	"double":  {type_: "number"},
-	"decimal": {type_: "string"},
+	"float":   {jsonType: "number"},
+	"double":  {jsonType: "number"},
+	"decimal": {jsonType: "string"},
 
-	"char":    {type_: "string"},
-	"varchar": {type_: "string"},
+	"char":    {jsonType: "string"},
+	"varchar": {jsonType: "string"},
 
-	"tinytext":   {type_: "string"},
-	"text":       {type_: "string"},
-	"mediumtext": {type_: "string"},
-	"longtext":   {type_: "string"},
+	"tinytext":   {jsonType: "string"},
+	"text":       {jsonType: "string"},
+	"mediumtext": {jsonType: "string"},
+	"longtext":   {jsonType: "string"},
 
-	"binary":     {type_: "string", contentEncoding: "base64"},
-	"varbinary":  {type_: "string", contentEncoding: "base64"},
-	"tinyblob":   {type_: "string", contentEncoding: "base64"},
-	"blob":       {type_: "string", contentEncoding: "base64"},
-	"mediumblob": {type_: "string", contentEncoding: "base64"},
-	"longblob":   {type_: "string", contentEncoding: "base64"},
+	"binary":     {jsonType: "string", contentEncoding: "base64"},
+	"varbinary":  {jsonType: "string", contentEncoding: "base64"},
+	"tinyblob":   {jsonType: "string", contentEncoding: "base64"},
+	"blob":       {jsonType: "string", contentEncoding: "base64"},
+	"mediumblob": {jsonType: "string", contentEncoding: "base64"},
+	"longblob":   {jsonType: "string", contentEncoding: "base64"},
 
-	"enum": {type_: "string"},
-	"set":  {type_: "string"},
+	"enum": {jsonType: "string"},
+	"set":  {jsonType: "string"},
 
-	"date":      {type_: "string"},
-	"datetime":  {type_: "string", format: "date-time"},
-	"timestamp": {type_: "string", format: "date-time"},
-	"time":      {type_: "string"},
-	"year":      {type_: "integer"},
+	"date":      {jsonType: "string"},
+	"datetime":  {jsonType: "string", format: "date-time"},
+	"timestamp": {jsonType: "string", format: "date-time"},
+	"time":      {jsonType: "string"},
+	"year":      {jsonType: "integer"},
 
 	"json": {},
 }
