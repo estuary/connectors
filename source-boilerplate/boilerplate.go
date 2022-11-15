@@ -303,6 +303,8 @@ func (out *PullOutput) Ready() error {
 
 // Documents emits one or more documents to the specified binding index.
 func (out *PullOutput) Documents(binding uint32, docs ...json.RawMessage) error {
+	log.WithField("count", len(docs)).Trace("emitting documents")
+
 	// Concatenate multiple documents into the arena, with appropriate indices
 	var arena []byte
 	var slices []pf.Slice

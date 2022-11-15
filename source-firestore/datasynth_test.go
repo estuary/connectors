@@ -15,6 +15,7 @@ import (
 	"time"
 
 	firestore "cloud.google.com/go/firestore"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -266,13 +267,13 @@ func TestMassiveBackfill(t *testing.T) {
 	for ctx.Err() == nil {
 		var ctx, cancel = context.WithCancel(ctx)
 		time.AfterFunc(30*time.Second, cancel)
-		capture.Capture(ctx, t, "THIS-SENTINEL-VALUE-SHOULD-NEVER-EXIST")
+		capture.Capture(ctx, t, nil)
 	}
 	capture.Verify(t)
 }
 
 type watchdogValidator struct {
-	inner captureValidator
+	inner st.CaptureValidator
 
 	wdt         *time.Timer
 	resetPeriod time.Duration
