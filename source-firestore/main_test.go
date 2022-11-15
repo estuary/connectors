@@ -14,6 +14,7 @@ import (
 
 	firestore "cloud.google.com/go/firestore"
 	"github.com/bradleyjkemp/cupaloy"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -45,6 +46,8 @@ const (
 	shutdownSentinel = "a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"
 )
 
+var DefaultSanitizers = make(map[string]*regexp.Regexp)
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if level, err := log.ParseLevel(os.Getenv("LOG_LEVEL")); err == nil {
@@ -56,6 +59,9 @@ func TestMain(m *testing.M) {
 		DataKey:  "data",
 		FieldMap: log.FieldMap{log.FieldKeyTime: "@ts"},
 	})
+	for k, v := range st.DefaultSanitizers {
+		DefaultSanitizers[k] = v
+	}
 	DefaultSanitizers["project-id-123456"] = regexp.MustCompile(regexp.QuoteMeta(*testProjectID))
 	os.Exit(m.Run())
 }
@@ -83,9 +89,7 @@ func TestSimpleCapture(t *testing.T) {
 			"docs/5", `{"data": 5}`,
 			"docs/6", `{"data": 6}`,
 		)
-		time.Sleep(100 * time.Millisecond)
-		client.Upsert(ctx, t, "docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel))
-		capture.Capture(ctx, t, restartSentinel).Verify(t)
+		verifyCapture(ctx, t, capture)
 	})
 	t.Run("two", func(t *testing.T) {
 		client.Upsert(ctx, t,
@@ -96,9 +100,7 @@ func TestSimpleCapture(t *testing.T) {
 			"docs/11", `{"data": 11}`,
 			"docs/12", `{"data": 12}`,
 		)
-		time.Sleep(100 * time.Millisecond)
-		client.Upsert(ctx, t, "docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel))
-		capture.Capture(ctx, t, shutdownSentinel).Verify(t)
+		verifyCapture(ctx, t, capture)
 	})
 }
 
@@ -115,15 +117,11 @@ func TestDeletions(t *testing.T) {
 		)
 		time.Sleep(1 * time.Second)
 		client.Delete(ctx, t, "docs/1", "docs/2")
-		time.Sleep(100 * time.Millisecond)
-		client.Upsert(ctx, t, "docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel))
-		capture.Capture(ctx, t, restartSentinel).Verify(t)
+		verifyCapture(ctx, t, capture)
 	})
 	t.Run("two", func(t *testing.T) {
 		client.Delete(ctx, t, "docs/3", "docs/4")
-		time.Sleep(100 * time.Millisecond)
-		client.Upsert(ctx, t, "docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel))
-		capture.Capture(ctx, t, shutdownSentinel).Verify(t)
+		verifyCapture(ctx, t, capture)
 	})
 }
 
@@ -140,10 +138,8 @@ func TestAddedBindingSameGroup(t *testing.T) {
 			"users/1/docs/2", `{"data": 2}`,
 			"groups/3/docs/7", `{"data": 7}`,
 			"groups/3/docs/8", `{"data": 8}`,
-			"users/1/docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel),
 		)
-		time.Sleep(500 * time.Millisecond)
-		capture.Capture(ctx, t, restartSentinel).Verify(t)
+		verifyCapture(ctx, t, capture)
 	})
 	capture.Bindings = append(capture.Bindings, simpleBindings(t, "groups/*/docs")...)
 	t.Run("two", func(t *testing.T) {
@@ -152,10 +148,8 @@ func TestAddedBindingSameGroup(t *testing.T) {
 			"users/1/docs/4", `{"data": 4}`,
 			"groups/2/docs/5", `{"data": 5}`,
 			"groups/2/docs/6", `{"data": 6}`,
-			"groups/2/docs/ZZZ", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel),
 		)
-		time.Sleep(500 * time.Millisecond)
-		capture.Capture(ctx, t, shutdownSentinel).Verify(t)
+		verifyCapture(ctx, t, capture)
 	})
 }
 
@@ -173,24 +167,18 @@ func TestManySmallWrites(t *testing.T) {
 				time.Sleep(100 * time.Millisecond)
 			}
 			if user == 4 {
-				client.Upsert(ctx, t,
-					"users/999/docs/999", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel),
-				)
+				time.Sleep(1500 * time.Millisecond)
 			}
-			time.Sleep(1 * time.Second)
 		}
-		client.Upsert(ctx, t,
-			"users/999/docs/999", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel),
-		)
 	}(ctx)
 
-	t.Run("one", func(t *testing.T) { capture.Capture(ctx, t, restartSentinel).Verify(t) })
-	t.Run("two", func(t *testing.T) { capture.Capture(ctx, t, shutdownSentinel).Verify(t) })
+	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
 func TestMultipleWatches(t *testing.T) {
 	var ctx = testContext(t, 40*time.Second)
-	var capture = simpleCapture(t, "users/*/docs", "users/*/notes", "users/*/tasks", "users/*/sentinels")
+	var capture = simpleCapture(t, "users/*/docs", "users/*/notes", "users/*/tasks")
 	var client = testFirestoreClient(ctx, t)
 
 	go func(ctx context.Context) {
@@ -201,19 +189,13 @@ func TestMultipleWatches(t *testing.T) {
 				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
 			}
 			if user == 4 {
-				client.Upsert(ctx, t,
-					"users/999/sentinels/999", fmt.Sprintf(`{"sentinel": %q}`, restartSentinel),
-				)
 				time.Sleep(1500 * time.Millisecond)
 			}
 		}
-		client.Upsert(ctx, t,
-			"users/999/sentinels/999", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel),
-		)
 	}(ctx)
 
-	t.Run("one", func(t *testing.T) { capture.Capture(ctx, t, restartSentinel).Verify(t) })
-	t.Run("two", func(t *testing.T) { capture.Capture(ctx, t, shutdownSentinel).Verify(t) })
+	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
 func TestBindingDeletion(t *testing.T) {
@@ -223,15 +205,13 @@ func TestBindingDeletion(t *testing.T) {
 		client.Upsert(ctx, t, fmt.Sprintf("docs/%d", idx), `{"data": "placeholder"}`)
 	}
 	time.Sleep(1 * time.Second)
-	client.Upsert(ctx, t, "docs/999", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel))
-	client.Upsert(ctx, t, "other/999", fmt.Sprintf(`{"sentinel": %q}`, shutdownSentinel))
 
 	var capture = simpleCapture(t, "docs")
-	t.Run("one", func(t *testing.T) { capture.Capture(ctx, t, shutdownSentinel).Verify(t) })
+	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 	capture.Bindings = simpleBindings(t, "other")
-	t.Run("two", func(t *testing.T) { capture.Capture(ctx, t, shutdownSentinel).Verify(t) })
+	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 	capture.Bindings = simpleBindings(t, "docs")
-	t.Run("three", func(t *testing.T) { capture.Capture(ctx, t, shutdownSentinel).Verify(t) })
+	t.Run("three", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
 func TestDiscovery(t *testing.T) {
@@ -253,10 +233,10 @@ func testContext(t testing.TB, duration time.Duration) context.Context {
 	return ctx
 }
 
-func simpleCapture(t testing.TB, names ...string) *testCaptureSpec {
+func simpleCapture(t testing.TB, names ...string) *st.CaptureSpec {
 	t.Helper()
-	if os.Getenv("RUN_CAPTURES") != "yes" {
-		t.Skipf("skipping %q capture: ${RUN_CAPTURES} != \"yes\"", t.Name())
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
 	// Load credentials from disk and construct an endpoint spec
@@ -269,11 +249,11 @@ func simpleCapture(t testing.TB, names ...string) *testCaptureSpec {
 		DatabasePath:    fmt.Sprintf("projects/%s/databases/%s", *testProjectID, *testDatabaseName),
 	}
 
-	return &testCaptureSpec{
+	return &st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: endpointSpec,
 		Bindings:     simpleBindings(t, names...),
-		Validator:    &sortedCaptureValidator{},
+		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   DefaultSanitizers,
 	}
 }
@@ -290,6 +270,26 @@ func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
 	return bindings
 }
 
+// verifyCapture performs a capture using the provided st.CaptureSpec and shuts it down after
+// a suitable time has elapsed without any documents or state checkpoints being emitted. It
+// then performs snapshot verification on the results.
+func verifyCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
+	t.Helper()
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	const shutdownDelay = 1000 * time.Millisecond
+	var shutdownWatchdog *time.Timer
+	cs.Capture(captureCtx, t, func(data json.RawMessage) {
+		if shutdownWatchdog == nil {
+			shutdownWatchdog = time.AfterFunc(shutdownDelay, func() {
+				log.WithField("delay", shutdownDelay.String()).Debug("capture shutdown watchdog expired")
+				cancelCapture()
+			})
+		}
+		shutdownWatchdog.Reset(shutdownDelay)
+	})
+	cs.Verify(t)
+}
+
 type firestoreClient struct {
 	inner  *firestore.Client
 	prefix string
@@ -297,8 +297,8 @@ type firestoreClient struct {
 
 func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
 	t.Helper()
-	if os.Getenv("RUN_CAPTURES") != "yes" {
-		t.Skipf("skipping %q capture: ${RUN_CAPTURES} != \"yes\"", t.Name())
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
 	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
