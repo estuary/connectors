@@ -80,18 +80,18 @@ run of `go test` will skip most of them:
 This is because the tests need to run against an actual Firestore instance, and the author
 doesn't trust the provided [emulator](https://firebase.google.com/docs/emulator-suite/connect_firestore)
 to accurately represent the actual behavior of Firestore databases. So you will have to provide
-some credentials and set the `RUN_CAPTURES` environment variable to `yes` for the tests to do
+some credentials and set the `TEST_DATABASE` environment variable to `yes` for the tests to do
 anything:
 
     ## Actually runs the automated capture tests
-    $ RUN_CAPTURES=yes go test -v ./source-firestore --project_id=some-project-123456 --creds_path=~/secrets/some-project-123456-12ab34cd45ef.json
+    $ TEST_DATABASE=yes go test -v ./source-firestore --project_id=some-project-123456 --creds_path=~/secrets/some-project-123456-12ab34cd45ef.json
 
 There's also another handfull of "automated tests" in `datasynth_test.go`, which aren't so much
 automated tests as they are tools for a human to run to stress-test capture behavior on massive
 datasets:
 
     ## Generates an enormous quantity of synthetic data
-    $ DATASYNTH=yes LOG_LEVEL=debug RUN_CAPTURES=yes go test -v ./source-firestore -timeout=0 -run TestSyntheticData --project_id=some-project-123456 --creds_path=~/secrets/some-project-123456-12ab34cd45ef.json
+    $ DATASYNTH=yes LOG_LEVEL=debug TEST_DATABASE=yes go test -v ./source-firestore -timeout=0 -run TestSyntheticData --project_id=some-project-123456 --creds_path=~/secrets/some-project-123456-12ab34cd45ef.json
 
     ## Tests a massive backfill
-    $ DATASYNTH=yes LOG_LEVEL=debug RUN_CAPTURES=yes go test -v ./source-firestore -timeout=0 -run TestMassiveBackfill --project_id=some-project-123456 --creds_path=~/secrets/some-project-123456-12ab34cd45ef.json
+    $ DATASYNTH=yes LOG_LEVEL=debug TEST_DATABASE=yes go test -v ./source-firestore -timeout=0 -run TestMassiveBackfill --project_id=some-project-123456 --creds_path=~/secrets/some-project-123456-12ab34cd45ef.json

@@ -1,4 +1,4 @@
-package main
+package testing
 
 import (
 	"bytes"
@@ -23,21 +23,67 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type testCaptureSpec struct {
+// CaptureSpec represents a configured capture task which can be run in an automated test.
+//
+// It consists of a pc.DriverServer, endpoint configuration, state checkpoint, and a list
+// of bindings. This is roughly equivalent to the configuration and runtime state of a real
+// capture running within Flow.
+//
+// In addition there is a set of "sanitizers" which replace specified regexes with constant
+// strings (this allows variable data such as timestamps to pass snapshot validation) and a
+// generic CaptureValidator interface which summarizes capture output (this allows validation
+// even of captures which are too large to fit entirely in memory, or other properties of
+// interest).
+type CaptureSpec struct {
 	Driver       pc.DriverServer
 	EndpointSpec interface{}
 	Bindings     []*flow.CaptureSpec_Binding
 	Checkpoint   json.RawMessage
 
-	Validator  captureValidator
+	Validator  CaptureValidator
 	Sanitizers map[string]*regexp.Regexp
 	Errors     []error
 }
 
-func (cs *testCaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*regexp.Regexp) {
+// Validate performs validation against the target database.
+func (cs *CaptureSpec) Validate(ctx context.Context, t testing.TB) ([]*pc.ValidateResponse_Binding, error) {
 	t.Helper()
-	if os.Getenv("RUN_CAPTURES") != "yes" {
-		t.Skipf("skipping %q capture: ${RUN_CAPTURES} != \"yes\"", t.Name())
+
+	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
+	require.NoError(t, err)
+
+	validation, err := cs.Driver.Validate(ctx, &pc.ValidateRequest{EndpointSpecJson: endpointSpecJSON})
+	if err != nil {
+		return nil, err
+	}
+	return validation.Bindings, nil
+}
+
+// VerifyDiscover runs Discover and then performs snapshot verification on the result.
+func (cs *CaptureSpec) VerifyDiscover(ctx context.Context, t testing.TB, matchers ...*regexp.Regexp) {
+	t.Helper()
+
+	var bindings = cs.Discover(ctx, t, matchers...)
+
+	var summary = new(strings.Builder)
+	for idx, binding := range bindings {
+		fmt.Fprintf(summary, "Binding %d:\n", idx)
+		bs, err := json.MarshalIndent(binding, "  ", "  ")
+		require.NoError(t, err)
+		io.Copy(summary, bytes.NewReader(bs))
+		fmt.Fprintf(summary, "\n")
+	}
+
+	cupaloy.SnapshotT(t, summary.String())
+}
+
+// Discover performs catalog discovery against the target database and returns
+// a sorted (by recommended name) list of all discovered bindings whose resource
+// spec matches one of the provided regexes.
+func (cs *CaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*regexp.Regexp) []*pc.DiscoverResponse_Binding {
+	t.Helper()
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
 	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
@@ -59,16 +105,11 @@ func (cs *testCaptureSpec) Discover(ctx context.Context, t testing.TB, matchers 
 	}
 	sort.Strings(matchedNames)
 
-	var summary = new(strings.Builder)
-	for idx, name := range matchedNames {
-		fmt.Fprintf(summary, "Binding %d:\n", idx)
-		bs, err := json.MarshalIndent(matchedBindings[name], "  ", "  ")
-		require.NoError(t, err)
-		io.Copy(summary, bytes.NewReader(bs))
-		fmt.Fprintf(summary, "\n")
-
+	var resultBindings []*pc.DiscoverResponse_Binding
+	for _, name := range matchedNames {
+		resultBindings = append(resultBindings, matchedBindings[name])
 	}
-	cupaloy.SnapshotT(t, summary.String())
+	return resultBindings
 }
 
 func matchesAny(matchers []*regexp.Regexp, text string) bool {
@@ -80,10 +121,12 @@ func matchesAny(matchers []*regexp.Regexp, text string) bool {
 	return false
 }
 
-func (cs *testCaptureSpec) Capture(ctx context.Context, t testing.TB, sentinel string) *testCaptureSpec {
+// Capture performs data capture from the target database into the associated CaptureValidator,
+// updating the state checkpoint and accumulating errors as appropriate.
+func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(data json.RawMessage)) *CaptureSpec {
 	t.Helper()
-	if os.Getenv("RUN_CAPTURES") != "yes" {
-		t.Skipf("skipping %q capture: ${RUN_CAPTURES} != \"yes\"", t.Name())
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 	log.WithFields(log.Fields{
 		"checkpoint": cs.Checkpoint,
@@ -104,16 +147,14 @@ func (cs *testCaptureSpec) Capture(ctx context.Context, t testing.TB, sentinel s
 		},
 	}
 
-	ctx, shutdown := context.WithCancel(ctx)
-	var adapter = &testPullAdapter{
-		ctx:           ctx,
-		openReq:       open,
-		checkpoint:    cs.Checkpoint,
-		bindings:      cs.Bindings,
-		validator:     cs.Validator,
-		sanitizers:    cs.Sanitizers,
-		sentinelValue: sentinel,
-		shutdown:      shutdown,
+	var adapter = &pullAdapter{
+		ctx:        ctx,
+		openReq:    open,
+		checkpoint: cs.Checkpoint,
+		bindings:   cs.Bindings,
+		validator:  cs.Validator,
+		sanitizers: cs.Sanitizers,
+		callback:   callback,
 	}
 	if err := cs.Driver.Pull(adapter); err != nil && !errors.Is(err, context.Canceled) {
 		cs.Errors = append(cs.Errors, err)
@@ -122,14 +163,17 @@ func (cs *testCaptureSpec) Capture(ctx context.Context, t testing.TB, sentinel s
 	return cs
 }
 
-func (cs *testCaptureSpec) Verify(t testing.TB) {
+// Verify performs snapshot verification on the capture results given by Summary.
+func (cs *CaptureSpec) Verify(t testing.TB) {
 	t.Helper()
 	cupaloy.SnapshotT(t, cs.Summary())
 	cs.Validator.Reset()
 	cs.Errors = nil
 }
 
-func (cs *testCaptureSpec) Summary() string {
+// Summary returns a human-readable summary of the capture output, current state checkpoint,
+// and any errors encountered along the way.
+func (cs *CaptureSpec) Summary() string {
 	var w = new(strings.Builder)
 
 	// Ask the output validator to summarize all observed output
@@ -158,27 +202,18 @@ func (cs *testCaptureSpec) Summary() string {
 	return w.String()
 }
 
-type testPullAdapter struct {
+type pullAdapter struct {
 	ctx         context.Context
 	openReq     *pc.PullRequest
 	checkpoint  []byte
 	bindings    []*flow.CaptureSpec_Binding
-	validator   captureValidator
+	validator   CaptureValidator
+	callback    func(data json.RawMessage)
 	sanitizers  map[string]*regexp.Regexp
 	transaction []*pc.Documents
-
-	// After the sentinel value is observed in an output document a shutdown
-	// WDT is activated, which will invoke the shutdown thunk after some time
-	// has passed with no further documents emitted.
-	sentinelReached bool
-	sentinelValue   string
-	shutdown        func()
-	wdt             *time.Timer
 }
 
-const shutdownHoldoffPeriod = 1000 * time.Millisecond
-
-func (a *testPullAdapter) Recv() (*pc.PullRequest, error) {
+func (a *pullAdapter) Recv() (*pc.PullRequest, error) {
 	if msg := a.openReq; msg != nil {
 		a.openReq = nil
 		return msg, nil
@@ -187,7 +222,7 @@ func (a *testPullAdapter) Recv() (*pc.PullRequest, error) {
 	return &pc.PullRequest{Acknowledge: &pc.Acknowledge{}}, nil
 }
 
-func (a *testPullAdapter) Send(m *pc.PullResponse) error {
+func (a *pullAdapter) Send(m *pc.PullResponse) error {
 	if m.Documents != nil {
 		a.transaction = append(a.transaction, m.Documents)
 	}
@@ -219,49 +254,52 @@ func (a *testPullAdapter) Send(m *pc.PullResponse) error {
 			for _, slice := range documents.DocsJson {
 				var doc = json.RawMessage(documents.Arena[slice.Begin:slice.End])
 				a.validator.Output(binding, sanitize(a.sanitizers, doc))
-				if !a.sentinelReached && bytes.Contains(doc, []byte(a.sentinelValue)) {
-					a.sentinelReached = true
-					log.WithField("holdoff", shutdownHoldoffPeriod.String()).Debug("sentinel value observed")
-					a.wdt = time.AfterFunc(shutdownHoldoffPeriod, func() {
-						log.WithField("holdoff", shutdownHoldoffPeriod.String()).Debug("holdoff period expired, shutting down")
-						a.shutdown()
-					})
-				}
-				if a.wdt != nil {
-					a.wdt.Reset(shutdownHoldoffPeriod)
+				if a.callback != nil {
+					a.callback(doc)
 				}
 			}
 		}
 		a.transaction = nil
+
+		if a.callback != nil {
+			a.callback(a.checkpoint)
+		}
 	}
 	return nil
 }
 
-func (a *testPullAdapter) Context() context.Context     { return a.ctx }
-func (a *testPullAdapter) SendMsg(m interface{}) error  { return nil }
-func (a *testPullAdapter) RecvMsg(m interface{}) error  { panic("RecvMsg is not supported") }
-func (a *testPullAdapter) SendHeader(metadata.MD) error { panic("SendHeader is not supported") }
-func (a *testPullAdapter) SetHeader(metadata.MD) error  { panic("SetHeader is not supported") }
-func (a *testPullAdapter) SetTrailer(metadata.MD)       { panic("SetTrailer is not supported") }
+func (a *pullAdapter) Context() context.Context     { return a.ctx }
+func (a *pullAdapter) SendMsg(m interface{}) error  { return nil }
+func (a *pullAdapter) RecvMsg(m interface{}) error  { panic("RecvMsg is not supported") }
+func (a *pullAdapter) SendHeader(metadata.MD) error { panic("SendHeader is not supported") }
+func (a *pullAdapter) SetHeader(metadata.MD) error  { panic("SetHeader is not supported") }
+func (a *pullAdapter) SetTrailer(metadata.MD)       { panic("SetTrailer is not supported") }
 
-type captureValidator interface {
+// A CaptureValidator represents a stateful component which can receive capture output
+// documents and summarize the results upon request. The type of summarization performed
+// can vary depending on the needs of a particular test.
+type CaptureValidator interface {
 	Output(collection string, data json.RawMessage)
 	Summarize(w io.Writer) error
 	Reset()
 }
 
-type sortedCaptureValidator struct {
+// SortedCaptureValidator maintains a list of every document emitted to each output
+// collection, and returns the list in sorted order upon request.
+type SortedCaptureValidator struct {
 	documents map[string][]json.RawMessage // Map from collection name to list of documents
 }
 
-func (v *sortedCaptureValidator) Output(collection string, data json.RawMessage) {
+// Output feeds a new document into the CaptureValidator.
+func (v *SortedCaptureValidator) Output(collection string, data json.RawMessage) {
 	if v.documents == nil {
 		v.documents = make(map[string][]json.RawMessage)
 	}
 	v.documents[collection] = append(v.documents[collection], data)
 }
 
-func (v *sortedCaptureValidator) Summarize(w io.Writer) error {
+// Summarize writes a human-readable / snapshottable summary of the documents observed by the CaptureValidator.
+func (v *SortedCaptureValidator) Summarize(w io.Writer) error {
 	var collections []string
 	for collection := range v.documents {
 		collections = append(collections, collection)
@@ -292,7 +330,8 @@ func (v *sortedCaptureValidator) Summarize(w io.Writer) error {
 	return nil
 }
 
-func (v *sortedCaptureValidator) Reset() {
+// Reset clears the internal state of the CaptureValidator.
+func (v *SortedCaptureValidator) Reset() {
 	v.documents = nil
 }
 
@@ -304,6 +343,8 @@ func sanitize(sanitizers map[string]*regexp.Regexp, data json.RawMessage) json.R
 	return json.RawMessage(bs)
 }
 
+// DefaultSanitizers is a collection of generic capture output sanitizers which should
+// be applied to any type of database's captures.
 var DefaultSanitizers = map[string]*regexp.Regexp{
 	`"<TIMESTAMP>"`: regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`),
 }
