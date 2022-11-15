@@ -238,7 +238,7 @@ type columnSchema struct {
 	contentEncoding string
 	format          string
 	nullable        bool
-	type_           string
+	jsonType        string
 }
 
 func (s columnSchema) toType() *jsonschema.Schema {
@@ -251,61 +251,61 @@ func (s columnSchema) toType() *jsonschema.Schema {
 		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.
 	}
 
-	if s.type_ == "" {
+	if s.jsonType == "" {
 		// No type constraint.
 	} else if s.nullable {
-		out.Extras["type"] = []string{s.type_, "null"} // Use variadic form.
+		out.Extras["type"] = []string{s.jsonType, "null"} // Use variadic form.
 	} else {
-		out.Type = s.type_
+		out.Type = s.jsonType
 	}
 	return out
 }
 
 var postgresTypeToJSON = map[string]columnSchema{
-	"bool": {type_: "boolean"},
+	"bool": {jsonType: "boolean"},
 
-	"int2": {type_: "integer"},
-	"int4": {type_: "integer"},
-	"int8": {type_: "integer"},
+	"int2": {jsonType: "integer"},
+	"int4": {jsonType: "integer"},
+	"int8": {jsonType: "integer"},
 
-	"numeric": {type_: "string"},
-	"float4":  {type_: "number"},
-	"float8":  {type_: "number"},
+	"numeric": {jsonType: "string"},
+	"float4":  {jsonType: "number"},
+	"float8":  {jsonType: "number"},
 
-	"varchar": {type_: "string"},
-	"bpchar":  {type_: "string"},
-	"text":    {type_: "string"},
-	"bytea":   {type_: "string", contentEncoding: "base64"},
-	"xml":     {type_: "string"},
-	"bit":     {type_: "string"},
-	"varbit":  {type_: "string"},
+	"varchar": {jsonType: "string"},
+	"bpchar":  {jsonType: "string"},
+	"text":    {jsonType: "string"},
+	"bytea":   {jsonType: "string", contentEncoding: "base64"},
+	"xml":     {jsonType: "string"},
+	"bit":     {jsonType: "string"},
+	"varbit":  {jsonType: "string"},
 
 	"json":     {},
 	"jsonb":    {},
-	"jsonpath": {type_: "string"},
+	"jsonpath": {jsonType: "string"},
 
 	// Domain-Specific Types
-	"date":        {type_: "string", format: "date-time"},
-	"timestamp":   {type_: "string", format: "date-time"},
-	"timestamptz": {type_: "string", format: "date-time"},
-	"time":        {type_: "integer"},
-	"timetz":      {type_: "string", format: "time"},
-	"interval":    {type_: "string"},
-	"money":       {type_: "string"},
-	"point":       {type_: "string"},
-	"line":        {type_: "string"},
-	"lseg":        {type_: "string"},
-	"box":         {type_: "string"},
-	"path":        {type_: "string"},
-	"polygon":     {type_: "string"},
-	"circle":      {type_: "string"},
-	"inet":        {type_: "string"},
-	"cidr":        {type_: "string"},
-	"macaddr":     {type_: "string"},
-	"macaddr8":    {type_: "string"},
-	"tsvector":    {type_: "string"},
-	"tsquery":     {type_: "string"},
-	"uuid":        {type_: "string", format: "uuid"},
+	"date":        {jsonType: "string", format: "date-time"},
+	"timestamp":   {jsonType: "string", format: "date-time"},
+	"timestamptz": {jsonType: "string", format: "date-time"},
+	"time":        {jsonType: "integer"},
+	"timetz":      {jsonType: "string", format: "time"},
+	"interval":    {jsonType: "string"},
+	"money":       {jsonType: "string"},
+	"point":       {jsonType: "string"},
+	"line":        {jsonType: "string"},
+	"lseg":        {jsonType: "string"},
+	"box":         {jsonType: "string"},
+	"path":        {jsonType: "string"},
+	"polygon":     {jsonType: "string"},
+	"circle":      {jsonType: "string"},
+	"inet":        {jsonType: "string"},
+	"cidr":        {jsonType: "string"},
+	"macaddr":     {jsonType: "string"},
+	"macaddr8":    {jsonType: "string"},
+	"tsvector":    {jsonType: "string"},
+	"tsquery":     {jsonType: "string"},
+	"uuid":        {jsonType: "string", format: "uuid"},
 }
 
 const queryDiscoverColumns = `
