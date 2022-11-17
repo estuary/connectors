@@ -2,18 +2,21 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
-	"github.com/estuary/connectors/sqlcapture"
+	_ "github.com/go-mysql-org/go-mysql/driver"
+
+	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	// "github.com/estuary/connectors/sqlcapture/tests"
 )
 
 var (
@@ -76,64 +79,25 @@ func lowerTuningParameters(t testing.TB) {
 	replicationBufferSize = 0
 }
 
-func TestConfigSchema(t *testing.T) {
-	var schema = make(map[string]interface{})
-	var err = json.Unmarshal(configSchema(), &schema)
-	require.NoError(t, err)
-	bs, err := json.MarshalIndent(schema, "", "  ")
-	require.NoError(t, err)
-	tests.VerifySnapshot(t, "", string(bs))
-}
-
-func TestAlterTable(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
-	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
-
-	var catalogA = tests.ConfiguredCatalog(ctx, t, tb, tableA)
-	var catalogAB = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB)
-	var catalogABC = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB, tableC)
-	var state = sqlcapture.PersistentState{}
-	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "abc"}, {2, "def"}})
-	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ghi"}, {4, "jkl"}})
-	tb.Insert(ctx, t, tableC, [][]interface{}{{5, "mno"}, {6, "pqr"}})
-	tests.VerifiedCapture(ctx, t, tb, &catalogAB, &state, "init")
-
-	// Altering tableC, which is not being captured, should be fine
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableC))
-	tests.VerifiedCapture(ctx, t, tb, &catalogAB, &state, "capture1")
-
-	// Altering tableB, which is being captured, should result in an error
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableB))
-	tests.VerifiedCapture(ctx, t, tb, &catalogAB, &state, "capture2_fails")
-
-	// Restarting the capture won't fix this
-	tests.VerifiedCapture(ctx, t, tb, &catalogAB, &state, "capture3_fails")
-
-	// But removing the problematic table should fix it
-	tests.VerifiedCapture(ctx, t, tb, &catalogA, &state, "capture4")
-
-	// And we can then re-add the table and it should start over after the problem
-	tests.VerifiedCapture(ctx, t, tb, &catalogAB, &state, "capture5")
-
-	// Finally we exercise the trickiest edge case, in which a new table (C)
-	// is added to the capture *when it was also altered after the last state
-	// checkpoint*. This should still work, because tables only become active
-	// after the first stream-to-watermark operation.
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN evenmore TEXT;", tableC))
-	tests.VerifiedCapture(ctx, t, tb, &catalogABC, &state, "capture6")
-}
-
 type mysqlTestBackend struct {
 	conn *client.Conn
 	cfg  Config
 }
 
+func (tb *mysqlTestBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
+	return &st.CaptureSpec{
+		Driver:       mysqlDriver,
+		EndpointSpec: tb.cfg,
+		Bindings:     tests.ResourceBindings(t, streamIDs...),
+		Validator:    &st.SortedCaptureValidator{},
+		Sanitizers:   CaptureSanitizers,
+	}
+}
+
 func (tb *mysqlTestBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
-	var tableName = "test_" + strings.TrimPrefix(t.Name(), "Test")
+	var tableName = "test." + strings.TrimPrefix(t.Name(), "Test")
 	if suffix != "" {
 		tableName += "_" + suffix
 	}
@@ -200,9 +164,14 @@ func (tb *mysqlTestBackend) Query(ctx context.Context, t testing.TB, query strin
 	defer result.Close()
 }
 
-func (tb *mysqlTestBackend) GetDatabase() sqlcapture.Database {
-	var cfg = tb.cfg
-	return &mysqlDatabase{config: &cfg}
+var CaptureSanitizers = make(map[string]*regexp.Regexp)
+
+func init() {
+	for k, v := range st.DefaultSanitizers {
+		CaptureSanitizers[k] = v
+	}
+	CaptureSanitizers[`"binlog.000123:56789"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+"`)
+	CaptureSanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 }
 
 // TestGeneric runs the generic sqlcapture test suite.
@@ -211,10 +180,55 @@ func TestGeneric(t *testing.T) {
 	tests.Run(context.Background(), t, TestBackend)
 }
 
+func TestAlterTable(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "abc"}, {2, "def"}})
+	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ghi"}, {4, "jkl"}})
+	tb.Insert(ctx, t, tableC, [][]interface{}{{5, "mno"}, {6, "pqr"}})
+
+	// var catalogA = tests.ConfiguredCatalog(ctx, t, tb, tableA)
+	// var catalogAB = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB)
+	// var catalogABC = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB, tableC)
+
+	var cs = tb.CaptureSpec(t, tableA, tableB)
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Altering tableC, which is not being captured, should be fine
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableC))
+	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Altering tableB, which is being captured, should result in an error
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableB))
+	t.Run("capture2-fails", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Restarting the capture won't fix this
+	t.Run("capture3-fails", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// But removing the problematic table should fix it
+	cs.Bindings = tests.ResourceBindings(t, tableA)
+	t.Run("capture4", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// And we can then re-add the table and it should start over after the problem
+	cs.Bindings = tests.ResourceBindings(t, tableA, tableB)
+	t.Run("capture5", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Finally we exercise the trickiest edge case, in which a new table (C)
+	// is added to the capture *when it was also altered after the last state
+	// checkpoint*. This should still work, because tables only become active
+	// after the first stream-to-watermark operation.
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN evenmore TEXT;", tableC))
+	cs.Bindings = tests.ResourceBindings(t, tableA, tableB, tableC)
+	t.Run("capture6", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
 // TestBinlogExpirySanityCheck verifies that the "dangerously short binlog expiry"
 // sanity check is working as intended.
 func TestBinlogExpirySanityCheck(t *testing.T) {
-	var ctx = context.Background()
+	var tb, ctx = TestBackend, context.Background()
+	var cs = tb.CaptureSpec(t)
 
 	for idx, tc := range []struct {
 		VarName     string
@@ -237,17 +251,18 @@ func TestBinlogExpirySanityCheck(t *testing.T) {
 		t.Run(fmt.Sprintf("%d_%s_%d", idx, tc.VarName, tc.VarValue), func(t *testing.T) {
 			// Set both expiry variables to their desired values. We start by setting them
 			// both to zero because MySQL only allows one at a time to be nonzero.
-			TestBackend.Query(ctx, t, "SET GLOBAL binlog_expire_logs_seconds = 0;")
-			TestBackend.Query(ctx, t, "SET GLOBAL expire_logs_days = 0;")
-			TestBackend.Query(ctx, t, fmt.Sprintf("SET GLOBAL %s = %d;", tc.VarName, tc.VarValue))
+			tb.Query(ctx, t, "SET GLOBAL binlog_expire_logs_seconds = 0;")
+			tb.Query(ctx, t, "SET GLOBAL expire_logs_days = 0;")
+			tb.Query(ctx, t, fmt.Sprintf("SET GLOBAL %s = %d;", tc.VarName, tc.VarValue))
 
-			// Connect to the database, which may run the sanity-check
-			db := TestBackend.GetDatabase()
-			if tc.SkipCheck {
-				db.(*mysqlDatabase).config.Advanced.SkipBinlogRetentionCheck = true
+			// Perform validation, which should run the sanity check
+			if cfg, ok := cs.EndpointSpec.(Config); ok {
+				cfg.Advanced.SkipBinlogRetentionCheck = tc.SkipCheck
+				cs.EndpointSpec = cfg
+			} else {
+				t.Fatal("broken test logic: capture endpoint spec should be Config")
 			}
-			err := db.Connect(ctx)
-			db.Close(ctx)
+			var _, err = cs.Validate(ctx, t)
 
 			// Verify the result
 			if tc.ExpectError {
@@ -263,23 +278,28 @@ func TestSkipBackfills(t *testing.T) {
 	// Set up three tables with some data in them, a catalog which captures all three,
 	// but a configuration which specifies that tables A and C should skip backfilling
 	// and only capture new changes.
-	var tb, ctx = &mysqlTestBackend{conn: TestBackend.conn, cfg: TestBackend.cfg}, context.Background()
+	var tb, ctx = TestBackend, context.Background()
 	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "one"}, {2, "two"}, {3, "three"}})
 	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
 	tb.Insert(ctx, t, tableC, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
-	tb.cfg.Advanced.SkipBackfills = fmt.Sprintf("test.%s,test.%s", tableA, tableC)
+
+	var cs = tb.CaptureSpec(t, tableA, tableB, tableC)
+	if cfg, ok := cs.EndpointSpec.(Config); ok {
+		cfg.Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
+		cs.EndpointSpec = cfg
+	} else {
+		t.Fatal("broken test logic: capture endpoint spec should be Config")
+	}
 
 	// Run an initial capture, which should only backfill events from table B
-	var catalog = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB, tableC)
-	var state = sqlcapture.PersistentState{}
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Insert additional data and verify that all three tables report new events
 	tb.Insert(ctx, t, tableA, [][]interface{}{{10, "ten"}, {11, "eleven"}, {12, "twelve"}})
 	tb.Insert(ctx, t, tableB, [][]interface{}{{13, "thirteen"}, {14, "fourteen"}, {15, "fifteen"}})
 	tb.Insert(ctx, t, tableC, [][]interface{}{{16, "sixteen"}, {17, "seventeen"}, {18, "eighteen"}})
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "")
+	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/estuary/connectors/sqlcapture"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
 )
 
 // TestBackend defines the methods necessary to set up test scenarios on a specific
@@ -26,7 +26,6 @@ type TestBackend interface {
 	Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{})
 	// Delete removes preexisting rows.
 	Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{})
-	// GetDatabase returns a new sqlcapture.Database which can be used to perform
-	// discovery and captures.
-	GetDatabase() sqlcapture.Database
+	// CaptureSpec returns a new st.CaptureSpec which can be used to run discovery and captures.
+	CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec
 }

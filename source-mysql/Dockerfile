@@ -11,13 +11,20 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Build the connector projects we depend on.
-COPY source-mysql  ./source-mysql
-COPY go-schema-gen ./go-schema-gen
-COPY sqlcapture    ./sqlcapture
-COPY go-network-tunnel       ./go-network-tunnel
+# Copy the helper packages we depend on and fetch dependencies.
+COPY go-network-tunnel  ./go-network-tunnel
+COPY go-schema-gen      ./go-schema-gen
+COPY source-boilerplate ./source-boilerplate
+COPY sqlcapture         ./sqlcapture
+RUN go get -v ./go-network-tunnel ./go-schema-gen ./source-boilerplate ./sqlcapture
 
-# Run the unit tests.
+# Copy the connector code and fetch dependencies.
+COPY source-mysql ./source-mysql
+RUN go get -v ./source-mysql
+
+# Run the unit tests. To skip tests which access a test database, specify `--build-arg TEST_DATABASE=no` in the Docker command line.
+ARG TEST_DATABASE=yes
+ENV TEST_DATABASE=$TEST_DATABASE
 RUN go test -v ./source-mysql/...
 
 # Build the connector.
