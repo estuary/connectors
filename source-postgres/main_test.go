@@ -5,15 +5,17 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/estuary/connectors/sqlcapture"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -41,32 +43,32 @@ func TestMain(m *testing.M) {
 	var ctx = context.Background()
 
 	if testing.Verbose() {
-		logrus.SetLevel(logrus.DebugLevel)
+		log.SetLevel(log.DebugLevel)
 	}
 
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		level, err := logrus.ParseLevel(logLevel)
+		level, err := log.ParseLevel(logLevel)
 		if err != nil {
-			logrus.WithField("level", logLevel).Fatal("invalid log level")
+			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
-		logrus.SetLevel(level)
+		log.SetLevel(level)
 	}
 
 	// Open a connection to the database which will be used for creating and
 	// tearing down the replication slot.
 	var replConnConfig, err = pgconn.ParseConfig(*TestConnectionURI)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{"uri": *TestConnectionURI, "err": err}).Fatal("error parsing connection config")
+		log.WithFields(log.Fields{"uri": *TestConnectionURI, "err": err}).Fatal("error parsing connection config")
 	}
 	replConnConfig.ConnectTimeout = 30 * time.Second
 	replConnConfig.RuntimeParams["replication"] = "database"
 	replConn, err := pgconn.ConnectConfig(ctx, replConnConfig)
 	if err != nil {
-		logrus.WithField("err", err).Fatal("unable to connect to database")
+		log.WithField("err", err).Fatal("unable to connect to database")
 	}
 	replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, *TestReplicationSlot)).Close() // Ignore failures because it probably doesn't exist
 	if err := replConn.Exec(ctx, fmt.Sprintf(`CREATE_REPLICATION_SLOT %s LOGICAL pgoutput;`, *TestReplicationSlot)).Close(); err != nil {
-		logrus.WithField("err", err).Fatal("error creating replication slot")
+		log.WithField("err", err).Fatal("error creating replication slot")
 	}
 
 	// Initialize test config and database connection
@@ -79,21 +81,25 @@ func TestMain(m *testing.M) {
 	TestDefaultConfig.Advanced.PublicationName = *TestPublicationName
 
 	if err := TestDefaultConfig.Validate(); err != nil {
-		logrus.WithFields(logrus.Fields{"err": err, "config": TestDefaultConfig}).Fatal("error validating test config")
+		log.WithFields(log.Fields{"err": err, "config": TestDefaultConfig}).Fatal("error validating test config")
 	}
 	TestDefaultConfig.SetDefaults()
 
 	pool, err := pgxpool.Connect(ctx, *TestConnectionURI)
 	if err != nil {
-		logrus.WithField("err", err).Fatal("error connecting to database")
+		log.WithField("err", err).Fatal("error connecting to database")
 	}
 	defer pool.Close()
 	TestDatabase = pool
 	TestBackend = &postgresTestBackend{pool: pool, cfg: TestDefaultConfig}
 
+	if _, err := TestDatabase.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS test;"); err != nil {
+		log.WithField("err", err).Fatal("error creating test schema")
+	}
+
 	var exitCode = m.Run()
 	if err := replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, *TestReplicationSlot)).Close(); err != nil {
-		logrus.WithField("err", err).Fatal("error cleaning up replication slot")
+		log.WithField("err", err).Fatal("error cleaning up replication slot")
 	}
 	os.Exit(exitCode)
 }
@@ -117,13 +123,34 @@ type postgresTestBackend struct {
 	cfg  Config
 }
 
+func (tb *postgresTestBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
+	return &st.CaptureSpec{
+		Driver:       postgresDriver,
+		EndpointSpec: tb.cfg,
+		Bindings:     tests.ResourceBindings(t, streamIDs...),
+		Validator:    &st.SortedCaptureValidator{},
+		Sanitizers:   CaptureSanitizers,
+	}
+}
+
+var CaptureSanitizers = make(map[string]*regexp.Regexp)
+
+func init() {
+	for k, v := range st.DefaultSanitizers {
+		CaptureSanitizers[k] = v
+	}
+	CaptureSanitizers[`"loc":[11111111,11111111,11111111]`] = regexp.MustCompile(`"loc":\[[0-9]+,[0-9]+,[0-9]+\]`)
+	CaptureSanitizers[`"cursor":"0/1111111"`] = regexp.MustCompile(`"cursor":"0/[0-9A-F]+"`)
+	CaptureSanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
+}
+
 // CreateTable is a test helper for creating a new database table and returning the
 // name of the new table. The table is named "test_<testName>", or "test_<testName>_<suffix>"
 // if the suffix is non-empty.
 func (tb *postgresTestBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
-	var tableName = "test_" + strings.TrimPrefix(t.Name(), "Test")
+	var tableName = "test." + strings.TrimPrefix(t.Name(), "Test")
 	if suffix != "" {
 		tableName += "_" + suffix
 	}
@@ -131,11 +158,11 @@ func (tb *postgresTestBackend) CreateTable(ctx context.Context, t testing.TB, su
 		tableName = strings.ReplaceAll(tableName, str, "_")
 	}
 
-	logrus.WithFields(logrus.Fields{"table": tableName, "cols": tableDef}).Debug("creating test table")
+	log.WithFields(log.Fields{"table": tableName, "cols": tableDef}).Debug("creating test table")
 	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
 	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
 	t.Cleanup(func() {
-		logrus.WithField("table", tableName).Debug("destroying test table")
+		log.WithField("table", tableName).Debug("destroying test table")
 		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE %s;`, tableName))
 	})
 	return tableName
@@ -151,10 +178,10 @@ func (tb *postgresTestBackend) Insert(ctx context.Context, t testing.TB, table s
 	if err != nil {
 		t.Fatalf("unable to begin transaction: %v", err)
 	}
-	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows), "first": rows[0]}).Debug("inserting data")
+	log.WithFields(log.Fields{"table": table, "count": len(rows), "first": rows[0]}).Debug("inserting data")
 	var query = fmt.Sprintf(`INSERT INTO %s VALUES %s`, table, argsTuple(len(rows[0])))
 	for _, row := range rows {
-		logrus.WithFields(logrus.Fields{"table": table, "row": row}).Trace("inserting row")
+		log.WithFields(log.Fields{"table": table, "row": row}).Trace("inserting row")
 		if len(row) != len(rows[0]) {
 			t.Fatalf("incorrect number of values in row %q (expected %d)", row, len(rows[0]))
 		}
@@ -181,7 +208,7 @@ func (tb *postgresTestBackend) Delete(ctx context.Context, t testing.TB, table s
 
 func (tb *postgresTestBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {
 	t.Helper()
-	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
+	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
 	var rows, err = tb.pool.Query(ctx, query, args...)
 	if err != nil {
 		t.Fatalf("unable to execute query: %v", err)
@@ -192,16 +219,11 @@ func (tb *postgresTestBackend) Query(ctx context.Context, t testing.TB, query st
 		if err != nil {
 			t.Fatalf("error processing query result: %v", err)
 		}
-		logrus.WithField("values", vals).Debug("query result row")
+		log.WithField("values", vals).Debug("query result row")
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatalf("error running query: %v", err)
 	}
-}
-
-func (tb *postgresTestBackend) GetDatabase() sqlcapture.Database {
-	var cfg = tb.cfg
-	return &postgresDatabase{config: &cfg}
 }
 
 func argsTuple(argc int) string {
@@ -210,4 +232,10 @@ func argsTuple(argc int) string {
 		tuple += fmt.Sprintf(",$%d", idx+1)
 	}
 	return tuple + ")"
+}
+
+// TestGeneric runs the generic sqlcapture test suite.
+func TestGeneric(t *testing.T) {
+	lowerTuningParameters(t)
+	tests.Run(context.Background(), t, TestBackend)
 }

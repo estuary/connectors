@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/estuary/connectors/sqlcapture"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
-	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -33,9 +33,8 @@ import (
 // target of one second isn't nearly enough. Aim for at least 30 seconds to
 // get useful numbers (and 300 seconds for perfect accuracy):
 //
-//     $ LOG_LEVEL=warn go test -run=NoTests -bench=. -benchtime=30s ./source-postgres/
-//     $ LOG_LEVEL=warn go test -run=NoTests -bench=. -benchtime=30s -memprofile memprofile.out -cpuprofile profile.out ./source-postgres/
-//
+//	$ LOG_LEVEL=warn go test -run=NoTests -bench=. -benchtime=30s ./source-postgres/
+//	$ LOG_LEVEL=warn go test -run=NoTests -bench=. -benchtime=30s -memprofile memprofile.out -cpuprofile profile.out ./source-postgres/
 func BenchmarkBackfill(b *testing.B) { benchmarkBackfills(b, 1, 10, b.N*100) }
 
 func BenchmarkReplication(b *testing.B) { benchmarkReplication(b, 1, 10, b.N*100) }
@@ -63,33 +62,31 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 		b.Fatalf("error populating tables: %v", err)
 	}
 
-	var catalog = tests.ConfiguredCatalog(ctx, b, tb, tables...)
-	var dummyOutput = &benchmarkMessageOutput{Inner: json.NewEncoder(io.Discard)}
-
 	logrus.WithField("iterations", iterations).Info("running backfill benchmark")
 	for i := 0; i < iterations; i++ {
 		// Run a capture of a single empty table. This helps to ensure that the database
 		// has fully processed and flushed all of the bulk data loading before we begin
 		// timing the actual capture of data we care about.
 		var emptyTable = tb.CreateTable(ctx, b, "empty", "(id INTEGER PRIMARY KEY, data TEXT)")
-		var dummyCatalog = tests.ConfiguredCatalog(ctx, b, tb, emptyTable)
-		var dummyState = sqlcapture.PersistentState{}
-		if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), &dummyCatalog, &dummyState, dummyOutput); err != nil {
-			b.Fatalf("capture failed with error: %v", err)
+		var dummy = tb.CaptureSpec(b, emptyTable)
+		runCapture(ctx, b, dummy)
+		if len(dummy.Errors) > 0 {
+			b.Fatalf("capture failed with error: %v", dummy.Errors[0])
 		}
-		dummyOutput.Reset()
 
-		var state = sqlcapture.PersistentState{}
+		var cs = tb.CaptureSpec(b, tables...)
+		var validator = &benchmarkCaptureValidator{}
+		cs.Validator = validator
 		b.StartTimer()
-		if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), &catalog, &state, dummyOutput); err != nil {
-			b.Fatalf("capture failed with error: %v", err)
-		}
+		runCapture(ctx, b, cs)
 		b.StopTimer()
-		var expectedRecords = numTables * rowsPerTable
-		if dummyOutput.Total != expectedRecords {
-			b.Fatalf("incorrect document count: got %d, expected %d", dummyOutput.Total, expectedRecords)
+		if len(cs.Errors) > 0 {
+			b.Fatalf("capture failed with error: %v", cs.Errors[0])
 		}
-		dummyOutput.Reset()
+		var expectedRecords = numTables * rowsPerTable
+		if validator.Total != expectedRecords {
+			b.Fatalf("incorrect document count: got %d, expected %d", validator.Total, expectedRecords)
+		}
 	}
 }
 
@@ -103,34 +100,58 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 		var table = tb.CreateTable(ctx, b, fmt.Sprintf("table%d", i), "(id INTEGER PRIMARY KEY, uid TEXT, name TEXT, status INTEGER, modified DATE, foo_id INTEGER, padding TEXT)")
 		tables = append(tables, table)
 	}
-	var catalog = tests.ConfiguredCatalog(ctx, b, tb, tables...)
-	var dummyOutput = &benchmarkMessageOutput{Inner: json.NewEncoder(io.Discard)}
 
-	var initialState = sqlcapture.PersistentState{}
-	if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), &catalog, &initialState, dummyOutput); err != nil {
-		b.Fatalf("capture failed with error: %v", err)
+	var cs = tb.CaptureSpec(b, tables...)
+	runCapture(ctx, b, cs)
+	if len(cs.Errors) > 0 {
+		b.Fatalf("capture failed with error: %v", cs.Errors[0])
 	}
+	var initialState = cs.Checkpoint
 
 	var grp errgroup.Group
 	for _, table := range tables {
 		var table = table
 		grp.Go(func() error { return populateTable(ctx, b, tb, table, rowsPerTable) })
 	}
-	grp.Wait()
+	if err := grp.Wait(); err != nil {
+		b.Fatalf("error populating tables: %v", err)
+	}
 
 	for i := 0; i < iterations; i++ {
-		var state = tests.CopyState(initialState)
+		var validator = &benchmarkCaptureValidator{}
+		cs.Validator = validator
+		cs.Checkpoint = initialState
 		b.StartTimer()
-		if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), &catalog, &state, dummyOutput); err != nil {
-			b.Fatalf("capture failed with error: %v", err)
-		}
+		runCapture(ctx, b, cs)
 		b.StopTimer()
-		var expectedRecords = numTables * rowsPerTable
-		if dummyOutput.Total != expectedRecords {
-			b.Fatalf("incorrect document count: got %d, expected %d", dummyOutput.Total, expectedRecords)
+		if len(cs.Errors) > 0 {
+			b.Fatalf("capture failed with error: %v", cs.Errors[0])
 		}
-		dummyOutput.Reset()
+		var expectedRecords = numTables * rowsPerTable
+		if validator.Total != expectedRecords {
+			b.Fatalf("incorrect document count: got %d, expected %d", validator.Total, expectedRecords)
+		}
 	}
+}
+
+func runCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) string {
+	t.Helper()
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	const shutdownDelay = 100 * time.Millisecond
+	var shutdownWatchdog *time.Timer
+	cs.Capture(captureCtx, t, func(data json.RawMessage) {
+		if shutdownWatchdog == nil {
+			shutdownWatchdog = time.AfterFunc(shutdownDelay, func() {
+				log.WithField("delay", shutdownDelay.String()).Debug("capture shutdown watchdog expired")
+				cancelCapture()
+			})
+		}
+		shutdownWatchdog.Reset(shutdownDelay)
+	})
+	var summary = cs.Summary()
+	cs.Validator.Reset()
+	cs.Errors = nil
+	return summary
 }
 
 func populateTable(ctx context.Context, t testing.TB, tb tests.TestBackend, table string, numRows int) error {
@@ -191,18 +212,19 @@ func bulkLoadData(ctx context.Context, t testing.TB, table string, columnNames [
 	}
 }
 
-type benchmarkMessageOutput struct {
+type benchmarkCaptureValidator struct {
 	Total int
-	Inner sqlcapture.MessageOutput
 }
 
-func (m *benchmarkMessageOutput) Reset() {
-	m.Total = 0
+func (v *benchmarkCaptureValidator) Output(collection string, data json.RawMessage) {
+	v.Total++
 }
 
-func (m *benchmarkMessageOutput) Encode(v interface{}) error {
-	if msg, ok := v.(airbyte.Message); ok && msg.Type == airbyte.MessageTypeRecord {
-		m.Total++
-	}
-	return m.Inner.Encode(v)
+func (v *benchmarkCaptureValidator) Summarize(w io.Writer) error {
+	var _, err = fmt.Fprintf(w, "Total Documents Captured: %d", v.Total)
+	return err
+}
+
+func (v *benchmarkCaptureValidator) Reset() {
+	v.Total = 0
 }
