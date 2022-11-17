@@ -1,9 +1,0 @@
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
-{"type":"RECORD","record":{"stream":"test_Generic_ReplicationDeletes","data":{"_meta":{"op":"c","source":{"schema":"test","table":"test_Generic_ReplicationDeletes"}},"data":"some","id":1002},"emitted_at":1234,"namespace":"test"}}
-{"type":"RECORD","record":{"stream":"test_Generic_ReplicationDeletes","data":{"_meta":{"op":"c","source":{"schema":"test","table":"test_Generic_ReplicationDeletes"}},"data":"more","id":1000},"emitted_at":1234,"namespace":"test"}}
-{"type":"RECORD","record":{"stream":"test_Generic_ReplicationDeletes","data":{"_meta":{"op":"c","source":{"schema":"test","table":"test_Generic_ReplicationDeletes"}},"data":"rows","id":1001},"emitted_at":1234,"namespace":"test"}}
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
-{"type":"RECORD","record":{"stream":"test_Generic_ReplicationDeletes","data":{"_meta":{"op":"d","source":{"schema":"test","table":"test_Generic_ReplicationDeletes"}},"data":"bbb","id":1},"emitted_at":1234,"namespace":"test"}}
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
-{"type":"RECORD","record":{"stream":"test_Generic_ReplicationDeletes","data":{"_meta":{"op":"d","source":{"schema":"test","table":"test_Generic_ReplicationDeletes"}},"data":"some","id":1002},"emitted_at":1234,"namespace":"test"}}
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}

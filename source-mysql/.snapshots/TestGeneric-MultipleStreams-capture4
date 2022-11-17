@@ -1,0 +1,17 @@
+# ================================
+# Collection "test.Generic_MultipleStreams_one": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_one"}},"data":"nine","id":9}
+# ================================
+# Collection "test.Generic_MultipleStreams_three": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_three"}},"data":"eleven","id":11}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.generic_multiplestreams_one":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}},"test.generic_multiplestreams_three":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}},"test.generic_multiplestreams_two":{"mode":"Ignore","metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+

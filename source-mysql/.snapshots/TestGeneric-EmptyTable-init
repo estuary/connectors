@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.generic_emptytable":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+

@@ -1,0 +1,17 @@
+# ================================
+# Collection "test.Generic_ReplicationInserts": 5 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationInserts"}},"data":"5","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationInserts"}},"data":"A","id":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationInserts"}},"data":"CDEFGHIJKLMNOP","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationInserts"}},"data":"Four","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationInserts"}},"data":"bbb","id":1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.generic_replicationinserts":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+

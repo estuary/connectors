@@ -1,0 +1,14 @@
+# ================================
+# Collection "test.AlterTable_ccc": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_ccc"}},"data":"mno","evenmore":null,"extra":null,"id":5}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_ccc"}},"data":"pqr","evenmore":null,"extra":null,"id":6}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_aaa":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}},"test.altertable_bbb":{"mode":"Active","metadata":{"schema":{"columns":["id","data","extra"],"types":{"data":"text","id":"int","extra":"text"}}},"key_columns":["id"]},"test.altertable_ccc":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data","extra","evenmore"],"types":{"data":"text","evenmore":"text","extra":"text","id":"int"}}}}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+
