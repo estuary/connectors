@@ -1,0 +1,139 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-mysql/config",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Server Address",
+        "description": "The host or host:port at which the database can be reached.",
+        "order": 0
+      },
+      "user": {
+        "type": "string",
+        "title": "Login Username",
+        "description": "The database user to authenticate as.",
+        "default": "flow_capture",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "title": "Login Password",
+        "description": "Password for the specified database user.",
+        "order": 2,
+        "secret": true
+      },
+      "advanced": {
+        "properties": {
+          "watermarks_table": {
+            "type": "string",
+            "title": "Watermarks Table Name",
+            "description": "The name of the table used for watermark writes. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form.",
+            "default": "flow.watermarks"
+          },
+          "dbname": {
+            "type": "string",
+            "title": "Database Name",
+            "description": "The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access.",
+            "default": "mysql"
+          },
+          "skip_binlog_retention_check": {
+            "type": "boolean",
+            "title": "Skip Binlog Retention Sanity Check",
+            "description": "Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need.",
+            "default": false
+          },
+          "node_id": {
+            "type": "integer",
+            "title": "Node ID",
+            "description": "Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."
+          },
+          "skip_backfills": {
+            "type": "string",
+            "title": "Skip Backfills",
+            "description": "A comma-separated list of fully-qualified table names which should not be backfilled."
+          },
+          "backfill_chunk_size": {
+            "type": "integer",
+            "title": "Backfill Chunk Size",
+            "description": "The number of rows which should be fetched from the database in a single backfill query.",
+            "default": 131072
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
+      },
+      "networkTunnel": {
+        "properties": {
+          "sshForwarding": {
+            "properties": {
+              "sshEndpoint": {
+                "type": "string",
+                "title": "SSH Endpoint",
+                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                "pattern": "^ssh://.+@.+$"
+              },
+              "privateKey": {
+                "type": "string",
+                "title": "SSH Private Key",
+                "description": "Private key to connect to the remote SSH server.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sshEndpoint",
+              "privateKey"
+            ],
+            "title": "SSH Forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Network Tunnel",
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "user",
+      "password"
+    ],
+    "title": "MySQL Connection"
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/sqlcapture/resource",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "title": "Namespace",
+        "description": "The schema (namespace) in which the table resides."
+      },
+      "stream": {
+        "type": "string",
+        "title": "Table Name",
+        "description": "The name of the table to be captured."
+      },
+      "primary_key": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array",
+        "title": "Primary Key Columns",
+        "description": "The columns which together form the primary key of the table."
+      }
+    },
+    "type": "object",
+    "required": [
+      "stream"
+    ],
+    "title": "SQL Database Resource Spec"
+  },
+  "documentation_url": "https://go.estuary.dev/source-mysql"
+}

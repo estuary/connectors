@@ -1,7 +1,0 @@
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
-
-========
-
-Capture Terminated With Error:
-
-    error processing query event: unsupported operation ALTER TABLE on stream "test.test_altertable_bbb" (go.estuary.dev/eVVwet)
