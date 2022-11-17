@@ -1,0 +1,15 @@
+# ================================
+# Collection "test.SkipBackfills_bbb": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"skipbackfills_bbb","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"skipbackfills_bbb","loc":[11111111,11111111,11111111]}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"skipbackfills_bbb","loc":[11111111,11111111,11111111]}},"data":"six","id":6}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.skipbackfills_aaa":{"mode":"Active","key_columns":["id"]},"test.skipbackfills_bbb":{"mode":"Active","key_columns":["id"]},"test.skipbackfills_ccc":{"mode":"Active","key_columns":["id"]}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+

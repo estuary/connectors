@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.slotlsnadvances_one":{"mode":"Active","key_columns":["id"]}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+
