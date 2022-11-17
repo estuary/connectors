@@ -1,0 +1,15 @@
+# ================================
+# Collection "test.Generic_CatalogPrimaryKeyOverride": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_catalogprimarykeyoverride","loc":[11111111,11111111,11111111]}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_catalogprimarykeyoverride","loc":[11111111,11111111,11111111]}},"fullname":"No Such State","population":12345,"state":"XX","year":1970}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_catalogprimarykeyoverride","loc":[11111111,11111111,11111111]}},"fullname":"No Such State","population":123456,"state":"XX","year":1990}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.generic_catalogprimarykeyoverride":{"mode":"Active","key_columns":["fullname","year"]}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+

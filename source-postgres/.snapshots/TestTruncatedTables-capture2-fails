@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.truncatedtables_aaa":{"mode":"Active","key_columns":["id"]}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+failed to relay messages: error decoding message: unsupported operation TRUNCATE on table "test.truncatedtables_aaa"
+
