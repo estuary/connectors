@@ -30,12 +30,14 @@ type tunnelConfig struct {
 	SSHForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
 }
 
+var postgresDriver = &sqlcapture.Driver{
+	ConfigSchema:     configSchema(),
+	DocumentationURL: "https://go.estuary.dev/source-postgresql",
+	Connect:          connectPostgres,
+}
+
 func main() {
-	boilerplate.RunMain(&sqlcapture.Driver{
-		ConfigSchema:     configSchema(),
-		DocumentationURL: "https://go.estuary.dev/source-postgresql",
-		Connect:          connectPostgres,
-	})
+	boilerplate.RunMain(postgresDriver)
 }
 
 func connectPostgres(ctx context.Context, cfg json.RawMessage) (sqlcapture.Database, error) {

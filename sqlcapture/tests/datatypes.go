@@ -32,13 +32,18 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 	}
 
 	for idx, tc := range cases {
-		t.Run(fmt.Sprintf("%d_%s", idx, sanitizeName(tc.ColumnType)), func(t *testing.T) {
-			var tableName = tb.CreateTable(ctx, t, "", fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+		var testName = sanitizeName(tc.ColumnType)
+		if len(testName) > 8 {
+			testName = testName[:8]
+		}
+		t.Run(fmt.Sprintf("%d_%s", idx, testName), func(t *testing.T) {
+			var uniqueSuffix = fmt.Sprintf("scrabbled_quinine_%d", idx)
+			var tableName = tb.CreateTable(ctx, t, uniqueSuffix, fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
 			var stream *capture.DiscoverResponse_Binding
 
 			// Perform discovery and verify that the generated JSON schema looks correct
 			t.Run("discovery", func(t *testing.T) {
-				var bindings = tb.CaptureSpec(t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(strings.TrimPrefix(tableName, "test."))))
+				var bindings = tb.CaptureSpec(t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueSuffix)))
 				if len(bindings) == 0 {
 					t.Errorf("column type %q: no table named %q discovered", tc.ColumnType, tableName)
 					return
@@ -68,6 +73,10 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 			// Insert a test row and scan it back out, then do the same via replication
 			t.Run("roundtrip", func(t *testing.T) {
 				var cs = tb.CaptureSpec(t, tableName)
+
+				// Don't sanitize anything, we're only looking for the output value field
+				// and sometimes that could contain a timestamp-looking value.
+				cs.Sanitizers = make(map[string]*regexp.Regexp)
 
 				t.Run("scan", func(t *testing.T) {
 					tb.Insert(ctx, t, tableName, [][]interface{}{{1, tc.InputValue}})
