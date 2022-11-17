@@ -1,9 +1,8 @@
 # ================================
-# Collection "flow_source_tests/*/groups/*/docs": 5 Documents
+# Collection "flow_source_tests/*/groups/*/docs": 4 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/2/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":5}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/2/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":6}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/2/docs/ZZZ","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/3/docs/7","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":7}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/3/docs/8","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":8}
 # ================================

@@ -1,5 +1,5 @@
 # ================================
-# Collection "flow_source_tests/*/users/*/docs": 26 Documents
+# Collection "flow_source_tests/*/users/*/docs": 25 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/0/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":0,"user":0}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/0/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":1,"user":0}
@@ -26,7 +26,6 @@
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/4/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":2,"user":4}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/4/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":3,"user":4}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/4/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"doc":4,"user":4}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestManySmallWrites/users/999/docs/999","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"5f91dae7-dc4d-48d9-bfec-2d3bfeec4164"}
 # ================================
 # Final State Checkpoint
 # ================================

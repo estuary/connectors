@@ -1,5 +1,5 @@
 # ================================
-# Collection "flow_source_tests/*/docs": 21 Documents
+# Collection "flow_source_tests/*/docs": 20 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
@@ -21,7 +21,6 @@
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/7","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/8","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/9","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestBindingDeletion/docs/999","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"a6d1c2e4-be25-4415-8f03-ab20abbcc5a6"}
 # ================================
 # Final State Checkpoint
 # ================================

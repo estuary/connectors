@@ -1,9 +1,8 @@
 # ================================
-# Collection "flow_source_tests/*/docs": 3 Documents
+# Collection "flow_source_tests/*/docs": 2 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDeletions/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":3}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDeletions/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":4}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDeletions/docs/ZZZ","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"5f91dae7-dc4d-48d9-bfec-2d3bfeec4164"}
 # ================================
 # Final State Checkpoint
 # ================================
