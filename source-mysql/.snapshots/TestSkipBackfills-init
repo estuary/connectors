@@ -1,0 +1,15 @@
+# ================================
+# Collection "test.SkipBackfills_bbb": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_bbb"}},"data":"five","id":5}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_bbb"}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_bbb"}},"data":"six","id":6}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.skipbackfills_aaa":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}},"test.skipbackfills_bbb":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}},"test.skipbackfills_ccc":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+
