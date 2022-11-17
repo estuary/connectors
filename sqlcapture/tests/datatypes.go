@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/flow/go/protocols/airbyte"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/flow/go/protocols/capture"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,31 +33,28 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 
 	for idx, tc := range cases {
 		t.Run(fmt.Sprintf("%d_%s", idx, sanitizeName(tc.ColumnType)), func(t *testing.T) {
-			var table = tb.CreateTable(ctx, t, "", fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
-			var stream *airbyte.Stream
+			var tableName = tb.CreateTable(ctx, t, "", fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+			var stream *capture.DiscoverResponse_Binding
 
 			// Perform discovery and verify that the generated JSON schema looks correct
 			t.Run("discovery", func(t *testing.T) {
-				var discoveredCatalog, err = sqlcapture.DiscoverCatalog(ctx, tb.GetDatabase())
-				require.NoError(t, err)
-
-				for idx := range discoveredCatalog.Streams {
-					if strings.EqualFold(discoveredCatalog.Streams[idx].Name, table) {
-						stream = &discoveredCatalog.Streams[idx]
-						break
-					}
-				}
-				if stream == nil {
-					t.Errorf("column type %q: no stream named %q discovered", tc.ColumnType, table)
+				var bindings = tb.CaptureSpec(t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(strings.TrimPrefix(tableName, "test."))))
+				if len(bindings) == 0 {
+					t.Errorf("column type %q: no table named %q discovered", tc.ColumnType, tableName)
 					return
 				}
+				if len(bindings) > 1 {
+					t.Errorf("column type %q: multiple tables named %q discovered", tc.ColumnType, tableName)
+					return
+				}
+				stream = bindings[0]
 
 				var skimmed = struct {
 					Definitions map[string]struct {
 						Properties map[string]json.RawMessage
 					} `json:"$defs"`
 				}{}
-				require.NoError(t, json.Unmarshal(stream.JSONSchema, &skimmed))
+				require.NoError(t, json.Unmarshal(stream.DocumentSchemaJson, &skimmed))
 				require.Len(t, skimmed.Definitions, 1)
 
 				for _, tbl := range skimmed.Definitions {
@@ -67,22 +67,17 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 
 			// Insert a test row and scan it back out, then do the same via replication
 			t.Run("roundtrip", func(t *testing.T) {
-				var catalog = airbyte.ConfiguredCatalog{
-					Streams: []airbyte.ConfiguredStream{
-						{Stream: *stream},
-					},
-				}
-				var state = sqlcapture.PersistentState{}
+				var cs = tb.CaptureSpec(t, tableName)
 
 				t.Run("scan", func(t *testing.T) {
-					tb.Insert(ctx, t, table, [][]interface{}{{1, tc.InputValue}})
-					var output, _ = PerformCapture(ctx, t, tb, &catalog, &state)
+					tb.Insert(ctx, t, tableName, [][]interface{}{{1, tc.InputValue}})
+					var output = runCapture(ctx, t, cs)
 					verifyRoundTrip(t, tc, output)
 				})
 
 				t.Run("replication", func(t *testing.T) {
-					tb.Insert(ctx, t, table, [][]interface{}{{2, tc.InputValue}})
-					var output, _ = PerformCapture(ctx, t, tb, &catalog, &state)
+					tb.Insert(ctx, t, tableName, [][]interface{}{{2, tc.InputValue}})
+					var output = runCapture(ctx, t, cs)
 					verifyRoundTrip(t, tc, output)
 				})
 			})
@@ -90,23 +85,41 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 	}
 }
 
+// runCapture performs a capture using the provided st.CaptureSpec and shuts it down
+// after a suitable time has elapsed without any further documents or state checkpoints.
+func runCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) string {
+	t.Helper()
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	const shutdownDelay = 100 * time.Millisecond
+	var shutdownWatchdog *time.Timer
+	cs.Capture(captureCtx, t, func(data json.RawMessage) {
+		if shutdownWatchdog == nil {
+			shutdownWatchdog = time.AfterFunc(shutdownDelay, func() {
+				log.WithField("delay", shutdownDelay.String()).Debug("capture shutdown watchdog expired")
+				cancelCapture()
+			})
+		}
+		shutdownWatchdog.Reset(shutdownDelay)
+	})
+	var summary = cs.Summary()
+	cs.Validator.Reset()
+	cs.Errors = nil
+	return summary
+}
+
 type datatypeTestRecord struct {
-	Stream string `json:"stream"`
-	Data   struct {
-		Value json.RawMessage `json:"b"`
-	} `json:"data"`
+	Value json.RawMessage `json:"b"`
 }
 
 func verifyRoundTrip(t *testing.T, tc DatatypeTestCase, actual string) {
 	t.Helper()
 
-	// Extract the value record from the full output
+	// Extract the document of interest from the full capture summary
+	const documentPrefix = `{"_meta":`
+
 	var record *datatypeTestRecord
 	for _, line := range strings.Split(actual, "\n") {
-		if strings.HasPrefix(line, `{"type":"RECORD","record":`) && strings.HasSuffix(line, `}`) {
-			line = strings.TrimPrefix(line, `{"type":"RECORD","record":`)
-			line = strings.TrimSuffix(line, `}`)
-
+		if strings.HasPrefix(line, documentPrefix) {
 			record = new(datatypeTestRecord)
 			if err := json.Unmarshal([]byte(line), record); err != nil {
 				t.Errorf("error unmarshalling result record: %v", err)
@@ -119,9 +132,9 @@ func verifyRoundTrip(t *testing.T, tc DatatypeTestCase, actual string) {
 		return
 	}
 
-	if string(record.Data.Value) != tc.ExpectValue {
+	if string(record.Value) != tc.ExpectValue {
 		t.Errorf("result mismatch for type %q: input %q, got %q, expected %q",
-			tc.ColumnType, tc.InputValue, string(record.Data.Value), tc.ExpectValue)
+			tc.ColumnType, tc.InputValue, string(record.Value), tc.ExpectValue)
 	}
 }
 
