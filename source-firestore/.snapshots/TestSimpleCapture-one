@@ -1,5 +1,5 @@
 # ================================
-# Collection "flow_source_tests/*/docs": 7 Documents
+# Collection "flow_source_tests/*/docs": 6 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":1}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":2}
@@ -7,7 +7,6 @@
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":4}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/5","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":5}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/6","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":6}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestSimpleCapture/docs/ZZZ","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"5f91dae7-dc4d-48d9-bfec-2d3bfeec4164"}
 # ================================
 # Final State Checkpoint
 # ================================

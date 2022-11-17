@@ -55,10 +55,6 @@
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/4/notes/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/4/notes/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
 # ================================
-# Collection "flow_source_tests/*/users/*/sentinels": 1 Documents
-# ================================
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/999/sentinels/999","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"sentinel":"5f91dae7-dc4d-48d9-bfec-2d3bfeec4164"}
-# ================================
 # Collection "flow_source_tests/*/users/*/tasks": 25 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestMultipleWatches/users/0/tasks/0","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":"placeholder"}
@@ -89,5 +85,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"Resources":{"flow_source_tests/*/users/*/docs":{"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/notes":{"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/sentinels":{"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/tasks":{"ReadTime":"<TIMESTAMP>"}}}
+{"Resources":{"flow_source_tests/*/users/*/docs":{"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/notes":{"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/tasks":{"ReadTime":"<TIMESTAMP>"}}}
 
