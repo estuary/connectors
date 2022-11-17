@@ -1,0 +1,17 @@
+# ================================
+# Collection "test.Generic_ReplicationUpdates": 5 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_replicationupdates","loc":[11111111,11111111,11111111]}},"data":"more","id":1000}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_replicationupdates","loc":[11111111,11111111,11111111]}},"data":"rows","id":1001}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_replicationupdates","loc":[11111111,11111111,11111111]}},"data":"some","id":1002}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_replicationupdates","loc":[11111111,11111111,11111111]}},"data":"updated","id":1002}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_replicationupdates","loc":[11111111,11111111,11111111]}},"data":"updated","id":1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.generic_replicationupdates":{"mode":"Active","key_columns":["id"]}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+
