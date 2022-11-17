@@ -10,11 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/estuary/connectors/sqlcapture"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
-	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // The benchmarks 'BenchmarkBackfill' and 'BenchmarkReplication' initialize
@@ -44,7 +43,7 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 	b.ResetTimer()
 
 	// Set up multiple tables full of data
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(log.Fields{
 		"rows":         rowsPerTable * numTables,
 		"rowsPerTable": rowsPerTable,
 		"tables":       numTables,
@@ -57,22 +56,22 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 		tables = append(tables, table)
 		populateTable(ctx, b, tb, table, rowsPerTable)
 	}
-	var catalog = tests.ConfiguredCatalog(ctx, b, tb, tables...)
-	var dummyOutput = &benchmarkMessageOutput{Inner: json.NewEncoder(io.Discard)}
 
-	logrus.WithField("iterations", iterations).Info("running backfill benchmark")
+	log.WithField("iterations", iterations).Info("running backfill benchmark")
 	for i := 0; i < iterations; i++ {
-		var state = sqlcapture.PersistentState{}
+		var cs = tb.CaptureSpec(b, tables...)
+		var validator = &benchmarkCaptureValidator{}
+		cs.Validator = validator
 		b.StartTimer()
-		if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), &catalog, &state, dummyOutput); err != nil {
-			b.Fatalf("capture failed with error: %v", err)
-		}
+		runCapture(ctx, b, cs)
 		b.StopTimer()
-		var expectedRecords = numTables * rowsPerTable
-		if dummyOutput.Total != expectedRecords {
-			b.Fatalf("incorrect document count: got %d, expected %d", dummyOutput.Total, expectedRecords)
+		if len(cs.Errors) > 0 {
+			b.Fatalf("capture failed with error: %v", cs.Errors[0])
 		}
-		dummyOutput.Reset()
+		var expectedRecords = numTables * rowsPerTable
+		if validator.Total != expectedRecords {
+			b.Fatalf("incorrect document count: got %d, expected %d", validator.Total, expectedRecords)
+		}
 	}
 }
 
@@ -86,13 +85,13 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 		var table = tb.CreateTable(ctx, b, fmt.Sprintf("table%d", i), "(id INTEGER PRIMARY KEY, uid TEXT, name TEXT, status INTEGER, modified DATE, foo_id INTEGER, padding TEXT)")
 		tables = append(tables, table)
 	}
-	var catalog = tests.ConfiguredCatalog(ctx, b, tb, tables...)
-	var dummyOutput = &benchmarkMessageOutput{Inner: json.NewEncoder(io.Discard)}
 
-	var initialState = sqlcapture.PersistentState{}
-	if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), &catalog, &initialState, dummyOutput); err != nil {
-		b.Fatalf("capture failed with error: %v", err)
+	var cs = tb.CaptureSpec(b, tables...)
+	runCapture(ctx, b, cs)
+	if len(cs.Errors) > 0 {
+		b.Fatalf("capture failed with error: %v", cs.Errors[0])
 	}
+	var initialState = cs.Checkpoint
 
 	for _, table := range tables {
 		var table = table
@@ -100,18 +99,40 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 	}
 
 	for i := 0; i < iterations; i++ {
-		var state = tests.CopyState(initialState)
+		var validator = &benchmarkCaptureValidator{}
+		cs.Validator = validator
+		cs.Checkpoint = initialState
 		b.StartTimer()
-		if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), &catalog, &state, dummyOutput); err != nil {
-			b.Fatalf("capture failed with error: %v", err)
-		}
+		runCapture(ctx, b, cs)
 		b.StopTimer()
-		var expectedRecords = numTables * rowsPerTable
-		if dummyOutput.Total != expectedRecords {
-			b.Fatalf("incorrect document count: got %d, expected %d", dummyOutput.Total, expectedRecords)
+		if len(cs.Errors) > 0 {
+			b.Fatalf("capture failed with error: %v", cs.Errors[0])
 		}
-		dummyOutput.Reset()
+		var expectedRecords = numTables * rowsPerTable
+		if validator.Total != expectedRecords {
+			b.Fatalf("incorrect document count: got %d, expected %d", validator.Total, expectedRecords)
+		}
 	}
+}
+
+func runCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) string {
+	t.Helper()
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	const shutdownDelay = 100 * time.Millisecond
+	var shutdownWatchdog *time.Timer
+	cs.Capture(captureCtx, t, func(data json.RawMessage) {
+		if shutdownWatchdog == nil {
+			shutdownWatchdog = time.AfterFunc(shutdownDelay, func() {
+				log.WithField("delay", shutdownDelay.String()).Debug("capture shutdown watchdog expired")
+				cancelCapture()
+			})
+		}
+		shutdownWatchdog.Reset(shutdownDelay)
+	})
+	var summary = cs.Summary()
+	cs.Validator.Reset()
+	cs.Errors = nil
+	return summary
 }
 
 func populateTable(ctx context.Context, t testing.TB, tb tests.TestBackend, table string, numRows int) error {
@@ -154,7 +175,7 @@ func bulkLoadData(ctx context.Context, t testing.TB, table string, columnNames [
 		t.Fatalf("error beginning transaction: %v", err)
 	}
 
-	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows)}).Trace("inserting bulk data")
+	log.WithFields(log.Fields{"table": table, "count": len(rows)}).Trace("inserting bulk data")
 	var argc = len(rows[0])
 	var placeholder = argsTuple(argc)
 	var placeholders []string
@@ -169,25 +190,26 @@ func bulkLoadData(ctx context.Context, t testing.TB, table string, columnNames [
 
 	var query = fmt.Sprintf("INSERT INTO %s VALUES %s", table, strings.Join(placeholders, ","))
 	TestBackend.Query(ctx, t, query, values...)
-	logrus.WithFields(logrus.Fields{"table": table, "count": len(rows)}).Trace("inserted bulk data")
+	log.WithFields(log.Fields{"table": table, "count": len(rows)}).Trace("inserted bulk data")
 
 	if err := TestBackend.conn.Commit(); err != nil {
 		t.Fatalf("error committing transaction: %v", err)
 	}
 }
 
-type benchmarkMessageOutput struct {
+type benchmarkCaptureValidator struct {
 	Total int
-	Inner sqlcapture.MessageOutput
 }
 
-func (m *benchmarkMessageOutput) Reset() {
-	m.Total = 0
+func (v *benchmarkCaptureValidator) Output(collection string, data json.RawMessage) {
+	v.Total++
 }
 
-func (m *benchmarkMessageOutput) Encode(v interface{}) error {
-	if msg, ok := v.(airbyte.Message); ok && msg.Type == airbyte.MessageTypeRecord {
-		m.Total++
-	}
-	return m.Inner.Encode(v)
+func (v *benchmarkCaptureValidator) Summarize(w io.Writer) error {
+	var _, err = fmt.Fprintf(w, "Total Documents Captured: %d", v.Total)
+	return err
+}
+
+func (v *benchmarkCaptureValidator) Reset() {
+	v.Total = 0
 }
