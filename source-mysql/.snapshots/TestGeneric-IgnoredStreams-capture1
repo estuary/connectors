@@ -1,0 +1,15 @@
+# ================================
+# Collection "test.Generic_IgnoredStreams_one": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_IgnoredStreams_one"}},"data":"one","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_IgnoredStreams_one"}},"data":"two","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_IgnoredStreams_one"}},"data":"zero","id":0}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.generic_ignoredstreams_one":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+

@@ -1,0 +1,19 @@
+# ================================
+# Collection "test.AlterTable_aaa": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_aaa"}},"data":"abc","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_aaa"}},"data":"def","id":2}
+# ================================
+# Collection "test.AlterTable_bbb": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_bbb"}},"data":"ghi","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_bbb"}},"data":"jkl","id":4}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_aaa":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}},"test.altertable_bbb":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+replication stream closed
+
