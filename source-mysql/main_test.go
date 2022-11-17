@@ -16,7 +16,6 @@ import (
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	// "github.com/estuary/connectors/sqlcapture/tests"
 )
 
 var (
@@ -94,6 +93,16 @@ func (tb *mysqlTestBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.C
 	}
 }
 
+var CaptureSanitizers = make(map[string]*regexp.Regexp)
+
+func init() {
+	for k, v := range st.DefaultSanitizers {
+		CaptureSanitizers[k] = v
+	}
+	CaptureSanitizers[`"binlog.000123:56789"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+"`)
+	CaptureSanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
+}
+
 func (tb *mysqlTestBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
@@ -162,16 +171,6 @@ func (tb *mysqlTestBackend) Query(ctx context.Context, t testing.TB, query strin
 		t.Fatalf("error executing query %q: %v", query, err)
 	}
 	defer result.Close()
-}
-
-var CaptureSanitizers = make(map[string]*regexp.Regexp)
-
-func init() {
-	for k, v := range st.DefaultSanitizers {
-		CaptureSanitizers[k] = v
-	}
-	CaptureSanitizers[`"binlog.000123:56789"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+"`)
-	CaptureSanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 }
 
 // TestGeneric runs the generic sqlcapture test suite.

@@ -11,14 +11,22 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Build the connector projects we depend on.
-COPY source-postgres        ./source-postgres
-COPY sqlcapture             ./sqlcapture
-COPY go-schema-gen          ./go-schema-gen
-COPY go-network-tunnel       ./go-network-tunnel
+# Copy the helper packages we depend on and fetch dependencies.
+COPY go-network-tunnel  ./go-network-tunnel
+COPY go-schema-gen      ./go-schema-gen
+COPY source-boilerplate ./source-boilerplate
+COPY sqlcapture         ./sqlcapture
+RUN go get -v ./go-network-tunnel ./go-schema-gen ./source-boilerplate ./sqlcapture
+
+# Copy the connector code and fetch dependencies.
+COPY source-postgres ./source-postgres
+RUN go get -v ./source-postgres
 
 ENV PATH="/builder/bin:$PATH"
-# Run the unit tests.
+
+# Run the unit tests. To skip tests which access a test database, specify `--build-arg TEST_DATABASE=no` in the Docker command line.
+ARG TEST_DATABASE=yes
+ENV TEST_DATABASE=$TEST_DATABASE
 RUN go test -short -v ./source-postgres/...
 
 # Build the connector.

@@ -3,22 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/jackc/pglogrepl"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
 )
-
-// TestGeneric runs the generic sqlcapture test suite.
-func TestGeneric(t *testing.T) {
-	lowerTuningParameters(t)
-	tests.Run(context.Background(), t, TestBackend)
-}
 
 // TestReplicaIdentity exercises the 'REPLICA IDENTITY' setting of a table,
 // which controls whether change events include full row contents or just the
@@ -26,10 +19,10 @@ func TestGeneric(t *testing.T) {
 func TestReplicaIdentity(t *testing.T) {
 	var tb, ctx = TestBackend, context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
-
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
+
+	var cs = tb.CaptureSpec(t, tableName)
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Default REPLICA IDENTITY logs only the old primary key for deletions and updates.
 	tb.Delete(ctx, t, tableName, "id", 1)
@@ -40,13 +33,12 @@ func TestReplicaIdentity(t *testing.T) {
 	tb.Delete(ctx, t, tableName, "id", 3)
 	tb.Update(ctx, t, tableName, "id", 4, "data", "UPDATED")
 
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "")
+	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
 func TestToastColumns(t *testing.T) {
 	var tb, ctx = TestBackend, context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, other INTEGER, data TEXT)")
-	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
 
 	// Table is created with REPLICA IDENTITY DEFAULT, which does *not* include
 	// unchanged TOAST fields within the replication log.
@@ -61,7 +53,8 @@ func TestToastColumns(t *testing.T) {
 	// Initial capture backfill.
 	tb.Insert(ctx, t, tableName, [][]interface{}{{1, 32, "smol"}})
 	tb.Insert(ctx, t, tableName, [][]interface{}{{2, 42, data}})
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
+	var cs = tb.CaptureSpec(t, tableName)
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Insert TOAST value, update TOAST value, and change an unrelated value.
 	tb.Insert(ctx, t, tableName, [][]interface{}{{3, 52, data}})        // Insert TOAST.
@@ -71,56 +64,14 @@ func TestToastColumns(t *testing.T) {
 	tb.Update(ctx, t, tableName, "id", 3, "data", "UPDATE smol")        // Update TOAST => non-TOAST.
 	tb.Update(ctx, t, tableName, "id", 1, "other", 72)                  // Update other (TOAST); data _not_ expected.
 	tb.Update(ctx, t, tableName, "id", 3, "other", 82)                  // Update other (non-TOAST).
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "ident-default")
+	t.Run("ident-default", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
 	tb.Update(ctx, t, tableName, "id", 1, "other", 92)                // Update other (TOAST); data *is* expected.
 	tb.Update(ctx, t, tableName, "id", 3, "other", 102)               // Update other (non-TOAST).
 	tb.Update(ctx, t, tableName, "id", 1, "data", "smol smol")        // Update TOAST => non-TOAST.
 	tb.Update(ctx, t, tableName, "id", 4, "data", "UPDATE SIX "+data) // Update non-TOAST => TOAST.
-
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "ident-full")
-}
-
-// TestComplexDataset tries to throw together a bunch of different bits of complexity
-// to synthesize something vaguely "realistic". It features a multiple-column primary
-// key, a dataset large enough that the initial table scan gets divided across many
-// "chunks", two connector restarts at different points in the initial table scan, and
-// some concurrent modifications to row ranges already-scanned and not-yet-scanned.
-func TestComplexDataset(t *testing.T) {
-	lowerTuningParameters(t)
-	var tb, ctx = TestBackend, context.Background()
-	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
-	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
-
-	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
-	var states = tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
-	state = states[22] // Restart in between (1960, 'IA') and (1960, 'ID')
-
-	tb.Insert(ctx, t, tableName, [][]interface{}{
-		{1930, "XX", "No Such State", 1234},   // An insert prior to the first restart, which will be reported once replication begins
-		{1970, "XX", "No Such State", 12345},  // An insert between the two restarts, which will be visible in the table scan and should be filtered during replication
-		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
-	})
-	states = tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "restart1")
-	state = states[10] // Restart in between (1980, 'SC') and (1980, 'SD')
-
-	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))
-	tb.Insert(ctx, t, tableName, [][]interface{}{
-		{1930, "XX", "No Such State", 1234},   // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
-		{1970, "XX", "No Such State", 12345},  // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
-		{1990, "XX", "No Such State", 123456}, // Deleting/reinserting this row will be filtered since this portion of the table has yet to be scanned
-	})
-
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
-
-	// We've scanned through (1980, 'IA'), and will see updates for N% states at that date or before,
-	// and creations for N% state records after that date which reflect the update.
-	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY');", tableName))
-	// We'll see a deletion since this row has already been scanned through.
-	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX' AND year = 1970;", tableName))
-
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "restart2")
+	t.Run("ident-full", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
 // TestSlotLSNAdvances checks that the `restart_lsn` of a replication slot
@@ -130,9 +81,9 @@ func TestSlotLSNAdvances(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	var tb, ctx, state = TestBackend, context.Background(), sqlcapture.PersistentState{}
-	var table = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog = tests.ConfiguredCatalog(ctx, t, tb, table)
+	var tb, ctx = TestBackend, context.Background()
+	var tableName = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(t, tableName)
 
 	var lsnQuery = `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`
 	var slotName = *TestReplicationSlot
@@ -152,8 +103,8 @@ func TestSlotLSNAdvances(t *testing.T) {
 	// an `XLOG_RUNNING_XACTS` record, which is the trigger for the mechanism allowing
 	// a replication slot's `restart_lsn` to advance in response to StandbyStatusUpdate
 	// messages.
-	tb.Insert(ctx, t, table, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "capture1")
+	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
+	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 	logrus.Info("waiting so a standby snapshot can occur")
 	time.Sleep(20 * time.Second)
 
@@ -161,7 +112,7 @@ func TestSlotLSNAdvances(t *testing.T) {
 	// keep trying until it does or the retry count is hit.
 	const retryCount = 50
 	for iter := 0; iter < retryCount; iter++ {
-		tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "captureN")
+		t.Run("captureN", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 		var afterLSN pglogrepl.LSN
 		if err := TestDatabase.QueryRow(ctx, lsnQuery, slotName).Scan(&afterLSN); err != nil {
@@ -179,30 +130,29 @@ func TestSlotLSNAdvances(t *testing.T) {
 
 func TestViewDiscovery(t *testing.T) {
 	var tb, ctx = TestBackend, context.Background()
-	var table = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, grp INTEGER, data TEXT)")
+	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, grp INTEGER, data TEXT)")
 
-	var view = table + "_view"
-	tb.Query(ctx, t, fmt.Sprintf(`CREATE VIEW %s AS SELECT id, data FROM %s WHERE grp = 1;`, view, table))
+	var view = tableName + "_view"
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE VIEW %s AS SELECT id, data FROM %s WHERE grp = 1;`, view, tableName))
 	t.Cleanup(func() {
 		logrus.WithField("view", view).Debug("dropping view")
 		tb.Query(ctx, t, fmt.Sprintf(`DROP VIEW IF EXISTS %s;`, view))
 	})
 
-	var matview = table + "_matview"
-	tb.Query(ctx, t, fmt.Sprintf(`CREATE MATERIALIZED VIEW %s AS SELECT id, data FROM %s WHERE grp = 1;`, matview, table))
+	var matview = tableName + "_matview"
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE MATERIALIZED VIEW %s AS SELECT id, data FROM %s WHERE grp = 1;`, matview, tableName))
 	t.Cleanup(func() {
 		logrus.WithField("view", matview).Debug("dropping materialized view")
 		tb.Query(ctx, t, fmt.Sprintf(`DROP MATERIALIZED VIEW IF EXISTS %s;`, matview))
 	})
 
-	var catalog, err = sqlcapture.DiscoverCatalog(ctx, tb.GetDatabase())
-	require.NoError(t, err)
-	for _, stream := range catalog.Streams {
-		logrus.WithField("name", stream.Name).Debug("discovered stream")
-		if stream.Name == view {
+	var bindings = tb.CaptureSpec(t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(strings.TrimPrefix(tableName, "test."))))
+	for _, binding := range bindings {
+		logrus.WithField("name", binding.RecommendedName).Debug("discovered stream")
+		if strings.Contains(string(binding.RecommendedName), "_view") {
 			t.Errorf("view returned by catalog discovery")
 		}
-		if stream.Name == matview {
+		if strings.Contains(string(binding.RecommendedName), "_matview") {
 			t.Errorf("materialized view returned by catalog discovery")
 		}
 	}
@@ -219,18 +169,22 @@ func TestSkipBackfills(t *testing.T) {
 	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "one"}, {2, "two"}, {3, "three"}})
 	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
 	tb.Insert(ctx, t, tableC, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
-	tb.cfg.Advanced.SkipBackfills = fmt.Sprintf("public.%s,public.%s", tableA, tableC)
 
-	// Run an initial capture, which should only backfill events from table B
-	var catalog = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB, tableC)
-	var state = sqlcapture.PersistentState{}
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
+	// Run an initial capture, which should capture all three tables but only backfill events from table B
+	var cs = tb.CaptureSpec(t, tableA, tableB, tableC)
+	if cfg, ok := cs.EndpointSpec.(Config); ok {
+		cfg.Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
+		cs.EndpointSpec = cfg
+	} else {
+		t.Fatal("broken test logic: capture endpoint spec should be Config")
+	}
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Insert additional data and verify that all three tables report new events
 	tb.Insert(ctx, t, tableA, [][]interface{}{{10, "ten"}, {11, "eleven"}, {12, "twelve"}})
 	tb.Insert(ctx, t, tableB, [][]interface{}{{13, "thirteen"}, {14, "fourteen"}, {15, "fifteen"}})
 	tb.Insert(ctx, t, tableC, [][]interface{}{{16, "sixteen"}, {17, "seventeen"}, {18, "eighteen"}})
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "")
+	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
 func TestTruncatedTables(t *testing.T) {
@@ -242,43 +196,85 @@ func TestTruncatedTables(t *testing.T) {
 	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
 
 	// Set up and run a capture of Table A only
-	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableA), sqlcapture.PersistentState{}
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
+	var cs = tb.CaptureSpec(t, tableA)
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Add data to table A and truncate table B. Captures should still succeed because we
 	// don't care about truncates to non-active tables.
 	tb.Insert(ctx, t, tableA, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
 	tb.Query(ctx, t, fmt.Sprintf("TRUNCATE TABLE %s;", tableB))
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "capture1")
+	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Truncating table A will cause the capture to fail though, as it should.
 	tb.Query(ctx, t, fmt.Sprintf("TRUNCATE TABLE %s;", tableA))
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "capture2_fails")
+	t.Run("capture2-fails", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
 func TestTrickyColumnNames(t *testing.T) {
 	// Create a table with some 'difficult' column names (a reserved word, a capitalized
 	// name, and one containing special characters which also happens to be the primary key).
 	var tb, ctx = TestBackend, context.Background()
-	var tableA = tb.CreateTable(ctx, t, "a", `("Meta/""wtf""/ID" INTEGER PRIMARY KEY, data TEXT)`)
-	var tableB = tb.CreateTable(ctx, t, "b", `("table" INTEGER PRIMARY KEY, data TEXT)`)
+	const uniqueString = "fizzed_cupcake"
+	var tableA = tb.CreateTable(ctx, t, uniqueString+"_a", `("Meta/""wtf""/ID" INTEGER PRIMARY KEY, data TEXT)`)
+	var tableB = tb.CreateTable(ctx, t, uniqueString+"_b", `("table" INTEGER PRIMARY KEY, data TEXT)`)
 	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "aaa"}, {2, "bbb"}})
 	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ccc"}, {4, "ddd"}})
 
-	// Discover the catalog and verify that the table's schema looks correct
-	var discovery, err = sqlcapture.DiscoverCatalog(ctx, tb.GetDatabase())
-	if err != nil {
-		t.Fatal(err)
-	}
-	tests.VerifyStream(t, "discovery_a", discovery, tableA)
-	tests.VerifyStream(t, "discovery_b", discovery, tableB)
+	// Discover the catalog and verify that the table schemas looks correct
+	t.Run("discover", func(t *testing.T) {
+		tb.CaptureSpec(t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+	})
 
 	// Perform an initial backfill
-	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB), sqlcapture.PersistentState{}
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "backfill")
+	var cs = tb.CaptureSpec(t, tableA, tableB)
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Add more data and read it via replication
 	tb.Insert(ctx, t, tableA, [][]interface{}{{5, "eee"}, {6, "fff"}})
 	tb.Insert(ctx, t, tableB, [][]interface{}{{7, "ggg"}, {8, "hhh"}})
-	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "replication")
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
+
+// TODO(wgd): Rewrite testComplexDataset using some trickery after figuring out a
+// more principled way of exercising "shut down partway through a backfill" behavior.
+//
+// // TestComplexDataset tries to throw together a bunch of different bits of complexity
+// // to synthesize something vaguely "realistic". It features a multiple-column primary
+// // key, a dataset large enough that the initial table scan gets divided across many
+// // "chunks", two connector restarts at different points in the initial table scan, and
+// // some concurrent modifications to row ranges already-scanned and not-yet-scanned.
+// func TestComplexDataset(t *testing.T) {
+// 	lowerTuningParameters(t)
+// 	var tb, ctx = TestBackend, context.Background()
+// 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
+// 	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
+//
+// 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
+// 	var states = tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
+// 	state = states[22] // Restart in between (1960, 'IA') and (1960, 'ID')
+//
+// 	tb.Insert(ctx, t, tableName, [][]interface{}{
+// 		{1930, "XX", "No Such State", 1234},   // An insert prior to the first restart, which will be reported once replication begins
+// 		{1970, "XX", "No Such State", 12345},  // An insert between the two restarts, which will be visible in the table scan and should be filtered during replication
+// 		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
+// 	})
+// 	states = tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "restart1")
+// 	state = states[10] // Restart in between (1980, 'SC') and (1980, 'SD')
+//
+// 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))
+// 	tb.Insert(ctx, t, tableName, [][]interface{}{
+// 		{1930, "XX", "No Such State", 1234},   // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
+// 		{1970, "XX", "No Such State", 12345},  // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
+// 		{1990, "XX", "No Such State", 123456}, // Deleting/reinserting this row will be filtered since this portion of the table has yet to be scanned
+// 	})
+//
+// 	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
+//
+// 	// We've scanned through (1980, 'IA'), and will see updates for N% states at that date or before,
+// 	// and creations for N% state records after that date which reflect the update.
+// 	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY');", tableName))
+// 	// We'll see a deletion since this row has already been scanned through.
+// 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX' AND year = 1970;", tableName))
+//
+// 	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "restart2")
+// }
