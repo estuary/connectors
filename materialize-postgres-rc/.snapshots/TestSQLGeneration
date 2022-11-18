@@ -3,6 +3,7 @@
 CREATE TABLE IF NOT EXISTS "a-schema".target_table (
 		key1 BIGINT NOT NULL,
 		"key!2" BOOLEAN NOT NULL,
+		"nullableKey" TEXT,
 		"Camel_Case" BIGINT,
 		"a Time" TIMESTAMPTZ,
 		"array" JSON,
@@ -10,7 +11,7 @@ CREATE TABLE IF NOT EXISTS "a-schema".target_table (
 		"value" TEXT,
 		flow_document JSON NOT NULL,
 
-		PRIMARY KEY (key1, "key!2")
+		PRIMARY KEY (key1, "key!2", "nullableKey")
 );
 
 COMMENT ON TABLE "a-schema".target_table IS 'Generated for materialization test/sqlite of collection key/value';
@@ -18,6 +19,7 @@ COMMENT ON COLUMN "a-schema".target_table.key1 IS 'Key One Title
 Key One Description
 auto-generated projection of JSON at: /key1 with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".target_table."key!2" IS 'auto-generated projection of JSON at: /key!2 with inferred types: [boolean]';
+COMMENT ON COLUMN "a-schema".target_table."nullableKey" IS 'auto-generated projection of JSON at: /nullableKey with inferred types: [string null]';
 COMMENT ON COLUMN "a-schema".target_table."Camel_Case" IS 'auto-generated projection of JSON at: /Camel_Case with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".target_table."a Time" IS 'auto-generated projection of JSON at: /a Time with inferred types: [string]';
 COMMENT ON COLUMN "a-schema".target_table."array" IS 'This is an array!
@@ -31,11 +33,13 @@ COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'user-provided projec
 
 CREATE TABLE IF NOT EXISTS "Delta Updates" (
 		"theKey" TEXT NOT NULL,
+		"nullableKey" TEXT,
 		"aValue" BIGINT
 );
 
 COMMENT ON TABLE "Delta Updates" IS 'Generated for materialization test/sqlite of collection delta/updates';
 COMMENT ON COLUMN "Delta Updates"."theKey" IS 'auto-generated projection of JSON at: /theKey with inferred types: [string]';
+COMMENT ON COLUMN "Delta Updates"."nullableKey" IS 'auto-generated projection of JSON at: /nullableKey with inferred types: [string null]';
 COMMENT ON COLUMN "Delta Updates"."aValue" IS 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]';
 --- End "Delta Updates" createTargetTable ---
@@ -44,29 +48,31 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]';
 
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 		key1 BIGINT NOT NULL,
-		"key!2" BOOLEAN NOT NULL
+		"key!2" BOOLEAN NOT NULL,
+		"nullableKey" TEXT
 ) ON COMMIT DROP;
 --- End "a-schema".target_table createLoadTable ---
 
 --- Begin "Delta Updates" createLoadTable ---
 
 CREATE TEMPORARY TABLE flow_temp_table_1 (
-		"theKey" TEXT NOT NULL
+		"theKey" TEXT NOT NULL,
+		"nullableKey" TEXT
 ) ON COMMIT DROP;
 --- End "Delta Updates" createLoadTable ---
 
 --- Begin "a-schema".target_table prepLoadInsert ---
 
 PREPARE load_0 AS
-INSERT INTO flow_temp_table_0 (key1, "key!2")
-	VALUES ($1, $2);
+INSERT INTO flow_temp_table_0 (key1, "key!2", "nullableKey")
+	VALUES ($1, $2, $3);
 --- End "a-schema".target_table prepLoadInsert ---
 
 --- Begin "Delta Updates" prepLoadInsert ---
 
 PREPARE load_1 AS
-INSERT INTO flow_temp_table_1 ("theKey")
-	VALUES ($1);
+INSERT INTO flow_temp_table_1 ("theKey", "nullableKey")
+	VALUES ($1, $2);
 --- End "Delta Updates" prepLoadInsert ---
 
 --- Begin "a-schema".target_table execLoadInsert ---
@@ -80,8 +86,9 @@ EXECUTE load_1--- End "Delta Updates" execLoadInsert ---
 SELECT 0, r.flow_document
 	FROM flow_temp_table_0 AS l
 	JOIN "a-schema".target_table AS r
-		 ON  l.key1 is not distinct from r.key1
-		 AND l."key!2" is not distinct from r."key!2"
+		 ON  l.key1 = r.key1
+		 AND l."key!2" = r."key!2"
+		 AND (l."nullableKey" = r."nullableKey" and l."nullableKey" is not null and r."nullableKey" is not null) or (l."nullableKey" is null and r."nullableKey" is null)
 
 --- End "a-schema".target_table loadQuery ---
 
@@ -98,13 +105,14 @@ PREPARE insert_0 AS
 INSERT INTO "a-schema".target_table (
 		key1,
 		"key!2",
+		"nullableKey",
 		"Camel_Case",
 		"a Time",
 		"array",
 		lower_case,
 		"value",
 		flow_document
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
 --- End "a-schema".target_table prepStoreInsert ---
 
 --- Begin "Delta Updates" prepStoreInsert ---
@@ -112,8 +120,9 @@ INSERT INTO "a-schema".target_table (
 PREPARE insert_1 AS
 INSERT INTO "Delta Updates" (
 		"theKey",
+		"nullableKey",
 		"aValue"
-) VALUES ($1, $2);
+) VALUES ($1, $2, $3);
 --- End "Delta Updates" prepStoreInsert ---
 
 --- Begin "a-schema".target_table execStoreInsert ---
@@ -126,22 +135,24 @@ EXECUTE insert_1--- End "Delta Updates" execStoreInsert ---
 
 PREPARE update_0 AS
 UPDATE "a-schema".target_table SET
-		"Camel_Case" = $3,
-		"a Time" = $4,
-		"array" = $5,
-		lower_case = $6,
-		"value" = $7,
-		flow_document = $8
-	 WHERE key1 is not distinct from $1
-	 AND   "key!2" is not distinct from $2;
+		"Camel_Case" = $4,
+		"a Time" = $5,
+		"array" = $6,
+		lower_case = $7,
+		"value" = $8,
+		flow_document = $9
+	 WHERE key1 = $1
+	 AND   "key!2" = $2
+	 AND   ("nullableKey" = $3 and "nullableKey" is not null and $3 is not null) or ("nullableKey" is null and $3 is null);
 --- End "a-schema".target_table prepStoreUpdate ---
 
 --- Begin "Delta Updates" prepStoreUpdate ---
 
 PREPARE update_1 AS
 UPDATE "Delta Updates" SET
-		"aValue" = $2
-	 WHERE "theKey" is not distinct from $1;
+		"aValue" = $3
+	 WHERE "theKey" = $1
+	 AND   ("nullableKey" = $2 and "nullableKey" is not null and $2 is not null) or ("nullableKey" is null and $2 is null);
 --- End "Delta Updates" prepStoreUpdate ---
 
 --- Begin "a-schema".target_table execStoreUpdate ---
