@@ -102,12 +102,19 @@ const emitterBufferSize = 4 * 1024 * 1024
 func (c *Capture) Run(ctx context.Context) (err error) {
 	// Start up the 'message emitter' goroutine and allocate associated channels.
 	// This goroutine exists so that output message serialization can take place
-	// in parallel with ongoing backfill/replication processing.
-	emitterCtx, emitterCancel := context.WithCancel(ctx)
-	defer emitterCancel()
+	// in parallel with ongoing backfill/replication processing. It must terminate
+	// before Run() returns thanks to a deferred receive from its error channel.
 	c.emitQueue = make(chan interface{}, emitterBufferSize)
 	c.emitError = make(chan error, 1)
+	emitterCtx, emitterCancel := context.WithCancel(ctx)
 	go c.emitWorker(emitterCtx, c.Output, c.emitQueue, c.emitError)
+	defer func() {
+		close(c.emitQueue)
+		emitterCancel()
+		if emitErr := <-c.emitError; err == nil && emitErr != nil {
+			err = emitErr
+		}
+	}()
 
 	// Perform discovery and cache the result. This is used at startup when
 	// updating the state to reflect catalog changes, and then later it is
@@ -224,13 +231,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	if err := c.streamToWatermark(replStream, targetWatermark, nil); err != nil {
 		return err
 	}
-
-	// Since the final 'streamToWatermark' terminated without an error, this must
-	// be a polling-mode connector run (and is probably an automated test run). So
-	// to finish up cleanly we need to close the emitter queue and wait for it to
-	// shut down properly.
-	close(c.emitQueue)
-	return <-c.emitError
+	return nil
 }
 
 func (c *Capture) updateState(ctx context.Context) error {
