@@ -10,7 +10,7 @@ if [[ ${#args[@]} -ne 3 ]]; then
     exit 1
 fi
 
-flowctl-admin combine \
+flowctl-go combine \
     --collection "${args[0]}" \
     --source "file://${TEST_DIR}/${CATALOG}" \
     --log.level debug \

@@ -11,8 +11,8 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Copy in a recent `flowctl-admin` for usage by tests.
-COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl-admin /usr/local/bin/flowctl-admin
+# Copy in a recent `flowctl-go` for usage by tests.
+COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl-go /usr/local/bin/flowctl-go
 
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate

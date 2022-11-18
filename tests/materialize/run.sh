@@ -2,7 +2,7 @@
 
 set -e
 
-command -v flowctl-admin >/dev/null 2>&1 || { echo >&2 "flowctl-admin must be available via PATH, aborting."; exit 1; }
+command -v flowctl-go >/dev/null 2>&1 || { echo >&2 "flowctl-go must be available via PATH, aborting."; exit 1; }
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
@@ -28,7 +28,7 @@ TEST_DIR=".build/tests/${CONNECTOR}"
 TEST_BASE_DIR="${ROOT_DIR}/tests/materialize"
 
 # The dir containing various helper scripts.
-TEST_SCRIPT_DIR="${ROOT_DIR}/tests/materialize/flowctl-admin"
+TEST_SCRIPT_DIR="${ROOT_DIR}/tests/materialize/flowctl-go"
 
 # The dir containing test scripts of the connector.
 CONNECTOR_TEST_SCRIPTS_DIR="${TEST_BASE_DIR}/${CONNECTOR}"
@@ -41,7 +41,7 @@ export BUILD_ID=run-test-"${CONNECTOR}"
 # A directory for hosting temp files generated during the test executions.
 export TEST_DIR="$(mktemp -d /tmp/"${CONNECTOR}"-XXXXXX)"
 
-# `flowctl-admin` commands which interact with the data plane look for *_ADDRESS
+# `flowctl-go` commands which interact with the data plane look for *_ADDRESS
 # variables, which are created by the temp-data-plane we're about to start.
 export BROKER_ADDRESS=unix://localhost${TEST_DIR}/gazette.sock
 export CONSUMER_ADDRESS=unix://localhost${TEST_DIR}/consumer.sock
@@ -79,7 +79,7 @@ export BINDING_NUM_SIMPLE=0
 export BINDING_NUM_DUPLICATED_KEYS=1
 export BINDING_NUM_MULTIPLE_DATATYPES=2
 
-# Util function for running the `flowctl-admin combine` to combine the results.
+# Util function for running the `flowctl-go combine` to combine the results.
 function combineResults() {
     # The collection name specified in the catalog.
     local collection="$1"
@@ -111,7 +111,7 @@ echo -e "\nstarting temp data plane"
 # Start an empty local data plane within our TESTDIR as a background job.
 # --tempdir to use our known TESTDIR rather than creating a new temporary directory.
 # --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
-flowctl-admin temp-data-plane \
+flowctl-go temp-data-plane \
     --log.level info \
     --network "flow-test" \
     --tempdir ${TEST_DIR} \

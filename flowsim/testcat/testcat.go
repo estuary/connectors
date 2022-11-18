@@ -129,7 +129,7 @@ func (ep TestEndpointFlowSync) MarshalYAML() (interface{}, error) {
 	}, nil
 }
 
-// BuildMaterializationSpecs invokes `flowctl-admin check` to build the named |source|
+// BuildMaterializationSpecs invokes `flowctl-go check` to build the named |source|
 // catalog and returns its MaterializationSpecs.  It converts the
 // materialization to SQLite to not require docker container to exist.  Once
 // complete it puts back the original materialization without the connector
@@ -183,14 +183,14 @@ func BuildMaterializationSpecs(ctx context.Context, tc *TestCatalog) ([]*flow.Ma
 
 	const buildId string = "built-catalog"
 
-	// Invoke flowctl-admin to compile the catalog.
-	var cmd = exec.Command("flowctl-admin", "api", "build", "--directory", workdir, "--source", file.Name(), "--build-id", buildId)
+	// Invoke flowctl-go to compile the catalog.
+	var cmd = exec.Command("flowctl-go", "api", "build", "--directory", workdir, "--source", file.Name(), "--build-id", buildId)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if err = cmd.Run(); err != nil {
 		logrus.Error("dumping catalog")
 		dump, _ := os.ReadFile(file.Name())
 		fmt.Print(string(dump))
-		return nil, fmt.Errorf("running flowctl-admin check: %w", err)
+		return nil, fmt.Errorf("running flowctl-go check: %w", err)
 	}
 
 	var builtMaterializations []*flow.MaterializationSpec
