@@ -8,24 +8,26 @@ collections:
           title: Key One Title
           description: Key One Description
         key!2: { type: boolean }
+        nullableKey: { type: string }
         value: { type: string }
         "a Time": { type: string, format: "date-time" }
         array: { type: array, title: This is an array! }
         Camel_Case: { type: integer }
         lower_case: { type: integer }
-      required: [key1, key!2]
-    key: [/key1, /key!2]
+      required: [key1, key!2, nullableKey]
+    key: [/key1, /key!2, /nullableKey]
 
   delta/updates:
     schema:
       type: object
       properties:
         theKey: { type: string }
+        nullableKey: { type: string }
         aValue:
           type: integer
           description: A super-awesome value.
-      required: [theKey]
-    key: [/theKey]
+      required: [theKey, nullableKey]
+    key: [/theKey, /nullableKey]
 
 materializations:
   test/sqlite:

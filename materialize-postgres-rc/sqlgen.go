@@ -124,9 +124,12 @@ INSERT INTO {{ template "temp_name" . }} (
 EXECUTE load_{{ $.Binding }}
 {{- end }}
 
--- Templated query which joins keys from the load table with the target table,
--- and returns values. It deliberately skips the trailing semi-colon
--- as these queries are composed with a UNION ALL.
+-- Templated query which joins keys from the load table with the target table, and returns values. It
+-- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL. If the
+-- column is not nullable, an efficient direct comparison can be made in the join condition. For
+-- columns that may contain null, a less efficient comparison must be used. For this we use a more
+-- cumbersome comparison operator than "is not distinct from" so that the table btree index will be
+-- utilized.
 
 {{ define "loadQuery" }}
 {{ if $.Document -}}
@@ -135,7 +138,11 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 	JOIN {{ $.Identifier}} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON  {{ end -}}
-		l.{{ $key.Identifier }} is not distinct from r.{{ $key.Identifier }}
+		{{ if $key.MustExist -}}
+			l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+		{{- else -}}
+			(l.{{ $key.Identifier }} = r.{{ $key.Identifier }} and l.{{ $key.Identifier }} is not null and r.{{ $key.Identifier }} is not null) or (l.{{ $key.Identifier }} is null and r.{{ $key.Identifier }} is null)
+		{{- end }}
 	{{- end }}
 {{ else }}
 SELECT -1, NULL LIMIT 0
@@ -177,7 +184,11 @@ UPDATE {{$.Identifier}} SET
 	{{- end -}}
 	{{ range $ind, $key := $.Keys }}
 	{{ if $ind }} AND   {{ else }} WHERE {{ end -}}
-	{{ $key.Identifier}} is not distinct from {{ $key.Placeholder }}
+	{{ if $key.MustExist -}}
+		{{ $key.Identifier }} = {{ $key.Placeholder }}
+	{{- else -}}
+		({{ $key.Identifier }} = {{ $key.Placeholder }} and {{ $key.Identifier }} is not null and {{ $key.Placeholder }} is not null) or ({{ $key.Identifier }} is null and {{ $key.Placeholder }} is null)
+	{{- end }}
 	{{- end -}}
 	;
 {{ end }}

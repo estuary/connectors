@@ -48,6 +48,8 @@ type Column struct {
 	Identifier string
 	// Placeholder for this column's converted value in parameterized statements.
 	Placeholder string
+	// If this column can be null or not.
+	MustExist bool
 }
 
 // ConvertKey converts a key Tuple to database parameters.
@@ -129,6 +131,8 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 		if col.MappedType, err = dialect.MapType(&col.Projection); err != nil {
 			return Table{}, fmt.Errorf("mapping column %s of %s: %w", col.Field, shape.Path, err)
 		}
+		_, mustExist := col.Projection.AsFlatType()
+		col.MustExist = mustExist
 		col.Identifier = dialect.Identifier(col.Field)
 		col.Placeholder = dialect.Placeholder(index)
 	}
