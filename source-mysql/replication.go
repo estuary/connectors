@@ -115,6 +115,7 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 	var stream = &mysqlReplicationStream{
 		syncer:   syncer,
 		streamer: streamer,
+		cursor:   pos,
 		events:   make(chan sqlcapture.ChangeEvent, replicationBufferSize),
 		cancel:   streamCancel,
 		errCh:    make(chan error),
@@ -162,6 +163,7 @@ func splitHostPort(addr string) (string, int64, error) {
 type mysqlReplicationStream struct {
 	syncer        *replication.BinlogSyncer
 	streamer      *replication.BinlogStreamer
+	cursor        mysql.Position
 	events        chan sqlcapture.ChangeEvent
 	cancel        context.CancelFunc
 	errCh         chan error
@@ -233,6 +235,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		var event, err = rs.streamer.GetEvent(ctx)
 		if err != nil {
 			return fmt.Errorf("error getting next event: %w", err)
+		}
+
+		if event.Header.LogPos > 0 {
+			rs.cursor.Pos = event.Header.LogPos
 		}
 
 		switch data := event.Event.(type) {
@@ -325,15 +331,14 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				return fmt.Errorf("unknown row event type: %q", event.Header.EventType)
 			}
 		case *replication.XIDEvent:
-			var cursor = rs.syncer.GetNextPosition()
 			logrus.WithFields(logrus.Fields{
 				"xid":    data.XID,
-				"cursor": cursor,
+				"cursor": rs.cursor,
 			}).Trace("XID Event")
 			rs.events <- sqlcapture.ChangeEvent{
 				Operation: sqlcapture.FlushOp,
 				Source: &mysqlSourceInfo{
-					FlushCursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
+					FlushCursor: fmt.Sprintf("%s:%d", rs.cursor.Name, rs.cursor.Pos),
 				},
 			}
 		case *replication.TableMapEvent:
@@ -348,7 +353,12 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				return fmt.Errorf("error processing query event: %w", err)
 			}
 		case *replication.RotateEvent:
-			logrus.WithField("data", data).Trace("Rotate Event")
+			rs.cursor.Name = string(data.NextLogName)
+			rs.cursor.Pos = uint32(data.Position)
+			logrus.WithFields(logrus.Fields{
+				"name": rs.cursor.Name,
+				"pos":  rs.cursor.Pos,
+			}).Trace("Rotate Event")
 		case *replication.FormatDescriptionEvent:
 			logrus.WithField("data", data).Trace("Format Description Event")
 		default:
