@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// CatalogExtract invokes `flowctl-admin` to build the named catalog
+// CatalogExtract invokes `flowctl-go` to build the named catalog
 // |sourcePath|, and then invokes the callback with its build
 // output database.
 func CatalogExtract(t *testing.T, sourcePath string, fn func(*sql.DB) error) error {
@@ -20,7 +20,7 @@ func CatalogExtract(t *testing.T, sourcePath string, fn func(*sql.DB) error) err
 
 	var tempdir = t.TempDir()
 	var cmd = exec.Command(
-		"flowctl-admin",
+		"flowctl-go",
 		"api",
 		"build",
 		"--build-id", "catalog",
