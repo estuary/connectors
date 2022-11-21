@@ -1,14 +1,14 @@
 #!/bin/bash
 
 set -e
-export TEST_STREAM="estuary_test_$(shuf -zer -n6 {a..z} | tr -d '\0')"
-export RESOURCE="{ stream: ${TEST_STREAM} }"
-
 export PGHOST="${PGHOST:=source-postgres-postgres-1.flow-test}"
 export PGPORT="${PGPORT:=5432}"
 export PGDATABASE="${PGDATABASE:=flow}"
 export PGPASSWORD="${PGPASSWORD:=flow}"
 export PGUSER="${PGUSER:=flow}"
+
+export TEST_STREAM="estuary_test_$(shuf -zer -n6 {a..z} | tr -d '\0')"
+export RESOURCE="{ \"namespace\": \"public\", \"stream\": \"${TEST_STREAM}\" }"
 
 docker compose -f source-postgres/docker-compose.yaml up --detach
 
