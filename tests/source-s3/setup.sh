@@ -3,7 +3,7 @@
 set -e
 
 export TEST_STREAM="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
-export RESOURCE="{ stream: ${TEST_STREAM} }"
+export RESOURCE="{ \"stream\": \"${TEST_STREAM}\", \"syncMode\": \"incremental\" }"
 # set ID_TYPE to string because parsing CSV files will always result in string values.
 export ID_TYPE=string
 
