@@ -2,7 +2,7 @@
 set -e
 
 export TEST_STREAM="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
-export RESOURCE="{ stream: ${TEST_STREAM} }"
+export RESOURCE="{ \"stream\": \"${TEST_STREAM}\", \"syncMode\": \"incremental\" }"
 
 # Because Flow uses network=host, the port exposed to Flow is different than the
 # one we use when running `docker exec` below.

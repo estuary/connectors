@@ -2,7 +2,7 @@
 
 set -e
 export TEST_STREAM="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
-export RESOURCE="{ stream: ${TEST_STREAM} }"
+export RESOURCE="{ \"stream\": \"${TEST_STREAM}\", \"syncMode\": \"incremental\" }"
 
 config_json_template='{
     "awsAccessKeyId": "$AWS_ACCESS_KEY_ID",
