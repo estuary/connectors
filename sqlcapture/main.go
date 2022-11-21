@@ -141,12 +141,6 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 		return fmt.Errorf("expected PullRequest.Open, got %#v", open)
 	}
 
-	var ctx = stream.Context()
-	db, err := d.Connect(ctx, open.Open.Capture.EndpointSpecJson)
-	if err != nil {
-		return fmt.Errorf("error connecting to database: %w", err)
-	}
-
 	var state = &PersistentState{Streams: make(map[string]TableState)}
 	if open.Open.DriverCheckpointJson != nil {
 		if err := pf.UnmarshalStrict(open.Open.DriverCheckpointJson, state); err != nil {
@@ -154,8 +148,10 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 		}
 	}
 
-	if err := db.Connect(ctx); err != nil {
-		return err
+	var ctx = stream.Context()
+	db, err := d.Connect(ctx, open.Open.Capture.EndpointSpecJson)
+	if err != nil {
+		return fmt.Errorf("error connecting to database: %w", err)
 	}
 	defer db.Close(ctx)
 

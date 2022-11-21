@@ -78,7 +78,11 @@ func connectMySQL(ctx context.Context, cfg json.RawMessage) (sqlcapture.Database
 		}
 	}
 
-	return &mysqlDatabase{config: &config}, nil
+	var db = &mysqlDatabase{config: &config}
+	if err := db.connect(ctx); err != nil {
+		return nil, err
+	}
+	return db, nil
 }
 
 // fixMysqlLogging works around some unfortunate defaults in the go-log package, which is used by
@@ -186,7 +190,7 @@ type mysqlDatabase struct {
 	explained map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 }
 
-func (db *mysqlDatabase) Connect(ctx context.Context) error {
+func (db *mysqlDatabase) connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"addr":     db.config.Address,
 		"dbName":   db.config.Advanced.DBName,
