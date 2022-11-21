@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/flow"
@@ -22,8 +23,16 @@ import (
 // then performs snapshot verification on the results.
 func VerifiedCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 	t.Helper()
+	var summary = RunCapture(ctx, t, cs)
+	cupaloy.SnapshotT(t, summary)
+}
+
+// RunCapture performs a capture using the provided st.CaptureSpec and shuts it down after
+// a suitable time has elapsed without any documents or state checkpoints being emitted.
+func RunCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) string {
+	t.Helper()
 	var captureCtx, cancelCapture = context.WithCancel(ctx)
-	const shutdownDelay = 100 * time.Millisecond
+	const shutdownDelay = 200 * time.Millisecond
 	var shutdownWatchdog *time.Timer
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		if shutdownWatchdog == nil {
@@ -34,7 +43,9 @@ func VerifiedCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 		}
 		shutdownWatchdog.Reset(shutdownDelay)
 	})
-	cs.Verify(t)
+	var summary = cs.Summary()
+	cs.Reset()
+	return summary
 }
 
 // ResourceBindings returns a new list of capture bindings for the specified streamIDs.

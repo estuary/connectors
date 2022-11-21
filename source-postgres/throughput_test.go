@@ -10,12 +10,10 @@ import (
 	"testing"
 	"time"
 
-	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -69,7 +67,7 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 		// timing the actual capture of data we care about.
 		var emptyTable = tb.CreateTable(ctx, b, "empty", "(id INTEGER PRIMARY KEY, data TEXT)")
 		var dummy = tb.CaptureSpec(b, emptyTable)
-		runCapture(ctx, b, dummy)
+		tests.RunCapture(ctx, b, dummy)
 		if len(dummy.Errors) > 0 {
 			b.Fatalf("capture failed with error: %v", dummy.Errors[0])
 		}
@@ -78,7 +76,7 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 		var validator = &benchmarkCaptureValidator{}
 		cs.Validator = validator
 		b.StartTimer()
-		runCapture(ctx, b, cs)
+		tests.RunCapture(ctx, b, cs)
 		b.StopTimer()
 		if len(cs.Errors) > 0 {
 			b.Fatalf("capture failed with error: %v", cs.Errors[0])
@@ -102,7 +100,7 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 	}
 
 	var cs = tb.CaptureSpec(b, tables...)
-	runCapture(ctx, b, cs)
+	tests.RunCapture(ctx, b, cs)
 	if len(cs.Errors) > 0 {
 		b.Fatalf("capture failed with error: %v", cs.Errors[0])
 	}
@@ -122,7 +120,7 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 		cs.Validator = validator
 		cs.Checkpoint = initialState
 		b.StartTimer()
-		runCapture(ctx, b, cs)
+		tests.RunCapture(ctx, b, cs)
 		b.StopTimer()
 		if len(cs.Errors) > 0 {
 			b.Fatalf("capture failed with error: %v", cs.Errors[0])
@@ -132,26 +130,6 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 			b.Fatalf("incorrect document count: got %d, expected %d", validator.Total, expectedRecords)
 		}
 	}
-}
-
-func runCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) string {
-	t.Helper()
-	var captureCtx, cancelCapture = context.WithCancel(ctx)
-	const shutdownDelay = 100 * time.Millisecond
-	var shutdownWatchdog *time.Timer
-	cs.Capture(captureCtx, t, func(data json.RawMessage) {
-		if shutdownWatchdog == nil {
-			shutdownWatchdog = time.AfterFunc(shutdownDelay, func() {
-				log.WithField("delay", shutdownDelay.String()).Debug("capture shutdown watchdog expired")
-				cancelCapture()
-			})
-		}
-		shutdownWatchdog.Reset(shutdownDelay)
-	})
-	var summary = cs.Summary()
-	cs.Validator.Reset()
-	cs.Errors = nil
-	return summary
 }
 
 func populateTable(ctx context.Context, t testing.TB, tb tests.TestBackend, table string, numRows int) error {

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	firestore "cloud.google.com/go/firestore"
+	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -269,7 +270,8 @@ func TestMassiveBackfill(t *testing.T) {
 		time.AfterFunc(30*time.Second, cancel)
 		capture.Capture(ctx, t, nil)
 	}
-	capture.Verify(t)
+	cupaloy.SnapshotT(t, capture.Summary())
+	capture.Reset()
 }
 
 type watchdogValidator struct {
