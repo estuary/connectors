@@ -287,7 +287,8 @@ func verifyCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 		}
 		shutdownWatchdog.Reset(shutdownDelay)
 	})
-	cs.Verify(t)
+	cupaloy.SnapshotT(t, cs.Summary())
+	cs.Reset()
 }
 
 type firestoreClient struct {

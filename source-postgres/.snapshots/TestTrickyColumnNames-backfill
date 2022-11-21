@@ -11,7 +11,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.trickycolumnnames_fizzed_cupcake_a":{"mode":"Active","key_columns":["Meta/\"wtf\"/ID"]},"test.trickycolumnnames_fizzed_cupcake_b":{"mode":"Active","key_columns":["table"]}}}
+{"cursor":"0/1111111","streams":{"test.trickycolumnnames_fizzed_cupcake_a":{"key_columns":["Meta/\"wtf\"/ID"],"mode":"Active"},"test.trickycolumnnames_fizzed_cupcake_b":{"key_columns":["table"],"mode":"Active"}}}
 # ================================
 # Captures Terminated With Errors
 # ================================

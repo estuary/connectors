@@ -9,7 +9,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.replicaidentity":{"mode":"Active","key_columns":["id"]}}}
+{"cursor":"0/1111111","streams":{"test.replicaidentity":{"key_columns":["id"],"mode":"Active"}}}
 # ================================
 # Captures Terminated With Errors
 # ================================
