@@ -72,7 +72,11 @@ func connectPostgres(ctx context.Context, cfg json.RawMessage) (sqlcapture.Datab
 		}
 	}
 
-	return &postgresDatabase{config: &config}, nil
+	var db = &postgresDatabase{config: &config}
+	if err := db.connect(ctx); err != nil {
+		return nil, err
+	}
+	return db, nil
 }
 
 // Config tells the connector how to connect to and interact with the source database.
@@ -176,7 +180,7 @@ type postgresDatabase struct {
 	explained map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 }
 
-func (db *postgresDatabase) Connect(ctx context.Context) error {
+func (db *postgresDatabase) connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"address":  db.config.Address,
 		"user":     db.config.User,

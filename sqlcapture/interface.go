@@ -100,9 +100,7 @@ type MetadataChangeEvent struct {
 // during the course of a capture in order to perform discovery, backfill preexisting
 // data, and process replicated change events.
 type Database interface {
-	// TODO(wgd): Document specific methods
-	Connect(ctx context.Context) error
-	// TODO(wgd): Document specific methods
+	// Close shuts down the database connection.
 	Close(ctx context.Context) error
 	// StartReplication opens a connection to the database and returns a ReplicationStream
 	// from which a neverending sequence of change events can be read.
