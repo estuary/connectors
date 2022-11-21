@@ -15,11 +15,6 @@ import (
 // DiscoverCatalog queries the database and generates an Airbyte Catalog
 // describing the available tables and their columns.
 func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.DiscoverResponse_Binding, error) {
-	if err := db.Connect(ctx); err != nil {
-		return nil, err
-	}
-	defer db.Close(ctx)
-
 	tables, err := db.DiscoverTables(ctx)
 	if err != nil {
 		return nil, err
