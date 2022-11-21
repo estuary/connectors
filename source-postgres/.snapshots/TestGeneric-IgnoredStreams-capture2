@@ -6,7 +6,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_ignoredstreams_one":{"mode":"Active","key_columns":["id"]}}}
+{"cursor":"0/1111111","streams":{"test.generic_ignoredstreams_one":{"key_columns":["id"],"mode":"Active"}}}
 # ================================
 # Captures Terminated With Errors
 # ================================

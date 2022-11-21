@@ -1,7 +1,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_emptytable":{"mode":"Active","key_columns":["id"]}}}
+{"cursor":"0/1111111","streams":{"test.generic_emptytable":{"key_columns":["id"],"mode":"Active"}}}
 # ================================
 # Captures Terminated With Errors
 # ================================

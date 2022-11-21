@@ -1,7 +1,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.altertable_aaa":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}},"test.altertable_bbb":{"mode":"Ignore","metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}}}}
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_aaa":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.altertable_bbb":{"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Ignore"}}}
 # ================================
 # Captures Terminated With Errors
 # ================================
