@@ -36,6 +36,9 @@ const watchTargetID = 1245678
 // after a little while.
 const retryInterval = 300 * time.Second
 
+// Log progress messages after every N documents on a particular stream
+const progressLogInterval = 10000
+
 func (driver) Pull(stream pc.Driver_PullServer) error {
 	log.Debug("connector started")
 
@@ -673,6 +676,9 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 				return fmt.Errorf("internal error: recieved document %q on listener for %q", doc.Name, collectionID)
 			}
 			numDocuments++
+			if numDocuments%progressLogInterval == 0 {
+				logEntry.WithField("docs", numDocuments).Debug("replication progress")
+			}
 			if err := c.HandleDocument(ctx, resourcePath, doc); err != nil {
 				return err
 			}
@@ -681,6 +687,9 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 			var readTime = resp.DocumentDelete.ReadTime.AsTime()
 			var resourcePath = documentToResourcePath(doc)
 			numDocuments++
+			if numDocuments%progressLogInterval == 0 {
+				logEntry.WithField("docs", numDocuments).Debug("replication progress")
+			}
 			if err := c.HandleDelete(ctx, resourcePath, doc, readTime); err != nil {
 				return err
 			}
@@ -689,6 +698,9 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 			var readTime = resp.DocumentRemove.ReadTime.AsTime()
 			var resourcePath = documentToResourcePath(doc)
 			numDocuments++
+			if numDocuments%progressLogInterval == 0 {
+				logEntry.WithField("docs", numDocuments).Debug("replication progress")
+			}
 			if err := c.HandleDelete(ctx, resourcePath, doc, readTime); err != nil {
 				return err
 			}
