@@ -163,10 +163,8 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 	return cs
 }
 
-// Verify performs snapshot verification on the capture results given by Summary.
-func (cs *CaptureSpec) Verify(t testing.TB) {
-	t.Helper()
-	cupaloy.SnapshotT(t, cs.Summary())
+// Reset clears validator and error state, but leaves the state checkpoint intact.
+func (cs *CaptureSpec) Reset() {
 	cs.Validator.Reset()
 	cs.Errors = nil
 }
@@ -222,6 +220,14 @@ func (a *pullAdapter) Recv() (*pc.PullRequest, error) {
 	return &pc.PullRequest{Acknowledge: &pc.Acknowledge{}}, nil
 }
 
+func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {
+	var x interface{}
+	if err := json.Unmarshal(bs, &x); err != nil {
+		return nil, err
+	}
+	return json.Marshal(x)
+}
+
 func (a *pullAdapter) Send(m *pc.PullResponse) error {
 	if m.Documents != nil {
 		a.transaction = append(a.transaction, m.Documents)
@@ -229,10 +235,12 @@ func (a *pullAdapter) Send(m *pc.PullResponse) error {
 	if m.Checkpoint != nil {
 		if !m.Checkpoint.Rfc7396MergePatch || a.checkpoint == nil {
 			a.checkpoint = m.Checkpoint.DriverCheckpointJson
-		} else if checkpoint, err := jsonpatch.MergePatch(a.checkpoint, m.Checkpoint.DriverCheckpointJson); err == nil {
-			a.checkpoint = checkpoint
-		} else {
+		} else if checkpoint, err := jsonpatch.MergePatch(a.checkpoint, m.Checkpoint.DriverCheckpointJson); err != nil {
 			return fmt.Errorf("test error merging checkpoint: %w", err)
+		} else if normalized, err := normalizeJSON(checkpoint); err != nil {
+			return fmt.Errorf("test error normalizing checkpoint: %w", err)
+		} else {
+			a.checkpoint = normalized
 		}
 		if logLevel := log.TraceLevel; log.IsLevelEnabled(logLevel) {
 			if !bytes.Equal(m.Checkpoint.DriverCheckpointJson, []byte("{}")) {

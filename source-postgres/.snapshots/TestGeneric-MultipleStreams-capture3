@@ -1,7 +1,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_multiplestreams_one":{"mode":"Active","key_columns":["id"]},"test.generic_multiplestreams_three":{"mode":"Active","key_columns":["id"]},"test.generic_multiplestreams_two":{"mode":"Ignore"}}}
+{"cursor":"0/1111111","streams":{"test.generic_multiplestreams_one":{"key_columns":["id"],"mode":"Active"},"test.generic_multiplestreams_three":{"key_columns":["id"],"mode":"Active"},"test.generic_multiplestreams_two":{"mode":"Ignore"}}}
 # ================================
 # Captures Terminated With Errors
 # ================================

@@ -104,7 +104,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_catalogprimarykeyoverride":{"mode":"Active","key_columns":["fullname","year"]}}}
+{"cursor":"0/1111111","streams":{"test.generic_catalogprimarykeyoverride":{"key_columns":["fullname","year"],"mode":"Active"}}}
 # ================================
 # Captures Terminated With Errors
 # ================================

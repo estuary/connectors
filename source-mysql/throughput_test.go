@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -63,7 +62,7 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 		var validator = &benchmarkCaptureValidator{}
 		cs.Validator = validator
 		b.StartTimer()
-		runCapture(ctx, b, cs)
+		tests.RunCapture(ctx, b, cs)
 		b.StopTimer()
 		if len(cs.Errors) > 0 {
 			b.Fatalf("capture failed with error: %v", cs.Errors[0])
@@ -87,7 +86,7 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 	}
 
 	var cs = tb.CaptureSpec(b, tables...)
-	runCapture(ctx, b, cs)
+	tests.RunCapture(ctx, b, cs)
 	if len(cs.Errors) > 0 {
 		b.Fatalf("capture failed with error: %v", cs.Errors[0])
 	}
@@ -103,7 +102,7 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 		cs.Validator = validator
 		cs.Checkpoint = initialState
 		b.StartTimer()
-		runCapture(ctx, b, cs)
+		tests.RunCapture(ctx, b, cs)
 		b.StopTimer()
 		if len(cs.Errors) > 0 {
 			b.Fatalf("capture failed with error: %v", cs.Errors[0])
@@ -113,26 +112,6 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 			b.Fatalf("incorrect document count: got %d, expected %d", validator.Total, expectedRecords)
 		}
 	}
-}
-
-func runCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) string {
-	t.Helper()
-	var captureCtx, cancelCapture = context.WithCancel(ctx)
-	const shutdownDelay = 100 * time.Millisecond
-	var shutdownWatchdog *time.Timer
-	cs.Capture(captureCtx, t, func(data json.RawMessage) {
-		if shutdownWatchdog == nil {
-			shutdownWatchdog = time.AfterFunc(shutdownDelay, func() {
-				log.WithField("delay", shutdownDelay.String()).Debug("capture shutdown watchdog expired")
-				cancelCapture()
-			})
-		}
-		shutdownWatchdog.Reset(shutdownDelay)
-	})
-	var summary = cs.Summary()
-	cs.Validator.Reset()
-	cs.Errors = nil
-	return summary
 }
 
 func populateTable(ctx context.Context, t testing.TB, tb tests.TestBackend, table string, numRows int) error {

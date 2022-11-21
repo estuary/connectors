@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.generic_multiplestreams_one":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}},"test.generic_multiplestreams_three":{"mode":"Active","key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}}},"test.generic_multiplestreams_two":{"mode":"Active","metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"key_columns":["id"]}}}
+{"cursor":"binlog.000123:56789","streams":{"test.generic_multiplestreams_one":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_three":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_two":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
 # ================================
 # Captures Terminated With Errors
 # ================================

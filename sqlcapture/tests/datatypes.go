@@ -7,11 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
-	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/flow/go/protocols/capture"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,40 +77,18 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 
 				t.Run("scan", func(t *testing.T) {
 					tb.Insert(ctx, t, tableName, [][]interface{}{{1, tc.InputValue}})
-					var output = runCapture(ctx, t, cs)
+					var output = RunCapture(ctx, t, cs)
 					verifyRoundTrip(t, tc, output)
 				})
 
 				t.Run("replication", func(t *testing.T) {
 					tb.Insert(ctx, t, tableName, [][]interface{}{{2, tc.InputValue}})
-					var output = runCapture(ctx, t, cs)
+					var output = RunCapture(ctx, t, cs)
 					verifyRoundTrip(t, tc, output)
 				})
 			})
 		})
 	}
-}
-
-// runCapture performs a capture using the provided st.CaptureSpec and shuts it down
-// after a suitable time has elapsed without any further documents or state checkpoints.
-func runCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) string {
-	t.Helper()
-	var captureCtx, cancelCapture = context.WithCancel(ctx)
-	const shutdownDelay = 100 * time.Millisecond
-	var shutdownWatchdog *time.Timer
-	cs.Capture(captureCtx, t, func(data json.RawMessage) {
-		if shutdownWatchdog == nil {
-			shutdownWatchdog = time.AfterFunc(shutdownDelay, func() {
-				log.WithField("delay", shutdownDelay.String()).Debug("capture shutdown watchdog expired")
-				cancelCapture()
-			})
-		}
-		shutdownWatchdog.Reset(shutdownDelay)
-	})
-	var summary = cs.Summary()
-	cs.Validator.Reset()
-	cs.Errors = nil
-	return summary
 }
 
 type datatypeTestRecord struct {
