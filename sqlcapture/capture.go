@@ -116,6 +116,11 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 	}()
 
+	// Notify Flow that we're starting.
+	if err := c.Output.Ready(); err != nil {
+		return err
+	}
+
 	// Perform discovery and cache the result. This is used at startup when
 	// updating the state to reflect catalog changes, and then later it is
 	// plumbed through so that value translation can take column types into
