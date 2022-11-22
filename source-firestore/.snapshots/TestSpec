@@ -39,7 +39,11 @@
           "sync"
         ],
         "title": "Backfill Mode",
-        "description": "Configures the handling of data already in the collection. Refer to go.estuary.dev/source-firestore for details or just stick with 'async'"
+        "description": "Configures the handling of data already in the collection. Refer to go.estuary.dev/source-firestore for details or just stick with 'async'. Has no effect if changed after a binding is added."
+      },
+      "initTimestamp": {
+        "type": "string",
+        "description": "Optionally overrides the initial replication timestamp (which is either Zero or Now depending on the backfill mode). Has no effect if changed after a binding is added."
       }
     },
     "type": "object",
