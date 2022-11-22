@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"time"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
@@ -20,8 +21,9 @@ const (
 )
 
 type resource struct {
-	Path         string       `json:"path" jsonschema:"title=Path to Collection,description=Supports parent/*/nested to capture all nested collections of parent's children"`
-	BackfillMode backfillMode `json:"backfillMode" jsonschema:"title=Backfill Mode,description=Configures the handling of data already in the collection. Refer to go.estuary.dev/source-firestore for details or just stick with 'async',enum=async,enum=none,enum=sync"`
+	Path          string       `json:"path" jsonschema:"title=Path to Collection,description=Supports parent/*/nested to capture all nested collections of parent's children"`
+	BackfillMode  backfillMode `json:"backfillMode" jsonschema:"title=Backfill Mode,description=Configures the handling of data already in the collection. Refer to go.estuary.dev/source-firestore for details or just stick with 'async'. Has no effect if changed after a binding is added.,enum=async,enum=none,enum=sync"`
+	InitTimestamp string       `json:"initTimestamp,omitempty" jsonschema:"Initial Replication Timestamp,description=Optionally overrides the initial replication timestamp (which is either Zero or Now depending on the backfill mode). Has no effect if changed after a binding is added."`
 }
 
 func (r resource) Validate() error {
@@ -30,6 +32,11 @@ func (r resource) Validate() error {
 	}
 	if r.BackfillMode != backfillModeSync && r.BackfillMode != backfillModeAsync && r.BackfillMode != backfillModeNone {
 		return fmt.Errorf("invalid backfill mode %q for %q", r.BackfillMode, r.Path)
+	}
+	if r.InitTimestamp != "" {
+		if _, err := time.Parse(time.RFC3339Nano, r.InitTimestamp); err != nil {
+			return fmt.Errorf("invalid initTimestamp value %q: %w", r.InitTimestamp, err)
+		}
 	}
 	return nil
 }
