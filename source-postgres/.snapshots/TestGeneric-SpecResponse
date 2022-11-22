@@ -122,6 +122,7 @@
     },
     "type": "object",
     "required": [
+      "namespace",
       "stream"
     ],
     "title": "SQL Database Resource Spec"
