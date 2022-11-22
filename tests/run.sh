@@ -81,7 +81,12 @@ fi
 if [[ -z "$CONNECTOR_CONFIG" ]]; then
     bail "setup did not set CONNECTOR_CONFIG"
 fi
-trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${CONNECTOR}/cleanup.sh" EXIT
+TEST_STATUS="Test Failed"
+function test_shutdown() {
+    kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${CONNECTOR}/cleanup.sh
+    echo -e "===========\n${TEST_STATUS}\n==========="
+}
+trap "test_shutdown" EXIT
 
 # The source-s3 and source-gcs connectors need the collection schema to use a string for the id
 # property because the parser treats all CSV columns as strings. Their setup.sh scripts will set
@@ -115,4 +120,5 @@ flowctl-go api delete --build-id test-build-id --all --log.level info || bail "D
 # Verify actual vs expected results. `diff` will exit 1 if files are different
 diff --suppress-common-lines --side-by-side "${ACTUAL}" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"
 
-echo "Test Passed"
+# Will be printed by the shutdown trap *after* any shutdown logging from flowctl
+TEST_STATUS="Test Passed"
