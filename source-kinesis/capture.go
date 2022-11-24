@@ -15,13 +15,11 @@ import (
 )
 
 // readStream starts reading the given kinesis stream, delivering both records and errors from all
-// kinsis shards over the given `resultsCh`. If `stopAt` is non-nil, then the this will only read
-// records up through _approximately_ that time, or until millisBehindLatest indicates we're caught
-// up to the tip of the stream. Otherwise, this will continue to read indefinitely.
+// kinsis shards over the given `resultsCh`. This will continue to read indefinitely.
 // The `wg` is expected to have been incremented once _prior_ to calling this function. It will be
 // further incremented and decremented behind the scenes, but will be decremented back down to the
 // prior value when the read is finished.
-func readStream(ctx context.Context, shardRange airbyte.Range, client *kinesis.Kinesis, stream string, state map[string]string, resultsCh chan<- readResult, stopAt *time.Time, wg *sync.WaitGroup) {
+func readStream(ctx context.Context, shardRange airbyte.Range, client *kinesis.Kinesis, stream string, state map[string]string, resultsCh chan<- readResult, wg *sync.WaitGroup) {
 
 	var kc = &streamReader{
 		client:         client,
@@ -31,7 +29,6 @@ func readStream(ctx context.Context, shardRange airbyte.Range, client *kinesis.K
 		dataCh:         resultsCh,
 		readingShards:  make(map[string]bool),
 		shardSequences: state,
-		stopAt:         stopAt,
 		waitGroup:      wg,
 	}
 	var err = kc.startReadingStream()
@@ -61,7 +58,6 @@ type streamReader struct {
 	stream             string
 	shardRange         airbyte.Range
 	dataCh             chan<- readResult
-	stopAt             *time.Time
 	waitGroup          *sync.WaitGroup
 	readingShards      map[string]bool
 	readingShardsMutex sync.Mutex
@@ -403,27 +399,6 @@ func (r *shardReader) readShardIterator(iteratorID string) error {
 				r.noDataBackoff.reset()
 			} else {
 				<-r.noDataBackoff.nextBackoff()
-			}
-		}
-
-		// If the connector is not in tailing mode, then we'll check to see if we've read all the
-		// records up through the timestamp of the desired stop point.
-		if r.parent.stopAt != nil {
-			if *getRecordsResp.MillisBehindLatest < 1000 {
-				// Regardless of whether the response contains records or not, we can be done if
-				// millisBehindLatest approaches 0, because that indicates that we've read all the
-				// records in the stream, at least for now. We allow for some slippage here because
-				// the returned value is relative to the tip of the _stream_, and so we may not ever
-				// read millisBehindLatest of 0 if there are many shards, since it only takes one
-				// record added to one shard to make that value non-zero.
-				r.logEntry.Info("stopping because millisBehindLatest < 1000")
-				return nil
-			} else if len(getRecordsResp.Records) > 0 {
-				var lastRecordTS = getRecordsResp.Records[len(getRecordsResp.Records)-1].ApproximateArrivalTimestamp
-				if lastRecordTS.After(*r.parent.stopAt) {
-					r.logEntry.Infof("Finished reading records through: %v", lastRecordTS)
-					return nil
-				}
 			}
 		}
 

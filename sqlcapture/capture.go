@@ -219,13 +219,6 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
 	var targetWatermark = nonexistentWatermark
-	if !c.Catalog.Tail {
-		var watermark = uuid.New().String()
-		if err = c.Database.WriteWatermark(ctx, watermark); err != nil {
-			return fmt.Errorf("error writing poll watermark: %w", err)
-		}
-		targetWatermark = watermark
-	}
 	if err := c.streamToWatermark(replStream, targetWatermark, nil); err != nil {
 		return err
 	}

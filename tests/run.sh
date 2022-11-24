@@ -52,13 +52,11 @@ export BROKER_ADDRESS=unix://localhost${TESTDIR}/gazette.sock
 export CONSUMER_ADDRESS=unix://localhost${TESTDIR}/consumer.sock
 
 # Start an empty local data plane within our TESTDIR as a background job.
-# --poll so that connectors are polled rather than continuously tailed.
 # --sigterm to verify we cleanly tear down the test catalog (otherwise it hangs).
 # --tempdir to use our known TESTDIR rather than creating a new temporary directory.
 # --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
 flowctl-go temp-data-plane \
     --log.level info \
-    --poll \
     --sigterm \
     --network "flow-test" \
     --tempdir ${TESTDIR} \
