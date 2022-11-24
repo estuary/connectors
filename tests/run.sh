@@ -52,13 +52,11 @@ export BROKER_ADDRESS=unix://localhost${TESTDIR}/gazette.sock
 export CONSUMER_ADDRESS=unix://localhost${TESTDIR}/consumer.sock
 
 # Start an empty local data plane within our TESTDIR as a background job.
-# --poll so that connectors are polled rather than continuously tailed.
 # --sigterm to verify we cleanly tear down the test catalog (otherwise it hangs).
 # --tempdir to use our known TESTDIR rather than creating a new temporary directory.
 # --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
 flowctl-go temp-data-plane \
     --log.level info \
-    --poll \
     --sigterm \
     --network "flow-test" \
     --tempdir ${TESTDIR} \
@@ -110,15 +108,30 @@ flowctl-go api build --directory ${TESTDIR}/builds --build-id test-build-id --so
 
 # Activate the catalog.
 flowctl-go api activate --build-id test-build-id --all --network "flow-test" --log.level info || bail "Activate failed."
-# Wait for a data-flow pass to finish.
-flowctl-go api await --build-id test-build-id --log.level info || bail "Await failed."
-# Read out materialization results.
-sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
+
+# Periodically check expected vs actual lines of output, once we reach the same
+# number of lines, we stop the plane and then compare the output
+retry_counter=0
+while true
+do
+  # Read out materialization results.
+  sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
+  if [[ "$(cat tests/${CONNECTOR}/expected.txt | wc -l )" -eq "$(cat ${ACTUAL} | wc -l)" ]]; then
+    # Verify actual vs expected results. `diff` will exit 1 if files are different
+    echo "-- RUNNING DIFF"
+    diff --suppress-common-lines --side-by-side "${ACTUAL}" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"
+    break
+  fi
+  # after 30 retries (30 seconds) we timeout
+  retry_counter=$((retry_counter + 1))
+  if [[ "$retry_counter" -eq "30" ]]; then
+    bail "Timeout reached while checking for expected output"
+  fi
+  sleep 1
+done
+
 # Clean up the activated catalog.
 flowctl-go api delete --build-id test-build-id --all --log.level info || bail "Delete failed."
-
-# Verify actual vs expected results. `diff` will exit 1 if files are different
-diff --suppress-common-lines --side-by-side "${ACTUAL}" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"
 
 # Will be printed by the shutdown trap *after* any shutdown logging from flowctl
 TEST_STATUS="Test Passed"

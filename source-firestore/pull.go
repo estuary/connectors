@@ -104,7 +104,6 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 			Resources: updatedResourceStates,
 		},
 		Output: &boilerplate.PullOutput{Stream: stream},
-		Tail:   open.Open.Tail,
 	}
 	return capture.Run(stream.Context())
 }
@@ -114,7 +113,6 @@ type capture struct {
 	Config   config
 	State    *captureState
 	Output   *boilerplate.PullOutput
-	Tail     bool
 }
 
 type captureState struct {
@@ -571,10 +569,6 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 						return err
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 						return err
-					}
-					// In polling mode (tests), shut down the capture once caught up
-					if !c.Tail {
-						return nil
 					}
 				}
 			case firestore_pb.TargetChange_ADD:

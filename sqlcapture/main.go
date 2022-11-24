@@ -175,7 +175,6 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 		Bindings: bindings,
 		State:    state,
 		Output:   &boilerplate.PullOutput{Stream: stream},
-		Tail:     open.Open.Tail,
 		Database: db,
 	}
 	return c.Run(ctx)

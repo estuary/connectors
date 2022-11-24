@@ -94,7 +94,6 @@ func peekAtStream(ctx context.Context, client *kinesis.Kinesis, streamName strin
 		cancel      context.CancelFunc
 		dataCh      chan readResult      = make(chan readResult, 8)
 		shardRange  airbyte.Range        = airbyte.NewFullRange()
-		stopAt      time.Time            = time.Now()
 		streamState map[string]string    = make(map[string]string)
 		waitGroup   *sync.WaitGroup      = new(sync.WaitGroup)
 		docs        chan json.RawMessage = make(chan schema_inference.Document, peekAtMost)
@@ -105,7 +104,7 @@ func peekAtStream(ctx context.Context, client *kinesis.Kinesis, streamName strin
 	defer cancel()
 
 	waitGroup.Add(1)
-	go readStream(ctx, shardRange, client, streamName, streamState, dataCh, &stopAt, waitGroup)
+	go readStream(ctx, shardRange, client, streamName, streamState, dataCh, waitGroup)
 	go closeChannelWhenDone(dataCh, waitGroup)
 	defer close(docs)
 
