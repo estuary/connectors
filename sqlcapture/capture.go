@@ -82,7 +82,6 @@ type Capture struct {
 	State    *PersistentState        // State read from `state.json` and emitted as updates
 	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
 	Database Database                // The database-specific interface which is operated by the generic Capture logic
-	Tail     bool                    // True if the connector is operating in tailing mode
 
 	discovery map[string]TableInfo // Cached result of the most recent table discovery request
 
@@ -226,13 +225,6 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
 	var targetWatermark = nonexistentWatermark
-	if !c.Tail {
-		var watermark = uuid.New().String()
-		if err = c.Database.WriteWatermark(ctx, watermark); err != nil {
-			return fmt.Errorf("error writing poll watermark: %w", err)
-		}
-		targetWatermark = watermark
-	}
 	if err := c.streamToWatermark(replStream, targetWatermark, nil); err != nil {
 		return err
 	}
