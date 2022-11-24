@@ -131,14 +131,6 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 		shardRange = airbyte.NewFullRange()
 	}
 
-	var stopAt *time.Time
-	if !catalog.Tail {
-		var t = time.Now().UTC()
-		log.Infof("reading in non-tailing mode until: %v", t)
-		stopAt = &t
-	} else {
-		log.Info("reading indefinitely because tail==true")
-	}
 	var waitGroup = new(sync.WaitGroup)
 	for _, stream := range catalog.Streams {
 		streamState, err := copyStreamState(stateMap, stream.Stream.Name)
@@ -147,7 +139,7 @@ func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) 
 			return fmt.Errorf("invalid state for stream %s: %w", stream.Stream.Name, err)
 		}
 		waitGroup.Add(1)
-		go readStream(ctx, shardRange, client, stream.Stream.Name, streamState, dataCh, stopAt, waitGroup)
+		go readStream(ctx, shardRange, client, stream.Stream.Name, streamState, dataCh, waitGroup)
 	}
 
 	go closeChannelWhenDone(dataCh, waitGroup)

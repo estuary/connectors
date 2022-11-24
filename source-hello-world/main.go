@@ -9,7 +9,6 @@ import (
 )
 
 type Config struct {
-	Greetings int `json:"greetings"`
 }
 
 type State struct {
@@ -17,9 +16,6 @@ type State struct {
 }
 
 func (c *Config) Validate() error {
-	if c.Greetings == 0 {
-		return fmt.Errorf("missing greetings")
-	}
 	return nil
 }
 
@@ -35,12 +31,6 @@ const configSchema = `{
 		"greetings"
 	],
 	"properties": {
-		"greetings": {
-			"type":        "integer",
-			"title":       "Number of Greetings",
-			"description": "Number of greeting documents to produce when running in non-tailing mode",
-			"default":     1000
-		}
 	}
 }`
 
@@ -119,10 +109,6 @@ func doRead(args airbyte.ReadCmd) error {
 	var enc = airbyte.NewStdoutEncoder()
 	var now = time.Now()
 	for {
-		if state.Cursor >= config.Greetings && !catalog.Tail {
-			return nil // All done.
-		}
-
 		var b, err = json.Marshal(struct {
 			Count   int    `json:"count"`
 			Message string `json:"message"`
@@ -155,8 +141,6 @@ func doRead(args airbyte.ReadCmd) error {
 			return err
 		}
 
-		if catalog.Tail {
-			now = <-time.After(time.Millisecond * 500)
-		}
+		now = <-time.After(time.Millisecond * 500)
 	}
 }
