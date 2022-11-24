@@ -12,6 +12,7 @@ type Config struct {
 	Greetings        int              `json:"greetings"`
 	SkipState        bool             `json:"skip_state"`
 	FailAfter        int              `json:"fail_after"`
+	ExitAfter        int              `json:"exit_after"`
 	OAuthCredentials oauthCredentials `json:"credentials"`
 }
 
@@ -61,6 +62,11 @@ const configSchema = `{
       "type": ["integer", "null"],
       "title": "Fail after sending N number of greetings",
       "description": "Fail after sending N number of greetings"
+    },
+    "exit_after": {
+      "type": ["integer", "null"],
+      "title": "Exit after sending N number of greetings",
+      "description": "Exit after sending N number of greetings"
     },
     "credentials": {
       "type": "object",
@@ -181,7 +187,7 @@ func doRead(args airbyte.ReadCmd) error {
 		if config.FailAfter != 0 && state.Cursor >= config.FailAfter {
 			return fmt.Errorf("a horrible, no good error!")
 		}
-		if state.Cursor >= config.Greetings && !catalog.Tail {
+		if config.ExitAfter != 0 && state.Cursor >= config.ExitAfter {
 			return nil // All done.
 		}
 
@@ -219,8 +225,6 @@ func doRead(args airbyte.ReadCmd) error {
 			}
 		}
 
-		if catalog.Tail {
-			now = <-time.After(time.Millisecond * 500)
-		}
+		now = <-time.After(time.Millisecond * 500)
 	}
 }
