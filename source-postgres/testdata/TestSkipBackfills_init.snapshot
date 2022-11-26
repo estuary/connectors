@@ -8,4 +8,3 @@
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_skipbackfills_bbb":{"mode":"Backfill","key_columns":["id"],"scanned":"FQY="}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_skipbackfills_bbb":{"mode":"Active","key_columns":["id"],"scanned":null}}},"estuary.dev/merge":true}}
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}

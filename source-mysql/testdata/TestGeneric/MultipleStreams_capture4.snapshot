@@ -1,5 +1,4 @@
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"test.test_generic_multiplestreams_two":{"mode":"Ignore","key_columns":null,"scanned":null}}},"estuary.dev/merge":true}}
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"RECORD","record":{"stream":"test_Generic_MultipleStreams_one","data":{"_meta":{"op":"c","source":{"schema":"test","table":"test_Generic_MultipleStreams_one"}},"data":"nine","id":9},"emitted_at":1234,"namespace":"test"}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"RECORD","record":{"stream":"test_Generic_MultipleStreams_three","data":{"_meta":{"op":"c","source":{"schema":"test","table":"test_Generic_MultipleStreams_three"}},"data":"eleven","id":11},"emitted_at":1234,"namespace":"test"}}

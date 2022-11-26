@@ -117,4 +117,3 @@
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_catalogprimarykey":{"mode":"Backfill","key_columns":["fullname","year"],"scanned":"Ald5b21pbmcAFgeA"}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_catalogprimarykey":{"mode":"Active","key_columns":["fullname","year"],"scanned":null}}},"estuary.dev/merge":true}}
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}

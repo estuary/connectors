@@ -3,7 +3,6 @@ package tests
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
 )
@@ -13,7 +12,6 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 	t.Helper()
 	t.Run("SimpleDiscovery", func(t *testing.T) { testSimpleDiscovery(ctx, t, tb) })
 	t.Run("SimpleCapture", func(t *testing.T) { testSimpleCapture(ctx, t, tb) })
-	t.Run("Tailing", func(t *testing.T) { testTailing(ctx, t, tb) })
 	t.Run("ReplicationInserts", func(t *testing.T) { testReplicationInserts(ctx, t, tb) })
 	t.Run("ReplicationUpdates", func(t *testing.T) { testReplicationUpdates(ctx, t, tb) })
 	t.Run("ReplicationDeletes", func(t *testing.T) { testReplicationDeletes(ctx, t, tb) })
@@ -51,32 +49,6 @@ func testSimpleCapture(ctx context.Context, t *testing.T, tb TestBackend) {
 	VerifiedCapture(ctx, t, tb, &catalog, &state, "")
 }
 
-// TestTailing performs a capture in 'tail' mode, which is how it actually runs
-// under Flow outside of development tests. This means that after the initial
-// backfilling completes, the capture will run indefinitely without writing
-// any more watermarks.
-func testTailing(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var catalog, state = ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
-	catalog.Tail = true
-
-	// Initial data which must be backfilled
-	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {10, "bbb"}, {20, "CDEFGHIJKLMNOP"}, {30, "Four"}, {40, "5"}})
-
-	// Run the capture
-	var captureCtx, cancelCapture = context.WithCancel(ctx)
-	go VerifiedCapture(captureCtx, t, tb, &catalog, &state, "")
-	time.Sleep(2 * time.Second)
-
-	// Some more changes occurring after the backfill completes
-	tb.Insert(ctx, t, tableName, [][]interface{}{{5, "asdf"}, {100, "lots"}})
-	tb.Delete(ctx, t, tableName, "id", 20)
-	tb.Update(ctx, t, tableName, "id", 30, "data", "updated")
-
-	// Let the capture catch up and then terminate it
-	time.Sleep(1 * time.Second)
-	cancelCapture()
-}
 
 // testReplicationInserts runs two captures, where the first will perform the
 // initial table scan and the second capture will use replication to receive

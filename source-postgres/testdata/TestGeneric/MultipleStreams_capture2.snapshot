@@ -11,4 +11,3 @@
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_multiplestreams_three":{"mode":"Backfill","key_columns":["id"],"scanned":"FQg="},"public.test_generic_multiplestreams_two":{"mode":"Backfill","key_columns":["id"],"scanned":"FQU="}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_multiplestreams_three":{"mode":"Active","key_columns":["id"],"scanned":null},"public.test_generic_multiplestreams_two":{"mode":"Active","key_columns":["id"],"scanned":null}}},"estuary.dev/merge":true}}
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}

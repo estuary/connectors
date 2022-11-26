@@ -398,4 +398,3 @@
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_complexdataset":{"mode":"Backfill","key_columns":["year","state"],"scanned":"FgfkAldZAA=="}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_generic_complexdataset":{"mode":"Active","key_columns":["year","state"],"scanned":null}}},"estuary.dev/merge":true}}
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}

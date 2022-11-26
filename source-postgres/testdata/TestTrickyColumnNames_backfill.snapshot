@@ -9,4 +9,3 @@
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_trickycolumnnames_a":{"mode":"Backfill","key_columns":["Meta/\"wtf\"/ID"],"scanned":"FQI="},"public.test_trickycolumnnames_b":{"mode":"Backfill","key_columns":["table"],"scanned":"FQQ="}}},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}
 {"type":"STATE","state":{"data":{"cursor":"REDACTED","streams":{"public.test_trickycolumnnames_a":{"mode":"Active","key_columns":["Meta/\"wtf\"/ID"],"scanned":null},"public.test_trickycolumnnames_b":{"mode":"Active","key_columns":["table"],"scanned":null}}},"estuary.dev/merge":true}}
-{"type":"STATE","state":{"data":{"cursor":"REDACTED"},"estuary.dev/merge":true}}

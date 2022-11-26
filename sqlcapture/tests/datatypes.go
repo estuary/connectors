@@ -76,13 +76,13 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 
 				t.Run("scan", func(t *testing.T) {
 					tb.Insert(ctx, t, table, [][]interface{}{{1, tc.InputValue}})
-					var output, _ = PerformCapture(ctx, t, tb, &catalog, &state)
+					var output, _ = PerformCapture(ctx, t, tb, &catalog, &state, 1, "")
 					verifyRoundTrip(t, tc, output)
 				})
 
 				t.Run("replication", func(t *testing.T) {
 					tb.Insert(ctx, t, table, [][]interface{}{{2, tc.InputValue}})
-					var output, _ = PerformCapture(ctx, t, tb, &catalog, &state)
+					var output, _ = PerformCapture(ctx, t, tb, &catalog, &state, 1, "")
 					verifyRoundTrip(t, tc, output)
 				})
 			})

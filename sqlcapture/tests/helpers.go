@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+  "time"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/airbyte"
@@ -23,7 +24,10 @@ import (
 // emitted during the capture, and updates the `state` argument to the final one.
 func VerifiedCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog *airbyte.ConfiguredCatalog, state *sqlcapture.PersistentState, suffix string) []sqlcapture.PersistentState {
 	t.Helper()
-	var result, states = PerformCapture(ctx, t, tb, catalog, state)
+
+  var expectedLines = SnapshotLines(t, suffix)
+
+	var result, states = PerformCapture(ctx, t, tb, catalog, state, expectedLines, suffix)
 	VerifySnapshot(t, suffix, result)
 	return states
 }
@@ -34,20 +38,48 @@ func VerifiedCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog 
 // and LSNs which will vary across test runs, and so can be fed directly into VerifySnapshot.
 //
 // As a side effect the input state is modified to the final result state.
-func PerformCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog *airbyte.ConfiguredCatalog, state *sqlcapture.PersistentState) (string, []sqlcapture.PersistentState) {
+func PerformCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog *airbyte.ConfiguredCatalog, state *sqlcapture.PersistentState, expectedLines int, suffix string) (string, []sqlcapture.PersistentState) {
 	t.Helper()
 
 	var buf = new(CaptureOutputBuffer)
 	buf.MergeBase = CopyState(*state)
 	var initState = CopyState(*state)
+
+  ctx, cancel := context.WithCancel(ctx)
+
+  // Check the number of snapshots periodically to stop the test once we reach
+  // the expected number
+  go func() {
+    for {
+      if ctx.Err() != nil {
+        return
+      }
+
+      fmt.Printf("%s_%s %d -- %d\n", t.Name(), suffix, buf.Count, expectedLines)
+      result, _ := buf.Output()
+      fmt.Printf("%v\n", result)
+      if buf.Count >= expectedLines {
+        cancel()
+        return
+      }
+      time.Sleep(1 * time.Second)
+    }
+  }()
+
 	if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), catalog, &initState, buf); err != nil {
-		fmt.Fprintf(&buf.Snapshot, "\n========\n\nCapture Terminated With Error:\n\n    %s\n", err.Error())
+    // replication stream closing before reaching watermark is expected since
+    // the connctor wants to indefinitely replicate and it's checking against a
+    // nonexistent-watermark
+    if !strings.Contains(err.Error(), "replication stream closed before reaching watermark") {
+		  fmt.Fprintf(&buf.Snapshot, "\n========\n\nCapture Terminated With Error:\n\n    %s\n", err.Error())
+    }
 	}
 
 	var result, states = buf.Output()
 	if len(states) > 0 {
 		*state = states[len(states)-1]
 	}
+  cancel()
 	return result, states
 }
 
@@ -74,6 +106,30 @@ func ConfiguredCatalog(ctx context.Context, t testing.TB, tb TestBackend, stream
 		})
 	}
 	return catalog
+}
+
+// Count the number of lines in snapshot
+func SnapshotLines(t *testing.T, suffix string) int {
+	var snapshotDir = "testdata"
+	var snapshotFile = snapshotDir + "/" + t.Name()
+	if suffix != "" {
+		snapshotFile += "_" + suffix
+	}
+	snapshotFile += ".snapshot"
+
+	var snapBytes, err = os.ReadFile(snapshotFile)
+	// Nonexistent snapshots aren't an error, because when adding a
+	// new test we'd like it to produce a "snapshot.new" file for us
+	// and the empty string won't match the expected result anyway.
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatalf("error reading snapshot %q: %v", snapshotFile, err)
+	}
+
+  if os.IsNotExist(err) {
+    return 0
+  }
+
+  return bytes.Count(snapBytes, []byte{'\n'})
 }
 
 // VerifySnapshot loads snapshot content from a file and compares with the
@@ -215,10 +271,11 @@ func LoadCSV(ctx context.Context, t *testing.T, tb TestBackend, table string, fi
 // Capture instance, recording State updates in one list and Records
 // in another.
 type CaptureOutputBuffer struct {
-	MergeBase sqlcapture.PersistentState
-	States    []sqlcapture.PersistentState
-	Snapshot  strings.Builder
-	lastState string
+	MergeBase        sqlcapture.PersistentState
+	States           []sqlcapture.PersistentState
+	Snapshot         strings.Builder
+	lastState        string
+  Count            int
 }
 
 // Encode accepts output messages from a capture, and is named 'Encode' to
@@ -296,6 +353,7 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	}
 	buf.States = append(buf.States, CopyState(buf.MergeBase))
 
+  buf.Count++
 	// Finally buffer the sanitized state update so it can be part of the test results.
 	return buf.bufferMessage(airbyte.Message{
 		Type: airbyte.MessageTypeState,
@@ -322,6 +380,7 @@ func (buf *CaptureOutputBuffer) bufferRecord(msg airbyte.Message) error {
 		return err
 	}
 
+  buf.Count++
 	return buf.bufferMessage(airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
 		Record: &airbyte.Record{
