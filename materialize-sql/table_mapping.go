@@ -50,6 +50,12 @@ type Column struct {
 	Placeholder string
 	// If this column can be null or not.
 	MustExist bool
+	// Unquoted identifier for this column, for databases which have special requirements for
+	// identifiers used in certain circumstances, for example when loading to a cloud storage
+	// bucket.
+	// TODO(whb): When https://github.com/estuary/connectors/issues/295 is completed, we may be able
+	// to remove this as it is currently only required for a legacy work-around in bigquery.
+	UnquotedIdentifier string
 }
 
 // ConvertKey converts a key Tuple to database parameters.
@@ -95,15 +101,21 @@ func convertTuple(in tuple.Tuple, columns []Column, out []interface{}) ([]interf
 // Columns returns all columns of the Table as a single slice,
 // ordered as Keys, then Values, then the Document.
 func (t *Table) Columns() []*Column {
-	var out []*Column
-	for i := range t.Keys {
-		out = append(out, &t.Keys[i])
-	}
+	out := t.KeyPtrs()
 	for i := range t.Values {
 		out = append(out, &t.Values[i])
 	}
 	if t.Document != nil {
 		out = append(out, t.Document)
+	}
+	return out
+}
+
+// KeyPtrs returns all keys of the Table as a single slice.
+func (t *Table) KeyPtrs() []*Column {
+	var out []*Column
+	for i := range t.Keys {
+		out = append(out, &t.Keys[i])
 	}
 	return out
 }
@@ -135,6 +147,9 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 		col.MustExist = mustExist
 		col.Identifier = dialect.Identifier(col.Field)
 		col.Placeholder = dialect.Placeholder(index)
+		if dialect.UnquotedIdentifierer != nil {
+			col.UnquotedIdentifier = dialect.UnquotedIdentifier(col.Field)
+		}
 	}
 
 	return table, nil

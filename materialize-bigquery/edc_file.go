@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"bufio"
@@ -26,8 +26,7 @@ type ExternalDataConnectionFile struct {
 }
 
 // NewExternalDataConnectionFile returns an ExternalDataConnectionFile configured and ready for writing rows.
-func (ep *Endpoint) NewExternalDataConnectionFile(ctx context.Context, file string, edc *bigquery.ExternalDataConfig) (*ExternalDataConnectionFile, error) {
-
+func (t *transactor) NewExternalDataConnectionFile(ctx context.Context, file string, edc *bigquery.ExternalDataConfig) (*ExternalDataConnectionFile, error) {
 	if edc.SourceFormat != bigquery.JSON {
 		return nil, fmt.Errorf("external data connection file only supports json at this time")
 	}
@@ -35,12 +34,12 @@ func (ep *Endpoint) NewExternalDataConnectionFile(ctx context.Context, file stri
 	// If BucketPath starts with a /, then so will the result of the Join. Trim the leading / so
 	// that we don't end up with repeated / chars in the URI and so that the object key does not
 	// start with a /.
-	objectKey := strings.TrimPrefix(path.Join(ep.config.BucketPath, file), "/")
+	objectKey := strings.TrimPrefix(path.Join(t.bucketPath, file), "/")
 
 	f := &ExternalDataConnectionFile{
-		URI:       fmt.Sprintf("gs://%s/%s", ep.config.Bucket, objectKey),
+		URI:       fmt.Sprintf("gs://%s/%s", t.bucket, objectKey),
 		edc:       edc,
-		gcsObject: ep.cloudStorageClient.Bucket(ep.config.Bucket).Object(objectKey),
+		gcsObject: t.client.cloudStorageClient.Bucket(t.bucket).Object(objectKey),
 	}
 
 	// Make sure this ExternalDataConfig has no configured file already.
