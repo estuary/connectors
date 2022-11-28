@@ -103,14 +103,23 @@ flowctl-go api build --directory ${TESTDIR}/builds --build-id test-build-id --so
 
 # Activate the catalog.
 flowctl-go api activate --build-id test-build-id --all --network "flow-test" --log.level info || bail "Activate failed."
-# Wait for a data-flow pass to finish.
-flowctl-go api await --build-id test-build-id --log.level info || bail "Await failed."
-# Read out materialization results.
-sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
+
+# Periodically check expected vs actual lines of output, once we reach the same
+# number of lines, we stop the plane and then compare the output
+while true
+do
+  # Read out materialization results.
+  sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
+  if [[ "$(cat tests/${CONNECTOR}/expected.txt | wc -l )" -eq "$(cat ${ACTUAL} | wc -l)" ]]; then
+    # Verify actual vs expected results. `diff` will exit 1 if files are different
+    echo "-- RUNNING DIFF"
+    diff --suppress-common-lines --side-by-side "${ACTUAL}" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"
+    break
+  fi
+  sleep 1
+done
+
 # Clean up the activated catalog.
 flowctl-go api delete --build-id test-build-id --all --log.level info || bail "Delete failed."
-
-# Verify actual vs expected results. `diff` will exit 1 if files are different
-diff --suppress-common-lines --side-by-side "${ACTUAL}" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"
 
 echo "Test Passed"
