@@ -98,10 +98,11 @@ func configForCols(cols []*sql.Column) (*bigquery.ExternalDataConfig, error) {
 			return nil, fmt.Errorf("map type for external data config schema: %v", err)
 		}
 
+		_, mustExist := col.AsFlatType()
 		config.Schema = append(config.Schema, &bigquery.FieldSchema{
 			Name:     col.UnquotedIdentifier,
 			Repeated: false,
-			Required: col.Inference.Exists == pf.Inference_MUST,
+			Required: mustExist,
 			Type:     bigquery.FieldType(mt.DDL),
 		})
 	}
