@@ -188,10 +188,6 @@ func TestAlterTable(t *testing.T) {
 	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ghi"}, {4, "jkl"}})
 	tb.Insert(ctx, t, tableC, [][]interface{}{{5, "mno"}, {6, "pqr"}})
 
-	// var catalogA = tests.ConfiguredCatalog(ctx, t, tb, tableA)
-	// var catalogAB = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB)
-	// var catalogABC = tests.ConfiguredCatalog(ctx, t, tb, tableA, tableB, tableC)
-
 	var cs = tb.CaptureSpec(t, tableA, tableB)
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 

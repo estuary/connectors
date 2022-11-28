@@ -584,10 +584,9 @@ func (c *Capture) emitMessage(out *boilerplate.PullOutput, msg interface{}) erro
 		if err != nil {
 			return fmt.Errorf("error serializing record data: %w", err)
 		}
-		// TODO(wgd): Compute the binding index for a particular message more intelligently
 		var sourceCommon = msg.Source.Common()
 		var streamID = JoinStreamID(sourceCommon.Schema, sourceCommon.Table)
-		var binding, ok = c.Bindings[streamID] // TODO(wgd): Unsynchronized access to this map from the worker goroutine should be fine since it's read-only after capture initialization?
+		var binding, ok = c.Bindings[streamID]
 		if !ok {
 			return fmt.Errorf("capture output to invalid stream %q", streamID)
 		}

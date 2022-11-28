@@ -305,35 +305,32 @@ func (out *PullOutput) Ready() error {
 func (out *PullOutput) Documents(binding uint32, docs ...json.RawMessage) error {
 	log.WithField("count", len(docs)).Trace("emitting documents")
 
-	// Concatenate multiple documents into the arena, with appropriate indices
-	var arena []byte
-	var slices []pf.Slice
+	// Construct one or more `PullResponse.Documents` messages from the provided documents.
+	//
+	// TODO(wgd): It might be theoretically more efficient to combine multiple documents into
+	//   a single message, but currently no captures produce multiple documents at once so it's
+	//   kind of a moot point.
+	var messages []*pc.PullResponse
 	for _, doc := range docs {
-		var begin = uint32(len(arena))
-		arena = append(arena, []byte(doc)...)
-		slices = append(slices, pf.Slice{Begin: begin, End: uint32(len(arena))})
+		messages = append(messages, &pc.PullResponse{
+			Documents: &pc.Documents{
+				Binding:  binding,
+				Arena:    []byte(doc),
+				DocsJson: []pf.Slice{{Begin: 0, End: uint32(len(doc))}},
+			},
+		})
 	}
 
-	// TODO(wgd): The logic of this function needs to be rewritten to support
-	//   splitting into multiple 'Documents' RPCs in order to keep the size of
-	//   any individual message bounded.
-	if len(arena) > 2*1024*1024 {
-		panic(fmt.Errorf("tried to emit %d bytes in a single Documents RPC, current limit %d (please implement proper chunking)", len(arena), 2*1024*1024))
-	}
-
-	var msg = &pc.PullResponse{
-		Documents: &pc.Documents{
-			Binding:  binding,
-			Arena:    arena,
-			DocsJson: slices,
-		},
-	}
-
+	// Emit all the messages with a single mutex acquisition so that a single Documents()
+	// call is atomic (no Checkpoint outputs can be interleaved with it) even when handling
+	// multiple documents at once.
 	out.Lock()
 	defer out.Unlock()
-	if err := out.Stream.Send(msg); err != nil {
-		log.WithField("err", err).Error("stream send error")
-		return fmt.Errorf("error emitting documents: %w", err)
+	for _, msg := range messages {
+		if err := out.Stream.Send(msg); err != nil {
+			log.WithField("err", err).Error("stream send error")
+			return fmt.Errorf("error emitting documents: %w", err)
+		}
 	}
 	return nil
 }
