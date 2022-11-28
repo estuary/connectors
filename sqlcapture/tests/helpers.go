@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-  "time"
+	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/airbyte"
@@ -25,7 +25,7 @@ import (
 func VerifiedCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog *airbyte.ConfiguredCatalog, state *sqlcapture.PersistentState, suffix string) []sqlcapture.PersistentState {
 	t.Helper()
 
-  var expectedLines = SnapshotLines(t, suffix)
+	var expectedLines = SnapshotLines(t, suffix)
 
 	var result, states = PerformCapture(ctx, t, tb, catalog, state, expectedLines, suffix)
 	VerifySnapshot(t, suffix, result)
@@ -45,41 +45,41 @@ func PerformCapture(ctx context.Context, t *testing.T, tb TestBackend, catalog *
 	buf.MergeBase = CopyState(*state)
 	var initState = CopyState(*state)
 
-  ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 
-  // Check the number of snapshots periodically to stop the test once we reach
-  // the expected number
-  go func() {
-    for {
-      if ctx.Err() != nil {
-        return
-      }
+	// Check the number of snapshots periodically to stop the test once we reach
+	// the expected number
+	go func() {
+		for {
+			if ctx.Err() != nil {
+				return
+			}
 
-      fmt.Printf("%s_%s %d -- %d\n", t.Name(), suffix, buf.Count, expectedLines)
-      result, _ := buf.Output()
-      fmt.Printf("%v\n", result)
-      if buf.Count >= expectedLines {
-        cancel()
-        return
-      }
-      time.Sleep(1 * time.Second)
-    }
-  }()
+			fmt.Printf("%s_%s %d -- %d\n", t.Name(), suffix, buf.Count, expectedLines)
+			result, _ := buf.Output()
+			fmt.Printf("%v\n", result)
+			if buf.Count >= expectedLines {
+				cancel()
+				return
+			}
+			time.Sleep(1 * time.Second)
+		}
+	}()
 
 	if err := sqlcapture.RunCapture(ctx, tb.GetDatabase(), catalog, &initState, buf); err != nil {
-    // replication stream closing before reaching watermark is expected since
-    // the connctor wants to indefinitely replicate and it's checking against a
-    // nonexistent-watermark
-    if !strings.Contains(err.Error(), "replication stream closed before reaching watermark") {
-		  fmt.Fprintf(&buf.Snapshot, "\n========\n\nCapture Terminated With Error:\n\n    %s\n", err.Error())
-    }
+		// replication stream closing before reaching watermark is expected since
+		// the connctor wants to indefinitely replicate and it's checking against a
+		// nonexistent-watermark
+		if !strings.Contains(err.Error(), "replication stream closed before reaching watermark") {
+			fmt.Fprintf(&buf.Snapshot, "\n========\n\nCapture Terminated With Error:\n\n    %s\n", err.Error())
+		}
 	}
 
 	var result, states = buf.Output()
 	if len(states) > 0 {
 		*state = states[len(states)-1]
 	}
-  cancel()
+	cancel()
 	return result, states
 }
 
@@ -125,11 +125,11 @@ func SnapshotLines(t *testing.T, suffix string) int {
 		t.Fatalf("error reading snapshot %q: %v", snapshotFile, err)
 	}
 
-  if os.IsNotExist(err) {
-    return 0
-  }
+	if os.IsNotExist(err) {
+		return 0
+	}
 
-  return bytes.Count(snapBytes, []byte{'\n'})
+	return bytes.Count(snapBytes, []byte{'\n'})
 }
 
 // VerifySnapshot loads snapshot content from a file and compares with the
@@ -275,7 +275,7 @@ type CaptureOutputBuffer struct {
 	States           []sqlcapture.PersistentState
 	Snapshot         strings.Builder
 	lastState        string
-  Count            int
+	Count            int
 }
 
 // Encode accepts output messages from a capture, and is named 'Encode' to
@@ -353,7 +353,7 @@ func (buf *CaptureOutputBuffer) bufferState(msg airbyte.Message) error {
 	}
 	buf.States = append(buf.States, CopyState(buf.MergeBase))
 
-  buf.Count++
+	buf.Count++
 	// Finally buffer the sanitized state update so it can be part of the test results.
 	return buf.bufferMessage(airbyte.Message{
 		Type: airbyte.MessageTypeState,
@@ -380,7 +380,7 @@ func (buf *CaptureOutputBuffer) bufferRecord(msg airbyte.Message) error {
 		return err
 	}
 
-  buf.Count++
+	buf.Count++
 	return buf.bufferMessage(airbyte.Message{
 		Type: airbyte.MessageTypeRecord,
 		Record: &airbyte.Record{
