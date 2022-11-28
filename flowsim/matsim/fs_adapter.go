@@ -2,9 +2,9 @@ package matsim
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
-	"github.com/estuary/flow/go/materialize/driver/image"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/gogo/protobuf/proto"
@@ -28,9 +28,18 @@ type flowSinkAdapter struct {
 // NewWrapper returns a new flowSinkWrapper.
 func NewFlowSinkAdapter(server pm.DriverServer) pm.DriverServer { return &flowSinkAdapter{server} }
 
+type specWithImage struct {
+	Config json.RawMessage
+	Image  string
+}
+
+func (h *specWithImage) Validate() error {
+	return nil
+}
+
 // Spec returns the specification of the connector.
 func (fsa flowSinkAdapter) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
-	var source = new(image.EndpointSpec)
+	var source = new(specWithImage)
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	} else if err = pf.UnmarshalStrict(req.EndpointSpecJson, source); err != nil {
@@ -43,7 +52,7 @@ func (fsa flowSinkAdapter) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.S
 
 // Validate validates the configuration.
 func (fsa flowSinkAdapter) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
-	var source = new(image.EndpointSpec)
+	var source = new(specWithImage)
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	} else if err = pf.UnmarshalStrict(req.EndpointSpecJson, source); err != nil {
@@ -57,7 +66,7 @@ func (fsa flowSinkAdapter) Validate(ctx context.Context, req *pm.ValidateRequest
 
 // Apply applies the configuration.
 func (fsa flowSinkAdapter) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	var source = new(image.EndpointSpec)
+	var source = new(specWithImage)
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	} else if err = pf.UnmarshalStrict(req.Materialization.EndpointSpecJson, source); err != nil {
@@ -82,7 +91,7 @@ func (fsa flowSinkAdapter) Transactions(stream pm.Driver_TransactionsServer) err
 		return fmt.Errorf("read Open: %w", err)
 	}
 
-	var source = new(image.EndpointSpec)
+	var source = new(specWithImage)
 	if err := open.Validate(); err != nil {
 		return fmt.Errorf("validating request: %w", err)
 	} else if err = pf.UnmarshalStrict(open.Open.Materialization.EndpointSpecJson, source); err != nil {

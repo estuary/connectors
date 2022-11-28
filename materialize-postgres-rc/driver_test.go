@@ -21,6 +21,7 @@ func TestFencingCases(t *testing.T) {
 	var client = client{uri: "postgresql://postgres:postgres@localhost:5432/postgres"}
 	sql.RunFenceTestCases(t,
 		client,
+		[]string{"temp_test_fencing_checkpoints"},
 		pgDialect,
 		tplCreateTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
