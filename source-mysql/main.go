@@ -218,6 +218,11 @@ func (db *mysqlDatabase) Connect(ctx context.Context) error {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 
+	// Set our desired timezone to UTC. This is required for backfills of timestamp columns to behave consistently.
+	if _, err := db.conn.Execute("SET time_zone = '+00:00';"); err != nil {
+		return fmt.Errorf("error setting session time_zone: %w", err)
+	}
+
 	// Sanity-check binlog retention and error out if it's insufficiently long.
 	// By doing this during the Connect operation it will occur both during
 	// actual captures and when performing discovery/config validation, which
