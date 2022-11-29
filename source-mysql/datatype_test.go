@@ -10,6 +10,10 @@ import (
 // TestDatatypes runs the discovery test on various datatypes.
 func TestDatatypes(t *testing.T) {
 	var ctx = context.Background()
+
+	// Tell MySQL to interpret test input timestamps as being in UTC.
+	TestBackend.Query(ctx, t, "SET time_zone = '+00:00';")
+
 	tests.TestDatatypes(ctx, t, TestBackend, []tests.DatatypeTestCase{
 		{ColumnType: "integer", ExpectType: `{"type":["integer","null"]}`, InputValue: 123, ExpectValue: `123`},
 		{ColumnType: "integer", ExpectType: `{"type":["integer","null"]}`, InputValue: nil, ExpectValue: `null`},
@@ -74,15 +78,14 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "set('a', 'b', 'c')", ExpectType: `{"type":["string","null"]}`, InputValue: "a,c", ExpectValue: `"a,c"`},
 
 		{ColumnType: "date", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31", ExpectValue: `"1991-08-31"`},
-		{ColumnType: "datetime", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31 12:34:56"`},
 
 		// This test fails on MariaDB because it truncates fractional seconds rather than rounding (see also: https://jira.mariadb.org/browse/MDEV-16991).
-		{ColumnType: "datetime", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31 12:34:57"`},
+		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T12:34:57Z"`},
+		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T12:34:56Z"`},
 
-		// TODO(wgd): Timestamps are reported differently in backfills vs replication because backfill
-		// queries do time-zone conversion while the replicated events appear to be un-converted.
-		// {ColumnType: "timestamp", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31 12:34:56"`},
-		// {ColumnType: "timestamp", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31 12:34:56.987654"`},
+		{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T12:34:56Z"`},
+		{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T12:34:57Z"`},
+		{ColumnType: "timestamp(4)", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T12:34:56.9877Z"`},
 		{ColumnType: "time", ExpectType: `{"type":["string","null"]}`, InputValue: "765:43:21", ExpectValue: `"765:43:21"`},
 		{ColumnType: "year", ExpectType: `{"type":["integer","null"]}`, InputValue: "2003", ExpectValue: `2003`},
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/client"
@@ -139,6 +140,8 @@ func translateRecordFields(columnTypes map[string]interface{}, f map[string]inte
 	return nil
 }
 
+const mysqlTimestampLayout = "2006-01-02 15:04:05"
+
 func translateRecordField(columnType interface{}, val interface{}) (interface{}, error) {
 	if columnType == nil {
 		return nil, fmt.Errorf("unknown column type")
@@ -165,6 +168,12 @@ func translateRecordField(columnType interface{}, val interface{}) (interface{},
 				return val, nil
 			case "json":
 				return json.RawMessage(val), nil
+			case "datetime", "timestamp":
+				t, err := time.Parse(mysqlTimestampLayout, string(val))
+				if err != nil {
+					return nil, fmt.Errorf("error parsing datetime %q: %w", string(val), err)
+				}
+				return t.Format(time.RFC3339Nano), nil
 			}
 		}
 		return string(val), nil
@@ -395,11 +404,11 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"enum": {type_: "string"},
 	"set":  {type_: "string"},
 
-	"date":     {type_: "string"},
-	"datetime": {type_: "string"},
-	// "timestamp": {type_: "string"}, // TODO(wgd): Enable after fixing timezone conversion inconsistencies
-	"time": {type_: "string"},
-	"year": {type_: "integer"},
+	"date":      {type_: "string"},
+	"datetime":  {type_: "string", format: "date-time"},
+	"timestamp": {type_: "string", format: "date-time"},
+	"time":      {type_: "string"},
+	"year":      {type_: "integer"},
 
 	"json": {},
 }
