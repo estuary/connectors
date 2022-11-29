@@ -50,27 +50,6 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 		return fmt.Errorf("expected PullRequest.Open, got %#v", open)
 	}
 
-	// TODO(wgd): Move this into source-boilerplate?
-	//
-	// Translate any other PullRequest RPCs (Acknowledges) into a channel
-	// so the capture logic can handle them without blocking reads.
-	var pullRequests = make(chan *pc.PullRequest)
-	go func(ctx context.Context, ch chan *pc.PullRequest) {
-		defer close(ch)
-		for {
-			var msg, err = stream.Recv()
-			if err != nil {
-				return
-			}
-			select {
-			case <-ctx.Done():
-				return
-			case pullRequests <- msg:
-				continue
-			}
-		}
-	}(stream.Context(), pullRequests)
-
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Open.Capture.EndpointSpecJson, &cfg); err != nil {
 		return fmt.Errorf("parsing endpoint config: %w", err)
@@ -98,8 +77,7 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 	}
 
 	var capture = &capture{
-		Requests: pullRequests,
-		Config:   cfg,
+		Config: cfg,
 		State: &captureState{
 			Resources: updatedResourceStates,
 		},
@@ -109,7 +87,6 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 }
 
 type capture struct {
-	Requests chan *pc.PullRequest
 	Config   config
 	State    *captureState
 	Output   *boilerplate.PullOutput
@@ -252,14 +229,6 @@ func (s *captureState) UpdateBackfillState(collectionID string, state *backfillS
 
 func (c *capture) Run(ctx context.Context) error {
 	eg, ctx := errgroup.WithContext(ctx)
-
-	// Discard PullRequest.Acknowledge RPCs. This goroutine can only "leak" until
-	// the requests channel is closed, which will happen when the underlying gRPC
-	// stream is closed or its context is cancelled.
-	go func() {
-		for range c.Requests {
-		}
-	}()
 
 	// Enumerate the sets of watch streams and async backfills we'll need to perform.
 	// In both cases we map resource paths to collection IDs, because that's how the
