@@ -46,8 +46,5 @@ function exportParquetToJson() {
     done
 }
 
-exportParquetToJson "${tmp_dir}/${TEST_PATH_PREFIX_SIMPLE}" "${tmp_dir}/simple.jsonl"
-combineResults "${TEST_COLLECTION_SIMPLE}" "${tmp_dir}/simple.jsonl" "${result_dir}/simple.jsonl"
-
-exportParquetToJson "${tmp_dir}/${TEST_PATH_PREFIX_MULTIPLE_DATATYPES}"  "${tmp_dir}/multiple_datatypes.jsonl"
-combineResults "${TEST_COLLECTION_MULTIPLE_DATATYPES}" "${tmp_dir}/multiple_datatypes.jsonl" "${result_dir}/multiple_datatypes.jsonl"
+exportParquetToJson "${tmp_dir}/${TEST_PATH_PREFIX_SIMPLE}" "${result_dir}/simple.jsonl"
+exportParquetToJson "${tmp_dir}/${TEST_PATH_PREFIX_MULTIPLE_DATATYPES}"  "${result_dir}/multiple_datatypes.jsonl"
