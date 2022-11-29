@@ -17,7 +17,7 @@ scripts located in the subdirectory with the same name as the connector. These s
   encouraged to enhance the testing datasets/collections for higher testing coverages.
 - `fetch-materialize-results.sh`: Executed to fetch the materialization results from the destinations, and store
    them into a result directory. Multi-files are allowed to be generated for different materialization destinations.
-   The results are recommended to be JSONL files, and pruned via the util function of `combineResults`. 
+   The results are recommended to be JSONL files.
 - `cleanup.sh`: Cleans up any test resources. Can read any variables exported by `setup.sh` so it
   knows what to cleanup.
 - `expected`: The directory of expected files generated from `fetch-materialize-results.sh`. It is used by the

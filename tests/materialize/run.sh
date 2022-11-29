@@ -76,19 +76,6 @@ export BINDING_NUM_SIMPLE=0
 export BINDING_NUM_DUPLICATED_KEYS=1
 export BINDING_NUM_MULTIPLE_DATATYPES=2
 
-# Util function for running the `flowctl-go combine` to combine the results.
-function combineResults() {
-    # The collection name specified in the catalog.
-    local collection="$1"
-    # The input jsonl file contains json docs of the specified collection.
-    local input_file_name="$2"
-    # The output jsonl file of the combined results.
-    local output_file_name="$3"
-    source "${TEST_SCRIPT_DIR}/combine.sh" "${collection} ${input_file_name} ${output_file_name}" false || bail "combine results failed."
-}
-# Export the function to be avialble to connector-specific testing scripts.
-export -f combineResults
-
 echo -e "\nexecuting setup"
 source "${CONNECTOR_TEST_SCRIPTS_DIR}/setup.sh" || bail "setup failed"
 
@@ -117,14 +104,16 @@ flowctl-go temp-data-plane \
 DATA_PLANE_PID=$!
 
 # Arrange to stop the data plane on exit.
-function cleanup() {
+TEST_STATUS="Test Failed"
+function test_shutdown() {
     echo -e "\nexecuting cleanup"
 
     source "${TEST_SCRIPT_DIR}/delete.sh" || true
     source "${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" || true
     kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} || true
+    echo -e "===========\n${TEST_STATUS}\n==========="
 }
-trap cleanup EXIT
+trap test_shutdown EXIT
 
 echo -e "\nbuilding and activating test catalog"
 source "${TEST_SCRIPT_DIR}/build-and-activate.sh" false || bail "building and activating test catalog failed."
@@ -165,5 +154,5 @@ for f in "${TEST_DIR}/${result_dir}"/*; do
     || bail "Test Failed because ${expected} is different"
 done
 
-
-echo "Tests Passed!"
+# Will be printed by the shutdown trap *after* any shutdown logging from flowctl
+TEST_STATUS="Test Passed"
