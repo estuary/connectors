@@ -91,6 +91,8 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		Password: db.config.Password,
 		// TODO(wgd): Maybe add 'serverName' checking as described over in Connect()
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
+		// Request that timestamp values coming via replication be interpreted as UTC.
+		TimestampStringLocation: time.UTC,
 	}
 
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
