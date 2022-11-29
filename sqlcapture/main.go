@@ -17,6 +17,8 @@ type Resource struct {
 	Namespace  string   `json:"namespace" jsonschema:"title=Namespace,description=The schema (namespace) in which the table resides."`
 	Stream     string   `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured."`
 	PrimaryKey []string `json:"primary_key,omitempty" jsonschema:"title=Primary Key Columns,description=The columns which together form the primary key of the table."`
+
+	DeprecatedSyncMode string `json:"syncMode,omitempty" jsonschema:"-"` // Unused, only supported to avoid breaking existing captures
 }
 
 // Validate checks to make sure a resource appears usable.
