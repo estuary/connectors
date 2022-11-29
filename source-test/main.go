@@ -225,6 +225,8 @@ func doRead(args airbyte.ReadCmd) error {
 			}
 		}
 
-		now = <-time.After(time.Millisecond * 500)
+		if config.ExitAfter == 0 && config.FailAfter == 0 {
+			now = <-time.After(time.Millisecond * 500)
+		}
 	}
 }
