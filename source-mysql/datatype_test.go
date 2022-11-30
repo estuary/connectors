@@ -11,8 +11,9 @@ import (
 func TestDatatypes(t *testing.T) {
 	var ctx = context.Background()
 
-	// Tell MySQL to interpret test input timestamps as being in UTC.
-	TestBackend.Query(ctx, t, "SET time_zone = '+00:00';")
+	// Tell MySQL to act as though we're running in Chicago. This has an effect (in very
+	// different ways) on the processing of DATETIME and TIMESTAMP values.
+	TestBackend.Query(ctx, t, "SET GLOBAL time_zone = 'America/Chicago';")
 
 	tests.TestDatatypes(ctx, t, TestBackend, []tests.DatatypeTestCase{
 		{ColumnType: "integer", ExpectType: `{"type":["integer","null"]}`, InputValue: 123, ExpectValue: `123`},
@@ -78,16 +79,27 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "set('a', 'b', 'c')", ExpectType: `{"type":["string","null"]}`, InputValue: "a,c", ExpectValue: `"a,c"`},
 
 		{ColumnType: "date", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31", ExpectValue: `"1991-08-31"`},
-
-		// This test fails on MariaDB because it truncates fractional seconds rather than rounding (see also: https://jira.mariadb.org/browse/MDEV-16991).
-		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T12:34:57Z"`},
-		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T12:34:56Z"`},
-
-		{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T12:34:56Z"`},
-		{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T12:34:57Z"`},
-		{ColumnType: "timestamp(4)", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T12:34:56.9877Z"`},
 		{ColumnType: "time", ExpectType: `{"type":["string","null"]}`, InputValue: "765:43:21", ExpectValue: `"765:43:21"`},
 		{ColumnType: "year", ExpectType: `{"type":["integer","null"]}`, InputValue: "2003", ExpectValue: `2003`},
+
+		// The DATETIME column type will be stored verbatim by MySQL, and we will interpret it as being in
+		// the time zone specified as the `time_zone` system variable. In this case that's 'America/Chicago'
+		// so when captured values are emitted as UTC they will have 5 or 6 hours (depending on the date
+		// of the input) added at capture time by the connector.
+		//
+		// This test fails on MariaDB because it truncates fractional seconds rather than rounding (see also: https://jira.mariadb.org/browse/MDEV-16991).
+		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T17:34:57Z"`},
+		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T17:34:56Z"`},
+		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T18:34:56Z"`},
+
+		// The TIMESTAMP column type will be converted by MySQL from the local time zone (which as mentioned
+		// above was set to 'America/Chicago' and acts as UTC-5 or UTC-6 depending on the date) to UTC for
+		// storage, and we will capture that value as UTC. Thus the captured value will have 5 hours added
+		// at input time by the MySQL database.
+		{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T17:34:56Z"`},
+		{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T17:34:57Z"`},
+		{ColumnType: "timestamp(4)", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T17:34:56.9877Z"`},
+		{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T18:34:56Z"`},
 
 		// This test fails on MariaDB, because the 'JSON' column type is just an alias for LONGTEXT
 		// and will result in the original input JSON being captured as a string. See also:

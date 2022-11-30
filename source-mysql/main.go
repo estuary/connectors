@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	mysqlLog "github.com/siddontang/go-log/log"
+
+	_ "time/tzdata"
 )
 
 type sshForwarding struct {
@@ -185,9 +188,10 @@ func configSchema() json.RawMessage {
 }
 
 type mysqlDatabase struct {
-	config    *Config
-	conn      *client.Conn
-	explained map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
+	config           *Config
+	conn             *client.Conn
+	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
+	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
 }
 
 func (db *mysqlDatabase) connect(ctx context.Context) error {
@@ -223,7 +227,16 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 
-	// Set our desired timezone to UTC. This is required for backfills of timestamp columns to behave consistently.
+	// Infer the location in which captured DATETIME values will be interpreted.
+	if loc, err := queryTimeZone(conn); err == nil {
+		db.datetimeLocation = loc
+		logrus.WithField("loc", loc.String()).Debug("using datetime location")
+	} else {
+		logrus.WithField("err", err).Warn("unable to determine database timezone")
+		logrus.Warn("capturing DATETIME values will not be permitted")
+	}
+
+	// Set our desired timezone to UTC. This is required for backfills of TIMESTAMP columns to behave consistently.
 	if _, err := db.conn.Execute("SET time_zone = '+00:00';"); err != nil {
 		return fmt.Errorf("error setting session time_zone: %w", err)
 	}
@@ -233,7 +246,7 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	// actual captures and when performing discovery/config validation, which
 	// is likely what we want.
 	if !db.config.Advanced.SkipBinlogRetentionCheck {
-		expiryTime, err := db.getBinlogExpiry()
+		expiryTime, err := getBinlogExpiry(conn)
 		if err != nil {
 			return fmt.Errorf("error querying binlog expiry time: %w", err)
 		}
@@ -245,22 +258,57 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	return nil
 }
 
-func (db *mysqlDatabase) getBinlogExpiry() (time.Duration, error) {
+var timeZoneOffsetRegex = regexp.MustCompile(`^[-+][0-9]{1,2}:[0-9]{2}$`)
+
+func queryTimeZone(conn *client.Conn) (*time.Location, error) {
+	var tzName, err = queryStringVariable(conn, `SELECT @@GLOBAL.time_zone;`)
+	if err != nil {
+		return nil, fmt.Errorf("error querying 'time_zone' system variable: %w", err)
+	}
+	logrus.WithField("time_zone", tzName).Debug("queried time_zone system variable")
+	if tzName == "SYSTEM" {
+		return nil, errDatabaseTimezoneUnknown
+	}
+
+	// If it looks like a numeric offset then construct a fixed-offset time zone from that.
+	if timeZoneOffsetRegex.MatchString(tzName) {
+		// The regex requires an explicit +/- sign
+		var sign = 1
+		if tzName[0:1] == "-" {
+			sign = -1
+		}
+		var parts = strings.SplitN(tzName[1:], ":", 2)
+		hours, err := strconv.Atoi(parts[0])
+		if err != nil {
+			return nil, fmt.Errorf("error parsing %q: %w", tzName, err)
+		}
+		minutes, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("error parsing %q: %w", tzName, err)
+		}
+		return time.FixedZone("UTC"+tzName, sign*(hours*60*60+minutes*60)), nil
+	}
+
+	// Otherwise let's hope the time zone setting is a valid IANA zone name.
+	return time.LoadLocation(tzName)
+}
+
+func getBinlogExpiry(conn *client.Conn) (time.Duration, error) {
 	// When running on Amazon RDS MySQL there's an RDS-specific configuration
 	// for binlog retention, so that takes precedence if it exists.
-	rdsRetentionHours, err := db.queryNumericVariable(`SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
+	rdsRetentionHours, err := queryNumericVariable(conn, `SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
 	if err == nil {
 		return time.Duration(rdsRetentionHours) * time.Hour, nil
 	}
 
 	// The newer 'binlog_expire_logs_seconds' variable takes priority if it exists and is nonzero.
-	expireLogsSeconds, err := db.queryNumericVariable(`SHOW VARIABLES LIKE 'binlog_expire_logs_seconds';`)
+	expireLogsSeconds, err := queryNumericVariable(conn, `SHOW VARIABLES LIKE 'binlog_expire_logs_seconds';`)
 	if err == nil && expireLogsSeconds > 0 {
 		return time.Duration(expireLogsSeconds * float64(time.Second)), nil
 	}
 
 	// And as the final resort we'll check 'expire_logs_days' if 'seconds' was zero or nonexistent.
-	expireLogsDays, err := db.queryNumericVariable(`SHOW VARIABLES LIKE 'expire_logs_days';`)
+	expireLogsDays, err := queryNumericVariable(conn, `SHOW VARIABLES LIKE 'expire_logs_days';`)
 	if err != nil {
 		return 0, err
 	}
@@ -275,8 +323,23 @@ func (db *mysqlDatabase) getBinlogExpiry() (time.Duration, error) {
 	return 365 * 24 * time.Hour, nil
 }
 
-func (db *mysqlDatabase) queryNumericVariable(query string) (float64, error) {
-	var results, err = db.conn.Execute(query)
+func queryStringVariable(conn *client.Conn, query string) (string, error) {
+	var results, err = conn.Execute(query)
+	if err != nil {
+		return "", fmt.Errorf("error executing query %q: %w", query, err)
+	} else if len(results.Values) == 0 {
+		return "", fmt.Errorf("no results from query %q", query)
+	}
+
+	var value = &results.Values[0][0]
+	if value.Type == mysql.FieldValueTypeString {
+		return string(value.AsString()), nil
+	}
+	return fmt.Sprintf("%s", value.Value()), nil
+}
+
+func queryNumericVariable(conn *client.Conn, query string) (float64, error) {
+	var results, err = conn.Execute(query)
 	if err != nil {
 		return 0, fmt.Errorf("error executing query %q: %w", query, err)
 	}
