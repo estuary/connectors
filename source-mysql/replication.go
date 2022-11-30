@@ -361,6 +361,8 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			}).Trace("Rotate Event")
 		case *replication.FormatDescriptionEvent:
 			logrus.WithField("data", data).Trace("Format Description Event")
+		case *replication.GenericEvent:
+			logrus.WithField("event", event.Header.EventType.String()).Debug("Generic Event")
 		default:
 			return fmt.Errorf("unhandled event type: %q", event.Header.EventType)
 		}
