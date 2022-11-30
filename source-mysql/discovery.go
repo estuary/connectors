@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -123,7 +124,7 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 	return schema.toType(), nil
 }
 
-func translateRecordFields(columnTypes map[string]interface{}, f map[string]interface{}) error {
+func (db *mysqlDatabase) translateRecordFields(columnTypes map[string]interface{}, f map[string]interface{}) error {
 	if columnTypes == nil {
 		return fmt.Errorf("unknown column types")
 	}
@@ -131,7 +132,7 @@ func translateRecordFields(columnTypes map[string]interface{}, f map[string]inte
 		return nil
 	}
 	for id, val := range f {
-		var translated, err = translateRecordField(columnTypes[id], val)
+		var translated, err = db.translateRecordField(columnTypes[id], val)
 		if err != nil {
 			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
 		}
@@ -142,7 +143,9 @@ func translateRecordFields(columnTypes map[string]interface{}, f map[string]inte
 
 const mysqlTimestampLayout = "2006-01-02 15:04:05"
 
-func translateRecordField(columnType interface{}, val interface{}) (interface{}, error) {
+var errDatabaseTimezoneUnknown = errors.New("system variable 'time_zone' must contain a valid IANA time zone name or +HH:MM offset (go.estuary.dev/80J6rX)")
+
+func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interface{}) (interface{}, error) {
 	if columnType == nil {
 		return nil, fmt.Errorf("unknown column type")
 	}
@@ -168,12 +171,21 @@ func translateRecordField(columnType interface{}, val interface{}) (interface{},
 				return val, nil
 			case "json":
 				return json.RawMessage(val), nil
-			case "datetime", "timestamp":
+			case "timestamp":
 				t, err := time.Parse(mysqlTimestampLayout, string(val))
+				if err != nil {
+					return nil, fmt.Errorf("error parsing timestamp %q: %w", string(val), err)
+				}
+				return t.Format(time.RFC3339Nano), nil
+			case "datetime":
+				if db.datetimeLocation == nil {
+					return nil, fmt.Errorf("unable to translate DATETIME values: %w", errDatabaseTimezoneUnknown)
+				}
+				t, err := time.ParseInLocation(mysqlTimestampLayout, string(val), db.datetimeLocation)
 				if err != nil {
 					return nil, fmt.Errorf("error parsing datetime %q: %w", string(val), err)
 				}
-				return t.Format(time.RFC3339Nano), nil
+				return t.UTC().Format(time.RFC3339Nano), nil
 			}
 		}
 		return string(val), nil

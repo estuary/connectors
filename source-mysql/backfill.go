@@ -63,7 +63,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.Tab
 		for idx, val := range row {
 			fields[string(results.Fields[idx].Name)] = val.Value()
 		}
-		if err := translateRecordFields(columnTypes, fields); err != nil {
+		if err := db.translateRecordFields(columnTypes, fields); err != nil {
 			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 

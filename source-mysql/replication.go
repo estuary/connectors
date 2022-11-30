@@ -113,6 +113,7 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 
 	var streamCtx, streamCancel = context.WithCancel(ctx)
 	var stream = &mysqlReplicationStream{
+		db:       db,
 		syncer:   syncer,
 		streamer: streamer,
 		cursor:   pos,
@@ -161,6 +162,7 @@ func splitHostPort(addr string) (string, int64, error) {
 }
 
 type mysqlReplicationStream struct {
+	db            *mysqlDatabase
 	syncer        *replication.BinlogSyncer
 	streamer      *replication.BinlogStreamer
 	cursor        mysql.Position
@@ -277,7 +279,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if err != nil {
 						return fmt.Errorf("error decoding row values: %w", err)
 					}
-					if err := translateRecordFields(columnTypes, after); err != nil {
+					if err := rs.db.translateRecordFields(columnTypes, after); err != nil {
 						return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 					}
 					rs.events <- sqlcapture.ChangeEvent{
@@ -298,10 +300,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						if err != nil {
 							return fmt.Errorf("error decoding row values: %w", err)
 						}
-						if err := translateRecordFields(columnTypes, before); err != nil {
+						if err := rs.db.translateRecordFields(columnTypes, before); err != nil {
 							return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
 						}
-						if err := translateRecordFields(columnTypes, after); err != nil {
+						if err := rs.db.translateRecordFields(columnTypes, after); err != nil {
 							return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
 						}
 						rs.events <- sqlcapture.ChangeEvent{
@@ -318,7 +320,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if err != nil {
 						return fmt.Errorf("error decoding row values: %w", err)
 					}
-					if err := translateRecordFields(columnTypes, before); err != nil {
+					if err := rs.db.translateRecordFields(columnTypes, before); err != nil {
 						return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
 					}
 					rs.events <- sqlcapture.ChangeEvent{
