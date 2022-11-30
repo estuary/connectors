@@ -19,7 +19,7 @@ function exportToJsonl() {
     -e PGUSER=$PGUSER \
     -e PGPASSWORD=$PGPASSWORD \
     -e PGDATABASE=$PGDATABASE \
-    materialize-postgres-rc-postgres-1 psql \
+    materialize-postgres-postgres-1 psql \
     --tuples-only \
     --command "select row_to_json(t) from \"$1\" as t;" |
         jq -c 'del(.flow_document)'

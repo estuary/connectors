@@ -2,12 +2,15 @@ package main
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
+	"text/template"
 
+	"github.com/bradleyjkemp/cupaloy"
+	sqlDriver "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/connectors/testsupport"
 	"github.com/estuary/flow/go/protocols/catalog"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,75 +23,85 @@ func TestSQLGeneration(t *testing.T) {
 			return err
 		}))
 
-	var gen = PostgresSQLGenerator()
-	var table = sqlDriver.TableForMaterialization("test_table", "", gen.IdentifierRenderer, spec.Bindings[0])
+	// TODO(whb): These keys are manually set as "nullable" for now to test the query generation
+	// with nullable keys. Once flow supports nullable keys natively, this should be cleaned up.
+	spec.Bindings[0].Collection.Projections[7].Inference.Exists = pf.Inference_MAY
+	spec.Bindings[0].Collection.Projections[7].Inference.Types = append(spec.Bindings[0].Collection.Projections[7].Inference.Types, "null")
+	spec.Bindings[1].Collection.Projections[2].Inference.Exists = pf.Inference_MAY
+	spec.Bindings[1].Collection.Projections[2].Inference.Types = append(spec.Bindings[1].Collection.Projections[2].Inference.Types, "null")
 
-	keyCreate, keyInsert, keyJoin, err := buildSQL(&gen, 123, table, spec.Bindings[0].FieldSelection)
+	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
+		Schema: "a-schema",
+		Table:  "target_table",
+		Delta:  false,
+	})
+	var shape2 = sqlDriver.BuildTableShape(spec, 1, tableConfig{
+		Schema: "",
+		Table:  "Delta Updates",
+		Delta:  true,
+	})
+	shape2.Document = nil // TODO(johnny): this is a bit gross.
+
+	table1, err := sqlDriver.ResolveTable(shape1, pgDialect)
+	require.NoError(t, err)
+	table2, err := sqlDriver.ResolveTable(shape2, pgDialect)
 	require.NoError(t, err)
 
-	require.Equal(t, `
-		CREATE TEMPORARY TABLE flow_load_key_tmp_123 (
-			key1 BIGINT NOT NULL, key2 BOOLEAN NOT NULL
-		) ON COMMIT DELETE ROWS
-		;`, keyCreate)
+	var snap strings.Builder
 
-	require.Equal(t, `
-		INSERT INTO flow_load_key_tmp_123 (
-			key1, key2
-		) VALUES (
-			$1, $2
-		);`, keyInsert)
+	for _, tpl := range []*template.Template{
+		tplCreateTargetTable,
+		tplCreateLoadTable,
+		tplPrepLoadInsert,
+		tplExecLoadInsert,
+		tplLoadQuery,
+		tplPrepStoreInsert,
+		tplExecStoreInsert,
+		tplPrepStoreUpdate,
+		tplExecStoreUpdate,
+	} {
+		for _, tbl := range []sqlDriver.Table{table1, table2} {
+			var testcase = tbl.Identifier + " " + tpl.Name()
 
-	// Note the intentional missing semicolon, as this is a subquery.
-	require.Equal(t, `
-		SELECT 123, l.flow_document
-			FROM test_table AS l
-			JOIN flow_load_key_tmp_123 AS r
-			ON l.key1 = r.key1 AND l.key2 = r.key2
-		`, keyJoin)
+			snap.WriteString("--- Begin " + testcase + " ---\n")
+			require.NoError(t, tpl.Execute(&snap, &tbl))
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
+	}
+
+	var fence = sqlDriver.Fence{
+		TablePath:       sqlDriver.TablePath{"path", "To", "checkpoints"},
+		Checkpoint:      []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+		Fence:           123,
+		Materialization: pf.Materialization("some/Materialization"),
+		KeyBegin:        0x00112233,
+		KeyEnd:          0xffeeddcc,
+	}
+	snap.WriteString("--- Begin Fence Install ---\n")
+	require.NoError(t, tplInstallFence.Execute(&snap, fence))
+	snap.WriteString("--- End Fence Install ---\n")
+
+	snap.WriteString("--- Begin Fence Update ---\n")
+	require.NoError(t, tplUpdateFence.Execute(&snap, fence))
+	snap.WriteString("--- End Fence Update ---\n")
+
+	cupaloy.SnapshotT(t, snap.String())
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var gen = PostgresSQLGenerator()
-	var column = sqlDriver.Column{
-		Name:       "foo",
-		Identifier: "fooi",
-		Comment:    "",
-		PrimaryKey: false,
-		Type:       sqlDriver.STRING,
-		StringType: &sqlDriver.StringTypeInfo{
-			Format: "date-time",
+	var mapped, err = pgDialect.MapType(&sqlDriver.Projection{
+		Projection: pf.Projection{
+			Inference: pf.Inference{
+				Types:   []string{"string"},
+				String_: &pf.Inference_String{Format: "date-time"},
+				Exists:  pf.Inference_MUST,
+			},
 		},
-		NotNull: false,
-	}
-	var result, err = gen.TypeMappings.GetColumnType(&column)
+	})
 	require.NoError(t, err)
-	require.Equal(t, "TIMESTAMPTZ", result.SQLType)
+	require.Equal(t, "TIMESTAMPTZ NOT NULL", mapped.DDL)
 
-	parsed, err := result.ValueConverter("2022-04-04T10:09:08.234567Z")
+	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, "2022-04-04T10:09:08.234567Z", parsed)
 	require.NoError(t, err)
-}
-
-func TestDateTimeColumnNullable(t *testing.T) {
-	var gen = PostgresSQLGenerator()
-	var column = sqlDriver.Column{
-		Name:       "foo",
-		Identifier: "fooi",
-		Comment:    "",
-		PrimaryKey: false,
-		Type:       sqlDriver.STRING,
-		StringType: &sqlDriver.StringTypeInfo{
-			Format: "date-time",
-		},
-		NotNull: false,
-	}
-	var result, err = gen.TypeMappings.GetColumnType(&column)
-	require.NoError(t, err)
-	require.Equal(t, "TIMESTAMPTZ", result.SQLType)
-
-	parsed, err := result.ValueConverter(nil)
-	require.NoError(t, err)
-	// The value returned from the converter must be nil
-	require.Equal(t, nil, parsed)
 }
