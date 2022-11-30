@@ -144,8 +144,8 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 			(l.{{ $key.Identifier }} = r.{{ $key.Identifier }} and l.{{ $key.Identifier }} is not null and r.{{ $key.Identifier }} is not null) or (l.{{ $key.Identifier }} is null and r.{{ $key.Identifier }} is null)
 		{{- end }}
 	{{- end }}
-{{ else }}
-SELECT -1, NULL LIMIT 0
+{{ else -}}
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 
