@@ -125,12 +125,14 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 			var constraint = &pm.Constraint{}
 			switch {
 			case projection.IsRootDocumentProjection():
+				constraint.Type = pm.Constraint_LOCATION_REQUIRED
+				constraint.Reason = "The root document is required."
 			case projection.IsPrimaryKey:
 				constraint.Type = pm.Constraint_LOCATION_REQUIRED
-				constraint.Reason = "The root document and primary key fields are needed."
+				constraint.Reason = "Primary key locations are required."
 			default:
 				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
-				constraint.Reason = "Non-root document fields and non-primary key fields are not needed."
+				constraint.Reason = "Non-root document fields and non-primary key locations cannot be used."
 			}
 			constraints[projection.Field] = constraint
 		}
