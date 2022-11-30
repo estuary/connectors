@@ -31,7 +31,7 @@ type Basic struct {
 	Key2     bool      `json:"key2" flowsim:"key2,key"`
 	Boolean  bool      `json:"boolean" flowsim:"boolean"`
 	Integer  int       `json:"integer" flowsim:"integer"`
-	Number   float32   `json:"number" flowsim:"number"`
+	Number   float64   `json:"number" flowsim:"number"`
 	String   string    `json:"string" flowsim:"string,required"`
 	DateTime time.Time `json:"dateTime" flowsim:"dateTime"`
 }
