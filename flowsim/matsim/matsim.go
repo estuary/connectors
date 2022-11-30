@@ -110,7 +110,7 @@ func (c *Config) ParseConfig() error {
 	if c.driverServer == nil {
 		// If driverServer is nil it means we were invoked as a command and should initialize
 		// the FlowSink driver and expect an image.
-		c.driverServer = image.NewDriver(c.Network, ops.StdLogger())
+		c.driverServer = image.NewDriver("matsim", c.Network, ops.StdLogger())
 	} else {
 		// If the driverServer is already initialized, it means we are being called from a
 		// connector. We need to wrap it in a FlowSinkAdapter to ensure configuration for the
