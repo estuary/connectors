@@ -3,13 +3,13 @@
 set -e
 
 # Ensure canonical Postgres environment variables are set.
-export PGHOST="${PGHOST:=materialize-postgres-rc-postgres-1.flow-test}"
+export PGHOST="${PGHOST:=materialize-postgres-postgres-1.flow-test}"
 export PGPORT="${PGPORT:=5432}"
 export PGDATABASE="${PGDATABASE:=flow}"
 export PGPASSWORD="${PGPASSWORD:=flow}"
 export PGUSER="${PGUSER:=flow}"
 
-docker compose -f materialize-postgres-rc/docker-compose.yaml up --detach
+docker compose -f materialize-postgres/docker-compose.yaml up --detach
 
 config_json_template='{
    "address":  "$PGHOST:$PGPORT",

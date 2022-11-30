@@ -87,7 +87,6 @@ jobs:
           - materialize-google-pubsub
           - materialize-google-sheets
           - materialize-postgres
-          - materialize-postgres-rc
           - materialize-rockset
           - materialize-s3-parquet
           - materialize-snowflake
@@ -200,7 +199,7 @@ jobs:
           contains(fromJson('[
               "materialize-elasticsearch",
               "materialize-google-sheets",
-              "materialize-postgres-rc",
+              "materialize-postgres",
               "materialize-s3-parquet"
             ]'), matrix.connector)
         env:
