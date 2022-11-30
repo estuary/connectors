@@ -65,11 +65,8 @@ type Endpoint struct {
 	// MetaCheckpoints is the checkpoints meta-table of the Endpoint.
 	// It's optional, and won't be created or used if it's nil.
 	MetaCheckpoints *TableShape
-	// Client must either be a standard *sql.DB, or an implementation of MinClient.
-	// Fencing is not used with implementations of MinClient and the endpoint
-	// must implement the post-commit acknowledge flow for end-to-end exactly
-	// once semantics.
-	// See "Implementation Pattern: Recovery Log with Idempotent Apply" in the Driver.Transactions gRPC.
+	// Client provides Endpoint-specific methods for performing basic operations with the Endpoint
+	// store.
 	Client Client
 	// CreateTableTemplate evaluates a Table into an endpoint statement which creates it.
 	CreateTableTemplate *template.Template

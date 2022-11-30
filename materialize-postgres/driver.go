@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
-	"time"
 
 	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -82,7 +81,7 @@ func (c *config) ToURI() string {
 type tableConfig struct {
 	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)"`
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false."`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
@@ -193,18 +192,6 @@ func (c client) ExecStatements(ctx context.Context, statements []string) error {
 
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	var err = c.withDB(func(db *stdsql.DB) error {
-		// Pick a path randomly to ensure both are exercised and correct.
-		if time.Now().Unix()%2 == 0 {
-
-			// Option 1: Install using template.
-			var query strings.Builder
-			if err := tplInstallFence.Execute(&query, fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
-			}
-			return db.QueryRow(query.String()).Scan(&fence.Fence, &fence.Checkpoint)
-		}
-
-		// Option 2: Install using StdInstallFence.
 		var err error
 		fence, err = sql.StdInstallFence(ctx, db, checkpoints, fence)
 		return err
