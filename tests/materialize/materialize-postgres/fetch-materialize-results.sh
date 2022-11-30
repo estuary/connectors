@@ -28,4 +28,5 @@ function exportToJsonl() {
 exportToJsonl "Simple" > "${TEST_DIR}/${result_dir}/simple.jsonl"
 exportToJsonl "duplicate_keys_standard" > "${TEST_DIR}/${result_dir}/duplicated-keys-standard.jsonl"
 exportToJsonl "duplicate_keys_delta" > "${TEST_DIR}/${result_dir}/duplicated-keys-delta.jsonl"
+exportToJsonl "duplicate_keys_delta_exclude_flow_doc" > "${TEST_DIR}/${result_dir}/duplicated-keys-delta-exclude-flow-doc.jsonl"
 exportToJsonl "Multiple Types" > "${TEST_DIR}/${result_dir}/multiple-data-types.jsonl"

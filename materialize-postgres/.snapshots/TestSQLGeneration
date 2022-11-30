@@ -94,8 +94,7 @@ SELECT 0, r.flow_document
 
 --- Begin "Delta Updates" loadQuery ---
 
-
-SELECT -1, NULL LIMIT 0
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 
 --- End "Delta Updates" loadQuery ---
 
