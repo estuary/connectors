@@ -93,7 +93,7 @@
       "delta_updates": {
         "type": "boolean",
         "title": "Delta Update",
-        "description": "Should updates to this table be done via delta updates. Defaults is false.",
+        "description": "Should updates to this table be done via delta updates. Default is false.",
         "default": false
       }
     },
