@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
 	// importing tzdata is required so that time.LoadLocation can be used to validate timezones
 	// without requiring timezone packages to be installed on the system.
 	_ "time/tzdata"
@@ -25,7 +26,7 @@ import (
 
 type config struct {
 	// Credentials used to authenticate with the Rockset API.
-	ApiKey string `json:"api_key" jsonschema:"title=Rockset API Key,description=The key used to authenticate to the Rockset API" jsonschema_extras:"secret=true"`
+	ApiKey string `json:"api_key" jsonschema:"title=Rockset API Key,description=The key used to authenticate to the Rockset API. Must have role of admin or member." jsonschema_extras:"secret=true,multiline=true"`
 }
 
 func (c *config) Validate() error {
