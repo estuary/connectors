@@ -235,7 +235,9 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		logrus.Warn("capturing DATETIME values will not be permitted")
 	}
 
-	// Set our desired timezone to UTC. This is required for backfills of TIMESTAMP columns to behave consistently.
+	// Set our desired timezone (specifically for the backfill connection, this has
+	// no effect on the database as a whole) to UTC. This is required for backfills of
+	// TIMESTAMP columns to behave consistently, and has no effect on DATETIME columns.
 	if _, err := db.conn.Execute("SET time_zone = '+00:00';"); err != nil {
 		return fmt.Errorf("error setting session time_zone: %w", err)
 	}
