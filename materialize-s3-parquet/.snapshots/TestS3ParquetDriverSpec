@@ -63,7 +63,8 @@
     "$id": "https://github.com/estuary/connectors/materialize-s3-parquet/resource",
     "properties": {
       "pathPrefix": {
-        "type": "string"
+        "type": "string",
+        "x-collection-name": true
       },
       "compressionType": {
         "type": "string"

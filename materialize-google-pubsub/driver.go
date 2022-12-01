@@ -60,7 +60,7 @@ func (c *config) client(ctx context.Context) (*pubsub.Client, error) {
 }
 
 type resource struct {
-	TopicName  string `json:"topic" jsonschema:"title=Topic Name"`
+	TopicName  string `json:"topic" jsonschema:"title=Topic Name" jsonschema_extras:"x-collection-name=true"`
 	Identifier string `json:"identifier,omitempty" jsonschema:"title=Resource Binding Identifier"`
 }
 

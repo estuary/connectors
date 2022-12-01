@@ -112,7 +112,7 @@ func (s *collectionSettings) Validate() error {
 type resource struct {
 	Workspace string `json:"workspace,omitempty" jsonschema:"title=Workspace,description=The name of the Rockset workspace (will be created if it does not exist)"`
 	// The name of the Rockset collection (will be created if it does not exist)
-	Collection string `json:"collection,omitempty" jsonschema:"title=Rockset Collection,description=The name of the Rockset collection (will be created if it does not exist)"`
+	Collection string `json:"collection,omitempty" jsonschema:"title=Rockset Collection,description=The name of the Rockset collection (will be created if it does not exist)" jsonschema_extras:"x-collection-name=true"`
 	// Configures the rockset collection to bulk load an initial data set from an S3 bucket, before
 	// transitioning to using the write API for ongoing data. If a previous version of this
 	// materialization wrote files into S3 in order to more quickly backfill historical data, then

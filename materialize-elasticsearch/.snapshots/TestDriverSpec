@@ -35,7 +35,8 @@
     "properties": {
       "index": {
         "type": "string",
-        "description": "Name of the ElasticSearch index to store the materialization results."
+        "description": "Name of the ElasticSearch index to store the materialization results.",
+        "x-collection-name": true
       },
       "delta_updates": {
         "type": "boolean",
