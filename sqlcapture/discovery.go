@@ -130,8 +130,9 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.DiscoverResponse_B
 		}
 
 		var res = Resource{
-			Namespace: table.Schema,
-			Stream:    table.Name,
+			Namespace:  table.Schema,
+			Stream:     table.Name,
+			PrimaryKey: table.PrimaryKey,
 		}
 		resourceSpecJSON, err := json.Marshal(res)
 		if err != nil {
@@ -150,6 +151,5 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.DiscoverResponse_B
 }
 
 func recommendedStreamName(schema, table string) string {
-	var streamID = JoinStreamID(schema, table)
-	return streamID
+	return strings.ToLower(table)
 }

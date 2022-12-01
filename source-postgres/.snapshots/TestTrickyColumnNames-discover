@@ -1,9 +1,12 @@
 Binding 0:
 {
-    "recommended_name": "test.trickycolumnnames_fizzed_cupcake_a",
+    "recommended_name": "trickycolumnnames_fizzed_cupcake_a",
     "resource_spec_json": {
       "namespace": "test",
-      "stream": "trickycolumnnames_fizzed_cupcake_a"
+      "stream": "trickycolumnnames_fizzed_cupcake_a",
+      "primary_key": [
+        "Meta/\"wtf\"/ID"
+      ]
     },
     "document_schema_json": {
       "$defs": {
@@ -111,10 +114,13 @@ Binding 0:
   }
 Binding 1:
 {
-    "recommended_name": "test.trickycolumnnames_fizzed_cupcake_b",
+    "recommended_name": "trickycolumnnames_fizzed_cupcake_b",
     "resource_spec_json": {
       "namespace": "test",
-      "stream": "trickycolumnnames_fizzed_cupcake_b"
+      "stream": "trickycolumnnames_fizzed_cupcake_b",
+      "primary_key": [
+        "table"
+      ]
     },
     "document_schema_json": {
       "$defs": {
