@@ -81,7 +81,8 @@
       "table": {
         "type": "string",
         "title": "Table",
-        "description": "Name of the Firebolt table to store materialized results in. The external table will be named after this table with an `_external` suffix."
+        "description": "Name of the Firebolt table to store materialized results in. The external table will be named after this table with an `_external` suffix.",
+        "x-collection-name": true
       },
       "table_type": {
         "type": "string",

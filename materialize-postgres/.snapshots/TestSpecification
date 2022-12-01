@@ -83,7 +83,8 @@
       "table": {
         "type": "string",
         "title": "Table",
-        "description": "Name of the database table"
+        "description": "Name of the database table",
+        "x-collection-name": true
       },
       "schema": {
         "type": "string",

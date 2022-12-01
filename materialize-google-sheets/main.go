@@ -69,7 +69,7 @@ func (c config) buildService(ctx context.Context) (*sheets.Service, error) {
 }
 
 type resource struct {
-	Sheet string `json:"sheet" jsonschema:"title=Sheet Name"`
+	Sheet string `json:"sheet" jsonschema:"title=Sheet Name" jsonschema_extras:"x-collection-name=true"`
 }
 
 func (resource) GetFieldDocString(fieldName string) string {

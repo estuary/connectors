@@ -86,7 +86,7 @@ func (c config) Validate() error {
 
 // resource specifies a materialization destinaion in S3, and the resulting parquet file configuration.
 type resource struct {
-	PathPrefix string `json:"pathPrefix"`
+	PathPrefix string `json:"pathPrefix" jsonschema_extras:"x-collection-name=true"`
 	// The method used for compressing data in parquet.
 	CompressionType string `json:"compressionType,omitempty"`
 }

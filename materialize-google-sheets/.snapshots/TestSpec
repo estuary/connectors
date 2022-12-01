@@ -87,7 +87,8 @@
       "sheet": {
         "type": "string",
         "title": "Sheet Name",
-        "description": "Name of the spreadsheet sheet to materialize into."
+        "description": "Name of the spreadsheet sheet to materialize into.",
+        "x-collection-name": true
       }
     },
     "type": "object",
