@@ -80,15 +80,15 @@
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-postgres/table-config",
     "properties": {
-      "schema": {
-        "type": "string",
-        "title": "Alternative Schema",
-        "description": "Alternative schema for this table (optional)"
-      },
       "table": {
         "type": "string",
         "title": "Table",
         "description": "Name of the database table"
+      },
+      "schema": {
+        "type": "string",
+        "title": "Alternative Schema",
+        "description": "Alternative schema for this table (optional)"
       },
       "delta_updates": {
         "type": "boolean",
