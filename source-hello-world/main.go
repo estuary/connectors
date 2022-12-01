@@ -9,6 +9,7 @@ import (
 )
 
 type Config struct {
+	Greetings int `json:"greetings"`
 }
 
 type State struct {
@@ -28,6 +29,10 @@ const configSchema = `{
 	"title":   "An Infinite Stream of Hello Worlds",
 	"type":    "object",
 	"properties": {
+		"greetings": {
+			"type": ["integer", "null"],
+			"default": null
+		}
 	}
 }`
 
