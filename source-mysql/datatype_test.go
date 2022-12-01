@@ -107,3 +107,41 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "json", ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
 	})
 }
+
+func TestDatetimes(t *testing.T) {
+	var ctx = context.Background()
+
+	// In Chicago noon should map to 17:00 or 18:00 UTC in summer/winter respectively due to DST.
+	t.Run("chicago", func(t *testing.T) {
+		TestBackend.Query(ctx, t, "SET GLOBAL time_zone = 'America/Chicago';")
+		tests.TestDatatypes(ctx, t, TestBackend, []tests.DatatypeTestCase{
+			{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T17:34:56Z"`},
+			{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T18:34:56Z"`},
+			{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T17:34:56Z"`},
+			{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T18:34:56Z"`},
+		})
+	})
+
+	// In fixed offset UTC-6 noon should always map to 18:00 UTC regardless of the time of the year.
+	t.Run("utc_minus_6", func(t *testing.T) {
+		TestBackend.Query(ctx, t, "SET GLOBAL time_zone = '-6:00';") // Leading zero deliberately omitted to make sure MySQL normalizes it into something we can parse
+		tests.TestDatatypes(ctx, t, TestBackend, []tests.DatatypeTestCase{
+			{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T18:34:56Z"`},
+			{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T18:34:56Z"`},
+			{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T18:34:56Z"`},
+			{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T18:34:56Z"`},
+		})
+	})
+
+	// In Manila noon should map to 04:00 UTC regardless of the time of the year, because Philippines
+	// Standard Time stopped observing DST in 1990.
+	t.Run("manila", func(t *testing.T) {
+		TestBackend.Query(ctx, t, "SET GLOBAL time_zone = 'Asia/Manila';")
+		tests.TestDatatypes(ctx, t, TestBackend, []tests.DatatypeTestCase{
+			{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T04:34:56Z"`},
+			{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T04:34:56Z"`},
+			{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T04:34:56Z"`},
+			{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T04:34:56Z"`},
+		})
+	})
+}
