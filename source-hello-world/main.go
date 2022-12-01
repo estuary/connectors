@@ -25,11 +25,8 @@ func (c *State) Validate() error {
 
 const configSchema = `{
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"title":   "Hello World Source Spec",
+	"title":   "An Infinite Stream of Hello Worlds",
 	"type":    "object",
-	"required": [
-		"greetings"
-	],
 	"properties": {
 	}
 }`
