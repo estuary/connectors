@@ -65,7 +65,7 @@ func (c *config) Validate() error {
 type tableConfig struct {
 	base *config
 
-	Table string `json:"table"`
+	Table string `json:"table" jsonschema_extras:"x-collection-name=true"`
 	Delta bool   `json:"delta_updates,omitempty"`
 }
 

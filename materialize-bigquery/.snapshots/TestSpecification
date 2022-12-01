@@ -65,7 +65,8 @@
       "table": {
         "type": "string",
         "title": "Table",
-        "description": "Table in the BigQuery dataset to store materialized result in."
+        "description": "Table in the BigQuery dataset to store materialized result in.",
+        "x-collection-name": true
       },
       "delta_updates": {
         "type": "boolean",

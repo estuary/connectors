@@ -87,7 +87,8 @@
       "topic": {
         "type": "string",
         "title": "Topic Name",
-        "description": "Name of the topic to publish materialized results to."
+        "description": "Name of the topic to publish materialized results to.",
+        "x-collection-name": true
       },
       "identifier": {
         "type": "string",

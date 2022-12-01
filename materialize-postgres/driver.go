@@ -79,7 +79,7 @@ func (c *config) ToURI() string {
 }
 
 type tableConfig struct {
-	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table"`
+	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
 	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)"`
 	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
 }

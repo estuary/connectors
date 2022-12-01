@@ -69,7 +69,8 @@
     "$id": "https://github.com/estuary/connectors/materialize-snowflake/table-config",
     "properties": {
       "table": {
-        "type": "string"
+        "type": "string",
+        "x-collection-name": "true"
       },
       "delta_updates": {
         "type": "boolean"
