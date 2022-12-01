@@ -230,7 +230,6 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	// Infer the location in which captured DATETIME values will be interpreted.
 	if loc, err := queryTimeZone(conn); err == nil {
 		db.datetimeLocation = loc
-		logrus.WithField("loc", loc.String()).Debug("using datetime location")
 	} else {
 		logrus.WithField("err", err).Warn("unable to determine database timezone")
 		logrus.Warn("capturing DATETIME values will not be permitted")
@@ -270,27 +269,24 @@ func queryTimeZone(conn *client.Conn) (*time.Location, error) {
 		return nil, errDatabaseTimezoneUnknown
 	}
 
-	// If it looks like a numeric offset then construct a fixed-offset time zone from that.
-	if timeZoneOffsetRegex.MatchString(tzName) {
-		// The regex requires an explicit +/- sign
-		var sign = 1
-		if tzName[0:1] == "-" {
-			sign = -1
-		}
-		var parts = strings.SplitN(tzName[1:], ":", 2)
-		hours, err := strconv.Atoi(parts[0])
-		if err != nil {
-			return nil, fmt.Errorf("error parsing %q: %w", tzName, err)
-		}
-		minutes, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return nil, fmt.Errorf("error parsing %q: %w", tzName, err)
-		}
-		return time.FixedZone("UTC"+tzName, sign*(hours*60*60+minutes*60)), nil
+	// If the time zone setting is a valid IANA zone name then return that.
+	loc, err := time.LoadLocation(tzName)
+	if err == nil {
+		logrus.WithField("name", loc.String()).Debug("using named datetime location")
+		return loc, nil
 	}
 
-	// Otherwise let's hope the time zone setting is a valid IANA zone name.
-	return time.LoadLocation(tzName)
+	// If it looks like a numeric offset then parse a fixed-offset time zone from that.
+	if timeZoneOffsetRegex.MatchString(tzName) {
+		var t, err = time.Parse("-07:00", tzName)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing %q: %w", tzName, err)
+		}
+		logrus.WithField("offset", tzName).Debug("using fixed datetime offset")
+		return t.Location(), nil
+	}
+
+	return nil, fmt.Errorf("unknown or invalid time_zone %q: %w", tzName, errDatabaseTimezoneUnknown)
 }
 
 func getBinlogExpiry(conn *client.Conn) (time.Duration, error) {
