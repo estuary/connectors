@@ -43,10 +43,14 @@ func TestRocksetDriverSpec(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("TestEndpointSpecSchema", func(t *testing.T) {
-		cupaloy.SnapshotT(t, string(response.EndpointSpecSchemaJson))
+		formatted, err := json.MarshalIndent(response.EndpointSpecSchemaJson, "", "  ")
+		require.NoError(t, err)
+		cupaloy.SnapshotT(t, string(formatted))
 	})
 	t.Run("TestResourceSpecSchema", func(t *testing.T) {
-		cupaloy.SnapshotT(t, string(response.ResourceSpecSchemaJson))
+		formatted, err := json.MarshalIndent(response.ResourceSpecSchemaJson, "", "  ")
+		require.NoError(t, err)
+		cupaloy.SnapshotT(t, string(formatted))
 	})
 }
 
