@@ -1,9 +1,12 @@
 Binding 0:
 {
-    "recommended_name": "test.generic_simplediscovery_magnanimous_outshine",
+    "recommended_name": "generic_simplediscovery_magnanimous_outshine",
     "resource_spec_json": {
       "namespace": "test",
-      "stream": "generic_simplediscovery_magnanimous_outshine"
+      "stream": "generic_simplediscovery_magnanimous_outshine",
+      "primary_key": [
+        "a"
+      ]
     },
     "document_schema_json": {
       "$defs": {
