@@ -5,7 +5,8 @@
     "api_key": {
       "type": "string",
       "title": "Rockset API Key",
-      "description": "The key used to authenticate to the Rockset API",
+      "description": "The key used to authenticate to the Rockset API. Must have role of admin or member.",
+      "multiline": true,
       "secret": true
     }
   },
