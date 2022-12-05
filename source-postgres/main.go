@@ -91,10 +91,11 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	PublicationName string `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
-	SlotName        string `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
-	WatermarksTable string `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
-	SkipBackfills   string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	PublicationName   string `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
+	SlotName          string `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
+	WatermarksTable   string `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	SkipBackfills     string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	BackfillChunkSize int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=4096,description=The number of rows which should be fetched from the database in a single backfill query."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -136,6 +137,9 @@ func (c *Config) SetDefaults() {
 	}
 	if c.Advanced.WatermarksTable == "" {
 		c.Advanced.WatermarksTable = "public.flow_watermarks"
+	}
+	if c.Advanced.BackfillChunkSize <= 0 {
+		c.Advanced.BackfillChunkSize = 4096
 	}
 
 	// The address config property should accept a host or host:port
