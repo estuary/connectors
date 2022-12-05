@@ -109,9 +109,9 @@ func lowerTuningParameters(t testing.TB) {
 
 	// Within the scope of a single test, adjust some tuning parameters so that it's
 	// easier to exercise backfill chunking and replication buffering behavior.
-	var prevChunkSize = backfillChunkSize
-	t.Cleanup(func() { backfillChunkSize = prevChunkSize })
-	backfillChunkSize = 16
+	var prevChunkSize = TestBackend.cfg.Advanced.BackfillChunkSize
+	t.Cleanup(func() { TestBackend.cfg.Advanced.BackfillChunkSize = prevChunkSize })
+	TestBackend.cfg.Advanced.BackfillChunkSize = 16
 
 	var prevBufferSize = replicationBufferSize
 	t.Cleanup(func() { replicationBufferSize = prevBufferSize })
