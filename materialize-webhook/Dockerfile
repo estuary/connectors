@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.17-bullseye as builder
+FROM golang:1.19-bullseye as builder
 
 WORKDIR /builder
 
