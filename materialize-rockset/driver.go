@@ -114,6 +114,8 @@ type resource struct {
 	Workspace string `json:"workspace,omitempty" jsonschema:"title=Workspace,description=The name of the Rockset workspace (will be created if it does not exist)"`
 	// The name of the Rockset collection (will be created if it does not exist)
 	Collection string `json:"collection,omitempty" jsonschema:"title=Rockset Collection,description=The name of the Rockset collection (will be created if it does not exist)" jsonschema_extras:"x-collection-name=true"`
+	// Additional settings for creating the Rockset collection, which are likely to be rarely used.
+	AdvancedCollectionSettings *collectionSettings `json:"advancedCollectionSettings,omitempty" jsonschema:"title=Advanced Collection Settings" jsonschema_extras:"advanced=true"`
 	// Configures the rockset collection to bulk load an initial data set from an S3 bucket, before
 	// transitioning to using the write API for ongoing data. If a previous version of this
 	// materialization wrote files into S3 in order to more quickly backfill historical data, then
@@ -121,8 +123,6 @@ type resource struct {
 	// https://go.estuary.dev/rock-bulk If a bulk loading integration is not being used, then this
 	// should be undefined.
 	InitializeFromS3 *cloudStorageIntegration `json:"initializeFromS3,omitempty" jsonschema:"title=Backfill from S3" jsonschema_extras:"advanced=true"`
-	// Additional settings for creating the Rockset collection, which are likely to be rarely used.
-	AdvancedCollectionSettings *collectionSettings `json:"advancedCollectionSettings,omitempty" jsonschema:"title=Advanced Collection Settings" jsonschema_extras:"advanced=true"`
 }
 
 // Configuration for bulk loading data into the new Rockset collection from a cloud storage bucket.

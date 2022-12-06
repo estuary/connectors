@@ -13,43 +13,6 @@
       "description": "The name of the Rockset collection (will be created if it does not exist)",
       "x-collection-name": true
     },
-    "initializeFromS3": {
-      "properties": {
-        "integration": {
-          "type": "string",
-          "title": "Integration Name",
-          "description": "The name of the integration that was previously created in the Rockset UI"
-        },
-        "bucket": {
-          "type": "string",
-          "title": "Bucket",
-          "description": "The name of the S3 bucket to load data from."
-        },
-        "region": {
-          "type": "string",
-          "title": "Region",
-          "description": "The AWS region in which the bucket resides. Optional."
-        },
-        "pattern": {
-          "type": "string",
-          "title": "Pattern",
-          "description": "A regex that is used to match objects to be ingested"
-        },
-        "prefix": {
-          "type": "string",
-          "title": "Prefix",
-          "description": "Prefix of the data within the S3 bucket. All files under this prefix will be loaded. Optional. Must not be set if 'pattern' is defined."
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "integration",
-        "bucket"
-      ],
-      "title": "Backfill from S3",
-      "advanced": true
-    },
     "advancedCollectionSettings": {
       "properties": {
         "retention_secs": {
@@ -112,6 +75,43 @@
       "additionalProperties": false,
       "type": "object",
       "title": "Advanced Collection Settings",
+      "advanced": true
+    },
+    "initializeFromS3": {
+      "properties": {
+        "integration": {
+          "type": "string",
+          "title": "Integration Name",
+          "description": "The name of the integration that was previously created in the Rockset UI"
+        },
+        "bucket": {
+          "type": "string",
+          "title": "Bucket",
+          "description": "The name of the S3 bucket to load data from."
+        },
+        "region": {
+          "type": "string",
+          "title": "Region",
+          "description": "The AWS region in which the bucket resides. Optional."
+        },
+        "pattern": {
+          "type": "string",
+          "title": "Pattern",
+          "description": "A regex that is used to match objects to be ingested"
+        },
+        "prefix": {
+          "type": "string",
+          "title": "Prefix",
+          "description": "Prefix of the data within the S3 bucket. All files under this prefix will be loaded. Optional. Must not be set if 'pattern' is defined."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "integration",
+        "bucket"
+      ],
+      "title": "Backfill from S3",
       "advanced": true
     }
   },
