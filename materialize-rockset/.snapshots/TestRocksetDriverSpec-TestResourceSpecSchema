@@ -116,5 +116,9 @@
     }
   },
   "type": "object",
+  "required": [
+    "workspace",
+    "collection"
+  ],
   "title": "Rockset Collection"
 }
