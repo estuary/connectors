@@ -2,16 +2,30 @@
   "$schema": "http://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/estuary/connectors/materialize-rockset/config",
   "properties": {
+    "region_base_url": {
+      "type": "string",
+      "enum": [
+        "api.usw2a1.rockset.com",
+        "api.use1a1.rockset.com",
+        "api.euc1a1.rockset.com"
+      ],
+      "title": "Region Base URL",
+      "description": "The base URL to connect to your Rockset deployment. Example: api.usw2a1.rockset.com (do not include the protocol).",
+      "multiline": true,
+      "order": 0
+    },
     "api_key": {
       "type": "string",
       "title": "Rockset API Key",
       "description": "The key used to authenticate to the Rockset API. Must have role of admin or member.",
       "multiline": true,
+      "order": 1,
       "secret": true
     }
   },
   "type": "object",
   "required": [
+    "region_base_url",
     "api_key"
   ],
   "title": "Rockset Endpoint"
