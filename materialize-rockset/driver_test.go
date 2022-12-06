@@ -12,7 +12,6 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	rockset "github.com/rockset/rockset-go-client"
 	"github.com/stretchr/testify/require"
 	pb "go.gazette.dev/core/broker/protocol"
 )
@@ -21,7 +20,7 @@ func TestRocksetConfig(t *testing.T) {
 	var invalid = config{}
 	require.NotNil(t, invalid.Validate())
 
-	var valid = testConfig()
+	var valid = config{ApiKey: "some_key", RegionBaseUrl: "www.something.com"}
 	require.Nil(t, valid.Validate())
 }
 
@@ -202,7 +201,7 @@ func TestRocksetDriverApply(t *testing.T) {
 
 func cleanup(config config, workspaceName string, collectionName string) {
 	ctx := context.Background()
-	client, err := rockset.NewClient(rockset.WithAPIKey(config.ApiKey))
+	client, err := config.client()
 	if err != nil {
 		log.Fatalf("initializing client: %s", err.Error())
 	}

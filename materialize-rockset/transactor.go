@@ -5,21 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	rockset "github.com/rockset/rockset-go-client"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
-
-type addDoc struct {
-	doc  json.RawMessage
-	done bool
-}
 
 // A binding represents the relationship between a single Flow Collection and a single Rockset Collection.
 type binding struct {
@@ -112,7 +105,7 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 			errGroup.Go(func() error {
 				return t.sendAllDocuments(ctx, b, addDocsCh)
 			})
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				"rocksetCollection": b.rocksetCollection(),
 				"rocksetWorkspace":  b.rocksetWorkspace(),
 			}).Debug("Started AddDocuments background worker")
@@ -135,7 +128,7 @@ func (t *transactor) Commit(ctx context.Context) error {
 		if binding.addDocsCh != nil {
 			close(binding.addDocsCh)
 			binding.addDocsCh = nil
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				"rocksetCollection": binding.rocksetCollection(),
 				"rocksetWorkspace":  binding.rocksetWorkspace(),
 			}).Debug("Closed AddDocuments channel")
@@ -144,7 +137,7 @@ func (t *transactor) Commit(ctx context.Context) error {
 	if err := t.errGroup.Wait(); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
-	log.Debug("Commit successful")
+	logrus.Debug("Commit successful")
 	return nil
 }
 
@@ -254,28 +247,9 @@ func (t *transactor) sendReq(ctx context.Context, b *binding, docs []interface{}
 			}).Error("Document was rejected by Rockset API")
 
 			if err == nil {
-				err = fmt.Errorf("A document was rejected by the Rockset API for Collection: '%s'", b.rocksetCollection())
+				err = fmt.Errorf("a document was rejected by the Rockset API for Collection: '%s'", b.rocksetCollection())
 			}
 		}
 	}
 	return err
-}
-
-func logElapsedTime(start time.Time, msg string) {
-	elapsed := time.Since(start)
-	log.Infof("%s,%f", msg, elapsed.Seconds())
-}
-
-func clamp(min int, max int, n int) int {
-	if max <= min {
-		panic("max must be larger than min")
-	}
-
-	if n > max {
-		return max
-	} else if n < min {
-		return min
-	} else {
-		return n
-	}
 }

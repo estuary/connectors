@@ -20,35 +20,6 @@
           "title": "Retention Period",
           "description": "Number of seconds after which data is purged based on event time"
         },
-        "event_time_info": {
-          "properties": {
-            "field": {
-              "type": "string",
-              "title": "Field Name",
-              "description": "Name of the field containing the event time"
-            },
-            "format": {
-              "type": "string",
-              "enum": [
-                "milliseconds_since_epoch",
-                "seconds_since_epoch"
-              ],
-              "title": "Format",
-              "description": "Format of the time field"
-            },
-            "time_zone": {
-              "type": "string",
-              "title": "Timezone",
-              "description": "Default timezone"
-            }
-          },
-          "additionalProperties": false,
-          "type": "object",
-          "required": [
-            "field"
-          ],
-          "title": "Event Time Info"
-        },
         "clustering_key": {
           "items": {
             "properties": {
@@ -59,17 +30,14 @@
               }
             },
             "additionalProperties": false,
-            "type": "object"
+            "type": "object",
+            "required": [
+              "field_name"
+            ]
           },
           "type": "array",
           "title": "Clustering Key",
           "description": "List of clustering fields"
-        },
-        "insert_only": {
-          "type": "boolean",
-          "title": "Insert Only",
-          "description": "If true disallows updates and deletes. The materialization will fail if there are documents with duplicate keys.",
-          "default": false
         }
       },
       "additionalProperties": false,

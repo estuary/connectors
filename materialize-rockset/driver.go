@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	// importing tzdata is required so that time.LoadLocation can be used to validate timezones
 	// without requiring timezone packages to be installed on the system.
@@ -20,7 +19,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	rockset "github.com/rockset/rockset-go-client"
-	rtypes "github.com/rockset/rockset-go-client/openapi"
+	"github.com/rockset/rockset-go-client/option"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,33 +41,8 @@ func (c *config) Validate() error {
 	return nil
 }
 
-// eventTimeInfo is copied from rtypes.EventTimeInfo and modified to customize the JSON schema.
-type eventTimeInfo struct {
-	Field    string  `json:"field" jsonschema:"title=Field Name,description=Name of the field containing the event time"`
-	Format   *string `json:"format,omitempty" jsonschema:"title=Format,description=Format of the time field,enum=milliseconds_since_epoch,enum=seconds_since_epoch"`
-	TimeZone *string `json:"time_zone,omitempty" jsonschema:"title=Timezone,description=Default timezone, in IANA format"`
-}
-
-func (e *eventTimeInfo) Validate() error {
-	if e.Field == "" {
-		return fmt.Errorf("Event Time Info: Field Name is empty")
-	}
-	if e.TimeZone != nil {
-		if _, err := time.LoadLocation(*e.TimeZone); err != nil {
-			return fmt.Errorf("Event Time Info: invalid Timezone: %w", err)
-		}
-	}
-
-	var validFormats = map[string]bool{
-		"milliseconds_since_epoch": true,
-		"seconds_since_epoch":      true,
-	}
-	if e.Format != nil {
-		if !validFormats[*e.Format] {
-			return fmt.Errorf("Event Time Info: Format is invalid")
-		}
-	}
-	return nil
+func (c *config) client() (*rockset.RockClient, error) {
+	return rockset.NewClient(rockset.WithAPIKey(c.ApiKey), rockset.WithAPIServer(c.RegionBaseUrl))
 }
 
 // fieldPartition was copied from rtypes.FieldPartition and modified both to customize the json
@@ -77,34 +51,26 @@ func (e *eventTimeInfo) Validate() error {
 // [docs](https://rockset.com/docs/rest-api/#createcollection) say that the `keys` are not needed if
 // type is `AUTO`.
 type fieldPartition struct {
-	FieldName *string `json:"field_name,omitempty" jsonschema:"title=Field Name,description=The name of a field\u002C parsed as a SQL qualified name"`
+	FieldName string `json:"field_name" jsonschema:"title=Field Name,description=The name of a field\u002C parsed as a SQL qualified name"`
 }
 
-func (fp *fieldPartition) ToRocksetFieldPartition() rtypes.FieldPartition {
-	// Go does not let you take the address of a constant directly :/
-	// AUTO is listed in the docs as the only permissible value for Type, so we might as well set it
-	// automatically.
-	var partitionType = "AUTO"
-	return rtypes.FieldPartition{
-		FieldName: fp.FieldName,
-		Type:      &partitionType,
-	}
+func (f *fieldPartition) toOpt() option.CollectionOption {
+	return option.WithCollectionClusteringKey(
+		f.FieldName,
+		"AUTO",
+		[]string{},
+	)
 }
 
 // collectionSettings exposes a subset of the "advanced" options on rtypes.CreateCollectionRequest
 type collectionSettings struct {
 	RetentionSecs *int64           `json:"retention_secs,omitempty" jsonschema:"title=Retention Period,description=Number of seconds after which data is purged based on event time"`
-	EventTimeInfo *eventTimeInfo   `json:"event_time_info,omitempty" jsonschema:"title=Event Time Info"`
 	ClusteringKey []fieldPartition `json:"clustering_key,omitempty" jsonschema:"title=Clustering Key,description=List of clustering fields"`
-	InsertOnly    *bool            `json:"insert_only,omitempty" jsonschema:"title=Insert Only,description=If true disallows updates and deletes. The materialization will fail if there are documents with duplicate keys.,default=false"`
 }
 
 func (s *collectionSettings) Validate() error {
 	if s.RetentionSecs != nil && *s.RetentionSecs < 0 {
-		return fmt.Errorf("Retention Period cannot be negative")
-	}
-	if s.EventTimeInfo != nil {
-		return s.EventTimeInfo.Validate()
+		return fmt.Errorf("retention period cannot be negative")
 	}
 	// nothing to validate on ClusteringKey
 	return nil
@@ -127,11 +93,11 @@ type resource struct {
 
 // Configuration for bulk loading data into the new Rockset collection from a cloud storage bucket.
 type cloudStorageIntegration struct {
-	Integration string `json:"integration" jsonschema:"title=Integration Name,description=The name of the integration that was previously created in the Rockset UI"`
-	Bucket      string `json:"bucket" jsonschema:"title=Bucket,description=The name of the S3 bucket to load data from."`
-	Region      string `json:"region,omitempty" jsonschema:"title=Region,description=The AWS region in which the bucket resides. Optional."`
-	Pattern     string `json:"pattern,omitempty" jsonschema:"title=Pattern,description=A regex that is used to match objects to be ingested, according to the rules specified in the rockset docs (https://rockset.com/docs/amazon-s3/#specifying-s3-path). Optional. Must not be set if 'prefix' is defined"`
-	Prefix      string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Prefix of the data within the S3 bucket. All files under this prefix will be loaded. Optional. Must not be set if 'pattern' is defined."`
+	Integration string  `json:"integration" jsonschema:"title=Integration Name,description=The name of the integration that was previously created in the Rockset UI"`
+	Bucket      string  `json:"bucket" jsonschema:"title=Bucket,description=The name of the S3 bucket to load data from."`
+	Region      *string `json:"region,omitempty" jsonschema:"title=Region,description=The AWS region in which the bucket resides. Optional."`
+	Pattern     *string `json:"pattern,omitempty" jsonschema:"title=Pattern,description=A regex that is used to match objects to be ingested, according to the rules specified in the rockset docs (https://rockset.com/docs/amazon-s3/#specifying-s3-path). Optional. Must not be set if 'prefix' is defined"`
+	Prefix      *string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Prefix of the data within the S3 bucket. All files under this prefix will be loaded. Optional. Must not be set if 'pattern' is defined."`
 }
 
 func (c *cloudStorageIntegration) Validate() error {
@@ -144,10 +110,32 @@ func (c *cloudStorageIntegration) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
-	if c.Pattern != "" && c.Prefix != "" {
-		return fmt.Errorf("'pattern' and 'prefix' can both be used together")
+	if c.Pattern != nil && c.Prefix != nil {
+		return fmt.Errorf("'pattern' and 'prefix' can't both be used together")
 	}
 	return nil
+}
+
+func (c *cloudStorageIntegration) toOpt() option.CollectionOption {
+	if c == nil {
+		return nil
+	}
+
+	var opts []option.S3SourceOption
+
+	if c.Region != nil {
+		opts = append(opts, option.WithS3Region(*c.Region))
+	}
+
+	if c.Pattern != nil {
+		opts = append(opts, option.WithS3Pattern(*c.Pattern))
+	}
+
+	if c.Prefix != nil {
+		opts = append(opts, option.WithS3Prefix(*c.Prefix))
+	}
+
+	return option.WithS3Source(c.Integration, c.Bucket, option.WithAutoFormat(), opts...)
 }
 
 func (r *resource) Validate() error {
@@ -225,7 +213,7 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 	if err != nil {
 		return nil, err
 	}
-	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey))
+	client, err := cfg.client()
 	if err != nil {
 		return nil, fmt.Errorf("creating Rockset client: %w", err)
 	}
@@ -245,7 +233,7 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 		if rocksetCollection != nil &&
 			res.InitializeFromS3 != nil &&
 			GetS3IntegrationSource(rocksetCollection, res.InitializeFromS3.Integration) == nil {
-			return nil, fmt.Errorf("Rockset collection '%s' does not have an integration named '%s', which is required by the binding '%s'",
+			return nil, fmt.Errorf("rockset collection '%s' does not have an integration named '%s', which is required by the binding '%s'",
 				res.Collection, res.InitializeFromS3.Integration, binding.Collection.Collection.String())
 		}
 
@@ -280,7 +268,7 @@ func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (
 		return nil, err
 	}
 
-	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey))
+	client, err := cfg.client()
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +309,7 @@ func (d *rocksetDriver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (
 	if err != nil {
 		return nil, err
 	}
-	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey))
+	client, err := cfg.client()
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +380,7 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 		return err
 	}
 
-	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey), rockset.WithAPIServer(cfg.RegionBaseUrl))
+	client, err := cfg.client()
 	if err != nil {
 		return err
 	}
