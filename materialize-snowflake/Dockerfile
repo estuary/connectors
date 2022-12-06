@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.17-bullseye as builder
+FROM golang:1.19-bullseye as builder
 
 WORKDIR /builder
 
@@ -28,11 +28,11 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-snowflake/...
 FROM ${BASE_IMAGE}
 
 RUN apt-get update -y \
- && apt-get install --no-install-recommends -y \
-      ca-certificates \
-      curl \
-      unzip \
- && rm -rf /var/lib/apt/lists/*
+     && apt-get install --no-install-recommends -y \
+     ca-certificates \
+     curl \
+     unzip \
+     && rm -rf /var/lib/apt/lists/*
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
