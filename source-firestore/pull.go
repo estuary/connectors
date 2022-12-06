@@ -480,11 +480,11 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 	return nil
 }
 
-func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client, collectionID string, startTime time.Time) error {
+func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client, collectionID string, readTime time.Time) error {
 	var logEntry = log.WithFields(log.Fields{
 		"collection": collectionID,
 	})
-	logEntry.WithField("startTime", startTime.Format(time.RFC3339)).Info("streaming changes from collection")
+	logEntry.WithField("readTime", readTime.Format(time.RFC3339)).Info("streaming changes from collection")
 
 	var target = &firestore_pb.Target{
 		TargetType: &firestore_pb.Target_Query{
@@ -502,9 +502,9 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 		},
 		TargetId: watchTargetID,
 	}
-	if !startTime.IsZero() {
+	if !readTime.IsZero() {
 		target.ResumeType = &firestore_pb.Target_ReadTime{
-			ReadTime: timestamppb.New(startTime),
+			ReadTime: timestamppb.New(readTime),
 		}
 	}
 	var req = &firestore_pb.ListenRequest{
@@ -517,6 +517,8 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 	var listenClient firestore_pb.Firestore_ListenClient
 	var numDocuments int
 	var isCurrent = false
+	var catchupStreaming = true
+	var catchupStarted = time.Now()
 	for {
 		if listenClient == nil {
 			var err error
@@ -565,6 +567,7 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 						"readTime": ts,
 						"docs":     numDocuments,
 					}).Debug("consistent point reached")
+					catchupStreaming = false
 					if checkpointJSON, err := c.State.UpdateReadTimes(collectionID, tc.ReadTime.AsTime()); err != nil {
 						return err
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
@@ -577,6 +580,10 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					return fmt.Errorf("unexpected target ID %d", tc.TargetIds[0])
 				}
 			case firestore_pb.TargetChange_REMOVE:
+				if catchupStreaming && time.Since(catchupStarted) > 5*time.Minute {
+					logEntry.Warn("replication failed to catch up in time, collection suspended until restart (go.estuary.dev/YRDsKd)")
+					return nil
+				}
 				if tc.Cause != nil {
 					return fmt.Errorf("unexpected TargetChange.REMOVE: %v", tc.Cause.Message)
 				}
