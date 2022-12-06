@@ -9,6 +9,7 @@ import (
 	"github.com/relvacode/iso8601"
 	rockset "github.com/rockset/rockset-go-client"
 	rtypes "github.com/rockset/rockset-go-client/openapi"
+	"github.com/rockset/rockset-go-client/option"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -69,7 +70,7 @@ func ensureCollectionExists(ctx context.Context, client *rockset.RockClient, res
 
 func GetS3IntegrationSource(collection *rtypes.Collection, integrationName string) *rtypes.SourceS3 {
 	for _, source := range collection.Sources {
-		if source.IntegrationName == integrationName {
+		if source.GetIntegrationName() == integrationName {
 			return source.S3
 		}
 	}
@@ -89,51 +90,32 @@ func getCollection(ctx context.Context, client *rockset.RockClient, workspace st
 }
 
 func createCollection(ctx context.Context, client *rockset.RockClient, resource *resource) error {
-	collection := rtypes.CreateCollectionRequest{Name: resource.Collection}
+	var opts []option.CollectionOption
+
 	if resource.InitializeFromS3 != nil {
-		var integration = resource.InitializeFromS3
-		collection.Sources = []rtypes.Source{{
-			IntegrationName: integration.Integration,
-			S3: &rtypes.SourceS3{
-				Bucket:  integration.Bucket,
-				Region:  trimToNill(integration.Region),
-				Prefix:  trimToNill(integration.Prefix),
-				Pattern: trimToNill(integration.Pattern),
-			},
-		}}
+		opts = append(opts, resource.InitializeFromS3.toOpt())
 	}
-	if resource.AdvancedCollectionSettings != nil {
-		var settings = resource.AdvancedCollectionSettings
-		// These are all nullable on both the AdvancedCollectionSettings and the request
-		collection.RetentionSecs = settings.RetentionSecs
-		collection.InsertOnly = settings.InsertOnly
 
-		for _, field := range settings.ClusteringKey {
-			collection.ClusteringKey = append(collection.ClusteringKey, field.ToRocksetFieldPartition())
+	if advanced := resource.AdvancedCollectionSettings; advanced != nil {
+		if advanced.RetentionSecs != nil {
+			opts = append(opts, option.WithCollectionRetentionSeconds(*advanced.RetentionSecs))
 		}
 
-		if settings.EventTimeInfo != nil {
-			collection.EventTimeInfo = &rtypes.EventTimeInfo{
-				Field:    settings.EventTimeInfo.Field,
-				Format:   settings.EventTimeInfo.Format,
-				TimeZone: settings.EventTimeInfo.TimeZone,
-			}
+		for _, field := range advanced.ClusteringKey {
+			opts = append(opts, field.toOpt())
 		}
 	}
-	log.WithField("request", collection).Info("Will create a new Rockset collection")
-	_, err := client.CreateCollection(ctx, resource.Workspace, resource.Collection, &collection)
+
+	log.WithFields(
+		log.Fields{
+			"workspace":  resource.Workspace,
+			"collection": resource.Collection,
+		}).Info("Will create a new Rockset collection")
+	_, err := client.CreateCollection(ctx, resource.Workspace, resource.Collection, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create collection `%s`: %w", resource.Collection, err)
 	}
 	return nil
-}
-
-func trimToNill(s string) *string {
-	if s == "" {
-		return nil
-	} else {
-		return &s
-	}
 }
 
 // awaitCollectionReady blocks until the given Rockset collection has a READY status AND has completed
