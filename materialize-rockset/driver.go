@@ -25,13 +25,14 @@ import (
 )
 
 type config struct {
-	// Credentials used to authenticate with the Rockset API.
-	ApiKey string `json:"api_key" jsonschema:"title=Rockset API Key,description=The key used to authenticate to the Rockset API. Must have role of admin or member." jsonschema_extras:"secret=true,multiline=true"`
+	RegionBaseUrl string `json:"region_base_url" jsonschema:"title=Region Base URL,description=The base URL to connect to your Rockset deployment. Example: api.usw2a1.rockset.com (do not include the protocol).,enum=api.usw2a1.rockset.com,enum=api.use1a1.rockset.com,enum=api.euc1a1.rockset.com" jsonschema_extras:"multiline=true,order=0"`
+	ApiKey        string `json:"api_key" jsonschema:"title=Rockset API Key,description=The key used to authenticate to the Rockset API. Must have role of admin or member." jsonschema_extras:"secret=true,multiline=true,order=1"`
 }
 
 func (c *config) Validate() error {
 	var requiredProperties = [][]string{
 		{"api_key", c.ApiKey},
+		{"region_base_url", c.RegionBaseUrl},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -391,7 +392,7 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 		return err
 	}
 
-	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey))
+	client, err := rockset.NewClient(rockset.WithAPIKey(cfg.ApiKey), rockset.WithAPIServer(cfg.RegionBaseUrl))
 	if err != nil {
 		return err
 	}

@@ -21,7 +21,7 @@ func TestRocksetConfig(t *testing.T) {
 	var invalid = config{}
 	require.NotNil(t, invalid.Validate())
 
-	var valid = config{ApiKey: fetchApiKey()}
+	var valid = testConfig()
 	require.Nil(t, valid.Validate())
 }
 
@@ -56,7 +56,7 @@ func TestRocksetDriverSpec(t *testing.T) {
 
 func TestRocksetDriverValidate(t *testing.T) {
 	driver := new(rocksetDriver)
-	config := config{ApiKey: fetchApiKey()}
+	config := testConfig()
 	var endpointSpecJson []byte
 
 	endpointSpecJson, err := json.Marshal(config)
@@ -137,7 +137,7 @@ func TestRocksetDriverApply(t *testing.T) {
 	collectionName := randCollection()
 
 	driver := new(rocksetDriver)
-	config := config{ApiKey: fetchApiKey()}
+	config := testConfig()
 
 	var endpointSpecJson []byte
 	endpointSpecJson, err := json.Marshal(config)
@@ -212,6 +212,13 @@ func cleanup(config config, workspaceName string, collectionName string) {
 	}
 
 	client.DeleteWorkspace(ctx, workspaceName)
+}
+
+func testConfig() config {
+	return config{
+		ApiKey:        fetchApiKey(),
+		RegionBaseUrl: "api.usw2a1.rockset.com",
+	}
 }
 
 func randWorkspace() string {
