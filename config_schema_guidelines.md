@@ -8,7 +8,16 @@ generated from these schemas.
 
 The `title` is rendered as the field label in the UI. Everything should have a sensible label.
 The `description` is also rendered next to each field, and should generally be present for most
-fields. Note that `description` must not contain any inline HTML, as it will not be rendered.
+fields. Both `title` and `description` are pulled into the documentation, as well. 
+
+Note that `description` must not contain any inline HTML, as it will not be rendered.
+
+Additional things to keep in mind when writing descriptions:
+* **Punctuation**: Descriptions should always end with a period, even when they're just sentence fragments.
+* **Capitalization**: While _titles_ should be in Title Case, descriptions are capitalized like ordinary sentences.
+* **Links**: Always use an [Estuary branded shortlink](https://app.short.io/public/login) for doc links in descriptions. 
+Whenever possible, link to a relevant section in the Estuary docs rather than third-party docs.
+* **Voice**: Use second person; refer to the reader as "you." Don't refer to "users," "developers," etc in descriptions.
 
 ### Group related fields within an object
 
