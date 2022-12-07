@@ -323,6 +323,7 @@ const queryDiscoverColumns = `
 		c.table_schema != 'information_schema' AND
 		c.table_schema != 'pg_internal' AND
 		c.table_schema != 'catalog_history' AND
+		c.table_schema != 'cron' AND
 		t.table_type = 'BASE TABLE'
   ORDER BY
 		c.table_schema,
