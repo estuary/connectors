@@ -433,8 +433,7 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 		return fmt.Errorf("sending Opened: %w", err)
 	}
 
-	log := log.NewEntry(log.StandardLogger())
-
+	log := log.WithField("materialization", "rockset")
 	return pm.RunTransactions(stream, &transactor, log)
 }
 
