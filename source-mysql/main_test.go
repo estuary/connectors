@@ -53,7 +53,7 @@ func TestMain(m *testing.M) {
 	if err := cfg.Validate(); err != nil {
 		logrus.WithFields(logrus.Fields{"err": err, "config": cfg}).Fatal("error validating test config")
 	}
-	cfg.SetDefaults()
+	cfg.SetDefaults("Test Config")
 
 	var conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName)
 	if err != nil {
