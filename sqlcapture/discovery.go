@@ -20,6 +20,12 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.DiscoverResponse_B
 		return nil, err
 	}
 
+	// If there are zero tables (or there's one table but it's the watermarks table) log a warning.
+	var _, watermarksPresent = tables[db.WatermarksTable()]
+	if len(tables) == 0 || len(tables) == 1 && watermarksPresent {
+		logrus.Warn("no tables discovered; note that tables in system schemas will not be discovered and must be added manually if desired")
+	}
+
 	// Shared schema of the embedded "source" property.
 	var sourceSchema = (&jsonschema.Reflector{
 		ExpandedStruct: true,
