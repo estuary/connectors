@@ -44,7 +44,7 @@ type Driver struct {
 	ConfigSchema     json.RawMessage
 	DocumentationURL string
 
-	Connect func(ctx context.Context, cfg json.RawMessage) (Database, error)
+	Connect func(ctx context.Context, name string, cfg json.RawMessage) (Database, error)
 }
 
 // Spec returns the specification definition of this driver.
@@ -73,7 +73,7 @@ func (d *Driver) ApplyDelete(ctx context.Context, req *pc.ApplyRequest) (*pc.App
 
 // Validate that store resources and proposed collection bindings are compatible.
 func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.ValidateResponse, error) {
-	var db, err = d.Connect(ctx, req.EndpointSpecJson)
+	var db, err = d.Connect(ctx, string(req.Capture), req.EndpointSpecJson)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -98,7 +98,7 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 
 // Discover returns the set of resources available from this Driver.
 func (d *Driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.DiscoverResponse, error) {
-	var db, err = d.Connect(ctx, req.EndpointSpecJson)
+	var db, err = d.Connect(ctx, "Flow Discovery", req.EndpointSpecJson)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -151,7 +151,7 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 	}
 
 	var ctx = stream.Context()
-	db, err := d.Connect(ctx, open.Open.Capture.EndpointSpecJson)
+	db, err := d.Connect(ctx, string(open.Open.Capture.Capture), open.Open.Capture.EndpointSpecJson)
 	if err != nil {
 		return fmt.Errorf("error connecting to database: %w", err)
 	}

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -49,12 +51,12 @@ func main() {
 	boilerplate.RunMain(mysqlDriver)
 }
 
-func connectMySQL(ctx context.Context, cfg json.RawMessage) (sqlcapture.Database, error) {
+func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcapture.Database, error) {
 	var config Config
 	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
 		return nil, fmt.Errorf("error parsing config json: %w", err)
 	}
-	config.SetDefaults()
+	config.SetDefaults(name)
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
@@ -154,7 +156,7 @@ func (c *Config) Validate() error {
 }
 
 // SetDefaults fills in the default values for unset optional parameters.
-func (c *Config) SetDefaults() {
+func (c *Config) SetDefaults(name string) {
 	// Note these are 1:1 with 'omitempty' in Config field tags,
 	// which cause these fields to be emitted as non-required.
 	if c.Advanced.WatermarksTable == "" {
@@ -164,7 +166,13 @@ func (c *Config) SetDefaults() {
 		c.Advanced.DBName = "mysql"
 	}
 	if c.Advanced.NodeID == 0 {
-		c.Advanced.NodeID = 0x476C6F77 // "Flow"
+		// The only constraint on the node/server ID is that it needs to be unique
+		// within a particular replication topology. We would also like it to be
+		// consistent for a given capture for observability reasons, so here we
+		// derive a default value by hashing the task name.
+		var nameHash = sha256.Sum256([]byte(name))
+		c.Advanced.NodeID = binary.BigEndian.Uint32(nameHash[:])
+		c.Advanced.NodeID &= 0x7FFFFFFF // Clear MSB because watermark writes use the node ID as an integer key
 	}
 	if c.Advanced.BackfillChunkSize <= 0 {
 		c.Advanced.BackfillChunkSize = 4096
