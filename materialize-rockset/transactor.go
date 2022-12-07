@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -116,7 +117,13 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 		case b.addDocsCh <- doc:
 			continue
 		case <-ctx.Done():
-			return ctx.Err()
+			err := ctx.Err()
+
+			if errors.Is(err, context.Canceled) {
+				err = errGroup.Wait()
+			}
+
+			return err
 		}
 	}
 	return nil
