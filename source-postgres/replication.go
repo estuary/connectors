@@ -72,7 +72,7 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 		connInfo:        pgtype.NewConnInfo(),
 		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
-		events: make(chan sqlcapture.ChangeEvent, replicationBufferSize),
+		events: make(chan sqlcapture.DatabaseEvent, replicationBufferSize),
 		errCh:  make(chan error),
 	}
 	stream.tables.active = activeTables
@@ -119,9 +119,12 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 // postgresSource is source metadata for data capture events.
 //
 // For more nuance on LSN vs Last LSN vs Final LSN, see:
-//  https://github.com/postgres/postgres/blob/a8fd13cab0ba815e9925dc9676e6309f699b5f72/src/include/replication/reorderbuffer.h#L260-L280
+//
+//	https://github.com/postgres/postgres/blob/a8fd13cab0ba815e9925dc9676e6309f699b5f72/src/include/replication/reorderbuffer.h#L260-L280
+//
 // See also how Materialize deserializes Postgres Debezium envelopes:
-// 	https://github.com/MaterializeInc/materialize/blob/4fca6f51338b0da9a44dd3a75a5a4a5da37a9733/src/interchange/src/avro/envelope_debezium.rs#L275
+//
+//	https://github.com/MaterializeInc/materialize/blob/4fca6f51338b0da9a44dd3a75a5a4a5da37a9733/src/interchange/src/avro/envelope_debezium.rs#L275
 type postgresSource struct {
 	sqlcapture.SourceCommon
 
@@ -158,17 +161,17 @@ func (s *postgresSource) Cursor() string {
 // is no built-in concurrency, so Process() must be called reasonably
 // soon after StartReplication() in order to not time out.
 type replicationStream struct {
-	ackLSN          uint64                      // The most recently Ack'd LSN, passed to startReplication or updated via CommitLSN.
-	cancel          context.CancelFunc          // Cancel function for the replication goroutine's context
-	errCh           chan error                  // Error channel for the final exit status of the replication goroutine
-	conn            *pgconn.PgConn              // The PostgreSQL replication connection
-	eventBuf        *sqlcapture.ChangeEvent     // A single-element buffer used in between 'receiveMessage' and the output channel
-	events          chan sqlcapture.ChangeEvent // The channel to which replication events will be written
-	lastTxnEndLSN   pglogrepl.LSN               // End LSN (record + 1) of the last completed transaction.
-	nextTxnFinalLSN pglogrepl.LSN               // Final LSN of the commit currently being processed, or zero if between transactions.
-	nextTxnMillis   int64                       // Unix timestamp (in millis) at which the change originally occurred.
-	pubName         string                      // The name of the PostgreSQL publication to use
-	replSlot        string                      // The name of the PostgreSQL replication slot to use
+	ackLSN          uint64                        // The most recently Ack'd LSN, passed to startReplication or updated via CommitLSN.
+	cancel          context.CancelFunc            // Cancel function for the replication goroutine's context
+	errCh           chan error                    // Error channel for the final exit status of the replication goroutine
+	conn            *pgconn.PgConn                // The PostgreSQL replication connection
+	eventBuf        sqlcapture.DatabaseEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
+	events          chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
+	lastTxnEndLSN   pglogrepl.LSN                 // End LSN (record + 1) of the last completed transaction.
+	nextTxnFinalLSN pglogrepl.LSN                 // Final LSN of the commit currently being processed, or zero if between transactions.
+	nextTxnMillis   int64                         // Unix timestamp (in millis) at which the change originally occurred.
+	pubName         string                        // The name of the PostgreSQL publication to use
+	replSlot        string                        // The name of the PostgreSQL replication slot to use
 
 	// standbyStatusDeadline is the time at which we need to stop receiving
 	// replication messages and go send a Standby Status Update message to
@@ -204,7 +207,7 @@ const standbyStatusInterval = 10 * time.Second
 // cause the database to cut us off.
 var replicationBufferSize = 64 * 1024 // Assuming change events average ~2kB then 64k * 2kB = 128MB
 
-func (s *replicationStream) Events() <-chan sqlcapture.ChangeEvent {
+func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 	return s.events
 }
 
@@ -246,7 +249,7 @@ func (s *replicationStream) relayMessages(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				return nil
-			case s.events <- *s.eventBuf:
+			case s.events <- s.eventBuf:
 				s.eventBuf = nil
 			}
 		}
@@ -271,7 +274,7 @@ func (s *replicationStream) relayMessages(ctx context.Context) error {
 	}
 }
 
-func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Message) (*sqlcapture.ChangeEvent, error) {
+func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Message) (sqlcapture.DatabaseEvent, error) {
 	// Some notes on the Logical Replication / pgoutput message stream, since
 	// as far as I can tell this isn't documented anywhere but comments in the
 	// relevant PostgreSQL sources.
@@ -321,8 +324,7 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		s.nextTxnMillis = 0
 		s.lastTxnEndLSN = msg.TransactionEndLSN
 
-		var event = &sqlcapture.ChangeEvent{
-			Operation: sqlcapture.FlushOp,
+		var event = &sqlcapture.FlushEvent{
 			Source: &postgresSource{
 				Location: [3]pglogrepl.LSN{s.lastTxnEndLSN, lsn, 0},
 			},
@@ -374,7 +376,7 @@ func (s *replicationStream) decodeChangeEvent(
 	beforeType uint8, // Postgres TupleType (0, 'K' for key, 'O' for old full tuple, 'N' for new).
 	before, after *pglogrepl.TupleData, // Before and after tuple data. Either may be nil.
 	relID uint32, // Relation ID to which tuple data pertains.
-) (*sqlcapture.ChangeEvent, error) {
+) (sqlcapture.DatabaseEvent, error) {
 	if s.nextTxnFinalLSN == 0 {
 		return nil, fmt.Errorf("got %q message without a transaction in progress", op)
 	}

@@ -25,7 +25,7 @@ func (db *mysqlDatabase) WatermarksTable() string {
 	return db.config.Advanced.WatermarksTable
 }
 
-func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.TableInfo, keyColumns []string, resumeKey []interface{}) ([]sqlcapture.ChangeEvent, error) {
+func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.TableInfo, keyColumns []string, resumeKey []interface{}) ([]*sqlcapture.ChangeEvent, error) {
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 	logrus.WithFields(logrus.Fields{
@@ -53,7 +53,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.Tab
 	defer results.Close()
 
 	// Process the results into `changeEvent` structs and return them
-	var events []sqlcapture.ChangeEvent
+	var events []*sqlcapture.ChangeEvent
 	logrus.WithFields(logrus.Fields{
 		"stream": streamID,
 		"rows":   len(results.Values),
@@ -68,7 +68,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.Tab
 		}
 
 		logrus.WithField("fields", fields).Trace("got row")
-		events = append(events, sqlcapture.ChangeEvent{
+		events = append(events, &sqlcapture.ChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			Source: &mysqlSourceInfo{
 				SourceCommon: sqlcapture.SourceCommon{

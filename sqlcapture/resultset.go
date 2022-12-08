@@ -16,10 +16,10 @@ type resultSet struct {
 }
 
 type backfillChunk struct {
-	rows       map[string]ChangeEvent // A map from the encoded primary key of a row to the 'Insert' event for that row
-	keyColumns []string               // The names of the primary key columns used for this table, in order
-	scanned    []byte                 // The encoded primary key of the greatest row in the chunk (or nil when complete=true)
-	complete   bool                   // When true, indicates that this chunk *completes* the table, and thus has no precise endpoint
+	rows       map[string]*ChangeEvent // A map from the encoded primary key of a row to the 'Insert' event for that row
+	keyColumns []string                // The names of the primary key columns used for this table, in order
+	scanned    []byte                  // The encoded primary key of the greatest row in the chunk (or nil when complete=true)
+	complete   bool                    // When true, indicates that this chunk *completes* the table, and thus has no precise endpoint
 }
 
 func newResultSet() *resultSet {
@@ -29,10 +29,10 @@ func newResultSet() *resultSet {
 // Buffer appends new "Insert" events to the buffered range for the specified stream. An
 // empty list of events indicates that the stream is completed, and thus the *range* of the
 // buffer now extends to infinity.
-func (r *resultSet) Buffer(streamID string, keyColumns []string, events []ChangeEvent, db Database) error {
+func (r *resultSet) Buffer(streamID string, keyColumns []string, events []*ChangeEvent, db Database) error {
 	var chunk, ok = r.streams[streamID]
 	if !ok {
-		chunk = &backfillChunk{keyColumns: keyColumns, rows: make(map[string]ChangeEvent)}
+		chunk = &backfillChunk{keyColumns: keyColumns, rows: make(map[string]*ChangeEvent)}
 		r.streams[streamID] = chunk
 	}
 
@@ -106,7 +106,7 @@ func (r *resultSet) Scanned(streamID string) []byte {
 // Patch modifies the buffered results to include the effect of the provided
 // changeEvent. This may simply mean ignoring the event, if it occured on a
 // table which is not in the resultSet or for a row which is not yet included.
-func (r *resultSet) Patch(streamID string, event ChangeEvent, rowKey []byte) error {
+func (r *resultSet) Patch(streamID string, event *ChangeEvent, rowKey []byte) error {
 	// If a particular table is not represented in the backfill result-set then
 	// patching its changes is a no-op.
 	if r == nil {
@@ -140,7 +140,7 @@ func (r *resultSet) Patch(streamID string, event ChangeEvent, rowKey []byte) err
 	case InsertOp:
 		chunk.rows[string(rowKey)] = event
 	case UpdateOp:
-		chunk.rows[string(rowKey)] = ChangeEvent{
+		chunk.rows[string(rowKey)] = &ChangeEvent{
 			Operation: InsertOp,
 			Source:    event.Source,
 			Before:    nil,
@@ -156,7 +156,7 @@ func (r *resultSet) Patch(streamID string, event ChangeEvent, rowKey []byte) err
 
 // Changes returns the buffered contents of the resultSet for the specified stream,
 // including any Patch()ed mutations to that buffer.
-func (r *resultSet) Changes(streamID string) []ChangeEvent {
+func (r *resultSet) Changes(streamID string) []*ChangeEvent {
 	if r == nil {
 		return nil
 	}
@@ -172,7 +172,7 @@ func (r *resultSet) Changes(streamID string) []ChangeEvent {
 	sort.Strings(keys)
 
 	// Make a list of events in the sorted order
-	var events []ChangeEvent
+	var events []*ChangeEvent
 	for _, key := range keys {
 		events = append(events, r.streams[streamID].rows[key])
 	}
