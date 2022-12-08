@@ -99,7 +99,7 @@ func TestDateTimeColumn(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, "TIMESTAMPTZ NOT NULL", mapped.DDL)
+	require.Equal(t, "TIMESTAMPTZ", mapped.DDL)
 
 	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, "2022-04-04T10:09:08.234567Z", parsed)
