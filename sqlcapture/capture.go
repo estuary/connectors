@@ -83,7 +83,7 @@ type Capture struct {
 	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
 	Database Database                // The database-specific interface which is operated by the generic Capture logic
 
-	discovery map[string]TableInfo // Cached result of the most recent table discovery request
+	discovery map[string]*DiscoveryInfo // Cached result of the most recent table discovery request
 
 	emitQueue chan interface{} // A large buffered channel containing messages to be serialized and emitted
 	emitError chan error       // A unit-buffered channel which contains the emitter goroutine's exit status after it terminates
@@ -136,18 +136,18 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error updating capture state: %w", err)
 	}
 
-	var captureTables = make(map[string]struct{})
-	var tableMetadata = make(map[string]json.RawMessage)
+	replStream, err := c.Database.ReplicationStream(ctx, c.State.Cursor)
+	if err != nil {
+		return fmt.Errorf("error creating replication stream: %w", err)
+	}
 	for streamID, state := range c.State.Streams {
 		if state.Mode == TableModeBackfill || state.Mode == TableModeActive {
-			tableMetadata[streamID] = state.Metadata
-			captureTables[streamID] = struct{}{}
+			replStream.ActivateTable(streamID, c.discovery[streamID], state.Metadata)
 		}
 	}
-	captureTables[c.Database.WatermarksTable()] = struct{}{}
-
-	replStream, err := c.Database.StartReplication(ctx, c.State.Cursor, captureTables, c.discovery, tableMetadata)
-	if err != nil {
+	var watermarks = c.Database.WatermarksTable()
+	replStream.ActivateTable(watermarks, c.discovery[watermarks], nil)
+	if err := replStream.StartReplication(ctx); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
 	defer func() {
@@ -169,7 +169,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	}
 	for _, streamID := range c.State.StreamsInState(TableModePending) {
 		logrus.WithField("stream", streamID).Info("activating replication for stream")
-		if err := replStream.ActivateTable(streamID); err != nil {
+		if err := replStream.ActivateTable(streamID, c.discovery[streamID], nil); err != nil {
 			return fmt.Errorf("error activating %q for replication: %w", streamID, err)
 		}
 		var state = c.State.Streams[streamID]
