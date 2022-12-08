@@ -16,7 +16,7 @@ import (
 )
 
 // DiscoverTables queries the database for information about tables available for capture.
-func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]sqlcapture.TableInfo, error) {
+func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
 	// Get lists of all columns and primary keys in the database
 	var columns, err = getColumns(ctx, db.conn)
 	if err != nil {
@@ -34,15 +34,15 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]sqlc
 		logrus.WithField("err", err).Warn("error fetching column descriptions")
 	}
 
-	// Aggregate column and primary key information into TableInfo structs
+	// Aggregate column and primary key information into DiscoveryInfo structs
 	// using a map from fully-qualified "<schema>.<name>" table names to
-	// the corresponding TableInfo.
-	var tableMap = make(map[string]sqlcapture.TableInfo)
+	// the corresponding DiscoveryInfo.
+	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
 	for _, column := range columns {
 		var id = column.TableSchema + "." + column.TableName
 		var info, ok = tableMap[id]
 		if !ok {
-			info = sqlcapture.TableInfo{Schema: column.TableSchema, Name: column.TableName}
+			info = &sqlcapture.DiscoveryInfo{Schema: column.TableSchema, Name: column.TableName}
 		}
 		if info.Columns == nil {
 			info.Columns = make(map[string]sqlcapture.ColumnInfo)
@@ -130,7 +130,7 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 	return jsonType, nil
 }
 
-func translateRecordFields(table *sqlcapture.TableInfo, f map[string]interface{}) error {
+func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interface{}) error {
 	if f == nil {
 		return nil
 	}

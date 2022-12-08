@@ -26,28 +26,7 @@ import (
 // likely to exercise blocking sends and backpressure.
 var replicationBufferSize = 1024
 
-func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor string, activeTables map[string]struct{}, discovery map[string]sqlcapture.TableInfo, metadata map[string]json.RawMessage) (sqlcapture.ReplicationStream, error) {
-	var parsedMetadata = make(map[string]*mysqlTableMetadata)
-	for streamID, metadataJSON := range metadata {
-		var parsed *mysqlTableMetadata
-		if metadataJSON != nil {
-			if err := json.Unmarshal(metadataJSON, &parsed); err != nil {
-				return nil, fmt.Errorf("error parsing metadata JSON: %w", err)
-			}
-			// Fix up complex (non-string) column types, since the JSON round-trip
-			// will turn *mysqlColumnType values into map[string]interface{}.
-			for column, columnType := range parsed.Schema.ColumnTypes {
-				if columnType, ok := columnType.(map[string]interface{}); ok {
-					var parsedType mysqlColumnType
-					if err := mapstructure.Decode(columnType, &parsedType); err == nil {
-						parsed.Schema.ColumnTypes[column] = &parsedType
-					}
-				}
-			}
-		}
-		parsedMetadata[streamID] = parsed
-	}
-
+func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
 	var address = db.config.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
 	// to address through the bastion server, so we use the tunnel's address
@@ -111,29 +90,15 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		}
 	}
 
-	var streamCtx, streamCancel = context.WithCancel(ctx)
 	var stream = &mysqlReplicationStream{
 		db:       db,
 		syncer:   syncer,
 		streamer: streamer,
 		cursor:   pos,
-		events:   make(chan sqlcapture.DatabaseEvent, replicationBufferSize),
-		cancel:   streamCancel,
-		errCh:    make(chan error),
 	}
-	stream.tables.active = activeTables
-	stream.tables.discovery = discovery
-	stream.tables.metadata = parsedMetadata
-	go func() {
-		var err = stream.run(streamCtx)
-		if errors.Is(err, context.Canceled) {
-			err = nil
-		}
-		syncer.Close()
-		close(stream.events)
-		stream.errCh <- err
-	}()
-
+	stream.tables.active = make(map[string]struct{})
+	stream.tables.discovery = make(map[string]sqlcapture.DiscoveryInfo)
+	stream.tables.metadata = make(map[string]*mysqlTableMetadata)
 	return stream, nil
 }
 
@@ -162,13 +127,15 @@ func splitHostPort(addr string) (string, int64, error) {
 }
 
 type mysqlReplicationStream struct {
-	db            *mysqlDatabase
-	syncer        *replication.BinlogSyncer
-	streamer      *replication.BinlogStreamer
-	cursor        mysql.Position
-	events        chan sqlcapture.DatabaseEvent
-	cancel        context.CancelFunc
-	errCh         chan error
+	db       *mysqlDatabase
+	syncer   *replication.BinlogSyncer
+	streamer *replication.BinlogStreamer
+	cursor   mysql.Position
+	events   chan sqlcapture.DatabaseEvent // Output channel from replication worker goroutine
+
+	cancel context.CancelFunc // Cancellation thunk for the replication worker goroutine
+	errCh  chan error         // Error output channel for the replication worker goroutine
+
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
 
 	// The active tables set and associated metadata, guarded by a
@@ -177,7 +144,7 @@ type mysqlReplicationStream struct {
 	tables struct {
 		sync.RWMutex
 		active        map[string]struct{}
-		discovery     map[string]sqlcapture.TableInfo
+		discovery     map[string]sqlcapture.DiscoveryInfo
 		metadata      map[string]*mysqlTableMetadata
 		dirtyMetadata []string
 	}
@@ -192,19 +159,29 @@ type mysqlTableSchema struct {
 	ColumnTypes map[string]interface{} `json:"types"`
 }
 
-func (rs *mysqlReplicationStream) run(ctx context.Context) error {
-	// Initialize metadata (as necessary) for all active tables.
-	//
-	// It is safe to access `rs.tables.active` here without locking, because the
-	// main goroutine won't start activating tables until after it receives a new
-	// watermark from replication. And we need to not be holding a lock when
-	// `ActivateTable()` tries to acquire the write lock.
-	for streamID := range rs.tables.active {
-		if err := rs.ActivateTable(streamID); err != nil {
-			return fmt.Errorf("error activating %q at replication start: %w", streamID, err)
-		}
+func (rs *mysqlReplicationStream) StartReplication(ctx context.Context) error {
+	if rs.cancel != nil {
+		return fmt.Errorf("internal error: replication stream already started")
 	}
 
+	var streamCtx, streamCancel = context.WithCancel(ctx)
+	rs.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
+	rs.errCh = make(chan error)
+	rs.cancel = streamCancel
+
+	go func() {
+		var err = rs.run(streamCtx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		rs.syncer.Close()
+		close(rs.events)
+		rs.errCh <- err
+	}()
+	return nil
+}
+
+func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 	for {
 		// Send "Metadata Change" events to the consumer where applicable.
 		//
@@ -260,7 +237,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 			// Get column names and types from persistent metadata. If available, allow
 			// override the persistent column name tracking using binlog row metadata.
 			var metadata, ok = rs.tableMetadata(streamID)
-			if !ok {
+			if !ok || metadata == nil {
 				return fmt.Errorf("missing metadata for stream %q", streamID)
 			}
 			var columnTypes = metadata.Schema.ColumnTypes
@@ -489,24 +466,36 @@ func (rs *mysqlReplicationStream) tableActive(streamID string) bool {
 	return ok
 }
 
-func (rs *mysqlReplicationStream) ActivateTable(streamID string) error {
+func (rs *mysqlReplicationStream) ActivateTable(streamID string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	rs.tables.Lock()
 	defer rs.tables.Unlock()
 
-	// Mark the table active. This is redundant for `ActivateTable()` calls
-	// during replication stream startup, but doesn't hurt anything and helps
-	// keep the control flow simpler.
-	rs.tables.active[streamID] = struct{}{}
-
-	// Do nothing if metadata is already initialized for this stream.
-	if metadata := rs.tables.metadata[streamID]; metadata != nil {
+	// Do nothing if the table is already active.
+	if _, ok := rs.tables.active[streamID]; ok {
 		return nil
 	}
 
-	// Otherwise construct new metadata based on discovery info.
-	logrus.WithField("stream", streamID).Debug("initializing table metadata")
-	var metadata = new(mysqlTableMetadata)
-	if discovery, ok := rs.tables.discovery[streamID]; ok {
+	// If metadata JSON is present then parse it into a usable object. Otherwise
+	// initialize new metadata based on discovery results.
+	var metadata *mysqlTableMetadata
+	if metadataJSON != nil {
+		if err := json.Unmarshal(metadataJSON, &metadata); err != nil {
+			return fmt.Errorf("error parsing metadata JSON: %w", err)
+		}
+		// Fix up complex (non-string) column types, since the JSON round-trip
+		// will turn *mysqlColumnType values into map[string]interface{}.
+		for column, columnType := range metadata.Schema.ColumnTypes {
+			if columnType, ok := columnType.(map[string]interface{}); ok {
+				var parsedType mysqlColumnType
+				if err := mapstructure.Decode(columnType, &parsedType); err == nil {
+					metadata.Schema.ColumnTypes[column] = &parsedType
+				}
+			}
+		}
+	} else if discovery != nil {
+		// If metadata JSON is not present, construct new default metadata based on the discovery info.
+		logrus.WithField("stream", streamID).Debug("initializing table metadata")
+		metadata = new(mysqlTableMetadata)
 		var colTypes = make(map[string]interface{})
 		for colName, colInfo := range discovery.Columns {
 			colTypes[colName] = colInfo.DataType
@@ -521,6 +510,9 @@ func (rs *mysqlReplicationStream) ActivateTable(streamID string) error {
 			"types":   metadata.Schema.ColumnTypes,
 		}).Debug("initialized table metadata")
 	}
+
+	// Finally, mark the table as active and store the updated metadata.
+	rs.tables.active[streamID] = struct{}{}
 	rs.tables.metadata[streamID] = metadata
 	rs.tables.dirtyMetadata = append(rs.tables.dirtyMetadata, streamID)
 	return nil

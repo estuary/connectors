@@ -20,9 +20,7 @@ import (
 
 var slotInUseRe = regexp.MustCompile(`replication slot ".*" is active for PID`)
 
-// StartReplication opens a connection to the database and returns a ReplicationStream
-// from which a neverending sequence of change events can be read.
-func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor string, activeTables map[string]struct{}, discovery map[string]sqlcapture.TableInfo, metadata map[string]json.RawMessage) (sqlcapture.ReplicationStream, error) {
+func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
 	// Replication database connection used for event streaming
 	connConfig, err := pgconn.ParseConfig(db.config.ToURI())
 	if err != nil {
@@ -61,32 +59,16 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 		"slot":        slot,
 	}).Info("starting replication")
 
-	var stream = &replicationStream{
-		replSlot:        slot,
-		pubName:         publication,
-		ackLSN:          uint64(startLSN),
-		lastTxnEndLSN:   startLSN,
-		nextTxnFinalLSN: 0,
-		nextTxnMillis:   0,
-		conn:            conn,
-		connInfo:        pgtype.NewConnInfo(),
-		relations:       make(map[uint32]*pglogrepl.RelationMessage),
-		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
-		events: make(chan sqlcapture.DatabaseEvent, replicationBufferSize),
-		errCh:  make(chan error),
-	}
-	stream.tables.active = activeTables
-
 	// Create the publication and replication slot, ignoring the inevitable errors
 	// when they already exist. We could in theory add some extra logic to check,
 	// but why bother when PostgreSQL will already do what we need?
-	_ = conn.Exec(ctx, fmt.Sprintf(`CREATE PUBLICATION %s FOR ALL TABLES;`, stream.pubName)).Close()
-	_ = conn.Exec(ctx, fmt.Sprintf(`CREATE_REPLICATION_SLOT %s LOGICAL pgoutput;`, stream.replSlot)).Close()
+	_ = conn.Exec(ctx, fmt.Sprintf(`CREATE PUBLICATION %s FOR ALL TABLES;`, publication)).Close()
+	_ = conn.Exec(ctx, fmt.Sprintf(`CREATE_REPLICATION_SLOT %s LOGICAL pgoutput;`, slot)).Close()
 
-	if err := pglogrepl.StartReplication(ctx, stream.conn, slot, startLSN, pglogrepl.StartReplicationOptions{
+	if err := pglogrepl.StartReplication(ctx, conn, slot, startLSN, pglogrepl.StartReplicationOptions{
 		PluginArgs: []string{
 			`"proto_version" '1'`,
-			fmt.Sprintf(`"publication_names" '%s'`, stream.pubName),
+			fmt.Sprintf(`"publication_names" '%s'`, publication),
 		},
 	}); err != nil {
 		conn.Close(ctx)
@@ -101,18 +83,20 @@ func (db *postgresDatabase) StartReplication(ctx context.Context, startCursor st
 		return nil, fmt.Errorf("unable to start replication: %w", err)
 	}
 
-	var streamCtx, streamCancel = context.WithCancel(ctx)
-	stream.cancel = streamCancel
-	go func() {
-		var err = stream.run(streamCtx)
-		if errors.Is(err, context.Canceled) {
-			err = nil
-		}
-		stream.conn.Close(ctx)
-		close(stream.events)
-		stream.errCh <- err
-	}()
+	var stream = &replicationStream{
+		conn:     conn,
+		pubName:  publication,
+		replSlot: slot,
 
+		ackLSN:          uint64(startLSN),
+		lastTxnEndLSN:   startLSN,
+		nextTxnFinalLSN: 0,
+		nextTxnMillis:   0,
+		connInfo:        pgtype.NewConnInfo(),
+		relations:       make(map[uint32]*pglogrepl.RelationMessage),
+		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
+	}
+	stream.tables.active = make(map[string]struct{})
 	return stream, nil
 }
 
@@ -161,17 +145,19 @@ func (s *postgresSource) Cursor() string {
 // is no built-in concurrency, so Process() must be called reasonably
 // soon after StartReplication() in order to not time out.
 type replicationStream struct {
-	ackLSN          uint64                        // The most recently Ack'd LSN, passed to startReplication or updated via CommitLSN.
-	cancel          context.CancelFunc            // Cancel function for the replication goroutine's context
-	errCh           chan error                    // Error channel for the final exit status of the replication goroutine
-	conn            *pgconn.PgConn                // The PostgreSQL replication connection
-	eventBuf        sqlcapture.DatabaseEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
-	events          chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
-	lastTxnEndLSN   pglogrepl.LSN                 // End LSN (record + 1) of the last completed transaction.
-	nextTxnFinalLSN pglogrepl.LSN                 // Final LSN of the commit currently being processed, or zero if between transactions.
-	nextTxnMillis   int64                         // Unix timestamp (in millis) at which the change originally occurred.
-	pubName         string                        // The name of the PostgreSQL publication to use
-	replSlot        string                        // The name of the PostgreSQL replication slot to use
+	conn     *pgconn.PgConn // The PostgreSQL replication connection
+	pubName  string         // The name of the PostgreSQL publication to use
+	replSlot string         // The name of the PostgreSQL replication slot to use
+
+	cancel   context.CancelFunc            // Cancel function for the replication goroutine's context
+	errCh    chan error                    // Error channel for the final exit status of the replication goroutine
+	events   chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
+	eventBuf sqlcapture.DatabaseEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
+
+	ackLSN          uint64        // The most recently Ack'd LSN, passed to startReplication or updated via CommitLSN.
+	lastTxnEndLSN   pglogrepl.LSN // End LSN (record + 1) of the last completed transaction.
+	nextTxnFinalLSN pglogrepl.LSN // Final LSN of the commit currently being processed, or zero if between transactions.
+	nextTxnMillis   int64         // Unix timestamp (in millis) at which the change originally occurred.
 
 	// standbyStatusDeadline is the time at which we need to stop receiving
 	// replication messages and go send a Standby Status Update message to
@@ -209,6 +195,24 @@ var replicationBufferSize = 64 * 1024 // Assuming change events average ~2kB the
 
 func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 	return s.events
+}
+
+func (s *replicationStream) StartReplication(ctx context.Context) error {
+	var streamCtx, streamCancel = context.WithCancel(ctx)
+	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
+	s.errCh = make(chan error)
+	s.cancel = streamCancel
+
+	go func() {
+		var err = s.run(streamCtx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		s.conn.Close(ctx)
+		close(s.events)
+		s.errCh <- err
+	}()
+	return nil
 }
 
 // run is the main loop of the replicationStream which combines message
@@ -545,7 +549,7 @@ func (s *replicationStream) tableActive(streamID string) bool {
 	return ok
 }
 
-func (s *replicationStream) ActivateTable(streamID string) error {
+func (s *replicationStream) ActivateTable(streamID string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	s.tables.Lock()
 	s.tables.active[streamID] = struct{}{}
 	s.tables.Unlock()
