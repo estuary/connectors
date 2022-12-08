@@ -3,8 +3,8 @@
 			materialization TEXT NOT NULL,
 			key_begin BIGINT NOT NULL,
 			key_end BIGINT NOT NULL,
-			fence BIGINT NOT NULL,
-			checkpoint TEXT NOT NULL,
+			fence BIGINT,
+			checkpoint TEXT,
 			PRIMARY KEY (materialization, key_begin, key_end)
 		
 	);

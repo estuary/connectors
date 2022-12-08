@@ -128,6 +128,7 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 	}
 
 	for _, key := range shape.Keys {
+		key.IsPrimaryKey = true
 		table.Keys = append(table.Keys, Column{Projection: key})
 	}
 	for _, val := range shape.Values {
