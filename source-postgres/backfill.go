@@ -11,9 +11,23 @@ import (
 )
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, keyColumns []string, resumeKey []interface{}) ([]*sqlcapture.ChangeEvent, error) {
+func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, keyColumns []string, resumeAfter []byte) ([]*sqlcapture.ChangeEvent, error) {
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
+
+	// Decode the resumeAfter key if non-nil
+	var err error
+	var resumeKey []interface{}
+	if resumeAfter != nil {
+		resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
+		if err != nil {
+			return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+		}
+		if len(resumeKey) != len(keyColumns) {
+			return nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+		}
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"stream":     streamID,
 		"keyColumns": keyColumns,
@@ -47,12 +61,17 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		for idx := range cols {
 			fields[string(cols[idx].Name)] = vals[idx]
 		}
+		rowKey, err := sqlcapture.EncodeRowKey(keyColumns, fields, encodeKeyFDB)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+		}
 		if err := translateRecordFields(info, fields); err != nil {
 			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
 		events = append(events, &sqlcapture.ChangeEvent{
 			Operation: sqlcapture.InsertOp,
+			RowKey:    rowKey,
 			Source: &postgresSource{
 				SourceCommon: sqlcapture.SourceCommon{
 					Millis:   0, // Not known.

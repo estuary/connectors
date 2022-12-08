@@ -99,6 +99,7 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 	stream.tables.active = make(map[string]struct{})
 	stream.tables.discovery = make(map[string]sqlcapture.DiscoveryInfo)
 	stream.tables.metadata = make(map[string]*mysqlTableMetadata)
+	stream.tables.keyColumns = make(map[string][]string)
 	return stream, nil
 }
 
@@ -146,6 +147,7 @@ type mysqlReplicationStream struct {
 		active        map[string]struct{}
 		discovery     map[string]sqlcapture.DiscoveryInfo
 		metadata      map[string]*mysqlTableMetadata
+		keyColumns    map[string][]string
 		dirtyMetadata []string
 	}
 }
@@ -246,6 +248,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				columnNames = metadata.Schema.Columns
 			}
 
+			keyColumns, ok := rs.keyColumns(streamID)
+			if !ok {
+				return fmt.Errorf("unknown key columns for stream %q", streamID)
+			}
+
 			switch event.Header.EventType {
 			case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 				for _, row := range data.Rows {
@@ -253,11 +260,16 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if err != nil {
 						return fmt.Errorf("error decoding row values: %w", err)
 					}
+					rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, encodeKeyFDB)
+					if err != nil {
+						return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+					}
 					if err := rs.db.translateRecordFields(columnTypes, after); err != nil {
 						return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 					}
 					rs.events <- &sqlcapture.ChangeEvent{
 						Operation: sqlcapture.InsertOp,
+						RowKey:    rowKey,
 						Source:    sourceMeta,
 						After:     after,
 					}
@@ -274,6 +286,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						if err != nil {
 							return fmt.Errorf("error decoding row values: %w", err)
 						}
+						rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, encodeKeyFDB)
+						if err != nil {
+							return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+						}
 						if err := rs.db.translateRecordFields(columnTypes, before); err != nil {
 							return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
 						}
@@ -282,6 +298,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						}
 						rs.events <- &sqlcapture.ChangeEvent{
 							Operation: sqlcapture.UpdateOp,
+							RowKey:    rowKey,
 							Source:    sourceMeta,
 							Before:    before,
 							After:     after,
@@ -294,11 +311,16 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if err != nil {
 						return fmt.Errorf("error decoding row values: %w", err)
 					}
+					rowKey, err := sqlcapture.EncodeRowKey(keyColumns, before, encodeKeyFDB)
+					if err != nil {
+						return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+					}
 					if err := rs.db.translateRecordFields(columnTypes, before); err != nil {
 						return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
 					}
 					rs.events <- &sqlcapture.ChangeEvent{
 						Operation: sqlcapture.DeleteOp,
+						RowKey:    rowKey,
 						Source:    sourceMeta,
 						Before:    before,
 					}
@@ -466,7 +488,14 @@ func (rs *mysqlReplicationStream) tableActive(streamID string) bool {
 	return ok
 }
 
-func (rs *mysqlReplicationStream) ActivateTable(streamID string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+func (rs *mysqlReplicationStream) keyColumns(streamID string) ([]string, bool) {
+	rs.tables.RLock()
+	defer rs.tables.RUnlock()
+	var keyColumns, ok = rs.tables.keyColumns[streamID]
+	return keyColumns, ok
+}
+
+func (rs *mysqlReplicationStream) ActivateTable(streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	rs.tables.Lock()
 	defer rs.tables.Unlock()
 
@@ -513,6 +542,7 @@ func (rs *mysqlReplicationStream) ActivateTable(streamID string, discovery *sqlc
 
 	// Finally, mark the table as active and store the updated metadata.
 	rs.tables.active[streamID] = struct{}{}
+	rs.tables.keyColumns[streamID] = keyColumns
 	rs.tables.metadata[streamID] = metadata
 	rs.tables.dirtyMetadata = append(rs.tables.dirtyMetadata, streamID)
 	return nil
