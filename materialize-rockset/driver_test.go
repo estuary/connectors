@@ -210,7 +210,11 @@ func cleanup(config config, workspaceName string, collectionName string) {
 		log.Fatalf("failed to cleanup collection: %s/%s: %s", workspaceName, collectionName, err.Error())
 	}
 
-	client.DeleteWorkspace(ctx, workspaceName)
+	client.WaitUntilCollectionGone(ctx, workspaceName, collectionName)
+
+	if err := client.DeleteWorkspace(ctx, workspaceName); err != nil {
+		log.Fatalf("failed to cleanup workspace: %s/%s: %s", workspaceName, collectionName, err.Error())
+	}
 }
 
 func testConfig() config {
