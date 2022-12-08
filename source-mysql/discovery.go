@@ -15,20 +15,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]sqlcapture.TableInfo, error) {
+func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
 	// Enumerate every column of every table, and then aggregate into a
 	// map from StreamID to TableInfo structs.
 	var columns, err = getColumns(ctx, db.conn)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering columns: %w", err)
 	}
-	var tableMap = make(map[string]sqlcapture.TableInfo)
+	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
 	for _, column := range columns {
 		// Create or look up the appropriate TableInfo struct for a given schema+name
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
 		var info, ok = tableMap[streamID]
 		if !ok {
-			info = sqlcapture.TableInfo{Schema: column.TableSchema, Name: column.TableName}
+			info = &sqlcapture.DiscoveryInfo{Schema: column.TableSchema, Name: column.TableName}
 		}
 
 		// The 'Stream IDs' used for table info lookup are case insensitive, so we
