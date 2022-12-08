@@ -16,10 +16,9 @@ type resultSet struct {
 }
 
 type backfillChunk struct {
-	rows       map[string]*ChangeEvent // A map from the encoded primary key of a row to the 'Insert' event for that row
-	keyColumns []string                // The names of the primary key columns used for this table, in order
-	scanned    []byte                  // The encoded primary key of the greatest row in the chunk (or nil when complete=true)
-	complete   bool                    // When true, indicates that this chunk *completes* the table, and thus has no precise endpoint
+	rows     map[string]*ChangeEvent // A map from the encoded primary key of a row to the 'Insert' event for that row
+	scanned  []byte                  // The encoded primary key of the greatest row in the chunk (or nil when complete=true)
+	complete bool                    // When true, indicates that this chunk *completes* the table, and thus has no precise endpoint
 }
 
 func newResultSet() *resultSet {
@@ -29,10 +28,10 @@ func newResultSet() *resultSet {
 // Buffer appends new "Insert" events to the buffered range for the specified stream. An
 // empty list of events indicates that the stream is completed, and thus the *range* of the
 // buffer now extends to infinity.
-func (r *resultSet) Buffer(streamID string, keyColumns []string, events []*ChangeEvent, db Database) error {
+func (r *resultSet) Buffer(streamID string, events []*ChangeEvent) error {
 	var chunk, ok = r.streams[streamID]
 	if !ok {
-		chunk = &backfillChunk{keyColumns: keyColumns, rows: make(map[string]*ChangeEvent)}
+		chunk = &backfillChunk{rows: make(map[string]*ChangeEvent)}
 		r.streams[streamID] = chunk
 	}
 
@@ -50,10 +49,7 @@ func (r *resultSet) Buffer(streamID string, keyColumns []string, events []*Chang
 		"count":  len(events),
 	}).Debug("buffering chunk of backfill data")
 	for _, event := range events {
-		var bs, err = encodeRowKey(chunk.keyColumns, event.After, db)
-		if err != nil {
-			return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
-		}
+		var bs = event.RowKey
 		if chunk.scanned != nil && compareTuples(chunk.scanned, bs) >= 0 {
 			// It's important for correctness that the ordering of serialized primary keys matches
 			// the ordering that PostgreSQL uses. Since we're already serializing every result row's
@@ -106,7 +102,7 @@ func (r *resultSet) Scanned(streamID string) []byte {
 // Patch modifies the buffered results to include the effect of the provided
 // changeEvent. This may simply mean ignoring the event, if it occured on a
 // table which is not in the resultSet or for a row which is not yet included.
-func (r *resultSet) Patch(streamID string, event *ChangeEvent, rowKey []byte) error {
+func (r *resultSet) Patch(streamID string, event *ChangeEvent) error {
 	// If a particular table is not represented in the backfill result-set then
 	// patching its changes is a no-op.
 	if r == nil {
@@ -119,12 +115,12 @@ func (r *resultSet) Patch(streamID string, event *ChangeEvent, rowKey []byte) er
 
 	// Ignore mutations occurring after the end of the current resultset, unless this
 	// is the final resultset which will complete the backfill.
-	if !chunk.complete && compareTuples(rowKey, chunk.scanned) > 0 {
+	if !chunk.complete && compareTuples(event.RowKey, chunk.scanned) > 0 {
 		if logrus.IsLevelEnabled(logrus.DebugLevel) {
 			logrus.WithFields(logrus.Fields{
 				"stream":   streamID,
 				"op":       event.Operation,
-				"rowKey":   base64.StdEncoding.EncodeToString(rowKey),
+				"rowKey":   base64.StdEncoding.EncodeToString(event.RowKey),
 				"chunkEnd": base64.StdEncoding.EncodeToString(chunk.scanned),
 			}).Debug("filtering change")
 		}
@@ -138,16 +134,16 @@ func (r *resultSet) Patch(streamID string, event *ChangeEvent, rowKey []byte) er
 	// all such inconsistencies by the time the next watermark is reached.
 	switch event.Operation {
 	case InsertOp:
-		chunk.rows[string(rowKey)] = event
+		chunk.rows[string(event.RowKey)] = event
 	case UpdateOp:
-		chunk.rows[string(rowKey)] = &ChangeEvent{
+		chunk.rows[string(event.RowKey)] = &ChangeEvent{
 			Operation: InsertOp,
 			Source:    event.Source,
 			Before:    nil,
 			After:     event.After,
 		}
 	case DeleteOp:
-		delete(chunk.rows, string(rowKey))
+		delete(chunk.rows, string(event.RowKey))
 	default:
 		return fmt.Errorf("patched invalid change type %q", event.Operation)
 	}
