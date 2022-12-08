@@ -111,17 +111,17 @@ func (e *ChangeEvent) KeyFields() map[string]interface{} {
 type Database interface {
 	// Close shuts down the database connection.
 	Close(ctx context.Context) error
-	// StartReplication opens a connection to the database and returns a ReplicationStream
-	// from which a neverending sequence of change events can be read.
-	StartReplication(ctx context.Context, startCursor string, activeTables map[string]struct{}, discovery map[string]TableInfo, metadata map[string]json.RawMessage) (ReplicationStream, error)
+	// ReplicationStream constructs a new ReplicationStream object, from which
+	// a neverending sequence of change events can be read.
+	ReplicationStream(ctx context.Context, startCursor string) (ReplicationStream, error)
 	// WriteWatermark writes the provided string into the 'watermarks' table.
 	WriteWatermark(ctx context.Context, watermark string) error
 	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
 	WatermarksTable() string
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-	ScanTableChunk(ctx context.Context, info TableInfo, keyColumns []string, resumeKey []interface{}) ([]*ChangeEvent, error)
+	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, keyColumns []string, resumeKey []interface{}) ([]*ChangeEvent, error)
 	// DiscoverTables queries the database for information about tables available for capture.
-	DiscoverTables(ctx context.Context) (map[string]TableInfo, error)
+	DiscoverTables(ctx context.Context) (map[string]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
 	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Schema, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
@@ -139,16 +139,22 @@ type Database interface {
 // ReplicationStream represents the process of receiving change events
 // from a database, managing keepalives and status updates, and translating
 // these changes into a stream of ChangeEvents.
+//
+// Each table must be 'Activated' before replicated change events will be
+// received for that table. It is permitted and necessary to activate some
+// tables before starting replication.
 type ReplicationStream interface {
-	ActivateTable(streamID string) error
+	ActivateTable(streamID string, info *DiscoveryInfo, metadata json.RawMessage) error
+
+	StartReplication(ctx context.Context) error
 	Events() <-chan DatabaseEvent
 	Acknowledge(ctx context.Context, cursor string) error
 	Close(ctx context.Context) error
 }
 
-// TableInfo holds metadata about a specific table in the database, and
+// DiscoveryInfo holds metadata about a specific table in the database, and
 // is used during discovery to automatically generate catalog information.
-type TableInfo struct {
+type DiscoveryInfo struct {
 	Name        string                // The PostgreSQL table name.
 	Schema      string                // The PostgreSQL schema (a namespace, in normal parlance) which contains the table.
 	Columns     map[string]ColumnInfo // Information about each column of the table.
