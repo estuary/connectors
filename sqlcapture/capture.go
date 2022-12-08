@@ -110,8 +110,10 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	defer func() {
 		close(c.emitQueue)
 		emitterCancel()
-		if emitErr := <-c.emitError; err == nil && emitErr != nil {
-			err = emitErr
+		for emitErr := range c.emitError {
+			if err == nil && emitErr != nil {
+				err = emitErr
+			}
 		}
 	}()
 
@@ -343,7 +345,7 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 
 		// Flush events update the checkpointed LSN and trigger a state update.
 		// If this is the commit after the target watermark, it also ends the loop.
-		if event.Operation == FlushOp {
+		if event, ok := event.(*FlushEvent); ok {
 			c.State.Cursor = event.Source.Cursor()
 			if err := c.emitState(); err != nil {
 				return fmt.Errorf("error emitting state update: %w", err)
@@ -357,16 +359,22 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 		// Metadata events update the per-table metadata and dirty flag.
 		// They have no other effect, the new metadata will only be written
 		// as part of a subsequent state checkpoint.
-		if event.Operation == MetadataOp {
-			var streamID = event.Metadata.StreamID
+		if event, ok := event.(*MetadataEvent); ok {
+			var streamID = event.StreamID
 			if state, ok := c.State.Streams[streamID]; ok {
 				logrus.WithField("stream", streamID).Trace("stream metadata changed")
-				state.Metadata = event.Metadata.Metadata
+				state.Metadata = event.Metadata
 				state.dirty = true
 				c.State.Streams[streamID] = state
 			}
 			continue
 		}
+
+		// Any other events must be ChangeEvents
+		if _, ok := event.(*ChangeEvent); !ok {
+			return fmt.Errorf("unhandled database event %q", event.String())
+		}
+		var event = event.(*ChangeEvent)
 
 		// Note when the expected watermark is finally observed. The subsequent Commit will exit the loop.
 		var sourceCommon = event.Source.Common()
@@ -494,8 +502,8 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 	return results, nil
 }
 
-func (c *Capture) handleChangeEvent(streamID string, event ChangeEvent) error {
-	return c.emit(&event)
+func (c *Capture) handleChangeEvent(streamID string, event *ChangeEvent) error {
+	return c.emit(event)
 }
 
 func (c *Capture) emitState() error {
@@ -528,9 +536,8 @@ func (c *Capture) emit(msg interface{}) error {
 	}
 }
 
-// Hang on now. How can we wait for the emit worker to cleanly shut down?
-// Ah,
 func (c *Capture) emitWorker(ctx context.Context, out *boilerplate.PullOutput, emitQueue <-chan interface{}, emitError chan<- error) {
+	defer close(emitError)
 	for {
 		select {
 		case <-ctx.Done():

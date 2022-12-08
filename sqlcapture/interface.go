@@ -20,13 +20,6 @@ const (
 	UpdateOp ChangeOp = "u"
 	// DeleteOp is a DELETE operation.
 	DeleteOp ChangeOp = "d"
-	// FlushOp is an internal-only ChangeOp which flushes a completed
-	// transaction, but is not actually serialized.
-	FlushOp ChangeOp = "x"
-	// MetadataOp is an internal-only ChangeOp which informs the generic
-	// SQL capture logic about changes to the per-table metadata JSON. It
-	// is not serialized.
-	MetadataOp ChangeOp = "m"
 )
 
 // SourceCommon is common source metadata for data capture events.
@@ -68,18 +61,41 @@ type SourceMetadata interface {
 	Cursor() string // TODO(wgd): Maybe json.RawMessage?
 }
 
-// ChangeEvent represents either an Insert/Update/Delete operation on a specific
-// row in the database, a Commit event which indicates that the database is at
-// a consistent point from which we could restart in the future, or a Metadata
-// event which indicates that some database-specific per-table metadata has
-// changed.
+// ChangeEvent represents an Insert/Update/Delete operation on a specific
+// row in the database.
 type ChangeEvent struct {
 	Operation ChangeOp
 	Source    SourceMetadata
 	Before    map[string]interface{}
 	After     map[string]interface{}
-	Metadata  *MetadataChangeEvent
 }
+
+// FlushEvent informs the generic sqlcapture logic about transaction
+// boundaries.
+type FlushEvent struct {
+	Source SourceMetadata
+}
+
+// MetadataEvent informs the generic sqlcapture logic about changes to
+// the per-table metadata JSON.
+type MetadataEvent struct {
+	StreamID string
+	Metadata json.RawMessage
+}
+
+// A DatabaseEvent can be a ChangeEvent, FlushEvent, or MetadataEvent.
+type DatabaseEvent interface {
+	isDatabaseEvent()
+	String() string
+}
+
+func (*ChangeEvent) isDatabaseEvent()   {}
+func (*FlushEvent) isDatabaseEvent()    {}
+func (*MetadataEvent) isDatabaseEvent() {}
+
+func (*ChangeEvent) String() string   { return "ChangeEvent" }
+func (*FlushEvent) String() string    { return "FlushEvent" }
+func (*MetadataEvent) String() string { return "MetadataEvent" }
 
 // KeyFields returns suitable fields for extracting the event primary key.
 func (e *ChangeEvent) KeyFields() map[string]interface{} {
@@ -87,13 +103,6 @@ func (e *ChangeEvent) KeyFields() map[string]interface{} {
 		return e.Before
 	}
 	return e.After
-}
-
-// MetadataChangeEvent represents a change to some database-specific per-table
-// metadata.
-type MetadataChangeEvent struct {
-	StreamID string
-	Metadata json.RawMessage
 }
 
 // Database represents the operations which must be performed on a specific database
@@ -110,7 +119,7 @@ type Database interface {
 	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
 	WatermarksTable() string
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-	ScanTableChunk(ctx context.Context, info TableInfo, keyColumns []string, resumeKey []interface{}) ([]ChangeEvent, error)
+	ScanTableChunk(ctx context.Context, info TableInfo, keyColumns []string, resumeKey []interface{}) ([]*ChangeEvent, error)
 	// DiscoverTables queries the database for information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[string]TableInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
@@ -132,7 +141,7 @@ type Database interface {
 // these changes into a stream of ChangeEvents.
 type ReplicationStream interface {
 	ActivateTable(streamID string) error
-	Events() <-chan ChangeEvent
+	Events() <-chan DatabaseEvent
 	Acknowledge(ctx context.Context, cursor string) error
 	Close(ctx context.Context) error
 }

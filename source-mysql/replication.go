@@ -117,7 +117,7 @@ func (db *mysqlDatabase) StartReplication(ctx context.Context, startCursor strin
 		syncer:   syncer,
 		streamer: streamer,
 		cursor:   pos,
-		events:   make(chan sqlcapture.ChangeEvent, replicationBufferSize),
+		events:   make(chan sqlcapture.DatabaseEvent, replicationBufferSize),
 		cancel:   streamCancel,
 		errCh:    make(chan error),
 	}
@@ -166,7 +166,7 @@ type mysqlReplicationStream struct {
 	syncer        *replication.BinlogSyncer
 	streamer      *replication.BinlogStreamer
 	cursor        mysql.Position
-	events        chan sqlcapture.ChangeEvent
+	events        chan sqlcapture.DatabaseEvent
 	cancel        context.CancelFunc
 	errCh         chan error
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
@@ -212,19 +212,16 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		// part cannot block and the blocking send doesn't hold the mutex. This
 		// helps avoid a (very unlikely) deadlock with the main thread calling
 		// ActivateTable() while the events buffer is full.
-		var metadataEvents []sqlcapture.ChangeEvent
+		var metadataEvents []sqlcapture.DatabaseEvent
 		rs.tables.RLock()
 		for _, streamID := range rs.tables.dirtyMetadata {
 			var bs, err = json.Marshal(rs.tables.metadata[streamID])
 			if err != nil {
 				return fmt.Errorf("error serializing metadata JSON for %q: %w", streamID, err)
 			}
-			metadataEvents = append(metadataEvents, sqlcapture.ChangeEvent{
-				Operation: sqlcapture.MetadataOp,
-				Metadata: &sqlcapture.MetadataChangeEvent{
-					StreamID: streamID,
-					Metadata: json.RawMessage(bs),
-				},
+			metadataEvents = append(metadataEvents, &sqlcapture.MetadataEvent{
+				StreamID: streamID,
+				Metadata: json.RawMessage(bs),
 			})
 		}
 		rs.tables.dirtyMetadata = nil
@@ -282,7 +279,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if err := rs.db.translateRecordFields(columnTypes, after); err != nil {
 						return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 					}
-					rs.events <- sqlcapture.ChangeEvent{
+					rs.events <- &sqlcapture.ChangeEvent{
 						Operation: sqlcapture.InsertOp,
 						Source:    sourceMeta,
 						After:     after,
@@ -306,7 +303,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						if err := rs.db.translateRecordFields(columnTypes, after); err != nil {
 							return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
 						}
-						rs.events <- sqlcapture.ChangeEvent{
+						rs.events <- &sqlcapture.ChangeEvent{
 							Operation: sqlcapture.UpdateOp,
 							Source:    sourceMeta,
 							Before:    before,
@@ -323,7 +320,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if err := rs.db.translateRecordFields(columnTypes, before); err != nil {
 						return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
 					}
-					rs.events <- sqlcapture.ChangeEvent{
+					rs.events <- &sqlcapture.ChangeEvent{
 						Operation: sqlcapture.DeleteOp,
 						Source:    sourceMeta,
 						Before:    before,
@@ -337,8 +334,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				"xid":    data.XID,
 				"cursor": rs.cursor,
 			}).Trace("XID Event")
-			rs.events <- sqlcapture.ChangeEvent{
-				Operation: sqlcapture.FlushOp,
+			rs.events <- &sqlcapture.FlushEvent{
 				Source: &mysqlSourceInfo{
 					FlushCursor: fmt.Sprintf("%s:%d", rs.cursor.Name, rs.cursor.Pos),
 				},
@@ -530,7 +526,7 @@ func (rs *mysqlReplicationStream) ActivateTable(streamID string) error {
 	return nil
 }
 
-func (rs *mysqlReplicationStream) Events() <-chan sqlcapture.ChangeEvent {
+func (rs *mysqlReplicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 	return rs.events
 }
 
