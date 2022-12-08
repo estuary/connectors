@@ -7,13 +7,15 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
-// encodeRowKey extracts the appropriate key-fields by name from a map and encodes
-// them as a FoundationDB serialized tuple.
-func encodeRowKey(key []string, fields map[string]interface{}, db Database) ([]byte, error) {
+// EncodeRowKey extracts the appropriate key-fields by name from a map and encodes
+// them as a FoundationDB serialized tuple. It applies the `translate` callback to
+// each field value so that complex database-specific types can be "lowered" into
+// FDB-serializable values.
+func EncodeRowKey(key []string, fields map[string]interface{}, translate func(key interface{}) (tuple.TupleElement, error)) ([]byte, error) {
 	var xs = make([]interface{}, len(key))
 	var err error
 	for i, elem := range key {
-		if xs[i], err = db.EncodeKeyFDB(fields[elem]); err != nil {
+		if xs[i], err = translate(fields[elem]); err != nil {
 			return nil, fmt.Errorf("encode row key: %w", err)
 		}
 	}
@@ -62,14 +64,17 @@ func packTuple(xs []interface{}) (bs []byte, err error) {
 	return tuple.Tuple(t).Pack(), nil
 }
 
-func unpackTuple(bs []byte, db Database) ([]interface{}, error) {
+// UnpackTuple decodes a FoundationDB-serialized sequence of bytes into a list of
+// tuple elements, and then applies the `translate` callback to each one in order
+// to reverse any lowering of complex database-specific types done in EncodeRowKey.
+func UnpackTuple(bs []byte, translate func(t tuple.TupleElement) (interface{}, error)) ([]interface{}, error) {
 	var t, err = tuple.Unpack(bs)
 	if err != nil {
 		return nil, err
 	}
 	var xs []interface{}
 	for _, elem := range t {
-		decoded, err := db.DecodeKeyFDB(elem)
+		decoded, err := translate(elem)
 		if err != nil {
 			return nil, fmt.Errorf("unpack tuple: %w", err)
 		}

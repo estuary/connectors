@@ -219,7 +219,7 @@ func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &postgresSource{}
 }
 
-func (db *postgresDatabase) EncodeKeyFDB(key interface{}) (tuple.TupleElement, error) {
+func encodeKeyFDB(key interface{}) (tuple.TupleElement, error) {
 	switch key := key.(type) {
 	case pgtype.Numeric:
 		return encodePgNumericKeyFDB(key)
@@ -228,7 +228,7 @@ func (db *postgresDatabase) EncodeKeyFDB(key interface{}) (tuple.TupleElement, e
 	}
 }
 
-func (db *postgresDatabase) DecodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
+func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
 	switch t := t.(type) {
 	case tuple.Tuple:
 		if d := maybeDecodePgNumericTuple(t); d != nil {

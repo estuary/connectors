@@ -142,11 +142,11 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	}
 	for streamID, state := range c.State.Streams {
 		if state.Mode == TableModeBackfill || state.Mode == TableModeActive {
-			replStream.ActivateTable(streamID, c.discovery[streamID], state.Metadata)
+			replStream.ActivateTable(streamID, state.KeyColumns, c.discovery[streamID], state.Metadata)
 		}
 	}
 	var watermarks = c.Database.WatermarksTable()
-	replStream.ActivateTable(watermarks, c.discovery[watermarks], nil)
+	replStream.ActivateTable(watermarks, c.discovery[watermarks].PrimaryKey, c.discovery[watermarks], nil)
 	if err := replStream.StartReplication(ctx); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
@@ -169,13 +169,13 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	}
 	for _, streamID := range c.State.StreamsInState(TableModePending) {
 		logrus.WithField("stream", streamID).Info("activating replication for stream")
-		if err := replStream.ActivateTable(streamID, c.discovery[streamID], nil); err != nil {
-			return fmt.Errorf("error activating %q for replication: %w", streamID, err)
-		}
 		var state = c.State.Streams[streamID]
 		state.Mode = TableModeBackfill
 		state.dirty = true
 		c.State.Streams[streamID] = state
+		if err := replStream.ActivateTable(streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
+			return fmt.Errorf("error activating %q for replication: %w", streamID, err)
+		}
 	}
 
 	// Transition streams from "Backfill" to "Active" if we're supposed to skip
@@ -412,15 +412,11 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 		// While a table is being backfilled, events occurring *before* the current scan point
 		// will be emitted, while events *after* that point will be patched (or ignored) into
 		// the buffered resultSet.
-		var rowKey, err = encodeRowKey(tableState.KeyColumns, event.KeyFields(), c.Database)
-		if err != nil {
-			return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
-		}
-		if compareTuples(rowKey, tableState.Scanned) <= 0 {
+		if compareTuples(event.RowKey, tableState.Scanned) <= 0 {
 			if err := c.handleChangeEvent(streamID, event); err != nil {
 				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 			}
-		} else if err := results.Patch(streamID, event, rowKey); err != nil {
+		} else if err := results.Patch(streamID, event); err != nil {
 			return fmt.Errorf("error patching resultset for %q: %w", streamID, err)
 		}
 	}
@@ -472,30 +468,17 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 	for _, streamID := range streams {
 		var streamState = c.State.Streams[streamID]
 
-		// Fetch a chunk of entries from the specified stream
-		var err error
-		var resumeKey []interface{}
-		if streamState.Scanned != nil {
-			resumeKey, err = unpackTuple(streamState.Scanned, c.Database)
-			if err != nil {
-				return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
-			}
-			if len(resumeKey) != len(streamState.KeyColumns) {
-				return nil, fmt.Errorf("expected %d resume-key values but got %d", len(streamState.KeyColumns), len(resumeKey))
-			}
-		}
-
 		discoveryInfo, ok := c.discovery[streamID]
 		if !ok {
 			return nil, fmt.Errorf("unknown table %q", streamID)
 		}
-		events, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState.KeyColumns, resumeKey)
+		events, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState.KeyColumns, streamState.Scanned)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning table %q: %w", streamID, err)
 		}
 
 		// Translate the resulting list of entries into a backfillChunk
-		if err := results.Buffer(streamID, streamState.KeyColumns, events, c.Database); err != nil {
+		if err := results.Buffer(streamID, events); err != nil {
 			return nil, fmt.Errorf("error buffering scan results for %q: %w", streamID, err)
 		}
 	}

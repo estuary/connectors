@@ -25,9 +25,23 @@ func (db *mysqlDatabase) WatermarksTable() string {
 	return db.config.Advanced.WatermarksTable
 }
 
-func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, keyColumns []string, resumeKey []interface{}) ([]*sqlcapture.ChangeEvent, error) {
+func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, keyColumns []string, resumeAfter []byte) ([]*sqlcapture.ChangeEvent, error) {
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
+
+	// Decode the resumeAfter key if non-nil
+	var err error
+	var resumeKey []interface{}
+	if resumeAfter != nil {
+		resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
+		if err != nil {
+			return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+		}
+		if len(resumeKey) != len(keyColumns) {
+			return nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+		}
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"stream":     streamID,
 		"keyColumns": keyColumns,
@@ -63,6 +77,10 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		for idx, val := range row {
 			fields[string(results.Fields[idx].Name)] = val.Value()
 		}
+		var rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, encodeKeyFDB)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+		}
 		if err := db.translateRecordFields(columnTypes, fields); err != nil {
 			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
@@ -70,6 +88,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		logrus.WithField("fields", fields).Trace("got row")
 		events = append(events, &sqlcapture.ChangeEvent{
 			Operation: sqlcapture.InsertOp,
+			RowKey:    rowKey,
 			Source: &mysqlSourceInfo{
 				SourceCommon: sqlcapture.SourceCommon{
 					Millis:   0, // Not known.
