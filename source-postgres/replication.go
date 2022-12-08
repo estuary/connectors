@@ -97,6 +97,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 	}
 	stream.tables.active = make(map[string]struct{})
+	stream.tables.keyColumns = make(map[string][]string)
 	return stream, nil
 }
 
@@ -177,7 +178,8 @@ type replicationStream struct {
 	// the main goroutine while it's read by the replication goroutine.
 	tables struct {
 		sync.RWMutex
-		active map[string]struct{}
+		active     map[string]struct{}
+		keyColumns map[string][]string
 	}
 }
 
@@ -405,6 +407,21 @@ func (s *replicationStream) decodeChangeEvent(
 	if err != nil {
 		return nil, fmt.Errorf("'after' tuple: %w", err)
 	}
+
+	keyColumns, ok := s.keyColumns(streamID)
+	if !ok {
+		return nil, fmt.Errorf("unknown key columns for stream %q", streamID)
+	}
+	var rowKey []byte
+	if op == sqlcapture.InsertOp || op == sqlcapture.UpdateOp {
+		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, af, encodeKeyFDB)
+	} else {
+		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, bf, encodeKeyFDB)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+	}
+
 	if err := translateRecordFields(nil, bf); err != nil {
 		return nil, fmt.Errorf("error translating 'before' tuple: %w", err)
 	}
@@ -414,6 +431,7 @@ func (s *replicationStream) decodeChangeEvent(
 
 	var event = &sqlcapture.ChangeEvent{
 		Operation: op,
+		RowKey:    rowKey,
 		Source: &postgresSource{
 			SourceCommon: sqlcapture.SourceCommon{
 				Millis:   s.nextTxnMillis,
@@ -549,9 +567,17 @@ func (s *replicationStream) tableActive(streamID string) bool {
 	return ok
 }
 
-func (s *replicationStream) ActivateTable(streamID string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
+	s.tables.RLock()
+	defer s.tables.RUnlock()
+	var keyColumns, ok = s.tables.keyColumns[streamID]
+	return keyColumns, ok
+}
+
+func (s *replicationStream) ActivateTable(streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	s.tables.Lock()
 	s.tables.active[streamID] = struct{}{}
+	s.tables.keyColumns[streamID] = keyColumns
 	s.tables.Unlock()
 	return nil
 }

@@ -384,11 +384,11 @@ func (db *mysqlDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &mysqlSourceInfo{}
 }
 
-func (db *mysqlDatabase) EncodeKeyFDB(key interface{}) (tuple.TupleElement, error) {
+func encodeKeyFDB(key interface{}) (tuple.TupleElement, error) {
 	return key, nil
 }
 
-func (db *mysqlDatabase) DecodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
+func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
 	return t, nil
 }
 

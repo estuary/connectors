@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/invopop/jsonschema"
 )
 
@@ -65,6 +64,7 @@ type SourceMetadata interface {
 // row in the database.
 type ChangeEvent struct {
 	Operation ChangeOp
+	RowKey    []byte
 	Source    SourceMetadata
 	Before    map[string]interface{}
 	After     map[string]interface{}
@@ -118,20 +118,14 @@ type Database interface {
 	WriteWatermark(ctx context.Context, watermark string) error
 	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
 	WatermarksTable() string
-	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, keyColumns []string, resumeKey []interface{}) ([]*ChangeEvent, error)
+	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
+	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, keyColumns []string, resumeAfter []byte) ([]*ChangeEvent, error)
 	// DiscoverTables queries the database for information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[string]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
 	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Schema, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
 	EmptySourceMetadata() SourceMetadata
-	// EncodeRowKeyForFDB converts a key as necessary to produce a TupleElement,
-	// which is encoded as part of a FoundationDB serialized tuple.
-	// Make sure the conversion is partial-order-preserving.
-	EncodeKeyFDB(key interface{}) (tuple.TupleElement, error)
-	// DecodeKeyFDB decodes the result of `EncodeKeyFDB` to its original form.
-	DecodeKeyFDB(t tuple.TupleElement) (interface{}, error)
 	// ShouldBackfill returns true if a given table's contents should be backfilled.
 	ShouldBackfill(streamID string) bool
 }
@@ -144,7 +138,7 @@ type Database interface {
 // received for that table. It is permitted and necessary to activate some
 // tables before starting replication.
 type ReplicationStream interface {
-	ActivateTable(streamID string, info *DiscoveryInfo, metadata json.RawMessage) error
+	ActivateTable(streamID string, keyColumns []string, info *DiscoveryInfo, metadata json.RawMessage) error
 
 	StartReplication(ctx context.Context) error
 	Events() <-chan DatabaseEvent
