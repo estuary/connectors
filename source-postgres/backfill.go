@@ -11,7 +11,7 @@ import (
 )
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.TableInfo, keyColumns []string, resumeKey []interface{}) ([]sqlcapture.ChangeEvent, error) {
+func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.TableInfo, keyColumns []string, resumeKey []interface{}) ([]*sqlcapture.ChangeEvent, error) {
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 	logrus.WithFields(logrus.Fields{
@@ -35,7 +35,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.
 
 	// Process the results into `changeEvent` structs and return them
 	var cols = rows.FieldDescriptions()
-	var events []sqlcapture.ChangeEvent
+	var events []*sqlcapture.ChangeEvent
 	logrus.WithField("stream", streamID).Debug("translating query rows to change events")
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
@@ -51,7 +51,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info sqlcapture.
 			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
-		events = append(events, sqlcapture.ChangeEvent{
+		events = append(events, &sqlcapture.ChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			Source: &postgresSource{
 				SourceCommon: sqlcapture.SourceCommon{
