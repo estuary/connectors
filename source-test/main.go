@@ -125,6 +125,7 @@ var spec = airbyte.Spec{
 	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
 	ConnectionSpecification:       json.RawMessage(configSchema),
 	AuthSpecification:             json.RawMessage(oauthSpec),
+	DocumentationURL:              "https://go.estuary.dev/source-test",
 }
 
 func doCheck(args airbyte.CheckCmd) error {
