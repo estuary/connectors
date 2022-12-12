@@ -190,9 +190,10 @@ func (m NullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
 	// support automatic schema migration of tables to mark fields as nullable
 	// after creation, we can revert back to the more strict behaviour,
 	// see: https://github.com/estuary/connectors/issues/447
-	if p.IsPrimaryKey && m.NotNullText != "" {
-		mapped.DDL += " " + m.NotNullText
-	} else if m.NullableText != "" {
+	// note that for primary keys we are leaving it up to the engine to decide
+	// whether they can be nullable or not (e.g. postgres will assume not
+	// null for primary keys)
+	if !p.IsPrimaryKey && m.NullableText != "" {
 		mapped.DDL += " " + m.NullableText
 	}
 
