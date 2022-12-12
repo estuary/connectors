@@ -3,11 +3,11 @@ flow_temp_table_0--- End `projectID`.`dataset`.`target_table` tempTableName ---
 
 --- Begin `projectID`.`dataset`.`target_table` createTargetTable ---
 CREATE TABLE IF NOT EXISTS `projectID`.`dataset`.`target_table` (
-		`key1` INT64 NOT NULL,
-		`key2` BOOL NOT NULL,
-		`boolean` BOOL NOT NULL,
-		`integer` INT64 NOT NULL,
-		`string` STRING NOT NULL,
+		`key1` INT64,
+		`key2` BOOL,
+		`boolean` BOOL,
+		`integer` INT64,
+		`string` STRING,
 		`number` BIGNUMERIC,
 		`person_place_` STRING,
 		`source.name` STRING,
