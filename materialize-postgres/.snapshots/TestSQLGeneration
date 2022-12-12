@@ -1,9 +1,9 @@
 --- Begin "a-schema".target_table createTargetTable ---
 
 CREATE TABLE IF NOT EXISTS "a-schema".target_table (
-		key1 BIGINT NOT NULL,
-		"key!2" BOOLEAN NOT NULL,
-		"nullableKey" TEXT NOT NULL,
+		key1 BIGINT,
+		"key!2" BOOLEAN,
+		"nullableKey" TEXT,
 		"Camel_Case" BIGINT,
 		"a Time" TIMESTAMPTZ,
 		"array" JSON,
@@ -32,8 +32,8 @@ COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'user-provided projec
 --- Begin "Delta Updates" createTargetTable ---
 
 CREATE TABLE IF NOT EXISTS "Delta Updates" (
-		"theKey" TEXT NOT NULL,
-		"nullableKey" TEXT NOT NULL,
+		"theKey" TEXT,
+		"nullableKey" TEXT,
 		"aValue" BIGINT
 );
 
@@ -47,17 +47,17 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]';
 --- Begin "a-schema".target_table createLoadTable ---
 
 CREATE TEMPORARY TABLE flow_temp_table_0 (
-		key1 BIGINT NOT NULL,
-		"key!2" BOOLEAN NOT NULL,
-		"nullableKey" TEXT NOT NULL
+		key1 BIGINT,
+		"key!2" BOOLEAN,
+		"nullableKey" TEXT
 ) ON COMMIT DROP;
 --- End "a-schema".target_table createLoadTable ---
 
 --- Begin "Delta Updates" createLoadTable ---
 
 CREATE TEMPORARY TABLE flow_temp_table_1 (
-		"theKey" TEXT NOT NULL,
-		"nullableKey" TEXT NOT NULL
+		"theKey" TEXT,
+		"nullableKey" TEXT
 ) ON COMMIT DROP;
 --- End "Delta Updates" createLoadTable ---
 
