@@ -361,7 +361,7 @@ func (c *capture) Run(ctx context.Context) error {
 	return nil
 }
 
-const backfillChunkSize = 4096
+const backfillChunkSize = 1024
 
 func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, collectionID string, resumeState *backfillState) error {
 	var logEntry = log.WithFields(log.Fields{"collection": collectionID})
