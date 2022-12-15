@@ -224,3 +224,25 @@ jobs:
           file: ${{ matrix.connector }}/Dockerfile
           push: true # See 'if' above
           tags: ghcr.io/estuary/${{ matrix.connector }}:dev,ghcr.io/estuary/${{ matrix.connector }}:${{ steps.prep.outputs.version }}
+
+      - name: Trigger webhook for version tag
+        if: ${{ github.event_name == 'push' }}
+        id: webhook-v
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: 'https://eyrcnmuzzyriypdajwdk.functions.supabase.co/gh-webhook'
+          method: 'POST'
+          bearerToken: ${{ secrets.SUPABASE_TOKEN }}
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"action": "published", "package": { "package_version": { "package_url": "ghcr.io/estuary/${{ matrix.connector }}:${{ steps.prep.outputs.version }}" } } }'
+
+      - name: Trigger webhook for dev tag
+        if: ${{ github.event_name == 'push' }}
+        id: webhook-dev
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: 'https://eyrcnmuzzyriypdajwdk.functions.supabase.co/gh-webhook'
+          method: 'POST'
+          bearerToken: ${{ secrets.SUPABASE_TOKEN }}
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"action": "published", "package": { "package_version": { "package_url": "ghcr.io/estuary/${{ matrix.connector }}:dev" } } }'
