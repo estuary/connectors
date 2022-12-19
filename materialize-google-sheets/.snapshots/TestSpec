@@ -100,9 +100,9 @@
   "documentation_url": "https://go.estuary.dev/materialize-google-sheets",
   "oauth2_spec": {
     "provider": "google",
-    "auth_url_template": "https://accounts.google.com/o/oauth2/auth?access_type=offline\u0026prompt=consent\u0026client_id={{ client_id }}\u0026redirect_uri={{ redirect_uri }}\u0026response_type=code\u0026scope=https://www.googleapis.com/auth/spreadsheets\u0026state={{ state }}",
+    "auth_url_template": "https://accounts.google.com/o/oauth2/auth?access_type=offline\u0026prompt=consent\u0026client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}\u0026redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}\u0026response_type=code\u0026scope={{#urlencode}}https://www.googleapis.com/auth/spreadsheets{{/urlencode}}\u0026state={{#urlencode}}{{{ state }}}{{/urlencode}}",
     "access_token_url_template": "https://oauth2.googleapis.com/token",
-    "access_token_body": "{\"grant_type\": \"authorization_code\", \"client_id\": \"{{ client_id }}\", \"client_secret\": \"{{ client_secret }}\", \"redirect_uri\": \"{{ redirect_uri }}\", \"code\": \"{{ code }}\"}",
+    "access_token_body": "{\"grant_type\": \"authorization_code\", \"client_id\": \"{{{ client_id }}}\", \"client_secret\": \"{{{ client_secret }}}\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"code\": \"{{{ code }}}\"}",
     "access_token_response_map_json": {
       "refresh_token": "/refresh_token"
     }
