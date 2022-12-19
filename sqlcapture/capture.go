@@ -164,7 +164,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
 		return fmt.Errorf("error writing next watermark: %w", err)
 	}
-	if err := c.streamToWatermark(replStream, watermark, nil); err != nil {
+	if err := c.streamToWatermark(ctx, replStream, watermark, nil); err != nil {
 		return fmt.Errorf("error streaming until watermark: %w", err)
 	}
 	for _, streamID := range c.State.StreamsInState(TableModePending) {
@@ -212,7 +212,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
 			return fmt.Errorf("error writing next watermark: %w", err)
 		}
-		if err := c.streamToWatermark(replStream, watermark, results); err != nil {
+		if err := c.streamToWatermark(ctx, replStream, watermark, results); err != nil {
 			return fmt.Errorf("error streaming until watermark: %w", err)
 		} else if err := c.emitBuffered(results); err != nil {
 			return fmt.Errorf("error emitting buffered results: %w", err)
@@ -227,7 +227,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
 	var targetWatermark = nonexistentWatermark
-	if err := c.streamToWatermark(replStream, targetWatermark, nil); err != nil {
+	if err := c.streamToWatermark(ctx, replStream, targetWatermark, nil); err != nil {
 		return err
 	}
 	return nil
@@ -294,7 +294,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 	return c.emitState()
 }
 
-func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark string, results *resultSet) error {
+func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationStream, watermark string, results *resultSet) error {
 	logrus.WithField("watermark", watermark).Info("streaming to watermark")
 	var watermarksTable = c.Database.WatermarksTable()
 	var watermarkReached = false
@@ -419,6 +419,9 @@ func (c *Capture) streamToWatermark(replStream ReplicationStream, watermark stri
 		} else if err := results.Patch(streamID, event); err != nil {
 			return fmt.Errorf("error patching resultset for %q: %w", streamID, err)
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if watermark == nonexistentWatermark {
 		return fmt.Errorf("replication stream closed")

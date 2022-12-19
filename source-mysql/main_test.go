@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bradleyjkemp/cupaloy"
 	_ "github.com/go-mysql-org/go-mysql/driver"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
@@ -297,4 +298,73 @@ func TestSkipBackfills(t *testing.T) {
 	tb.Insert(ctx, t, tableB, [][]interface{}{{13, "thirteen"}, {14, "fourteen"}, {15, "fifteen"}})
 	tb.Insert(ctx, t, tableC, [][]interface{}{{16, "sixteen"}, {17, "seventeen"}, {18, "eighteen"}})
 	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+// TestCursorResume sets up a capture with a (string, int) primary key and
+// and repeatedly restarts it after each row of capture output.
+func TestCursorResume(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+	var tableName = tb.CreateTable(ctx, t, "", "(epoch VARCHAR(8), count INTEGER, data TEXT, PRIMARY KEY (epoch, count))")
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{"aaa", 1, "bvzf"}, {"aaa", 2, "ukwh"}, {"aaa", 3, "lntg"}, {"bbb", -100, "bycz"},
+		{"bbb", 2, "ajgp"}, {"bbb", 333, "zljj"}, {"bbb", 4096, "lhnw"}, {"bbb", 800000, "iask"},
+		{"ccc", 1234, "bikh"}, {"ddd", -10000, "dhqc"}, {"x", 1, "djsf"}, {"y", 1, "iwnx"},
+		{"z", 1, "qmjp"}, {"", 0, "xakg"}, {"", -1, "kvxr"}, {"   ", 3, "gboj"},
+	})
+	var cs = tb.CaptureSpec(t, tableName)
+
+	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
+	// restarted after each scan key update, this means we'll advance over the keys
+	// one by one.
+	var cfg = cs.EndpointSpec.(Config)
+	cfg.Advanced.BackfillChunkSize = 1
+	cs.EndpointSpec = cfg
+	var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
+	cupaloy.SnapshotT(t, summary)
+}
+
+// TestComplexDataset tries to throw together a bunch of different bits of complexity
+// to synthesize something vaguely "realistic". It features a multiple-column primary
+// key, a dataset large enough that the initial table scan gets divided across many
+// "chunks", two connector restarts at different points in the initial table scan, and
+// some concurrent modifications to row ranges already-scanned and not-yet-scanned.
+func TestComplexDataset(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER, PRIMARY KEY (year, state))")
+	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
+	var cs = tb.CaptureSpec(t, tableName)
+
+	// Reduce the backfill chunk size to 10 rows for this test.
+	var cfg = cs.EndpointSpec.(Config)
+	cfg.Advanced.BackfillChunkSize = 10
+	cs.EndpointSpec = cfg
+
+	t.Run("init", func(t *testing.T) {
+		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		cupaloy.SnapshotT(t, summary)
+		cs.Checkpoint = states[13] // Next restart between (1940, 'NV') and (1940, 'NY')
+		logrus.WithField("checkpoint", string(cs.Checkpoint)).Warn("restart at")
+	})
+
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{1930, "XX", "No Such State", 1234},   // An insert prior to the first restart, which will be reported once replication begins
+		{1970, "XX", "No Such State", 12345},  // An insert between the two restarts, which will be visible in the table scan and should be filtered during replication
+		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
+	})
+	t.Run("restart1", func(t *testing.T) {
+		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		cupaloy.SnapshotT(t, summary)
+		cs.Checkpoint = states[10] // Next restart in the middle of 1980 data
+	})
+
+	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{1930, "XX", "No Such State", 1234},   // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
+		{1970, "XX", "No Such State", 12345},  // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
+		{1990, "XX", "No Such State", 123456}, // Deleting/reinserting this row will be filtered since this portion of the table has yet to be scanned
+	})
+	t.Run("restart2", func(t *testing.T) {
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
+		cupaloy.SnapshotT(t, summary)
+	})
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/jackc/pglogrepl"
 	"github.com/sirupsen/logrus"
@@ -235,46 +236,80 @@ func TestTrickyColumnNames(t *testing.T) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-// TODO(wgd): Rewrite testComplexDataset using some trickery after figuring out a
-// more principled way of exercising "shut down partway through a backfill" behavior.
-//
-// // TestComplexDataset tries to throw together a bunch of different bits of complexity
-// // to synthesize something vaguely "realistic". It features a multiple-column primary
-// // key, a dataset large enough that the initial table scan gets divided across many
-// // "chunks", two connector restarts at different points in the initial table scan, and
-// // some concurrent modifications to row ranges already-scanned and not-yet-scanned.
-// func TestComplexDataset(t *testing.T) {
-// 	lowerTuningParameters(t)
-// 	var tb, ctx = TestBackend, context.Background()
-// 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
-// 	var catalog, state = tests.ConfiguredCatalog(ctx, t, tb, tableName), sqlcapture.PersistentState{}
-//
-// 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
-// 	var states = tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "init")
-// 	state = states[22] // Restart in between (1960, 'IA') and (1960, 'ID')
-//
-// 	tb.Insert(ctx, t, tableName, [][]interface{}{
-// 		{1930, "XX", "No Such State", 1234},   // An insert prior to the first restart, which will be reported once replication begins
-// 		{1970, "XX", "No Such State", 12345},  // An insert between the two restarts, which will be visible in the table scan and should be filtered during replication
-// 		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
-// 	})
-// 	states = tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "restart1")
-// 	state = states[10] // Restart in between (1980, 'SC') and (1980, 'SD')
-//
-// 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))
-// 	tb.Insert(ctx, t, tableName, [][]interface{}{
-// 		{1930, "XX", "No Such State", 1234},   // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
-// 		{1970, "XX", "No Such State", 12345},  // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
-// 		{1990, "XX", "No Such State", 123456}, // Deleting/reinserting this row will be filtered since this portion of the table has yet to be scanned
-// 	})
-//
-// 	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
-//
-// 	// We've scanned through (1980, 'IA'), and will see updates for N% states at that date or before,
-// 	// and creations for N% state records after that date which reflect the update.
-// 	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY');", tableName))
-// 	// We'll see a deletion since this row has already been scanned through.
-// 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX' AND year = 1970;", tableName))
-//
-// 	tests.VerifiedCapture(ctx, t, tb, &catalog, &state, "restart2")
-// }
+// TestCursorResume sets up a capture with a (string, int) primary key and
+// and repeatedly restarts it after each row of capture output.
+func TestCursorResume(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+	var tableName = tb.CreateTable(ctx, t, "", "(epoch VARCHAR(8), count INTEGER, data TEXT, PRIMARY KEY (epoch, count))")
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{"aaa", 1, "bvzf"}, {"aaa", 2, "ukwh"}, {"aaa", 3, "lntg"}, {"bbb", -100, "bycz"},
+		{"bbb", 2, "ajgp"}, {"bbb", 333, "zljj"}, {"bbb", 4096, "lhnw"}, {"bbb", 800000, "iask"},
+		{"ccc", 1234, "bikh"}, {"ddd", -10000, "dhqc"}, {"x", 1, "djsf"}, {"y", 1, "iwnx"},
+		{"z", 1, "qmjp"}, {"", 0, "xakg"}, {"", -1, "kvxr"}, {"   ", 3, "gboj"},
+	})
+	var cs = tb.CaptureSpec(t, tableName)
+
+	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
+	// restarted after each scan key update, this means we'll advance over the keys
+	// one by one.
+	var cfg = cs.EndpointSpec.(Config)
+	cfg.Advanced.BackfillChunkSize = 1
+	cs.EndpointSpec = cfg
+	var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
+	cupaloy.SnapshotT(t, summary)
+}
+
+// TestComplexDataset tries to throw together a bunch of different bits of complexity
+// to synthesize something vaguely "realistic". It features a multiple-column primary
+// key, a dataset large enough that the initial table scan gets divided across many
+// "chunks", two connector restarts at different points in the initial table scan, and
+// some concurrent modifications to row ranges already-scanned and not-yet-scanned.
+func TestComplexDataset(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
+	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
+	var cs = tb.CaptureSpec(t, tableName)
+
+	// Reduce the backfill chunk size to 10 rows for this test.
+	var cfg = cs.EndpointSpec.(Config)
+	cfg.Advanced.BackfillChunkSize = 10
+	cs.EndpointSpec = cfg
+
+	t.Run("init", func(t *testing.T) {
+		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		cupaloy.SnapshotT(t, summary)
+		cs.Checkpoint = states[13] // Next restart between (1940, 'NV') and (1940, 'NY')
+		logrus.WithField("checkpoint", string(cs.Checkpoint)).Warn("restart at")
+	})
+
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{1930, "XX", "No Such State", 1234},   // An insert prior to the first restart, which will be reported once replication begins
+		{1970, "XX", "No Such State", 12345},  // An insert between the two restarts, which will be visible in the table scan and should be filtered during replication
+		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
+	})
+	t.Run("restart1", func(t *testing.T) {
+		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		cupaloy.SnapshotT(t, summary)
+		cs.Checkpoint = states[10] // Next restart in the middle of 1980 data
+	})
+
+	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{1930, "XX", "No Such State", 1234},   // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
+		{1970, "XX", "No Such State", 12345},  // Deleting/reinserting this row will be reported since they happened after that portion of the table was scanned
+		{1990, "XX", "No Such State", 123456}, // Deleting/reinserting this row will be filtered since this portion of the table has yet to be scanned
+	})
+
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
+
+	// We've scanned through (1980, 'IA'), and will see updates for N% states at that date or before,
+	// and creations for N% state records after that date which reflect the update.
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE state IN ('NJ', 'NY');", tableName))
+	// We'll see a deletion since this row has already been scanned through.
+	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX' AND year = 1970;", tableName))
+
+	t.Run("restart2", func(t *testing.T) {
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
+		cupaloy.SnapshotT(t, summary)
+	})
+}
