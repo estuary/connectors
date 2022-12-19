@@ -15,6 +15,8 @@ func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 		// Tweak signature slightly to take TablePath, as dynamic slicing is a bit tricky
 		// in templates and this is most-frequently used with TablePath.Base().
 		"Identifier": func(p TablePath) string { return dialect.Identifier(p...) },
+		// A helper for iterating over all fields of a table
+		"AllFields": func(table Table) []Column { return append(append(append([]Column{}, table.Keys...), table.Values...), *table.Document) },
 	})
 	return template.Must(tpl.Parse(body))
 }
