@@ -92,8 +92,14 @@ func RestartingBackfillCapture(ctx context.Context, t testing.TB, cs *st.Capture
 		})
 
 		io.Copy(summary, strings.NewReader(cs.Summary()))
-		cs.Reset()
 		fmt.Fprintf(summary, "\n\n")
+		if len(cs.Errors) > 0 {
+			fmt.Fprintf(summary, "####################################\n")
+			fmt.Fprintf(summary, "### Terminating Capture due to Errors\n")
+			fmt.Fprintf(summary, "####################################\n")
+			break
+		}
+		cs.Reset()
 
 		if startKey == "" {
 			break

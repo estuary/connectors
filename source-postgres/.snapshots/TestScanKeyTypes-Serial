@@ -1,0 +1,62 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Serial": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_serial","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":-3}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_serial":{"key_columns":["key"],"mode":"Backfill","scanned":"E/w="}}}
+
+
+####################################
+### Capture from Key "E/w="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Serial": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_serial","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":0}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_serial":{"key_columns":["key"],"mode":"Backfill","scanned":"FA=="}}}
+
+
+####################################
+### Capture from Key "FA=="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Serial": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_serial","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_serial":{"key_columns":["key"],"mode":"Backfill","scanned":"FQI="}}}
+
+
+####################################
+### Capture from Key "FQI="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Serial": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_serial","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":1723}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_serial":{"key_columns":["key"],"mode":"Backfill","scanned":"Fga7"}}}
+
+
+####################################
+### Capture from Key "Fga7"
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_serial":{"key_columns":["key"],"mode":"Active"}}}
+
+
+

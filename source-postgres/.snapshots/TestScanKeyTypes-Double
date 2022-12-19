@@ -1,0 +1,218 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":-1.1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"IUAOZmZmZmZl"}}}
+
+
+####################################
+### Capture from Key "IUAOZmZmZmZl"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":-1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"IUAP////////"}}}
+
+
+####################################
+### Capture from Key "IUAP////////"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":-0.9}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"IUATMzMzMzMy"}}}
+
+
+####################################
+### Capture from Key "IUATMzMzMzMy"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":0}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"IYAAAAAAAAAA"}}}
+
+
+####################################
+### Capture from Key "IYAAAAAAAAAA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 4","key":0.9}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib/szMzMzMzN"}}}
+
+
+####################################
+### Capture from Key "Ib/szMzMzMzN"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 5","key":1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib/wAAAAAAAA"}}}
+
+
+####################################
+### Capture from Key "Ib/wAAAAAAAA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 6","key":1.111}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib/xxqfvnbIt"}}}
+
+
+####################################
+### Capture from Key "Ib/xxqfvnbIt"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 7","key":1.222}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib/zjU/fO2Ra"}}}
+
+
+####################################
+### Capture from Key "Ib/zjU/fO2Ra"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 8","key":1.333}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib/1U/fO2RaH"}}}
+
+
+####################################
+### Capture from Key "Ib/1U/fO2RaH"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 9","key":1.444}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib/3Gp++dsi0"}}}
+
+
+####################################
+### Capture from Key "Ib/3Gp++dsi0"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 10","key":1.555}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib/44UeuFHrh"}}}
+
+
+####################################
+### Capture from Key "Ib/44UeuFHrh"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 11","key":1.666}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib/6p++dsi0O"}}}
+
+
+####################################
+### Capture from Key "Ib/6p++dsi0O"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 12","key":1.777}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib/8bpeNT987"}}}
+
+
+####################################
+### Capture from Key "Ib/8bpeNT987"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 13","key":1.888}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib/+NT987ZFo"}}}
+
+
+####################################
+### Capture from Key "Ib/+NT987ZFo"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 14","key":1.999}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"Ib//++dsi0OW"}}}
+
+
+####################################
+### Capture from Key "Ib//++dsi0OW"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Double": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 15","key":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Backfill","scanned":"IcAAAAAAAAAA"}}}
+
+
+####################################
+### Capture from Key "IcAAAAAAAAAA"
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_double":{"key_columns":["key"],"mode":"Active"}}}
+
+
+
