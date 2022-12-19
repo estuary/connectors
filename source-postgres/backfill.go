@@ -61,7 +61,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		for idx := range cols {
 			fields[string(cols[idx].Name)] = vals[idx]
 		}
-		rowKey, err := sqlcapture.EncodeRowKey(keyColumns, fields, encodeKeyFDB)
+		rowKey, err := sqlcapture.EncodeRowKey(keyColumns, fields, nil, encodeKeyFDB)
 		if err != nil {
 			return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 		}

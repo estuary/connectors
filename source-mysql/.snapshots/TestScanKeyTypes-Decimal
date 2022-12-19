@@ -1,0 +1,218 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 2","k":"-1.100"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"IUAOZmZmZmZl"}}}
+
+
+####################################
+### Capture from Key "IUAOZmZmZmZl"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 1","k":"-1.000"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"IUAP////////"}}}
+
+
+####################################
+### Capture from Key "IUAP////////"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 0","k":"-0.900"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"IUATMzMzMzMy"}}}
+
+
+####################################
+### Capture from Key "IUATMzMzMzMy"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 3","k":"0.000"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"IYAAAAAAAAAA"}}}
+
+
+####################################
+### Capture from Key "IYAAAAAAAAAA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 4","k":"0.900"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib/szMzMzMzN"}}}
+
+
+####################################
+### Capture from Key "Ib/szMzMzMzN"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 5","k":"1.000"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib/wAAAAAAAA"}}}
+
+
+####################################
+### Capture from Key "Ib/wAAAAAAAA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 6","k":"1.111"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib/xxqfvnbIt"}}}
+
+
+####################################
+### Capture from Key "Ib/xxqfvnbIt"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 7","k":"1.222"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib/zjU/fO2Ra"}}}
+
+
+####################################
+### Capture from Key "Ib/zjU/fO2Ra"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 8","k":"1.333"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib/1U/fO2RaH"}}}
+
+
+####################################
+### Capture from Key "Ib/1U/fO2RaH"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 9","k":"1.444"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib/3Gp++dsi0"}}}
+
+
+####################################
+### Capture from Key "Ib/3Gp++dsi0"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 10","k":"1.555"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib/44UeuFHrh"}}}
+
+
+####################################
+### Capture from Key "Ib/44UeuFHrh"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 11","k":"1.666"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib/6p++dsi0O"}}}
+
+
+####################################
+### Capture from Key "Ib/6p++dsi0O"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 12","k":"1.777"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib/8bpeNT987"}}}
+
+
+####################################
+### Capture from Key "Ib/8bpeNT987"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 13","k":"1.888"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib/+NT987ZFo"}}}
+
+
+####################################
+### Capture from Key "Ib/+NT987ZFo"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 14","k":"1.999"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"Ib//++dsi0OW"}}}
+
+
+####################################
+### Capture from Key "Ib//++dsi0OW"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Decimal": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 15","k":"2.000"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Backfill","scanned":"IcAAAAAAAAAA"}}}
+
+
+####################################
+### Capture from Key "IcAAAAAAAAAA"
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_decimal":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"decimal"}}},"mode":"Active"}}}
+
+
+
