@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -46,6 +48,59 @@ func RunCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) string {
 	var summary = cs.Summary()
 	cs.Reset()
 	return summary
+}
+
+// RestartingBackfillCapture runs a capture multiple times, killing it after each time a new
+// resume key is observed in a state checkpoint and then restarting from that checkpoint. It
+// also returns the sequence of unique restart checkpoints.
+func RestartingBackfillCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) (string, []json.RawMessage) {
+	t.Helper()
+
+	var checkpointRegex = regexp.MustCompile(`^{"cursor":`)
+	var scanCursorRegex = regexp.MustCompile(`"scanned":"(.*)"`)
+
+	var checkpoints = []json.RawMessage{cs.Checkpoint}
+	var startKey string
+	if m := scanCursorRegex.FindStringSubmatch(string(cs.Checkpoint)); len(m) > 1 {
+		startKey = m[1]
+	}
+
+	var summary = new(strings.Builder)
+	for {
+		fmt.Fprintf(summary, "####################################\n")
+		if startKey != "" {
+			fmt.Fprintf(summary, "### Capture from Key %q\n", startKey)
+		} else {
+			fmt.Fprintf(summary, "### Capture from Start\n")
+		}
+		fmt.Fprintf(summary, "####################################\n")
+
+		var captureCtx, cancelCapture = context.WithCancel(ctx)
+		cs.Capture(captureCtx, t, func(data json.RawMessage) {
+			if checkpointRegex.Match(data) {
+				var nextKey string
+				if m := scanCursorRegex.FindStringSubmatch(string(data)); len(m) > 1 {
+					nextKey = m[1]
+				}
+				if nextKey != startKey {
+					log.WithField("checkpoint", string(data)).Info("new scan key/checkpoint")
+					cs.Checkpoint, startKey = data, nextKey
+					checkpoints = append(checkpoints, cs.Checkpoint)
+					cancelCapture()
+				}
+			}
+		})
+
+		io.Copy(summary, strings.NewReader(cs.Summary()))
+		cs.Reset()
+		fmt.Fprintf(summary, "\n\n")
+
+		if startKey == "" {
+			break
+		}
+	}
+
+	return summary.String(), checkpoints
 }
 
 // ResourceBindings returns a new list of capture bindings for the specified streamIDs.
