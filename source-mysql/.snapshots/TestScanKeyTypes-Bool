@@ -1,0 +1,36 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Bool": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool"}},"data":"Data 1","k":0}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_bool":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Backfill","scanned":"FA=="}}}
+
+
+####################################
+### Capture from Key "FA=="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Bool": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool"}},"data":"Data 0","k":1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_bool":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Backfill","scanned":"FQE="}}}
+
+
+####################################
+### Capture from Key "FQE="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_bool":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Active"}}}
+
+
+

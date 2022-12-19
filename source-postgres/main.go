@@ -219,7 +219,7 @@ func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &postgresSource{}
 }
 
-func encodeKeyFDB(key interface{}) (tuple.TupleElement, error) {
+func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 	switch key := key.(type) {
 	case time.Time:
 		return key.Format(time.RFC3339Nano), nil
