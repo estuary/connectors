@@ -15,8 +15,10 @@ RUN go mod download
 RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" | tar -zx -C /usr/local/bin/
 
 # Build the connector projects we depend on.
+COPY go-schema-gen           ./go-schema-gen
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-snowflake   ./materialize-snowflake
+COPY materialize-sql         ./materialize-sql
 COPY testsupport             ./testsupport
 
 # Test and build the connector.

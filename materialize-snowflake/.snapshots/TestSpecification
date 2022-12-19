@@ -70,7 +70,7 @@
     "properties": {
       "table": {
         "type": "string",
-        "x-collection-name": "true"
+        "x-collection-name": true
       },
       "delta_updates": {
         "type": "boolean"
