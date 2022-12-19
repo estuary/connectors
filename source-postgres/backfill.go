@@ -34,9 +34,14 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		"resumeKey":  resumeKey,
 	}).Debug("scanning table chunk")
 
+	var columnTypes = make(map[string]interface{})
+	for name, column := range info.Columns {
+		columnTypes[name] = column.DataType
+	}
+
 	// Build a query to fetch the next `backfillChunkSize` rows from the database.
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
-	var query = db.buildScanQuery(resumeKey == nil, keyColumns, schema, table)
+	var query = db.buildScanQuery(resumeKey == nil, keyColumns, columnTypes, schema, table)
 	db.explainQuery(ctx, streamID, query, resumeKey)
 
 	// Execute the backfill query to fetch rows from the database
@@ -113,25 +118,34 @@ func (db *postgresDatabase) WatermarksTable() string {
 	return db.config.Advanced.WatermarksTable
 }
 
-func (db *postgresDatabase) buildScanQuery(start bool, keyColumns []string, schemaName, tableName string) string {
-	// Construct strings like `(foo, bar, baz)` and `($1, $2, $3)` for use in the query
-	var pkey, args string
+// The set of MySQL column types for which we need to specify `COLLATE "C"` to get
+// proper ordering and comparison. Represented as a map[string]bool so that it can be
+// combined with the "is the column typename a string" check into one if statement.
+var columnBinaryKeyComparison = map[string]bool{
+	"varchar": true,
+	"text":    true,
+}
+
+func (db *postgresDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
+	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
+	var pkey []string
+	var args []string
 	for idx, colName := range keyColumns {
-		if idx > 0 {
-			pkey += ", "
-			args += ", "
+		if colType, ok := columnTypes[colName].(string); ok && columnBinaryKeyComparison[colType] {
+			pkey = append(pkey, colName+` COLLATE "C"`)
+		} else {
+			pkey = append(pkey, colName)
 		}
-		pkey += quoteColumnName(colName)
-		args += fmt.Sprintf("$%d", idx+1)
+		args = append(args, fmt.Sprintf("$%d", idx+1))
 	}
 
 	// Construct the query itself
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, "SELECT * FROM %s.%s", schemaName, tableName)
 	if !start {
-		fmt.Fprintf(query, ` WHERE (%s) > (%s) COLLATE "C"`, pkey, args)
+		fmt.Fprintf(query, ` WHERE (%s) > (%s)`, strings.Join(pkey, ", "), strings.Join(args, ", "))
 	}
-	fmt.Fprintf(query, ` ORDER BY (%s) COLLATE "C"`, pkey)
+	fmt.Fprintf(query, ` ORDER BY (%s)`, strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " LIMIT %d;", db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
