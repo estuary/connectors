@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/sqlcapture/tests"
 )
 
@@ -118,4 +119,30 @@ func TestDatatypes(t *testing.T) {
 
 		// TODO(wgd): Add enumeration test case?
 	})
+}
+
+func TestScanKeyTimestamps(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+	var tableName = tb.CreateTable(ctx, t, "", "(ts TIMESTAMP PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{"1991-08-31T12:34:56.000Z", "aood"},
+		{"1991-08-31T12:34:56.111Z", "xwxt"},
+		{"1991-08-31T12:34:56.222Z", "tpxi"},
+		{"1991-08-31T12:34:56.333Z", "jvqz"},
+		{"1991-08-31T12:34:56.444Z", "juwf"},
+		{"1991-08-31T12:34:56.555Z", "znzn"},
+		{"1991-08-31T12:34:56.666Z", "zocp"},
+		{"1991-08-31T12:34:56.777Z", "pxoi"},
+		{"1991-08-31T12:34:56.888Z", "vdug"},
+		{"1991-08-31T12:34:56.999Z", "xerk"},
+	})
+	var cs = tb.CaptureSpec(t, tableName)
+
+	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
+	// restarted after each scan key update, this means we'll advance over the keys
+	// one by one.
+	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
+
+	var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
+	cupaloy.SnapshotT(t, summary)
 }
