@@ -3,17 +3,18 @@ package main
 import (
 	"bufio"
 	"context"
-	"database/sql"
+	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"github.com/pkg/errors"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	sqlDriver "github.com/estuary/flow/go/protocols/materialize/sql"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake"
@@ -30,6 +31,26 @@ type config struct {
 	Schema    string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use." jsonschema_extras:"order=5"`
 	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries." jsonschema_extras:"order=6"`
 	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=7"`
+}
+
+// ToURI converts the Config to a DSN string.
+func (c *config) ToURI() string {
+	// Build a DSN connection string.
+	var configCopy = c.asSnowflakeConfig()
+	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
+	// Without this, the authentication token will expire after 4 hours of inactivity.
+	// The Params map will not have been initialized if the endpoint config didn't specify
+	// it, so we check and initialize here if needed.
+	if configCopy.Params == nil {
+		configCopy.Params = make(map[string]*string)
+	}
+	configCopy.Params["client_session_keep_alive"] = &trueString
+	dsn, err := sf.DSN(&configCopy)
+	if err != nil {
+		panic(fmt.Errorf("building snowflake dsn: %w", err))
+	}
+
+	return dsn
 }
 
 func (c *config) asSnowflakeConfig() sf.Config {
@@ -69,6 +90,10 @@ type tableConfig struct {
 	Delta bool   `json:"delta_updates,omitempty"`
 }
 
+func newTableConfig(ep *sql.Endpoint) sql.Resource {
+	return &tableConfig{}
+}
+
 func (c tableConfig) Validate() error {
 	if c.Table == "" {
 		return fmt.Errorf("expected table")
@@ -76,7 +101,7 @@ func (c tableConfig) Validate() error {
 	return nil
 }
 
-func (c tableConfig) Path() sqlDriver.ResourcePath {
+func (c tableConfig) Path() sql.TablePath {
 	return []string{c.Table}
 }
 
@@ -88,34 +113,18 @@ func (c tableConfig) DeltaUpdates() bool {
 var trueString = "true"
 
 // newSnowflakeDriver creates a new Driver for Snowflake.
-func newSnowflakeDriver() *sqlDriver.Driver {
-	return &sqlDriver.Driver{
+func newSnowflakeDriver() *sql.Driver {
+	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
-		NewResource: func(endpoint sqlDriver.Endpoint) sqlDriver.Resource {
-			return &tableConfig{base: endpoint.(*sqlDriver.StdEndpoint).Config().(*config)}
-		},
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage) (sqlDriver.Endpoint, error) {
+		NewEndpoint: func(ctx context.Context, raw json.RawMessage) (*sql.Endpoint, error) {
 			var parsed = new(config)
 			if err := pf.UnmarshalStrict(raw, parsed); err != nil {
 				return nil, fmt.Errorf("parsing Snowflake configuration: %w", err)
 			}
 
-			// Build a DSN connection string.
-			var configCopy = parsed.asSnowflakeConfig()
-			// client_session_keep_alive causes the driver to issue a periodic keepalive request.
-			// Without this, the authentication token will expire after 4 hours of inactivity.
-			// The Params map will not have been initialized if the endpoint config didn't specify
-			// it, so we check and initialize here if needed.
-			if configCopy.Params == nil {
-				configCopy.Params = make(map[string]*string)
-			}
-			configCopy.Params["client_session_keep_alive"] = &trueString
-			dsn, err := sf.DSN(&configCopy)
-			if err != nil {
-				return nil, fmt.Errorf("building Snowflake DSN: %w", err)
-			}
+			var dsn = parsed.ToURI();
 
 			log.WithFields(log.Fields{
 				"host":     parsed.Host,
@@ -124,7 +133,7 @@ func newSnowflakeDriver() *sqlDriver.Driver {
 				"schema":   parsed.Schema,
 			}).Info("opening Snowflake")
 
-			db, err := sql.Open("snowflake", dsn)
+			db, err := stdsql.Open("snowflake", dsn)
 			if err == nil {
 				err = db.PingContext(ctx)
 			}
@@ -133,94 +142,57 @@ func newSnowflakeDriver() *sqlDriver.Driver {
 				return nil, fmt.Errorf("opening Snowflake database: %w", err)
 			}
 
-			return sqlDriver.NewStdEndpoint(parsed, db, SQLGenerator(), sqlDriver.DefaultFlowTables("")), nil
-		},
-		NewTransactor: func(
-			ctx context.Context,
-			epi sqlDriver.Endpoint,
-			spec *pf.MaterializationSpec,
-			fence sqlDriver.Fence,
-			resources []sqlDriver.Resource,
-		) (_ pm.Transactor, err error) {
-			var ep = epi.(*sqlDriver.StdEndpoint)
-			var d = &transactor{
-				cfg: ep.Config().(*config),
-				gen: ep.Generator(),
-			}
-			d.store.fence = fence.(*sqlDriver.StdFence)
+			var metaBase sql.TablePath
+			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
-			// Establish connections.
-			if d.load.conn, err = ep.DB().Conn(ctx); err != nil {
-				return nil, fmt.Errorf("load DB.Conn: %w", err)
-			}
-			if d.store.conn, err = ep.DB().Conn(ctx); err != nil {
-				return nil, fmt.Errorf("store DB.Conn: %w", err)
-			}
 
-			// Create stage for file-based transfers.
-			if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
-				return nil, fmt.Errorf("creating transfer stage : %w", err)
-			}
-
-			for _, spec := range spec.Bindings {
-				var target = sqlDriver.ResourcePath(spec.ResourcePath).Join()
-				if err = d.addBinding(target, spec); err != nil {
-					return nil, fmt.Errorf("%s: %w", target, err)
-				}
-			}
-
-			return d, nil
+			return &sql.Endpoint{
+				Config:              parsed,
+				Dialect:             snowflakeDialect,
+				MetaSpecs:           metaSpecs,
+				MetaCheckpoints:     &metaCheckpoints,
+				Client:              client{uri: dsn},
+				CreateTableTemplate: tplCreateTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+			}, nil
 		},
 	}
 }
 
-// SQLGenerator returns a SQLGenerator for the Snowflake SQL dialect.
-func SQLGenerator() sqlDriver.Generator {
-	var variantMapper = sqlDriver.ConstColumnType{
-		SQLType: "VARIANT",
-		ValueConverter: func(i interface{}) (interface{}, error) {
-			switch ii := i.(type) {
-			case []byte:
-				return json.RawMessage(ii), nil
-			case json.RawMessage:
-				return ii, nil
-			case nil:
-				return json.RawMessage(nil), nil
-			default:
-				return nil, fmt.Errorf("invalid type %#v for variant", i)
-			}
-		},
-	}
-	var typeMappings = sqlDriver.ColumnTypeMapper{
-		sqlDriver.ARRAY:   variantMapper,
-		sqlDriver.BINARY:  sqlDriver.RawConstColumnType("BINARY"),
-		sqlDriver.BOOLEAN: sqlDriver.RawConstColumnType("BOOLEAN"),
-		sqlDriver.INTEGER: sqlDriver.RawConstColumnType("INTEGER"),
-		sqlDriver.NUMBER:  sqlDriver.RawConstColumnType("DOUBLE"),
-		sqlDriver.OBJECT:  variantMapper,
-		sqlDriver.STRING: sqlDriver.StringTypeMapping{
-			Default: sqlDriver.RawConstColumnType("STRING"),
-			ByFormat: map[string]sqlDriver.TypeMapper{
-				"date-time": sqlDriver.RawConstColumnType("TIMESTAMP"),
-			},
-		},
-	}
-	var nullable sqlDriver.TypeMapper = sqlDriver.NullableTypeMapping{
-		NotNullText: "NOT NULL",
-		Inner:       typeMappings,
-	}
-
-	return sqlDriver.Generator{
-		CommentRenderer:    sqlDriver.LineCommentRenderer(),
-		IdentifierRenderer: sqlDriver.NewRenderer(nil, sqlDriver.DoubleQuotesWrapper(), SkipWrapper),
-		ValueRenderer:      sqlDriver.NewRenderer(sqlDriver.DefaultQuoteSanitizer, sqlDriver.SingleQuotesWrapper(), nil),
-		Placeholder:        sqlDriver.QuestionMarkPlaceholder,
-		TypeMappings:       nullable,
-	}
+// client implements the sql.Client interface.
+type client struct {
+	uri string
 }
 
-func SkipWrapper(identifier string) bool {
-	return sqlDriver.DefaultUnwrappedIdentifiers(identifier) && !sliceContains(strings.ToLower(identifier), SF_RESERVED_WORDS)
+func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
+	err = c.withDB(func(db *stdsql.DB) error {
+		specB64, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
+		return err
+	})
+	return
+}
+
+func (c client) ExecStatements(ctx context.Context, statements []string) error {
+	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
+}
+
+func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
+	var err = c.withDB(func(db *stdsql.DB) error {
+		var err error
+		fence, err = sql.StdInstallFence(ctx, db, checkpoints, fence)
+		return err
+	})
+	return fence, err
+}
+
+func (c client) withDB(fn func(*stdsql.DB) error) error {
+	var db, err = stdsql.Open("snowflake", c.uri)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	return fn(db)
 }
 
 func sliceContains(expected string, actual []string) bool {
@@ -234,43 +206,86 @@ func sliceContains(expected string, actual []string) bool {
 
 type transactor struct {
 	cfg *config
-	gen *sqlDriver.Generator
+	dialect *sql.Dialect
 
 	// Variables exclusively used by Load.
 	load struct {
-		conn *sql.Conn
+		conn *stdsql.Conn
 	}
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
-		conn  *sql.Conn
-		fence *sqlDriver.StdFence
+		conn  *stdsql.Conn
+		fence *sql.Fence
 	}
 	bindings []*binding
 }
 
+func newTransactor(
+	ctx context.Context,
+	ep *sql.Endpoint,
+	fence sql.Fence,
+	bindings []sql.Table,
+) (_ pm.Transactor, err error) {
+	var d = &transactor{
+		cfg: ep.Config.(*config),
+	}
+	d.store.fence = &fence
+
+	var cfg = ep.Config.(*config)
+
+	// Establish connections.
+	if db, err := stdsql.Open("snowflake", cfg.ToURI()); err != nil {
+		return nil, fmt.Errorf("load stdsql.Open: %w", err)
+	} else if d.load.conn, err = db.Conn(ctx); err != nil {
+		return nil, fmt.Errorf("load db.Conn: %w", err)
+	}
+	if db, err := stdsql.Open("snowflake", cfg.ToURI()); err != nil {
+		return nil, fmt.Errorf("store stdsql.Open: %w", err)
+	} else if d.store.conn, err = db.Conn(ctx); err != nil {
+		return nil, fmt.Errorf("store db.Conn: %w", err)
+	}
+
+	// Create stage for file-based transfers.
+	if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
+		return nil, fmt.Errorf("creating transfer stage : %w", err)
+	}
+
+	for _, binding := range bindings {
+		if err = d.addBinding(ctx, binding); err != nil {
+			return nil, fmt.Errorf("%v: %w", binding, err)
+		}
+	}
+
+	return d, nil
+}
+
 type binding struct {
+	target sql.Table
 	// Variables exclusively used by Load.
 	load struct {
-		params  sqlDriver.ParametersConverter
-		sql     string
-		stage   *scratchFile
-		hasKeys bool
+		loadQuery string
+		stage     *scratchFile
+		hasKeys   bool
 	}
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
 		stage     *scratchFile
-		params    sqlDriver.ParametersConverter
-		mergeSQL  string
-		copySQL   string
+		mergeInto string
+		copyInto  string
 		mustMerge bool
 		hasDocs   bool
 	}
 }
 
-func (t *transactor) addBinding(targetName string, spec *pf.MaterializationSpec_Binding) error {
+type TableWithUUID struct {
+	Table *sql.Table
+	RandomUUID uuid.UUID
+}
+
+func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	var d = new(binding)
 	var err error
-	var target = sqlDriver.TableForMaterialization(targetName, "", t.gen.IdentifierRenderer, spec)
+	d.target = target
 
 	// Create local scratch files used for loads and stores.
 	if d.load.stage, err = newScratchFile(os.TempDir()); err != nil {
@@ -280,17 +295,14 @@ func (t *transactor) addBinding(targetName string, spec *pf.MaterializationSpec_
 		return fmt.Errorf("newScratchFile: %w", err)
 	}
 
-	// Build all SQL statements and parameter converters.
-	d.load.sql, d.store.copySQL, d.store.mergeSQL = BuildSQL(
-		len(t.bindings), target, spec.FieldSelection, d.load.stage.uuid, d.store.stage.uuid)
-
-	_, d.load.params, err = t.gen.QueryOnPrimaryKey(target, spec.FieldSelection.Document)
-	if err != nil {
-		return fmt.Errorf("building load params: %w", err)
+	if d.load.loadQuery, err = RenderTableWithRandomUUIDTemplate(target, d.load.stage.uuid, tplLoadQuery); err != nil {
+		return fmt.Errorf("loadQuery template: %w", err)
 	}
-	_, d.store.params, err = t.gen.InsertStatement(target)
-	if err != nil {
-		return fmt.Errorf("building insert params: %w", err)
+	if d.store.copyInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, tplCopyInto); err != nil {
+		return fmt.Errorf("copyInto template: %w", err)
+	}
+	if d.store.mergeInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, tplMergeInto); err != nil {
+		return fmt.Errorf("mergeInto template: %w", err)
 	}
 
 	t.bindings = append(t.bindings, d)
@@ -303,7 +315,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if converted, err := b.load.params.Convert(it.Key); err != nil {
+		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
 		} else if err = b.load.stage.Encode(converted); err != nil {
 			return fmt.Errorf("encoding Load key to scratch file: %w", err)
@@ -322,7 +334,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 		} else if err := b.load.stage.put(ctx, d.load.conn, d.cfg); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
-			subqueries = append(subqueries, b.load.sql)
+			subqueries = append(subqueries, b.load.loadQuery)
 			b.load.hasKeys = false // Reset for next transaction.
 		}
 	}
@@ -342,7 +354,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 
 	for rows.Next() {
 		var binding int
-		var document sql.RawBytes
+		var document stdsql.RawBytes
 
 		if err = rows.Scan(&binding, &document); err != nil {
 			return fmt.Errorf("scanning Load document: %w", err)
@@ -358,7 +370,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 }
 
 func (d *transactor) Prepare(_ context.Context, prepare pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	d.store.fence.SetCheckpoint(prepare.FlowCheckpoint)
+	d.store.fence.Checkpoint = prepare.FlowCheckpoint
 	return pf.DriverCheckpoint{}, nil
 }
 
@@ -366,9 +378,7 @@ func (d *transactor) Store(it *pm.StoreIterator) error {
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if converted, err := b.store.params.Convert(
-			append(append(it.Key, it.Values...), it.RawJSON),
-		); err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return fmt.Errorf("converting Store: %w", err)
 		} else if err = b.store.stage.Encode(converted); err != nil {
 			return fmt.Errorf("encoding Store to scratch file: %w", err)
@@ -399,33 +409,37 @@ func (d *transactor) Commit(ctx context.Context) error {
 	}
 	defer txn.Rollback()
 
-	// Apply the client's prepared checkpoint to our fence.
-	if err = d.store.fence.Update(ctx,
-		func(ctx context.Context, sql string, arguments ...interface{}) (rowsAffected int64, _ error) {
-			if result, err := txn.ExecContext(ctx, sql, arguments...); err != nil {
-				return 0, fmt.Errorf("txn.Exec: %w", err)
-			} else if rowsAffected, err = result.RowsAffected(); err != nil {
-				return 0, fmt.Errorf("result.RowsAffected: %w", err)
-			}
-			return
-		},
-	); err != nil && strings.Contains(err.Error(), "timeout") {
+
+	// First we must validate the fence has not been modified.
+	var fenceUpdate strings.Builder
+	if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+		return fmt.Errorf("evaluating fence template: %w", err)
+	}
+	if result, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
+		return fmt.Errorf("txn.Exec: %w", err)
+	} else if rowsAffected, err := result.RowsAffected(); err != nil {
+		return fmt.Errorf("result.RowsAffected: %w", err)
+	} else if rowsAffected == 0 {
+		return errors.Errorf("this transactions session was fenced off by another")
+	}
+
+	/*strings.Contains(err.Error(), "timeout") {
 		return fmt.Errorf("fence.Update: %w  (ensure LOCK_TIMEOUT and STATEMENT_TIMEOUT_IN_SECONDS are at least ten minutes)", err)
 	} else if err != nil {
 		return fmt.Errorf("fence.Update: %w", err)
-	}
+	}*/
 
 	for _, b := range d.bindings {
 		if !b.store.hasDocs {
 			// No table update required
 		} else if !b.store.mustMerge {
 			// We can issue a faster COPY INTO the target table.
-			if _, err = d.store.conn.ExecContext(ctx, b.store.copySQL); err != nil {
+			if _, err = d.store.conn.ExecContext(ctx, b.store.copyInto); err != nil {
 				return fmt.Errorf("copying Store documents: %w", err)
 			}
 		} else {
 			// We must MERGE into the target table.
-			if _, err = d.store.conn.ExecContext(ctx, b.store.mergeSQL); err != nil {
+			if _, err = d.store.conn.ExecContext(ctx, b.store.mergeInto); err != nil {
 				return fmt.Errorf("merging Store documents: %w", err)
 			}
 		}
@@ -492,7 +506,7 @@ func newScratchFile(tempdir string) (*scratchFile, error) {
 	}, nil
 }
 
-func (f *scratchFile) put(ctx context.Context, conn *sql.Conn, cfg *config) error {
+func (f *scratchFile) put(ctx context.Context, conn *stdsql.Conn, cfg *config) error {
 	if err := f.bw.Flush(); err != nil {
 		return fmt.Errorf("scratch.Flush: %w", err)
 	}
@@ -518,97 +532,5 @@ func (f *scratchFile) put(ctx context.Context, conn *sql.Conn, cfg *config) erro
 
 	return nil
 }
-
-// BuildSQL generates SQL used by Snowflake.
-func BuildSQL(binding int, table *sqlDriver.Table, fields pf.FieldSelection, loadUUID, storeUUID uuid.UUID) (
-	keyJoin, copyInto, mergeInto string) {
-
-	var exStore, names, rValues []string
-	for idx, name := range fields.AllFields() {
-		var col = table.GetColumn(name)
-		exStore = append(exStore, fmt.Sprintf("$1[%d] AS %s", idx, col.Identifier))
-		names = append(names, col.Identifier)
-		rValues = append(rValues, fmt.Sprintf("r.%s", col.Identifier))
-	}
-	var exLoad, joins []string
-	for idx, name := range fields.Keys {
-		var col = table.GetColumn(name)
-		exLoad = append(exLoad, fmt.Sprintf("$1[%d] AS %s", idx, col.Identifier))
-		joins = append(joins, fmt.Sprintf("%s.%s = r.%s", table.Identifier, col.Identifier, col.Identifier))
-	}
-	var updates []string
-	for _, name := range append(fields.Values, fields.Document) {
-		var col = table.GetColumn(name)
-		updates = append(updates, fmt.Sprintf("%s.%s = r.%s", table.Identifier, col.Identifier, col.Identifier))
-	}
-
-	keyJoin = fmt.Sprintf(`
-		SELECT %d, %s.%s
-		FROM %s
-		JOIN (
-			SELECT %s
-			FROM @flow_v1/%s
-		) AS r
-		ON %s
-		`,
-		binding,
-		table.Identifier,
-		table.GetColumn(fields.Document).Identifier,
-		table.Identifier,
-		strings.Join(exLoad, ", "),
-		loadUUID.String(),
-		strings.Join(joins, " AND "),
-	)
-
-	var storeSubquery = fmt.Sprintf(`
-			SELECT %s
-			FROM @flow_v1/%s
-		`,
-		strings.Join(exStore, ", "),
-		storeUUID.String(),
-	)
-
-	copyInto = fmt.Sprintf(`
-		COPY INTO %s (
-			%s
-		) FROM (%s)
-		;`,
-		table.Identifier,
-		strings.Join(names, ", "),
-		storeSubquery,
-	)
-
-	mergeInto = fmt.Sprintf(`
-		MERGE INTO %s
-		USING (%s) AS r
-		ON %s
-		WHEN MATCHED AND IS_NULL_VALUE(r.%s) THEN
-			DELETE
-		WHEN MATCHED THEN
-			UPDATE SET %s
-		WHEN NOT MATCHED THEN
-			INSERT (%s)
-			VALUES (%s)
-		;`,
-		table.Identifier,
-		storeSubquery,
-		strings.Join(joins, " AND "),
-		table.GetColumn(fields.Document).Identifier,
-		strings.Join(updates, ", "),
-		strings.Join(names, ", "),
-		strings.Join(rValues, ", "),
-	)
-
-	return
-}
-
-const createStageSQL = `
-		CREATE STAGE IF NOT EXISTS flow_v1
-			FILE_FORMAT = (
-				TYPE = JSON
-				BINARY_FORMAT = BASE64
-			)
-			COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored documents'
-		;`
 
 func main() { boilerplate.RunMain(newSnowflakeDriver()) }
