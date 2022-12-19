@@ -8,6 +8,7 @@ require (
 	cloud.google.com/go/pubsub v1.25.1
 	cloud.google.com/go/storage v1.23.0
 	firebase.google.com/go v3.13.0+incompatible
+	github.com/alpacahq/alpaca-trade-api-go/v2 v2.8.0
 	github.com/aws/aws-sdk-go v1.44.26
 	github.com/benbjohnson/clock v1.3.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
@@ -119,6 +120,8 @@ require (
 	github.com/tinylib/msgp v1.1.1 // indirect
 	github.com/uber/jaeger-client-go v2.16.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
+	github.com/vmihailenco/msgpack/v5 v5.3.0 // indirect
+	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
@@ -130,4 +133,5 @@ require (
 	gopkg.in/DataDog/dd-trace-go.v1 v1.17.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apimachinery v0.20.6 // indirect
+	nhooyr.io/websocket v1.8.7 // indirect
 )
