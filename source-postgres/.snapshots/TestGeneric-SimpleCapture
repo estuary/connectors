@@ -10,8 +10,4 @@
 # Final State Checkpoint
 # ================================
 {"cursor":"0/1111111","streams":{"test.generic_simplecapture":{"key_columns":["id"],"mode":"Active"}}}
-# ================================
-# Captures Terminated With Errors
-# ================================
-replication stream closed
 

@@ -105,8 +105,4 @@
 # Final State Checkpoint
 # ================================
 {"cursor":"binlog.000123:56789","streams":{"test.generic_catalogprimarykey":{"key_columns":["fullname","year"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Active"}}}
-# ================================
-# Captures Terminated With Errors
-# ================================
-replication stream closed
 

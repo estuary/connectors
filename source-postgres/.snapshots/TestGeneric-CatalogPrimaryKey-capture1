@@ -105,8 +105,4 @@
 # Final State Checkpoint
 # ================================
 {"cursor":"0/1111111","streams":{"test.generic_catalogprimarykey":{"key_columns":["fullname","year"],"mode":"Active"}}}
-# ================================
-# Captures Terminated With Errors
-# ================================
-replication stream closed
 
