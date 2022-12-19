@@ -1,0 +1,218 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":-1,"data":"kvxr","epoch":""}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AQAT/g=="}}}
+
+
+####################################
+### Capture from Key "AQAT/g=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":0,"data":"xakg","epoch":""}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AQAU"}}}
+
+
+####################################
+### Capture from Key "AQAU"
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":3,"data":"gboj","epoch":"   "}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"ASAgIAAVAw=="}}}
+
+
+####################################
+### Capture from Key "ASAgIAAVAw=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":1,"data":"bvzf","epoch":"aaa"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AWFhYQAVAQ=="}}}
+
+
+####################################
+### Capture from Key "AWFhYQAVAQ=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":2,"data":"ukwh","epoch":"aaa"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AWFhYQAVAg=="}}}
+
+
+####################################
+### Capture from Key "AWFhYQAVAg=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":3,"data":"lntg","epoch":"aaa"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AWFhYQAVAw=="}}}
+
+
+####################################
+### Capture from Key "AWFhYQAVAw=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":-100,"data":"bycz","epoch":"bbb"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AWJiYgATmw=="}}}
+
+
+####################################
+### Capture from Key "AWJiYgATmw=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":2,"data":"ajgp","epoch":"bbb"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AWJiYgAVAg=="}}}
+
+
+####################################
+### Capture from Key "AWJiYgAVAg=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":333,"data":"zljj","epoch":"bbb"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AWJiYgAWAU0="}}}
+
+
+####################################
+### Capture from Key "AWJiYgAWAU0="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":4096,"data":"lhnw","epoch":"bbb"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AWJiYgAWEAA="}}}
+
+
+####################################
+### Capture from Key "AWJiYgAWEAA="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":800000,"data":"iask","epoch":"bbb"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AWJiYgAXDDUA"}}}
+
+
+####################################
+### Capture from Key "AWJiYgAXDDUA"
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":1234,"data":"bikh","epoch":"ccc"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AWNjYwAWBNI="}}}
+
+
+####################################
+### Capture from Key "AWNjYwAWBNI="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":-10000,"data":"dhqc","epoch":"ddd"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AWRkZAAS2O8="}}}
+
+
+####################################
+### Capture from Key "AWRkZAAS2O8="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":1,"data":"djsf","epoch":"x"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AXgAFQE="}}}
+
+
+####################################
+### Capture from Key "AXgAFQE="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":1,"data":"iwnx","epoch":"y"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AXkAFQE="}}}
+
+
+####################################
+### Capture from Key "AXkAFQE="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":1,"data":"qmjp","epoch":"z"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Backfill","scanned":"AXoAFQE="}}}
+
+
+####################################
+### Capture from Key "AXoAFQE="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"metadata":{"schema":{"columns":["epoch","count","data"],"types":{"count":"int","data":"text","epoch":"varchar"}}},"mode":"Active"}}}
+
+
+

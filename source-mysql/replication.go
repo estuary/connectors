@@ -230,10 +230,12 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 
 			var sourceMeta = &mysqlSourceInfo{
 				SourceCommon: sqlcapture.SourceCommon{
-					Millis: rs.gtidTimestamp.UnixMilli(),
 					Schema: schema,
 					Table:  table,
 				},
+			}
+			if !rs.gtidTimestamp.IsZero() {
+				sourceMeta.SourceCommon.Millis = rs.gtidTimestamp.UnixMilli()
 			}
 
 			// Get column names and types from persistent metadata. If available, allow

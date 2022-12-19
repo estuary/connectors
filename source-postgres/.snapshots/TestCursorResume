@@ -1,0 +1,218 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":-1,"data":"kvxr","epoch":""}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AgAT/g=="}}}
+
+
+####################################
+### Capture from Key "AgAT/g=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":0,"data":"xakg","epoch":""}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AgAU"}}}
+
+
+####################################
+### Capture from Key "AgAU"
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":3,"data":"gboj","epoch":"   "}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AiAgIAAVAw=="}}}
+
+
+####################################
+### Capture from Key "AiAgIAAVAw=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":1,"data":"bvzf","epoch":"aaa"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AmFhYQAVAQ=="}}}
+
+
+####################################
+### Capture from Key "AmFhYQAVAQ=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":2,"data":"ukwh","epoch":"aaa"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AmFhYQAVAg=="}}}
+
+
+####################################
+### Capture from Key "AmFhYQAVAg=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":3,"data":"lntg","epoch":"aaa"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AmFhYQAVAw=="}}}
+
+
+####################################
+### Capture from Key "AmFhYQAVAw=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":-100,"data":"bycz","epoch":"bbb"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AmJiYgATmw=="}}}
+
+
+####################################
+### Capture from Key "AmJiYgATmw=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":2,"data":"ajgp","epoch":"bbb"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AmJiYgAVAg=="}}}
+
+
+####################################
+### Capture from Key "AmJiYgAVAg=="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":333,"data":"zljj","epoch":"bbb"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AmJiYgAWAU0="}}}
+
+
+####################################
+### Capture from Key "AmJiYgAWAU0="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":4096,"data":"lhnw","epoch":"bbb"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AmJiYgAWEAA="}}}
+
+
+####################################
+### Capture from Key "AmJiYgAWEAA="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":800000,"data":"iask","epoch":"bbb"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AmJiYgAXDDUA"}}}
+
+
+####################################
+### Capture from Key "AmJiYgAXDDUA"
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":1234,"data":"bikh","epoch":"ccc"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AmNjYwAWBNI="}}}
+
+
+####################################
+### Capture from Key "AmNjYwAWBNI="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":-10000,"data":"dhqc","epoch":"ddd"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AmRkZAAS2O8="}}}
+
+
+####################################
+### Capture from Key "AmRkZAAS2O8="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":1,"data":"djsf","epoch":"x"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AngAFQE="}}}
+
+
+####################################
+### Capture from Key "AngAFQE="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":1,"data":"iwnx","epoch":"y"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AnkAFQE="}}}
+
+
+####################################
+### Capture from Key "AnkAFQE="
+####################################
+# ================================
+# Collection "test.CursorResume": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":1,"data":"qmjp","epoch":"z"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Backfill","scanned":"AnoAFQE="}}}
+
+
+####################################
+### Capture from Key "AnoAFQE="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.cursorresume":{"key_columns":["epoch","count"],"mode":"Active"}}}
+
+
+
