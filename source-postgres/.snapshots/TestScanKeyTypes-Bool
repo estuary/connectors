@@ -1,0 +1,36 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Bool": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_bool","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":false}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"key_columns":["key"],"mode":"Backfill","scanned":"Jg=="}}}
+
+
+####################################
+### Capture from Key "Jg=="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Bool": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_bool","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":true}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"key_columns":["key"],"mode":"Backfill","scanned":"Jw=="}}}
+
+
+####################################
+### Capture from Key "Jw=="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"key_columns":["key"],"mode":"Active"}}}
+
+
+
