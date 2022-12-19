@@ -146,3 +146,41 @@ func TestScanKeyTimestamps(t *testing.T) {
 	var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 	cupaloy.SnapshotT(t, summary)
 }
+
+func TestScanKeyTypes(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+	for _, tc := range []struct {
+		Name       string
+		ColumnType string
+		Values     []interface{}
+	}{
+		{"Bool", "BOOLEAN", []interface{}{"true", "false"}},
+		{"Integer", "INTEGER", []interface{}{0, -3, 2, 1723}},
+		{"SmallInt", "SMALLINT", []interface{}{0, -3, 2, 1723}},
+		{"BigInt", "BIGINT", []interface{}{0, -3, 2, 1723}},
+		{"Serial", "SERIAL", []interface{}{0, -3, 2, 1723}},
+		{"SmallSerial", "SMALLSERIAL", []interface{}{0, -3, 2, 1723}},
+		{"BigSerial", "BIGSERIAL", []interface{}{0, -3, 2, 1723}},
+		{"Real", "REAL", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"Double", "DOUBLE PRECISION", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"Decimal", "DECIMAL", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"Numeric", "NUMERIC(4,3)", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"VarChar", "VARCHAR(10)", []interface{}{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
+		{"Char", "CHAR(3)", []interface{}{"   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
+		{"Text", "TEXT", []interface{}{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			var tableName = tb.CreateTable(ctx, t, "", fmt.Sprintf("(key %s PRIMARY KEY, data TEXT)", tc.ColumnType))
+			var rows [][]interface{}
+			for idx, val := range tc.Values {
+				rows = append(rows, []interface{}{val, fmt.Sprintf("Data %d", idx)})
+			}
+			tb.Insert(ctx, t, tableName, rows)
+
+			var cs = tb.CaptureSpec(t, tableName)
+			cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
+			var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
+			cupaloy.SnapshotT(t, summary)
+		})
+	}
+}
