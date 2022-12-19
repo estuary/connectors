@@ -1,0 +1,62 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Integer": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer"}},"data":"Data 1","k":-3}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"E/w="}}}
+
+
+####################################
+### Capture from Key "E/w="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Integer": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer"}},"data":"Data 0","k":0}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"FA=="}}}
+
+
+####################################
+### Capture from Key "FA=="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Integer": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer"}},"data":"Data 2","k":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"FQI="}}}
+
+
+####################################
+### Capture from Key "FQI="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_Integer": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer"}},"data":"Data 3","k":1723}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"Fga7"}}}
+
+
+####################################
+### Capture from Key "Fga7"
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Active"}}}
+
+
+

@@ -1,0 +1,140 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_VarChar": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarChar"}},"data":"Data 0","k":""}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Backfill","scanned":"AQA="}}}
+
+
+####################################
+### Capture from Key "AQA="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_VarChar": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarChar"}},"data":"Data 4","k":"B"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Backfill","scanned":"AUIA"}}}
+
+
+####################################
+### Capture from Key "AUIA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_VarChar": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarChar"}},"data":"Data 5","k":"E"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Backfill","scanned":"AUUA"}}}
+
+
+####################################
+### Capture from Key "AUUA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_VarChar": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarChar"}},"data":"Data 6","k":"H"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Backfill","scanned":"AUgA"}}}
+
+
+####################################
+### Capture from Key "AUgA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_VarChar": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarChar"}},"data":"Data 7","k":"_c"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Backfill","scanned":"AV9jAA=="}}}
+
+
+####################################
+### Capture from Key "AV9jAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_VarChar": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarChar"}},"data":"Data 8","k":"_f"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Backfill","scanned":"AV9mAA=="}}}
+
+
+####################################
+### Capture from Key "AV9mAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_VarChar": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarChar"}},"data":"Data 9","k":"_i"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Backfill","scanned":"AV9pAA=="}}}
+
+
+####################################
+### Capture from Key "AV9pAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_VarChar": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarChar"}},"data":"Data 1","k":"a"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Backfill","scanned":"AWEA"}}}
+
+
+####################################
+### Capture from Key "AWEA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_VarChar": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarChar"}},"data":"Data 2","k":"d"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Backfill","scanned":"AWQA"}}}
+
+
+####################################
+### Capture from Key "AWQA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_VarChar": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarChar"}},"data":"Data 3","k":"g"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Backfill","scanned":"AWcA"}}}
+
+
+####################################
+### Capture from Key "AWcA"
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_varchar":{"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"varchar"}}},"mode":"Active"}}}
+
+
+
