@@ -173,12 +173,7 @@ func TestSkipBackfills(t *testing.T) {
 
 	// Run an initial capture, which should capture all three tables but only backfill events from table B
 	var cs = tb.CaptureSpec(t, tableA, tableB, tableC)
-	if cfg, ok := cs.EndpointSpec.(Config); ok {
-		cfg.Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
-		cs.EndpointSpec = cfg
-	} else {
-		t.Fatal("broken test logic: capture endpoint spec should be Config")
-	}
+	cs.EndpointSpec.(*Config).Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Insert additional data and verify that all three tables report new events
@@ -252,9 +247,7 @@ func TestCursorResume(t *testing.T) {
 	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
 	// restarted after each scan key update, this means we'll advance over the keys
 	// one by one.
-	var cfg = cs.EndpointSpec.(Config)
-	cfg.Advanced.BackfillChunkSize = 1
-	cs.EndpointSpec = cfg
+	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
 	var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 	cupaloy.SnapshotT(t, summary)
 }
@@ -271,9 +264,7 @@ func TestComplexDataset(t *testing.T) {
 	var cs = tb.CaptureSpec(t, tableName)
 
 	// Reduce the backfill chunk size to 10 rows for this test.
-	var cfg = cs.EndpointSpec.(Config)
-	cfg.Advanced.BackfillChunkSize = 10
-	cs.EndpointSpec = cfg
+	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10
 
 	t.Run("init", func(t *testing.T) {
 		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)

@@ -1,0 +1,140 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.ScanKeyDatetimes": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"aood","ts":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMDAwAA=="}}}
+
+
+####################################
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMDAwAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyDatetimes": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"xwxt","ts":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMTExMDAwAA=="}}}
+
+
+####################################
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMTExMDAwAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyDatetimes": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"tpxi","ts":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMjIyMDAwAA=="}}}
+
+
+####################################
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMjIyMDAwAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyDatetimes": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"jvqz","ts":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMzMzMDAwAA=="}}}
+
+
+####################################
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMzMzMDAwAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyDatetimes": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"juwf","ts":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNDQ0MDAwAA=="}}}
+
+
+####################################
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNDQ0MDAwAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyDatetimes": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"znzn","ts":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNTU1MDAwAA=="}}}
+
+
+####################################
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNTU1MDAwAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyDatetimes": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"zocp","ts":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNjY2MDAwAA=="}}}
+
+
+####################################
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNjY2MDAwAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyDatetimes": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"pxoi","ts":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNzc3MDAwAA=="}}}
+
+
+####################################
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNzc3MDAwAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyDatetimes": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"vdug","ts":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuODg4MDAwAA=="}}}
+
+
+####################################
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuODg4MDAwAA=="
+####################################
+# ================================
+# Collection "test.ScanKeyDatetimes": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"xerk","ts":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuOTk5MDAwAA=="}}}
+
+
+####################################
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuOTk5MDAwAA=="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Active"}}}
+
+
+

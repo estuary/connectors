@@ -124,9 +124,10 @@ type postgresTestBackend struct {
 }
 
 func (tb *postgresTestBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
+	var cfg = tb.cfg
 	return &st.CaptureSpec{
 		Driver:       postgresDriver,
-		EndpointSpec: tb.cfg,
+		EndpointSpec: &cfg,
 		Bindings:     tests.ResourceBindings(t, streamIDs...),
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   CaptureSanitizers,
