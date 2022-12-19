@@ -85,9 +85,10 @@ type mysqlTestBackend struct {
 }
 
 func (tb *mysqlTestBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
+	var cfg = tb.cfg
 	return &st.CaptureSpec{
 		Driver:       mysqlDriver,
-		EndpointSpec: tb.cfg,
+		EndpointSpec: &cfg,
 		Bindings:     tests.ResourceBindings(t, streamIDs...),
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   CaptureSanitizers,
@@ -252,12 +253,7 @@ func TestBinlogExpirySanityCheck(t *testing.T) {
 			tb.Query(ctx, t, fmt.Sprintf("SET GLOBAL %s = %d;", tc.VarName, tc.VarValue))
 
 			// Perform validation, which should run the sanity check
-			if cfg, ok := cs.EndpointSpec.(Config); ok {
-				cfg.Advanced.SkipBinlogRetentionCheck = tc.SkipCheck
-				cs.EndpointSpec = cfg
-			} else {
-				t.Fatal("broken test logic: capture endpoint spec should be Config")
-			}
+			cs.EndpointSpec.(*Config).Advanced.SkipBinlogRetentionCheck = tc.SkipCheck
 			var _, err = cs.Validate(ctx, t)
 
 			// Verify the result
@@ -283,12 +279,7 @@ func TestSkipBackfills(t *testing.T) {
 	tb.Insert(ctx, t, tableC, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
 
 	var cs = tb.CaptureSpec(t, tableA, tableB, tableC)
-	if cfg, ok := cs.EndpointSpec.(Config); ok {
-		cfg.Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
-		cs.EndpointSpec = cfg
-	} else {
-		t.Fatal("broken test logic: capture endpoint spec should be Config")
-	}
+	cs.EndpointSpec.(*Config).Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
 
 	// Run an initial capture, which should only backfill events from table B
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
@@ -316,9 +307,7 @@ func TestCursorResume(t *testing.T) {
 	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
 	// restarted after each scan key update, this means we'll advance over the keys
 	// one by one.
-	var cfg = cs.EndpointSpec.(Config)
-	cfg.Advanced.BackfillChunkSize = 1
-	cs.EndpointSpec = cfg
+	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
 	var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 	cupaloy.SnapshotT(t, summary)
 }
@@ -335,9 +324,7 @@ func TestComplexDataset(t *testing.T) {
 	var cs = tb.CaptureSpec(t, tableName)
 
 	// Reduce the backfill chunk size to 10 rows for this test.
-	var cfg = cs.EndpointSpec.(Config)
-	cfg.Advanced.BackfillChunkSize = 10
-	cs.EndpointSpec = cfg
+	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10
 
 	t.Run("init", func(t *testing.T) {
 		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
