@@ -1,0 +1,293 @@
+####################################
+### Capture from Key "Fge8AU5IAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 14 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Nevada","population":810215,"state":"NV","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New Jersey","population":7376330,"state":"NJ","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New Mexico","population":1309400,"state":"NM","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New York","population":17566754,"state":"NY","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Ohio","population":10800650,"state":"OH","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Oklahoma","population":3040758,"state":"OK","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Oregon","population":2641218,"state":"OR","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Pennsylvania","population":11868305,"state":"PA","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Rhode Island","population":948773,"state":"RI","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"South Carolina","population":3134502,"state":"SC","year":1980}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"ComplexDataset"}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"ComplexDataset"}},"fullname":"No Such State","population":12345,"state":"XX","year":1970}
+{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"ComplexDataset"}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
+{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"ComplexDataset"}},"fullname":"No Such State","population":12345,"state":"XX","year":1970}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"Fge8AVNDAA=="}}}
+
+
+####################################
+### Capture from Key "Fge8AVNDAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"South Dakota","population":690851,"state":"SD","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Tennessee","population":4600252,"state":"TN","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Texas","population":14338208,"state":"TX","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Utah","population":1472595,"state":"UT","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Vermont","population":512524,"state":"VT","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Virginia","population":5368334,"state":"VA","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Washington","population":4154678,"state":"WA","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"West Virginia","population":1951349,"state":"WV","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Wisconsin","population":4712045,"state":"WI","year":1980}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Wyoming","population":474185,"state":"WY","year":1980}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"Fge8AVdZAA=="}}}
+
+
+####################################
+### Capture from Key "Fge8AVdZAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Alabama","population":4452173,"state":"AL","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Alaska","population":627963,"state":"AK","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Arizona","population":5160586,"state":"AZ","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Arkansas","population":2678588,"state":"AR","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"California","population":33987977,"state":"CA","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Colorado","population":4326921,"state":"CO","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Connecticut","population":3411777,"state":"CT","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Delaware","population":786373,"state":"DE","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"District of Columbia","population":572046,"state":"DC","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"No Such State","population":123456,"state":"XX","year":1990}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfQAURFAA=="}}}
+
+
+####################################
+### Capture from Key "FgfQAURFAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Florida","population":16047515,"state":"FL","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Georgia","population":8227303,"state":"GA","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Hawaii","population":1213519,"state":"HI","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Idaho","population":1299430,"state":"ID","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Illinois","population":12434161,"state":"IL","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Indiana","population":6091866,"state":"IN","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Iowa","population":2929067,"state":"IA","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Kansas","population":2693681,"state":"KS","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Kentucky","population":4049021,"state":"KY","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Louisiana","population":4471885,"state":"LA","year":2000}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfQAUxBAA=="}}}
+
+
+####################################
+### Capture from Key "FgfQAUxBAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Maine","population":1277072,"state":"ME","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Maryland","population":5311034,"state":"MD","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Massachusetts","population":6361104,"state":"MA","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Michigan","population":9952450,"state":"MI","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Minnesota","population":4933692,"state":"MN","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Mississippi","population":2848353,"state":"MS","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Missouri","population":5607285,"state":"MO","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Montana","population":903773,"state":"MT","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"North Carolina","population":8081614,"state":"NC","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"North Dakota","population":642023,"state":"ND","year":2000}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfQAU5EAA=="}}}
+
+
+####################################
+### Capture from Key "FgfQAU5EAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Nebraska","population":1713820,"state":"NE","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Nevada","population":2018741,"state":"NV","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New Hampshire","population":1239882,"state":"NH","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New Jersey","population":8430621,"state":"NJ","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New Mexico","population":1821204,"state":"NM","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New York","population":19001780,"state":"NY","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Ohio","population":11363543,"state":"OH","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Oklahoma","population":3454365,"state":"OK","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Oregon","population":3429708,"state":"OR","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Pennsylvania","population":12284173,"state":"PA","year":2000}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfQAVBBAA=="}}}
+
+
+####################################
+### Capture from Key "FgfQAVBBAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Rhode Island","population":1050268,"state":"RI","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"South Carolina","population":4024223,"state":"SC","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"South Dakota","population":755844,"state":"SD","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Tennessee","population":5703719,"state":"TN","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Texas","population":20944499,"state":"TX","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Utah","population":2244502,"state":"UT","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Vermont","population":609618,"state":"VT","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Virginia","population":7105817,"state":"VA","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Washington","population":5910512,"state":"WA","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Wisconsin","population":5373999,"state":"WI","year":2000}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfQAVdJAA=="}}}
+
+
+####################################
+### Capture from Key "FgfQAVdJAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Alabama","population":4921532,"state":"AL","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Alaska","population":731158,"state":"AK","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Arizona","population":7421401,"state":"AZ","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Arkansas","population":3030522,"state":"AR","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"California","population":39368078,"state":"CA","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Colorado","population":5807719,"state":"CO","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Connecticut","population":3557006,"state":"CT","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"District of Columbia","population":712816,"state":"DC","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"West Virginia","population":1807021,"state":"WV","year":2000}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Wyoming","population":494300,"state":"WY","year":2000}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfkAURDAA=="}}}
+
+
+####################################
+### Capture from Key "FgfkAURDAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Delaware","population":986809,"state":"DE","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Florida","population":21733312,"state":"FL","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Georgia","population":10710017,"state":"GA","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Hawaii","population":1407006,"state":"HI","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Idaho","population":1826913,"state":"ID","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Illinois","population":12587530,"state":"IL","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Indiana","population":6754953,"state":"IN","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Iowa","population":3163561,"state":"IA","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Kansas","population":2913805,"state":"KS","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Kentucky","population":4477251,"state":"KY","year":2020}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfkAUtZAA=="}}}
+
+
+####################################
+### Capture from Key "FgfkAUtZAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Louisiana","population":4645318,"state":"LA","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Maine","population":1350141,"state":"ME","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Maryland","population":6055802,"state":"MD","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Massachusetts","population":6893574,"state":"MA","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Michigan","population":9966555,"state":"MI","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Minnesota","population":5657342,"state":"MN","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Mississippi","population":2966786,"state":"MS","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Missouri","population":6151548,"state":"MO","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Montana","population":1080577,"state":"MT","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"North Carolina","population":10600823,"state":"NC","year":2020}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfkAU5DAA=="}}}
+
+
+####################################
+### Capture from Key "FgfkAU5DAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Nebraska","population":1937552,"state":"NE","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Nevada","population":3138259,"state":"NV","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New Hampshire","population":1366275,"state":"NH","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New Jersey","population":8882371,"state":"NJ","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New Mexico","population":2106319,"state":"NM","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"New York","population":19336776,"state":"NY","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"North Dakota","population":765309,"state":"ND","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Ohio","population":11693217,"state":"OH","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Oklahoma","population":3980783,"state":"OK","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Oregon","population":4241507,"state":"OR","year":2020}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfkAU9SAA=="}}}
+
+
+####################################
+### Capture from Key "FgfkAU9SAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 10 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Pennsylvania","population":12783254,"state":"PA","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Rhode Island","population":1057125,"state":"RI","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"South Carolina","population":5218040,"state":"SC","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"South Dakota","population":892717,"state":"SD","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Tennessee","population":6886834,"state":"TN","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Texas","population":29360759,"state":"TX","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Utah","population":3249879,"state":"UT","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Vermont","population":623347,"state":"VT","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Virginia","population":8590563,"state":"VA","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Washington","population":7693612,"state":"WA","year":2020}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfkAVdBAA=="}}}
+
+
+####################################
+### Capture from Key "FgfkAVdBAA=="
+####################################
+# ================================
+# Collection "test.ComplexDataset": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"West Virginia","population":1784787,"state":"WV","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Wisconsin","population":5832655,"state":"WI","year":2020}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset"}},"fullname":"Wyoming","population":582328,"state":"WY","year":2020}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Backfill","scanned":"FgfkAVdZAA=="}}}
+
+
+####################################
+### Capture from Key "FgfkAVdZAA=="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.complexdataset":{"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Active"}}}
+
+
+
