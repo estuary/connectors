@@ -11,16 +11,21 @@ import (
 // them as a FoundationDB serialized tuple. It applies the `translate` callback to
 // each field value so that complex database-specific types can be "lowered" into
 // FDB-serializable values.
-func EncodeRowKey(key []string, fields map[string]interface{}, translate func(key interface{}) (tuple.TupleElement, error)) ([]byte, error) {
+func EncodeRowKey(key []string, fields map[string]interface{}, fieldTypes map[string]interface{}, translate func(key interface{}, ktype interface{}) (tuple.TupleElement, error)) ([]byte, error) {
+	if fieldTypes == nil {
+		fieldTypes = emptyFieldTypesMap
+	}
 	var xs = make([]interface{}, len(key))
 	var err error
 	for i, elem := range key {
-		if xs[i], err = translate(fields[elem]); err != nil {
+		if xs[i], err = translate(fields[elem], fieldTypes[elem]); err != nil {
 			return nil, fmt.Errorf("encode row key: %w", err)
 		}
 	}
 	return packTuple(xs)
 }
+
+var emptyFieldTypesMap = make(map[string]interface{})
 
 // We translate a list of column values (representing the primary key of a
 // database row) into a list of bytes using the FoundationDB tuple encoding

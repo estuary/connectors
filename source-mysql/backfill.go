@@ -55,7 +55,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 
 	// Build a query to fetch the next `backfillChunkSize` rows from the database.
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
-	var query = db.buildScanQuery(resumeKey == nil, keyColumns, schema, table)
+	var query = db.buildScanQuery(resumeKey == nil, keyColumns, columnTypes, schema, table)
 	db.explainQuery(streamID, query, resumeKey)
 
 	// Execute the backfill query to fetch rows from the database
@@ -77,7 +77,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		for idx, val := range row {
 			fields[string(results.Fields[idx].Name)] = val.Value()
 		}
-		var rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, encodeKeyFDB)
+		var rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 		if err != nil {
 			return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 		}
@@ -104,25 +104,38 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 	return events, nil
 }
 
-func (db *mysqlDatabase) buildScanQuery(start bool, keyColumns []string, schemaName, tableName string) string {
-	// Construct strings like `(foo, bar, baz)` and `(?, ?, ?)` for use in the query
-	var pkey, args string
-	for idx, colName := range keyColumns {
-		if idx > 0 {
-			pkey += ", "
-			args += ", "
+// The set of MySQL column types for which we need to specify `BINARY` ordering
+// and comparison. Represented as a map[string]bool so that it can be combined
+// with the "is the column typename a string" check into a single if statement.
+var columnBinaryKeyComparison = map[string]bool{
+	"char":       true,
+	"varchar":    true,
+	"tinytext":   true,
+	"text":       true,
+	"mediumtext": true,
+	"longtext":   true,
+}
+
+func (db *mysqlDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
+	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
+	var pkey []string
+	var args []string
+	for _, colName := range keyColumns {
+		if colType, ok := columnTypes[colName].(string); ok && columnBinaryKeyComparison[colType] {
+			pkey = append(pkey, "BINARY "+colName)
+		} else {
+			pkey = append(pkey, colName)
 		}
-		pkey += colName
-		args += "?"
+		args = append(args, "?")
 	}
 
 	// Construct the query itself
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, "SELECT * FROM %s.%s", schemaName, tableName)
 	if !start {
-		fmt.Fprintf(query, " WHERE (%s) > (%s)", pkey, args)
+		fmt.Fprintf(query, " WHERE (%s) > (%s)", strings.Join(pkey, ", "), strings.Join(args, ", "))
 	}
-	fmt.Fprintf(query, " ORDER BY %s", pkey)
+	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " LIMIT %d;", db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }

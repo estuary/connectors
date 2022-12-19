@@ -384,11 +384,26 @@ func (db *mysqlDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &mysqlSourceInfo{}
 }
 
-func encodeKeyFDB(key interface{}) (tuple.TupleElement, error) {
+func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
+	switch val := key.(type) {
+	case []byte:
+		if typeName, ok := ktype.(string); ok {
+			switch typeName {
+			case "decimal":
+				// TODO(wgd): This should probably be done in a more principled way, but
+				// this is a viable placeholder solution.
+				return strconv.ParseFloat(string(val), 64)
+			}
+		}
+	}
 	return key, nil
 }
 
 func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
+	switch v := t.(type) {
+	case []byte:
+		return string(v), nil
+	}
 	return t, nil
 }
 

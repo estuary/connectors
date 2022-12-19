@@ -262,7 +262,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if err != nil {
 						return fmt.Errorf("error decoding row values: %w", err)
 					}
-					rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, encodeKeyFDB)
+					rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
 					if err != nil {
 						return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 					}
@@ -288,7 +288,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						if err != nil {
 							return fmt.Errorf("error decoding row values: %w", err)
 						}
-						rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, encodeKeyFDB)
+						rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
 						if err != nil {
 							return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 						}
@@ -313,7 +313,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if err != nil {
 						return fmt.Errorf("error decoding row values: %w", err)
 					}
-					rowKey, err := sqlcapture.EncodeRowKey(keyColumns, before, encodeKeyFDB)
+					rowKey, err := sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB)
 					if err != nil {
 						return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 					}

@@ -414,9 +414,9 @@ func (s *replicationStream) decodeChangeEvent(
 	}
 	var rowKey []byte
 	if op == sqlcapture.InsertOp || op == sqlcapture.UpdateOp {
-		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, af, encodeKeyFDB)
+		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, af, nil, encodeKeyFDB)
 	} else {
-		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, bf, encodeKeyFDB)
+		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, bf, nil, encodeKeyFDB)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
