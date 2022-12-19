@@ -129,9 +129,9 @@ func (db *postgresDatabase) buildScanQuery(start bool, keyColumns []string, sche
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, "SELECT * FROM %s.%s", schemaName, tableName)
 	if !start {
-		fmt.Fprintf(query, " WHERE (%s) > (%s)", pkey, args)
+		fmt.Fprintf(query, ` WHERE (%s) > (%s) COLLATE "C"`, pkey, args)
 	}
-	fmt.Fprintf(query, " ORDER BY (%s)", pkey)
+	fmt.Fprintf(query, ` ORDER BY (%s) COLLATE "C"`, pkey)
 	fmt.Fprintf(query, " LIMIT %d;", db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
