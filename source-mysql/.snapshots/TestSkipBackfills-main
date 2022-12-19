@@ -20,8 +20,4 @@
 # Final State Checkpoint
 # ================================
 {"cursor":"binlog.000123:56789","streams":{"test.skipbackfills_aaa":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.skipbackfills_bbb":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.skipbackfills_ccc":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
-# ================================
-# Captures Terminated With Errors
-# ================================
-replication stream closed
 

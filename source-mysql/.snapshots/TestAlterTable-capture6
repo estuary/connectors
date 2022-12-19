@@ -7,8 +7,4 @@
 # Final State Checkpoint
 # ================================
 {"cursor":"binlog.000123:56789","streams":{"test.altertable_aaa":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.altertable_bbb":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","extra"],"types":{"data":"text","extra":"text","id":"int"}}},"mode":"Active"},"test.altertable_ccc":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","extra","evenmore"],"types":{"data":"text","evenmore":"text","extra":"text","id":"int"}}},"mode":"Active"}}}
-# ================================
-# Captures Terminated With Errors
-# ================================
-replication stream closed
 
