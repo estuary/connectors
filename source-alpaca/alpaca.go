@@ -16,6 +16,8 @@ import (
 
 const emptyCheckpoint string = `{}`
 
+var streamerLoggingInterval = 1 * time.Minute
+
 type tickDocument struct {
 	ID         int64
 	Symbol     string
@@ -60,14 +62,10 @@ func (c *alpacaClient) handleDocuments(docs <-chan tickDocument, checkpointJSON 
 }
 
 func (c *alpacaClient) doStream(ctx context.Context) error {
-	streamedTradeHandler := func(t marketdataStream.Trade) {
-		log.WithFields(log.Fields{
-			"exchange":  t.Exchange,
-			"timestamp": t.Timestamp,
-			"symbol":    t.Symbol,
-			"id":        t.ID,
-		}).Debug("got streamed trade")
+	streamedCount := 0
+	logTimer := time.NewTimer(streamerLoggingInterval)
 
+	streamedTradeHandler := func(t marketdataStream.Trade) {
 		docsChan := make(chan tickDocument)
 		eg, _ := errgroup.WithContext(ctx) // TODO: Handle returned context
 		eg.Go(func() error {
@@ -88,44 +86,92 @@ func (c *alpacaClient) doStream(ctx context.Context) error {
 		close(docsChan)
 
 		eg.Wait() // TODO: Handle the error from here also.
+
+		select {
+		case <-logTimer.C:
+			log.WithFields(log.Fields{
+				"handled":       streamedCount,
+				"lastSymbol":    t.Symbol,
+				"lastTimestamp": t.Timestamp,
+			}).Info("trade streaming in progress")
+
+			logTimer.Reset(streamerLoggingInterval)
+		default:
+		}
+		streamedCount++
+	}
+
+	log.Info("starting streaming client")
+
+	if err := c.streamClient.Connect(ctx); err != nil {
+		return err // TODO: Better errors
 	}
 
 	if err := c.streamClient.SubscribeToTrades(streamedTradeHandler, c.symbols...); err != nil {
 		return err
 	}
 
-	// TODO: Error handling
-	return c.streamClient.Connect(ctx)
+	select {
+	case err := <-c.streamClient.Terminated():
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
-func (c *alpacaClient) doBackfill(ctx context.Context, start time.Time, maxInterval, minInterval time.Duration) error {
+func (c *alpacaClient) doBackfill(ctx context.Context, start, end time.Time, maxInterval, minInterval time.Duration, caughtUp chan struct{}) error {
+	var once sync.Once
+
 	for {
 		var err error
-		if start, err = c.backfill(ctx, start, getEndDate(c.freePlan), maxInterval, minInterval); err != nil {
+		if start, err = c.backfill(ctx, start, getEndDate(c.freePlan, end), maxInterval, minInterval); err != nil {
 			return err
 		}
+
 		// If it took a long time to backfill we might not need to wait
-		nextEnd := getEndDate(c.freePlan)
+		nextEnd := getEndDate(c.freePlan, end)
 		if nextEnd.Sub(start) < minInterval {
-			log.WithField("start", start).Debug("time interval wait starting")
-			time.Sleep(minInterval)
+			log.WithField("waitTime", minInterval).Info("waiting before backfilling historical trade data")
+
+			// Send notification that the backfill is caught up if we haven't already.
+			once.Do(func() { close(caughtUp) })
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(minInterval):
+				// Fallthrough.
+			}
 		}
 	}
 }
 
 func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxInterval, minInterval time.Duration) (time.Time, error) {
-	// diagnostic
-	countedTrades := 0
-
-	// Sanity check
+	// Sanity check, this should never happen.
 	if start.After(end) {
 		return time.Time{}, fmt.Errorf("start can't be after end: %s (start) vs %s (end)", start, end)
 	}
+
+	// Guard against start and end being so close that there is nothing to do.
+	if end.Sub(start) < minInterval {
+		return end, nil
+	}
+
+	// diagnostic
+	countedTrades := 0
 
 	var backfilledUntil time.Time
 
 	// Loop until we are done
 	for {
+		// If the group context has been cancelled, bail out instead of continuing to complete a
+		// possibly lengthy backfill.
+		select {
+		case <-ctx.Done():
+			return time.Time{}, ctx.Err()
+		default:
+		}
+
 		var thisEnd time.Time
 
 		if end.Sub(start) >= maxInterval {
@@ -136,19 +182,11 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 			thisEnd = end
 		} else {
 			// We must be done if we got here.
-
-			// If we have not set backfilledUntil, it means that the function was called with start
-			// and end close enough to each other that we aren't going to do anything. We should
-			// return that we are backfilled up to the end time in this case.
-			if backfilledUntil.IsZero() {
-				backfilledUntil = end
-			}
-
 			log.WithFields(log.Fields{
 				"start": start,
 				"end":   end,
 				"count": countedTrades,
-			}).Debug("backfilled trades")
+			}).Info("backfilled trades")
 
 			return backfilledUntil, nil
 		}
@@ -161,16 +199,12 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 			// asOf would probably be good for individual symbols
 		}
 
-		log.WithFields(log.Fields{
-			"start": start,
-			"end":   thisEnd,
-		}).Debug("backfilling trades")
-
 		tChan := c.dataClient.GetMultiTradesAsync(c.symbols, params)
 
 		// This is an unbounded list. We need to pass the channel to the document handler.
 		docsChan := make(chan tickDocument)
-		eg, _ := errgroup.WithContext(ctx) // TODO: Handle returned context
+
+		eg, _ := errgroup.WithContext(ctx)
 		eg.Go(func() error {
 			checkpoint := captureState{
 				BackfilledUntil: map[string]time.Time{
@@ -222,10 +256,15 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 	}
 }
 
-// Free plan has limits on how recent the data can be. Can't be from within the last 15 minutes.
-func getEndDate(freePlan bool) time.Time {
+func getEndDate(freePlan bool, endDate time.Time) time.Time {
+	// If an end date was explicitly provided, use that.
+	if !endDate.IsZero() {
+		return endDate
+	}
+
 	now := time.Now()
 
+	// Free plans can't get data from within the last 15 minutes.
 	if freePlan {
 		now = now.Add(-1 * 15 * time.Minute)
 	}
