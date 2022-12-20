@@ -62,33 +62,6 @@ func (driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Valida
 	return &pc.ValidateResponse{Bindings: out}, nil
 }
 
-// TODO: Discover
-type message struct {
-	Timestamp time.Time `json:"ts" jsonschema:"title=Timestamp,description=The time at which this message was generated"`
-	Message   string    `json:"message" jsonschema:"title=Message,description=A human-readable message"`
-}
-
-func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.DiscoverResponse, error) {
-	messageSchema, err := schemagen.GenerateSchema("Example Output Record", &message{}).MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("generating message schema: %w", err)
-	}
-
-	resourceJSON, err := json.Marshal(resource{})
-	if err != nil {
-		return nil, fmt.Errorf("serializing resource json: %w", err)
-	}
-
-	return &pc.DiscoverResponse{
-		Bindings: []*pc.DiscoverResponse_Binding{{
-			RecommendedName:    "events",
-			ResourceSpecJson:   resourceJSON,
-			DocumentSchemaJson: messageSchema,
-			KeyPtrs:            []string{"/ts"},
-		}},
-	}, nil
-}
-
 func (driver) Pull(stream pc.Driver_PullServer) error {
 	log.Debug("connector started")
 

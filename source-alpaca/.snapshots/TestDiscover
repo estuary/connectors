@@ -1,0 +1,75 @@
+Binding 0:
+{
+    "recommended_name": "trades",
+    "resource_spec_json": {
+      "name": "trades"
+    },
+    "document_schema_json": {
+      "$schema": "http://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-alpaca/tick-document",
+      "properties": {
+        "ID": {
+          "type": "integer",
+          "title": "ID",
+          "description": "Trade ID"
+        },
+        "Symbol": {
+          "type": "string",
+          "title": "Symbol",
+          "description": "Symbol"
+        },
+        "Exchange": {
+          "type": "string",
+          "title": "Exchange",
+          "description": "Exchange where the trade happened"
+        },
+        "Price": {
+          "type": "number",
+          "title": "Price",
+          "description": "Trade price"
+        },
+        "Size": {
+          "type": "integer",
+          "title": "Size",
+          "description": "Trade size"
+        },
+        "Timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Timestamp",
+          "description": "Timestamp in RFC-3339 format with nanosecond precision"
+        },
+        "Conditions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "title": "Conditions",
+          "description": "Trade conditions"
+        },
+        "Tape": {
+          "type": "string",
+          "title": "Tape",
+          "description": "Tape"
+        }
+      },
+      "type": "object",
+      "required": [
+        "ID",
+        "Symbol",
+        "Exchange",
+        "Price",
+        "Size",
+        "Timestamp",
+        "Conditions",
+        "Tape"
+      ]
+    },
+    "key_ptrs": [
+      "/ID",
+      "/Symbol",
+      "/Exchange",
+      "/Timestamp"
+    ]
+  }
+
