@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/alpacahq/alpaca-trade-api-go/v2/marketdata"
@@ -149,44 +147,16 @@ type capture struct {
 	Bindings []resource
 	Config   config
 	State    captureState
-	Acks     <-chan *pc.Acknowledge
 	Output   *boilerplate.PullOutput
 }
 
 func (c *capture) Run() error {
-	// Spawn a goroutine which will translate gRPC PullRequest.Acknowledge messages
-	// into equivalent messages on a channel. Since the ServerStream interface doesn't
-	// have any sort of polling receive, this is necessary to allow captures to handle
-	// acknowledgements without blocking their own capture progress.
-
-	// TODO: I don't know if this is still necessary. Can we opt out of acks yet?
-	var acks = make(chan *pc.Acknowledge)
-	var eg, ctx = errgroup.WithContext(c.Stream.Context())
-	eg.Go(func() error {
-		defer close(acks)
-		for {
-			var msg, err = c.Stream.Recv()
-			if errors.Is(err, io.EOF) {
-				return nil
-			} else if err != nil {
-				return fmt.Errorf("error reading PullRequest: %w", err)
-			} else if msg.Acknowledge == nil {
-				return fmt.Errorf("expected PullRequest.Acknowledge, got %#v", msg)
-			}
-			select {
-			case <-ctx.Done():
-				return nil
-			case acks <- msg.Acknowledge:
-				// Loop and receive another acknowledgement
-			}
-		}
-	})
-	c.Acks = acks
-
 	// Notify Flow that we're starting.
 	if err := c.Output.Ready(); err != nil {
 		return err
 	}
+
+	var eg, ctx = errgroup.WithContext(c.Stream.Context())
 
 	// Capture each binding.
 	for idx, r := range c.Bindings {
