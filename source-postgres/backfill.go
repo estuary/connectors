@@ -123,6 +123,7 @@ func (db *postgresDatabase) WatermarksTable() string {
 // combined with the "is the column typename a string" check into one if statement.
 var columnBinaryKeyComparison = map[string]bool{
 	"varchar": true,
+	"bpchar":  true,
 	"text":    true,
 }
 
