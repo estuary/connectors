@@ -136,7 +136,20 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 			thisEnd = end
 		} else {
 			// We must be done if we got here.
-			log.WithField("count", countedTrades).Debug("backfilled trades")
+
+			// If we have not set backfilledUntil, it means that the function was called with start
+			// and end close enough to each other that we aren't going to do anything. We should
+			// return that we are backfilled up to the end time in this case.
+			if backfilledUntil.IsZero() {
+				backfilledUntil = end
+			}
+
+			log.WithFields(log.Fields{
+				"start": start,
+				"end":   end,
+				"count": countedTrades,
+			}).Debug("backfilled trades")
+
 			return backfilledUntil, nil
 		}
 
@@ -160,16 +173,23 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 		eg, _ := errgroup.WithContext(ctx) // TODO: Handle returned context
 		eg.Go(func() error {
 			checkpoint := captureState{
-				BackfilledUntil: make(map[string]string),
+				BackfilledUntil: map[string]time.Time{
+					c.resourceName: thisEnd,
+				},
 			}
-			checkpoint.BackfilledUntil[c.resourceName] = thisEnd.String() // TODO: Timezones...
+
+			log.WithFields(log.Fields{
+				"resourceName": c.resourceName,
+				"thisEnd":      thisEnd,
+				"checkpoint":   checkpoint,
+			}).Debug("submitting checkpoint")
 
 			serialized, err := json.Marshal(checkpoint)
 			if err != nil {
 				return fmt.Errorf("error serializing checkpoint %q: %w", checkpoint, err)
 			}
 
-			return c.handleDocuments(docsChan, serialized, true) // TODO: Figure out checkpoint
+			return c.handleDocuments(docsChan, serialized, true)
 		})
 
 		for item := range tChan {
@@ -189,12 +209,6 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 			}
 
 			countedTrades++
-			log.WithFields(log.Fields{
-				"exchange":  item.Trade.Exchange,
-				"timestamp": item.Trade.Timestamp,
-				"symbol":    item.Symbol,
-				"id":        item.Trade.ID,
-			}).Debug("got backfilled trade")
 		}
 		close(docsChan)
 
@@ -204,8 +218,7 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 		}
 
 		// Start the next pass where we left off
-		start = end
-		backfilledUntil = thisEnd
+		start, backfilledUntil = end, thisEnd
 	}
 }
 
