@@ -172,21 +172,16 @@ func (c *capture) Run() error {
 func (c *capture) Capture(ctx context.Context, bindingIdx int, r resource) error {
 	log.WithField("resource", r).Debug("starting capture for resource")
 
-	// Here we need to start up the backfiller as well as the streamer.
-
-	// Initialize the backfiller.
 	dataClient := marketdata.NewClient(marketdata.ClientOpts{
 		ApiKey:    c.Config.ApiKey,
 		ApiSecret: c.Config.ApiSecret,
 	})
 
-	// Initialize the streamer.
 	streamClient := marketdataStream.NewStocksClient(
 		r.Feed,
 		marketdataStream.WithCredentials(c.Config.ApiKey, c.Config.ApiSecret),
 	)
 
-	// Make the client.
 	client := alpacaClient{
 		output:       c.Output,
 		bindingIdx:   bindingIdx,
@@ -196,20 +191,28 @@ func (c *capture) Capture(ctx context.Context, bindingIdx int, r resource) error
 		symbols:      r.GetSymbols(),
 		feed:         r.Feed,
 		currency:     r.Currency,
-		freePlan:     c.Config.IsFreePlan,
+		freePlan:     c.Config.Advanced.IsFreePlan,
 	}
 
-	// Run it.
 	eg, ctx := errgroup.WithContext(ctx)
 
-	eg.Go(func() error {
-		// TODO: This could probably be moved up.
-		return client.doBackfill(ctx, r.StartDate, maxInterval, minInterval)
-	})
+	caughtUp := make(chan struct{})
 
 	eg.Go(func() error {
-		return client.doStream(ctx)
+		return client.doBackfill(ctx, r.StartDate, r.Advanced.StopDate, maxInterval, minInterval, caughtUp)
 	})
+
+	if !r.Advanced.DisableRealTime {
+		eg.Go(func() error {
+			// Wait until the backfilling is caught up before starting streaming. Throughput will
+			// most likely be limited by the network or journal append limits. It may be possible
+			// that there is such a large amount of data that the backfilling will never catch up.
+			// This would be unfortunate, but we woulnd't want to add on event streaming to that as
+			// well since it would only make matters worse.
+			<-caughtUp
+			return client.doStream(ctx)
+		})
+	}
 
 	return eg.Wait()
 }
