@@ -8,11 +8,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTZaAA=="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMDAwMDAwMDAwWgA="}}}
 
 
 ####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTZaAA=="
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMDAwMDAwMDAwWgA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTimestamps": 1 Documents
@@ -21,11 +21,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMTExWgA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMTExMDAwMDAwWgA="}}}
 
 
 ####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMTExWgA="
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMTExMDAwMDAwWgA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTimestamps": 1 Documents
@@ -34,11 +34,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMjIyWgA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMjIyMDAwMDAwWgA="}}}
 
 
 ####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMjIyWgA="
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMjIyMDAwMDAwWgA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTimestamps": 1 Documents
@@ -47,11 +47,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMzMzWgA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMzMzMDAwMDAwWgA="}}}
 
 
 ####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMzMzWgA="
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuMzMzMDAwMDAwWgA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTimestamps": 1 Documents
@@ -60,11 +60,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNDQ0WgA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNDQ0MDAwMDAwWgA="}}}
 
 
 ####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNDQ0WgA="
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNDQ0MDAwMDAwWgA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTimestamps": 1 Documents
@@ -73,11 +73,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNTU1WgA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNTU1MDAwMDAwWgA="}}}
 
 
 ####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNTU1WgA="
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNTU1MDAwMDAwWgA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTimestamps": 1 Documents
@@ -86,11 +86,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNjY2WgA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNjY2MDAwMDAwWgA="}}}
 
 
 ####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNjY2WgA="
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNjY2MDAwMDAwWgA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTimestamps": 1 Documents
@@ -99,11 +99,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNzc3WgA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNzc3MDAwMDAwWgA="}}}
 
 
 ####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNzc3WgA="
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuNzc3MDAwMDAwWgA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTimestamps": 1 Documents
@@ -112,11 +112,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuODg4WgA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuODg4MDAwMDAwWgA="}}}
 
 
 ####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuODg4WgA="
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuODg4MDAwMDAwWgA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTimestamps": 1 Documents
@@ -125,11 +125,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuOTk5WgA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytimestamps":{"key_columns":["ts"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTYuOTk5MDAwMDAwWgA="}}}
 
 
 ####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuOTk5WgA="
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTYuOTk5MDAwMDAwWgA="
 ####################################
 # ================================
 # Final State Checkpoint
