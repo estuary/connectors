@@ -36,6 +36,11 @@ var postgresDriver = &sqlcapture.Driver{
 	Connect:          connectPostgres,
 }
 
+// The standard library `time.RFC3339Nano` is wrong for historical reasons, this
+// format string is better because it always uses 9-digit fractional seconds, and
+// thus it can be sorted lexicographically as bytes.
+const sortableRFC3339Nano = "2006-01-02T15:04:05.000000000Z07:00"
+
 func main() {
 	boilerplate.RunMain(postgresDriver)
 }
@@ -222,7 +227,7 @@ func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 	switch key := key.(type) {
 	case time.Time:
-		return key.Format(time.RFC3339Nano), nil
+		return key.Format(sortableRFC3339Nano), nil
 	case pgtype.Numeric:
 		return encodePgNumericKeyFDB(key)
 	default:
