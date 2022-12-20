@@ -132,10 +132,11 @@ func (db *postgresDatabase) buildScanQuery(start bool, keyColumns []string, colu
 	var pkey []string
 	var args []string
 	for idx, colName := range keyColumns {
+		var quotedName = quoteColumnName(colName)
 		if colType, ok := columnTypes[colName].(string); ok && columnBinaryKeyComparison[colType] {
-			pkey = append(pkey, colName+` COLLATE "C"`)
+			pkey = append(pkey, quotedName+` COLLATE "C"`)
 		} else {
-			pkey = append(pkey, colName)
+			pkey = append(pkey, quotedName)
 		}
 		args = append(args, fmt.Sprintf("$%d", idx+1))
 	}
