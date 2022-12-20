@@ -14,9 +14,9 @@ const (
 )
 
 type resource struct {
-	Name      string `json:"name" jsonschema:"title=Name,description=Unique name for this binding. Cannot be changed once set."`
-	StartDate string `json:"start_date" jsonschema:"title=Start Date,description=Get ticks starting at this date."`
-	Feed      string `json:"feed" jsonschema:"title=Feed,description=Feed to pull from. Probably IEX for a free plan."`
+	Name      string    `json:"name" jsonschema:"title=Name,description=Unique name for this binding. Cannot be changed once set."`
+	StartDate time.Time `json:"start_date" jsonschema:"title=Start Date,description=Get ticks starting at this date. Has no effect if changed after a binding is added."`
+	Feed      string    `json:"feed" jsonschema:"title=Feed,description=Feed to pull from. Probably IEX for a free plan."`
 	// TODO: Does currency work with streaming?
 	Currency string `json:"currency" jsonschema:"title=Currency,description=Currency to report data in. Probably USD."`
 	Symbols  string `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to get trade data for."`
@@ -24,7 +24,6 @@ type resource struct {
 
 func (r *resource) Validate() error {
 	var requiredProperties = [][]string{
-		{"start_date", r.StartDate},
 		{"feed", r.Feed},
 		{"currency", r.Currency},
 		{"symbols", r.Symbols},
@@ -36,8 +35,8 @@ func (r *resource) Validate() error {
 		}
 	}
 
-	if _, err := time.Parse(time.RFC3339Nano, r.StartDate); err != nil {
-		return fmt.Errorf("invalid start_date value %q: %w", r.StartDate, err)
+	if r.StartDate.IsZero() {
+		return fmt.Errorf("must provide a value for start_date")
 	}
 
 	return nil
