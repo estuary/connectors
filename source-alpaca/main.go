@@ -16,10 +16,17 @@ const (
 type resource struct {
 	Name      string    `json:"name" jsonschema:"title=Name,description=Unique name for this binding. Cannot be changed once set."`
 	StartDate time.Time `json:"start_date" jsonschema:"title=Start Date,description=Get ticks starting at this date. Has no effect if changed after a binding is added."`
-	Feed      string    `json:"feed" jsonschema:"title=Feed,description=Feed to pull from. Probably IEX for a free plan."`
+	// TODO: These are case sensitive for the streaming client.
+	Feed string `json:"feed" jsonschema:"title=Feed,description=Feed to pull from. Probably IEX for a free plan."`
 	// TODO: Does currency work with streaming?
-	Currency string `json:"currency" jsonschema:"title=Currency,description=Currency to report data in. Probably USD."`
-	Symbols  string `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to get trade data for."`
+	Currency string                 `json:"currency" jsonschema:"title=Currency,description=Currency to report data in. Probably USD."`
+	Symbols  string                 `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to get trade data for."`
+	Advanced advancedResourceConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+}
+
+type advancedResourceConfig struct {
+	StopDate        time.Time `json:"stop_date,omitempty" jsonschema:"title=Stop Date,description=Stop backfilling historical data at this date."`
+	DisableRealTime bool      `json:"disable_real_time,omitempty" jsonschema:"title=Disable Real-Time Streaming,description=Disables real-time streaming of ticks via the websocket API. Data will only be collected via the backfill mechanism."`
 }
 
 func (r *resource) Validate() error {
@@ -39,6 +46,10 @@ func (r *resource) Validate() error {
 		return fmt.Errorf("must provide a value for start_date")
 	}
 
+	if !r.Advanced.StopDate.IsZero() && r.Advanced.StopDate.Before(r.StartDate) {
+		return fmt.Errorf("stop_date %s cannot be before start_date %s", r.Advanced.StopDate, r.StartDate)
+	}
+
 	return nil
 }
 
@@ -48,9 +59,13 @@ func (r *resource) GetSymbols() []string {
 }
 
 type config struct {
-	ApiKey     string `json:"api_key" jsonschema:"title=Alpaca API Key,description=Your Alpaca API key."`
-	ApiSecret  string `json:"api_secret" jsonschema:"title=Alpaca API Key Secret,description=Your Alpaca API key secret."`
-	IsFreePlan bool   `json:"is_free_plan,omitempty" jsonschema:"title=Free Plan,description=If you are using a free plan. Delays data by 15 minutes."`
+	ApiKey    string         `json:"api_key" jsonschema:"title=Alpaca API Key,description=Your Alpaca API key." jsonschema_extras:"secret=true"`
+	ApiSecret string         `json:"api_secret" jsonschema:"title=Alpaca API Key Secret,description=Your Alpaca API key secret." jsonschema_extras:"secret=true"`
+	Advanced  advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+}
+
+type advancedConfig struct {
+	IsFreePlan bool `json:"is_free_plan,omitempty" jsonschema:"title=Free Plan,description=If you are using a free plan. Delays data by 15 minutes."`
 }
 
 func (c *config) Validate() error {
