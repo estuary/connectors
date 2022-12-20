@@ -3,6 +3,7 @@ package testing
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -345,6 +346,75 @@ func (v *SortedCaptureValidator) Summarize(w io.Writer) error {
 func (v *SortedCaptureValidator) Reset() {
 	v.documents = nil
 }
+
+// ChecksumValidator receives documents and reduces them into a final checksum. Useful for
+// snapshotting large collections where a human-readable output is not feasible.
+type ChecksumValidator struct {
+	collections map[string]*checksumValidatorState
+}
+
+type checksumValidatorState struct {
+	count    int
+	checksum [32]byte
+}
+
+func (v *ChecksumValidator) Output(collection string, data json.RawMessage) {
+	if v.collections == nil {
+		v.collections = make(map[string]*checksumValidatorState)
+	}
+	state, ok := v.collections[collection]
+	if !ok {
+		state = &checksumValidatorState{}
+		v.collections[collection] = state
+	}
+	state.reduce(data)
+}
+
+func (s *checksumValidatorState) reduce(data json.RawMessage) {
+	s.count++
+	var docSum = sha256.Sum256([]byte(data))
+	for idx := range s.checksum {
+		s.checksum[idx] ^= docSum[idx]
+	}
+}
+
+func (v *ChecksumValidator) Summarize(w io.Writer) error {
+	var names []string
+	for name := range v.collections {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		fmt.Fprintf(w, "# ================================\n")
+		fmt.Fprintf(w, "# Collection %q: %d Documents\n", name, v.collections[name].count)
+		fmt.Fprintf(w, "# ================================\n")
+		fmt.Fprintf(w, "Checksum: %x\n", v.collections[name].checksum)
+	}
+	return nil
+}
+
+func (v *ChecksumValidator) Reset() {
+	v.collections = nil
+}
+
+// WatchdogValidator wraps a CaptureValidator and resets a timer after any output is received. This
+// timer can be used as a condition for terminating a test due to lack of output when the capture
+// context needs to be restarted for other reasons.
+type WatchdogValidator struct {
+	Inner CaptureValidator
+
+	WatchdogTimer *time.Timer
+	ResetPeriod   time.Duration
+}
+
+func (v *WatchdogValidator) Output(collection string, data json.RawMessage) {
+	v.WatchdogTimer.Reset(v.ResetPeriod)
+	v.Inner.Output(collection, data)
+}
+
+func (v *WatchdogValidator) Summarize(w io.Writer) error { return v.Inner.Summarize(w) }
+func (v *WatchdogValidator) Reset()                      { v.Inner.Reset() }
 
 func sanitize(sanitizers map[string]*regexp.Regexp, data json.RawMessage) json.RawMessage {
 	var bs = []byte(data)

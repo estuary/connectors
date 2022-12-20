@@ -1,0 +1,46 @@
+# ================================
+# Collection "first": 29 Documents
+# ================================
+{"ID":21,"Symbol":"MSFT","Exchange":"V","Price":245.46,"Size":34,"Timestamp":"2022-12-19T14:01:11.870242689Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":22,"Symbol":"MSFT","Exchange":"V","Price":245.48,"Size":34,"Timestamp":"2022-12-19T14:01:11.870255162Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":23,"Symbol":"MSFT","Exchange":"V","Price":245.32,"Size":1,"Timestamp":"2022-12-19T14:02:52.692301984Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":65,"Symbol":"AAPL","Exchange":"V","Price":135,"Size":50,"Timestamp":"2022-12-19T14:00:30.366180976Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":66,"Symbol":"AAPL","Exchange":"V","Price":135,"Size":50,"Timestamp":"2022-12-19T14:00:30.366201476Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":67,"Symbol":"AAPL","Exchange":"V","Price":135.01,"Size":10,"Timestamp":"2022-12-19T14:00:37.296967254Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":68,"Symbol":"AAPL","Exchange":"V","Price":135.06,"Size":50,"Timestamp":"2022-12-19T14:00:48.784792576Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":69,"Symbol":"AAPL","Exchange":"V","Price":135.06,"Size":50,"Timestamp":"2022-12-19T14:00:48.784816281Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":70,"Symbol":"AAPL","Exchange":"V","Price":135.08,"Size":50,"Timestamp":"2022-12-19T14:00:57.771362163Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":71,"Symbol":"AAPL","Exchange":"V","Price":135.09,"Size":10,"Timestamp":"2022-12-19T14:04:39.143158408Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":72,"Symbol":"AAPL","Exchange":"V","Price":135.06,"Size":50,"Timestamp":"2022-12-19T14:05:44.77351593Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":73,"Symbol":"AAPL","Exchange":"V","Price":135.07,"Size":10,"Timestamp":"2022-12-19T14:05:44.773535893Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":74,"Symbol":"AAPL","Exchange":"V","Price":135.07,"Size":10,"Timestamp":"2022-12-19T14:05:44.773549001Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":75,"Symbol":"AAPL","Exchange":"V","Price":135.06,"Size":50,"Timestamp":"2022-12-19T14:06:03.66546086Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":76,"Symbol":"AAPL","Exchange":"V","Price":135.06,"Size":9,"Timestamp":"2022-12-19T14:06:03.665482353Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":77,"Symbol":"AAPL","Exchange":"V","Price":135.07,"Size":10,"Timestamp":"2022-12-19T14:06:05.502608796Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":78,"Symbol":"AAPL","Exchange":"V","Price":135.08,"Size":50,"Timestamp":"2022-12-19T14:06:05.502644623Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":79,"Symbol":"AAPL","Exchange":"V","Price":135.08,"Size":50,"Timestamp":"2022-12-19T14:06:05.502658635Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":80,"Symbol":"AAPL","Exchange":"V","Price":135.08,"Size":50,"Timestamp":"2022-12-19T14:06:05.502669555Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":81,"Symbol":"AAPL","Exchange":"V","Price":135.04,"Size":50,"Timestamp":"2022-12-19T14:06:11.975904584Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":82,"Symbol":"AAPL","Exchange":"V","Price":135.04,"Size":50,"Timestamp":"2022-12-19T14:06:11.975918946Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":83,"Symbol":"AAPL","Exchange":"V","Price":135.04,"Size":50,"Timestamp":"2022-12-19T14:06:11.975933593Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":84,"Symbol":"AAPL","Exchange":"V","Price":135.15,"Size":10,"Timestamp":"2022-12-19T14:07:43.747538752Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":85,"Symbol":"AAPL","Exchange":"V","Price":135.15,"Size":10,"Timestamp":"2022-12-19T14:07:43.747566055Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":86,"Symbol":"AAPL","Exchange":"V","Price":135.16,"Size":50,"Timestamp":"2022-12-19T14:07:43.747566139Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":87,"Symbol":"AAPL","Exchange":"V","Price":135.16,"Size":50,"Timestamp":"2022-12-19T14:07:43.747576647Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":88,"Symbol":"AAPL","Exchange":"V","Price":135.2,"Size":50,"Timestamp":"2022-12-19T14:07:59.105181195Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":89,"Symbol":"AAPL","Exchange":"V","Price":135.14,"Size":50,"Timestamp":"2022-12-19T14:08:52.525046219Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":90,"Symbol":"AAPL","Exchange":"V","Price":135.06,"Size":50,"Timestamp":"2022-12-19T14:09:19.360480961Z","Conditions":["@","T","I"],"Tape":"C"}
+# ================================
+# Collection "second": 6 Documents
+# ================================
+{"ID":55,"Symbol":"AMZN","Exchange":"V","Price":88,"Size":50,"Timestamp":"2022-12-19T14:00:40.253575356Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":56,"Symbol":"AMZN","Exchange":"V","Price":88,"Size":34,"Timestamp":"2022-12-19T14:00:40.253599568Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":57,"Symbol":"AMZN","Exchange":"V","Price":88.02,"Size":34,"Timestamp":"2022-12-19T14:05:35.055222523Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":58,"Symbol":"AMZN","Exchange":"V","Price":88.05,"Size":10,"Timestamp":"2022-12-19T14:06:17.121034149Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":59,"Symbol":"AMZN","Exchange":"V","Price":88.05,"Size":50,"Timestamp":"2022-12-19T14:06:17.121046367Z","Conditions":["@","T","I"],"Tape":"C"}
+{"ID":60,"Symbol":"AMZN","Exchange":"V","Price":88.02,"Size":34,"Timestamp":"2022-12-19T14:09:31.853413268Z","Conditions":["@","T","I"],"Tape":"C"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"backfilledUntil":{"first":"2022-12-19T14:10:00Z","second":"2022-12-19T14:10:00Z","third":"2022-12-19T14:10:00Z"}}
+
