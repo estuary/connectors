@@ -163,7 +163,6 @@ func (c *capture) Capture(ctx context.Context, bindingIdx int, r resource) error
 		resourceName: r.Name,
 		symbols:      r.GetSymbols(),
 		feed:         r.Feed,
-		currency:     r.Currency,
 		freePlan:     c.Config.Advanced.IsFreePlan,
 	}
 

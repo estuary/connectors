@@ -1,0 +1,98 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-alpaca/config",
+    "properties": {
+      "api_key": {
+        "type": "string",
+        "title": "Alpaca API Key",
+        "description": "Your Alpaca API key.",
+        "secret": true
+      },
+      "api_secret": {
+        "type": "string",
+        "title": "Alpaca API Key Secret",
+        "description": "Your Alpaca API key secret.",
+        "secret": true
+      },
+      "advanced": {
+        "properties": {
+          "is_free_plan": {
+            "type": "boolean",
+            "title": "Free Plan",
+            "description": "Set this if you are using a free plan. Delays data by 15 minutes."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
+      }
+    },
+    "type": "object",
+    "required": [
+      "api_key",
+      "api_secret"
+    ],
+    "title": "Alpaca"
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-alpaca/resource",
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "description": "Unique name for this binding. Cannot be changed once set."
+      },
+      "start_date": {
+        "type": "string",
+        "format": "date-time",
+        "title": "Start Date",
+        "description": "Get trades starting at this date. Has no effect if changed after a binding is added."
+      },
+      "feed": {
+        "type": "string",
+        "enum": [
+          "iex",
+          "sip"
+        ],
+        "title": "Feed",
+        "description": "The feed to pull market data from."
+      },
+      "symbols": {
+        "type": "string",
+        "title": "Symbols",
+        "description": "Comma separated list of symbols to monitor."
+      },
+      "advanced": {
+        "properties": {
+          "stop_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Stop Date",
+            "description": "Stop backfilling historical data at this date."
+          },
+          "disable_real_time": {
+            "type": "boolean",
+            "title": "Disable Real-Time Streaming",
+            "description": "Disables real-time streaming of ticks via the websocket API. Data will only be collected via the backfill mechanism."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
+      }
+    },
+    "type": "object",
+    "required": [
+      "name",
+      "start_date",
+      "feed",
+      "symbols"
+    ],
+    "title": "Alpaca Resource Spec"
+  },
+  "documentation_url": "https://go.estuary.dev/source-alpaca"
+}

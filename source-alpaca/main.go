@@ -14,14 +14,11 @@ const (
 )
 
 type resource struct {
-	Name      string    `json:"name" jsonschema:"title=Name,description=Unique name for this binding. Cannot be changed once set."`
-	StartDate time.Time `json:"start_date" jsonschema:"title=Start Date,description=Get ticks starting at this date. Has no effect if changed after a binding is added."`
-	// TODO: These are case sensitive for the streaming client.
-	Feed string `json:"feed" jsonschema:"title=Feed,description=Feed to pull from. Probably IEX for a free plan."`
-	// TODO: Does currency work with streaming?
-	Currency string                 `json:"currency" jsonschema:"title=Currency,description=Currency to report data in. Probably USD."`
-	Symbols  string                 `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to get trade data for."`
-	Advanced advancedResourceConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Name      string                 `json:"name" jsonschema:"title=Name,description=Unique name for this binding. Cannot be changed once set."`
+	StartDate time.Time              `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after a binding is added."`
+	Feed      string                 `json:"feed" jsonschema:"title=Feed,description=The feed to pull market data from.,enum=iex,enum=sip"`
+	Symbols   string                 `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor."`
+	Advanced  advancedResourceConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
 
 type advancedResourceConfig struct {
@@ -32,7 +29,6 @@ type advancedResourceConfig struct {
 func (r *resource) Validate() error {
 	var requiredProperties = [][]string{
 		{"feed", r.Feed},
-		{"currency", r.Currency},
 		{"symbols", r.Symbols},
 		{"name", r.Name},
 	}
@@ -50,6 +46,10 @@ func (r *resource) Validate() error {
 		return fmt.Errorf("stop_date %s cannot be before start_date %s", r.Advanced.StopDate, r.StartDate)
 	}
 
+	if r.Feed != "iex" && r.Feed != "sip" {
+		return fmt.Errorf("feed must be 'iex' or 'sip'")
+	}
+
 	return nil
 }
 
@@ -65,7 +65,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	IsFreePlan bool `json:"is_free_plan,omitempty" jsonschema:"title=Free Plan,description=If you are using a free plan. Delays data by 15 minutes."`
+	IsFreePlan bool `json:"is_free_plan,omitempty" jsonschema:"title=Free Plan,description=Set this if you are using a free plan. Delays data by 15 minutes."`
 }
 
 func (c *config) Validate() error {
