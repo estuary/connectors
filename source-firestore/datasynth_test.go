@@ -2,14 +2,11 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -247,7 +244,7 @@ func TestMassiveBackfill(t *testing.T) {
 	}
 
 	// Set up a watchdog timeout which will terminate the overall context after nothing
-	// has been captured for 120s. The WDT will be fed via the `watchdogValidator` wrapper
+	// has been captured for 120s. The WDT will be fed via the `WatchdogValidator` wrapper
 	// around the actual capture output validator.
 	const quiescentTimeout = 120 * time.Second
 	var ctx, cancel = context.WithCancel(context.Background())
@@ -255,10 +252,10 @@ func TestMassiveBackfill(t *testing.T) {
 		log.WithField("timeout", quiescentTimeout.String()).Debug("capture watchdog timeout expired")
 		cancel()
 	})
-	capture.Validator = &watchdogValidator{
-		inner:       &checksumValidator{},
-		wdt:         wdt,
-		resetPeriod: quiescentTimeout,
+	capture.Validator = &st.WatchdogValidator{
+		Inner:         &st.ChecksumValidator{},
+		WatchdogTimer: wdt,
+		ResetPeriod:   quiescentTimeout,
 	}
 
 	// Run the capture and verify the results. The capture is killed every 30s and
@@ -272,68 +269,4 @@ func TestMassiveBackfill(t *testing.T) {
 	}
 	cupaloy.SnapshotT(t, capture.Summary())
 	capture.Reset()
-}
-
-type watchdogValidator struct {
-	inner st.CaptureValidator
-
-	wdt         *time.Timer
-	resetPeriod time.Duration
-}
-
-func (v *watchdogValidator) Output(collection string, data json.RawMessage) {
-	v.wdt.Reset(v.resetPeriod)
-	v.inner.Output(collection, data)
-}
-
-func (v *watchdogValidator) Summarize(w io.Writer) error { return v.inner.Summarize(w) }
-func (v *watchdogValidator) Reset()                      { v.inner.Reset() }
-
-type checksumValidator struct {
-	collections map[string]*checksumValidatorState
-}
-
-type checksumValidatorState struct {
-	count    int
-	checksum [32]byte
-}
-
-func (v *checksumValidator) Output(collection string, data json.RawMessage) {
-	if v.collections == nil {
-		v.collections = make(map[string]*checksumValidatorState)
-	}
-	state, ok := v.collections[collection]
-	if !ok {
-		state = &checksumValidatorState{}
-		v.collections[collection] = state
-	}
-	state.Reduce(data)
-}
-
-func (s *checksumValidatorState) Reduce(data json.RawMessage) {
-	s.count++
-	var docSum = sha256.Sum256([]byte(data))
-	for idx := range s.checksum {
-		s.checksum[idx] ^= docSum[idx]
-	}
-}
-
-func (v *checksumValidator) Summarize(w io.Writer) error {
-	var names []string
-	for name := range v.collections {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
-		fmt.Fprintf(w, "# ================================\n")
-		fmt.Fprintf(w, "# Collection %q: %d Documents\n", name, v.collections[name].count)
-		fmt.Fprintf(w, "# ================================\n")
-		fmt.Fprintf(w, "Checksum: %x\n", v.collections[name].checksum)
-	}
-	return nil
-}
-
-func (v *checksumValidator) Reset() {
-	v.collections = nil
 }
