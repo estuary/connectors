@@ -118,7 +118,7 @@ func (db *postgresDatabase) WatermarksTable() string {
 	return db.config.Advanced.WatermarksTable
 }
 
-// The set of MySQL column types for which we need to specify `COLLATE "C"` to get
+// The set of column types for which we need to specify `COLLATE "C"` to get
 // proper ordering and comparison. Represented as a map[string]bool so that it can be
 // combined with the "is the column typename a string" check into one if statement.
 var columnBinaryKeyComparison = map[string]bool{
