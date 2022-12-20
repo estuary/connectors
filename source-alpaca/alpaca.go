@@ -142,29 +142,30 @@ func (c *alpacaClient) doBackfill(ctx context.Context, start, end time.Time, max
 			case <-time.After(minInterval):
 				// Fallthrough.
 			}
+
 		}
 	}
 }
 
-func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxInterval, minInterval time.Duration) (time.Time, error) {
+func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.Time, maxInterval, minInterval time.Duration) (time.Time, error) {
 	// Sanity check, this should never happen.
-	if start.After(end) {
-		return time.Time{}, fmt.Errorf("start can't be after end: %s (start) vs %s (end)", start, end)
+	if startLimit.After(endLimit) {
+		return time.Time{}, fmt.Errorf("start can't be after end: %s (start) vs %s (end)", startLimit, endLimit)
 	}
 
 	// Guard against start and end being so close that there is nothing to do.
-	if end.Sub(start) < minInterval {
-		return end, nil
+	if endLimit.Sub(startLimit) < minInterval {
+		return endLimit, nil
 	}
 
-	// diagnostic
+	// For logging purposes.
 	countedTrades := 0
 
-	var backfilledUntil time.Time
+	start := startLimit
+	var end time.Time
 
-	// Loop until we are done
 	for {
-		// If the group context has been cancelled, bail out instead of continuing to complete a
+		// If the group context has been cancelled, fail fast instead of continuing to complete a
 		// possibly lengthy backfill.
 		select {
 		case <-ctx.Done():
@@ -172,28 +173,28 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 		default:
 		}
 
-		var thisEnd time.Time
-
-		if end.Sub(start) >= maxInterval {
-			// Take the largest interval possible if that would not exceed our end time
-			thisEnd = start.Add(maxInterval)
-		} else if end.Sub(start) >= minInterval {
+		// Compute the ending time for this pass.
+		if start.Add(maxInterval).Before(endLimit) {
+			// Take the largest interval possible if that would not exceed our end time.
+			end = start.Add(maxInterval)
+		} else if endLimit.Sub(start) >= minInterval {
 			// We have enough to do something, even though it is not up to the max interval. Read up to the end time.
-			thisEnd = end
+			end = endLimit
 		} else {
-			// We must be done if we got here.
+			// The difference between where we want to start and where the end limit is must not be
+			// larger than the minimum interval, so we're done.
 			log.WithFields(log.Fields{
-				"start": start,
+				"start": startLimit,
 				"end":   end,
 				"count": countedTrades,
 			}).Info("backfilled trades")
 
-			return backfilledUntil, nil
+			return end, nil
 		}
 
 		params := marketdata.GetTradesParams{
 			Start:    start,
-			End:      thisEnd,
+			End:      end,
 			Feed:     c.feed,     // default is IEX for free plans
 			Currency: c.currency, // defaults to USD
 			// asOf would probably be good for individual symbols
@@ -208,15 +209,9 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 		eg.Go(func() error {
 			checkpoint := captureState{
 				BackfilledUntil: map[string]time.Time{
-					c.resourceName: thisEnd,
+					c.resourceName: end,
 				},
 			}
-
-			log.WithFields(log.Fields{
-				"resourceName": c.resourceName,
-				"thisEnd":      thisEnd,
-				"checkpoint":   checkpoint,
-			}).Debug("submitting checkpoint")
 
 			serialized, err := json.Marshal(checkpoint)
 			if err != nil {
@@ -228,7 +223,7 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 
 		for item := range tChan {
 			if err := item.Error; err != nil {
-				return backfilledUntil, err
+				return time.Time{}, err
 			}
 
 			docsChan <- tickDocument{
@@ -248,11 +243,11 @@ func (c *alpacaClient) backfill(ctx context.Context, start, end time.Time, maxIn
 
 		// Wait until the checkpoint has been successfully committed.
 		if err := eg.Wait(); err != nil {
-			return backfilledUntil, err
+			return time.Time{}, err
 		}
 
 		// Start the next pass where we left off
-		start, backfilledUntil = end, thisEnd
+		start = end
 	}
 }
 
