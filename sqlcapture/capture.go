@@ -534,7 +534,7 @@ func (c *Capture) emitWorker(ctx context.Context, out *boilerplate.PullOutput, e
 	for {
 		select {
 		case <-ctx.Done():
-			emitError <- fmt.Errorf("emitter context cancelled")
+			emitError <- fmt.Errorf("emitter context cancelled: %w", ctx.Err())
 			return
 		case msg, ok := <-emitQueue:
 			if !ok {
