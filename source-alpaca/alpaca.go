@@ -14,7 +14,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const emptyCheckpoint string = `{}`
+const (
+	emptyCheckpoint = `{}`
+	defaultCurrency = "usd"
+)
 
 var streamerLoggingInterval = 1 * time.Minute
 
@@ -38,7 +41,6 @@ type alpacaClient struct {
 	resourceName string
 	symbols      []string
 	feed         string
-	currency     string
 	freePlan     bool
 }
 
@@ -195,9 +197,8 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 		params := marketdata.GetTradesParams{
 			Start:    start,
 			End:      end,
-			Feed:     c.feed,     // default is IEX for free plans
-			Currency: c.currency, // defaults to USD
-			// asOf would probably be good for individual symbols
+			Feed:     c.feed,
+			Currency: defaultCurrency,
 		}
 
 		tChan := c.dataClient.GetMultiTradesAsync(c.symbols, params)

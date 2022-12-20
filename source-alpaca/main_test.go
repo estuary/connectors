@@ -11,6 +11,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	pc "github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -39,6 +40,16 @@ func TestMain(m *testing.M) {
 		FieldMap: log.FieldMap{log.FieldKeyTime: "@ts"},
 	})
 	os.Exit(m.Run())
+}
+
+func TestSpec(t *testing.T) {
+	driver := driver{}
+	response, err := driver.Spec(context.Background(), &pc.SpecRequest{})
+	require.NoError(t, err)
+
+	formatted, err := json.MarshalIndent(response, "", "  ")
+	require.NoError(t, err)
+	cupaloy.SnapshotT(t, string(formatted))
 }
 
 func TestDiscover(t *testing.T) {
@@ -158,7 +169,6 @@ func makeBindings(t testing.TB, bMappings bindingsMapping, start, end time.Time)
 			Name:      name,
 			StartDate: start,
 			Feed:      "iex",
-			Currency:  "usd",
 			Symbols:   symbols,
 			Advanced: advancedResourceConfig{
 				StopDate:        end,
