@@ -19,14 +19,14 @@ const emptyCheckpoint string = `{}`
 var streamerLoggingInterval = 1 * time.Minute
 
 type tickDocument struct {
-	ID         int64
-	Symbol     string
-	Exchange   string
-	Price      float64
-	Size       uint32
-	Timestamp  time.Time
-	Conditions []string
-	Tape       string
+	ID         int64     `json:"ID" jsonschema:"title=ID,description=Trade ID"`
+	Symbol     string    `json:"Symbol" jsonschema:"title=Symbol,description=Symbol"`
+	Exchange   string    `json:"Exchange" jsonschema:"title=Exchange,description=Exchange where the trade happened"`
+	Price      float64   `json:"Price" jsonschema:"title=Price,description=Trade price"`
+	Size       uint32    `json:"Size" jsonschema:"title=Size,description=Trade size"`
+	Timestamp  time.Time `json:"Timestamp" jsonschema:"title=Timestamp,description=Timestamp in RFC-3339 format with nanosecond precision"`
+	Conditions []string  `json:"Conditions" jsonschema:"title=Conditions,description=Trade conditions"`
+	Tape       string    `json:"Tape" jsonschema:"title=Tape,description=Tape"`
 }
 
 type alpacaClient struct {
@@ -224,6 +224,11 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 		for item := range tChan {
 			if err := item.Error; err != nil {
 				return time.Time{}, err
+			}
+
+			if item.Trade.Update != "" {
+				// Only capture "normal" trades.
+				continue
 			}
 
 			docsChan <- tickDocument{
