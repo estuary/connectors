@@ -41,6 +41,14 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestDiscover(t *testing.T) {
+	// Discover for this capture does not actually make any external API or database calls, so we
+	// can always test it as part of the normal unit tests.
+	t.Setenv("TEST_DATABASE", "yes")
+	capture := captureSpec(t, map[string]string{}, time.Time{}, time.Time{}, nil)
+	capture.VerifyDiscover(context.Background(), t, nil...)
+}
+
 // The remaining 2 tests are end-to-end tests that will interact with the live Alpaca API and assert
 // the correctness of the results of the capture's backfilling capability. They will not be run
 // automatically as part of CI due to how long they take to run, but can be run manually as desired.
@@ -54,13 +62,13 @@ func TestCaptureMultipleBindings(t *testing.T) {
 	end, err := time.Parse(time.RFC3339Nano, "2022-12-19T14:10:00Z")
 	require.NoError(t, err)
 
-	var capture = captureSpec(t, map[string]string{
+	capture := captureSpec(t, map[string]string{
 		"first":  "AAPL,MSFT",  // Both have trades in this time period.
 		"second": "AMZN,BRK-B", // Only AMZN has trades in this time period.
 		"third":  "UNH,JNJ",    // Neither has trades in this time period.
 	}, start, end, &st.SortedCaptureValidator{})
 
-	var captureCtx, cancelCapture = context.WithCancel(context.Background())
+	captureCtx, cancelCapture := context.WithCancel(context.Background())
 
 	// We need to use a relatively long shutdown delay, since the backfill can potentially cover
 	// periods of time with no historical data.
@@ -126,7 +134,7 @@ func captureSpec(t testing.TB, bMappings bindingsMapping, start, end time.Time, 
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
-	var endpointSpec = &config{
+	endpointSpec := &config{
 		ApiKey:    *testApiKey,
 		ApiSecret: *testApiSecret,
 		Advanced: advancedConfig{
