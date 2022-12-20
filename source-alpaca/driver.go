@@ -20,7 +20,7 @@ import (
 
 type captureState struct {
 	// Mapping of binding names to how far along they have read.
-	BackfilledUntil map[string]string `json:"backfilledUntil,omitempty"`
+	BackfilledUntil map[string]time.Time `json:"backfilledUntil,omitempty"`
 }
 
 type driver struct{}
@@ -113,6 +113,8 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 		}
 	}
 
+	log.WithField("checkpoint", checkpoint.BackfilledUntil).Debug("loaded checkpoint")
+
 	var resources []resource
 	for _, binding := range open.Open.Capture.Bindings {
 		var res resource
@@ -120,10 +122,13 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 
+		log.WithField("resource", res).Debug("loaded resource from binding")
+
 		// If we have persisted a checkpoint indicating progress for this resource, use that instead
 		// of the configured startDate.
 		if got, ok := checkpoint.BackfilledUntil[res.Name]; ok {
 			res.StartDate = got
+			log.WithField("resource", res).Debug("set resource StartDate from checkpoint")
 		}
 
 		resources = append(resources, res)
@@ -195,6 +200,8 @@ func (c *capture) Run() error {
 }
 
 func (c *capture) Capture(ctx context.Context, bindingIdx int, r resource) error {
+	log.WithField("resource", r).Debug("starting capture for resource")
+
 	// Here we need to start up the backfiller as well as the streamer.
 
 	// Initialize the backfiller.
@@ -215,6 +222,7 @@ func (c *capture) Capture(ctx context.Context, bindingIdx int, r resource) error
 		bindingIdx:   bindingIdx,
 		dataClient:   dataClient,
 		streamClient: streamClient,
+		resourceName: r.Name,
 		symbols:      r.GetSymbols(),
 		feed:         r.Feed,
 		currency:     r.Currency,
@@ -226,12 +234,7 @@ func (c *capture) Capture(ctx context.Context, bindingIdx int, r resource) error
 
 	eg.Go(func() error {
 		// TODO: This could probably be moved up.
-		// TODO: Time format.
-		parsed, err := time.Parse(time.RFC3339Nano, r.StartDate)
-		if err != nil {
-			return err
-		}
-		return client.doBackfill(ctx, parsed, maxInterval, minInterval)
+		return client.doBackfill(ctx, r.StartDate, maxInterval, minInterval)
 	})
 
 	eg.Go(func() error {
