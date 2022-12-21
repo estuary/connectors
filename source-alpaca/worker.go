@@ -20,7 +20,7 @@ const (
 	streamerLoggingInterval = 1 * time.Minute
 )
 
-type tickDocument struct {
+type tradeDocument struct {
 	ID         int64     `json:"ID" jsonschema:"title=ID,description=Trade ID"`
 	Symbol     string    `json:"Symbol" jsonschema:"title=Symbol,description=Symbol"`
 	Exchange   string    `json:"Exchange" jsonschema:"title=Exchange,description=Exchange where the trade happened"`
@@ -31,7 +31,7 @@ type tickDocument struct {
 	Tape       string    `json:"Tape" jsonschema:"title=Tape,description=Tape"`
 }
 
-type alpacaClient struct {
+type alpacaWorker struct {
 	mu           sync.Mutex
 	output       *boilerplate.PullOutput
 	bindingIdx   int
@@ -43,7 +43,7 @@ type alpacaClient struct {
 	freePlan     bool
 }
 
-func (c *alpacaClient) handleDocuments(docs <-chan tickDocument, checkpointJSON []byte) error {
+func (c *alpacaWorker) handleDocuments(docs <-chan tradeDocument, checkpointJSON []byte) error {
 	// We may be emitting documents to the same binding from either the streamer or the backfiller,
 	// so this synchronization makes sure checkpoints do not get interleaved between the two.
 	c.mu.Lock()
@@ -60,7 +60,7 @@ func (c *alpacaClient) handleDocuments(docs <-chan tickDocument, checkpointJSON 
 	return c.output.Checkpoint(json.RawMessage(checkpointJSON), true)
 }
 
-func (c *alpacaClient) doStream(ctx context.Context) error {
+func (c *alpacaWorker) streamTrades(ctx context.Context) error {
 	streamedCount := 0
 	logTimer := time.NewTimer(streamerLoggingInterval)
 
@@ -69,7 +69,7 @@ func (c *alpacaClient) doStream(ctx context.Context) error {
 	handlerErr := make(chan error)
 
 	streamedTradeHandler := func(t marketdataStream.Trade) {
-		docsChan := make(chan tickDocument)
+		docsChan := make(chan tradeDocument)
 		eg := errgroup.Group{}
 		eg.Go(func() error {
 			return c.handleDocuments(docsChan, []byte(emptyCheckpoint))
@@ -78,7 +78,7 @@ func (c *alpacaClient) doStream(ctx context.Context) error {
 		// For streaming trades, we send only a single document at a time. The channel gymnastics
 		// here are a bit cumbersome, but necessary so that the document handler is also compatible
 		// with the many documents produced at a time by the backfiller.
-		docsChan <- tickDocument{
+		docsChan <- tradeDocument{
 			ID:         t.ID,
 			Symbol:     t.Symbol,
 			Exchange:   t.Exchange,
@@ -101,6 +101,7 @@ func (c *alpacaClient) doStream(ctx context.Context) error {
 		select {
 		case <-logTimer.C:
 			log.WithFields(log.Fields{
+				"binding":       c.resourceName,
 				"handled":       streamedCount,
 				"lastSymbol":    t.Symbol,
 				"lastTimestamp": t.Timestamp,
@@ -111,7 +112,7 @@ func (c *alpacaClient) doStream(ctx context.Context) error {
 		}
 	}
 
-	log.Info("starting streaming client")
+	log.WithField("binding", c.resourceName).Info("starting streaming client")
 
 	if err := c.streamClient.Connect(ctx); err != nil {
 		return fmt.Errorf("streaming client connect: %w", err)
@@ -131,18 +132,23 @@ func (c *alpacaClient) doStream(ctx context.Context) error {
 	}
 }
 
-func (c *alpacaClient) doBackfill(ctx context.Context, start, end time.Time, maxInterval, minInterval time.Duration, caughtUp chan struct{}) error {
+func (c *alpacaWorker) backfillTrades(ctx context.Context, start, end time.Time, maxInterval, minInterval time.Duration, caughtUp chan struct{}) error {
 	var once sync.Once
 
+	// This loop manages the cycle of catching up the backfill to the present time and then waiting
+	// for a short duration before performing smaller incremental backfills.
 	for {
 		var err error
-		if start, err = c.backfill(ctx, start, getEndDate(c.freePlan, end), maxInterval, minInterval); err != nil {
+		if start, err = c.doBackfill(ctx, start, getEndDate(c.freePlan, end), maxInterval, minInterval); err != nil {
 			return err
 		}
 
 		nextEnd := getEndDate(c.freePlan, end)
 		if nextEnd.Sub(start) < minInterval {
-			log.WithField("waitTime", minInterval.String()).Info("waiting before backfilling historical trade data")
+			log.WithFields(log.Fields{
+				"binding":  c.resourceName,
+				"waitTime": minInterval.String(),
+			}).Info("waiting before backfilling historical trade data")
 
 			// Send notification that the backfill is caught up if we haven't already.
 			once.Do(func() { close(caughtUp) })
@@ -158,7 +164,11 @@ func (c *alpacaClient) doBackfill(ctx context.Context, start, end time.Time, max
 	}
 }
 
-func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.Time, maxInterval, minInterval time.Duration) (time.Time, error) {
+// doBackfill will backfill trade documents starting at startLimit and ending within minInterval of
+// endLimit. On success, it will always return how far up to the current time the backfill
+// completed. This may not be exactly equal to the provided endLimit if the last chunk of time is
+// less than minInterval.
+func (c *alpacaWorker) doBackfill(ctx context.Context, startLimit, endLimit time.Time, maxInterval, minInterval time.Duration) (time.Time, error) {
 	// Sanity check, this should never happen.
 	if startLimit.After(endLimit) {
 		return time.Time{}, fmt.Errorf("start can't be after end: %s (start) vs %s (end)", startLimit, endLimit)
@@ -195,9 +205,10 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 			// The difference between where we want to start and where the end limit is must not be
 			// larger than the minimum interval, so we're done.
 			log.WithFields(log.Fields{
-				"start": startLimit,
-				"end":   end,
-				"count": totalTrades,
+				"binding": c.resourceName,
+				"start":   startLimit,
+				"end":     end,
+				"count":   totalTrades,
 			}).Info("finished backfilling trades")
 
 			return end, nil
@@ -212,7 +223,7 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 
 		tChan := c.dataClient.GetMultiTradesAsync(c.symbols, params)
 
-		docsChan := make(chan tickDocument)
+		docsChan := make(chan tradeDocument)
 
 		eg := errgroup.Group{}
 		eg.Go(func() error {
@@ -241,7 +252,7 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 				continue
 			}
 
-			docsChan <- tickDocument{
+			docsChan <- tradeDocument{
 				ID:         item.Trade.ID,
 				Symbol:     item.Symbol,
 				Exchange:   item.Trade.Exchange,
@@ -263,9 +274,10 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 		}
 
 		log.WithFields(log.Fields{
-			"start": start,
-			"end":   end,
-			"count": theseTrades,
+			"binding": c.resourceName,
+			"start":   start,
+			"end":     end,
+			"count":   theseTrades,
 		}).Info("backfilling trades in progress")
 
 		// Start the next pass where we left off.
