@@ -16,11 +16,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	maxInterval = 15 * time.Minute
-	minInterval = 1 * time.Minute
-)
-
 type captureState struct {
 	// Mapping of binding names to how far along they have read.
 	BackfilledUntil map[string]time.Time `json:"backfilledUntil,omitempty"`
@@ -29,11 +24,11 @@ type captureState struct {
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecResponse, error) {
-	var endpointSchema, err = schemagen.GenerateSchema("Alpaca", &config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("Source Alpaca Spec", &config{}).MarshalJSON()
 	if err != nil {
 		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
 	}
-	resourceSchema, err := schemagen.GenerateSchema("Alpaca Resource Spec", &resource{}).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("Trade Document", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -111,7 +106,12 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 
 	var resources []resource
 	for _, binding := range open.Open.Capture.Bindings {
-		var res resource
+		// Default values from the endpoint config will be overridden by anything from the resource
+		// spec.
+		res := resource{
+			Feed:    cfg.Feed,
+			Symbols: cfg.Symbols,
+		}
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
@@ -193,17 +193,22 @@ func (c *capture) Capture(ctx context.Context, bindingIdx int, r resource) error
 
 	caughtUp := make(chan struct{})
 
-	eg.Go(func() error {
-		return client.doBackfill(ctx, r.startDate, c.Config.Advanced.StopDate, maxInterval, minInterval, caughtUp)
-	})
+	if !c.Config.Advanced.DisableBackfill {
+		eg.Go(func() error {
+			return client.doBackfill(ctx, r.startDate, c.Config.Advanced.StopDate, c.Config.Advanced.MaxBackfillInterval, c.Config.Advanced.MinBackfillInterval, caughtUp)
+		})
+	} else {
+		// If backfilling is disabled, there's nothing to catch up on. Streaming can start right away.
+		close(caughtUp)
+	}
 
 	if !c.Config.Advanced.DisableRealTime {
 		eg.Go(func() error {
-			// Wait until the backfilling is caught up before starting streaming. Throughput will
-			// most likely be limited by the network or journal append limits. It may be possible
-			// that there is such a large amount of data that the backfilling will never catch up.
-			// This would be unfortunate, but we wouldn't want to add on event streaming to that as
-			// well since it would only make matters worse.
+			// Wait until the backfilling is caught up (or disabled) before starting streaming.
+			// Throughput will most likely be limited by the network or journal append limits. It
+			// may be possible that there is such a large amount of data that the backfilling will
+			// never catch up. This would be unfortunate, but we wouldn't want to add on event
+			// streaming to that as well since it would only make matters worse.
 			<-caughtUp
 			return client.doStream(ctx)
 		})

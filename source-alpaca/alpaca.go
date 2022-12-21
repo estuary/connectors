@@ -140,10 +140,9 @@ func (c *alpacaClient) doBackfill(ctx context.Context, start, end time.Time, max
 			return err
 		}
 
-		// If it took a long time to backfill we might not need to wait
 		nextEnd := getEndDate(c.freePlan, end)
 		if nextEnd.Sub(start) < minInterval {
-			log.WithField("waitTime", minInterval).Info("waiting before backfilling historical trade data")
+			log.WithField("waitTime", minInterval.String()).Info("waiting before backfilling historical trade data")
 
 			// Send notification that the backfill is caught up if we haven't already.
 			once.Do(func() { close(caughtUp) })
@@ -269,7 +268,7 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 			"count": theseTrades,
 		}).Info("backfilling trades in progress")
 
-		// Start the next pass where we left off
+		// Start the next pass where we left off.
 		start = end
 	}
 }

@@ -8,18 +8,21 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 )
 
+const (
+	defaultMaxBackfillInterval = 15 * time.Minute
+	defaultMinBackfillInterval = 1 * time.Minute
+)
+
 type resource struct {
 	Name    string `json:"name" jsonschema:"title=Name,description=Unique name for this binding. Cannot be changed once set."`
-	Feed    string `json:"feed" jsonschema:"title=Feed,description=The feed to pull market data from.,enum=iex,enum=sip"`
-	Symbols string `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor."`
+	Feed    string `json:"feed,omitempty" jsonschema:"title=Feed,description=The feed to pull market data from.,enum=iex,enum=sip"`
+	Symbols string `json:"symbols,omitempty" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor."`
 
 	startDate time.Time
 }
 
 func (r *resource) Validate() error {
 	var requiredProperties = [][]string{
-		{"feed", r.Feed},
-		{"symbols", r.Symbols},
 		{"name", r.Name},
 	}
 	for _, req := range requiredProperties {
@@ -28,7 +31,11 @@ func (r *resource) Validate() error {
 		}
 	}
 
-	if r.Feed != "iex" && r.Feed != "sip" {
+	// Feed and Symbols will default to the values provided by the endpoint config unless explicitly
+	// provided in the binding config. This is a sanity check to ensure that if a value for Feed is
+	// provided in the binding config that it is valid. The same check is done when validating the
+	// endpoint config.
+	if r.Feed != "" && r.Feed != "iex" && r.Feed != "sip" {
 		return fmt.Errorf("feed must be iex or sip, got %s", r.Feed)
 	}
 
@@ -54,9 +61,12 @@ type config struct {
 }
 
 type advancedConfig struct {
-	IsFreePlan      bool      `json:"is_free_plan,omitempty" jsonschema:"title=Free Plan,description=Set this if you are using a free plan. Delays data by 15 minutes."`
-	StopDate        time.Time `json:"stop_date,omitempty" jsonschema:"title=Stop Date,description=Stop backfilling historical data at this date."`
-	DisableRealTime bool      `json:"disable_real_time,omitempty" jsonschema:"title=Disable Real-Time Streaming,description=Disables real-time streaming of ticks via the websocket API. Data will only be collected via the backfill mechanism."`
+	IsFreePlan          bool          `json:"is_free_plan,omitempty" jsonschema:"title=Free Plan,description=Set this if you are using a free plan. Delays data by 15 minutes."`
+	StopDate            time.Time     `json:"stop_date,omitempty" jsonschema:"title=Stop Date,description=Stop backfilling historical data at this date."`
+	DisableRealTime     bool          `json:"disable_real_time,omitempty" jsonschema:"title=Disable Real-Time Streaming,description=Disables real-time streaming via the websocket API. Data will only be collected via the backfill mechanism."`
+	DisableBackfill     bool          `json:"disable_backfill,omitempty" jsonschema:"title=Disable Historical Data Backfill,description=Disables historical data backfill via the historical data API. Data will only be collected via streaming."`
+	MaxBackfillInterval time.Duration `json:"max_backfill_interval,omitempty" jsonschema:"title=Maximum Backfill Interval,description=The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols.,default=15m"`
+	MinBackfillInterval time.Duration `json:"min_backfill_interval,omitempty" jsonschema:"title=Minimum Backfill Interval,description=The smallest time interval that will be requested for backfills after the initial backfill is complete.,default=1m"`
 }
 
 func (c *config) Validate() error {
@@ -82,6 +92,22 @@ func (c *config) Validate() error {
 
 	if c.Feed != "iex" && c.Feed != "sip" {
 		return fmt.Errorf("feed must be iex or sip, got %s", c.Feed)
+	}
+
+	if c.Advanced.DisableRealTime && c.Advanced.DisableBackfill {
+		return fmt.Errorf("cannot disable both real time and backfill data collection")
+	}
+
+	if c.Advanced.MaxBackfillInterval == 0 {
+		c.Advanced.MaxBackfillInterval = defaultMaxBackfillInterval
+	}
+
+	if c.Advanced.MinBackfillInterval == 0 {
+		c.Advanced.MinBackfillInterval = defaultMinBackfillInterval
+	}
+
+	if c.Advanced.MinBackfillInterval > c.Advanced.MaxBackfillInterval {
+		return fmt.Errorf("min_backfill_interval of %s cannot be greater than max_backfill_interval of %s", c.Advanced.MinBackfillInterval, c.Advanced.MaxBackfillInterval)
 	}
 
 	return nil
