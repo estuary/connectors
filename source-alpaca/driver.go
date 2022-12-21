@@ -16,6 +16,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	maxInterval = 15 * time.Minute
+	minInterval = 1 * time.Minute
+)
+
 type captureState struct {
 	// Mapping of binding names to how far along they have read.
 	BackfilledUntil map[string]time.Time `json:"backfilledUntil,omitempty"`
@@ -41,14 +46,13 @@ func (driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecResponse, 
 }
 
 func (driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.ValidateResponse, error) {
-	// TODO: Validate credentials via connection to Alpaca.
-
 	var cfg config
 	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	var out []*pc.ValidateResponse_Binding
+	feeds := make(map[string][]string)
 	for _, binding := range req.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
@@ -58,7 +62,28 @@ func (driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Valida
 		out = append(out, &pc.ValidateResponse_Binding{
 			ResourcePath: []string{res.Name},
 		})
+
+		feeds[res.Feed] = res.GetSymbols()
 	}
+
+	// Validate that a connection can be made to Alpaca API for all of the specified feeds. We need
+	// to provide a symbol for the test request, so just use the first one from the list of symbols
+	// for the binding. Validation ensures that there will be at least one symbol in the list.
+
+	// Query an arbitrary time in the past so that we don't have to worry about the "free plan"
+	// option which cannot query within the last 15 minutes.
+	testTime := time.Now().Add(-1 * time.Hour)
+	for feed, symbols := range feeds {
+		_, err := marketdata.NewClient(marketdata.ClientOpts{
+			ApiKey:    cfg.ApiKey,
+			ApiSecret: cfg.ApiSecret,
+		}).GetTrades(symbols[0], marketdata.GetTradesParams{Feed: feed, Start: testTime, End: testTime})
+
+		if err != nil {
+			return nil, fmt.Errorf("error when connecting to feed %s: %w", feed, err)
+		}
+	}
+
 	return &pc.ValidateResponse{Bindings: out}, nil
 }
 
@@ -84,8 +109,6 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 		}
 	}
 
-	log.WithField("checkpoint", checkpoint.BackfilledUntil).Debug("loaded checkpoint")
-
 	var resources []resource
 	for _, binding := range open.Open.Capture.Bindings {
 		var res resource
@@ -93,13 +116,14 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		log.WithField("resource", res).Debug("loaded resource from binding")
-
 		// If we have persisted a checkpoint indicating progress for this resource, use that instead
 		// of the configured startDate.
 		if got, ok := checkpoint.BackfilledUntil[res.Name]; ok {
 			res.StartDate = got
-			log.WithField("resource", res).Debug("set resource StartDate from checkpoint")
+			log.WithFields(log.Fields{
+				"Name":      res.Name,
+				"StartDate": res.StartDate,
+			}).Info("set resource StartDate from checkpoint")
 		}
 
 		resources = append(resources, res)
@@ -143,8 +167,6 @@ func (c *capture) Run() error {
 }
 
 func (c *capture) Capture(ctx context.Context, bindingIdx int, r resource) error {
-	log.WithField("resource", r).Debug("starting capture for resource")
-
 	dataClient := marketdata.NewClient(marketdata.ClientOpts{
 		ApiKey:    c.Config.ApiKey,
 		ApiSecret: c.Config.ApiSecret,
@@ -179,7 +201,7 @@ func (c *capture) Capture(ctx context.Context, bindingIdx int, r resource) error
 			// Wait until the backfilling is caught up before starting streaming. Throughput will
 			// most likely be limited by the network or journal append limits. It may be possible
 			// that there is such a large amount of data that the backfilling will never catch up.
-			// This would be unfortunate, but we woulnd't want to add on event streaming to that as
+			// This would be unfortunate, but we wouldn't want to add on event streaming to that as
 			// well since it would only make matters worse.
 			<-caughtUp
 			return client.doStream(ctx)
