@@ -8,7 +8,7 @@ Binding 0:
     },
     "document_schema_json": {
       "$schema": "http://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/estuary/connectors/source-alpaca/tick-document",
+      "$id": "https://github.com/estuary/connectors/source-alpaca/trade-document",
       "properties": {
         "ID": {
           "type": "integer",
