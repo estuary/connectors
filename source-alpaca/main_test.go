@@ -19,11 +19,11 @@ import (
 
 func TestConfigValidate(t *testing.T) {
 	valid := config{
-		ApiKey:    "something",
-		ApiSecret: "something",
-		Feed:      "iex",
-		Symbols:   "AAPL,MSFT",
-		StartDate: time.Now(),
+		ApiKeyID:     "something",
+		ApiSecretKey: "something",
+		Feed:         "iex",
+		Symbols:      "AAPL,MSFT",
+		StartDate:    time.Now(),
 	}
 
 	stopBeforeStart := valid
@@ -89,11 +89,11 @@ func TestConfigValidate(t *testing.T) {
 
 	t.Run("default intervals are set correctly", func(t *testing.T) {
 		conf := &config{
-			ApiKey:    "something",
-			ApiSecret: "something",
-			Feed:      "iex",
-			Symbols:   "AAPL,MSFT",
-			StartDate: time.Now(),
+			ApiKeyID:     "something",
+			ApiSecretKey: "something",
+			Feed:         "iex",
+			Symbols:      "AAPL,MSFT",
+			StartDate:    time.Now(),
 		}
 
 		require.Equal(t, nil, conf.Validate())
@@ -107,14 +107,14 @@ func TestConfigValidate(t *testing.T) {
 // of CI due to how long they take to run, but can be run manually as desired.
 
 var testApiKey = flag.String(
-	"api_key",
+	"api_key_id",
 	"",
 	"Alpaca API Key to use for tests",
 )
 var testApiSecret = flag.String(
-	"api_secret",
+	"api_secret_key",
 	"",
-	"Alpaca API Key secret to use for tests",
+	"Alpaca API secret key to use for tests",
 )
 
 func TestMain(m *testing.M) {
@@ -224,11 +224,11 @@ func captureSpec(t testing.TB, bMappings bindingsMapping, start, end time.Time, 
 	}
 
 	endpointSpec := &config{
-		ApiKey:    apiKey,
-		ApiSecret: apiSecret,
-		Feed:      "iex",
-		Symbols:   "AAPL", // Will be over-ridden by individual resource bindings.
-		StartDate: start,
+		ApiKeyID:     apiKey,
+		ApiSecretKey: apiSecret,
+		Feed:         "iex",
+		Symbols:      "AAPL", // Will be over-ridden by individual resource bindings.
+		StartDate:    start,
 		Advanced: advancedConfig{
 			IsFreePlan:      true,
 			StopDate:        end,
