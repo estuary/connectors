@@ -22,53 +22,62 @@
           "sip"
         ],
         "title": "Feed",
-        "description": "The feed to pull market data from. May be overridden within the binding resource configuration."
+        "description": "The feed to pull market data from. May be overridden within the binding resource configuration.",
+        "multiline": true
       },
       "symbols": {
         "type": "string",
         "title": "Symbols",
-        "description": "Comma separated list of symbols to monitor. May be overridden within the binding resource configuration"
+        "description": "Comma separated list of symbols to monitor. May be overridden within the binding resource configuration",
+        "multiline": true
       },
       "start_date": {
         "type": "string",
         "format": "date-time",
         "title": "Start Date",
-        "description": "Get trades starting at this date. Has no effect if changed after a binding is added."
+        "description": "Get trades starting at this date. Has no effect if changed after a binding is added.",
+        "multiline": true
       },
       "advanced": {
         "properties": {
           "is_free_plan": {
             "type": "boolean",
             "title": "Free Plan",
-            "description": "Set this if you are using a free plan. Delays data by 15 minutes."
+            "description": "Set this if you are using a free plan. Delays data by 15 minutes.",
+            "multiline": true
           },
           "stop_date": {
             "type": "string",
             "format": "date-time",
             "title": "Stop Date",
-            "description": "Stop backfilling historical data at this date."
+            "description": "Stop backfilling historical data at this date.",
+            "multiline": true
           },
           "disable_real_time": {
             "type": "boolean",
             "title": "Disable Real-Time Streaming",
-            "description": "Disables real-time streaming via the websocket API. Data will only be collected via the backfill mechanism."
+            "description": "Disables real-time streaming via the websocket API. Data will only be collected via the backfill mechanism.",
+            "multiline": true
           },
           "disable_backfill": {
             "type": "boolean",
             "title": "Disable Historical Data Backfill",
-            "description": "Disables historical data backfill via the historical data API. Data will only be collected via streaming."
+            "description": "Disables historical data backfill via the historical data API. Data will only be collected via streaming.",
+            "multiline": true
           },
           "max_backfill_interval": {
-            "type": "integer",
+            "type": "string",
             "title": "Maximum Backfill Interval",
-            "description": "The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols.",
-            "default": 0
+            "description": "The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols. Must be a valid Go duration string.",
+            "default": "15m",
+            "multiline": true
           },
           "min_backfill_interval": {
-            "type": "integer",
+            "type": "string",
             "title": "Minimum Backfill Interval",
-            "description": "The smallest time interval that will be requested for backfills after the initial backfill is complete.",
-            "default": 0
+            "description": "The smallest time interval that will be requested for backfills after the initial backfill is complete. Must be a valid Go duration string.",
+            "default": "1m",
+            "multiline": true
           }
         },
         "additionalProperties": false,
