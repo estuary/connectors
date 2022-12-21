@@ -15,11 +15,10 @@ import (
 )
 
 const (
-	emptyCheckpoint = `{}`
-	defaultCurrency = "usd"
+	emptyCheckpoint         = `{}`
+	defaultCurrency         = "usd"
+	streamerLoggingInterval = 1 * time.Minute
 )
-
-var streamerLoggingInterval = 1 * time.Minute
 
 type tickDocument struct {
 	ID         int64     `json:"ID" jsonschema:"title=ID,description=Trade ID"`
@@ -44,37 +43,41 @@ type alpacaClient struct {
 	freePlan     bool
 }
 
-func (c *alpacaClient) handleDocuments(docs <-chan tickDocument, checkpointJSON []byte, mergeCheckpoint bool) error {
+func (c *alpacaClient) handleDocuments(docs <-chan tickDocument, checkpointJSON []byte) error {
 	// We may be emitting documents to the same binding from either the streamer or the backfiller,
-	// so make sure they don't get mixed up.
+	// so this synchronization makes sure checkpoints do not get interleaved between the two.
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	for doc := range docs {
 		if docJSON, err := json.Marshal(doc); err != nil {
-			return fmt.Errorf("error serializing document %q: %w", doc.Symbol, err) // TODO: This needs work.
+			return fmt.Errorf("error serializing document: %w", err)
 		} else if err := c.output.Documents(uint32(c.bindingIdx), docJSON); err != nil {
 			return err
 		}
 	}
 
-	// Empty checkpoint should simply be merged. This would come from the streamer. The batcher
-	// should do an actual checkpoint though.
-	return c.output.Checkpoint(json.RawMessage(checkpointJSON), mergeCheckpoint)
+	return c.output.Checkpoint(json.RawMessage(checkpointJSON), true)
 }
 
 func (c *alpacaClient) doStream(ctx context.Context) error {
 	streamedCount := 0
 	logTimer := time.NewTimer(streamerLoggingInterval)
 
+	// Communicate errors encountered inside the async trade handler callback so we can respond
+	// appropriately in the main thread.
+	handlerErr := make(chan error)
+
 	streamedTradeHandler := func(t marketdataStream.Trade) {
 		docsChan := make(chan tickDocument)
-		eg, _ := errgroup.WithContext(ctx) // TODO: Handle returned context
+		eg := errgroup.Group{}
 		eg.Go(func() error {
-			return c.handleDocuments(docsChan, []byte(emptyCheckpoint), true)
+			return c.handleDocuments(docsChan, []byte(emptyCheckpoint))
 		})
 
-		// Send only a single document a time for these.
+		// For streaming trades, we send only a single document at a time. The channel gymnastics
+		// here are a bit cumbersome, but necessary so that the document handler is also compatible
+		// with the many documents produced at a time by the backfiller.
 		docsChan <- tickDocument{
 			ID:         t.ID,
 			Symbol:     t.Symbol,
@@ -87,8 +90,14 @@ func (c *alpacaClient) doStream(ctx context.Context) error {
 		}
 		close(docsChan)
 
-		eg.Wait() // TODO: Handle the error from here also.
+		if err := eg.Wait(); err != nil {
+			handlerErr <- err
+		}
 
+		streamedCount++
+
+		// Log progress of the streaming client at reasonable time intervals to provide evidence
+		// that it is still running while not spamming the logs overly.
 		select {
 		case <-logTimer.C:
 			log.WithFields(log.Fields{
@@ -100,22 +109,23 @@ func (c *alpacaClient) doStream(ctx context.Context) error {
 			logTimer.Reset(streamerLoggingInterval)
 		default:
 		}
-		streamedCount++
 	}
 
 	log.Info("starting streaming client")
 
 	if err := c.streamClient.Connect(ctx); err != nil {
-		return err // TODO: Better errors
+		return fmt.Errorf("streaming client connect: %w", err)
 	}
 
 	if err := c.streamClient.SubscribeToTrades(streamedTradeHandler, c.symbols...); err != nil {
-		return err
+		return fmt.Errorf("streaming client subscribe to trades: %w", err)
 	}
 
 	select {
+	case err := <-handlerErr:
+		return fmt.Errorf("emitting documents: %w", err)
 	case err := <-c.streamClient.Terminated():
-		return err
+		return fmt.Errorf("streaming client terminated: %w", err)
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -161,7 +171,7 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 	}
 
 	// For logging purposes.
-	countedTrades := 0
+	totalTrades := 0
 
 	start := startLimit
 	var end time.Time
@@ -188,8 +198,8 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 			log.WithFields(log.Fields{
 				"start": startLimit,
 				"end":   end,
-				"count": countedTrades,
-			}).Info("backfilled trades")
+				"count": totalTrades,
+			}).Info("finished backfilling trades")
 
 			return end, nil
 		}
@@ -203,10 +213,9 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 
 		tChan := c.dataClient.GetMultiTradesAsync(c.symbols, params)
 
-		// This is an unbounded list. We need to pass the channel to the document handler.
 		docsChan := make(chan tickDocument)
 
-		eg, _ := errgroup.WithContext(ctx)
+		eg := errgroup.Group{}
 		eg.Go(func() error {
 			checkpoint := captureState{
 				BackfilledUntil: map[string]time.Time{
@@ -219,12 +228,13 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 				return fmt.Errorf("error serializing checkpoint %q: %w", checkpoint, err)
 			}
 
-			return c.handleDocuments(docsChan, serialized, true)
+			return c.handleDocuments(docsChan, serialized)
 		})
 
+		theseTrades := 0
 		for item := range tChan {
 			if err := item.Error; err != nil {
-				return time.Time{}, err
+				return time.Time{}, fmt.Errorf("trade item error: %w", err)
 			}
 
 			if item.Trade.Update != "" {
@@ -243,7 +253,8 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 				Tape:       item.Trade.Tape,
 			}
 
-			countedTrades++
+			theseTrades++
+			totalTrades++
 		}
 		close(docsChan)
 
@@ -251,6 +262,12 @@ func (c *alpacaClient) backfill(ctx context.Context, startLimit, endLimit time.T
 		if err := eg.Wait(); err != nil {
 			return time.Time{}, err
 		}
+
+		log.WithFields(log.Fields{
+			"start": start,
+			"end":   end,
+			"count": theseTrades,
+		}).Info("backfilling trades in progress")
 
 		// Start the next pass where we left off
 		start = end
