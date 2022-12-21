@@ -484,7 +484,18 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 			// key value is greater than the previous cursor value. This together
 			// with the check in resultset.go ensures that the scan key always
 			// increases (or else the capture will fail).
-			return nil, fmt.Errorf("scan key ordering failure: last=%q, next=%q", streamState.Scanned, events[0].RowKey)
+			logrus.WithFields(logrus.Fields{
+				"last": fmt.Sprintf("%q", streamState.Scanned),
+				"next": fmt.Sprintf("%q", events[0].RowKey),
+			}).Error("scan key ordering failure")
+
+			// FIXME(2022-12-21): Disabling this is a temporary hack which will be reverted as soon as production captures are in a good state.
+			//
+			// These ordering failures occur when the *old* encoding of a row key (from before the whole FDB key serialization refactor)
+			// differs from the *new* encoding (after the refactor) in a way that makes the ordering comparison wrong immediately after
+			// the capture is upgraded, however the database still understands the old form correctly so it's okay to just ignore the
+			// error and keep going.
+			//return nil, fmt.Errorf("scan key ordering failure: last=%q, next=%q", streamState.Scanned, events[0].RowKey)
 		}
 
 		// Translate the resulting list of entries into a backfillChunk
