@@ -15,42 +15,6 @@
         "description": "Your Alpaca API key secret.",
         "secret": true
       },
-      "advanced": {
-        "properties": {
-          "is_free_plan": {
-            "type": "boolean",
-            "title": "Free Plan",
-            "description": "Set this if you are using a free plan. Delays data by 15 minutes."
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "Advanced Options",
-        "description": "Options for advanced users. You should not typically need to modify these."
-      }
-    },
-    "type": "object",
-    "required": [
-      "api_key",
-      "api_secret"
-    ],
-    "title": "Alpaca"
-  },
-  "resource_spec_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
-    "$id": "https://github.com/estuary/connectors/source-alpaca/resource",
-    "properties": {
-      "name": {
-        "type": "string",
-        "title": "Name",
-        "description": "Unique name for this binding. Cannot be changed once set."
-      },
-      "start_date": {
-        "type": "string",
-        "format": "date-time",
-        "title": "Start Date",
-        "description": "Get trades starting at this date. Has no effect if changed after a binding is added."
-      },
       "feed": {
         "type": "string",
         "enum": [
@@ -58,15 +22,26 @@
           "sip"
         ],
         "title": "Feed",
-        "description": "The feed to pull market data from."
+        "description": "The feed to pull market data from. May be overridden within the binding resource configuration."
       },
       "symbols": {
         "type": "string",
         "title": "Symbols",
-        "description": "Comma separated list of symbols to monitor."
+        "description": "Comma separated list of symbols to monitor. May be overridden within the binding resource configuration"
+      },
+      "start_date": {
+        "type": "string",
+        "format": "date-time",
+        "title": "Start Date",
+        "description": "Get trades starting at this date. Has no effect if changed after a binding is added."
       },
       "advanced": {
         "properties": {
+          "is_free_plan": {
+            "type": "boolean",
+            "title": "Free Plan",
+            "description": "Set this if you are using a free plan. Delays data by 15 minutes."
+          },
           "stop_date": {
             "type": "string",
             "format": "date-time",
@@ -87,8 +62,41 @@
     },
     "type": "object",
     "required": [
+      "api_key",
+      "api_secret",
+      "feed",
+      "symbols",
+      "start_date"
+    ],
+    "title": "Alpaca"
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-alpaca/resource",
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "description": "Unique name for this binding. Cannot be changed once set."
+      },
+      "feed": {
+        "type": "string",
+        "enum": [
+          "iex",
+          "sip"
+        ],
+        "title": "Feed",
+        "description": "The feed to pull market data from."
+      },
+      "symbols": {
+        "type": "string",
+        "title": "Symbols",
+        "description": "Comma separated list of symbols to monitor."
+      }
+    },
+    "type": "object",
+    "required": [
       "name",
-      "start_date",
       "feed",
       "symbols"
     ],

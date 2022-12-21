@@ -116,13 +116,14 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 
+		res.startDate = cfg.StartDate
 		// If we have persisted a checkpoint indicating progress for this resource, use that instead
 		// of the configured startDate.
 		if got, ok := checkpoint.BackfilledUntil[res.Name]; ok {
-			res.StartDate = got
+			res.startDate = got
 			log.WithFields(log.Fields{
 				"Name":      res.Name,
-				"StartDate": res.StartDate,
+				"StartDate": res.startDate,
 			}).Info("set resource StartDate from checkpoint")
 		}
 
@@ -193,10 +194,10 @@ func (c *capture) Capture(ctx context.Context, bindingIdx int, r resource) error
 	caughtUp := make(chan struct{})
 
 	eg.Go(func() error {
-		return client.doBackfill(ctx, r.StartDate, r.Advanced.StopDate, maxInterval, minInterval, caughtUp)
+		return client.doBackfill(ctx, r.startDate, c.Config.Advanced.StopDate, maxInterval, minInterval, caughtUp)
 	})
 
-	if !r.Advanced.DisableRealTime {
+	if !c.Config.Advanced.DisableRealTime {
 		eg.Go(func() error {
 			// Wait until the backfilling is caught up before starting streaming. Throughput will
 			// most likely be limited by the network or journal append limits. It may be possible

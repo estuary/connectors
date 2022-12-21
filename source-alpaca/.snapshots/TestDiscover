@@ -2,7 +2,9 @@ Binding 0:
 {
     "recommended_name": "trades",
     "resource_spec_json": {
-      "name": "trades"
+      "name": "trades",
+      "feed": "iex",
+      "symbols": "AAPL"
     },
     "document_schema_json": {
       "$schema": "http://json-schema.org/draft/2020-12/schema",
