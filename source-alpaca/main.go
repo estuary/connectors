@@ -54,19 +54,22 @@ func (r *resource) GetSymbols() []string {
 type config struct {
 	ApiKey    string         `json:"api_key" jsonschema:"title=Alpaca API Key,description=Your Alpaca API key." jsonschema_extras:"secret=true"`
 	ApiSecret string         `json:"api_secret" jsonschema:"title=Alpaca API Key Secret,description=Your Alpaca API key secret." jsonschema_extras:"secret=true"`
-	Feed      string         `json:"feed" jsonschema:"title=Feed,description=The feed to pull market data from. May be overridden within the binding resource configuration.,enum=iex,enum=sip"`
-	Symbols   string         `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor. May be overridden within the binding resource configuration"`
-	StartDate time.Time      `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after a binding is added."`
+	Feed      string         `json:"feed" jsonschema:"title=Feed,description=The feed to pull market data from. May be overridden within the binding resource configuration.,enum=iex,enum=sip" jsonschema_extras:"multiline=true"`
+	Symbols   string         `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor. May be overridden within the binding resource configuration" jsonschema_extras:"multiline=true"`
+	StartDate time.Time      `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after a binding is added." jsonschema_extras:"multiline=true"`
 	Advanced  advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+
+	effectiveMaxBackfillInterval time.Duration
+	effectiveMinBackfillInterval time.Duration
 }
 
 type advancedConfig struct {
-	IsFreePlan          bool          `json:"is_free_plan,omitempty" jsonschema:"title=Free Plan,description=Set this if you are using a free plan. Delays data by 15 minutes."`
-	StopDate            time.Time     `json:"stop_date,omitempty" jsonschema:"title=Stop Date,description=Stop backfilling historical data at this date."`
-	DisableRealTime     bool          `json:"disable_real_time,omitempty" jsonschema:"title=Disable Real-Time Streaming,description=Disables real-time streaming via the websocket API. Data will only be collected via the backfill mechanism."`
-	DisableBackfill     bool          `json:"disable_backfill,omitempty" jsonschema:"title=Disable Historical Data Backfill,description=Disables historical data backfill via the historical data API. Data will only be collected via streaming."`
-	MaxBackfillInterval time.Duration `json:"max_backfill_interval,omitempty" jsonschema:"title=Maximum Backfill Interval,description=The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols.,default=15m"`
-	MinBackfillInterval time.Duration `json:"min_backfill_interval,omitempty" jsonschema:"title=Minimum Backfill Interval,description=The smallest time interval that will be requested for backfills after the initial backfill is complete.,default=1m"`
+	IsFreePlan          bool      `json:"is_free_plan,omitempty" jsonschema:"title=Free Plan,description=Set this if you are using a free plan. Delays data by 15 minutes." jsonschema_extras:"multiline=true"`
+	StopDate            time.Time `json:"stop_date,omitempty" jsonschema:"title=Stop Date,description=Stop backfilling historical data at this date." jsonschema_extras:"multiline=true"`
+	DisableRealTime     bool      `json:"disable_real_time,omitempty" jsonschema:"title=Disable Real-Time Streaming,description=Disables real-time streaming via the websocket API. Data will only be collected via the backfill mechanism." jsonschema_extras:"multiline=true"`
+	DisableBackfill     bool      `json:"disable_backfill,omitempty" jsonschema:"title=Disable Historical Data Backfill,description=Disables historical data backfill via the historical data API. Data will only be collected via streaming." jsonschema_extras:"multiline=true"`
+	MaxBackfillInterval string    `json:"max_backfill_interval,omitempty" jsonschema:"title=Maximum Backfill Interval,description=The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols. Must be a valid Go duration string." jsonschema_extras:"multiline=true"`
+	MinBackfillInterval string    `json:"min_backfill_interval,omitempty" jsonschema:"title=Minimum Backfill Interval,description=The smallest time interval that will be requested for backfills after the initial backfill is complete. Must be a valid Go duration string." jsonschema_extras:"multiline=true"`
 }
 
 func (c *config) Validate() error {
@@ -98,16 +101,30 @@ func (c *config) Validate() error {
 		return fmt.Errorf("cannot disable both real time and backfill data collection")
 	}
 
-	if c.Advanced.MaxBackfillInterval == 0 {
-		c.Advanced.MaxBackfillInterval = defaultMaxBackfillInterval
+	if c.Advanced.MaxBackfillInterval != "" {
+		parsed, err := time.ParseDuration(c.Advanced.MaxBackfillInterval)
+		if err != nil {
+			return fmt.Errorf("invalid max_backfill_interval %q: %w", c.Advanced.MaxBackfillInterval, err)
+		}
+
+		c.effectiveMaxBackfillInterval = parsed
+	} else {
+		c.effectiveMaxBackfillInterval = defaultMaxBackfillInterval
 	}
 
-	if c.Advanced.MinBackfillInterval == 0 {
-		c.Advanced.MinBackfillInterval = defaultMinBackfillInterval
+	if c.Advanced.MinBackfillInterval != "" {
+		parsed, err := time.ParseDuration(c.Advanced.MinBackfillInterval)
+		if err != nil {
+			return fmt.Errorf("invalid min_backfill_interval %q: %w", c.Advanced.MinBackfillInterval, err)
+		}
+
+		c.effectiveMinBackfillInterval = parsed
+	} else {
+		c.effectiveMinBackfillInterval = defaultMinBackfillInterval
 	}
 
-	if c.Advanced.MinBackfillInterval > c.Advanced.MaxBackfillInterval {
-		return fmt.Errorf("min_backfill_interval of %s cannot be greater than max_backfill_interval of %s", c.Advanced.MinBackfillInterval, c.Advanced.MaxBackfillInterval)
+	if c.effectiveMinBackfillInterval > c.effectiveMaxBackfillInterval {
+		return fmt.Errorf("min_backfill_interval of %s cannot be greater than max_backfill_interval of %s", c.effectiveMinBackfillInterval, c.effectiveMaxBackfillInterval)
 	}
 
 	return nil

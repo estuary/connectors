@@ -129,7 +129,7 @@ func (c *capture) CaptureBinding(ctx context.Context, bindingIdx int, r resource
 
 	if !c.Config.Advanced.DisableBackfill {
 		eg.Go(func() error {
-			return worker.backfillTrades(ctx, r.startDate, c.Config.Advanced.StopDate, c.Config.Advanced.MaxBackfillInterval, c.Config.Advanced.MinBackfillInterval, caughtUp)
+			return worker.backfillTrades(ctx, r.startDate, c.Config.Advanced.StopDate, c.Config.effectiveMaxBackfillInterval, c.Config.effectiveMinBackfillInterval, caughtUp)
 		})
 	} else {
 		// If backfilling is disabled, there's nothing to catch up on. Streaming can start right away.
