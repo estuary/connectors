@@ -56,7 +56,13 @@ func TestDiscover(t *testing.T) {
 	// Discover for this capture does not actually make any external API or database calls, so we
 	// can always test it as part of the normal unit tests.
 	t.Setenv("TEST_DATABASE", "yes")
-	capture := captureSpec(t, map[string]string{}, time.Time{}, time.Time{}, nil)
+
+	startDate, err := time.Parse(time.RFC3339Nano, "2006-01-02T15:04:05.999999999Z")
+	require.NoError(t, err)
+	endDate, err := time.Parse(time.RFC3339Nano, "2007-02-03T15:04:05.999999999Z")
+	require.NoError(t, err)
+
+	capture := captureSpec(t, map[string]string{}, startDate, endDate, nil)
 	capture.VerifyDiscover(context.Background(), t, nil...)
 }
 
@@ -145,11 +151,27 @@ func captureSpec(t testing.TB, bMappings bindingsMapping, start, end time.Time, 
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
+	// Use credentials if provided by flags, otherwise use placeholders for tests that don't
+	// interact with a real API.
+	apiKey := "apiKey"
+	apiSecret := "apiSecret"
+	if *testApiKey != "" {
+		apiKey = *testApiKey
+	}
+	if *testApiSecret != "" {
+		apiSecret = *testApiSecret
+	}
+
 	endpointSpec := &config{
-		ApiKey:    *testApiKey,
-		ApiSecret: *testApiSecret,
+		ApiKey:    apiKey,
+		ApiSecret: apiSecret,
+		Feed:      "iex",  // Will be over-ridden by individual bindings.
+		Symbols:   "AAPL", // Will be over-ridden by individual bindings.
+		StartDate: start,
 		Advanced: advancedConfig{
-			IsFreePlan: true,
+			IsFreePlan:      true,
+			StopDate:        end,
+			DisableRealTime: true,
 		},
 	}
 
@@ -167,13 +189,9 @@ func makeBindings(t testing.TB, bMappings bindingsMapping, start, end time.Time)
 	for name, symbols := range bMappings {
 		spec := resource{
 			Name:      name,
-			StartDate: start,
 			Feed:      "iex",
 			Symbols:   symbols,
-			Advanced: advancedResourceConfig{
-				StopDate:        end,
-				DisableRealTime: true,
-			},
+			startDate: start,
 		}
 
 		specBytes, err := json.Marshal(spec)
