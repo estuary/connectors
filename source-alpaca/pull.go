@@ -103,13 +103,13 @@ func (c *capture) Run() error {
 
 func (c *capture) CaptureBinding(ctx context.Context, bindingIdx int, r resource) error {
 	dataClient := marketdata.NewClient(marketdata.ClientOpts{
-		ApiKey:    c.Config.ApiKey,
-		ApiSecret: c.Config.ApiSecret,
+		ApiKey:    c.Config.ApiKeyID,
+		ApiSecret: c.Config.ApiSecretKey,
 	})
 
 	streamClient := marketdataStream.NewStocksClient(
 		r.Feed,
-		marketdataStream.WithCredentials(c.Config.ApiKey, c.Config.ApiSecret),
+		marketdataStream.WithCredentials(c.Config.ApiKeyID, c.Config.ApiSecretKey),
 	)
 
 	worker := alpacaWorker{

@@ -77,8 +77,8 @@ func (driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Valida
 	testTime := time.Now().Add(-1 * time.Hour)
 	for feed, symbols := range feeds {
 		_, err := marketdata.NewClient(marketdata.ClientOpts{
-			ApiKey:    cfg.ApiKey,
-			ApiSecret: cfg.ApiSecret,
+			ApiKey:    cfg.ApiKeyID,
+			ApiSecret: cfg.ApiSecretKey,
 		}).GetTrades(symbols[0], marketdata.GetTradesParams{Feed: feed, Start: testTime, End: testTime})
 
 		if err != nil {

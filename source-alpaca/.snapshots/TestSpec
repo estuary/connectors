@@ -3,16 +3,16 @@
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/source-alpaca/config",
     "properties": {
-      "api_key": {
+      "api_key_id": {
         "type": "string",
-        "title": "Alpaca API Key",
-        "description": "Your Alpaca API key.",
+        "title": "Alpaca API Key ID",
+        "description": "Your Alpaca API key ID.",
         "secret": true
       },
-      "api_secret": {
+      "api_secret_key": {
         "type": "string",
-        "title": "Alpaca API Key Secret",
-        "description": "Your Alpaca API key secret.",
+        "title": "Alpaca API Secret Key",
+        "description": "Your Alpaca API Secret key.",
         "secret": true
       },
       "feed": {
@@ -69,14 +69,12 @@
             "type": "string",
             "title": "Maximum Backfill Interval",
             "description": "The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols. Must be a valid Go duration string.",
-            "default": "15m",
             "multiline": true
           },
           "min_backfill_interval": {
             "type": "string",
             "title": "Minimum Backfill Interval",
             "description": "The smallest time interval that will be requested for backfills after the initial backfill is complete. Must be a valid Go duration string.",
-            "default": "1m",
             "multiline": true
           }
         },
@@ -88,8 +86,8 @@
     },
     "type": "object",
     "required": [
-      "api_key",
-      "api_secret",
+      "api_key_id",
+      "api_secret_key",
       "feed",
       "symbols",
       "start_date"
