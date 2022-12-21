@@ -52,12 +52,12 @@ func (r *resource) GetSymbols() []string {
 }
 
 type config struct {
-	ApiKey    string         `json:"api_key" jsonschema:"title=Alpaca API Key,description=Your Alpaca API key." jsonschema_extras:"secret=true"`
-	ApiSecret string         `json:"api_secret" jsonschema:"title=Alpaca API Key Secret,description=Your Alpaca API key secret." jsonschema_extras:"secret=true"`
-	Feed      string         `json:"feed" jsonschema:"title=Feed,description=The feed to pull market data from. May be overridden within the binding resource configuration.,enum=iex,enum=sip" jsonschema_extras:"multiline=true"`
-	Symbols   string         `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor. May be overridden within the binding resource configuration" jsonschema_extras:"multiline=true"`
-	StartDate time.Time      `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after a binding is added." jsonschema_extras:"multiline=true"`
-	Advanced  advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	ApiKeyID     string         `json:"api_key_id" jsonschema:"title=Alpaca API Key ID,description=Your Alpaca API key ID." jsonschema_extras:"secret=true"`
+	ApiSecretKey string         `json:"api_secret_key" jsonschema:"title=Alpaca API Secret Key,description=Your Alpaca API Secret key." jsonschema_extras:"secret=true"`
+	Feed         string         `json:"feed" jsonschema:"title=Feed,description=The feed to pull market data from. May be overridden within the binding resource configuration.,enum=iex,enum=sip" jsonschema_extras:"multiline=true"`
+	Symbols      string         `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor. May be overridden within the binding resource configuration" jsonschema_extras:"multiline=true"`
+	StartDate    time.Time      `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after a binding is added." jsonschema_extras:"multiline=true"`
+	Advanced     advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
 	effectiveMaxBackfillInterval time.Duration
 	effectiveMinBackfillInterval time.Duration
@@ -74,8 +74,8 @@ type advancedConfig struct {
 
 func (c *config) Validate() error {
 	var requiredProperties = [][]string{
-		{"api_key", c.ApiKey},
-		{"api_secret", c.ApiSecret},
+		{"api_key_id", c.ApiKeyID},
+		{"api_secret_key", c.ApiSecretKey},
 		{"feed", c.Feed},
 		{"symbols", c.Symbols},
 	}
