@@ -51,7 +51,24 @@
           "disable_real_time": {
             "type": "boolean",
             "title": "Disable Real-Time Streaming",
-            "description": "Disables real-time streaming of ticks via the websocket API. Data will only be collected via the backfill mechanism."
+            "description": "Disables real-time streaming via the websocket API. Data will only be collected via the backfill mechanism."
+          },
+          "disable_backfill": {
+            "type": "boolean",
+            "title": "Disable Historical Data Backfill",
+            "description": "Disables historical data backfill via the historical data API. Data will only be collected via streaming."
+          },
+          "max_backfill_interval": {
+            "type": "integer",
+            "title": "Maximum Backfill Interval",
+            "description": "The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols.",
+            "default": 0
+          },
+          "min_backfill_interval": {
+            "type": "integer",
+            "title": "Minimum Backfill Interval",
+            "description": "The smallest time interval that will be requested for backfills after the initial backfill is complete.",
+            "default": 0
           }
         },
         "additionalProperties": false,
@@ -68,7 +85,7 @@
       "symbols",
       "start_date"
     ],
-    "title": "Alpaca"
+    "title": "Source Alpaca Spec"
   },
   "resource_spec_schema_json": {
     "$schema": "http://json-schema.org/draft/2020-12/schema",
@@ -96,11 +113,9 @@
     },
     "type": "object",
     "required": [
-      "name",
-      "feed",
-      "symbols"
+      "name"
     ],
-    "title": "Alpaca Resource Spec"
+    "title": "Trade Document"
   },
   "documentation_url": "https://go.estuary.dev/source-alpaca"
 }
