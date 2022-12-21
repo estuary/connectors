@@ -8,11 +8,6 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 )
 
-const (
-	maxInterval = 15 * time.Minute
-	minInterval = 1 * time.Minute
-)
-
 type resource struct {
 	Name      string                 `json:"name" jsonschema:"title=Name,description=Unique name for this binding. Cannot be changed once set."`
 	StartDate time.Time              `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after a binding is added."`
@@ -47,14 +42,18 @@ func (r *resource) Validate() error {
 	}
 
 	if r.Feed != "iex" && r.Feed != "sip" {
-		return fmt.Errorf("feed must be 'iex' or 'sip'")
+		return fmt.Errorf("feed must be iex or sip, got %s", r.Feed)
 	}
 
 	return nil
 }
 
 func (r *resource) GetSymbols() []string {
-	// TODO: Needs some pre-validation that this isn't mangled.
+	// There does not seem to be any strict standard for what constitutes a "valid" stock symbol
+	// format in terms of allowable characters, etc. We will just need to trust that the user has
+	// provided a valid list of comma-separated symbols. Practically speaking, there is no such
+	// thing as an "invalid" symbol, and if the symbol does not exist it will simply not return any
+	// data.
 	return strings.Split(r.Symbols, ",")
 }
 
