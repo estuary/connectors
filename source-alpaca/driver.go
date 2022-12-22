@@ -19,7 +19,7 @@ func (driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecResponse, 
 	if err != nil {
 		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
 	}
-	resourceSchema, err := schemagen.GenerateSchema("Trade Document", &resource{}).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("Resource", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
