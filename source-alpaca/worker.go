@@ -139,11 +139,24 @@ func (c *alpacaWorker) backfillTrades(ctx context.Context, start, end time.Time,
 	// for a short duration before performing smaller incremental backfills.
 	for {
 		var err error
-		if start, err = c.doBackfill(ctx, start, getEndDate(c.freePlan, end), maxInterval, minInterval); err != nil {
+		thisEnd := getEndDate(c.freePlan, end)
+		dataDurationCovered := thisEnd.Sub(start)
+
+		now := time.Now()
+		if start, err = c.doBackfill(ctx, start, thisEnd, maxInterval, minInterval); err != nil {
 			return err
 		}
+		dataCollectionTime := time.Since(now)
 
 		nextEnd := getEndDate(c.freePlan, end)
+		if dataCollectionTime > dataDurationCovered {
+			log.WithFields(log.Fields{
+				"binding":             c.resourceName,
+				"dataDurationCovered": dataDurationCovered.String(),
+				"dataCollectionTime":  dataCollectionTime.String(),
+			}).Info("backfilling previous time period took longer than trades spanned by that time period - backfill may be falling behind")
+		}
+
 		if nextEnd.Sub(start) < minInterval {
 			log.WithFields(log.Fields{
 				"binding":  c.resourceName,
