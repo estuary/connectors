@@ -22,20 +22,20 @@
           "sip"
         ],
         "title": "Feed",
-        "description": "The feed to pull market data from. May be overridden within the binding resource configuration.",
+        "description": "The feed to pull market data from.",
         "multiline": true
       },
       "symbols": {
         "type": "string",
         "title": "Symbols",
-        "description": "Comma separated list of symbols to monitor. May be overridden within the binding resource configuration",
+        "description": "Comma separated list of symbols to monitor.",
         "multiline": true
       },
       "start_date": {
         "type": "string",
         "format": "date-time",
         "title": "Start Date",
-        "description": "Get trades starting at this date. Has no effect if changed after a binding is added.",
+        "description": "Get trades starting at this date. Has no effect if changed after the capture has started.",
         "multiline": true
       },
       "advanced": {
@@ -102,20 +102,6 @@
         "type": "string",
         "title": "Name",
         "description": "Unique name for this binding. Cannot be changed once set."
-      },
-      "feed": {
-        "type": "string",
-        "enum": [
-          "iex",
-          "sip"
-        ],
-        "title": "Feed",
-        "description": "The feed to pull market data from."
-      },
-      "symbols": {
-        "type": "string",
-        "title": "Symbols",
-        "description": "Comma separated list of symbols to monitor."
       }
     },
     "type": "object",

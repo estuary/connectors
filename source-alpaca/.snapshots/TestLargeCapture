@@ -1,13 +1,9 @@
 # ================================
-# Collection "first": 125942 Documents
+# Collection "trades": 228905 Documents
 # ================================
-Checksum: 3599e44241cedeb065242d22cc9ed720e02f90409479ae69ec5e85964debe2fd
-# ================================
-# Collection "second": 102963 Documents
-# ================================
-Checksum: a3d5235027d5752dbe75d7ca904696ecb56fce84f9c16312ab3602577d9ec80b
+Checksum: 964cc712661bab9ddb51fae85cd841cc55405ec46db8cd7b476887c130752af6
 # ================================
 # Final State Checkpoint
 # ================================
-{"backfilledUntil":{"first":"2022-12-17T00:00:00Z","second":"2022-12-17T00:00:00Z"}}
+{"backfilledUntil":{"trades":"2022-12-17T00:00:00Z"}}
 

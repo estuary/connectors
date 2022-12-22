@@ -20,6 +20,11 @@ type captureState struct {
 	BackfilledUntil map[string]time.Time `json:"backfilledUntil,omitempty"`
 }
 
+type resourceState struct {
+	startDate    time.Time
+	bindingIndex uint32
+}
+
 func (driver) Pull(stream pc.Driver_PullServer) error {
 	log.Debug("connector started")
 
@@ -42,101 +47,104 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 		}
 	}
 
-	var resources []resource
-	for _, binding := range open.Open.Capture.Bindings {
+	resourceStates := make(map[string]*resourceState)
+	for idx, binding := range open.Open.Capture.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
-		res = resourceWithConfigDefaults(res, cfg)
 
-		res.startDate = cfg.StartDate
+		resourceState := &resourceState{
+			bindingIndex: uint32(idx),
+			startDate:    cfg.StartDate,
+		}
+
 		// If we have persisted a checkpoint indicating progress for this resource, use that instead
 		// of the configured startDate.
 		if got, ok := checkpoint.BackfilledUntil[res.Name]; ok {
-			res.startDate = got
+			resourceState.startDate = got
 			log.WithFields(log.Fields{
 				"Name":      res.Name,
-				"StartDate": res.startDate,
+				"StartDate": resourceState.startDate,
 			}).Info("set resource StartDate from checkpoint")
 		}
 
-		resources = append(resources, res)
+		resourceStates[res.Name] = resourceState
 	}
 
 	var capture = &capture{
-		Stream:   stream,
-		Bindings: resources,
-		Config:   cfg,
-		State:    checkpoint,
-		Output:   &boilerplate.PullOutput{Stream: stream},
+		stream:         stream,
+		config:         cfg,
+		state:          checkpoint,
+		output:         &boilerplate.PullOutput{Stream: stream},
+		resourceStates: resourceStates,
 	}
 	return capture.Run()
 }
 
 type capture struct {
-	Stream   pc.Driver_PullServer
-	Bindings []resource
-	Config   config
-	State    captureState
-	Output   *boilerplate.PullOutput
+	stream         pc.Driver_PullServer
+	config         config
+	state          captureState
+	output         *boilerplate.PullOutput
+	resourceStates map[string]*resourceState
 }
 
 func (c *capture) Run() error {
 	// Notify Flow that we're starting.
-	if err := c.Output.Ready(); err != nil {
+	if err := c.output.Ready(); err != nil {
 		return err
 	}
 
-	var eg, ctx = errgroup.WithContext(c.Stream.Context())
+	var eg, ctx = errgroup.WithContext(c.stream.Context())
 
-	// Capture each binding.
-	for idx, r := range c.Bindings {
-		idx, r := idx, r // Copy the loop variables for each closure
+	// Capture each resource.
+	for name, res := range c.resourceStates {
+		name, res := name, res // Copy the loop variables for each closure
 		eg.Go(func() error {
-			return c.CaptureBinding(ctx, idx, r)
+			return c.captureResource(ctx, name, res)
 		})
 	}
 
 	return eg.Wait()
 }
 
-func (c *capture) CaptureBinding(ctx context.Context, bindingIdx int, r resource) error {
+func (c *capture) captureResource(ctx context.Context, name string, r *resourceState) error {
 	dataClient := marketdata.NewClient(marketdata.ClientOpts{
-		ApiKey:    c.Config.ApiKeyID,
-		ApiSecret: c.Config.ApiSecretKey,
+		ApiKey:    c.config.ApiKeyID,
+		ApiSecret: c.config.ApiSecretKey,
 	})
 
 	streamClient := marketdataStream.NewStocksClient(
-		r.Feed,
-		marketdataStream.WithCredentials(c.Config.ApiKeyID, c.Config.ApiSecretKey),
+		c.config.Feed,
+		marketdataStream.WithCredentials(c.config.ApiKeyID, c.config.ApiSecretKey),
 	)
 
 	worker := alpacaWorker{
-		output:       c.Output,
-		bindingIdx:   bindingIdx,
+		output:       c.output,
+		bindingIdx:   r.bindingIndex,
 		dataClient:   dataClient,
 		streamClient: streamClient,
-		resourceName: r.Name,
-		symbols:      r.GetSymbols(),
-		feed:         r.Feed,
-		freePlan:     c.Config.Advanced.IsFreePlan,
+		resourceName: name,
+		symbols:      c.config.GetSymbols(),
+		feed:         c.config.Feed,
+		freePlan:     c.config.Advanced.IsFreePlan,
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
 
 	caughtUp := make(chan struct{})
 
-	if !c.Config.Advanced.DisableBackfill {
+	if !c.config.Advanced.DisableBackfill {
 		eg.Go(func() error {
-			return worker.backfillTrades(ctx, r.startDate, c.Config.Advanced.StopDate, c.Config.effectiveMaxBackfillInterval, c.Config.effectiveMinBackfillInterval, caughtUp)
+			return worker.backfillTrades(ctx, r.startDate, c.config.Advanced.StopDate, c.config.effectiveMaxBackfillInterval, c.config.effectiveMinBackfillInterval, caughtUp)
 		})
 	} else {
 		// If backfilling is disabled, there's nothing to catch up on. Streaming can start right away.
 		close(caughtUp)
 	}
 
-	if !c.Config.Advanced.DisableRealTime {
+	if !c.config.Advanced.DisableRealTime {
 		eg.Go(func() error {
 			// Wait until the backfilling is caught up (or disabled) before starting streaming.
 			// Throughput will most likely be limited by the network or journal append limits. It

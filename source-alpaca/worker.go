@@ -34,7 +34,7 @@ type tradeDocument struct {
 type alpacaWorker struct {
 	mu           sync.Mutex
 	output       *boilerplate.PullOutput
-	bindingIdx   int
+	bindingIdx   uint32
 	dataClient   marketdata.Client
 	streamClient marketdataStream.StocksClient
 	resourceName string
@@ -149,12 +149,12 @@ func (c *alpacaWorker) backfillTrades(ctx context.Context, start, end time.Time,
 		dataCollectionTime := time.Since(now)
 
 		nextEnd := getEndDate(c.freePlan, end)
-		if dataCollectionTime > dataDurationCovered {
+		if dataCollectionTime > dataDurationCovered && dataCollectionTime > minInterval {
 			log.WithFields(log.Fields{
 				"binding":             c.resourceName,
 				"dataDurationCovered": dataDurationCovered.String(),
 				"dataCollectionTime":  dataCollectionTime.String(),
-			}).Info("backfilling previous time period took longer than trades spanned by that time period - backfill may be falling behind")
+			}).Warn("backfilling previous time period took longer than trades spanned by that time period - backfill may be falling behind")
 		}
 
 		if nextEnd.Sub(start) < minInterval {
