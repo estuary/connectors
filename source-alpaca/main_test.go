@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -131,20 +132,20 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// Mapping of binding name to the ticker symbols it should capture.
-type bindingsMapping map[string]string
-
 func TestCaptureMultipleBindings(t *testing.T) {
 	start, err := time.Parse(time.RFC3339Nano, "2022-12-19T14:00:00Z")
 	require.NoError(t, err)
 	end, err := time.Parse(time.RFC3339Nano, "2022-12-19T14:10:00Z")
 	require.NoError(t, err)
 
-	capture := captureSpec(t, map[string]string{
-		"first":  "AAPL,MSFT",  // Both have trades in this time period.
-		"second": "AMZN,BRK-B", // Only AMZN has trades in this time period.
-		"third":  "UNH,JNJ",    // Neither has trades in this time period.
-	}, start, end, &st.SortedCaptureValidator{})
+	capture := captureSpec(t,
+		[]string{"first", "second"},
+		// BRK-B does not have trades in this time period.
+		[]string{"AAPL", "MSFT", "AMZN", "BRK-B"},
+		start,
+		end,
+		&st.SortedCaptureValidator{},
+	)
 
 	captureCtx, cancelCapture := context.WithCancel(context.Background())
 
@@ -184,14 +185,17 @@ func TestLargeCapture(t *testing.T) {
 		cancel()
 	})
 
-	capture := captureSpec(t, map[string]string{
-		"first":  "AAPL,MSFT",
-		"second": "GOOG,AMZN",
-	}, start, end, &st.WatchdogValidator{
-		Inner:         &st.ChecksumValidator{},
-		WatchdogTimer: wdt,
-		ResetPeriod:   quiescentTimeout,
-	})
+	capture := captureSpec(t,
+		[]string{"trades"},
+		[]string{"AAPL", "MSFT", "GOOG", "AMZN"},
+		start,
+		end,
+		&st.WatchdogValidator{
+			Inner:         &st.ChecksumValidator{},
+			WatchdogTimer: wdt,
+			ResetPeriod:   quiescentTimeout,
+		},
+	)
 
 	// Run the capture and verify the results. The capture is killed every 10s and then restarted
 	// from the previous checkpoint, in order to exercise incremental backfill resuming behavior.
@@ -206,7 +210,7 @@ func TestLargeCapture(t *testing.T) {
 	capture.Reset()
 }
 
-func captureSpec(t testing.TB, bMappings bindingsMapping, start, end time.Time, validator st.CaptureValidator) *st.CaptureSpec {
+func captureSpec(t testing.TB, names []string, symbols []string, start, end time.Time, validator st.CaptureValidator) *st.CaptureSpec {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
@@ -227,7 +231,7 @@ func captureSpec(t testing.TB, bMappings bindingsMapping, start, end time.Time, 
 		ApiKeyID:     apiKey,
 		ApiSecretKey: apiSecret,
 		Feed:         "iex",
-		Symbols:      "AAPL", // Will be over-ridden by individual resource bindings.
+		Symbols:      strings.Join(symbols, ","),
 		StartDate:    start,
 		Advanced: advancedConfig{
 			IsFreePlan:      true,
@@ -239,19 +243,17 @@ func captureSpec(t testing.TB, bMappings bindingsMapping, start, end time.Time, 
 	return &st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: endpointSpec,
-		Bindings:     makeBindings(t, bMappings, start, end),
+		Bindings:     makeBindings(t, names, start, end),
 		Validator:    validator,
 		Sanitizers:   make(map[string]*regexp.Regexp),
 	}
 }
 
-func makeBindings(t testing.TB, bMappings bindingsMapping, start, end time.Time) []*flow.CaptureSpec_Binding {
+func makeBindings(t testing.TB, names []string, start, end time.Time) []*flow.CaptureSpec_Binding {
 	var bindings []*flow.CaptureSpec_Binding
-	for name, symbols := range bMappings {
+	for _, name := range names {
 		spec := resource{
-			Name:      name,
-			Symbols:   symbols,
-			startDate: start,
+			Name: name,
 		}
 
 		specBytes, err := json.Marshal(spec)

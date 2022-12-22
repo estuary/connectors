@@ -31,6 +31,6 @@ func TestDiscover(t *testing.T) {
 	endDate, err := time.Parse(time.RFC3339Nano, "2007-02-03T15:04:05.999999999Z")
 	require.NoError(t, err)
 
-	capture := captureSpec(t, map[string]string{}, startDate, endDate, nil)
+	capture := captureSpec(t, []string{"trades"}, []string{"AAPL"}, startDate, endDate, nil)
 	capture.VerifyDiscover(context.Background(), t, nil...)
 }
