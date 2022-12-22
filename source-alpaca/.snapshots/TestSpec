@@ -108,7 +108,7 @@
     "required": [
       "name"
     ],
-    "title": "Trade Document"
+    "title": "Resource"
   },
   "documentation_url": "https://go.estuary.dev/source-alpaca"
 }
