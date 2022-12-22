@@ -14,11 +14,7 @@ const (
 )
 
 type resource struct {
-	Name    string `json:"name" jsonschema:"title=Name,description=Unique name for this binding. Cannot be changed once set."`
-	Feed    string `json:"feed,omitempty" jsonschema:"title=Feed,description=The feed to pull market data from.,enum=iex,enum=sip"`
-	Symbols string `json:"symbols,omitempty" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor."`
-
-	startDate time.Time
+	Name string `json:"name" jsonschema:"title=Name,description=Unique name for this binding. Cannot be changed once set."`
 }
 
 func (r *resource) Validate() error {
@@ -31,36 +27,28 @@ func (r *resource) Validate() error {
 		}
 	}
 
-	// Feed and Symbols will default to the values provided by the endpoint config unless explicitly
-	// provided in the binding config. This is a sanity check to ensure that if a value for Feed is
-	// provided in the binding config that it is valid. The same check is done when validating the
-	// endpoint config.
-	if r.Feed != "" && r.Feed != "iex" && r.Feed != "sip" {
-		return fmt.Errorf("feed must be iex or sip, got %s", r.Feed)
-	}
-
 	return nil
-}
-
-func (r *resource) GetSymbols() []string {
-	// There does not seem to be any strict standard for what constitutes a "valid" stock symbol
-	// format in terms of allowable characters, etc. We will just need to trust that the user has
-	// provided a valid list of comma-separated symbols. Practically speaking, there is no such
-	// thing as an "invalid" symbol, and if the symbol does not exist it will simply not return any
-	// data.
-	return strings.Split(r.Symbols, ",")
 }
 
 type config struct {
 	ApiKeyID     string         `json:"api_key_id" jsonschema:"title=Alpaca API Key ID,description=Your Alpaca API key ID." jsonschema_extras:"secret=true"`
 	ApiSecretKey string         `json:"api_secret_key" jsonschema:"title=Alpaca API Secret Key,description=Your Alpaca API Secret key." jsonschema_extras:"secret=true"`
-	Feed         string         `json:"feed" jsonschema:"title=Feed,description=The feed to pull market data from. May be overridden within the binding resource configuration.,enum=iex,enum=sip" jsonschema_extras:"multiline=true"`
-	Symbols      string         `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor. May be overridden within the binding resource configuration" jsonschema_extras:"multiline=true"`
-	StartDate    time.Time      `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after a binding is added." jsonschema_extras:"multiline=true"`
+	Feed         string         `json:"feed" jsonschema:"title=Feed,description=The feed to pull market data from.,enum=iex,enum=sip" jsonschema_extras:"multiline=true"`
+	Symbols      string         `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor." jsonschema_extras:"multiline=true"`
+	StartDate    time.Time      `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after the capture has started." jsonschema_extras:"multiline=true"`
 	Advanced     advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
 	effectiveMaxBackfillInterval time.Duration
 	effectiveMinBackfillInterval time.Duration
+}
+
+func (c *config) GetSymbols() []string {
+	// There does not seem to be any strict standard for what constitutes a "valid" stock symbol
+	// format in terms of allowable characters, etc. We will just need to trust that the user has
+	// provided a valid list of comma-separated symbols. Practically speaking, there is no such
+	// thing as an "invalid" symbol, and if the symbol does not exist it will simply not return any
+	// data.
+	return strings.Split(c.Symbols, ",")
 }
 
 type advancedConfig struct {

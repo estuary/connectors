@@ -31,21 +31,6 @@ func (driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecResponse, 
 	}, nil
 }
 
-func resourceWithConfigDefaults(res resource, cfg config) resource {
-	out := res
-
-	// If there are no explicit values from the resource configuration, fall back to the values from
-	// the endpoint configuration.
-	if out.Feed == "" {
-		out.Feed = cfg.Feed
-	}
-	if out.Symbols == "" {
-		out.Symbols = cfg.Symbols
-	}
-
-	return out
-}
-
 func (driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.ValidateResponse, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
@@ -53,37 +38,31 @@ func (driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Valida
 	}
 
 	var out []*pc.ValidateResponse_Binding
-	feeds := make(map[string][]string)
 	for _, binding := range req.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
-		res = resourceWithConfigDefaults(res, cfg)
 
 		out = append(out, &pc.ValidateResponse_Binding{
 			ResourcePath: []string{res.Name},
 		})
-
-		feeds[res.Feed] = res.GetSymbols()
 	}
 
-	// Validate that a connection can be made to Alpaca API for all of the specified feeds. We need
-	// to provide a symbol for the test request, so just use the first one from the list of symbols
-	// for the binding. Validation ensures that there will be at least one symbol in the list.
+	// Validate that a connection can be made to Alpaca API for the specified feed. We need to
+	// provide a symbol for the test request, so just use the first one from the list of symbols for
+	// the capture. Validation ensures that there will be at least one symbol in the list.
 
 	// Query an arbitrary time in the past so that we don't have to worry about the "free plan"
 	// option which cannot query within the last 15 minutes.
 	testTime := time.Now().Add(-1 * time.Hour)
-	for feed, symbols := range feeds {
-		_, err := marketdata.NewClient(marketdata.ClientOpts{
-			ApiKey:    cfg.ApiKeyID,
-			ApiSecret: cfg.ApiSecretKey,
-		}).GetTrades(symbols[0], marketdata.GetTradesParams{Feed: feed, Start: testTime, End: testTime})
+	_, err := marketdata.NewClient(marketdata.ClientOpts{
+		ApiKey:    cfg.ApiKeyID,
+		ApiSecret: cfg.ApiSecretKey,
+	}).GetTrades(cfg.GetSymbols()[0], marketdata.GetTradesParams{Feed: cfg.Feed, Start: testTime, End: testTime})
 
-		if err != nil {
-			return nil, fmt.Errorf("error when connecting to feed %s: %w", feed, err)
-		}
+	if err != nil {
+		return nil, fmt.Errorf("error when connecting to feed %s: %w", cfg.Feed, err)
 	}
 
 	return &pc.ValidateResponse{Bindings: out}, nil
@@ -101,9 +80,7 @@ func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Discov
 	}
 
 	resourceJSON, err := json.Marshal(resource{
-		Name:    "trades",
-		Feed:    cfg.Feed,
-		Symbols: cfg.Symbols,
+		Name: cfg.Feed,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("serializing resource json: %w", err)
@@ -111,7 +88,7 @@ func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Discov
 
 	return &pc.DiscoverResponse{
 		Bindings: []*pc.DiscoverResponse_Binding{{
-			RecommendedName:    "trades",
+			RecommendedName:    pf.Collection(cfg.Feed),
 			ResourceSpecJson:   resourceJSON,
 			DocumentSchemaJson: documentSchema,
 			KeyPtrs:            []string{"/ID", "/Symbol", "/Exchange", "/Timestamp"},
