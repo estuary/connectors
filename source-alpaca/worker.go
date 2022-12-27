@@ -18,6 +18,7 @@ const (
 	emptyCheckpoint         = `{}`
 	defaultCurrency         = "usd"
 	streamerLoggingInterval = 1 * time.Minute
+	backfillDely            = 1 * time.Minute
 )
 
 type tradeDocument struct {
@@ -309,6 +310,10 @@ func getEndDate(freePlan bool, endDate time.Time) time.Time {
 	// Free plans can't get data from within the last 15 minutes.
 	if freePlan {
 		now = now.Add(-1 * 15 * time.Minute)
+	} else {
+		// Slight delay on how recent the backfill can query for to account for instability in very
+		// recently received data on Alpaca's servers.
+		now = now.Add(-1 * backfillDely)
 	}
 
 	return now
