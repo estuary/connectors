@@ -22,8 +22,7 @@
           "sip"
         ],
         "title": "Feed",
-        "description": "The feed to pull market data from.",
-        "multiline": true
+        "description": "The feed to pull market data from."
       },
       "symbols": {
         "type": "string",
@@ -35,47 +34,40 @@
         "type": "string",
         "format": "date-time",
         "title": "Start Date",
-        "description": "Get trades starting at this date. Has no effect if changed after the capture has started.",
-        "multiline": true
+        "description": "Get trades starting at this date. Has no effect if changed after the capture has started."
       },
       "advanced": {
         "properties": {
           "is_free_plan": {
             "type": "boolean",
             "title": "Free Plan",
-            "description": "Set this if you are using a free plan. Delays data by 15 minutes.",
-            "multiline": true
+            "description": "Set this if you are using a free plan. Delays data by 15 minutes."
           },
           "stop_date": {
             "type": "string",
             "format": "date-time",
             "title": "Stop Date",
-            "description": "Stop backfilling historical data at this date.",
-            "multiline": true
+            "description": "Stop backfilling historical data at this date."
           },
           "disable_real_time": {
             "type": "boolean",
             "title": "Disable Real-Time Streaming",
-            "description": "Disables real-time streaming via the websocket API. Data will only be collected via the backfill mechanism.",
-            "multiline": true
+            "description": "Disables real-time streaming via the websocket API. Data will only be collected via the backfill mechanism."
           },
           "disable_backfill": {
             "type": "boolean",
             "title": "Disable Historical Data Backfill",
-            "description": "Disables historical data backfill via the historical data API. Data will only be collected via streaming.",
-            "multiline": true
+            "description": "Disables historical data backfill via the historical data API. Data will only be collected via streaming."
           },
           "max_backfill_interval": {
             "type": "string",
             "title": "Maximum Backfill Interval",
-            "description": "The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols. Must be a valid Go duration string.",
-            "multiline": true
+            "description": "The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols. Must be a valid Go duration string."
           },
           "min_backfill_interval": {
             "type": "string",
             "title": "Minimum Backfill Interval",
-            "description": "The smallest time interval that will be requested for backfills after the initial backfill is complete. Must be a valid Go duration string.",
-            "multiline": true
+            "description": "The smallest time interval that will be requested for backfills after the initial backfill is complete. Must be a valid Go duration string."
           }
         },
         "additionalProperties": false,
