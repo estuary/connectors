@@ -77,7 +77,7 @@ func (c *config) DatasetPath(path ...string) sql.TablePath {
 }
 
 type tableConfig struct {
-  Table     string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in." jsonschema_extras:"x-collection-name=true"`
+	Table     string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in." jsonschema_extras:"x-collection-name=true"`
 	Delta     bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false."`
 	projectID string
 	dataset   string
@@ -100,6 +100,10 @@ func (c tableConfig) Validate() error {
 // Path returns the sqlDriver.ResourcePath for a table.
 func (c tableConfig) Path() sql.TablePath {
 	return []string{c.projectID, c.dataset, c.Table}
+}
+
+func (c tableConfig) GetAdditionalSql() string {
+	return ""
 }
 
 // DeltaUpdates returns if BigQuery is in DeltaUpdates mode or not.
