@@ -160,6 +160,10 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 		} else {
 			statements = append(statements, statement)
 		}
+
+		if shape.AdditionalSql != "" {
+			statements = append(statements, shape.AdditionalSql)
+		}
 	}
 
 	// Insert or update the materialization specification.
