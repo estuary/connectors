@@ -190,6 +190,7 @@ func main() {
 			"credentials": {
 			"title": "Credentials",
 			"description": "User credentials, if required to access the data at the HTTP URL.",
+			"type": "object",
 			"oneOf": [{
 				"type": "object",
 				"title": "Basic Authentication",
