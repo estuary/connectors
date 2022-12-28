@@ -152,5 +152,6 @@ func (CredentialConfig) JSONSchema() *jsonschema.Schema {
 		Extras: map[string]interface{}{
 			"discriminator": map[string]string{"propertyName": "auth_type"},
 		},
+		Type: "object",
 	}
 }
