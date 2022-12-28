@@ -64,6 +64,7 @@
             "title": "Service Account Key"
           }
         ],
+        "type": "object",
         "title": "Authentication",
         "default": {
           "auth_type": "Client"
