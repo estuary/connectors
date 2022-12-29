@@ -13,7 +13,7 @@ export CONNECTOR_CONFIG='{
     "username": "alice",
     "password": "alice-pass"
   },
-  "tls": null
+  "tls": "no_tls"
 }'
 
 root_dir="$(git rev-parse --show-toplevel)"

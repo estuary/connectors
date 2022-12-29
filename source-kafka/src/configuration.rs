@@ -35,7 +35,7 @@ pub struct Configuration {
     pub authentication: Option<Authentication>,
 
     /// # TLS connection settings.
-    pub tls: Option<TlsSettings>,
+    pub tls: TlsSettings,
 }
 
 impl Configuration {
@@ -49,10 +49,10 @@ impl Configuration {
 
     pub fn security_protocol(&self) -> &'static str {
         match (&self.authentication, &self.tls) {
-            (None, Some(TlsSettings::SystemCertificates)) => "SSL",
-            (None, None) => "PLAINTEXT",
-            (Some(_), Some(TlsSettings::SystemCertificates)) => "SASL_SSL",
-            (Some(_), None) => "SASL_PLAINTEXT",
+            (None, TlsSettings::SystemCertificates) => "SSL",
+            (None, TlsSettings::NoTls) => "PLAINTEXT",
+            (Some(_), TlsSettings::SystemCertificates) => "SASL_SSL",
+            (Some(_), TlsSettings::NoTls) => "SASL_PLAINTEXT",
         }
     }
 }
@@ -68,6 +68,7 @@ impl JsonSchema for Configuration {
             "type": "object",
             "required": [
                 "bootstrap_servers",
+                "tls"
             ],
             "properties": {
                 "bootstrap_servers": {
@@ -80,29 +81,20 @@ impl JsonSchema for Configuration {
                     },
                     "order": 0,
                 },
-                "authentication": {
-                    "title": "Authentication",
-                    "description":  "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments.",
-                    "oneOf": [
-                        { "title": "Enabled", "$ref": "#/definitions/Authentication" },
-                        { "title": "Disabled", "type": "null" },
-                    ],
-                    "order": 1,
-                },
                 "tls": {
                     "title": "TLS Settings",
                     "description": "Controls how should TLS certificates be found or used.",
-                    "oneOf": [
-                        { "title": "Enabled", "$ref": "#/definitions/TlsSettings" },
-                        { "title": "Disabled", "type": "null" },
+                    "type": "string",
+                    "default": "system_certificates",
+                    "enum": [
+                        "system_certificates",
+                        "no_tls",
                     ],
-                    "order": 2,
-                }
-            },
-            "definitions": {
-                "Authentication": {
+                    "order": 1,
+                },
+                "authentication": {
                     "title": "Authentication",
-                    "description": "The information necessary to connect to Kafka.",
+                    "description":  "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments.",
                     "type": "object",
                     "required": [
                         "mechanism",
@@ -111,9 +103,13 @@ impl JsonSchema for Configuration {
                     ],
                     "properties": {
                         "mechanism": {
-                            "title": "Sasl Mechanism",
-                            "allOf": [
-                                { "$ref": "#/definitions/SaslMechanism" }
+                            "title": "SASL Mechanism",
+                            "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
+                            "type": "string",
+                            "enum": [
+                                "PLAIN",
+                                "SCRAM-SHA-256",
+                                "SCRAM-SHA-512",
                             ],
                             "order": 0,
                         },
@@ -129,26 +125,8 @@ impl JsonSchema for Configuration {
                             "secret": true,
                             "order": 2,
                         },
-                    }
-                },
-                "SaslMechanism": {
-                    "title": "SASL Mechanism",
-                    "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
-                    "type": "string",
-                    "enum": [
-                        "PLAIN",
-                        "SCRAM-SHA-256",
-                        "SCRAM-SHA-512",
-                    ]
-                },
-                "TlsSettings": {
-                    "title": "TLS Settings",
-                    "description": "Controls how should TLS certificates be found or used.",
-                    "type": "string",
-                    "default": "system_certificates",
-                    "enum": [
-                        "system_certificates",
-                    ]
+                    },
+                    "order": 2,
                 }
             }
         }))
@@ -295,6 +273,8 @@ pub struct Authentication {
 pub enum TlsSettings {
     /// Use the TLS certificates bundled with openssl.
     SystemCertificates,
+    /// Disable TLS
+    NoTls,
     // TODO: allow the user to specify custom TLS certs, authorities, etc.
     // CustomCertificates(CustomTlsSettings),
 }
@@ -358,7 +338,7 @@ mod test {
                 "username": "user",
                 "password": "password"
             },
-            "tls": null
+            "tls": "no_tls"
         }
         "#,
         );
