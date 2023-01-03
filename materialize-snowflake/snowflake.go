@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake"
@@ -134,7 +134,7 @@ func newSnowflakeDriver() *sql.Driver {
 				return nil, fmt.Errorf("parsing Snowflake configuration: %w", err)
 			}
 
-			var dsn = parsed.ToURI();
+			var dsn = parsed.ToURI()
 
 			log.WithFields(log.Fields{
 				"host":     parsed.Host,
@@ -154,7 +154,6 @@ func newSnowflakeDriver() *sql.Driver {
 
 			var metaBase sql.TablePath
 			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
-
 
 			return &sql.Endpoint{
 				Config:              parsed,
@@ -205,17 +204,8 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 	return fn(db)
 }
 
-func sliceContains(expected string, actual []string) bool {
-	for _, ty := range actual {
-		if ty == expected {
-			return true
-		}
-	}
-	return false
-}
-
 type transactor struct {
-	cfg *config
+	cfg     *config
 	dialect *sql.Dialect
 
 	// Variables exclusively used by Load.
@@ -288,7 +278,7 @@ type binding struct {
 }
 
 type TableWithUUID struct {
-	Table *sql.Table
+	Table      *sql.Table
 	RandomUUID uuid.UUID
 }
 
@@ -418,7 +408,6 @@ func (d *transactor) Commit(ctx context.Context) error {
 		return fmt.Errorf("conn.BeginTx: %w", err)
 	}
 	defer txn.Rollback()
-
 
 	// First we must validate the fence has not been modified.
 	var fenceUpdate strings.Builder

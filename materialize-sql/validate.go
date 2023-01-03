@@ -32,7 +32,7 @@ func ValidateSelectedFields(constraints map[string]*pm.Constraint, proposed *pf.
 	for field, constraint := range constraints {
 		switch constraint.Type {
 		case pm.Constraint_FIELD_REQUIRED:
-			if !sliceContains(field, allFields) {
+			if !SliceContains(field, allFields) {
 				return fmt.Errorf("Required field '%s' is missing. It is required because: %s", field, constraint.Reason)
 			}
 		case pm.Constraint_LOCATION_REQUIRED:
@@ -134,7 +134,7 @@ func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.Coll
 	// The new projection is allowed to contain fewer types than the original, though, since that
 	// will always work with the original database schema.
 	for _, pt := range proposedProjection.Inference.Types {
-		if !sliceContains(pt, existingProjection.Inference.Types) {
+		if !SliceContains(pt, existingProjection.Inference.Types) {
 			return fmt.Sprintf("The proposed projection may contain the type '%s', which is not part of the original projection", pt)
 		}
 	}
@@ -145,14 +145,14 @@ func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.Coll
 	// column is nullable, then it won't matter if the new one is or not since the column will be
 	// unconstrained.
 	if existingProjection.Inference.Exists == pf.Inference_MUST &&
-		!sliceContains("null", existingProjection.Inference.Types) &&
+		!SliceContains("null", existingProjection.Inference.Types) &&
 		proposedProjection.Inference.Exists != pf.Inference_MUST {
 		return "The existing projection must exist and be non-null, so the new projection must also exist"
 	}
 	return ""
 }
 
-func sliceContains(expected string, actual []string) bool {
+func SliceContains(expected string, actual []string) bool {
 	for _, ty := range actual {
 		if ty == expected {
 			return true
