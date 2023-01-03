@@ -8,7 +8,6 @@ import (
 // Dialect encapsulates many specifics of an Endpoint's interpretation of SQL.
 type Dialect struct {
 	Identifierer
-	UnquotedIdentifierer
 	Literaler
 	Placeholderer
 	TypeMapper
@@ -18,12 +17,6 @@ type Dialect struct {
 // Endpoint with necessary quoting applied.
 type Identifierer interface {
 	Identifier(path ...string) string
-}
-
-// Identifierer takes path components and returns a raw SQL identifier for the
-// Endpoint without necessary quoting applied.
-type UnquotedIdentifierer interface {
-	UnquotedIdentifier(path ...string) string
 }
 
 // Literaler takes a string and returns a raw SQL literal for the Endpoint
@@ -48,11 +41,6 @@ type TypeMapper interface {
 type IdentifierFn func(path ...string) string
 
 func (f IdentifierFn) Identifier(path ...string) string { return f(path...) }
-
-// UnquotedIdentifierFn is a function that implements UnquotedIdentifierer.
-type UnquotedIdentifierFn func(path ...string) string
-
-func (f UnquotedIdentifierFn) UnquotedIdentifier(path ...string) string { return f(path...) }
 
 // LiteralFn is a function that implements Literaler.
 type LiteralFn func(s string) string

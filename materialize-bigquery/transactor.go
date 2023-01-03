@@ -100,7 +100,7 @@ func configForCols(cols []*sql.Column) (*bigquery.ExternalDataConfig, error) {
 
 		_, mustExist := col.AsFlatType()
 		config.Schema = append(config.Schema, &bigquery.FieldSchema{
-			Name:     col.UnquotedIdentifier,
+			Name:     unquotedIdentifier(col.Identifier),
 			Repeated: false,
 			Required: mustExist,
 			Type:     bigquery.FieldType(mt.DDL),
@@ -108,6 +108,12 @@ func configForCols(cols []*sql.Column) (*bigquery.ExternalDataConfig, error) {
 	}
 
 	return config, nil
+}
+
+// unquotedIdentifier strips identifier quoting (if present) so that the name is suitable for use in
+// a FieldSchema. There should only be identifer quoting if the column name matches a reserved word.
+func unquotedIdentifier(ident string) string {
+	return strings.TrimSuffix(strings.TrimPrefix(ident, "`"), "`")
 }
 
 func (t *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {

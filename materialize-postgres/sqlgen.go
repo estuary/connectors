@@ -38,7 +38,7 @@ var pgDialect = func() sql.Dialect {
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
-					return sql.IsSimpleIdentifier(s) && !sliceContains(strings.ToLower(s), PG_RESERVED_WORDS)
+					return sql.IsSimpleIdentifier(s) && !sql.SliceContains(strings.ToLower(s), PG_RESERVED_WORDS)
 				},
 				sql.QuoteTransform("\"", "\\\""),
 			))),
@@ -50,15 +50,6 @@ var pgDialect = func() sql.Dialect {
 		TypeMapper: mapper,
 	}
 }()
-
-func sliceContains(expected string, actual []string) bool {
-	for _, ty := range actual {
-		if ty == expected {
-			return true
-		}
-	}
-	return false
-}
 
 var (
 	tplAll = sql.MustParseTemplate(pgDialect, "root", `
