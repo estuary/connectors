@@ -1,13 +1,15 @@
 package main
+
 import (
 	"fmt"
 	"strings"
 
 	"encoding/json"
-	sql "github.com/estuary/connectors/materialize-sql"
 	"text/template"
-	"github.com/google/uuid"
+
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	"github.com/google/uuid"
 )
 
 var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
@@ -24,7 +26,7 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 }
 
 // snowflakeDialect returns a representation of the Snowflake SQL dialect.
-var snowflakeDialect = func () sql.Dialect {
+var snowflakeDialect = func() sql.Dialect {
 	var variantMapper = sql.NewStaticMapper("VARIANT", sql.WithElementConverter(jsonConverter))
 	var typeMappings = sql.ProjectionTypeMapper{
 		sql.ARRAY:   variantMapper,
@@ -42,18 +44,18 @@ var snowflakeDialect = func () sql.Dialect {
 	}
 	var nullable sql.TypeMapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:       typeMappings,
+		Delegate:    typeMappings,
 	}
 
 	return sql.Dialect{
-		Identifierer:       sql.IdentifierFn(sql.JoinTransform(".", 
-		sql.PassThroughTransform(
-			func(s string) bool {
-				return sql.IsSimpleIdentifier(s) && !sliceContains(strings.ToLower(s), SF_RESERVED_WORDS)
-			},
-			sql.QuoteTransform("\"", "\\\""),
-		))),
-		Literaler:          sql.LiteralFn(sql.QuoteTransform("'", "''")),
+		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
+			sql.PassThroughTransform(
+				func(s string) bool {
+					return sql.IsSimpleIdentifier(s) && !sql.SliceContains(strings.ToLower(s), SF_RESERVED_WORDS)
+				},
+				sql.QuoteTransform("\"", "\\\""),
+			))),
+		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
@@ -62,7 +64,7 @@ var snowflakeDialect = func () sql.Dialect {
 }()
 
 var (
-  tplAll = sql.MustParseTemplate(snowflakeDialect, "root", `
+	tplAll = sql.MustParseTemplate(snowflakeDialect, "root", `
   {{ define "temp_name" -}}
   flow_temp_table_{{ $.Binding }}
   {{- end }}
@@ -180,11 +182,11 @@ BEGIN
 END $$;
 {{ end }}
   `)
-  tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-  tplLoadQuery         = tplAll.Lookup("loadQuery")
-  tplCopyInto          = tplAll.Lookup("copyInto")
-  tplMergeInto         = tplAll.Lookup("mergeInto")
-  tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
+	tplLoadQuery         = tplAll.Lookup("loadQuery")
+	tplCopyInto          = tplAll.Lookup("copyInto")
+	tplMergeInto         = tplAll.Lookup("mergeInto")
+	tplUpdateFence       = tplAll.Lookup("updateFence")
 )
 
 var createStageSQL = `
@@ -198,9 +200,8 @@ COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored document
 
 func RenderTableWithRandomUUIDTemplate(table sql.Table, randomUUID uuid.UUID, tpl *template.Template) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &TableWithUUID { Table: &table, RandomUUID: randomUUID }); err != nil {
+	if err := tpl.Execute(&w, &TableWithUUID{Table: &table, RandomUUID: randomUUID}); err != nil {
 		return "", err
 	}
 	return w.String(), nil
 }
-
