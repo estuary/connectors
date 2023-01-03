@@ -49,6 +49,19 @@ func TestSQLGeneration(t *testing.T) {
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 
+	var shapeNoValues = sqlDriver.BuildTableShape(spec, 1, tableConfig{
+		Table:     "target_table_no_values_materialized",
+		Delta:     false,
+		projectID: "projectID",
+		dataset:   "dataset",
+	})
+	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, bqDialect)
+	require.NoError(t, err)
+
+	snap.WriteString("--- Begin " + "target_table_no_values_materialized storeUpdate" + " ---\n")
+	require.NoError(t, tplStoreUpdate.Execute(&snap, &tableNoValues))
+	snap.WriteString("--- End " + "target_table_no_values_materialized storeUpdate" + " ---\n\n")
+
 	var fence = sqlDriver.Fence{
 		TablePath:       sqlDriver.TablePath{"project", "dataset", "checkpoints"},
 		Checkpoint:      []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},

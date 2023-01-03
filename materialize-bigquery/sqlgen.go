@@ -135,11 +135,13 @@ WHEN MATCHED AND r.{{$.Document.UnquotedIdentifier}} IS NULL THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN
-	UPDATE SET {{ range $ind, $key := $.Values }}
+	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
-		l.{{$key.UnquotedIdentifier}} = r.{{$key.UnquotedIdentifier}}
+		l.{{$val.UnquotedIdentifier}} = r.{{$val.UnquotedIdentifier}}
 	{{- end}} 
-	{{- if $.Document }}, l.{{$.Document.UnquotedIdentifier}} = r.{{$.Document.UnquotedIdentifier}} {{- end }}
+	{{- if $.Document -}}
+		{{ if $.Values  }}, {{ end }}l.{{$.Document.UnquotedIdentifier}} = r.{{$.Document.UnquotedIdentifier}}
+	{{- end }}
 WHEN NOT MATCHED THEN
 	INSERT (
 	{{- range $ind, $col := $.Columns }}

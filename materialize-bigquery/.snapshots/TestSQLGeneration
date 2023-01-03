@@ -47,6 +47,19 @@ WHEN NOT MATCHED THEN
 	VALUES (r.key1, r.key2, r.boolean, r.integer, r.string, r.number, r.person_place_, r.source.name, r.with-dash, r.flow_document);
 --- End `projectID`.`dataset`.`target_table` storeUpdate ---
 
+--- Begin target_table_no_values_materialized storeUpdate ---
+MERGE INTO `projectID`.`dataset`.`target_table_no_values_materialized` AS l
+USING flow_temp_table_1 AS r
+ON l.key1 = r.key1 AND l.key2 = r.key2
+WHEN MATCHED AND r.flow_document IS NULL THEN
+	DELETE
+WHEN MATCHED THEN
+	UPDATE SET l.flow_document = r.flow_document
+WHEN NOT MATCHED THEN
+	INSERT (`key1`, `key2`, `flow_document`)
+	VALUES (r.key1, r.key2, r.flow_document);
+--- End target_table_no_values_materialized storeUpdate ---
+
 --- Begin Fence Install ---
 
 -- Our desired fence
