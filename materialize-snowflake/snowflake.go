@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"github.com/pkg/errors"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -54,6 +53,7 @@ func (c *config) ToURI() string {
 }
 
 func (c *config) asSnowflakeConfig() sf.Config {
+	var maxStatementCount string = "0"
 	return sf.Config{
 		Account:   c.Account,
 		Host:      c.Host,
@@ -63,6 +63,12 @@ func (c *config) asSnowflakeConfig() sf.Config {
 		Schema:    c.Schema,
 		Warehouse: c.Warehouse,
 		Role:      c.Role,
+		Params: map[string]*string{
+			// By default Snowflake expects the number of statements to be provided
+			// with every request. By setting this parameter to zero we are allowing a
+			// variable number of statements to be executed in a single request
+			"MULTI_STATEMENT_COUNT": &maxStatementCount,
+		},
 	}
 }
 
@@ -415,19 +421,9 @@ func (d *transactor) Commit(ctx context.Context) error {
 	if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
 		return fmt.Errorf("evaluating fence template: %w", err)
 	}
-	if result, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
+	if _, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
 		return fmt.Errorf("txn.Exec: %w", err)
-	} else if rowsAffected, err := result.RowsAffected(); err != nil {
-		return fmt.Errorf("result.RowsAffected: %w", err)
-	} else if rowsAffected == 0 {
-		return errors.Errorf("this transactions session was fenced off by another")
 	}
-
-	/*strings.Contains(err.Error(), "timeout") {
-		return fmt.Errorf("fence.Update: %w  (ensure LOCK_TIMEOUT and STATEMENT_TIMEOUT_IN_SECONDS are at least ten minutes)", err)
-	} else if err != nil {
-		return fmt.Errorf("fence.Update: %w", err)
-	}*/
 
 	for _, b := range d.bindings {
 		if !b.store.hasDocs {
