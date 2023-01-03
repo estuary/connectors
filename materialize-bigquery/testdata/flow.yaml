@@ -15,6 +15,15 @@ collections:
       required: [key1, key2, boolean, integer, string]
     key: [/key1, /key2, /boolean, /integer, /string]
 
+  no_values:
+    schema:
+      type: object
+      properties:
+        key1: { type: integer }
+        key2: { type: boolean }
+      required: [key1, key2]
+    key: [/key1, /key2]
+
 materializations:
   test/sqlite:
     endpoint:
@@ -23,6 +32,8 @@ materializations:
     bindings:
       - source: key/value
         resource: { table: key_value }
+      - source: no_values
+        resource: { table: no_values }
 
 storageMappings:
   "": { stores: [{ provider: S3, bucket: a-bucket }] }
