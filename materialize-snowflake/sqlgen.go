@@ -160,21 +160,21 @@ var (
 	);
 {{- end }}
 
-
-
-  {{ define "selectByKeys" }}
-    SELECT {{ $.Document.Identifier }}
-    FROM {{ $.Identifier }}
-    WHERE
-      {{- range $ind, $key := $.Keys }}
-        {{- if $ind }} AND {{ end -}}
-        {{ $key.Identifier }} = {{ $key.Placeholder }}
-      {{- end -}}
-    ;
-  {{ end }}
+{{ define "selectByKeys" }}
+	SELECT {{ $.Document.Identifier }}
+	FROM {{ $.Identifier }}
+	WHERE
+		{{- range $ind, $key := $.Keys }}
+			{{- if $ind }} AND {{ end -}}
+			{{ $key.Identifier }} = {{ $key.Placeholder }}
+		{{- end -}}
+	;
+{{ end }}
 
 {{ define "updateFence" }}
-DO $$
+EXECUTE IMMEDIATE $$
+DECLARE
+    fenced_excp EXCEPTION (-20002, 'This instance was fenced off by another');
 BEGIN
 	UPDATE {{ Identifier $.TablePath }}
 		SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
@@ -183,9 +183,11 @@ BEGIN
 		AND   key_end   = {{ $.KeyEnd }}
 		AND   fence     = {{ $.Fence }};
 
-	IF NOT FOUND THEN
-		RAISE 'This instance was fenced off by another';
+	IF (SQLNOTFOUND = true) THEN
+		RAISE fenced_excp;
 	END IF;
+
+  RETURN SQLROWCOUNT;
 END $$;
 {{ end }}
   `)
@@ -204,8 +206,7 @@ FILE_FORMAT = (
   BINARY_FORMAT = BASE64
 )
 COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored documents'
-;
-{{ end }}`
+;`
 
 func RenderTableWithRandomUUIDTemplate(table sql.Table, randomUUID uuid.UUID, tpl *template.Template) (string, error) {
 	var w strings.Builder
