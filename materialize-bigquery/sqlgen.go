@@ -4,10 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
+
+// Identifiers matching the this pattern do not need to be quoted. See
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#identifiers.
+var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
 // Bigquery only allows underscore, letters, numbers, and sometimes hyphens for identifiers. Convert everything else to underscore.
 var identifierSanitizerRegexp = regexp.MustCompile(`[^\-\._0-9a-zA-Z]`)
@@ -54,9 +59,14 @@ var bqDialect = func() sql.Dialect {
 	}
 
 	return sql.Dialect{
-		Identifierer:         sql.IdentifierFn(sql.JoinTransform(".", identifierSanitizer(sql.QuoteTransform("`", "\\`")))),
-		UnquotedIdentifierer: sql.UnquotedIdentifierFn(sql.JoinTransform(".", identifierSanitizer(func(s string) string { return s }))),
-		Literaler:            sql.LiteralFn(sql.QuoteTransform("'", "\\'")),
+		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
+			identifierSanitizer(sql.PassThroughTransform(
+				func(s string) bool {
+					return simpleIdentifierRegexp.MatchString(s) && !sql.SliceContains(strings.ToUpper(s), BQ_RESERVED_WORDS)
+				},
+				sql.QuoteTransform("`", "\\`"),
+			)))),
+		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "\\'")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
@@ -94,12 +104,12 @@ CLUSTER BY {{ range $ind, $key := $.Keys }}
 
 {{ define "loadQuery" -}}
 {{ if $.Document -}}
-SELECT {{ $.Binding }}, l.{{$.Document.UnquotedIdentifier}}
+SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 	FROM {{ $.Identifier }} AS l
 	JOIN {{ template "tempTableName" . }} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
-		l.{{ $key.UnquotedIdentifier }} is not distinct from r.{{ $key.UnquotedIdentifier }}
+		l.{{ $key.Identifier }} is not distinct from r.{{ $key.Identifier }}
 	{{- end }}
 {{ else }}
 SELECT -1, NULL LIMIT 0
@@ -128,19 +138,19 @@ MERGE INTO {{ $.Identifier }} AS l
 USING {{ template "tempTableName" . }} AS r
 ON {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
-	l.{{$key.UnquotedIdentifier}} = r.{{$key.UnquotedIdentifier}}
+	l.{{$key.Identifier}} = r.{{$key.Identifier}}
 {{- end}}
 {{- if $.Document }}
-WHEN MATCHED AND r.{{$.Document.UnquotedIdentifier}} IS NULL THEN
+WHEN MATCHED AND r.{{$.Document.Identifier}} IS NULL THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
-		l.{{$val.UnquotedIdentifier}} = r.{{$val.UnquotedIdentifier}}
+		l.{{$val.Identifier}} = r.{{$val.Identifier}}
 	{{- end}} 
 	{{- if $.Document -}}
-		{{ if $.Values  }}, {{ end }}l.{{$.Document.UnquotedIdentifier}} = r.{{$.Document.UnquotedIdentifier}}
+		{{ if $.Values  }}, {{ end }}l.{{$.Document.Identifier}} = r.{{$.Document.Identifier}}
 	{{- end }}
 WHEN NOT MATCHED THEN
 	INSERT (
@@ -152,7 +162,7 @@ WHEN NOT MATCHED THEN
 	VALUES (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
-		r.{{$col.UnquotedIdentifier}}
+		r.{{$col.Identifier}}
 	{{- end -}}
 	);
 {{ end }}
