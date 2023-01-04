@@ -241,3 +241,34 @@ jobs:
           file: ${{ matrix.connector.path }}/Dockerfile
           push: true # See 'if' above
           tags: ${{ steps.prep.outputs.this_push_tags }}
+
+      - name: Install psql
+        if: ${{ github.event_name == 'push' }}
+        run: sudo apt install postgresql-client
+
+      - name: Refresh connector tags for ${{ matrix.connector.path }}
+        if: ${{ github.event_name == 'push' }}
+        env:
+          PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
+          PGUSER: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
+          PGPASSWORD: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
+          PGDATABASE: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
+        run: |
+          VERSION=$(cat ${{ matrix.connector.path }}/VERSION | tr -d '\n')
+          echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
+                  WHERE connector_id IN (
+                    SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${{ matrix.connector.path }}'
+                  )
+                  AND
+                  image_tag IN (':$VERSION', ':dev');" | psql
+
+          # Add any additional tags that should be updated for this connector image.
+          for additional in ${{ join(matrix.connector.additionalTags, ' ') }}
+          do
+            echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
+                    WHERE connector_id IN (
+                      SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/$additional'
+                    )
+                    AND
+                    image_tag IN (':$VERSION', ':dev');" | psql
+          done
