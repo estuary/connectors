@@ -14,8 +14,29 @@ import (
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#identifiers.
 var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
-// Bigquery only allows underscore, letters, numbers, and sometimes hyphens for identifiers. Convert everything else to underscore.
-var identifierSanitizerRegexp = regexp.MustCompile(`[^\-\._0-9a-zA-Z]`)
+// Bigquery allows only alphanumeric characters and underscores for column names. We will convert
+// everything else to underscore. Column names are also not allowed to start with a number. Table
+// names are generally much more permissive but for historical reasons, we will sanitize table names
+// in the same way as column names. A notable incongruity here (also for historical reasons) is that
+// hyphens are _not_ sanitized. Hyphens are allowed in table names but not column names. There are
+// existing materializations that have table names with hyphens, and underscoring hyphens in table
+// names would break these.
+
+// It would be possible to modify the materialize-sql framework to use a separate identifier for
+// column names vs. table names to work with this peculiarity of Bigquery perhaps. An even better
+// long-term solution may be to use resource-specific constraints for BigQuery and require column
+// names to have compliant projections and do away with this identifier transforming entirely. But
+// until we have UI capaibilities that would support easily providing a large number of projections,
+// I am leaving things as-is and not adding the complexity of a separate table vs. column identifier
+// that would only be applicable to Bigquery. We should revisit this once projection editing is
+// better supported.
+
+// As-is, the connector will error on ApplyUpsert under the following conditions:
+//   - Field name has a hyphen
+//   - Field name starts with a number
+//   - Field name collisions due to underscore conversion:
+//     Ex: "field!" vs. "field?" both sanitizing to "field_".
+var identifierSanitizerRegexp = regexp.MustCompile(`[^\-_0-9a-zA-Z]`)
 
 func identifierSanitizer(delegate func(string) string) func(string) string {
 	return func(text string) string {
