@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS projectID.dataset.target_table (
 		`defAULT` STRING,
 		number BIGNUMERIC,
 		person_place_ STRING,
-		`source.name` STRING,
+		source_name STRING,
 		`with-dash` STRING,
 		flow_document STRING
 )
@@ -31,8 +31,8 @@ SELECT 0, l.flow_document
 --- End projectID.dataset.target_table loadQuery ---
 
 --- Begin projectID.dataset.target_table storeInsert ---
-INSERT INTO projectID.dataset.target_table (key1, key2, boolean, integer, string, `defAULT`, number, person_place_, `source.name`, `with-dash`, flow_document)
-SELECT key1, key2, boolean, integer, string, `defAULT`, number, person_place_, `source.name`, `with-dash`, flow_document FROM flow_temp_table_0;
+INSERT INTO projectID.dataset.target_table (key1, key2, boolean, integer, string, `defAULT`, number, person_place_, source_name, `with-dash`, flow_document)
+SELECT key1, key2, boolean, integer, string, `defAULT`, number, person_place_, source_name, `with-dash`, flow_document FROM flow_temp_table_0;
 --- End projectID.dataset.target_table storeInsert ---
 
 --- Begin projectID.dataset.target_table storeUpdate ---
@@ -42,10 +42,10 @@ ON l.key1 = r.key1 AND l.key2 = r.key2 AND l.boolean = r.boolean AND l.integer =
 WHEN MATCHED AND r.flow_document IS NULL THEN
 	DELETE
 WHEN MATCHED THEN
-	UPDATE SET l.`defAULT` = r.`defAULT`, l.number = r.number, l.person_place_ = r.person_place_, l.`source.name` = r.`source.name`, l.`with-dash` = r.`with-dash`, l.flow_document = r.flow_document
+	UPDATE SET l.`defAULT` = r.`defAULT`, l.number = r.number, l.person_place_ = r.person_place_, l.source_name = r.source_name, l.`with-dash` = r.`with-dash`, l.flow_document = r.flow_document
 WHEN NOT MATCHED THEN
-	INSERT (key1, key2, boolean, integer, string, `defAULT`, number, person_place_, `source.name`, `with-dash`, flow_document)
-	VALUES (r.key1, r.key2, r.boolean, r.integer, r.string, r.`defAULT`, r.number, r.person_place_, r.`source.name`, r.`with-dash`, r.flow_document);
+	INSERT (key1, key2, boolean, integer, string, `defAULT`, number, person_place_, source_name, `with-dash`, flow_document)
+	VALUES (r.key1, r.key2, r.boolean, r.integer, r.string, r.`defAULT`, r.number, r.person_place_, r.source_name, r.`with-dash`, r.flow_document);
 --- End projectID.dataset.target_table storeUpdate ---
 
 --- Begin target_table_no_values_materialized storeUpdate ---
