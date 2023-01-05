@@ -103,31 +103,28 @@ func TestS3ParquetDriverSpec(t *testing.T) {
 }
 
 func TestTransactor(t *testing.T) {
-	var ctx = context.Background()
 	var mockClock = clock.NewMock()
 	var mockNextSeqNumList = []int{1, 2, 3}
 	var transactor = &transactor{
 		clock:                mockClock,
 		fileProcessor:        newMockFileProcessor(mockNextSeqNumList),
 		driverCheckpointJSON: nil,
-		flowCheckpoint:       nil,
+		runtimeCheckpoint:    nil,
 		uploadInterval:       time.Second,
 		lastUploadTime:       mockClock.Now(),
 	}
 
-	require.Panics(t, func() { transactor.Load(nil, nil, nil, nil) })
-
 	var testFlowCheckpoint = []byte("test_checkPoint")
-	transactor.Prepare(ctx, pm.TransactionRequest_Prepare{FlowCheckpoint: testFlowCheckpoint})
-	require.Equal(t, testFlowCheckpoint, transactor.flowCheckpoint)
+	transactor.runtimeCheckpoint = testFlowCheckpoint
+	require.Equal(t, testFlowCheckpoint, transactor.runtimeCheckpoint)
 
 	// driverCheckpoint is not set if no upload-to-cloud action is triggered.
-	require.NoError(t, transactor.Commit(ctx))
+	require.NoError(t, transactor.maybeUpload())
 	require.Nil(t, transactor.driverCheckpointJSON)
 
 	// driverCheckpoint is set after an upload-to-cloud action.
 	mockClock.Add(time.Second * 2)
-	require.NoError(t, transactor.Commit(ctx))
+	require.NoError(t, transactor.maybeUpload())
 	var expected, _ = marshalDriverCheckpointJSON(testFlowCheckpoint, mockNextSeqNumList)
 	require.Equal(t, 0, bytes.Compare(transactor.driverCheckpointJSON, expected))
 }

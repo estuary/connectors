@@ -42,7 +42,6 @@ type transactor struct {
 	config   *config
 	client   *rockset.RockClient
 	bindings []*binding
-	errGroup *errgroup.Group
 }
 
 // awaitAllRocksetCollectionsReady will block until all the Rockset collections named in the bindings
@@ -76,26 +75,19 @@ func (t *transactor) awaitAllRocksetCollectionsReady(ctx context.Context) error 
 }
 
 // pm.Transactor
-func (t *transactor) Load(it *pm.LoadIterator, priorCommittedCh <-chan struct{}, priorAcknowledgedCh <-chan struct{}, loaded func(binding int, doc json.RawMessage) error) error {
-	panic("Rockset is not transactional - Load should never be called")
-}
-
-// pm.Transactor
-func (t *transactor) Prepare(ctx context.Context, msg pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	// There's nothing in particular to be done here, but what we're _not_ doing is notable.  We return an empty driver
-	// checkpoint here, which may clear out a previous driver checkpoint from the materialize-s3-parquet connector, if
-	// the user had used that to backfill data.
-	return pf.DriverCheckpoint{}, nil
+func (t *transactor) Load(it *pm.LoadIterator, loaded func(binding int, doc json.RawMessage) error) error {
+	for it.Next() {
+		panic("Rockset is not transactional - Load should never be called")
+	}
+	return nil
 }
 
 // max number of documents to send with each request
 const storeBatchSize = 256
 
 // pm.Transactor
-func (t *transactor) Store(it *pm.StoreIterator) error {
+func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	var errGroup, ctx = errgroup.WithContext(it.Context())
-	// Store the error group so we can await it during commit
-	t.errGroup = errGroup
 
 	for it.Next() {
 		var b *binding = t.bindings[it.Binding]
@@ -123,14 +115,10 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 				err = errGroup.Wait()
 			}
 
-			return err
+			return nil, err
 		}
 	}
-	return nil
-}
 
-// pm.Transactor
-func (t *transactor) Commit(ctx context.Context) error {
 	for _, binding := range t.bindings {
 		if binding.addDocsCh != nil {
 			close(binding.addDocsCh)
@@ -141,17 +129,19 @@ func (t *transactor) Commit(ctx context.Context) error {
 			}).Debug("Closed AddDocuments channel")
 		}
 	}
-	if err := t.errGroup.Wait(); err != nil {
-		return fmt.Errorf("commit: %w", err)
+	if err := errGroup.Wait(); err != nil {
+		return nil, err
 	}
-	logrus.Debug("Commit successful")
-	return nil
-}
 
-// pm.Transactor
-func (t *transactor) Acknowledge(ctx context.Context) error {
-	// ack is a no-op since we ensure writes are durable in Commit
-	return nil
+	return func(_ context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+		// There's nothing in particular to be done here, but what we're _not_ doing is notable.  We return an empty driver
+		// checkpoint here, which may clear out a previous driver checkpoint from the materialize-s3-parquet connector, if
+		// the user had used that to backfill data.
+		return &pf.DriverCheckpoint{
+			DriverCheckpointJson: []byte("{}"),
+			Rfc7396MergePatch:    false,
+		}, nil
+	}, nil
 }
 
 // pm.Transactor

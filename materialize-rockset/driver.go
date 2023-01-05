@@ -368,73 +368,61 @@ func (d *rocksetDriver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (
 
 // pm.DriverServer interface.
 func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error {
-	var open, err = stream.Recv()
-	if err != nil {
-		return fmt.Errorf("read Open: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected Open, got %#v", open)
-	}
-
-	cfg, err := ResolveEndpointConfig(open.Open.Materialization.EndpointSpecJson)
-	if err != nil {
-		return err
-	}
-
-	client, err := cfg.client()
-	if err != nil {
-		return err
-	}
-
-	// It's possible that there was a previous materialization with the same name as this one, and that it may have left
-	// a driver checkpoint. This is expected in the case that a user wishes to use a cloud storage integration in
-	// Rockset for bulk loading data for a large backfill as described here: https://go.estuary.dev/rock-bulk
-	// If such a checkpoint is left over, then we'll return it here. The driver checkpoint will then be cleared out
-	// on the next successful commit of a transaction.
-	var flowCheckpoint []byte
-	var s3DriverCheckpoint checkpoint.DriverCheckpoint
-	if len(open.Open.DriverCheckpointJson) > 0 {
-		if err = json.Unmarshal(open.Open.DriverCheckpointJson, &s3DriverCheckpoint); err != nil {
-			return fmt.Errorf("unmarshaling S3 driver checkpoint: %w", err)
+	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
+		cfg, err := ResolveEndpointConfig(open.Materialization.EndpointSpecJson)
+		if err != nil {
+			return nil, nil, err
 		}
-		if s3DriverCheckpoint.B64EncodedFlowCheckpoint != "" {
-			log.WithField("s3DriverCheckpoint", open.Open.DriverCheckpointJson).Info("Using driver checkpoint from a prior cloud storage materialization connector")
-			if flowCheckpoint, err = base64.StdEncoding.DecodeString(s3DriverCheckpoint.B64EncodedFlowCheckpoint); err != nil {
-				return fmt.Errorf("decoding base64 checkpoint: %w", err)
+
+		client, err := cfg.client()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// It's possible that there was a previous materialization with the same name as this one, and that it may have left
+		// a driver checkpoint. This is expected in the case that a user wishes to use a cloud storage integration in
+		// Rockset for bulk loading data for a large backfill as described here: https://go.estuary.dev/rock-bulk
+		// If such a checkpoint is left over, then we'll return it here. The driver checkpoint will then be cleared out
+		// on the next successful commit of a transaction.
+		var runtimeCheckpoint []byte
+		var s3DriverCheckpoint checkpoint.DriverCheckpoint
+		if len(open.DriverCheckpointJson) > 0 {
+			if err = json.Unmarshal(open.DriverCheckpointJson, &s3DriverCheckpoint); err != nil {
+				return nil, nil, fmt.Errorf("unmarshaling S3 driver checkpoint: %w", err)
+			}
+			if s3DriverCheckpoint.B64EncodedFlowCheckpoint != "" {
+				log.WithField("s3DriverCheckpoint", open.DriverCheckpointJson).Info("Using driver checkpoint from a prior cloud storage materialization connector")
+				if runtimeCheckpoint, err = base64.StdEncoding.DecodeString(s3DriverCheckpoint.B64EncodedFlowCheckpoint); err != nil {
+					return nil, nil, fmt.Errorf("decoding base64 checkpoint: %w", err)
+				}
 			}
 		}
-	}
 
-	var bindings = make([]*binding, 0, len(open.Open.Materialization.Bindings))
-	for i, spec := range open.Open.Materialization.Bindings {
-		if res, err := ResolveResourceConfig(spec.ResourceSpecJson); err != nil {
-			return fmt.Errorf("building resource for binding %v: %w", i, err)
-		} else {
-			bindings = append(bindings, NewBinding(spec, &res))
+		var bindings = make([]*binding, 0, len(open.Materialization.Bindings))
+		for i, spec := range open.Materialization.Bindings {
+			if res, err := ResolveResourceConfig(spec.ResourceSpecJson); err != nil {
+				return nil, nil, fmt.Errorf("building resource for binding %v: %w", i, err)
+			} else {
+				bindings = append(bindings, NewBinding(spec, &res))
+			}
 		}
-	}
 
-	transactor := transactor{
-		config:   &cfg,
-		client:   client,
-		bindings: bindings,
-	}
-	// Ensure that all the collections are ready to accept writes before returning the opened
-	// response. It's important that we await _all_ bindings before continuing, since the flow
-	// checkpoint that's embedded in the driver checkpoint (when there's an s3 integration) will be
-	// cleared on the first successful transaction. Even collections without any integrations may
-	// still take a while to become ready after they've been created, so this also ensures that
-	// those are ready before we proceed (the error that's returned when attempting to write to a
-	// non-ready collection is not considered retryable by the client library).
-	transactor.awaitAllRocksetCollectionsReady(stream.Context())
+		var transactor = &transactor{
+			config:   &cfg,
+			client:   client,
+			bindings: bindings,
+		}
+		// Ensure that all the collections are ready to accept writes before returning the opened
+		// response. It's important that we await _all_ bindings before continuing, since the flow
+		// checkpoint that's embedded in the driver checkpoint (when there's an s3 integration) will be
+		// cleared on the first successful transaction. Even collections without any integrations may
+		// still take a while to become ready after they've been created, so this also ensures that
+		// those are ready before we proceed (the error that's returned when attempting to write to a
+		// non-ready collection is not considered retryable by the client library).
+		transactor.awaitAllRocksetCollectionsReady(stream.Context())
 
-	if err = stream.Send(&pm.TransactionResponse{
-		Opened: &pm.TransactionResponse_Opened{FlowCheckpoint: flowCheckpoint},
-	}); err != nil {
-		return fmt.Errorf("sending Opened: %w", err)
-	}
-
-	log := log.WithField("materialization", "rockset")
-	return pm.RunTransactions(stream, &transactor, log)
+		return transactor, &pm.TransactionResponse_Opened{RuntimeCheckpoint: runtimeCheckpoint}, nil
+	})
 }
 
 func ResolveEndpointConfig(specJson json.RawMessage) (config, error) {

@@ -110,7 +110,7 @@ func configForCols(cols []*sql.Column) (*bigquery.ExternalDataConfig, error) {
 	return config, nil
 }
 
-func (t *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var err error
 	var ctx = it.Context()
 
@@ -214,14 +214,7 @@ func (t *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 	return nil
 }
 
-func (t *transactor) Prepare(_ context.Context, prepare pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	// This is triggered to let you know that the loads have completed.
-	// It also tells us what checkpoint we are about to store.
-	t.fence.Checkpoint = prepare.FlowCheckpoint
-	return pf.DriverCheckpoint{}, nil
-}
-
-func (t *transactor) Store(it *pm.StoreIterator) error {
+func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	var ctx = it.Context()
 
 	// Iterate through all the new values to store.
@@ -237,24 +230,27 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 				b.storeExtDataConfig,
 			)
 			if err != nil {
-				return fmt.Errorf("new external data connection file: %v", err)
+				return nil, fmt.Errorf("new external data connection file: %v", err)
 			}
 		}
 
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
-			return fmt.Errorf("converting store parameters: %w", err)
+			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
 
 		if err = b.mergeFile.WriteRow(converted); err != nil {
-			return fmt.Errorf("encoding Store to scratch file: %w", err)
+			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
 	}
 
-	return nil
+	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+		t.fence.Checkpoint = runtimeCheckpoint
+		return nil, pf.RunAsyncOperation(func() error { return t.commit(ctx) })
+	}, nil
 }
 
-func (t *transactor) Commit(ctx context.Context) error {
+func (t *transactor) commit(ctx context.Context) error {
 	// Build the slice of transactions required for a commit.
 	var subqueries []string
 

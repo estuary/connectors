@@ -39,7 +39,7 @@ type transactorBinding struct {
 	UserSheetName string
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
 		var needle = string(it.Key.Pack())
 		var rows = d.bindings[it.Binding].rows
@@ -58,7 +58,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 	return it.Err()
 }
 
-func (d *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
+func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	// The commit of this transaction within the recovery log will permanently
 	// increment the current `round`. On recovery, the next connector will
 	// examine `round` to determine whether this in-progress transaction committed
@@ -66,13 +66,6 @@ func (d *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare)
 	// one depending on the restored `round`.
 	d.round++
 
-	return pf.DriverCheckpoint{
-		DriverCheckpointJson: json.RawMessage(fmt.Sprintf("{\"round\":%v}", d.round)),
-		Rfc7396MergePatch:    false,
-	}, nil
-}
-
-func (d *transactor) Store(it *pm.StoreIterator) error {
 	type storedRow struct {
 		RowState
 		cells []*sheets.CellData
@@ -216,12 +209,21 @@ func (d *transactor) Store(it *pm.StoreIterator) error {
 		batchRequests = append(batchRequests, updateCells...)
 	}
 
-	return batchRequestWithRetry(
+	if err := batchRequestWithRetry(
 		it.Context(),
 		d.client,
 		d.spreadsheetId,
 		batchRequests,
-	)
+	); err != nil {
+		return nil, err
+	}
+
+	return func(_ context.Context, _ []byte, _ <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+		return &pf.DriverCheckpoint{
+			DriverCheckpointJson: json.RawMessage(fmt.Sprintf("{\"round\":%v}", d.round)),
+			Rfc7396MergePatch:    false,
+		}, nil
+	}, nil
 }
 
 func valueToCell(e tuple.TupleElement) *sheets.CellData {
@@ -263,15 +265,6 @@ func valueToCell(e tuple.TupleElement) *sheets.CellData {
 	default:
 		panic(fmt.Sprintf("unhandled type %#v", e))
 	}
-}
-
-// Commit is a no-op because the recovery log is authoritative.
-func (d *transactor) Commit(ctx context.Context) error {
-	return nil
-}
-
-func (d *transactor) Acknowledge(context.Context) error {
-	return nil
 }
 
 // Destroy is a no-op.

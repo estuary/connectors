@@ -12,9 +12,8 @@ require (
 	github.com/aws/aws-sdk-go v1.44.26
 	github.com/benbjohnson/clock v1.3.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
-	github.com/brianvoe/gofakeit/v6 v6.16.0
 	github.com/elastic/go-elasticsearch/v7 v7.17.1
-	github.com/estuary/flow v0.1.6-0.20221108191318-280052b31c5f
+	github.com/estuary/flow v0.1.7-0.20230105000454-6475d0da2eab
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/gogo/protobuf v1.3.2
@@ -44,7 +43,6 @@ require (
 	google.golang.org/genproto v0.0.0-20220822174746-9e6da59bd2fc
 	google.golang.org/grpc v1.48.0
 	google.golang.org/protobuf v1.28.1
-	gopkg.in/yaml.v2 v2.4.0
 	vitess.io/vitess v0.13.1
 )
 

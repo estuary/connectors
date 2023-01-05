@@ -11,7 +11,6 @@ import (
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 )
 
@@ -297,53 +296,38 @@ func (d driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 }
 
 func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	req, err := stream.Recv()
-	if err != nil {
-		return fmt.Errorf("stream recv: %w", err)
-	} else if req.Open == nil {
-		return fmt.Errorf("expected Open, got %#v", req)
-	}
-
-	cfg, err := resolveEndpointConfig(req.Open.Materialization.EndpointSpecJson)
-	if err != nil {
-		return err
-	}
-
-	client, err := cfg.client(stream.Context())
-	if err != nil {
-		return err
-	}
-
-	var topicBindings []*topicBinding
-	for _, b := range req.Open.Materialization.Bindings {
-		res, err := resolveResourceConfig(b.ResourceSpecJson)
+	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
+		var cfg, err = resolveEndpointConfig(open.Materialization.EndpointSpecJson)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
-		t := client.Topic(res.TopicName)
 
-		// Allows for the reading of messages in-order with a provided ordering key. See
-		// https://cloud.google.com/pubsub/docs/ordering
-		t.EnableMessageOrdering = true
-		topicBindings = append(topicBindings, &topicBinding{
-			identifier: res.Identifier,
-			topic:      t,
-		})
-	}
+		client, err := cfg.client(stream.Context())
+		if err != nil {
+			return nil, nil, err
+		}
 
-	t := &transactor{
-		bindings: topicBindings,
-	}
+		var topicBindings []*topicBinding
+		for _, b := range open.Materialization.Bindings {
+			res, err := resolveResourceConfig(b.ResourceSpecJson)
+			if err != nil {
+				return nil, nil, err
+			}
+			t := client.Topic(res.TopicName)
 
-	if err = stream.Send(&pm.TransactionResponse{
-		Opened: &pm.TransactionResponse_Opened{FlowCheckpoint: nil},
-	}); err != nil {
-		logrus.Info("driver transactions - send error: ", err)
-		return fmt.Errorf("sending Opened: %w", err)
-	}
+			// Allows for the reading of messages in-order with a provided ordering key. See
+			// https://cloud.google.com/pubsub/docs/ordering
+			t.EnableMessageOrdering = true
+			topicBindings = append(topicBindings, &topicBinding{
+				identifier: res.Identifier,
+				topic:      t,
+			})
+		}
 
-	log := logrus.WithField("materialization", "google pubsub")
-	return pm.RunTransactions(stream, t, log)
+		return &transactor{
+			bindings: topicBindings,
+		}, &pm.TransactionResponse_Opened{}, nil
+	})
 }
 
 func resolveEndpointConfig(specJson json.RawMessage) (config, error) {

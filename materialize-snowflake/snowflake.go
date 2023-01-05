@@ -297,7 +297,7 @@ func (t *transactor) addBinding(targetName string, spec *pf.MaterializationSpec_
 	return nil
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
 	for it.Next() {
@@ -357,21 +357,16 @@ func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 	return nil
 }
 
-func (d *transactor) Prepare(_ context.Context, prepare pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	d.store.fence.SetCheckpoint(prepare.FlowCheckpoint)
-	return pf.DriverCheckpoint{}, nil
-}
-
-func (d *transactor) Store(it *pm.StoreIterator) error {
+func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
 		if converted, err := b.store.params.Convert(
 			append(append(it.Key, it.Values...), it.RawJSON),
 		); err != nil {
-			return fmt.Errorf("converting Store: %w", err)
+			return nil, fmt.Errorf("converting Store: %w", err)
 		} else if err = b.store.stage.Encode(converted); err != nil {
-			return fmt.Errorf("encoding Store to scratch file: %w", err)
+			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
 
 		if it.Exists {
@@ -379,27 +374,30 @@ func (d *transactor) Store(it *pm.StoreIterator) error {
 		}
 		b.store.hasDocs = true
 	}
-	return nil
-}
 
-func (d *transactor) Commit(ctx context.Context) error {
 	for _, b := range d.bindings {
 		if b.store.hasDocs {
-			// PUT staged keys to Snowflake in preparation for querying.
-			if err := b.store.stage.put(ctx, d.store.conn, d.cfg); err != nil {
-				return fmt.Errorf("load.stage(): %w", err)
+			// PUT staged rows to Snowflake in preparation for commit.
+			if err := b.store.stage.put(it.Context(), d.store.conn, d.cfg); err != nil {
+				return nil, fmt.Errorf("store.stage(): %w", err)
 			}
 		}
 	}
 
-	// Start a transaction for our Store phase.
+	return func(ctx context.Context, runtimeCheckpoint []byte, _ <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+		d.store.fence.SetCheckpoint(runtimeCheckpoint)
+		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx) })
+	}, nil
+}
+
+func (d *transactor) commit(ctx context.Context) error {
 	var txn, err = d.store.conn.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("conn.BeginTx: %w", err)
+		return fmt.Errorf("store.conn.BeginTx: %w", err)
 	}
 	defer txn.Rollback()
 
-	// Apply the client's prepared checkpoint to our fence.
+	// Apply the runtime's prepared checkpoint to our fence.
 	if err = d.store.fence.Update(ctx,
 		func(ctx context.Context, sql string, arguments ...interface{}) (rowsAffected int64, _ error) {
 			if result, err := txn.ExecContext(ctx, sql, arguments...); err != nil {
@@ -439,11 +437,6 @@ func (d *transactor) Commit(ctx context.Context) error {
 		return fmt.Errorf("txn.Commit: %w", err)
 	}
 
-	return nil
-}
-
-// Acknowledge is a no-op.
-func (d *transactor) Acknowledge(context.Context) error {
 	return nil
 }
 
