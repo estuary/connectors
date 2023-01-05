@@ -148,7 +148,7 @@ func (d *transactor) Store(it *pm.StoreIterator) error {
 			}
 
 			// Row is being updated or inserted.
-			// It's sheet row index is 1-indexed (due to its header).
+			// Its sheet row index is 1-indexed due to its header.
 			var rowInd = int64(len(next) + 1)
 			var s = stores[si]
 			si++
@@ -159,7 +159,8 @@ func (d *transactor) Store(it *pm.StoreIterator) error {
 				Round:     s.NextRound,
 			})
 
-			// Does a `prev` row exist? If so include its prior version in the prior state.
+			// Does a `prev` row corresponding with this store document exist?
+			// If so include this prior version in the state.
 			if cmp == 0 {
 				s.PrevDoc = prev[pi].Doc
 				s.PrevRound = prev[pi].Round

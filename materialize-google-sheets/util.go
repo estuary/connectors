@@ -36,7 +36,7 @@ func buildTransactorBindings(
 			case row.NextRound != 0 && row.NextRound <= row.PrevRound:
 				err = fmt.Errorf("NextRound must be greater than PrevRound")
 			case row.PrevRound > loadRound:
-				err = fmt.Errorf("PrevRound must have been committed (less or equal to loadRound)")
+				err = fmt.Errorf("PrevRound must have been committed (less or equal to loadRound). This most commonly happens if there are multiple materializations writing to the same sheet. To ensure consistency, each sheet must be written to by a single materialization only, this includes materializations that have been disabled.")
 			case row.NextRound != 0 && row.NextRound <= loadRound:
 				// NextRound has already committed and is used.
 				rows = append(rows, transactorRow{
@@ -164,6 +164,9 @@ type RowState struct {
 const sentinelValue = `{}`
 
 // loadSheetStates loads the SheetStates of all named `sheetNames`.
+// each row in a sheet has a zero-indexed cell where RowState is written to,
+// this zero-indexed cell is not visible to users when they look at the sheet
+// but we have it available when using the API
 func loadSheetStates(
 	bindings []*pf.MaterializationSpec_Binding,
 	client *sheets.Service,
