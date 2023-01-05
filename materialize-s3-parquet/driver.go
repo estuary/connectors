@@ -14,7 +14,6 @@ import (
 	"github.com/estuary/connectors/materialize-s3-parquet/checkpoint"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	log "github.com/sirupsen/logrus"
 	"github.com/xitongsys/parquet-go/parquet"
 )
 
@@ -244,68 +243,50 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 }
 
 func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	open, err := stream.Recv()
-	if err != nil {
-		return fmt.Errorf("read Open: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected Open, got %#v", open)
-	}
+	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
+		var cfg config
+		if err := pf.UnmarshalStrict(open.Materialization.EndpointSpecJson, &cfg); err != nil {
+			return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+		}
 
-	var cfg config
-	if err = pf.UnmarshalStrict(open.Open.Materialization.EndpointSpecJson, &cfg); err != nil {
-		return fmt.Errorf("parsing endpoint config: %w", err)
-	}
+		runtimeCheckpoint, nextSeqNumList, err := unmarshalDriverCheckpointJSON(open.DriverCheckpointJson)
+		if err != nil {
+			// TODO(jixiang): How to resume the flow if there is a corrupt checkpoint? Always reset in code, or after a manual evaluation?
+			return nil, nil, fmt.Errorf("parsing CheckpointJson: %w", err)
+		}
 
-	flowCheckpoint, nextSeqNumList, err := unmarshalDriverCheckpointJSON(open.Open.DriverCheckpointJson)
-	if err != nil {
-		// TODO(jixiang): How to resume the flow if there is a corrupt checkpoint? Always reset in code, or after a manual evaluation?
-		return fmt.Errorf("parsing CheckpointJson: %w", err)
-	}
+		s3Uploader, err := NewS3Uploader(cfg)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating s3 uploader: %w", err)
+		}
 
-	var ctx = stream.Context()
+		var fileProcessor FileProcessor
+		fileProcessor, err = NewParquetFileProcessor(ctx, s3Uploader, nextSeqNumList, &open)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating parquet file processor: %w", err)
+		}
 
-	s3Uploader, err := NewS3Uploader(cfg)
-	if err != nil {
-		return fmt.Errorf("creating s3 uploader: %w", err)
-	}
+		var clock = clock.New()
 
-	var fileProcessor FileProcessor
-	fileProcessor, err = NewParquetFileProcessor(ctx, s3Uploader, nextSeqNumList, open.Open)
-	if err != nil {
-		return fmt.Errorf("creating parquet file processor: %w", err)
-	}
+		var fileProcessorProxy = NewFileProcessorProxy(
+			ctx,
+			fileProcessor,
+			// The time interval for the proxy to trigger an upload-to-cloud action is set to be twice as long as the interval of the driver.
+			// To make sure - as long as the files are uploaded on a reasonable schedule from the driver, no upload is triggered by the proxy.
+			time.Duration(cfg.UploadIntervalInSeconds*2)*time.Second,
+			clock,
+		)
 
-	var clock = clock.New()
+		var transactor = &transactor{
+			clock:             clock,
+			fileProcessor:     fileProcessorProxy,
+			runtimeCheckpoint: runtimeCheckpoint,
+			uploadInterval:    time.Duration(cfg.UploadIntervalInSeconds) * time.Second,
+			lastUploadTime:    clock.Now(),
+		}
 
-	var fileProcessorProxy = NewFileProcessorProxy(
-		ctx,
-		fileProcessor,
-		// The time interval for the proxy to trigger an upload-to-cloud action is set to be twice as long as the interval of the driver.
-		// To make sure - as long as the files are uploaded on a reasonable schedule from the driver, no upload is triggered by the proxy.
-		time.Duration(cfg.UploadIntervalInSeconds*2)*time.Second,
-		clock,
-	)
-
-	var transactor = &transactor{
-		clock:                clock,
-		fileProcessor:        fileProcessorProxy,
-		driverCheckpointJSON: open.Open.DriverCheckpointJson,
-		flowCheckpoint:       flowCheckpoint,
-		uploadInterval:       time.Duration(cfg.UploadIntervalInSeconds) * time.Second,
-		lastUploadTime:       clock.Now(),
-	}
-
-	if err = stream.Send(&pm.TransactionResponse{
-		Opened: &pm.TransactionResponse_Opened{FlowCheckpoint: flowCheckpoint},
-	}); err != nil {
-		return fmt.Errorf("sending Opened: %w", err)
-	}
-
-	var log = log.WithField(
-		"materialization",
-		fmt.Sprintf("s3parquet-%d-%d", open.Open.KeyBegin, open.Open.KeyEnd),
-	)
-	return pm.RunTransactions(stream, transactor, log)
+		return transactor, &pm.TransactionResponse_Opened{RuntimeCheckpoint: runtimeCheckpoint}, nil
+	})
 }
 
 // transactor implements the Transactor interface.
@@ -313,37 +294,48 @@ type transactor struct {
 	clock                clock.Clock
 	fileProcessor        FileProcessor
 	driverCheckpointJSON json.RawMessage
-	flowCheckpoint       []byte
+	runtimeCheckpoint    []byte
 	uploadInterval       time.Duration
 	lastUploadTime       time.Time
 }
 
-func (t *transactor) Load(_ *pm.LoadIterator, _, _ <-chan struct{}, _ func(int, json.RawMessage) error) error {
-	panic("Load should never be called for materialize-s3-parquet.Driver")
-}
-
-func (t *transactor) Prepare(_ context.Context, req pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	t.flowCheckpoint = req.FlowCheckpoint
-	return pf.DriverCheckpoint{DriverCheckpointJson: t.driverCheckpointJSON}, nil
-}
-
-func (t *transactor) Store(it *pm.StoreIterator) error {
+func (t *transactor) Load(it *pm.LoadIterator, _ func(int, json.RawMessage) error) error {
 	for it.Next() {
-		if err := t.fileProcessor.Store(it.Binding, it.Key, it.Values); err != nil {
-			return err
-		}
+		panic("Load should never be called for materialize-s3-parquet.Driver")
 	}
 	return nil
 }
 
-func (t *transactor) Commit(context.Context) error {
+func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+	for it.Next() {
+		if err := t.fileProcessor.Store(it.Binding, it.Key, it.Values); err != nil {
+			return nil, err
+		}
+	}
+
+	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+		// Retain runtime checkpoint for it to be potentially encoded in a
+		// driverCheckpointJSON produced as part of a future call to maybeUpload().
+		t.runtimeCheckpoint = runtimeCheckpoint
+
+		// We don't await `runtimeAckCh` because it's not required for correctness.
+		// If this file is uploaded but the recovery log commit fails, we'll resume
+		// with a previous driver checkpoint which will re-produce and upload this
+		// same file.
+		var err = t.maybeUpload()
+		return &pf.DriverCheckpoint{DriverCheckpointJson: t.driverCheckpointJSON},
+			pf.FinishedOperation(err)
+	}, nil
+}
+
+func (t *transactor) maybeUpload() error {
 	var now = t.clock.Now()
 	if now.Sub(t.lastUploadTime) >= t.uploadInterval {
 		// Uploads the local file to cloud.
 		if nextSeqNumList, err := t.fileProcessor.Commit(); err != nil {
 			return fmt.Errorf("uploading to cloud: %w,", err)
 		} else if t.driverCheckpointJSON, err = marshalDriverCheckpointJSON(
-			t.flowCheckpoint, nextSeqNumList,
+			t.runtimeCheckpoint, nextSeqNumList,
 		); err != nil {
 			return fmt.Errorf("encoding driverCheckpointJson: %w", err)
 		}

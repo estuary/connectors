@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -19,80 +17,70 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
 // Transactions implements the DriverServer interface.
 func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	var open, err = stream.Recv()
-	if err != nil {
-		return fmt.Errorf("read Open: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected Open, got %#v", open)
-	}
+	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
 
-	var cfg config
-	if err := pf.UnmarshalStrict(open.Open.Materialization.EndpointSpecJson, &cfg); err != nil {
-		return fmt.Errorf("parsing endpoint config: %w", err)
-	}
-
-	var checkpoint FireboltCheckpoint
-	if open.Open.DriverCheckpointJson != nil {
-		if err := json.Unmarshal(open.Open.DriverCheckpointJson, &checkpoint); err != nil {
-			return fmt.Errorf("parsing driver config: %w", err)
+		var cfg config
+		if err := pf.UnmarshalStrict(open.Materialization.EndpointSpecJson, &cfg); err != nil {
+			return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 		}
-	}
 
-	fb, err := firebolt.New(firebolt.Config{
-		EngineURL: cfg.EngineURL,
-		Database:  cfg.Database,
-		Username:  cfg.Username,
-		Password:  cfg.Password,
+		var checkpoint FireboltCheckpoint
+		if open.DriverCheckpointJson != nil {
+			if err := json.Unmarshal(open.DriverCheckpointJson, &checkpoint); err != nil {
+				return nil, nil, fmt.Errorf("parsing driver config: %w", err)
+			}
+		}
+
+		var fb, err = firebolt.New(firebolt.Config{
+			EngineURL: cfg.EngineURL,
+			Database:  cfg.Database,
+			Username:  cfg.Username,
+			Password:  cfg.Password,
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating firebolt client: %w", err)
+		}
+
+		if err = applyCheckpoint(ctx, fb, checkpoint); err != nil {
+			return nil, nil, fmt.Errorf("applying recovered checkpoint: %w", err)
+		}
+
+		var bindings []*binding
+		for _, b := range open.Materialization.Bindings {
+			var res resource
+			if err := pf.UnmarshalStrict(b.ResourceSpecJson, &res); err != nil {
+				return nil, nil, fmt.Errorf("parsing resource config: %w", err)
+			}
+			bindings = append(bindings,
+				&binding{
+					table: res.Table,
+					spec:  b,
+				})
+		}
+
+		queries, err := schemalate.GetQueriesBundle(open.Materialization)
+		if err != nil {
+			return nil, nil, fmt.Errorf("building firebolt search schema: %w", err)
+		}
+
+		var transactor = &transactor{
+			fb:           fb,
+			queries:      queries,
+			bindings:     bindings,
+			awsKeyId:     cfg.AWSKeyId,
+			awsSecretKey: cfg.AWSSecretKey,
+			awsRegion:    cfg.AWSRegion,
+			bucket:       cfg.S3Bucket,
+			prefix:       fmt.Sprintf("%s/%s/", CleanPrefix(cfg.S3Prefix), open.Materialization.Materialization),
+		}
+
+		return transactor, &pm.TransactionResponse_Opened{}, nil
 	})
-	if err != nil {
-		return fmt.Errorf("creating firebolt client: %w", err)
-	}
-
-	var bindings []*binding
-	for _, b := range open.Open.Materialization.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(b.ResourceSpecJson, &res); err != nil {
-			return fmt.Errorf("parsing resource config: %w", err)
-		}
-		bindings = append(bindings,
-			&binding{
-				table: res.Table,
-				spec:  b,
-			})
-	}
-
-	queries, err := schemalate.GetQueriesBundle(open.Open.Materialization)
-	if err != nil {
-		return fmt.Errorf("building firebolt search schema: %w", err)
-	}
-
-	var transactor = &transactor{
-		fb:           fb,
-		queries:      queries,
-		checkpoint:   checkpoint,
-		bindings:     bindings,
-		awsKeyId:     cfg.AWSKeyId,
-		awsSecretKey: cfg.AWSSecretKey,
-		awsRegion:    cfg.AWSRegion,
-		bucket:       cfg.S3Bucket,
-		prefix:       fmt.Sprintf("%s/%s/", CleanPrefix(cfg.S3Prefix), open.Open.Materialization.Materialization.String()),
-	}
-
-	if err = stream.Send(&pm.TransactionResponse{
-		Opened: &pm.TransactionResponse_Opened{},
-	}); err != nil {
-		return fmt.Errorf("sending Opened: %w", err)
-	}
-
-	log.SetLevel(log.DebugLevel)
-	var log = log.WithField("materialization", "firebolt")
-	return pm.RunTransactions(stream, transactor, log)
 }
 
 type binding struct {
@@ -113,7 +101,6 @@ type FireboltCheckpoint struct {
 type transactor struct {
 	fb           *firebolt.Client
 	queries      *schemalate.QueriesBundle
-	checkpoint   FireboltCheckpoint
 	awsKeyId     string
 	awsSecretKey string
 	awsRegion    string
@@ -123,17 +110,20 @@ type transactor struct {
 }
 
 // firebolt is delta-update only, so loading of data from Firebolt is not necessary
-func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
-	panic("delta updates have no load phase")
+func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+	for it.Next() {
+		panic("delta updates have no loads")
+	}
+	return nil
 }
 
-func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
+func (t *transactor) buildCheckpoint() (FireboltCheckpoint, error) {
 	var queries []string
 	var files []TemporaryFileRecord
-	for i, _ := range t.bindings {
+	for i := range t.bindings {
 		var randomKey, err = uuid.NewRandom()
 		if err != nil {
-			return pf.DriverCheckpoint{}, fmt.Errorf("generating random key for file: %w", err)
+			return FireboltCheckpoint{}, fmt.Errorf("generating random key for file: %w", err)
 		}
 		var key = fmt.Sprintf("%s%s.json", t.prefix, randomKey)
 		files = append(files, TemporaryFileRecord{
@@ -145,18 +135,11 @@ func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare)
 		var values = fmt.Sprintf("'%s'", key)
 		queries = append(queries, strings.Replace(insertQuery, "?", values, -1))
 	}
-	checkpoint := FireboltCheckpoint{
+	return FireboltCheckpoint{
 		Queries: queries,
 		Files:   files,
-	}
+	}, nil
 
-	jsn, err := json.Marshal(checkpoint)
-	if err != nil {
-		return pf.DriverCheckpoint{}, fmt.Errorf("creating checkpoint json: %w", err)
-	}
-	t.checkpoint = checkpoint
-
-	return pf.DriverCheckpoint{DriverCheckpointJson: jsn}, nil
 }
 
 func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys tuple.Tuple, values tuple.Tuple) ([]byte, error) {
@@ -196,30 +179,34 @@ func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys 
 	return jsonDoc, nil
 }
 
-func (t *transactor) Store(it *pm.StoreIterator) error {
+func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	var awsConfig = aws.Config{
 		Credentials: credentials.NewStaticCredentials(t.awsKeyId, t.awsSecretKey, ""),
 		Region:      &t.awsRegion,
 	}
-	var sess = session.Must(session.NewSession(&awsConfig))
-	var uploader = s3manager.NewUploader(sess)
-
+	var session = session.Must(session.NewSession(&awsConfig))
+	var uploader = s3manager.NewUploader(session)
 	var pipes = make([]*io.PipeWriter, len(t.bindings))
-	g, ctx := errgroup.WithContext(it.Context())
+	var group, groupCtx = errgroup.WithContext(it.Context())
+
+	var checkpoint, err = t.buildCheckpoint()
+	if err != nil {
+		return nil, fmt.Errorf("building checkpoint: %w", err)
+	}
 
 	for it.Next() {
 		var doc, err = t.projectDocument(t.bindings[it.Binding].spec, it.Key, it.Values)
 		if err != nil {
-			return fmt.Errorf("projecting new store json: %w", err)
+			return nil, fmt.Errorf("projecting new store json: %w", err)
 		}
 
 		if pipes[it.Binding] == nil {
 			var reader, writer = io.Pipe()
 			pipes[it.Binding] = writer
 
-			cp := t.checkpoint.Files[it.Binding]
-			g.Go(func() error {
-				var _, err = uploader.UploadWithContext(ctx, &s3manager.UploadInput{
+			var cp = checkpoint.Files[it.Binding]
+			group.Go(func() error {
+				var _, err = uploader.UploadWithContext(groupCtx, &s3manager.UploadInput{
 					Bucket: aws.String(cp.Bucket),
 					Key:    aws.String(cp.Key),
 					Body:   reader,
@@ -239,21 +226,33 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 		}
 	}
 
-	if err := g.Wait(); err != nil {
-		return err
+	if err = group.Wait(); err != nil {
+		return nil, err
 	}
 
-	return nil
+	// Return a StartCommitFunc closure which returns our encoded `checkpoint`,
+	// and will apply it only after the runtime acknowledges its commit.
+	return func(ctx context.Context, _ []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+		var checkpointJSON, err = json.Marshal(checkpoint)
+		if err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+		}
+
+		var commitOp = pf.RunAsyncOperation(func() error {
+			select {
+			case <-runtimeAckCh:
+				return applyCheckpoint(ctx, t.fb, checkpoint)
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		})
+		return &pf.DriverCheckpoint{DriverCheckpointJson: checkpointJSON}, commitOp
+	}, nil
 }
 
-func (t *transactor) Commit(ctx context.Context) error {
-	return nil
-}
-
-// Acknowledge loads stored files from external table to main table
-func (t *transactor) Acknowledge(context.Context) error {
-
-	if len(t.checkpoint.Files) < 1 {
+// applyCheckpoint loads stored files from external table to main table
+func applyCheckpoint(ctx context.Context, fb *firebolt.Client, checkpoint FireboltCheckpoint) error {
+	if len(checkpoint.Files) < 1 {
 		return nil
 	}
 
@@ -263,32 +262,14 @@ func (t *transactor) Acknowledge(context.Context) error {
 	// with MaterializationSpec v1 be run by a transactor initialised with MaterializationSpec v2.
 	// As such, we keep a copy of the queries generated from the MaterializationSpec of the
 	// transaction to which this Acknowledge belongs in the checkpoint to avoid inconsistencies.
-	for _, query := range t.checkpoint.Queries {
-		_, err := t.fb.Query(query)
+	for _, query := range checkpoint.Queries {
+		_, err := fb.Query(query)
 		if err != nil {
 			return fmt.Errorf("moving files from external to main table: %w", err)
 		}
 	}
 
-	t.checkpoint.Files = []TemporaryFileRecord{}
-	t.checkpoint.Queries = []string{}
-
 	return nil
-}
-
-func randomDocumentKey() string {
-	const charset = "abcdefghijklmnopqrstuvwxyz" +
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	const length = 32
-
-	var seededRand *rand.Rand = rand.New(
-		rand.NewSource(time.Now().UnixNano()))
-
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(b)
 }
 
 func (t *transactor) Destroy() {}

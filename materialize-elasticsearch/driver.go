@@ -15,7 +15,6 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	log "github.com/sirupsen/logrus"
 )
 
 type config struct {
@@ -110,7 +109,7 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 
 		// Make sure the specified resource is valid to build
 		if schema, err := schemabuilder.RunSchemaBuilder(
-			binding.Collection.SchemaJson,
+			binding.Collection.GetReadSchemaJson(),
 			res.FieldOverides,
 		); err != nil {
 			return nil, fmt.Errorf("building elastic search schema: %w", err)
@@ -168,7 +167,7 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		}
 
 		if elasticSearchSchema, err := schemabuilder.RunSchemaBuilder(
-			binding.Collection.SchemaJson,
+			binding.Collection.GetReadSchemaJson(),
 			res.FieldOverides,
 		); err != nil {
 			return nil, fmt.Errorf("building elastic search schema: %w", err)
@@ -218,51 +217,37 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 
 // Transactions implements the DriverServer interface.
 func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	var open, err = stream.Recv()
-	if err != nil {
-		return fmt.Errorf("read Open: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected Open, got %#v", open)
-	}
-
-	var cfg config
-	if err := pf.UnmarshalStrict(open.Open.Materialization.EndpointSpecJson, &cfg); err != nil {
-		return fmt.Errorf("parsing endpoint config: %w", err)
-	}
-
-	var elasticSearch *ElasticSearch
-	elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
-	if err != nil {
-		return fmt.Errorf("creating elastic search client: %w", err)
-	}
-
-	var bindings []*binding
-	for _, b := range open.Open.Materialization.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(b.ResourceSpecJson, &res); err != nil {
-			return fmt.Errorf("parsing resource config: %w", err)
+	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
+		var cfg config
+		if err := pf.UnmarshalStrict(open.Materialization.EndpointSpecJson, &cfg); err != nil {
+			return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 		}
-		bindings = append(bindings,
-			&binding{
-				index:        res.Index,
-				deltaUpdates: res.DeltaUpdates,
-			})
-	}
 
-	var transactor = &transactor{
-		elasticSearch:    elasticSearch,
-		bindings:         bindings,
-		bulkIndexerItems: []*esutil.BulkIndexerItem{},
-	}
+		var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating elastic search client: %w", err)
+		}
 
-	if err = stream.Send(&pm.TransactionResponse{
-		Opened: &pm.TransactionResponse_Opened{},
-	}); err != nil {
-		return fmt.Errorf("sending Opened: %w", err)
-	}
+		var bindings []*binding
+		for _, b := range open.Materialization.Bindings {
+			var res resource
+			if err := pf.UnmarshalStrict(b.ResourceSpecJson, &res); err != nil {
+				return nil, nil, fmt.Errorf("parsing resource config: %w", err)
+			}
+			bindings = append(bindings,
+				&binding{
+					index:        res.Index,
+					deltaUpdates: res.DeltaUpdates,
+				})
+		}
 
-	var log = log.WithField("materialization", "elasticsearch")
-	return pm.RunTransactions(stream, transactor, log)
+		var transactor = &transactor{
+			elasticSearch: elasticSearch,
+			bindings:      bindings,
+		}
+		return transactor, &pm.TransactionResponse_Opened{}, nil
+	})
+
 }
 
 type binding struct {
@@ -271,16 +256,17 @@ type binding struct {
 }
 
 type transactor struct {
-	elasticSearch    *ElasticSearch
-	bindings         []*binding
-	bulkIndexerItems []*esutil.BulkIndexerItem
+	elasticSearch *ElasticSearch
+	bindings      []*binding
 }
 
 const loadByIdBatchSize = 1000
 
-func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var loadingIdsByBinding = map[int][]string{}
 
+	// TODO(johnny): We should be executing these in chunks along the way,
+	// rather than queuing all until the end.
 	for it.Next() {
 		loadingIdsByBinding[it.Binding] = append(loadingIdsByBinding[it.Binding], documentId(it.Key))
 	}
@@ -309,14 +295,11 @@ func (t *transactor) Load(it *pm.LoadIterator, _ <-chan struct{}, _ <-chan struc
 	return nil
 }
 
-func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	if len(t.bulkIndexerItems) != 0 {
-		panic("non-empty bulkIndexerItems") // Invariant: previous call is finished.
-	}
-	return pf.DriverCheckpoint{}, nil
-}
+func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+	var items []*esutil.BulkIndexerItem
 
-func (t *transactor) Store(it *pm.StoreIterator) error {
+	// TODO(johnny): store chunks of items along the way rather queuing
+	// them all to apply at the very end.
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 		var action, docId = "create", ""
@@ -330,16 +313,11 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 			DocumentID: docId,
 			Body:       bytes.NewReader(it.RawJSON),
 		}
-
-		t.bulkIndexerItems = append(t.bulkIndexerItems, item)
+		items = append(items, item)
 	}
 
-	return nil
-}
-
-func (t *transactor) Commit(ctx context.Context) error {
-	if err := t.elasticSearch.Commit(ctx, t.bulkIndexerItems); err != nil {
-		return fmt.Errorf("commit: %w", err)
+	if err := t.elasticSearch.Commit(it.Context(), items); err != nil {
+		return nil, err
 	}
 
 	for _, b := range t.bindings {
@@ -348,16 +326,11 @@ func (t *transactor) Commit(ctx context.Context) error {
 		// Flush guarantees the data are persisted to disk. For details see
 		// https://qbox.io/blog/refresh-flush-operations-elasticsearch-guide/)
 		if err := t.elasticSearch.Flush(b.index); err != nil {
-			return fmt.Errorf("commit flush: %w", err)
+			return nil, err
 		}
 	}
 
-	t.bulkIndexerItems = t.bulkIndexerItems[:0]
-	return nil
-}
-
-func (t *transactor) Acknowledge(context.Context) error {
-	return nil
+	return nil, nil
 }
 
 func documentId(tuple tuple.Tuple) string {

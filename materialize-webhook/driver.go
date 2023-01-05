@@ -123,66 +123,50 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 
 // Transactions implements the DriverServer interface.
 func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	var open, err = stream.Recv()
-	if err != nil {
-		return fmt.Errorf("read Open: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected Open, got %#v", open)
-	}
-
-	var cfg config
-	if err := pf.UnmarshalStrict(open.Open.Materialization.EndpointSpecJson, &cfg); err != nil {
-		return fmt.Errorf("parsing endpoint config: %w", err)
-	}
-
-	var log = log.WithField("address", cfg.Address)
-	var addresses []*url.URL
-
-	for _, binding := range open.Open.Materialization.Bindings {
-		// Join paths of each binding with the base URL.
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
-			return fmt.Errorf("parsing resource config: %w", err)
+	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
+		var cfg config
+		if err := pf.UnmarshalStrict(open.Materialization.EndpointSpecJson, &cfg); err != nil {
+			return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 		}
-		addresses = append(addresses, cfg.Address.URL().ResolveReference(res.URL()))
-	}
 
-	var transactor = &transactor{
-		addresses: addresses,
-		bodies:    make([]bytes.Buffer, len(open.Open.Materialization.Bindings)),
-	}
+		var addresses []*url.URL
 
-	if err = stream.Send(&pm.TransactionResponse{
-		Opened: &pm.TransactionResponse_Opened{FlowCheckpoint: nil},
-	}); err != nil {
-		return fmt.Errorf("sending Opened: %w", err)
-	}
+		for _, binding := range open.Materialization.Bindings {
+			// Join paths of each binding with the base URL.
+			var res resource
+			if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+				return nil, nil, fmt.Errorf("parsing resource config: %w", err)
+			}
+			addresses = append(addresses, cfg.Address.URL().ResolveReference(res.URL()))
+		}
 
-	return pm.RunTransactions(stream, transactor, log)
+		var transactor = &transactor{
+			addresses: addresses,
+		}
+		return transactor, &pm.TransactionResponse_Opened{}, nil
+	})
 }
 
 type transactor struct {
 	addresses []*url.URL
-	bodies    []bytes.Buffer
 }
 
 // Load should not be called and panics.
-func (d *transactor) Load(_ *pm.LoadIterator, _, _ <-chan struct{}, _ func(int, json.RawMessage) error) error {
-	panic("Load should never be called for webhook.Driver")
-}
-
-// Prepare returns a zero-valued Prepared.
-func (d *transactor) Prepare(_ context.Context, req pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	if d.bodies[0].Len() != 0 {
-		panic("d.body.Len() != 0") // Invariant: previous call is finished.
+func (d *transactor) Load(it *pm.LoadIterator, _ func(int, json.RawMessage) error) error {
+	for it.Next() {
+		panic("Load should never be called for webhook.Driver")
 	}
-	return pf.DriverCheckpoint{}, nil
+	return nil
 }
 
 // Store invokes the Webhook URL, with a body containing StoreIterator documents.
-func (d *transactor) Store(it *pm.StoreIterator) error {
+func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+	var bodies = make([]bytes.Buffer, len(d.addresses))
+	var ctx = it.Context()
+
+	// TODO(johnny): perform incremental POSTs rather than queuing a single call.
 	for it.Next() {
-		var b = &d.bodies[it.Binding]
+		var b = &bodies[it.Binding]
 
 		if b.Len() != 0 {
 			b.WriteString(",\n")
@@ -190,34 +174,29 @@ func (d *transactor) Store(it *pm.StoreIterator) error {
 			b.WriteString("[\n")
 		}
 		if _, err := b.Write(it.RawJSON); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	for i := range d.bodies {
-		d.bodies[i].WriteString("\n]")
+	for i := range bodies {
+		bodies[i].WriteString("\n]")
 	}
-	return nil
-}
-
-// Commit awaits the completion of the call started in Store.
-func (d *transactor) Commit(ctx context.Context) error {
 
 	for i, address := range d.addresses {
 		var address = address.String()
-		var body = &d.bodies[i]
+		var body = &bodies[i]
 
 		for attempt := 0; true; attempt++ {
 			select {
 			case <-ctx.Done():
-				return ctx.Err()
+				return nil, ctx.Err()
 			case <-time.After(backoff(attempt)):
 				// Fallthrough.
 			}
 
 			request, err := http.NewRequest("POST", address, bytes.NewReader(body.Bytes()))
 			if err != nil {
-				return fmt.Errorf("http.NewRequest(%s): %w", address, err)
+				return nil, fmt.Errorf("http.NewRequest(%s): %w", address, err)
 			}
 			request.Header.Add("Content-Type", "application/json")
 
@@ -242,11 +221,7 @@ func (d *transactor) Commit(ctx context.Context) error {
 			}).Error("failed to invoke Webhook (will retry)")
 		}
 	}
-	return nil
-}
-
-func (d *transactor) Acknowledge(context.Context) error {
-	return nil
+	return nil, nil
 }
 
 // Destroy is a no-op.

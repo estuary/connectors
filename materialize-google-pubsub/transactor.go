@@ -1,11 +1,9 @@
 package connector
 
 import (
-	"context"
 	"encoding/json"
 
 	"cloud.google.com/go/pubsub"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"golang.org/x/sync/errgroup"
 )
@@ -20,15 +18,14 @@ type topicBinding struct {
 }
 
 // PubSub is delta-update only.
-func (t *transactor) Load(_ *pm.LoadIterator, _ <-chan struct{}, _ <-chan struct{}, _ func(int, json.RawMessage) error) error {
-	panic("driver only supports delta updates")
+func (t *transactor) Load(it *pm.LoadIterator, _ func(int, json.RawMessage) error) error {
+	for it.Next() {
+		panic("driver only supports delta updates")
+	}
+	return nil
 }
 
-func (t *transactor) Prepare(_ context.Context, _ pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	return pf.DriverCheckpoint{}, nil
-}
-
-func (t *transactor) Store(it *pm.StoreIterator) error {
+func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
 
 	for it.Next() {
@@ -60,16 +57,7 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 	}
 
 	// Wait for all messages to be delivered.
-	return errGroup.Wait()
-}
-
-// Commit is a no-op because the recovery log is authoritative.
-func (t *transactor) Commit(ctx context.Context) error {
-	return nil
-}
-
-func (t *transactor) Acknowledge(context.Context) error {
-	return nil
+	return nil, errGroup.Wait()
 }
 
 func (t *transactor) Destroy() {
