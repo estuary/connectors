@@ -13,7 +13,6 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 )
@@ -243,68 +242,56 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 
 // Transactions implements the DriverServer interface.
 func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	var open, err = stream.Recv()
-	if err != nil {
-		return fmt.Errorf("read Open: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected Open, got %#v", open)
-	}
+	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
+		var cfg config
+		if err := pf.UnmarshalStrict(open.Materialization.EndpointSpecJson, &cfg); err != nil {
+			return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+		}
 
-	var cfg config
-	if err = pf.UnmarshalStrict(open.Open.Materialization.EndpointSpecJson, &cfg); err != nil {
-		return fmt.Errorf("parsing endpoint config: %w", err)
-	}
+		var checkpoint driverCheckpoint
+		if err := pf.UnmarshalStrict(open.DriverCheckpointJson, &checkpoint); err != nil {
+			return nil, nil, fmt.Errorf("parsing driver checkpoint: %w", err)
+		}
 
-	var checkpoint driverCheckpoint
-	if err = pf.UnmarshalStrict(open.Open.DriverCheckpointJson, &checkpoint); err != nil {
-		return fmt.Errorf("parsing driver checkpoint: %w", err)
-	}
+		svc, err := cfg.buildService(stream.Context())
+		if err != nil {
+			return nil, nil, err
+		}
 
-	svc, err := cfg.buildService(stream.Context())
-	if err != nil {
-		return err
-	}
+		states, err := loadSheetStates(
+			open.Materialization.Bindings,
+			svc,
+			cfg.spreadsheetID(),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("recovering sheet states: %w", err)
+		}
 
-	states, err := loadSheetStates(
-		open.Open.Materialization.Bindings,
-		svc,
-		cfg.spreadsheetID(),
-	)
-	if err != nil {
-		return fmt.Errorf("recovering sheet states: %w", err)
-	}
+		if err := writeSheetSentinels(stream.Context(), svc, cfg.spreadsheetID(), states); err != nil {
+			return nil, nil, fmt.Errorf("writing sheet sentinels: %w", err)
+		}
 
-	if err := writeSheetSentinels(stream.Context(), svc, cfg.spreadsheetID(), states); err != nil {
-		return fmt.Errorf("writing sheet sentinels: %w", err)
-	}
+		bindings, err := buildTransactorBindings(
+			open.Materialization.Bindings,
+			checkpoint.Round,
+			states,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
 
-	bindings, err := buildTransactorBindings(
-		open.Open.Materialization.Bindings,
-		checkpoint.Round,
-		states,
-	)
-	if err != nil {
-		return err
-	}
+		if err := writeSheetHeaders(stream.Context(), svc, cfg.spreadsheetID(), bindings); err != nil {
+			return nil, nil, fmt.Errorf("writing sheet headers: %w", err)
+		}
 
-	if err := writeSheetHeaders(stream.Context(), svc, cfg.spreadsheetID(), bindings); err != nil {
-		return fmt.Errorf("writing sheet headers: %w", err)
-	}
-
-	var transactor = &transactor{
-		bindings:      bindings,
-		client:        svc,
-		round:         checkpoint.Round,
-		spreadsheetId: cfg.spreadsheetID(),
-	}
-
-	if err = stream.Send(&pm.TransactionResponse{
-		Opened: &pm.TransactionResponse_Opened{FlowCheckpoint: nil},
-	}); err != nil {
-		return fmt.Errorf("sending Opened: %w", err)
-	}
-
-	return pm.RunTransactions(stream, transactor, logrus.NewEntry(logrus.StandardLogger()))
+		var transactor = &transactor{
+			bindings:      bindings,
+			client:        svc,
+			round:         checkpoint.Round,
+			spreadsheetId: cfg.spreadsheetID(),
+		}
+		return transactor, &pm.TransactionResponse_Opened{}, nil
+	})
 }
 
 func main() { boilerplate.RunMain(new(driver)) }

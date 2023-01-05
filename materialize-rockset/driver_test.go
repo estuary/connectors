@@ -90,10 +90,10 @@ func TestRocksetDriverValidate(t *testing.T) {
 		},
 	}
 	collection := pf.CollectionSpec{
-		Collection:  "widgets",
-		SchemaUri:   "file:///schema.local",
-		KeyPtrs:     []string{"/id"},
-		Projections: projections,
+		Collection:     "widgets",
+		WriteSchemaUri: "file:///schema.local",
+		KeyPtrs:        []string{"/id"},
+		Projections:    projections,
 		PartitionTemplate: &pf.JournalSpec{
 			Name:        "widgets",
 			Replication: 1,
@@ -163,10 +163,10 @@ func TestRocksetDriverApply(t *testing.T) {
 		},
 	}
 	collection := pf.CollectionSpec{
-		Collection:  pf.Collection(collectionName),
-		SchemaUri:   "file:///schema.local",
-		KeyPtrs:     []string{"/id"},
-		Projections: projections,
+		Collection:     pf.Collection(collectionName),
+		WriteSchemaUri: "file:///schema.local",
+		KeyPtrs:        []string{"/id"},
+		Projections:    projections,
 	}
 
 	bindings := []*pf.MaterializationSpec_Binding{
