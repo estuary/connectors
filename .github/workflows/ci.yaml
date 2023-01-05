@@ -233,8 +233,10 @@ jobs:
           push: true
           tags: ${{ steps.prep.outputs.this_commit_tags }}
 
-      - name: Push ${{ matrix.connector.path }} image with 'dev' tag
-        if: ${{ github.event_name == 'push' }}
+      - name: Push ${{ matrix.connector.path }} image with 'dev' and $VERSION tag
+        # TODO(whb): Temporarily disabling pushing of the snowflake materialization. Remove this
+        # condition when the snowflake materialization is fixed.
+        if: ${{ github.event_name == 'push' && matrix.connector.path != 'materialize-snowflake' }}
         uses: docker/build-push-action@v2
         with:
           context: .
