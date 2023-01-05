@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"encoding/json"
@@ -11,6 +12,13 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/google/uuid"
 )
+
+// For historical reasons, we do not quote identifiers starting with an underscore or any letter,
+// and containing only letters, numbers & underscores. See
+// https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html for some details about how
+// Snowflake handles unquoted identifiers. Crucially, unquoted identifiers are resolved as
+// UPPERCASE, making this historical quoting important for backward compatibility.
+var simpleIdentifierRegexp = regexp.MustCompile(`^[_\pL]+[_\pL\pN]*$`)
 
 var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
 	switch ii := te.(type) {
@@ -51,7 +59,7 @@ var snowflakeDialect = func() sql.Dialect {
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
-					return sql.IsSimpleIdentifier(s) && !sql.SliceContains(strings.ToLower(s), SF_RESERVED_WORDS)
+					return simpleIdentifierRegexp.MatchString(s) && !sql.SliceContains(strings.ToLower(s), SF_RESERVED_WORDS)
 				},
 				sql.QuoteTransform("\"", "\\\""),
 			))),
