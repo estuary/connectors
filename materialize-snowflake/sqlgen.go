@@ -34,9 +34,9 @@ var snowflakeDialect = func () sql.Dialect {
     sql.NUMBER:  sql.NewStaticMapper("DOUBLE"),
     sql.OBJECT:  variantMapper,
     sql.STRING: sql.StringTypeMapper{
-      Fallback: sql.NewStaticMapper("TEXT"),
+      Fallback: sql.NewStaticMapper("STRING"),
       WithFormat: map[string]sql.TypeMapper{
-        "date-time": sql.NewStaticMapper("TIMESTAMPT"),
+        "date-time": sql.NewStaticMapper("TIMESTAMP"),
       },
     },
   }
@@ -160,17 +160,6 @@ var (
 	);
 {{- end }}
 
-{{ define "selectByKeys" }}
-	SELECT {{ $.Document.Identifier }}
-	FROM {{ $.Identifier }}
-	WHERE
-		{{- range $ind, $key := $.Keys }}
-			{{- if $ind }} AND {{ end -}}
-			{{ $key.Identifier }} = {{ $key.Placeholder }}
-		{{- end -}}
-	;
-{{ end }}
-
 {{ define "updateFence" }}
 EXECUTE IMMEDIATE $$
 DECLARE
@@ -195,7 +184,6 @@ END $$;
   tplLoadQuery         = tplAll.Lookup("loadQuery")
   tplCopyInto          = tplAll.Lookup("copyInto")
   tplMergeInto         = tplAll.Lookup("mergeInto")
-  tplSelectByKeys      = tplAll.Lookup("selectByKeys")
   tplUpdateFence       = tplAll.Lookup("updateFence")
 )
 
