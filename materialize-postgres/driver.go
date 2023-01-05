@@ -222,15 +222,12 @@ type transactor struct {
 		conn     *pgx.Conn
 		unionSQL string
 	}
-	// Variables accessed by Prepare, Store, and Commit.
+	// Variables exclusively used by Store.
 	store struct {
-		batch pgBatch
 		conn  *pgx.Conn
 		fence sql.Fence
 	}
 	bindings []*binding
-
-	tunnel networkTunnel.SshTunnel
 }
 
 func newTransactor(
@@ -305,7 +302,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	return nil
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
 	// We send SQL commands in batches to amortize network round-trips.
@@ -362,56 +359,47 @@ func (d *transactor) Load(it *pm.LoadIterator, _, _ <-chan struct{}, loaded func
 	return batch.roundTrip(ctx, d.load.conn.PgConn())
 }
 
-func (d *transactor) Prepare(_ context.Context, prepare pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	d.store.batch = newPGBatch()
-	d.store.batch.queue(nil, "begin;")
+func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+	var batch = newPGBatch()
+	batch.queue(nil, "begin;")
 
 	for _, b := range d.bindings {
-		d.store.batch.queue(nil, b.prepStoreInsertSQL)
-		d.store.batch.queue(nil, b.prepStoreUpdateSQL)
+		batch.queue(nil, b.prepStoreInsertSQL)
+		batch.queue(nil, b.prepStoreUpdateSQL)
 	}
-
-	d.store.fence.Checkpoint = prepare.FlowCheckpoint
-	var fenceUpdate strings.Builder
-	if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-		return pf.DriverCheckpoint{}, fmt.Errorf("evaluating fence template: %w", err)
-	}
-	d.store.batch.queue(nil, fenceUpdate.String())
-
-	return pf.DriverCheckpoint{}, nil
-}
-
-func (d *transactor) Store(it *pm.StoreIterator) error {
-	var ctx = it.Context()
 
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
-			return fmt.Errorf("converting store parameters: %w", err)
+			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if it.Exists {
-			d.store.batch.queueParams(nil, b.execStoreUpdateSQL, converted...)
+			batch.queueParams(nil, b.execStoreUpdateSQL, converted...)
 		} else {
-			d.store.batch.queueParams(nil, b.execStoreInsertSQL, converted...)
+			batch.queueParams(nil, b.execStoreInsertSQL, converted...)
 		}
 
-		if len(d.store.batch.buf) > 1024*1024 {
-			if err := d.store.batch.roundTrip(ctx, d.store.conn.PgConn()); err != nil {
-				return err
+		if len(batch.buf) > 1024*1024 {
+			if err := batch.roundTrip(it.Context(), d.store.conn.PgConn()); err != nil {
+				return nil, err
 			}
 		}
 	}
-	return nil
-}
 
-func (d *transactor) Commit(ctx context.Context) error {
-	d.store.batch.queue(nil, "deallocate prepare all;") // Cleanup prepared statements.
-	d.store.batch.queue(nil, "commit;")
-	return d.store.batch.roundTrip(ctx, d.store.conn.PgConn())
-}
+	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+		d.store.fence.Checkpoint = runtimeCheckpoint
+		var fenceUpdate strings.Builder
+		if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
+		}
+		batch.queue(nil, fenceUpdate.String())
 
-func (d *transactor) Acknowledge(context.Context) error {
-	return nil
+		return nil, pf.RunAsyncOperation(func() error {
+			batch.queue(nil, "deallocate prepare all;") // Cleanup prepared statements.
+			batch.queue(nil, "commit;")
+			return batch.roundTrip(ctx, d.store.conn.PgConn())
+		})
+	}, nil
 }
 
 func (d *transactor) Destroy() {

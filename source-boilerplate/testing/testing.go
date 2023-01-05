@@ -144,7 +144,6 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 				EndpointSpecJson: endpointSpecJSON,
 				Bindings:         cs.Bindings,
 			},
-			Tail: true,
 		},
 	}
 

@@ -10,7 +10,6 @@ import (
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/sirupsen/logrus"
 )
 
 // Driver implements the pm.DriverServer interface.
@@ -253,41 +252,36 @@ func (d *Driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 
 // Transactions implements the DriverServer interface.
 func (d *Driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	var (
-		endpoint      *Endpoint
-		open          *pm.TransactionRequest
-		loadedVersion string
-		err           error
-	)
+	return pm.RunTransactions(stream, d.newTransactor)
+}
 
-	if open, err = stream.Recv(); err != nil {
-		return fmt.Errorf("read Open: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected Open, got %#v", open)
-	} else if endpoint, err = d.NewEndpoint(stream.Context(), open.Open.Materialization.EndpointSpecJson); err != nil {
-		return fmt.Errorf("building endpoint: %w", err)
-	} else if _, loadedVersion, err = loadSpec(stream.Context(), endpoint,
-		open.Open.Materialization.Materialization); err != nil {
-		return fmt.Errorf("loading prior applied materialization spec: %w", err)
+func (d *Driver) newTransactor(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
+	var loadedVersion string
+
+	var endpoint, err = d.NewEndpoint(ctx, open.Materialization.EndpointSpecJson)
+	if err != nil {
+		return nil, nil, fmt.Errorf("building endpoint: %w", err)
+	} else if _, loadedVersion, err = loadSpec(ctx, endpoint, open.Materialization.Materialization); err != nil {
+		return nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
 	} else if loadedVersion == "" {
-		return fmt.Errorf("materialization has not been applied")
-	} else if loadedVersion != open.Open.Version {
-		return fmt.Errorf(
+		return nil, nil, fmt.Errorf("materialization has not been applied")
+	} else if loadedVersion != open.Version {
+		return nil, nil, fmt.Errorf(
 			"applied and current materializations are different versions (applied: %s vs current: %s)",
-			loadedVersion, open.Open.Version)
+			loadedVersion, open.Version)
 	}
 
 	var tables []Table
-	for index, spec := range open.Open.Materialization.Bindings {
+	for index, spec := range open.Materialization.Bindings {
 		var resource = endpoint.NewResource(endpoint)
 
 		if err := pf.UnmarshalStrict(spec.ResourceSpecJson, resource); err != nil {
-			return fmt.Errorf("resource binding for collection %q: %w", spec.Collection.Collection, err)
+			return nil, nil, fmt.Errorf("resource binding for collection %q: %w", spec.Collection.Collection, err)
 		}
-		var shape = BuildTableShape(open.Open.Materialization, index, resource)
+		var shape = BuildTableShape(open.Materialization, index, resource)
 
 		if table, err := ResolveTable(shape, endpoint.Dialect); err != nil {
-			return err
+			return nil, nil, err
 		} else {
 			tables = append(tables, table)
 		}
@@ -295,9 +289,9 @@ func (d *Driver) Transactions(stream pm.Driver_TransactionsServer) error {
 
 	var fence = Fence{
 		TablePath:       nil, // Set later iff endpoint.MetaCheckpoints != nil.
-		Materialization: open.Open.Materialization.Materialization,
-		KeyBegin:        open.Open.KeyBegin,
-		KeyEnd:          open.Open.KeyEnd,
+		Materialization: open.Materialization.Materialization,
+		KeyBegin:        open.KeyBegin,
+		KeyEnd:          open.KeyEnd,
 		Fence:           0,
 		Checkpoint:      nil, // Set later iff endpoint.MetaCheckpoints != nil.
 	}
@@ -307,7 +301,7 @@ func (d *Driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		// materialization from committing further transactions.
 		var metaCheckpoints, err = ResolveTable(*endpoint.MetaCheckpoints, endpoint.Dialect)
 		if err != nil {
-			return fmt.Errorf("resolving checkpoints table: %w", err)
+			return nil, nil, fmt.Errorf("resolving checkpoints table: %w", err)
 		}
 
 		// Initialize a checkpoint such that the materialization starts from scratch,
@@ -315,27 +309,16 @@ func (d *Driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		fence.TablePath = endpoint.MetaCheckpoints.Path
 		fence.Checkpoint = pm.ExplicitZeroCheckpoint
 
-		fence, err = endpoint.Client.InstallFence(stream.Context(), metaCheckpoints, fence)
+		fence, err = endpoint.Client.InstallFence(ctx, metaCheckpoints, fence)
 		if err != nil {
-			return fmt.Errorf("installing checkpoints fence: %w", err)
+			return nil, nil, fmt.Errorf("installing checkpoints fence: %w", err)
 		}
 	}
 
-	transactor, err := endpoint.NewTransactor(stream.Context(), endpoint, fence, tables)
+	transactor, err := endpoint.NewTransactor(ctx, endpoint, fence, tables)
 	if err != nil {
-		return fmt.Errorf("building transactor: %w", err)
+		return nil, nil, fmt.Errorf("building transactor: %w", err)
 	}
 
-	// Respond to the runtime that we've opened the transactions stream.
-	if err = stream.Send(&pm.TransactionResponse{
-		Opened: &pm.TransactionResponse_Opened{FlowCheckpoint: fence.Checkpoint}}); err != nil {
-		return fmt.Errorf("sending Opened: %w", err)
-	}
-
-	return pm.RunTransactions(stream, transactor, logrus.WithFields(logrus.Fields{
-		"materialization": open.Open.Materialization.Materialization,
-		"keyBegin":        open.Open.KeyBegin,
-		"keyEnd":          open.Open.KeyEnd,
-		"fence":           fence.Fence,
-	}))
+	return transactor, &pm.TransactionResponse_Opened{RuntimeCheckpoint: fence.Checkpoint}, nil
 }
