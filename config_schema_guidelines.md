@@ -201,3 +201,69 @@ Example 1:
   "description": "A list of selectable properties"
 }
 ```
+
+### Use `discriminator` to differenciate complex `oneOf`
+
+Anytime you have a oneOf that contains several options that do not have matching schemas you need to include the discriminator property. This property needs to contain a `const` and `default` value and that value must be unique.
+
+This is mainly for the UI and the validator used in the UI has some limitations. [AJV Docs](https://ajv.js.org/json-schema.html#discriminator)
+
+To see a working example in production reference `parser` in `Amazon S3`
+
+Example 1:
+
+```json
+{
+  "properties": {
+    "setting_name_foo": {
+      "discriminator": {
+        "propertyName": "foo_bar"
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "foo_bar": {
+              "const": "unique_value_one",
+              "default": "unique_value_one",
+              "type": "string"
+            },
+            "prop_fizz": {...},
+            "prop_buzz": {...}
+          },
+          "required": [
+            "foo_bar",
+            "prop_fizz",
+            "prop_buzz"
+          ],
+          ...
+        },
+        {
+          "properties": {
+            "foo_bar": {
+              "const": "unique_value_two",
+              "default": "unique_value_two",
+              "type": "string"
+            },
+            "prop_foo": {...},
+            "prop_bar": {...}
+          },
+          "required": [
+            "foo_bar",
+            "prop_foo",
+            "prop_bar"
+          ],
+          ...
+        }
+      ],
+      "title": "Authentication",
+      "type": "object"
+    },
+    ...
+  },
+  "required": [
+    "setting_name_foo",
+    ...
+  ],
+  ...
+}
+```
