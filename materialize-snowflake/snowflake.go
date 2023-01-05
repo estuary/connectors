@@ -422,7 +422,14 @@ func (d *transactor) Commit(ctx context.Context) error {
 		return fmt.Errorf("evaluating fence template: %w", err)
 	}
 	if _, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-		return fmt.Errorf("txn.Exec: %w", err)
+		err = fmt.Errorf("txn.Exec: %w", err)
+
+		// Give recommendation to user for resolving timeout issues
+		if strings.Contains(err.Error(), "timeout") {
+			return fmt.Errorf("fence.Update: %w  (ensure LOCK_TIMEOUT and STATEMENT_TIMEOUT_IN_SECONDS are at least ten minutes)", err)
+		}
+
+		return err
 	}
 
 	for _, b := range d.bindings {
