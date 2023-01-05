@@ -1,64 +1,64 @@
 package main
 import (
-  "fmt"
-  "strings"
+	"fmt"
+	"strings"
 
 	"encoding/json"
-  sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"text/template"
 	"github.com/google/uuid"
-  "github.com/estuary/flow/go/protocols/fdb/tuple"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
-  switch ii := te.(type) {
-  case []byte:
-    return json.RawMessage(ii), nil
-  case json.RawMessage:
-    return ii, nil
-  case nil:
-    return json.RawMessage(nil), nil
-  default:
-    return nil, fmt.Errorf("invalid type %#v for variant", te)
-  }
+	switch ii := te.(type) {
+	case []byte:
+		return json.RawMessage(ii), nil
+	case json.RawMessage:
+		return ii, nil
+	case nil:
+		return json.RawMessage(nil), nil
+	default:
+		return nil, fmt.Errorf("invalid type %#v for variant", te)
+	}
 }
 
 // snowflakeDialect returns a representation of the Snowflake SQL dialect.
 var snowflakeDialect = func () sql.Dialect {
-  var variantMapper = sql.NewStaticMapper("VARIANT", sql.WithElementConverter(jsonConverter))
-  var typeMappings = sql.ProjectionTypeMapper{
-    sql.ARRAY:   variantMapper,
-    sql.BINARY:  sql.NewStaticMapper("BINARY"),
-    sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
-    sql.INTEGER: sql.NewStaticMapper("INTEGER"),
-    sql.NUMBER:  sql.NewStaticMapper("DOUBLE"),
-    sql.OBJECT:  variantMapper,
-    sql.STRING: sql.StringTypeMapper{
-      Fallback: sql.NewStaticMapper("STRING"),
-      WithFormat: map[string]sql.TypeMapper{
-        "date-time": sql.NewStaticMapper("TIMESTAMP"),
-      },
-    },
-  }
-  var nullable sql.TypeMapper = sql.NullableMapper{
-    NotNullText: "NOT NULL",
-    Delegate:       typeMappings,
-  }
+	var variantMapper = sql.NewStaticMapper("VARIANT", sql.WithElementConverter(jsonConverter))
+	var typeMappings = sql.ProjectionTypeMapper{
+		sql.ARRAY:   variantMapper,
+		sql.BINARY:  sql.NewStaticMapper("BINARY"),
+		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
+		sql.INTEGER: sql.NewStaticMapper("INTEGER"),
+		sql.NUMBER:  sql.NewStaticMapper("DOUBLE"),
+		sql.OBJECT:  variantMapper,
+		sql.STRING: sql.StringTypeMapper{
+			Fallback: sql.NewStaticMapper("STRING"),
+			WithFormat: map[string]sql.TypeMapper{
+				"date-time": sql.NewStaticMapper("TIMESTAMP"),
+			},
+		},
+	}
+	var nullable sql.TypeMapper = sql.NullableMapper{
+		NotNullText: "NOT NULL",
+		Delegate:       typeMappings,
+	}
 
-  return sql.Dialect{
+	return sql.Dialect{
 		Identifierer:       sql.IdentifierFn(sql.JoinTransform(".", 
-      sql.PassThroughTransform(
-        func(s string) bool {
-          return sql.IsSimpleIdentifier(s) && !sliceContains(strings.ToLower(s), SF_RESERVED_WORDS)
-        },
-        sql.QuoteTransform("\"", "\\\""),
-    ))),
+		sql.PassThroughTransform(
+			func(s string) bool {
+				return sql.IsSimpleIdentifier(s) && !sliceContains(strings.ToLower(s), SF_RESERVED_WORDS)
+			},
+			sql.QuoteTransform("\"", "\\\""),
+		))),
 		Literaler:          sql.LiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
 		TypeMapper: nullable,
-  }
+	}
 }()
 
 var (
