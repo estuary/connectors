@@ -64,6 +64,14 @@ func (c *config) client(ctx context.Context) (*client, error) {
 		return nil, fmt.Errorf("creating cloud storage client: %w", err)
 	}
 
+	if _, err := bigqueryClient.DatasetInProject(c.ProjectID, c.Dataset).Metadata(ctx); err != nil {
+		return nil, fmt.Errorf("validating dataset & project: %w", err)
+	}
+
+	if _, err := cloudStorageClient.Bucket(c.Bucket).Attrs(ctx); err != nil {
+		return nil, fmt.Errorf("validating connection to bucket %q: %w", c.Bucket, err)
+	}
+
 	return &client{
 		bigqueryClient:     bigqueryClient,
 		cloudStorageClient: cloudStorageClient,
