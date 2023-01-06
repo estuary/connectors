@@ -13,7 +13,7 @@ config_json_template='{
    "dataset":           "$DATASET",
    "region":            "$REGION",
    "bucket":            "$BUCKET",
-   "credentials_json":  "$GCP_SERVICE_ACCOUNT_KEY_QUOTED"
+   "credentials_json":  $GCP_SERVICE_ACCOUNT_KEY_QUOTED
 }'
 
 resources_json_template='[
