@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
+	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -20,17 +21,21 @@ import (
 type driver struct{}
 
 type config struct {
-	Address pf.Endpoint `json:"address"`
+	Address pf.Endpoint `json:"address" jsonschema:"title=Address,description=Base address URL. Must end in a trailing '/'."`
 }
 
 // Validate returns an error if the config is not well-formed.
 func (c config) Validate() error {
-	return c.Address.Validate()
+	if err := c.Address.Validate(); err != nil {
+		return fmt.Errorf("address: %w", err)
+	} else if !strings.HasSuffix(string(c.Address), "/") {
+		return fmt.Errorf("address must end in a trailing '/'")
+	}
+	return nil
 }
 
 type resource struct {
-	// Path which is joined with the base Address to build a complete URL.
-	RelativePath string `json:"relativePath,omitempty"`
+	RelativePath string `json:"relativePath,omitempty" jsonschema:"title=Relative Path,description=Path which is joined with the base Address to build a complete URL" jsonschema_extras:"x-collection-name=true"`
 }
 
 func (r resource) Validate() error {
@@ -49,11 +54,12 @@ func (r resource) URL() *url.URL {
 }
 
 func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
-	endpointSchema, err := jsonschema.Reflect(new(config)).MarshalJSON()
+	endpointSchema, err := schemagen.GenerateSchema("Webhook", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
-	resourceSchema, err := jsonschema.Reflect(new(resource)).MarshalJSON()
+
+	resourceSchema, err := schemagen.GenerateSchema("Webhook URL", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -61,7 +67,7 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 	return &pm.SpecResponse{
 		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
 		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://docs.estuary.dev",
+		DocumentationUrl:       "https://go.estuary.dev/materialize-webhook",
 	}, nil
 }
 
@@ -212,6 +218,8 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			if err == nil {
 				body.Reset() // Reset for next use.
 				break
+			} else if attempt == 10 {
+				return nil, fmt.Errorf("webhook failed after many attempts: %w", err)
 			}
 
 			log.WithFields(log.Fields{
