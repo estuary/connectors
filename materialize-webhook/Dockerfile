@@ -17,7 +17,7 @@ COPY --from=ghcr.io/estuary/flow:dev /usr/local/bin/flowctl-go /usr/local/bin/fl
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-webhook     ./materialize-webhook
-COPY testsupport             ./testsupport
+COPY go-schema-gen           ./go-schema-gen
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-webhook/...
