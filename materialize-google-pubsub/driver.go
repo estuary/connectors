@@ -60,8 +60,9 @@ func (c *config) client(ctx context.Context) (*pubsub.Client, error) {
 }
 
 type resource struct {
-	TopicName  string `json:"topic" jsonschema:"title=Topic Name" jsonschema_extras:"x-collection-name=true"`
-	Identifier string `json:"identifier,omitempty" jsonschema:"title=Resource Binding Identifier"`
+	TopicName                 string `json:"topic" jsonschema:"title=Topic Name" jsonschema_extras:"x-collection-name=true"`
+	Identifier                string `json:"identifier,omitempty" jsonschema:"title=Resource Binding Identifier"`
+	CreateDefaultSubscription bool   `json:"create_default_subscription" jsonschema:"title=Create with Default Subscription,default=true"`
 }
 
 func (resource) GetFieldDocString(fieldName string) string {
@@ -71,6 +72,8 @@ func (resource) GetFieldDocString(fieldName string) string {
 			fmt.Sprintf("Included as %q attribute in published messages if specified.", IDENTIFIER_ATTRIBUTE_KEY)
 	case "TopicName":
 		return "Name of the topic to publish materialized results to."
+	case "CreateDefaultSubscription":
+		return "Create a default subscription when creating the topic. Will be created as \"topic-sub\". Has no effect if the topic already exists."
 	default:
 		return ""
 	}
@@ -195,7 +198,7 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 	}
 
 	checkedTopics := make(map[string]struct{})
-	var newTopics []string
+	var newTopics []resource
 	for _, b := range req.Materialization.Bindings {
 		res, err := resolveResourceConfig(b.ResourceSpecJson)
 		if err != nil {
@@ -214,26 +217,40 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		}
 
 		if !exists {
-			newTopics = append(newTopics, res.TopicName)
+			newTopics = append(newTopics, res)
 		}
 	}
 
-	action := ""
-	if len(newTopics) > 0 {
-		action = fmt.Sprintf("created topics: %s", strings.Join(newTopics, ","))
-	}
+	actions := []string{}
+	for _, topic := range newTopics {
+		var t *pubsub.Topic
+		var s *pubsub.Subscription
 
-	if !req.DryRun {
-		for _, topicName := range newTopics {
-			_, err := client.CreateTopic(ctx, topicName)
+		if req.DryRun {
+			// No-op, but record the action that would have been taken.
+			actions = append(actions, fmt.Sprintf("to create topic %s", t.ID()))
+			if topic.CreateDefaultSubscription {
+				actions = append(actions, fmt.Sprintf("to create subscription %s for topic %s", s.ID(), t.ID()))
+			}
+		} else {
+			t, err = client.CreateTopic(ctx, topic.TopicName)
 			if err != nil {
 				return nil, fmt.Errorf("pubsub apply create topic error: %w", err)
+			}
+			actions = append(actions, fmt.Sprintf("created topic %s", t.ID()))
+
+			if topic.CreateDefaultSubscription {
+				s, err = client.CreateSubscription(ctx, fmt.Sprintf("%s-sub", topic.TopicName), pubsub.SubscriptionConfig{Topic: t})
+				if err != nil {
+					return nil, fmt.Errorf("pubsub apply create default subscription: %w", err)
+				}
+				actions = append(actions, fmt.Sprintf("created subscription %s for topic %s", s.ID(), t.ID()))
 			}
 		}
 	}
 
 	return &pm.ApplyResponse{
-		ActionDescription: action,
+		ActionDescription: strings.Join(actions, ", "),
 	}, nil
 }
 
