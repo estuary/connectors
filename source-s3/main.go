@@ -87,7 +87,12 @@ func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
 		return nil, fmt.Errorf("creating aws config: %w", err)
 	}
 
-	return &s3Store{s3: s3.New(awsSession)}, nil
+	s3Sess := s3.New(awsSession)
+	if _, err := s3Sess.HeadBucketWithContext(ctx, &s3.HeadBucketInput{Bucket: &cfg.Bucket}); err != nil {
+		return nil, fmt.Errorf("validating connection to bucket %q: %w", cfg.Bucket, err)
+	}
+
+	return &s3Store{s3: s3Sess}, nil
 }
 
 func (s *s3Store) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {

@@ -69,6 +69,10 @@ func newGCStore(ctx context.Context, cfg *config) (*gcStore, error) {
 		return nil, fmt.Errorf("creating GCS session: %w", err)
 	}
 
+	if _, err := client.Bucket(cfg.Bucket).Attrs(ctx); err != nil {
+		return nil, fmt.Errorf("validating connection to bucket %q: %w", cfg.Bucket, err)
+	}
+
 	return &gcStore{gcs: client}, nil
 }
 
