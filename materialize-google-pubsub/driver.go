@@ -339,6 +339,11 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		}
 		t := client.Topic(res.TopicName)
 
+		// Have calls to publish block when the number of queued messages exceeds the default limit
+		// of 1000, per topic. This bounds the connector memory usage when the store iterator is
+		// read from faster than the rate of publishing.
+		t.PublishSettings.FlowControlSettings.LimitExceededBehavior = pubsub.FlowControlBlock
+
 		// Allows for the reading of messages in-order with a provided ordering key. See
 		// https://cloud.google.com/pubsub/docs/ordering
 		t.EnableMessageOrdering = true
