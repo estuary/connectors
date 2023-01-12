@@ -40,6 +40,8 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			msg.Attributes = map[string]string{IDENTIFIER_ATTRIBUTE_KEY: binding.identifier}
 		}
 
+		// Blocks if the maximum number of messages are queue'd, since
+		// topic.PublishSettings.FlowControlSettings.LimitExceededBehavior = pubsub.FlowControlBlock
 		res := binding.topic.Publish(ctx, msg)
 
 		errGroup.Go(func() error {
