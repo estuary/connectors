@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/estuary/connectors/filesource"
 	"github.com/estuary/flow/go/parser"
+	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -69,7 +72,41 @@ func newGCStore(ctx context.Context, cfg *config) (*gcStore, error) {
 		return nil, fmt.Errorf("creating GCS session: %w", err)
 	}
 
+	if err := validateBucket(ctx, cfg, client); err != nil {
+		return nil, err
+	}
+
 	return &gcStore{gcs: client}, nil
+}
+
+// validateBucket verifies that we can list objects in the bucket and read an object in the bucket.
+// This is done in a way that requires only storage.objects.list and storage.objects.get since these
+// are the permissions required by the connector.
+func validateBucket(ctx context.Context, cfg *config, client *storage.Client) error {
+	iter := client.Bucket(cfg.Bucket).Objects(ctx, &storage.Query{
+		Prefix: cfg.Prefix,
+	})
+
+	// Optimization to limit the number of buffered objects, since all we care about is a successful
+	// listing rather than iterating on all the objects.
+	iter.PageInfo().MaxSize = 1
+
+	// No objects in the bucket is represented by iterator.Done. This can be considered a successful
+	// outcome, since a bucket we don't have access to or doesn't exist will return a specific error
+	// for that case.
+	if _, err := iter.Next(); err != nil && err != iterator.Done {
+		return fmt.Errorf("unable to list objects in bucket %q: %w", cfg.Bucket, err)
+	}
+
+	// storage.objects.get allows reading object data as well as object metadata. The name of the
+	// object is not important here. We have verified our ability to list objects in this bucket, so
+	// we can interpret a "not found" as a successful outcome.
+	objectKey := strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
+	if _, err := client.Bucket(cfg.Bucket).Object(objectKey).Attrs(ctx); err != nil && err != storage.ErrObjectNotExist {
+		return fmt.Errorf("unable to read objects in bucket %q: %w", cfg.Bucket, err)
+	}
+
+	return nil
 }
 
 func (s *gcStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
