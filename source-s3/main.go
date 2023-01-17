@@ -5,14 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/estuary/connectors/filesource"
 	"github.com/estuary/flow/go/parser"
+	"github.com/google/uuid"
 )
 
 type config struct {
@@ -87,7 +92,43 @@ func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
 		return nil, fmt.Errorf("creating aws config: %w", err)
 	}
 
-	return &s3Store{s3: s3.New(awsSession)}, nil
+	s3Sess := s3.New(awsSession)
+	if err := validateBucket(ctx, cfg, s3Sess); err != nil {
+		return nil, err
+	}
+
+	return &s3Store{s3: s3Sess}, nil
+}
+
+// validateBucket verifies that we can list objects in the bucket and potentially read an object in
+// the bucket. This is done in a way that requires only s3:ListBucket and s3:GetObject permissions,
+// since these are the permissions required by the connector.
+func validateBucket(ctx context.Context, cfg *config, s3Sess *s3.S3) error {
+	// All we care about is a succesful listing rather than iterating on all objects, so MaxKeys = 1
+	// in this query.
+	_, err := s3Sess.ListObjectsV2WithContext(ctx, &s3.ListObjectsV2Input{
+		Bucket:  aws.String(cfg.Bucket),
+		Prefix:  aws.String(cfg.Prefix),
+		MaxKeys: aws.Int64(1),
+	})
+	if err != nil {
+		// Note that a listing with zero objects does not return an error here, so we don't have to
+		// account for that case.
+		return fmt.Errorf("unable to list objects in bucket %q: %w", cfg.Bucket, err)
+	}
+
+	// s3:GetObject allows reading object data as well as object metadata. The name of the object is
+	// not important here. We have verified our ability to list objects in this bucket (bucket
+	// exists & correct access) via the list operation, so we can interpret a "not found" as a
+	// successful outcome.
+	objectKey := strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
+	if _, err := s3Sess.HeadObjectWithContext(ctx, &s3.HeadObjectInput{Bucket: &cfg.Bucket, Key: aws.String(objectKey)}); err != nil {
+		if e, ok := err.(awserr.RequestFailure); ok && e.StatusCode() != http.StatusNotFound {
+			return fmt.Errorf("unable to read objects in bucket %q: %w", cfg.Bucket, err)
+		}
+	}
+
+	return nil
 }
 
 func (s *s3Store) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
