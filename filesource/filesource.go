@@ -474,6 +474,7 @@ const (
 	metaOffsetLocation = "/_meta/offset"
 	// Baseline document schema for resource streams we discover.
 	minimalDocumentSchema = `{
+		"x-infer-schema": true,
 		"type": "object",
 		"properties": {
 			"_meta": {
