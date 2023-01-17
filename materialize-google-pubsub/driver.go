@@ -72,7 +72,7 @@ func (resource) GetFieldDocString(fieldName string) string {
 	case "TopicName":
 		return "Name of the topic to publish materialized results to."
 	case "CreateDefaultSubscription":
-		return "Create a default subscription when creating the topic. Will be created as \"topic-sub\". Has no effect if the topic already exists."
+		return "Create a default subscription when creating the topic. Will be created as \"<topic>-sub\". Has no effect if the topic already exists."
 	default:
 		return ""
 	}
