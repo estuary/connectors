@@ -13,7 +13,6 @@ import (
 
 	firestore "cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
-	"github.com/estuary/connectors/schema_inference"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
@@ -63,9 +62,8 @@ type documentMetadata struct {
 }
 
 // minimalSchema is the maximally-permissive schema which just specifies the
-// metadata our connector adds. If schema inference succeeds the discovered
-// schema is allOf(minimalSchema, inferredSchema) and if inference fails then
-// the discovered schema defaults to minimalSchema.
+// metadata our connector adds. The schema of collections is minimalSchema as we
+// rely on Flow's schema inference to infer the collection schema
 var minimalSchema = generateMinimalSchema()
 
 func generateMinimalSchema() json.RawMessage {
@@ -135,30 +133,23 @@ func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Discov
 type discoveryState struct {
 	client        *firestore.Client
 	scanners      *errgroup.Group // Contains all scanner goroutines launched during discovery.
-	inference     *errgroup.Group // Contains all inference process goroutines launched during discovery.
-	inferenceCtx  context.Context // The context with which inference goroutines will be run.
 	scanSemaphore chan struct{}   // Semaphore channel used to limit number of concurrent scanners
 
 	// Mutex-guarded state which may be modified from within worker goroutines.
 	shared struct {
 		sync.Mutex
-		channels map[resourcePath]chan json.RawMessage // Map from resource paths to inference worker input channels.
 		counts   map[resourcePath]int                  // Map from resource paths to the number of documents processed.
 		bindings []*pc.DiscoverResponse_Binding        // List of output bindings from inference workers which have terminated.
 	}
 }
 
 func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.DiscoverResponse_Binding, error) {
-	inference, inferenceCtx := errgroup.WithContext(ctx)
 	scanners, ctx := errgroup.WithContext(ctx)
 	var state = &discoveryState{
 		client:        client,
 		scanners:      scanners,
-		inference:     inference,
-		inferenceCtx:  inferenceCtx,
 		scanSemaphore: make(chan struct{}, discoverConcurrentScanners),
 	}
-	state.shared.channels = make(map[resourcePath]chan json.RawMessage)
 	state.shared.counts = make(map[resourcePath]int)
 
 	// Request processing of all top-level collections.
@@ -170,17 +161,8 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.D
 		state.handleCollection(ctx, coll)
 	}
 
-	// Wait for all scanners to terminate, then close all inference channels, and
-	// finally wait for the inference processes to terminate.
+	// Wait for all scanners to terminate
 	if err := state.scanners.Wait(); err != nil {
-		return nil, err
-	}
-	state.shared.Lock()
-	for _, ch := range state.shared.channels {
-		close(ch)
-	}
-	state.shared.Unlock()
-	if err := state.inference.Wait(); err != nil {
 		return nil, err
 	}
 
@@ -194,8 +176,7 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.D
 	return bindings, nil
 }
 
-// discoverCollection iterates over every document of a collection, feeds each document
-// into the appropriate inference process, and recursively checks some of the documents
+// discoverCollection iterates over every document of a collection, and recursively checks some of the documents
 // for subcollections.
 func (ds *discoveryState) discoverCollection(ctx context.Context, coll *firestore.CollectionRef) error {
 	var resourcePath = collectionToResourcePath(coll.Path)
@@ -241,22 +222,32 @@ func (ds *discoveryState) discoverCollection(ctx context.Context, coll *firestor
 		}
 		numDocuments++
 	}
+
+  resourceJSON, err := json.Marshal(resource{
+          Path:         resourcePath,
+          BackfillMode: backfillModeAsync,
+  })
+  if err != nil {
+          return fmt.Errorf("error serializing resource json: %w", err)
+  }
+  var binding = &pc.DiscoverResponse_Binding{
+          RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
+          ResourceSpecJson:   resourceJSON,
+          DocumentSchemaJson: minimalSchema,
+          KeyPtrs:            []string{documentPath},
+  }
+  ds.shared.Lock()
+  ds.shared.bindings = append(ds.shared.bindings, binding)
+  ds.shared.Unlock()
+
 	return nil
 }
 
 func (ds *discoveryState) handleDocument(ctx context.Context, doc *firestore.DocumentSnapshot) error {
-	// Marshal the document to JSON that we'll send to schema inference
-	var docJSON, err = json.Marshal(doc.Data())
-	if err != nil {
-		return fmt.Errorf("error marshalling document: %w", err)
-	}
-
 	// Map the document path to a resource path like 'users/*/messages' and then send
 	// it to the appropriate schema inference worker.
 	var resourcePath = collectionToResourcePath(doc.Ref.Parent.Path)
 	log.WithFields(log.Fields{"path": doc.Ref.Path, "resource": resourcePath}).Trace("process document")
-	var docsCh = ds.inferenceChannel(ctx, resourcePath)
-	docsCh <- docJSON
 
 	// Increment the document count for this resource path
 	ds.shared.Lock()
@@ -295,74 +286,9 @@ func (ds *discoveryState) handleCollection(ctx context.Context, coll *firestore.
 				"error":      err,
 			}).Error("error scanning collection")
 		}
+
 		return err
 	})
-}
-
-func (ds *discoveryState) inferenceChannel(ctx context.Context, resourcePath resourcePath) chan json.RawMessage {
-	ds.shared.Lock()
-	defer ds.shared.Unlock()
-	if ch, ok := ds.shared.channels[resourcePath]; ok {
-		return ch
-	}
-
-	log.WithField("resource", resourcePath).Info("discovered resource")
-	var ch = make(chan json.RawMessage)
-	ds.shared.channels[resourcePath] = ch
-	ds.inference.Go(func() error {
-		var err = ds.inferenceWorker(ds.inferenceCtx, resourcePath, ch)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"resource": resourcePath,
-				"error":    err,
-			}).Error("inference error")
-		}
-		return err
-	})
-	return ch
-}
-
-func (ds *discoveryState) inferenceWorker(ctx context.Context, resourcePath resourcePath, docsCh chan json.RawMessage) error {
-	var logEntry = log.WithField("resource", resourcePath)
-	var inferredSchema, err = schema_inference.Run(ctx, logEntry, docsCh)
-	var documentSchema json.RawMessage
-	if err != nil {
-		// Ideally schema inference shouldn't ever fail, but in the event that
-		// it does we should just use a maximally permissive Firestore document
-		// placeholder and keep going.
-		logEntry.WithField("err", err).Warn("schema inference failed")
-		documentSchema = minimalSchema
-	} else {
-		// In the happy path when schema inference succeeds, we want to combine
-		// the inferred document schema with the minimal "just /_meta" schema to
-		// produce a schema which accurately describes the capture output.
-		combinedSchema, err := json.Marshal(map[string]interface{}{
-			"allOf": []interface{}{inferredSchema, minimalSchema},
-		})
-		if err != nil {
-			return fmt.Errorf("error serializing combined schema: %w", err)
-		}
-		documentSchema = combinedSchema
-	}
-
-	resourceJSON, err := json.Marshal(resource{
-		Path:         resourcePath,
-		BackfillMode: backfillModeAsync,
-	})
-	if err != nil {
-		return fmt.Errorf("error serializing resource json: %w", err)
-	}
-	var binding = &pc.DiscoverResponse_Binding{
-		RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
-		ResourceSpecJson:   resourceJSON,
-		DocumentSchemaJson: documentSchema,
-		KeyPtrs:            []string{documentPath},
-	}
-
-	ds.shared.Lock()
-	ds.shared.bindings = append(ds.shared.bindings, binding)
-	ds.shared.Unlock()
-	return nil
 }
 
 // The collection name must not have slashes in it, otherwise we end up with parent
