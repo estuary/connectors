@@ -251,6 +251,7 @@ func main() {
 		// not re-process that file until it's modification time is greater
 		// than the prior invocation time plus this delta.
 		TimeHorizonDelta: 2 * time.Second,
+		SkipSchemaInference: true,
 	}
 
 	src.Main()
