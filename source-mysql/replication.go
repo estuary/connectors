@@ -460,6 +460,8 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 				return fmt.Errorf("unsupported DML query %q (go.estuary.dev/IK5EVx)", query)
 			}
 		}
+	case *sqlparser.OtherAdmin:
+		// We ignore queries like REPAIR or OPTIMIZE.
 	default:
 		return fmt.Errorf("unhandled query %q (go.estuary.dev/ceqr74)", query)
 	}
