@@ -33,7 +33,7 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
-COPY --from=builder /builder/connector /connector/
+COPY --from=builder /builder/connector /connector/materialize-elasticsearch
 COPY --from=builder /builder/flow-schemalate /connector/
 COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
@@ -42,4 +42,4 @@ USER nonroot:nonroot
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
-ENTRYPOINT ["/connector/connector"]
+ENTRYPOINT ["/connector/materialize-elasticsearch"]

@@ -40,8 +40,8 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
-COPY --from=builder /builder/connector ./connector
+COPY --from=builder /builder/connector ./materialize-bigquery
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
-ENTRYPOINT ["/connector/connector"]
+ENTRYPOINT ["/connector/materialize-bigquery"]

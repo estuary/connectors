@@ -29,11 +29,11 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
-COPY --from=builder /builder/connector /connector/
+COPY --from=builder /builder/connector /connector/materialize-google-pubsub
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
-ENTRYPOINT ["/connector/connector"]
+ENTRYPOINT ["/connector/materialize-google-pubsub"]
