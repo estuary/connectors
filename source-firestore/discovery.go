@@ -90,6 +90,7 @@ func generateMinimalSchema() json.RawMessage {
 			"properties": map[string]*jsonschema.Schema{
 				metaProperty: metadataSchema,
 			},
+			"x-infer-schema": true,
 		},
 	}
 
@@ -223,29 +224,27 @@ func (ds *discoveryState) discoverCollection(ctx context.Context, coll *firestor
 		numDocuments++
 	}
 
-  resourceJSON, err := json.Marshal(resource{
-          Path:         resourcePath,
-          BackfillMode: backfillModeAsync,
-  })
-  if err != nil {
-          return fmt.Errorf("error serializing resource json: %w", err)
-  }
-  var binding = &pc.DiscoverResponse_Binding{
-          RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
-          ResourceSpecJson:   resourceJSON,
-          DocumentSchemaJson: minimalSchema,
-          KeyPtrs:            []string{documentPath},
-  }
-  ds.shared.Lock()
-  ds.shared.bindings = append(ds.shared.bindings, binding)
-  ds.shared.Unlock()
+	resourceJSON, err := json.Marshal(resource{
+		Path:         resourcePath,
+		BackfillMode: backfillModeAsync,
+	})
+	if err != nil {
+		return fmt.Errorf("error serializing resource json: %w", err)
+	}
+	var binding = &pc.DiscoverResponse_Binding{
+		RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
+		ResourceSpecJson:   resourceJSON,
+		DocumentSchemaJson: minimalSchema,
+		KeyPtrs:            []string{documentPath},
+	}
+	ds.shared.Lock()
+	ds.shared.bindings = append(ds.shared.bindings, binding)
+	ds.shared.Unlock()
 
 	return nil
 }
 
 func (ds *discoveryState) handleDocument(ctx context.Context, doc *firestore.DocumentSnapshot) error {
-	// Map the document path to a resource path like 'users/*/messages' and then send
-	// it to the appropriate schema inference worker.
 	var resourcePath = collectionToResourcePath(doc.Ref.Parent.Path)
 	log.WithFields(log.Fields{"path": doc.Ref.Path, "resource": resourcePath}).Trace("process document")
 
