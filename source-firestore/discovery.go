@@ -90,6 +90,7 @@ func generateMinimalSchema() json.RawMessage {
 			"properties": map[string]*jsonschema.Schema{
 				metaProperty: metadataSchema,
 			},
+			"x-infer-schema": true,
 		},
 	}
 
