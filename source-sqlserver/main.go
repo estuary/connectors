@@ -14,8 +14,7 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/invopop/jsonschema"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -43,7 +42,7 @@ type Config struct {
 type advancedConfig struct {
 	//PublicationName   string `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
 	//SlotName          string `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
-	//WatermarksTable   string `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	WatermarksTable string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 	//SkipBackfills     string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize int `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=4096,description=The number of rows which should be fetched from the database in a single backfill query."`
 }
@@ -70,9 +69,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	//if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
-	//	return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
-	//}
+	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
+		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
+	}
 	//if c.Advanced.SkipBackfills != "" {
 	//	for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
 	//		if !strings.Contains(skipStreamID, ".") {
@@ -93,9 +92,9 @@ func (c *Config) SetDefaults() {
 	// if c.Advanced.PublicationName == "" {
 	// 	c.Advanced.PublicationName = "flow_publication"
 	// }
-	// if c.Advanced.WatermarksTable == "" {
-	// 	c.Advanced.WatermarksTable = "public.flow_watermarks"
-	// }
+	if c.Advanced.WatermarksTable == "" {
+		c.Advanced.WatermarksTable = "dbo.flow_watermarks"
+	}
 	if c.Advanced.BackfillChunkSize <= 0 {
 		c.Advanced.BackfillChunkSize = 4096
 	}
@@ -165,7 +164,7 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
 		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
 		if err := tunnel.Start(); err != nil {
-			logrus.WithField("error", err).Error("network tunnel error")
+			log.WithField("error", err).Error("network tunnel error")
 		}
 	}
 
@@ -182,7 +181,7 @@ type sqlserverDatabase struct {
 }
 
 func (db *sqlserverDatabase) connect(ctx context.Context) error {
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(log.Fields{
 		"address": db.config.Address,
 		"user":    db.config.User,
 	}).Info("initializing connector")
@@ -216,7 +215,7 @@ func (db *sqlserverDatabase) WriteWatermark(ctx context.Context, watermark strin
 
 // WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
 func (db *sqlserverDatabase) WatermarksTable() string {
-	panic("NOT YET IMPLEMENTED: WatermarksTable")
+	return db.config.Advanced.WatermarksTable
 }
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
@@ -224,19 +223,22 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	panic("NOT YET IMPLEMENTED: ScanTableChunk")
 }
 
-// DiscoverTables queries the database for information about tables available for capture.
-func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
-	panic("NOT YET IMPLEMENTED: DiscoverTables")
-}
-
-// TranslateDBToJSONType returns JSON schema information about the provided database column type.
-func (db *sqlserverDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
-	panic("NOT YET IMPLEMENTED: TranslateDBToJSONType")
-}
-
 // Returns an empty instance of the source-specific metadata (used for JSON schema generation).
 func (db *sqlserverDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
-	panic("NOT YET IMPLEMENTED: EmptySourceMetadata")
+	return &sqlserverSourceInfo{}
+}
+
+// sqlserverSourceInfo is source metadata for data capture events.
+type sqlserverSourceInfo struct {
+	sqlcapture.SourceCommon
+}
+
+func (s *sqlserverSourceInfo) Common() sqlcapture.SourceCommon {
+	return s.SourceCommon
+}
+
+func (s *sqlserverSourceInfo) Cursor() string {
+	return "TBD"
 }
 
 // ShouldBackfill returns true if a given table's contents should be backfilled.
