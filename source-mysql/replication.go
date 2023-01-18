@@ -424,7 +424,15 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 		logrus.WithField("query", query).Trace("ignoring benign query")
 	case *sqlparser.AlterTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
-			return fmt.Errorf("unsupported operation (go.estuary.dev/eVVwet): %s", query)
+			logrus.WithFields(logrus.Fields{
+				"query":         query,
+				"partitionSpec": stmt.PartitionSpec,
+				"alterOptions":  stmt.AlterOptions,
+			}).Info("parsed components of ALTER TABLE statement")
+
+			if stmt.PartitionSpec == nil || len(stmt.AlterOptions) != 0 {
+				return fmt.Errorf("unsupported operation (go.estuary.dev/eVVwet): %s", query)
+			}
 		}
 	case *sqlparser.DropTable:
 		for _, table := range stmt.FromTables {
