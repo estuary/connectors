@@ -424,46 +424,46 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 		logrus.WithField("query", query).Trace("ignoring benign query")
 	case *sqlparser.AlterTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
-			return fmt.Errorf("unsupported operation ALTER TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
+			return fmt.Errorf("unsupported operation (go.estuary.dev/eVVwet): %s", query)
 		}
 	case *sqlparser.DropTable:
 		for _, table := range stmt.FromTables {
 			if streamID := resolveTableName(schema, table); rs.tableActive(streamID) {
-				return fmt.Errorf("unsupported operation DROP TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
+				return fmt.Errorf("unsupported operation (go.estuary.dev/eVVwet): %s", query)
 			}
 		}
 	case *sqlparser.TruncateTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
-			return fmt.Errorf("unsupported operation TRUNCATE TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
+			return fmt.Errorf("unsupported operation (go.estuary.dev/eVVwet): %s", query)
 		}
 	case *sqlparser.RenameTable:
 		for _, pair := range stmt.TablePairs {
 			if streamID := resolveTableName(schema, pair.FromTable); rs.tableActive(streamID) {
-				return fmt.Errorf("unsupported operation RENAME TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
+				return fmt.Errorf("operation conflicts with %s (go.estuary.dev/eVVwet): %s", streamID, query)
 			}
 			if streamID := resolveTableName(schema, pair.ToTable); rs.tableActive(streamID) {
-				return fmt.Errorf("unsupported operation RENAME TABLE on stream %q (go.estuary.dev/eVVwet)", streamID)
+				return fmt.Errorf("operation conflicts with %s (go.estuary.dev/eVVwet): %s", streamID, query)
 			}
 		}
 	case *sqlparser.Insert:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
-			return fmt.Errorf("unsupported DML query %q (go.estuary.dev/IK5EVx)", query)
+			return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 		}
 	case *sqlparser.Update:
 		// TODO(wgd): It would be nice to only halt on UPDATE statements impacting
 		// active tables. Unfortunately UPDATE queries are complicated and it's not
 		// as simple to implement that check as for INSERT and DELETE.
-		return fmt.Errorf("unsupported DML query %q (go.estuary.dev/IK5EVx)", query)
+		return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 	case *sqlparser.Delete:
 		for _, target := range stmt.Targets {
 			if streamID := resolveTableName(schema, target); rs.tableActive(streamID) {
-				return fmt.Errorf("unsupported DML query %q (go.estuary.dev/IK5EVx)", query)
+				return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 			}
 		}
 	case *sqlparser.OtherAdmin:
 		// We ignore queries like REPAIR or OPTIMIZE.
 	default:
-		return fmt.Errorf("unhandled query %q (go.estuary.dev/ceqr74)", query)
+		return fmt.Errorf("unhandled query (go.estuary.dev/ceqr74): %s", query)
 	}
 
 	return nil
