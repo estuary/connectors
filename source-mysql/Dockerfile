@@ -42,12 +42,12 @@ COPY --from=busybox:latest /bin/sh /bin/sh
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
-COPY --from=builder /builder/connector ./connector
+COPY --from=builder /builder/connector ./source-mysql
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-ENTRYPOINT ["/connector/connector"]
+ENTRYPOINT ["/connector/source-mysql"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture

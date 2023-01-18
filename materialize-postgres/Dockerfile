@@ -33,7 +33,7 @@ FROM ${BASE_IMAGE}
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
-COPY --from=builder /builder/connector ./connector
+COPY --from=builder /builder/connector ./materialize-postgres
 COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 # Avoid running the connector as root.
@@ -41,4 +41,4 @@ USER nonroot:nonroot
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
-ENTRYPOINT ["/connector/connector"]
+ENTRYPOINT ["/connector/materialize-postgres"]

@@ -33,13 +33,13 @@ ENV PATH="/connector:$PATH"
 COPY flow-bin/flow-parser ./
 
 # Bring in the compiled connector artifact from the builder.
-COPY --from=builder /builder/connector ./connector
+COPY --from=builder /builder/connector ./source-gcs
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
 COPY --from=ghcr.io/estuary/airbyte-to-flow:dev /airbyte-to-flow ./
-ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/connector"]
+ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/source-gcs"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture
