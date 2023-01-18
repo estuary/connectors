@@ -170,6 +170,18 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 				}
 				return t.Format(time.RFC3339Nano), nil
 			case "datetime":
+				// Per the MySQL docs:
+				//
+				//  > Invalid DATE, DATETIME, or TIMESTAMP values are converted to the “zero” value
+				//  > of the appropriate type ('0000-00-00' or '0000-00-00 00:00:00')"
+				//
+				// But month 0 and day 0 don't exist so this can't be parsed and even if
+				// it could it wouldn't be a valid RFC3339 timestamp. Since this is the
+				// "your data is junk" sentinel value we replace it with a similar one
+				// that actually is a valid RFC3339 timestamp.
+				if string(val) == "0000-00-00 00:00:00" {
+					return "0001-01-01T00:00:00Z", nil
+				}
 				if db.datetimeLocation == nil {
 					return nil, fmt.Errorf("unable to translate DATETIME values: %w", errDatabaseTimezoneUnknown)
 				}
