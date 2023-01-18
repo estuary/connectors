@@ -1,24 +1,7 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "properties": {
-    "canary": {
-      "type": "string"
-    },
-    "foo": {
-      "type": [
-        "boolean",
-        "integer",
-        "string"
-      ]
-    },
-    "id": {
-      "type": "integer"
-    }
-  },
   "required": [
-    "canary",
-    "foo",
-    "id"
+    "_meta"
   ],
-  "type": "object"
+  "type": "object",
+  "x-infer-schema": true
 }
