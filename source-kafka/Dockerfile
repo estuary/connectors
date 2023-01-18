@@ -48,13 +48,13 @@ COPY --from=builder /usr/lib/x86_64-linux-gnu/sasl2/libsasldb.so* /usr/lib/x86_6
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libsasl2.so.2* /usr/lib/x86_64-linux-gnu/
 
 # Copy in the connector artifact.
-COPY --from=builder /usr/local/cargo/bin/source-kafka ./connector
+COPY --from=builder /usr/local/cargo/bin/source-kafka ./source-kafka
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
 COPY --from=ghcr.io/estuary/airbyte-to-flow:dev /airbyte-to-flow ./
-ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/connector"]
+ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/source-kafka"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture

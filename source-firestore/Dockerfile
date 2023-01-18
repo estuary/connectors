@@ -36,7 +36,7 @@ COPY flow-bin/flow-parser ./
 COPY flow-bin/flow-schema-inference ./
 
 # Bring in the compiled connector artifact from the builder.
-COPY --from=builder /builder/connector ./connector
+COPY --from=builder /builder/connector ./source-firestore
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture
@@ -44,4 +44,4 @@ LABEL CONNECTOR_PROTOCOL=flow-capture
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-ENTRYPOINT ["/connector/connector"]
+ENTRYPOINT ["/connector/source-firestore"]
