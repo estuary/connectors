@@ -39,17 +39,18 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 	// the corresponding DiscoveryInfo.
 	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
 	for _, column := range columns {
-		var id = column.TableSchema + "." + column.TableName
-		var info, ok = tableMap[id]
+		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
+		var info, ok = tableMap[streamID]
 		if !ok {
 			info = &sqlcapture.DiscoveryInfo{Schema: column.TableSchema, Name: column.TableName}
 		}
+
 		if info.Columns == nil {
 			info.Columns = make(map[string]sqlcapture.ColumnInfo)
 		}
 		info.Columns[column.Name] = column
 		info.ColumnNames = append(info.ColumnNames, column.Name)
-		tableMap[id] = info
+		tableMap[streamID] = info
 	}
 	for _, desc := range columnDescriptions {
 		var id = desc.TableSchema + "." + desc.TableName
