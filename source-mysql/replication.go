@@ -391,7 +391,7 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 // prefix matching to detect many types of query that we just completely
 // don't care about. This is good, because the Vitess SQL parser disagrees
 // with the binlog Query Events for some statements like GRANT and CREATE USER.
-var ignoreQueriesRe = regexp.MustCompile(`^(BEGIN|COMMIT|GRANT|CREATE USER|DROP USER|# )`)
+var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|CREATE USER|DROP USER|DROP PROCEDURE|# )`)
 
 func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	// There are basically three types of query events we might receive:
@@ -406,16 +406,15 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	//     that we don't care about, either because they change things that
 	//     don't impact our capture or because we get the relevant information
 	//     by some other means.
-	logrus.WithField("query", query).Debug("handling query event")
-
 	if ignoreQueriesRe.MatchString(query) {
-		logrus.WithField("query", query).Trace("ignoring safe query without parsing")
+		logrus.WithField("query", query).Debug("ignoring query event")
 		return nil
 	}
+	logrus.WithField("query", query).Debug("handling query event")
 
 	var stmt, err = sqlparser.Parse(query)
 	if err != nil {
-		return fmt.Errorf("error parsing query: %w", err)
+		return fmt.Errorf("parsing query %s: %w", query, err)
 	}
 	logrus.WithField("stmt", fmt.Sprintf("%#v", stmt)).Debug("parsed query")
 
