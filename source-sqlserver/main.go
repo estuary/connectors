@@ -202,27 +202,6 @@ func (db *sqlserverDatabase) Close(ctx context.Context) error {
 	return nil
 }
 
-// ReplicationStream constructs a new ReplicationStream object, from which
-// a neverending sequence of change events can be read.
-func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
-	panic("NOT YET IMPLEMENTED: ReplicationStream")
-}
-
-// WriteWatermark writes the provided string into the 'watermarks' table.
-func (db *sqlserverDatabase) WriteWatermark(ctx context.Context, watermark string) error {
-	panic("NOT YET IMPLEMENTED: WriteWatermark")
-}
-
-// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
-func (db *sqlserverDatabase) WatermarksTable() string {
-	return db.config.Advanced.WatermarksTable
-}
-
-// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
-func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, keyColumns []string, resumeAfter []byte) ([]*sqlcapture.ChangeEvent, error) {
-	panic("NOT YET IMPLEMENTED: ScanTableChunk")
-}
-
 // Returns an empty instance of the source-specific metadata (used for JSON schema generation).
 func (db *sqlserverDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &sqlserverSourceInfo{}
@@ -238,10 +217,6 @@ func (s *sqlserverSourceInfo) Common() sqlcapture.SourceCommon {
 }
 
 func (s *sqlserverSourceInfo) Cursor() string {
+	// TODO(wgd): Implement replication cursors
 	return "TBD"
-}
-
-// ShouldBackfill returns true if a given table's contents should be backfilled.
-func (db *sqlserverDatabase) ShouldBackfill(streamID string) bool {
-	panic("NOT YET IMPLEMENTED: ShouldBackfill")
 }
