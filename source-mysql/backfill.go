@@ -131,7 +131,12 @@ func (db *mysqlDatabase) buildScanQuery(start bool, keyColumns []string, columnT
 
 	// Construct the query itself
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM %s.%s", schemaName, tableName)
+	// * HIGH_PRIORITY: gives the SELECT higher priority than a pending statement that updates a table.
+	// * SQL_BUFFER_RESULT: forces the result to be put into a temporary table.
+	//   This helps MySQL free the table locks early and helps in cases where it takes a long time to send.
+	// * SQL_NO_CACHE: the server does not use the query cache.
+	//   It neither checks the query cache to see whether the result is already cached, nor does it cache the query result
+	fmt.Fprintf(query, "SELECT HIGH_PRIORITY SQL_BUFFER_RESULT SQL_NO_CACHE * FROM %s.%s", schemaName, tableName)
 	if !start {
 		fmt.Fprintf(query, " WHERE (%s) > (%s)", strings.Join(pkey, ", "), strings.Join(args, ", "))
 	}
