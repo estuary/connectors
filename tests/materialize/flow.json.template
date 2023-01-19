@@ -40,6 +40,19 @@
           "type": "object"
        },
        "key": ["/id"]
+    },
+
+    "${TEST_COLLECTION_FORMATTED_STRINGS}": {
+       "schema": {
+       "properties": {
+           "id": { "type": "integer" },
+           "int_str": {"type": ["integer", "string"], "format": "integer" },
+           "num_str": {"type": ["number", "string"], "format": "number" }
+          },
+          "required": ["id"],
+          "type": "object"
+       },
+       "key": ["/id"]
     }
   },
 
@@ -50,6 +63,7 @@
         { "target": "${TEST_COLLECTION_SIMPLE}", "resource": { "name": "${TEST_COLLECTION_SIMPLE}" } },
         { "target": "${TEST_COLLECTION_DUPLICATED_KEYS}", "resource": { "name": "${TEST_COLLECTION_DUPLICATED_KEYS}" } },
         { "target": "${TEST_COLLECTION_MULTIPLE_DATATYPES}", "resource": { "name": "${TEST_COLLECTION_MULTIPLE_DATATYPES}" } },
+        { "target": "${TEST_COLLECTION_FORMATTED_STRINGS}", "resource": { "name": "${TEST_COLLECTION_FORMATTED_STRINGS}" } },
       ]
     },
   },

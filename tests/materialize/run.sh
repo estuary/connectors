@@ -62,6 +62,7 @@ export PUSH_CAPTURE_NAME=test/ingest
 export TEST_COLLECTION_SIMPLE="tests/${CONNECTOR}/simple"
 export TEST_COLLECTION_DUPLICATED_KEYS="tests/${CONNECTOR}/duplicated-keys"
 export TEST_COLLECTION_MULTIPLE_DATATYPES="tests/${CONNECTOR}/multiple-datatypes"
+export TEST_COLLECTION_FORMATTED_STRINGS="tests/${CONNECTOR}/formatted-strings"
 
 # 2. the paths of test datasets that matches the test collections.
 # - a dataset that matches the schema of TEST_COLLECTION_SIMPLE.
@@ -70,11 +71,14 @@ export DATASET_SIMPLE="${ROOT_DIR}/tests/materialize/datasets/simple.jsonl"
 export DATASET_DUPLICATED_KEYS="${ROOT_DIR}/tests/materialize/datasets/duplicated-keys.jsonl"
 # - a dataset that matches the schema of TEST_COLLECTION_MULTIPLE_DATATYPES.
 export DATASET_MULTIPLE_DATATYPES="${ROOT_DIR}/tests/materialize/datasets/multiple-datatypes.jsonl"
+# - a dataset that matches the schema of TEST_COLLECTION_FORMATTED_STRINGS.
+export DATASET_FORMATTED_STRINGS="${ROOT_DIR}/tests/materialize/datasets/formatted-strings.jsonl"
 
 # 3. the binding number of datasets in the push capture.
 export BINDING_NUM_SIMPLE=0
 export BINDING_NUM_DUPLICATED_KEYS=1
 export BINDING_NUM_MULTIPLE_DATATYPES=2
+export BINDING_NUM_FORMATTED_STRINGS=3
 
 echo -e "\nexecuting setup"
 source "${CONNECTOR_TEST_SCRIPTS_DIR}/setup.sh" || bail "setup failed"

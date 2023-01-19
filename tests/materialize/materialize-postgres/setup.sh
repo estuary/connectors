@@ -65,6 +65,19 @@ resources_json_template='[
         "array_int": {}
       }
     }
+  },
+  {
+    "resource": {
+      "table": "Formatted Strings"
+    },
+    "source": "${TEST_COLLECTION_FORMATTED_STRINGS}",
+    "fields": {
+      "recommended": true,
+      "include": {
+        "int_str": {},
+        "num_str": {}
+      }
+    }
   }
 ]'
 
