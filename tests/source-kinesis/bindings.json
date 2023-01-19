@@ -1,4 +1,21 @@
 {
+  "properties": {
+    "_meta": {
+      "properties": {
+        "partition_key": {
+          "type": "string"
+        },
+        "sequence_number": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sequence_number",
+        "partition_key"
+      ],
+      "type": "object"
+    }
+  },
   "required": [
     "_meta"
   ],
