@@ -425,7 +425,21 @@ func (r *shardReader) extractRecords(resp *kinesis.GetRecordsOutput) []json.RawM
 	} else {
 		var result = make([]json.RawMessage, len(resp.Records))
 		for i, rec := range resp.Records {
-			result[i] = json.RawMessage(rec.Data)
+			var j = make(map[string]interface{})
+			if err := json.Unmarshal(rec.Data, &j); err != nil {
+				panic(err)
+			}
+
+			j[metaProperty] = make(map[string]string)
+			j[metaProperty].(map[string]string)[sequenceNumber] = *rec.SequenceNumber
+			j[metaProperty].(map[string]string)[partitionKey] = *rec.PartitionKey
+
+			bs, err := json.Marshal(&j)
+			if err != nil {
+				panic(err)
+			}
+
+			result[i] = json.RawMessage(bs)
 		}
 		return result
 	}
