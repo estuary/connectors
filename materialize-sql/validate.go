@@ -71,14 +71,14 @@ func ValidateNewSQLProjections(resource Resource, proposed *pf.CollectionSpec) m
 			constraint.Type = pm.Constraint_LOCATION_RECOMMENDED
 			constraint.Reason = "The projection has a single scalar type"
 
-		case projection.Inference.IsSingleType():
+		case projection.Inference.IsSingleType() || len(effectiveJsonTypes(&projection)) == 1:
 			constraint.Type = pm.Constraint_FIELD_OPTIONAL
 			constraint.Reason = "This field is able to be materialized"
 		default:
-			// If we got here, then either the field may have multiple types, or the only possible
-			// type is "null". In either case, we're not going to allow it. Technically, we could
-			// allow the null type to be materialized, but I can't think of a use case where that
-			// would be desirable.
+			// If we got here, then either the field may have multiple incompatible types, or the
+			// only possible type is "null". In either case, we're not going to allow it.
+			// Technically, we could allow the null type to be materialized, but I can't think of a
+			// use case where that would be desirable.
 			constraint.Type = pm.Constraint_FIELD_FORBIDDEN
 			constraint.Reason = "Cannot materialize this field"
 		}
@@ -130,11 +130,13 @@ func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.Coll
 		return "The proposed materialization is missing the projection, which is required because it's included in the existing materialization"
 	}
 
-	// Ensure that the possible types of the proposed are a subset of the existing possible types.
-	// The new projection is allowed to contain fewer types than the original, though, since that
-	// will always work with the original database schema.
-	for _, pt := range proposedProjection.Inference.Types {
-		if !SliceContains(pt, existingProjection.Inference.Types) && pt != "null" {
+	// Ensure that the possible types of the proposed are compatible with the possible types of the
+	// existing. The new projection is always allowed to contain fewer types than the original since
+	// that will always work with the original database schema. Additional proposed types may be
+	// compatible if they do not alter the effective FlatType, such as adding a string formatted as
+	// an integer to an existing integer type.
+	for _, pt := range effectiveJsonTypes(proposedProjection) {
+		if !SliceContains(pt, effectiveJsonTypes(existingProjection)) && pt != "null" {
 			return fmt.Sprintf("The proposed projection may contain the type '%s', which is not part of the original projection", pt)
 		}
 	}

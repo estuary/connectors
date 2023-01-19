@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
 
@@ -33,6 +34,17 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
+// Snowflake INTEGER values support up to 38 digits, which is more than an int64.
+func strToSfInt(str string) (interface{}, error) {
+	var i big.Int
+	out, ok := i.SetString(str, 10)
+	if !ok {
+		return nil, fmt.Errorf("could not convert %q to big.Int", str)
+	}
+
+	return out, nil
+}
+
 // snowflakeDialect returns a representation of the Snowflake SQL dialect.
 var snowflakeDialect = func() sql.Dialect {
 	var variantMapper = sql.NewStaticMapper("VARIANT", sql.WithElementConverter(jsonConverter))
@@ -40,9 +52,12 @@ var snowflakeDialect = func() sql.Dialect {
 		sql.ARRAY:   variantMapper,
 		sql.BINARY:  sql.NewStaticMapper("BINARY"),
 		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER: sql.NewStaticMapper("INTEGER"),
-		sql.NUMBER:  sql.NewStaticMapper("DOUBLE"),
-		sql.OBJECT:  variantMapper,
+		sql.INTEGER: sql.NewStaticMapper(
+			"INTEGER",
+			sql.WithElementConverter(sql.StringCastConverter(strToSfInt)),
+		),
+		sql.NUMBER: sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat())),
+		sql.OBJECT: variantMapper,
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("STRING"),
 			WithFormat: map[string]sql.TypeMapper{
