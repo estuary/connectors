@@ -12,6 +12,8 @@ import (
 
 const (
 	metaProperty  = "_meta"
+	sequenceNumber = "sequence_number"
+	partitionKey = "partition_key"
 )
 
 // Provides a default schema to use for collections.
@@ -21,6 +23,23 @@ var minimalSchema = &jsonschema.Schema{
 		AdditionalProperties: nil,
 		Extras: map[string]interface{}{
 			"x-infer-schema": true,
+
+			"properties": map[string]*jsonschema.Schema{
+				metaProperty: &jsonschema.Schema{
+					Type: "object",
+					Required: []string{sequenceNumber, partitionKey},
+					Extras: map[string]interface{}{
+						"properties": map[string]*jsonschema.Schema{
+							sequenceNumber: &jsonschema.Schema{
+								Type: "string",
+							},
+							partitionKey: &jsonschema.Schema{
+								Type: "string",
+							},
+						},
+					},
+				},
+			},
 		},
 }
 
@@ -38,6 +57,7 @@ func discoverStreams(ctx context.Context, client *kinesis.Kinesis, streamNames [
 			Name:                name,
 			JSONSchema:          json.RawMessage(bs),
 			SupportedSyncModes:  []airbyte.SyncMode{airbyte.SyncModeIncremental},
+			SourceDefinedPrimaryKey: [][]string{{metaProperty, sequenceNumber}, {metaProperty, partitionKey}},
 			SourceDefinedCursor: true,
 		}
 	}
