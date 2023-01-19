@@ -9,8 +9,8 @@ import (
 
 var pgDialect = func() sql.Dialect {
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
+		sql.INTEGER: sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
+		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
 		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:  sql.NewStaticMapper("JSON"),
 		sql.ARRAY:   sql.NewStaticMapper("JSON"),

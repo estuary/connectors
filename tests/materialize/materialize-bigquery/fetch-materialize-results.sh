@@ -20,3 +20,4 @@ function exportToJsonl() {
 exportToJsonl "simple" > "${TEST_DIR}/${result_dir}/simple.jsonl"
 exportToJsonl "duplicate_keys" > "${TEST_DIR}/${result_dir}/duplicated-keys.jsonl"
 exportToJsonl "multiple_types" > "${TEST_DIR}/${result_dir}/multiple-data-types.jsonl"
+exportToJsonl "formatted_strings" > "${TEST_DIR}/${result_dir}/formatted-strings.jsonl"
