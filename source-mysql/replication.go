@@ -409,7 +409,7 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	//     don't impact our capture or because we get the relevant information
 	//     by some other means.
 	if ignoreQueriesRe.MatchString(query) {
-		logrus.WithField("query", query).Debug("ignoring query event")
+		logrus.WithField("query", query).Trace("ignoring query event")
 		return nil
 	}
 	logrus.WithField("query", query).Debug("handling query event")
