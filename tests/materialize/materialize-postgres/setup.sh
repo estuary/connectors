@@ -75,7 +75,8 @@ resources_json_template='[
       "recommended": true,
       "include": {
         "int_str": {},
-        "num_str": {}
+        "num_str": {},
+        "frac_str": {}
       }
     }
   }
