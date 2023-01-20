@@ -250,8 +250,12 @@ func (c *Capture) updateState(ctx context.Context) error {
 		// otherwise use the "native" primary key of this table in the database.
 		// Print a warning if the two are not the same.
 		var primaryKey []string
-		if dinfo := c.discovery[streamID]; dinfo != nil && len(dinfo.PrimaryKey) > 0 {
-			primaryKey = c.discovery[streamID].PrimaryKey
+		var discoveryInfo = c.discovery[streamID]
+		if discoveryInfo == nil {
+			return fmt.Errorf("table %q is a configured binding of this capture, but doesn't exist or isn't visible with current permissions", streamID)
+		}
+		if len(discoveryInfo.PrimaryKey) > 0 {
+			primaryKey = discoveryInfo.PrimaryKey
 			if len(primaryKey) != 0 {
 				logrus.WithFields(logrus.Fields{
 					"table": streamID,
