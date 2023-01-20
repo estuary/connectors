@@ -48,7 +48,7 @@
            "id": { "type": "integer" },
            "int_str": {"type": ["integer", "string"], "format": "integer"},
            "num_str": {"type": ["number", "string"], "format": "number"},
-           "frac_str": {"type": ["number", "string"], "format": "number", not: { "type": "integer" }}
+           "frac_str": {"type": ["fractional", "string"], "format": "fractional"}
           },
           "required": ["id"],
           "type": "object"
