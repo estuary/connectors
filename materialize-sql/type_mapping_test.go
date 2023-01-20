@@ -87,7 +87,7 @@ func TestAsFlatType(t *testing.T) {
 			name: "multiple types with null",
 			inference: pf.Inference{
 				Exists: pf.Inference_MUST,
-				Types:  []string{"integer", "string", pf.JsonTypeNull},
+				Types:  []string{"integer", "string", "null"},
 			},
 			flatType:  MULTIPLE,
 			mustExist: false,
@@ -153,13 +153,25 @@ func TestAsFlatType(t *testing.T) {
 			name: "allowable format with a null is not mustExist",
 			inference: pf.Inference{
 				Exists: pf.Inference_MUST,
-				Types:  []string{"string", pf.JsonTypeNull},
+				Types:  []string{"string", "null"},
 				String_: &pf.Inference_String{
 					Format: "number",
 				},
 			},
 			flatType:  STRING,
 			mustExist: false,
+		},
+		{
+			name: "single string formatted as numeric",
+			inference: pf.Inference{
+				Exists: pf.Inference_MUST,
+				Types:  []string{"string"},
+				String_: &pf.Inference_String{
+					Format: "number",
+				},
+			},
+			flatType:  NUMBER,
+			mustExist: true,
 		},
 	}
 
