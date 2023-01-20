@@ -1,10 +1,10 @@
-{ "id":1, "int_str":1, "num_str":1.0, "frac_str":1.2 }
-{ "id":2, "int_str":2, "num_str":2.2, "frac_str":2.3 }
-{ "id":3, "int_str":3, "num_str":3.3, "frac_str":3.4 }
-{ "id":4, "int_str":"4", "num_str":"4.4", "frac_str":"4.5" }
-{ "id":5, "int_str":"5", "num_str":"5.5", "frac_str":"5.6" }
-{ "id":1, "int_str":"1", "num_str":"1.0", "frac_str":"1.2" }
-{ "id":2, "int_str":"2", "num_str":"2.2", "frac_str":"2.3" }
-{ "id":3, "int_str":"3", "num_str":"3.3", "frac_str":"3.4" }
-{ "id":4, "int_str":4, "num_str":4.4, "frac_str":4.5 }
-{ "id":5, "int_str":5, "num_str":5.5, "frac_str":5.6 }
+{ "id":1, "int_and_str":1, "num_and_str":1.1, "frac_and_str":1.2, "int_str": "10", "num_str":"10.1", "frac_str":"10.2" }
+{ "id":2, "int_and_str":2, "num_and_str":2.1, "frac_and_str":2.2, "int_str": "20", "num_str":"20.1", "frac_str":"20.2" }
+{ "id":3, "int_and_str":3, "num_and_str":3.1, "frac_and_str":3.2, "int_str": "30", "num_str":"30.1", "frac_str":"30.2" }
+{ "id":4, "int_and_str":"4", "num_and_str":"4.1", "frac_and_str":"4.2", "int_str": "40", "num_str":"40.1", "frac_str":"40.2" }
+{ "id":5, "int_and_str":"5", "num_and_str":"5.1", "frac_and_str":"5.2", "int_str": "50", "num_str":"50.1", "frac_str":"50.2" }
+{ "id":1, "int_and_str":"1", "num_and_str":"1.1", "frac_and_str":"1.2", "int_str": "10", "num_str":"10.1", "frac_str":"10.2" }
+{ "id":2, "int_and_str":"2", "num_and_str":"2.1", "frac_and_str":"2.2", "int_str": "20", "num_str":"20.1", "frac_str":"20.2" }
+{ "id":3, "int_and_str":"3", "num_and_str":"3.1", "frac_and_str":"3.2", "int_str": "30", "num_str":"30.1", "frac_str":"30.2" }
+{ "id":4, "int_and_str":4, "num_and_str":4.1, "frac_and_str":4.2, "int_str": "40", "num_str":"40.1", "frac_str":"40.2" }
+{ "id":5, "int_and_str":5, "num_and_str":5.1, "frac_and_str":5.2, "int_str": "50", "num_str":"50.1", "frac_str":"50.2" }
