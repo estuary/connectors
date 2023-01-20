@@ -12,7 +12,6 @@ COPY go.* ./
 RUN go mod download
 
 # Build the connector projects we depend on.
-COPY schema_inference ./schema_inference
 COPY source-kinesis ./source-kinesis
 
 # Run the unit tests.
@@ -28,9 +27,6 @@ FROM ${BASE_IMAGE}
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
-
-# Grab the statically-built schema-inference cli.
-COPY flow-bin/flow-schema-inference ./
 
 COPY --from=busybox:latest /bin/sh /bin/sh
 
