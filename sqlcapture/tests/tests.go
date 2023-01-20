@@ -28,6 +28,7 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 	t.Run("MultipleStreams", func(t *testing.T) { testMultipleStreams(ctx, t, tb) })
 	t.Run("CatalogPrimaryKey", func(t *testing.T) { testCatalogPrimaryKey(ctx, t, tb) })
 	t.Run("CatalogPrimaryKeyOverride", func(t *testing.T) { testCatalogPrimaryKeyOverride(ctx, t, tb) })
+	t.Run("MissingTable", func(t *testing.T) { testMissingTable(ctx, t, tb) })
 	//t.Run("ComplexDataset", func(t *testing.T) { testComplexDataset(ctx, t, tb) })
 }
 
@@ -210,4 +211,21 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 		{1990, "XX", "No Such State", 123456},
 	})
 	t.Run("capture2", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
+}
+
+// testMissingTable verifies that things fail cleanly if a capture
+// binding doesn't actually exist.
+func testMissingTable(ctx context.Context, t *testing.T, tb TestBackend) {
+	var table1 = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var table2 = strings.ReplaceAll(table1, "one", "two") // This table doesn't actually exist
+	var cs = tb.CaptureSpec(t, table1, table2)
+	for _, binding := range cs.Bindings {
+		var res sqlcapture.Resource
+		require.NoError(t, json.Unmarshal(binding.ResourceSpecJson, &res))
+		res.PrimaryKey = []string{"id"}
+		var bs, err = json.Marshal(res)
+		require.NoError(t, err)
+		binding.ResourceSpecJson = bs
+	}
+	VerifiedCapture(ctx, t, cs)
 }
