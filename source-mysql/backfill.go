@@ -54,13 +54,22 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 	}
 
 	// Build a query to fetch the next `backfillChunkSize` rows from the database.
-	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
 	var query = db.buildScanQuery(resumeKey == nil, keyColumns, columnTypes, schema, table)
-	db.explainQuery(streamID, query, resumeKey)
+	// Splat the resume key into runs of arguments matching the predicate built by buildScanQuery.
+	// This is super gross, and is a work-around for lack of indexed positional argument support,
+	// AND lack of implementation for named arguments in our MySQL client.
+	// See: https://github.com/go-sql-driver/mysql/issues/561
+	var args []interface{}
+	for i := range resumeKey {
+		args = append(args, resumeKey[:i+1]...)
+	}
+
+	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
+	db.explainQuery(streamID, query, args)
 
 	// Execute the backfill query to fetch rows from the database
-	logrus.WithFields(logrus.Fields{"query": query, "args": resumeKey}).Debug("executing query")
-	results, err := db.conn.Execute(query, resumeKey...)
+	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
+	results, err := db.conn.Execute(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
@@ -119,24 +128,32 @@ var columnBinaryKeyComparison = map[string]bool{
 func (db *mysqlDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
-	var args []string
 	for _, colName := range keyColumns {
 		if colType, ok := columnTypes[colName].(string); ok && columnBinaryKeyComparison[colType] {
 			pkey = append(pkey, "BINARY "+colName)
 		} else {
 			pkey = append(pkey, colName)
 		}
-		args = append(args, "?")
 	}
 
-	// Construct the query itself
+	// Construct the query itself.
 	var query = new(strings.Builder)
-	// * HIGH_PRIORITY: gives the SELECT higher priority than a pending statement that updates a table.
-	// * SQL_BUFFER_RESULT: forces the result to be put into a temporary table.
-	//   This helps MySQL free the table locks early and helps in cases where it takes a long time to send.
-	fmt.Fprintf(query, "SELECT HIGH_PRIORITY * FROM %s.%s", schemaName, tableName)
+	fmt.Fprintf(query, "SELECT * FROM %s.%s", schemaName, tableName)
+
 	if !start {
-		fmt.Fprintf(query, " WHERE (%s) > (%s)", strings.Join(pkey, ", "), strings.Join(args, ", "))
+		for i := 0; i != len(pkey); i++ {
+			if i == 0 {
+				fmt.Fprintf(query, " WHERE (")
+			} else {
+				fmt.Fprintf(query, ") OR (")
+			}
+
+			for j := 0; j != i; j++ {
+				fmt.Fprintf(query, "%s = ? AND ", pkey[j])
+			}
+			fmt.Fprintf(query, "%s > ?", pkey[i])
+		}
+		fmt.Fprintf(query, ")")
 	}
 	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " LIMIT %d;", db.config.Advanced.BackfillChunkSize)
@@ -153,15 +170,20 @@ func (db *mysqlDatabase) explainQuery(streamID, query string, args []interface{}
 	}
 	db.explained[streamID] = struct{}{}
 
-	// Ask the database to EXPLAIN the backfill query
-	var explainQuery = "EXPLAIN " + query
-	logrus.WithFields(logrus.Fields{
-		"id":    streamID,
-		"query": explainQuery,
-	}).Info("explain backfill query")
-	explainResult, err := db.conn.Execute(explainQuery, args...)
+	// Ask the database to analyze the backfill query.
+	// ANALYZE is not universally supported, so try a few forms.
+	var explainResult, err = db.conn.Execute("ANALYZE "+query, args...)
 	if err != nil {
-		logrus.WithField("query", explainQuery).Warn("unable to execute query")
+		explainResult, err = db.conn.Execute("EXPLAIN ANALYZE "+query, args...)
+	}
+	if err != nil {
+		explainResult, err = db.conn.Execute("EXPLAIN "+query, args...)
+	}
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"query": query,
+			"err":   err,
+		}).Error("unable to explain query")
 		return
 	}
 	defer explainResult.Close()
@@ -179,6 +201,7 @@ func (db *mysqlDatabase) explainQuery(streamID, query string, args []interface{}
 		}
 		logrus.WithFields(logrus.Fields{
 			"id":       streamID,
+			"query":    query,
 			"response": result,
 		}).Info("explain backfill query")
 	}
