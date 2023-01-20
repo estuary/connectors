@@ -146,6 +146,9 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 	}
 	var watermarks = c.Database.WatermarksTable()
+	if c.discovery[watermarks] == nil {
+		return fmt.Errorf("watermarks table %q does not exist", watermarks)
+	}
 	replStream.ActivateTable(watermarks, c.discovery[watermarks].PrimaryKey, c.discovery[watermarks], nil)
 	if err := replStream.StartReplication(ctx); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
