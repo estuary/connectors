@@ -44,36 +44,6 @@ type transactor struct {
 	bindings []*binding
 }
 
-// awaitAllRocksetCollectionsReady will block until all the Rockset collections named in the bindings
-// are in `READY` status and have completed any pending bulk ingestions. Specifically, this waits until the
-// number of objects in the bucket (as reported by rockset) and the number of successfully imported objects
-// is the same.
-func (t *transactor) awaitAllRocksetCollectionsReady(ctx context.Context) error {
-	group, ctx := errgroup.WithContext(ctx)
-	for _, b := range t.bindings {
-		// Assignment here is required because we capture this in the goroutine function
-		var binding = b
-		group.Go(func() error {
-			var integration = ""
-			if binding.res.InitializeFromS3 != nil {
-				integration = binding.res.InitializeFromS3.Integration
-			}
-			var err = awaitCollectionReady(
-				ctx,
-				t.client,
-				binding.res.Workspace,
-				binding.res.Collection,
-				integration,
-			)
-			if err != nil {
-				return fmt.Errorf("awaiting readiness of rockset collection '%s': %w", binding.res.Collection, err)
-			}
-			return nil
-		})
-	}
-	return group.Wait()
-}
-
 // pm.Transactor
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(binding int, doc json.RawMessage) error) error {
 	for it.Next() {
@@ -129,19 +99,8 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			}).Debug("Closed AddDocuments channel")
 		}
 	}
-	if err := errGroup.Wait(); err != nil {
-		return nil, err
-	}
 
-	return func(_ context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
-		// There's nothing in particular to be done here, but what we're _not_ doing is notable.  We return an empty driver
-		// checkpoint here, which may clear out a previous driver checkpoint from the materialize-s3-parquet connector, if
-		// the user had used that to backfill data.
-		return &pf.DriverCheckpoint{
-			DriverCheckpointJson: []byte("{}"),
-			Rfc7396MergePatch:    false,
-		}, nil
-	}, nil
+	return nil, errGroup.Wait()
 }
 
 // pm.Transactor

@@ -2,9 +2,11 @@ package materialize_rockset
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -225,13 +227,21 @@ func testConfig() config {
 }
 
 func randWorkspace() string {
-	return fmt.Sprintf("automated-tests-%s", RandString(6))
+	return fmt.Sprintf("automated-tests-%s", randString(6))
 }
 
 func randCollection() string {
-	return fmt.Sprintf("c-%s", RandString(6))
+	return fmt.Sprintf("c-%s", randString(6))
 }
 
 func fetchApiKey() string {
 	return os.Getenv("ROCKSET_API_KEY")
+}
+
+func randString(len int) string {
+	var buffer = make([]byte, len)
+	if _, err := rand.Read(buffer); err != nil {
+		panic("failed to generate random string")
+	}
+	return hex.EncodeToString(buffer)
 }

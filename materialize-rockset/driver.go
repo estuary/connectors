@@ -2,9 +2,6 @@ package materialize_rockset
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -15,7 +12,6 @@ import (
 	_ "time/tzdata"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
-	"github.com/estuary/connectors/materialize-s3-parquet/checkpoint"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	rockset "github.com/rockset/rockset-go-client"
@@ -82,60 +78,6 @@ type resource struct {
 	Collection string `json:"collection" jsonschema:"title=Rockset Collection,description=The name of the Rockset collection (will be created if it does not exist)" jsonschema_extras:"x-collection-name=true"`
 	// Additional settings for creating the Rockset collection, which are likely to be rarely used.
 	AdvancedCollectionSettings *collectionSettings `json:"advancedCollectionSettings,omitempty" jsonschema:"title=Advanced Collection Settings" jsonschema_extras:"advanced=true"`
-	// Configures the rockset collection to bulk load an initial data set from an S3 bucket, before
-	// transitioning to using the write API for ongoing data. If a previous version of this
-	// materialization wrote files into S3 in order to more quickly backfill historical data, then
-	// this value should contain configuration about the integration.  See:
-	// https://go.estuary.dev/rock-bulk If a bulk loading integration is not being used, then this
-	// should be undefined.
-	InitializeFromS3 *cloudStorageIntegration `json:"initializeFromS3,omitempty" jsonschema:"title=Backfill from S3" jsonschema_extras:"advanced=true"`
-}
-
-// Configuration for bulk loading data into the new Rockset collection from a cloud storage bucket.
-type cloudStorageIntegration struct {
-	Integration string  `json:"integration" jsonschema:"title=Integration Name,description=The name of the integration that was previously created in the Rockset UI"`
-	Bucket      string  `json:"bucket" jsonschema:"title=Bucket,description=The name of the S3 bucket to load data from."`
-	Region      *string `json:"region,omitempty" jsonschema:"title=Region,description=The AWS region in which the bucket resides. Optional."`
-	Pattern     *string `json:"pattern,omitempty" jsonschema:"title=Pattern,description=A regex that is used to match objects to be ingested, according to the rules specified in the rockset docs (https://rockset.com/docs/amazon-s3/#specifying-s3-path). Optional. Must not be set if 'prefix' is defined"`
-	Prefix      *string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Prefix of the data within the S3 bucket. All files under this prefix will be loaded. Optional. Must not be set if 'pattern' is defined."`
-}
-
-func (c *cloudStorageIntegration) Validate() error {
-	var requiredProperties = [][]string{
-		{"integration", c.Integration},
-		{"bucket", c.Bucket},
-	}
-	for _, req := range requiredProperties {
-		if req[1] == "" {
-			return fmt.Errorf("missing '%s'", req[0])
-		}
-	}
-	if c.Pattern != nil && c.Prefix != nil {
-		return fmt.Errorf("'pattern' and 'prefix' can't both be used together")
-	}
-	return nil
-}
-
-func (c *cloudStorageIntegration) toOpt() option.CollectionOption {
-	if c == nil {
-		return nil
-	}
-
-	var opts []option.S3SourceOption
-
-	if c.Region != nil {
-		opts = append(opts, option.WithS3Region(*c.Region))
-	}
-
-	if c.Pattern != nil {
-		opts = append(opts, option.WithS3Pattern(*c.Pattern))
-	}
-
-	if c.Prefix != nil {
-		opts = append(opts, option.WithS3Prefix(*c.Prefix))
-	}
-
-	return option.WithS3Source(c.Integration, c.Bucket, option.WithAutoFormat(), opts...)
 }
 
 func (r *resource) Validate() error {
@@ -154,12 +96,6 @@ func (r *resource) Validate() error {
 	}
 	if err := validateRocksetName("collection", r.Collection); err != nil {
 		return err
-	}
-
-	if r.InitializeFromS3 != nil {
-		if err := r.InitializeFromS3.Validate(); err != nil {
-			return fmt.Errorf("invalid 'initializeFromS3' value: %w", err)
-		}
 	}
 
 	return nil
@@ -209,32 +145,12 @@ func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
-	cfg, err := ResolveEndpointConfig(req.EndpointSpecJson)
-	if err != nil {
-		return nil, err
-	}
-	client, err := cfg.client()
-	if err != nil {
-		return nil, fmt.Errorf("creating Rockset client: %w", err)
-	}
 
 	var bindings = []*pm.ValidateResponse_Binding{}
 	for i, binding := range req.Bindings {
-		var res resource
-		if res, err = ResolveResourceConfig(binding.ResourceSpecJson); err != nil {
-			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
-		}
-		rocksetCollection, err := getCollection(ctx, client, res.Workspace, res.Collection)
+		res, err := ResolveResourceConfig(binding.ResourceSpecJson)
 		if err != nil {
-			return nil, fmt.Errorf("requesting rockset collection: %w", err)
-		}
-		// If the binding specifies a bulkLoadIntegration and the collection already exists,
-		// then it must already have the integration, since the collection definition is immutable.
-		if rocksetCollection != nil &&
-			res.InitializeFromS3 != nil &&
-			GetS3IntegrationSource(rocksetCollection, res.InitializeFromS3.Integration) == nil {
-			return nil, fmt.Errorf("rockset collection '%s' does not have an integration named '%s', which is required by the binding '%s'",
-				res.Collection, res.InitializeFromS3.Integration, binding.Collection.Collection.String())
+			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
 
 		var constraints = make(map[string]*pm.Constraint)
@@ -379,25 +295,6 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 			return nil, nil, err
 		}
 
-		// It's possible that there was a previous materialization with the same name as this one, and that it may have left
-		// a driver checkpoint. This is expected in the case that a user wishes to use a cloud storage integration in
-		// Rockset for bulk loading data for a large backfill as described here: https://go.estuary.dev/rock-bulk
-		// If such a checkpoint is left over, then we'll return it here. The driver checkpoint will then be cleared out
-		// on the next successful commit of a transaction.
-		var runtimeCheckpoint []byte
-		var s3DriverCheckpoint checkpoint.DriverCheckpoint
-		if len(open.DriverCheckpointJson) > 0 {
-			if err = json.Unmarshal(open.DriverCheckpointJson, &s3DriverCheckpoint); err != nil {
-				return nil, nil, fmt.Errorf("unmarshaling S3 driver checkpoint: %w", err)
-			}
-			if s3DriverCheckpoint.B64EncodedFlowCheckpoint != "" {
-				log.WithField("s3DriverCheckpoint", open.DriverCheckpointJson).Info("Using driver checkpoint from a prior cloud storage materialization connector")
-				if runtimeCheckpoint, err = base64.StdEncoding.DecodeString(s3DriverCheckpoint.B64EncodedFlowCheckpoint); err != nil {
-					return nil, nil, fmt.Errorf("decoding base64 checkpoint: %w", err)
-				}
-			}
-		}
-
 		var bindings = make([]*binding, 0, len(open.Materialization.Bindings))
 		for i, spec := range open.Materialization.Bindings {
 			if res, err := ResolveResourceConfig(spec.ResourceSpecJson); err != nil {
@@ -407,21 +304,26 @@ func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error 
 			}
 		}
 
-		var transactor = &transactor{
+		// Ensure that all the collections are ready to accept writes before returning the opened
+		// response. The error that's returned when attempting to write to a non-ready collection is
+		// not considered retryable by the client library.
+		log.Info("Waiting for Rockset collections to be ready to accept writes")
+		for _, b := range bindings {
+			if err := client.WaitUntilCollectionReady(ctx, b.rocksetWorkspace(), b.rocksetCollection()); err != nil {
+				return nil, nil, fmt.Errorf("waiting for rockset collection %q to be ready: %w", b.rocksetCollection(), err)
+			}
+			log.WithFields(log.Fields{
+				"workspace":  b.rocksetWorkspace(),
+				"collection": b.rocksetCollection(),
+			}).Info("Rockset collection is ready to accept writes")
+		}
+		log.Info("All Rockset collections are ready to accept writes")
+
+		return &transactor{
 			config:   &cfg,
 			client:   client,
 			bindings: bindings,
-		}
-		// Ensure that all the collections are ready to accept writes before returning the opened
-		// response. It's important that we await _all_ bindings before continuing, since the flow
-		// checkpoint that's embedded in the driver checkpoint (when there's an s3 integration) will be
-		// cleared on the first successful transaction. Even collections without any integrations may
-		// still take a while to become ready after they've been created, so this also ensures that
-		// those are ready before we proceed (the error that's returned when attempting to write to a
-		// non-ready collection is not considered retryable by the client library).
-		transactor.awaitAllRocksetCollectionsReady(stream.Context())
-
-		return transactor, &pm.TransactionResponse_Opened{RuntimeCheckpoint: runtimeCheckpoint}, nil
+		}, &pm.TransactionResponse_Opened{}, nil
 	})
 }
 
@@ -439,12 +341,4 @@ func ResolveResourceConfig(specJson json.RawMessage) (resource, error) {
 		return cfg, fmt.Errorf("parsing Rockset config: %w", err)
 	}
 	return cfg, cfg.Validate()
-}
-
-func RandString(len int) string {
-	var buffer = make([]byte, len)
-	if _, err := rand.Read(buffer); err != nil {
-		panic("failed to generate random string")
-	}
-	return hex.EncodeToString(buffer)
 }
