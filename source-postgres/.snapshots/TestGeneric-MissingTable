@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.generic_missingtable_one":{"key_columns":["id"],"mode":"Backfill"},"test.generic_missingtable_two":{"key_columns":["id"],"mode":"Backfill"}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+error performing backfill: unknown table "test.generic_missingtable_two"
+

@@ -246,12 +246,15 @@ func (c *Capture) updateState(ctx context.Context) error {
 		// If the `PrimaryKey` property is specified in the catalog then use that,
 		// otherwise use the "native" primary key of this table in the database.
 		// Print a warning if the two are not the same.
-		var primaryKey = c.discovery[streamID].PrimaryKey
-		if len(primaryKey) != 0 {
-			logrus.WithFields(logrus.Fields{
-				"table": streamID,
-				"key":   primaryKey,
-			}).Debug("queried primary key")
+		var primaryKey []string
+		if dinfo := c.discovery[streamID]; dinfo != nil && len(dinfo.PrimaryKey) > 0 {
+			primaryKey = c.discovery[streamID].PrimaryKey
+			if len(primaryKey) != 0 {
+				logrus.WithFields(logrus.Fields{
+					"table": streamID,
+					"key":   primaryKey,
+				}).Debug("queried primary key")
+			}
 		}
 		if len(binding.Resource.PrimaryKey) != 0 {
 			if strings.Join(primaryKey, ",") != strings.Join(binding.Resource.PrimaryKey, ",") {
