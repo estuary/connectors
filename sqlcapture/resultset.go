@@ -116,13 +116,13 @@ func (r *resultSet) Patch(streamID string, event *ChangeEvent) error {
 	// Ignore mutations occurring after the end of the current resultset, unless this
 	// is the final resultset which will complete the backfill.
 	if !chunk.complete && compareTuples(event.RowKey, chunk.scanned) > 0 {
-		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithFields(logrus.Fields{
 				"stream":   streamID,
 				"op":       event.Operation,
 				"rowKey":   base64.StdEncoding.EncodeToString(event.RowKey),
 				"chunkEnd": base64.StdEncoding.EncodeToString(chunk.scanned),
-			}).Debug("filtering change")
+			}).Trace("filtering change")
 		}
 		return nil
 	}
