@@ -3,6 +3,7 @@ package sql
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -27,11 +28,6 @@ const (
 	OBJECT   FlatType = "object"
 	STRING   FlatType = "string"
 )
-
-// effectiveTypeFormats is the listing of custom string formats Flow supports for treating strings
-// as some other datatype. The format must match a JSON type and must also match the underlying
-// string of a FlatType.
-var effectiveTypeFormats = []string{string(INTEGER), string(NUMBER)}
 
 // Projection lifts a pf.Projection into a form that's more easily worked with for SQL column mapping.
 type Projection struct {
@@ -85,9 +81,24 @@ func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Proj
 func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	mustExist = p.Inference.Exists == pf.Inference_MUST
 
-	types, hasNull := jsonTypesToFlatTypes(effectiveJsonTypes(&p.Projection))
-	if hasNull {
-		mustExist = false
+	var types []FlatType
+	for _, ty := range effectiveJsonTypes(&p.Projection) {
+		switch ty {
+		case "string":
+			types = append(types, STRING)
+		case "integer":
+			types = append(types, INTEGER)
+		case "number":
+			types = append(types, NUMBER)
+		case "boolean":
+			types = append(types, BOOLEAN)
+		case "object":
+			types = append(types, OBJECT)
+		case "array":
+			types = append(types, ARRAY)
+		case "null":
+			mustExist = false
+		}
 	}
 
 	switch len(types) {
@@ -100,75 +111,19 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	}
 }
 
-func jsonTypesToFlatTypes(jsonTypes []string) ([]FlatType, bool) {
-	var flatTypes []FlatType
-	var hasNullType bool
-	for _, ty := range jsonTypes {
-		switch ty {
-		case "string":
-			flatTypes = append(flatTypes, STRING)
-		case "integer":
-			flatTypes = append(flatTypes, INTEGER)
-		case "number":
-			flatTypes = append(flatTypes, NUMBER)
-		case "boolean":
-			flatTypes = append(flatTypes, BOOLEAN)
-		case "object":
-			flatTypes = append(flatTypes, OBJECT)
-		case "array":
-			flatTypes = append(flatTypes, ARRAY)
-		case "null":
-			hasNullType = true
-		}
-	}
-
-	return flatTypes, hasNullType
-}
-
 // effectiveJsonTypes potentially "condenses" the list of JSON types from a projection's Inference
-// into fewer types. Currently this supports cases where the projected field has exactly two types
-// with one of them being a string. The string must have a "format" matching the JSON type of the
-// non-string type, and the format must be one of the allowed formats that Flow handles. Fields for
-// collection keys are not condensed.
+// into fewer types. Currently this supports cases where a numeric value has an additional string
+// field formatted as that same numeric type.
 func effectiveJsonTypes(projection *pf.Projection) []string {
-	if projection.IsPrimaryKey || projection.Inference.String_ == nil {
-		return projection.Inference.Types
-	}
-
-	format := projection.Inference.String_.Format
-	if !SliceContains(format, effectiveTypeFormats) {
-		return projection.Inference.Types
-	}
-
-	applicableType, ok := singleNonStringField(projection.Inference.Types)
-	if !ok {
-		return projection.Inference.Types
-	}
-
-	if format != applicableType {
-		return projection.Inference.Types
-	}
-
-	return []string{applicableType}
-}
-
-func singleNonStringField(fields []string) (string, bool) {
-	if len(fields) != 2 {
-		return "", false
-	}
-
-	if !SliceContains(pf.JsonTypeString, fields) {
-		return "", false
-	}
-
-	for _, f := range fields {
-		if f != pf.JsonTypeString {
-			return f, true
+	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
+		if reflect.DeepEqual(projection.Inference.Types, []string{"integer", "string"}) && projection.Inference.String_.Format == "integer" {
+			return []string{"integer"}
+		} else if reflect.DeepEqual(projection.Inference.Types, []string{"number", "string"}) && projection.Inference.String_.Format == "number" {
+			return []string{"number"}
 		}
 	}
 
-	// Should never get here - would require both types to be "string".
-	return "", false
+	return projection.Inference.Types
 }
 
 type MappedType struct {

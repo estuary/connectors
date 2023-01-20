@@ -50,3 +50,4 @@ go run ${DATA_INGEST_SCRIPT_PATH} \
   --capture=${PUSH_CAPTURE_NAME} \
   --binding_num=${BINDING_NUM_FORMATTED_STRINGS} \
   --data_file_path=${DATASET_FORMATTED_STRINGS}
+  
