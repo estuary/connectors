@@ -111,17 +111,27 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	}
 }
 
-// effectiveJsonTypes potentially "condenses" the list of JSON types from a projection's Inference
-// into fewer types. Currently this supports cases where a numeric value has an additional string
-// field formatted as that same numeric type.
+// effectiveJsonTypes potentially maps the provided JSON types into alternate types for
+// materialization. It currently supports strings formatted as numeric values, either as stand-alone
+// string types or as a string type formatted as numeric + that numeric type. It does not apply to
+// keyed fields.
 func effectiveJsonTypes(projection *pf.Projection) []string {
 	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
-		if reflect.DeepEqual(projection.Inference.Types, []string{"integer", "string"}) && projection.Inference.String_.Format == "integer" {
+		switch {
+		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"integer", "string"}):
 			return []string{"integer"}
-		} else if reflect.DeepEqual(projection.Inference.Types, []string{"number", "string"}) && projection.Inference.String_.Format == "number" {
+		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"number", "string"}):
 			return []string{"number"}
-		} else if reflect.DeepEqual(projection.Inference.Types, []string{"fractional", "string"}) && projection.Inference.String_.Format == "fractional" {
+		case projection.Inference.String_.Format == "fractional" && reflect.DeepEqual(projection.Inference.Types, []string{"fractional", "string"}):
 			return []string{"fractional"}
+		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
+			return []string{"integer"}
+		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
+			return []string{"number"}
+		case projection.Inference.String_.Format == "fractional" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
+			return []string{"fractional"}
+		default:
+			// Fallthrough, types are returned as-is.
 		}
 	}
 
