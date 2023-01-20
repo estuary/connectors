@@ -88,7 +88,7 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 			types = append(types, STRING)
 		case "integer":
 			types = append(types, INTEGER)
-		case "number":
+		case "number", "fractional":
 			types = append(types, NUMBER)
 		case "boolean":
 			types = append(types, BOOLEAN)
@@ -120,6 +120,8 @@ func effectiveJsonTypes(projection *pf.Projection) []string {
 			return []string{"integer"}
 		} else if reflect.DeepEqual(projection.Inference.Types, []string{"number", "string"}) && projection.Inference.String_.Format == "number" {
 			return []string{"number"}
+		} else if reflect.DeepEqual(projection.Inference.Types, []string{"fractional", "string"}) && projection.Inference.String_.Format == "fractional" {
+			return []string{"fractional"}
 		}
 	}
 
