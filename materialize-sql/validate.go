@@ -130,6 +130,11 @@ func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.Coll
 		return "The proposed materialization is missing the projection, which is required because it's included in the existing materialization"
 	}
 
+	// Ensure that the possible types of the proposed are compatible with the possible types of the
+	// existing. The new projection is always allowed to contain fewer types than the original since
+	// that will always work with the original database schema. Additional proposed types may be
+	// compatible if they do not alter the effective FlatType, such as adding a string formatted as
+	// an integer to an existing integer type.
 	for _, pt := range effectiveJsonTypes(proposedProjection) {
 		if !SliceContains(pt, effectiveJsonTypes(existingProjection)) {
 			return fmt.Sprintf("The proposed projection may contain the type '%s', which is not part of the original projection", pt)

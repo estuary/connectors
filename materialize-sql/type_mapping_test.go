@@ -18,9 +18,9 @@ func TestAsFlatType(t *testing.T) {
 			name: "integer formatted string with integer",
 			inference: pf.Inference{
 				Exists: pf.Inference_MUST,
-				Types:  []string{pf.JsonTypeInteger, pf.JsonTypeString},
+				Types:  []string{"integer", "string"},
 				String_: &pf.Inference_String{
-					Format: pf.JsonTypeInteger,
+					Format: "integer",
 				},
 			},
 			flatType:  INTEGER,
@@ -30,9 +30,9 @@ func TestAsFlatType(t *testing.T) {
 			name: "number formatted string with number",
 			inference: pf.Inference{
 				Exists: pf.Inference_MAY,
-				Types:  []string{pf.JsonTypeNumber, pf.JsonTypeString},
+				Types:  []string{"number", "string"},
 				String_: &pf.Inference_String{
-					Format: pf.JsonTypeNumber,
+					Format: "number",
 				},
 			},
 			flatType:  NUMBER,
@@ -42,9 +42,9 @@ func TestAsFlatType(t *testing.T) {
 			name: "integer formatted string with number",
 			inference: pf.Inference{
 				Exists: pf.Inference_MAY,
-				Types:  []string{pf.JsonTypeNumber, pf.JsonTypeString},
+				Types:  []string{"number", "string"},
 				String_: &pf.Inference_String{
-					Format: pf.JsonTypeInteger,
+					Format: "integer",
 				},
 			},
 			flatType:  MULTIPLE,
@@ -54,7 +54,7 @@ func TestAsFlatType(t *testing.T) {
 			name: "single number type",
 			inference: pf.Inference{
 				Exists: pf.Inference_MAY,
-				Types:  []string{pf.JsonTypeNumber},
+				Types:  []string{"number"},
 			},
 			flatType:  NUMBER,
 			mustExist: false,
@@ -63,9 +63,9 @@ func TestAsFlatType(t *testing.T) {
 			name: "number formatted string with number and other field",
 			inference: pf.Inference{
 				Exists: pf.Inference_MAY,
-				Types:  []string{pf.JsonTypeNumber, pf.JsonTypeString, pf.JsonTypeArray},
+				Types:  []string{"number", "string", pf.JsonTypeArray},
 				String_: &pf.Inference_String{
-					Format: pf.JsonTypeNumber,
+					Format: "number",
 				},
 			},
 			flatType:  MULTIPLE,
@@ -75,9 +75,9 @@ func TestAsFlatType(t *testing.T) {
 			name: "number formatted string with integer",
 			inference: pf.Inference{
 				Exists: pf.Inference_MAY,
-				Types:  []string{pf.JsonTypeInteger, pf.JsonTypeString},
+				Types:  []string{"integer", "string"},
 				String_: &pf.Inference_String{
-					Format: pf.JsonTypeNumber,
+					Format: "number",
 				},
 			},
 			flatType:  MULTIPLE,
@@ -87,7 +87,7 @@ func TestAsFlatType(t *testing.T) {
 			name: "multiple types with null",
 			inference: pf.Inference{
 				Exists: pf.Inference_MUST,
-				Types:  []string{pf.JsonTypeInteger, pf.JsonTypeString, pf.JsonTypeNull},
+				Types:  []string{"integer", "string", pf.JsonTypeNull},
 			},
 			flatType:  MULTIPLE,
 			mustExist: false,
@@ -107,7 +107,7 @@ func TestAsFlatType(t *testing.T) {
 				Exists: pf.Inference_MUST,
 				Types:  nil,
 				String_: &pf.Inference_String{
-					Format: pf.JsonTypeNumber,
+					Format: "number",
 				},
 			},
 			flatType:  NEVER,
@@ -117,7 +117,7 @@ func TestAsFlatType(t *testing.T) {
 			name: "other formatted string with integer",
 			inference: pf.Inference{
 				Exists: pf.Inference_MAY,
-				Types:  []string{pf.JsonTypeInteger, pf.JsonTypeString},
+				Types:  []string{"integer", "string"},
 				String_: &pf.Inference_String{
 					Format: pf.JsonTypeArray,
 				},
@@ -129,9 +129,9 @@ func TestAsFlatType(t *testing.T) {
 			name: "format with two non-string fields",
 			inference: pf.Inference{
 				Exists: pf.Inference_MAY,
-				Types:  []string{pf.JsonTypeInteger, pf.JsonTypeNumber},
+				Types:  []string{"integer", "number"},
 				String_: &pf.Inference_String{
-					Format: pf.JsonTypeNumber,
+					Format: "number",
 				},
 			},
 			flatType:  MULTIPLE,
@@ -141,9 +141,9 @@ func TestAsFlatType(t *testing.T) {
 			name: "format with two string fields",
 			inference: pf.Inference{
 				Exists: pf.Inference_MAY,
-				Types:  []string{pf.JsonTypeString, pf.JsonTypeString},
+				Types:  []string{"string", "string"},
 				String_: &pf.Inference_String{
-					Format: pf.JsonTypeNumber,
+					Format: "number",
 				},
 			},
 			flatType:  MULTIPLE,
@@ -153,9 +153,9 @@ func TestAsFlatType(t *testing.T) {
 			name: "allowable format with a null is not mustExist",
 			inference: pf.Inference{
 				Exists: pf.Inference_MUST,
-				Types:  []string{pf.JsonTypeString, pf.JsonTypeNull},
+				Types:  []string{"string", pf.JsonTypeNull},
 				String_: &pf.Inference_String{
-					Format: pf.JsonTypeNumber,
+					Format: "number",
 				},
 			},
 			flatType:  STRING,
@@ -164,14 +164,16 @@ func TestAsFlatType(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		projection := &Projection{
-			Projection: pf.Projection{
-				Inference: tt.inference,
-			},
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			projection := &Projection{
+				Projection: pf.Projection{
+					Inference: tt.inference,
+				},
+			}
 
-		flatType, mustExist := projection.AsFlatType()
-		require.Equal(t, tt.flatType, flatType)
-		require.Equal(t, tt.mustExist, mustExist)
+			flatType, mustExist := projection.AsFlatType()
+			require.Equal(t, tt.flatType, flatType)
+			require.Equal(t, tt.mustExist, mustExist)
+		})
 	}
 }
