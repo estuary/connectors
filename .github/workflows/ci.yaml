@@ -194,7 +194,7 @@ jobs:
         if: |
           contains(fromJson('[
             "source-gcs",
-            "source-kafka",
+
             "source-kinesis",
             "source-mysql",
             "source-postgres",

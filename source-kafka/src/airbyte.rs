@@ -93,31 +93,31 @@ impl Serialize for Stream {
     {
         let mut state = serializer.serialize_struct("Stream", 2)?;
         state.serialize_field("name", &self.name)?;
-        state.serialize_field("json_schema", &json!({"type": "object"}))?;
-        // state.serialize_field(
-        //     "json_schema",
-        //     &json!({
-        //         "x-infer-schema": true,
-        //         "type": "object",
-        //         "properties": {
-        //             "_meta": {
-        //                 "type": "object",
-        //                 "properties": {
-        //                     "partition": {
-        //                         "description": "The partition the message was read from",
-        //                         "type": "integer",
-        //                     },
-        //                     "offset": {
-        //                         "description": "The offset of the message within the partition",
-        //                         "type": "integer",
-        //                     }
-        //                 },
-        //                 "required": ["partition", "offset"]
-        //             }
-        //         },
-        //         "required": ["_meta"]
-        //     }),
-        // )?;
+        // state.serialize_field("json_schema", &json!({"type": "object"}))?;
+        state.serialize_field(
+            "json_schema",
+            &json!({
+                "x-infer-schema": true,
+                "type": "object",
+                "properties": {
+                    "_meta": {
+                        "type": "object",
+                        "properties": {
+                            "partition": {
+                                "description": "The partition the message was read from",
+                                "type": "integer",
+                            },
+                            "offset": {
+                                "description": "The offset of the message within the partition",
+                                "type": "integer",
+                            }
+                        },
+                        "required": ["partition", "offset"]
+                    }
+                },
+                "required": ["_meta"]
+            }),
+        )?;
         state.serialize_field("supported_sync_modes", &vec!["incremental".to_string()])?;
         state.serialize_field(
             "source_defined_primary_key",
