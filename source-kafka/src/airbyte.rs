@@ -119,10 +119,10 @@ impl Serialize for Stream {
             }),
         )?;
         state.serialize_field("supported_sync_modes", &vec!["incremental".to_string()])?;
-        state.serialize_field(
-            "source_defined_primary_key",
-            &vec!["_meta/partition".to_string(), "_meta/offset".to_string()],
-        )?;
+        // state.serialize_field(
+        //     "source_defined_primary_key",
+        //     &vec!["_meta/partition".to_string(), "_meta/offset".to_string()],
+        // )?;
         state.end()
     }
 }
