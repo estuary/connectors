@@ -172,7 +172,14 @@ pub fn process_message<'m>(
     let emitted_at = timestamp_to_datetime(msg.timestamp());
     let namespace = format!("Partition {}", msg.partition());
 
-    let message = airbyte::Record::new(msg.topic().to_owned(), payload, emitted_at, namespace);
+    let message = airbyte::Record::new(
+        msg.topic().to_owned(),
+        payload,
+        msg.partition(),
+        msg.offset(),
+        emitted_at,
+        namespace,
+    );
     let checkpoint = state::Checkpoint::new(msg.topic(), msg.partition(), state::Offset::from(msg));
     Ok((message, checkpoint))
 }

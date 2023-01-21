@@ -78,17 +78,11 @@ impl ConnectionStatus {
 #[derive(Deserialize, Debug)]
 pub struct Stream {
     pub name: String,
-    json_schema: Value,
-    // supported_sync_modes: Vec<SyncMode>,
-    // TODO: others
 }
 
 impl Stream {
     pub fn new(name: String) -> Self {
-        Self {
-            name,
-            json_schema: json!({"type": "object"}),
-        }
+        Self { name }
     }
 }
 
@@ -100,6 +94,35 @@ impl Serialize for Stream {
         let mut state = serializer.serialize_struct("Stream", 2)?;
         state.serialize_field("name", &self.name)?;
         state.serialize_field("json_schema", &json!({"type": "object"}))?;
+        // state.serialize_field(
+        //     "json_schema",
+        //     &json!({
+        //         "x-infer-schema": true,
+        //         "type": "object",
+        //         "properties": {
+        //             "_meta": {
+        //                 "type": "object",
+        //                 "properties": {
+        //                     "partition": {
+        //                         "description": "The partition the message was read from",
+        //                         "type": "integer",
+        //                     },
+        //                     "offset": {
+        //                         "description": "The offset of the message within the partition",
+        //                         "type": "integer",
+        //                     }
+        //                 },
+        //                 "required": ["partition", "offset"]
+        //             }
+        //         },
+        //         "required": ["_meta"]
+        //     }),
+        // )?;
+        state.serialize_field("supported_sync_modes", &vec!["incremental".to_string()])?;
+        state.serialize_field(
+            "source_defined_primary_key",
+            &vec!["_meta/partition".to_string(), "_meta/offset".to_string()],
+        )?;
         state.end()
     }
 }
@@ -118,17 +141,40 @@ impl Catalog {
 #[derive(Serialize, Debug)]
 pub struct Record {
     pub stream: String,
-    pub data: Value,
+    pub data: RecordData,
     #[serde(with = "chrono::serde::ts_seconds")]
     pub emitted_at: DateTime<Utc>,
     pub namespace: String,
 }
 
+#[derive(Serialize, Debug)]
+pub struct RecordData {
+    data: Value,
+    #[serde(rename = "_meta")]
+    meta: RecordMeta,
+}
+
+#[derive(Serialize, Debug)]
+struct RecordMeta {
+    partition: i32,
+    offset: i64,
+}
+
 impl Record {
-    pub fn new(stream: String, data: Value, emitted_at: DateTime<Utc>, namespace: String) -> Self {
+    pub fn new(
+        stream: String,
+        payload: Value,
+        partition: i32,
+        offset: i64,
+        emitted_at: DateTime<Utc>,
+        namespace: String,
+    ) -> Self {
         Self {
             stream,
-            data,
+            data: RecordData {
+                data: payload,
+                meta: RecordMeta { partition, offset },
+            },
             emitted_at,
             namespace,
         }
@@ -279,7 +325,9 @@ mod test {
     fn serialize_record_test() {
         let record: Envelope<Record> = Record::new(
             "First Stream".to_owned(),
-            json!(1),
+            json!({"some": "value"}),
+            1,
+            0,
             Utc::now(),
             "ns".to_owned(),
         )

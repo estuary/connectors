@@ -1,7 +1,6 @@
 ---
 source: tests/it/main.rs
 expression: parse_from_output(&stdout)
-
 ---
 spec:
   connectionSpecification:
@@ -80,6 +79,7 @@ spec:
       - bootstrap_servers
     title: Kafka Source Configuration
     type: object
+  documentationUrl: "https://go.estuary.dev/source-kafka"
   supported_destination_sync_modes: []
   supportsIncremental: true
 type: SPEC
