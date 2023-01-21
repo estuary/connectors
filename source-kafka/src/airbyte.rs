@@ -93,7 +93,6 @@ impl Serialize for Stream {
     {
         let mut state = serializer.serialize_struct("Stream", 4)?;
         state.serialize_field("name", &self.name)?;
-        // state.serialize_field("json_schema", &json!({"type": "object"}))?;
         state.serialize_field(
             "json_schema",
             &json!({
@@ -156,16 +155,26 @@ impl Record {
         emitted_at: DateTime<Utc>,
         namespace: String,
     ) -> Self {
-        // TODO: What about arrays?
-        data.as_object_mut()
-            .expect("Message data must be formatted as a JSON object")
-            .insert(
-                "_meta".to_string(),
-                json!({
-                    "partition": partition,
-                    "offset": offset,
-                }),
-            );
+        data = match data.as_object_mut() {
+            Some(obj) => {
+                obj.insert(
+                    "_meta".to_string(),
+                    json!({
+                        "partition": partition,
+                        "offset": offset,
+                    }),
+                );
+
+                data
+            }
+            None => json!({
+                    "_meta": {
+                        "partition": partition,
+                        "offset": offset,
+                    },
+                    "message": data
+            }),
+        };
 
         Self {
             stream,

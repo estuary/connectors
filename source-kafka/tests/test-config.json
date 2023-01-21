@@ -1,3 +1,9 @@
 {
-  "bootstrap_servers": ["0.tcp.ngrok.io:19256"]
+  "bootstrap_servers": ["localhost:9092"],
+  "authentication": {
+    "mechanism": "SCRAM-SHA-256",
+    "username": "alice",
+    "password": "alice-pass"
+  },
+  "tls": null
 }
