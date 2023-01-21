@@ -121,7 +121,7 @@ impl Serialize for Stream {
         state.serialize_field("supported_sync_modes", &vec!["incremental"])?;
         state.serialize_field(
             "source_defined_primary_key",
-            &vec![vec!["_meta/partition"], vec!["_meta/offset"]],
+            &vec![vec!["_meta", "partition"], vec!["_meta", "offset"]],
         )?;
         state.end()
     }
