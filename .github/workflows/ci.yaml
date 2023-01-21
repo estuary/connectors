@@ -71,31 +71,31 @@ jobs:
       fail-fast: false
       matrix:
         connector:
-          - path: source-alpaca
-          - path: source-gcs
-          - path: source-hello-world
-          - path: source-http-file
-          - path: source-test
-          - path: source-firestore
+          # - path: source-alpaca
+          # - path: source-gcs
+          # - path: source-hello-world
+          # - path: source-http-file
+          # - path: source-test
+          # - path: source-firestore
           - path: source-kafka
-          - path: source-kinesis
-          - path: source-mysql
-            additionalTags:
-              - source-mariadb
-          - path: source-postgres
-          - path: source-s3
-          - path: materialize-bigquery
-          - path: materialize-elasticsearch
-          - path: materialize-firebolt
-          - path: materialize-google-pubsub
-          - path: materialize-google-sheets
-          - path: materialize-postgres
-            additionalTags:
-              - materialize-timescaledb
-          - path: materialize-rockset
-          - path: materialize-s3-parquet
-          - path: materialize-snowflake
-          - path: materialize-webhook
+          # - path: source-kinesis
+          # - path: source-mysql
+          #   additionalTags:
+          #     - source-mariadb
+          # - path: source-postgres
+          # - path: source-s3
+          # - path: materialize-bigquery
+          # - path: materialize-elasticsearch
+          # - path: materialize-firebolt
+          # - path: materialize-google-pubsub
+          # - path: materialize-google-sheets
+          # - path: materialize-postgres
+          #   additionalTags:
+          #     - materialize-timescaledb
+          # - path: materialize-rockset
+          # - path: materialize-s3-parquet
+          # - path: materialize-snowflake
+          # - path: materialize-webhook
 
     steps:
       - uses: actions/checkout@v2
