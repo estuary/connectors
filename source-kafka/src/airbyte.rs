@@ -91,7 +91,7 @@ impl Serialize for Stream {
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("Stream", 2)?;
+        let mut state = serializer.serialize_struct("Stream", 4)?;
         state.serialize_field("name", &self.name)?;
         // state.serialize_field("json_schema", &json!({"type": "object"}))?;
         state.serialize_field(
@@ -141,40 +141,35 @@ impl Catalog {
 #[derive(Serialize, Debug)]
 pub struct Record {
     pub stream: String,
-    pub data: RecordData,
+    pub data: Value,
     #[serde(with = "chrono::serde::ts_seconds")]
     pub emitted_at: DateTime<Utc>,
     pub namespace: String,
 }
 
-#[derive(Serialize, Debug)]
-pub struct RecordData {
-    data: Value,
-    #[serde(rename = "_meta")]
-    meta: RecordMeta,
-}
-
-#[derive(Serialize, Debug)]
-struct RecordMeta {
-    partition: i32,
-    offset: i64,
-}
-
 impl Record {
     pub fn new(
         stream: String,
-        payload: Value,
+        mut data: Value,
         partition: i32,
         offset: i64,
         emitted_at: DateTime<Utc>,
         namespace: String,
     ) -> Self {
+        // TODO: What about arrays?
+        data.as_object_mut()
+            .expect("Message data must be formatted as a JSON object")
+            .insert(
+                "_meta".to_string(),
+                json!({
+                    "partition": partition,
+                    "offset": offset,
+                }),
+            );
+
         Self {
             stream,
-            data: RecordData {
-                data: payload,
-                meta: RecordMeta { partition, offset },
-            },
+            data,
             emitted_at,
             namespace,
         }
