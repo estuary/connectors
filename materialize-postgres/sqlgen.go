@@ -82,6 +82,12 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 {{- end}}
 {{ end }}
 
+-- Alter column and mark it as nullable
+
+{{ define "alterColumnNullable" }}
+ALTER TABLE {{ $.Table.Identifier }} ALTER COLUMN {{ $.Identifier }} DROP NOT NULL;
+{{ end }}
+
 -- Templated creation of a temporary load table:
 
 {{ define "createLoadTable" }}
@@ -243,15 +249,16 @@ BEGIN
 END $$;
 {{ end }}
 `)
-	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplExecLoadInsert    = tplAll.Lookup("execLoadInsert")
-	tplExecStoreInsert   = tplAll.Lookup("execStoreInsert")
-	tplExecStoreUpdate   = tplAll.Lookup("execStoreUpdate")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplPrepLoadInsert    = tplAll.Lookup("prepLoadInsert")
-	tplPrepStoreInsert   = tplAll.Lookup("prepStoreInsert")
-	tplPrepStoreUpdate   = tplAll.Lookup("prepStoreUpdate")
-	tplInstallFence      = tplAll.Lookup("installFence")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCreateLoadTable     = tplAll.Lookup("createLoadTable")
+	tplCreateTargetTable   = tplAll.Lookup("createTargetTable")
+	tplExecLoadInsert      = tplAll.Lookup("execLoadInsert")
+	tplExecStoreInsert     = tplAll.Lookup("execStoreInsert")
+	tplExecStoreUpdate     = tplAll.Lookup("execStoreUpdate")
+	tplLoadQuery           = tplAll.Lookup("loadQuery")
+	tplPrepLoadInsert      = tplAll.Lookup("prepLoadInsert")
+	tplPrepStoreInsert     = tplAll.Lookup("prepStoreInsert")
+	tplPrepStoreUpdate     = tplAll.Lookup("prepStoreUpdate")
+	tplInstallFence        = tplAll.Lookup("installFence")
+	tplUpdateFence         = tplAll.Lookup("updateFence")
+	tplAlterColumnNullable = tplAll.Lookup("alterColumnNullable")
 )

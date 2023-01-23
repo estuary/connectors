@@ -80,3 +80,20 @@ func TestTableTemplate(t *testing.T) {
 	require.NoError(t, err)
 	cupaloy.SnapshotT(t, out)
 }
+
+func TestAlterColumnNullableTemplate(t *testing.T) {
+	var (
+		shape      = FlowCheckpointsTable("one", "reserved", "checkpoints")
+		dialect    = newTestDialect()
+		table, err = ResolveTable(shape, dialect)
+	)
+	assert.NoError(t, err)
+
+	var tpl = MustParseTemplate(dialect, "template", `
+  ALTER TABLE {{ $.Table.Identifier }} ALTER COLUMN {{ $.Identifier }} DROP NOT NULL;
+  `)
+
+  out, err := RenderAlterColumnNullableTemplate(AlterColumnNullableInput { Table: table, Identifier: "id" }, tpl)
+	require.NoError(t, err)
+	cupaloy.SnapshotT(t, out)
+}

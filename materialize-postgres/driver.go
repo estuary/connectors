@@ -165,14 +165,15 @@ func newPostgresDriver() pm.DriverServer {
 			}
 
 			return &sql.Endpoint{
-				Config:              cfg,
-				Dialect:             pgDialect,
-				MetaSpecs:           metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: cfg.ToURI()},
-				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+				Config:                      cfg,
+				Dialect:                     pgDialect,
+				MetaSpecs:                   metaSpecs,
+				MetaCheckpoints:             &metaCheckpoints,
+				Client:                      client{uri: cfg.ToURI()},
+				CreateTableTemplate:         tplCreateTargetTable,
+				AlterColumnNullableTemplate: tplAlterColumnNullable,
+				NewResource:                 newTableConfig,
+				NewTransactor:               newTransactor,
 			}, nil
 		},
 	}
