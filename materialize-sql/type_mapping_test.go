@@ -63,7 +63,7 @@ func TestAsFlatType(t *testing.T) {
 			name: "number formatted string with number and other field",
 			inference: pf.Inference{
 				Exists: pf.Inference_MAY,
-				Types:  []string{"number", "string", pf.JsonTypeArray},
+				Types:  []string{"number", "string", "array"},
 				String_: &pf.Inference_String{
 					Format: "number",
 				},
@@ -119,7 +119,7 @@ func TestAsFlatType(t *testing.T) {
 				Exists: pf.Inference_MAY,
 				Types:  []string{"integer", "string"},
 				String_: &pf.Inference_String{
-					Format: pf.JsonTypeArray,
+					Format: "array",
 				},
 			},
 			flatType:  MULTIPLE,
