@@ -72,6 +72,8 @@ type Endpoint struct {
 	Client Client
 	// CreateTableTemplate evaluates a Table into an endpoint statement which creates it.
 	CreateTableTemplate *template.Template
+	// AlterFieldNullable alters a column and marks it as nullable
+	AlterColumnNullableTemplate *template.Template
 
 	// NewResource returns an uninitialized or partially-initialized Resource
 	// which will be parsed into and validated from a resource configuration.

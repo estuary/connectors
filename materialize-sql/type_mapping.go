@@ -184,16 +184,9 @@ var _ TypeMapper = NullableMapper{}
 func (m NullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
 	if mapped, err = m.Delegate.MapType(p); err != nil {
 		return
-	}
-	// We are temporarily creating all non-pk columns as nullable, this is to allow
-	// fields to be made nullable from a collection without causing issues. Once we
-	// support automatic schema migration of tables to mark fields as nullable
-	// after creation, we can revert back to the more strict behaviour,
-	// see: https://github.com/estuary/connectors/issues/447
-	// note that for primary keys we are leaving it up to the engine to decide
-	// whether they can be nullable or not (e.g. postgres will assume not
-	// null for primary keys)
-	if !p.IsPrimaryKey && m.NullableText != "" {
+	} else if _, notNull := p.AsFlatType(); notNull && m.NotNullText != "" {
+		mapped.DDL += " " + m.NotNullText
+	} else if m.NullableText != "" {
 		mapped.DDL += " " + m.NullableText
 	}
 

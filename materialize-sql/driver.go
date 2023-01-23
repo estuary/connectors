@@ -116,6 +116,8 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 		tableShapes = append(tableShapes, *endpoint.MetaCheckpoints)
 	}
 
+	var statements []string
+
 	for bindingIndex, bindingSpec := range req.Materialization.Bindings {
 		var collection = bindingSpec.Collection.Collection
 		var constraints, loadedBinding, resource, err = resolveResourceToExistingBinding(
@@ -124,6 +126,9 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 			&bindingSpec.Collection,
 			loadedSpec,
 		)
+
+		var tableShape = BuildTableShape(req.Materialization, bindingIndex, resource)
+
 		if err != nil {
 			return nil, err
 		} else if err = ValidateSelectedFields(constraints, bindingSpec); err != nil {
@@ -141,14 +146,33 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 				loadedBinding.FieldSelection.String(),
 			)
 		} else if loadedBinding != nil {
-			continue // Table was already created. Nothing to do.
+			// If the table has already been created, make sure all non-null fields
+			// are marked as such
+			for _, field := range bindingSpec.FieldSelection.Values {
+				var p = bindingSpec.Collection.GetProjection(field)
+
+				if p.Inference.Exists != pf.Inference_MUST {
+					var table, err = ResolveTable(tableShape, endpoint.Dialect)
+					if err != nil {
+						return nil, err
+					}
+					var input = AlterColumnNullableInput {
+						Table: table,
+						Identifier: field,
+					}
+					if statement, err := RenderAlterColumnNullableTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
+						return nil, err
+					} else {
+						statements = append(statements, statement)
+					}
+				}
+			}
+
+			continue
 		}
 
-		tableShapes = append(tableShapes,
-			BuildTableShape(req.Materialization, bindingIndex, resource))
+		tableShapes = append(tableShapes, tableShape)
 	}
-
-	var statements []string
 
 	for _, shape := range tableShapes {
 		var table, err = ResolveTable(shape, endpoint.Dialect)

@@ -156,14 +156,15 @@ func newSnowflakeDriver() *sql.Driver {
 			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
 			return &sql.Endpoint{
-				Config:              parsed,
-				Dialect:             snowflakeDialect,
-				MetaSpecs:           metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: dsn},
-				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+				Config:                      parsed,
+				Dialect:                     snowflakeDialect,
+				MetaSpecs:                   metaSpecs,
+				MetaCheckpoints:             &metaCheckpoints,
+				Client:                      client{uri: dsn},
+				CreateTableTemplate:         tplCreateTargetTable,
+				AlterColumnNullableTemplate: tplAlterColumnNullable,
+				NewResource:                 newTableConfig,
+				NewTransactor:               newTransactor,
 			}, nil
 		},
 	}
