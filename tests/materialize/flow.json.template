@@ -48,10 +48,8 @@
            "id": { "type": "integer" },
            "int_and_str": {"type": ["integer", "string"], "format": "integer"},
            "num_and_str": {"type": ["number", "string"], "format": "number"},
-           "frac_and_str": {"type": ["fractional", "string"], "format": "fractional"},
            "int_str": {"type": "string", "format": "integer"},
-           "num_str": {"type": "string", "format": "number"},
-           "frac_str": {"type": "string", "format": "fractional"}
+           "num_str": {"type": "string", "format": "number"}
           },
           "required": ["id"],
           "type": "object"
