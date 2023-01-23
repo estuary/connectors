@@ -162,14 +162,15 @@ func newBigQueryDriver() pm.DriverServer {
 			}
 
 			return &sql.Endpoint{
-				Config:              cfg,
-				Dialect:             bqDialect,
-				MetaSpecs:           metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client,
-				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+				Config:                      cfg,
+				Dialect:                     bqDialect,
+				MetaSpecs:                   metaSpecs,
+				MetaCheckpoints:             &metaCheckpoints,
+				Client:                      client,
+				CreateTableTemplate:         tplCreateTargetTable,
+				AlterColumnNullableTemplate: tplAlterColumnNullable,
+				NewResource:                 newTableConfig,
+				NewTransactor:               newTransactor,
 			}, nil
 		},
 	}

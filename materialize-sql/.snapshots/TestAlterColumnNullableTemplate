@@ -1,0 +1,3 @@
+
+  ALTER TABLE one."reserved".checkpoints ALTER COLUMN id DROP NOT NULL;
+  

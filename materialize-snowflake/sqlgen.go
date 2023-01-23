@@ -102,6 +102,12 @@ var (
   {{- end}}
   {{ end }}
 
+-- Alter column and mark it as nullable
+
+{{ define "alterColumnNullable" }}
+ALTER TABLE {{ $.Table.Identifier }} ALTER COLUMN {{ $.Identifier }} DROP NOT NULL;
+{{ end }}
+
 {{ define "loadQuery" }}
 	SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
 	FROM {{ $.Table.Identifier }}
@@ -190,11 +196,12 @@ BEGIN
 END $$;
 {{ end }}
   `)
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplCopyInto          = tplAll.Lookup("copyInto")
-	tplMergeInto         = tplAll.Lookup("mergeInto")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCreateTargetTable   = tplAll.Lookup("createTargetTable")
+	tplLoadQuery           = tplAll.Lookup("loadQuery")
+	tplCopyInto            = tplAll.Lookup("copyInto")
+	tplMergeInto           = tplAll.Lookup("mergeInto")
+	tplUpdateFence         = tplAll.Lookup("updateFence")
+	tplAlterColumnNullable = tplAll.Lookup("alterColumnNullable")
 )
 
 var createStageSQL = `

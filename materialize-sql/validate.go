@@ -134,21 +134,11 @@ func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.Coll
 	// The new projection is allowed to contain fewer types than the original, though, since that
 	// will always work with the original database schema.
 	for _, pt := range proposedProjection.Inference.Types {
-		if !SliceContains(pt, existingProjection.Inference.Types) {
+		if !SliceContains(pt, existingProjection.Inference.Types) && pt != "null" {
 			return fmt.Sprintf("The proposed projection may contain the type '%s', which is not part of the original projection", pt)
 		}
 	}
 
-	// If the existing projection must exist, then so must the proposed. This is because this field
-	// is used to determine whether a column may contain nulls. So if the existing column cannot
-	// contain null, then we can't allow the new projection to possible be null. But if the existing
-	// column is nullable, then it won't matter if the new one is or not since the column will be
-	// unconstrained.
-	if existingProjection.Inference.Exists == pf.Inference_MUST &&
-		!SliceContains("null", existingProjection.Inference.Types) &&
-		proposedProjection.Inference.Exists != pf.Inference_MUST {
-		return "The existing projection must exist and be non-null, so the new projection must also exist"
-	}
 	return ""
 }
 
