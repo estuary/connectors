@@ -76,10 +76,8 @@ resources_json_template='[
       "include": {
         "int_and_str": {},
         "num_and_str": {},
-        "frac_and_str": {},
         "int_str": {},
-        "num_str": {},
-        "frac_str": {}
+        "num_str": {}
       }
     }
   }

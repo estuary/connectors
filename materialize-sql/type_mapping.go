@@ -122,14 +122,10 @@ func effectiveJsonTypes(projection *pf.Projection) []string {
 			return []string{"integer"}
 		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"number", "string"}):
 			return []string{"number"}
-		case projection.Inference.String_.Format == "fractional" && reflect.DeepEqual(projection.Inference.Types, []string{"fractional", "string"}):
-			return []string{"fractional"}
 		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
 			return []string{"integer"}
 		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
 			return []string{"number"}
-		case projection.Inference.String_.Format == "fractional" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
-			return []string{"fractional"}
 		default:
 			// Fallthrough, types are returned as-is.
 		}
