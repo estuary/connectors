@@ -79,8 +79,20 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 	}
 	defer db.Close(ctx)
 
-	if _, err := DiscoverCatalog(ctx, db); err != nil {
+	discoveredBindings, err := DiscoverCatalog(ctx, db)
+	if err != nil {
 		return nil, err
+	}
+
+	var discoveredStreams []string
+
+	for _, binding := range discoveredBindings {
+		var res Resource
+		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+			return nil, fmt.Errorf("error parsing resource config: %w", err)
+		}
+		var streamID = JoinStreamID(res.Namespace, res.Stream)
+		discoveredStreams = append(discoveredStreams, streamID)
 	}
 
 	var out []*pc.ValidateResponse_Binding
@@ -89,6 +101,13 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
+
+		var streamID = JoinStreamID(res.Namespace, res.Stream)
+
+		if !SliceContains(streamID, discoveredStreams) {
+			return nil, fmt.Errorf("could not find or access table %s", res.Stream)
+		}
+
 		out = append(out, &pc.ValidateResponse_Binding{
 			ResourcePath: []string{res.Namespace, res.Stream},
 		})
@@ -178,4 +197,13 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 		Database: db,
 	}
 	return c.Run(ctx)
+}
+
+func SliceContains(expected string, actual []string) bool {
+	for _, ty := range actual {
+		if ty == expected {
+			return true
+		}
+	}
+	return false
 }
