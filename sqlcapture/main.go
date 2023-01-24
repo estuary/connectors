@@ -63,6 +63,29 @@ func (d *Driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecRespons
 
 // ApplyUpsert applies a new or updated capture to the store.
 func (d *Driver) ApplyUpsert(ctx context.Context, req *pc.ApplyRequest) (*pc.ApplyResponse, error) {
+	var db, err = d.Connect(ctx, string(req.Capture.Capture), req.Capture.EndpointSpecJson)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to database: %w", err)
+	}
+	defer db.Close(ctx)
+
+	discoveredTables, err := db.DiscoverTables(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, binding := range req.Capture.Bindings {
+		var res Resource
+		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+			return nil, fmt.Errorf("error parsing resource config: %w", err)
+		}
+
+		var streamID = JoinStreamID(res.Namespace, res.Stream)
+
+		if _, ok := discoveredTables[streamID]; !ok {
+			return nil, fmt.Errorf("could not find or access table %s", res.Stream)
+		}
+	}
 	return &pc.ApplyResponse{ActionDescription: ""}, nil
 }
 
@@ -83,12 +106,24 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 		return nil, err
 	}
 
+	discoveredTables, err := db.DiscoverTables(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var out []*pc.ValidateResponse_Binding
 	for _, binding := range req.Bindings {
 		var res Resource
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
+
+		var streamID = JoinStreamID(res.Namespace, res.Stream)
+
+		if _, ok := discoveredTables[streamID]; !ok {
+			return nil, fmt.Errorf("could not find or access table %s", res.Stream)
+		}
+
 		out = append(out, &pc.ValidateResponse_Binding{
 			ResourcePath: []string{res.Namespace, res.Stream},
 		})
