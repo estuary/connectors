@@ -150,8 +150,12 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 			// are marked as such
 			for _, field := range bindingSpec.FieldSelection.Values {
 				var p = bindingSpec.Collection.GetProjection(field)
+				var previousProjection = loadedBinding.Collection.GetProjection(field)
 
-				if p.Inference.Exists != pf.Inference_MUST {
+				var previousNullable = previousProjection.Inference.Exists != pf.Inference_MUST || SliceContains("null", p.Inference.Types)
+				var newNullable = p.Inference.Exists != pf.Inference_MUST || SliceContains("null", p.Inference.Types)
+
+				if !previousNullable && newNullable {
 					var table, err = ResolveTable(tableShape, endpoint.Dialect)
 					if err != nil {
 						return nil, err
