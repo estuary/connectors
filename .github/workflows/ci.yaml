@@ -94,6 +94,7 @@ jobs:
           - path: materialize-postgres
             additionalTags:
               - materialize-timescaledb
+              - materialize-alloydb
           - path: materialize-rockset
           - path: materialize-s3-parquet
           - path: materialize-snowflake
