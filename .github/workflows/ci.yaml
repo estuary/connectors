@@ -83,6 +83,8 @@ jobs:
             additionalTags:
               - source-mariadb
           - path: source-postgres
+            additionalTags:
+              - source-alloydb
           - path: source-s3
           - path: materialize-bigquery
           - path: materialize-elasticsearch
