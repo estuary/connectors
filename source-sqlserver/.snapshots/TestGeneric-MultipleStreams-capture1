@@ -1,0 +1,11 @@
+# ================================
+# Collection "dbo.test_Generic_MultipleStreams_one": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_one"}},"data":"one","id":1}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_one"}},"data":"two","id":2}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_one"}},"data":"zero","id":0}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_multiplestreams_one":{"key_columns":["id"],"mode":"Active"}}}
+
