@@ -210,6 +210,20 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 	db.conn = conn
+
+	if err := db.createWatermarksTable(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (db *postgresDatabase) createWatermarksTable(ctx context.Context) error {
+	var query = fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", db.config.Advanced.WatermarksTable)
+	rows, err := db.conn.Query(ctx, query)
+	if err != nil {
+		return fmt.Errorf("error creating watermarks table: %w", err)
+	}
+	rows.Close()
 	return nil
 }
 
