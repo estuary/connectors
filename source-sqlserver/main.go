@@ -73,13 +73,13 @@ func (c *Config) Validate() error {
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
 		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
 	}
-	//if c.Advanced.SkipBackfills != "" {
-	//	for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
-	//		if !strings.Contains(skipStreamID, ".") {
-	//			return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
-	//		}
-	//	}
-	//}
+	if c.Advanced.SkipBackfills != "" {
+		for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
+			if !strings.Contains(skipStreamID, ".") {
+				return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
+			}
+		}
+	}
 	return nil
 }
 
@@ -87,12 +87,6 @@ func (c *Config) Validate() error {
 func (c *Config) SetDefaults() {
 	// Note these are 1:1 with 'omitempty' in Config field tags,
 	// which cause these fields to be emitted as non-required.
-	// if c.Advanced.SlotName == "" {
-	// 	c.Advanced.SlotName = "flow_slot"
-	// }
-	// if c.Advanced.PublicationName == "" {
-	// 	c.Advanced.PublicationName = "flow_publication"
-	// }
 	if c.Advanced.WatermarksTable == "" {
 		c.Advanced.WatermarksTable = "dbo.flow_watermarks"
 	}
