@@ -15,6 +15,8 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
+
+	_ "github.com/microsoft/go-mssqldb"
 )
 
 func main() {
@@ -31,20 +33,18 @@ const defaultPort = "1433"
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address  string `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User     string `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	///Database string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	Address       string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User          string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password      string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database      string         `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
 	Advanced      advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 	NetworkTunnel *tunnelConfig  `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
-	//PublicationName   string `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
-	//SlotName          string `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
-	WatermarksTable string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
-	//SkipBackfills     string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize int `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=4096,description=The number of rows which should be fetched from the database in a single backfill query."`
+	WatermarksTable   string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	SkipBackfills     string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	BackfillChunkSize int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=4096,description=The number of rows which should be fetched from the database in a single backfill query."`
 }
 
 type tunnelConfig struct {
@@ -62,6 +62,7 @@ func (c *Config) Validate() error {
 		{"address", c.Address},
 		{"user", c.User},
 		{"password", c.Password},
+		{"database", c.Database},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -120,6 +121,7 @@ func (c *Config) ToURI() string {
 	params.Add("app name", "Flow CDC Connector")
 	params.Add("encrypt", "true")
 	params.Add("TrustServerCertificate", "true")
+	params.Add("database", c.Database)
 	var connectURL = &url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(c.User, c.Password),
@@ -130,7 +132,7 @@ func (c *Config) ToURI() string {
 }
 
 func configSchema() json.RawMessage {
-	var schema = schemagen.GenerateSchema("PostgreSQL Connection", &Config{})
+	var schema = schemagen.GenerateSchema("SQL Server Connection", &Config{})
 	var configSchema, err = schema.MarshalJSON()
 	if err != nil {
 		panic(err)
@@ -191,6 +193,10 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 	db.conn = conn
+
+	if err := db.createWatermarksTable(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -205,18 +211,4 @@ func (db *sqlserverDatabase) Close(ctx context.Context) error {
 // Returns an empty instance of the source-specific metadata (used for JSON schema generation).
 func (db *sqlserverDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &sqlserverSourceInfo{}
-}
-
-// sqlserverSourceInfo is source metadata for data capture events.
-type sqlserverSourceInfo struct {
-	sqlcapture.SourceCommon
-}
-
-func (s *sqlserverSourceInfo) Common() sqlcapture.SourceCommon {
-	return s.SourceCommon
-}
-
-func (s *sqlserverSourceInfo) Cursor() string {
-	// TODO(wgd): Implement replication cursors
-	return "TBD"
 }
