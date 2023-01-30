@@ -13,6 +13,25 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
+const (
+	// Maximum number of cells allowed for any single binding to either read from the Store iterator
+	// or hold in-memory in the binding's rows.
+	cellsLimit = 1000000
+)
+
+func checkCellCount(rows int, cellsPerRow int) error {
+	if rows*cellsPerRow > cellsLimit {
+		return fmt.Errorf(
+			"Maximum cells limit of %d exceeded for this materialization. If you are materializing "+
+				"a collection with a large number of unique keys, consider creating a derivation to "+
+				"transform your data into a collection with fewer unique keys.",
+			cellsLimit,
+		)
+	}
+
+	return nil
+}
+
 type transactor struct {
 	bindings []transactorBinding
 	client   *sheets.Service
@@ -37,6 +56,11 @@ type transactorBinding struct {
 	UserSheetId int64
 	// User-facing sheet name for this binding.
 	UserSheetName string
+}
+
+func (b transactorBinding) columnCount() int {
+	// Note: Additional column for materialization record data.
+	return len(b.Fields.Keys) + len(b.Fields.Values) + 1
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
@@ -74,6 +98,13 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 	// Gather all of the stored rows on a per-binding basis.
 	for it.Next() {
+		// Verify that we don't read an excessive amount of data from the store iterator, which
+		// would indicate we are reading from a high cardinality collection that will not fit into a
+		// reasonable amount of connector memory.
+		if err := checkCellCount(len(stores[it.Binding]), d.bindings[it.Binding].columnCount()); err != nil {
+			return nil, err
+		}
+
 		// Marshal key and value fields into cells of the row.
 		// cells[0] is a placeholder for internal state that's written later.
 		var cells = make([]*sheets.CellData, 1, 1+len(it.Key)+len(it.Values))
@@ -120,6 +151,12 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		var addRows, updateCells []*sheets.Request
 
 		for pi != len(prev) || si != len(stores) {
+			// Verify that our in-memory view of the sheet has not grown excessively large would
+			// indicate we are reading from a high cardinality collection that will not fit into a
+			// reasonable amount of connector memory.
+			if err := checkCellCount(len(next), d.bindings[bindInd].columnCount()); err != nil {
+				return nil, err
+			}
 
 			// Compare next `prev` vs `stores`.
 			var cmp int
