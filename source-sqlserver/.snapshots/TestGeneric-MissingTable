@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+
+# ================================
+# Captures Terminated With Errors
+# ================================
+error updating capture state: table "dbo.test_generic_missingtable_two" is a configured binding of this capture, but doesn't exist or isn't visible with current permissions
+

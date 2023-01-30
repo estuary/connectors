@@ -9,8 +9,42 @@
         "description": "The host or host:port at which the database can be reached.",
         "order": 0
       },
+      "user": {
+        "type": "string",
+        "description": "The database user to authenticate as.",
+        "default": "flow_capture",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "description": "Password for the specified database user.",
+        "order": 2,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "description": "Logical database name to capture from.",
+        "order": 3
+      },
       "advanced": {
-        "properties": {},
+        "properties": {
+          "watermarksTable": {
+            "type": "string",
+            "description": "The name of the table used for watermark writes during backfills. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form.",
+            "default": "dbo.flow_watermarks"
+          },
+          "skip_backfills": {
+            "type": "string",
+            "title": "Skip Backfills",
+            "description": "A comma-separated list of fully-qualified table names which should not be backfilled."
+          },
+          "backfill_chunk_size": {
+            "type": "integer",
+            "title": "Backfill Chunk Size",
+            "description": "The number of rows which should be fetched from the database in a single backfill query.",
+            "default": 4096
+          }
+        },
         "additionalProperties": false,
         "type": "object",
         "title": "Advanced Options",
@@ -51,9 +85,12 @@
     },
     "type": "object",
     "required": [
-      "address"
+      "address",
+      "user",
+      "password",
+      "database"
     ],
-    "title": "PostgreSQL Connection"
+    "title": "SQL Server Connection"
   },
   "resource_spec_schema_json": {
     "$schema": "http://json-schema.org/draft/2020-12/schema",

@@ -1,0 +1,13 @@
+# ================================
+# Collection "dbo.test_Generic_ReplicationInserts": 5 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationInserts"}},"data":"5","id":4}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationInserts"}},"data":"A","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationInserts"}},"data":"CDEFGHIJKLMNOP","id":2}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationInserts"}},"data":"Four","id":3}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationInserts"}},"data":"bbb","id":1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationinserts":{"key_columns":["id"],"mode":"Active"}}}
+
