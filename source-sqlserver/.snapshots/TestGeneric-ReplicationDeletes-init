@@ -1,0 +1,13 @@
+# ================================
+# Collection "dbo.test_Generic_ReplicationDeletes": 5 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationDeletes"}},"data":"5","id":4}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationDeletes"}},"data":"A","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationDeletes"}},"data":"CDEFGHIJKLMNOP","id":2}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationDeletes"}},"data":"Four","id":3}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationDeletes"}},"data":"bbb","id":1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationdeletes":{"key_columns":["id"],"mode":"Active"}}}
+

@@ -84,6 +84,17 @@ Binding 0:
                     "table": {
                       "type": "string",
                       "description": "Database table of the event."
+                    },
+                    "lsn": {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "description": "The LSN at which a CDC event occurred. Only set for CDC events"
+                    },
+                    "seqval": {
+                      "description": "Sequence value used to order changes to a row within a transaction. Only set for CDC events"
+                    },
+                    "updateMask": {
+                      "description": "A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"
                     }
                   },
                   "additionalProperties": false,

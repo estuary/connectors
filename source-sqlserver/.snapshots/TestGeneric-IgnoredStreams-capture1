@@ -1,0 +1,11 @@
+# ================================
+# Collection "dbo.test_Generic_IgnoredStreams_one": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_IgnoredStreams_one"}},"data":"one","id":1}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_IgnoredStreams_one"}},"data":"two","id":2}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_IgnoredStreams_one"}},"data":"zero","id":0}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_ignoredstreams_one":{"key_columns":["id"],"mode":"Active"}}}
+
