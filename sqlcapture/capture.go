@@ -580,6 +580,10 @@ func (c *Capture) emitMessage(out *boilerplate.PullOutput, msg interface{}) erro
 		case DeleteOp:
 			record = msg.Before // After is never used.
 		}
+		if record == nil {
+			logrus.WithField("op", msg.Operation).Warn("change event data map is nil")
+			record = make(map[string]interface{})
+		}
 		record["_meta"] = &meta
 
 		var bs, err = json.Marshal(record)
