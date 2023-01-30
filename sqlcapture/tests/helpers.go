@@ -29,21 +29,24 @@ func VerifiedCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 	cupaloy.SnapshotT(t, summary)
 }
 
+// CaptureShutdownDelay is the length of time after which RunCapture() will
+// terminate a test capture if there hasn't been any further output.
+var CaptureShutdownDelay = 200 * time.Millisecond
+
 // RunCapture performs a capture using the provided st.CaptureSpec and shuts it down after
 // a suitable time has elapsed without any documents or state checkpoints being emitted.
 func RunCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) string {
 	t.Helper()
 	var captureCtx, cancelCapture = context.WithCancel(ctx)
-	const shutdownDelay = 200 * time.Millisecond
 	var shutdownWatchdog *time.Timer
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		if shutdownWatchdog == nil {
-			shutdownWatchdog = time.AfterFunc(shutdownDelay, func() {
-				log.WithField("delay", shutdownDelay.String()).Debug("capture shutdown watchdog expired")
+			shutdownWatchdog = time.AfterFunc(CaptureShutdownDelay, func() {
+				log.WithField("delay", CaptureShutdownDelay.String()).Debug("capture shutdown watchdog expired")
 				cancelCapture()
 			})
 		}
-		shutdownWatchdog.Reset(shutdownDelay)
+		shutdownWatchdog.Reset(CaptureShutdownDelay)
 	})
 	var summary = cs.Summary()
 	cs.Reset()
