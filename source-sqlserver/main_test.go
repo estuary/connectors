@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
@@ -17,14 +18,13 @@ import (
 	pc "github.com/estuary/flow/go/protocols/capture"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-
-	_ "github.com/microsoft/go-mssqldb"
 )
 
 var (
 	dbAddress  = flag.String("db_addr", "127.0.0.1:1433", "Connect to the specified address/port for tests")
 	dbUser     = flag.String("db_user", "sa", "Connect as the specified user for tests")
 	dbPassword = flag.String("db_password", "gf6w6dkD", "Password for the specified database test user")
+	dbName     = flag.String("db_name", "test", "Connect to the named database for tests")
 )
 
 func TestMain(m *testing.M) {
@@ -38,6 +38,13 @@ func TestMain(m *testing.M) {
 		log.SetLevel(level)
 	}
 
+	// SQL Server captures aren't just tailing the WAL directly, instead they're
+	// polling change tables which are updated by an asynchronous worker which in
+	// turn is reading the WAL, which has a higher latency than in other DBs. The
+	// default polling interval in our connector is 500ms, so 5s should be plenty
+	// of time for reliable shutdown.
+	tests.CaptureShutdownDelay = 10 * time.Second
+
 	os.Exit(m.Run())
 }
 
@@ -46,6 +53,7 @@ func defaultConfig(t *testing.T) Config {
 		Address:  *dbAddress,
 		User:     *dbUser,
 		Password: *dbPassword,
+		Database: *dbName,
 	}
 }
 
@@ -90,10 +98,9 @@ func init() {
 	for k, v := range st.DefaultSanitizers {
 		CaptureSanitizers[k] = v
 	}
-	// TODO(wgd): Add some capture sanitizers
-	//CaptureSanitizers[`"loc":[11111111,11111111,11111111]`] = regexp.MustCompile(`"loc":\[[0-9]+,[0-9]+,[0-9]+\]`)
-	//CaptureSanitizers[`"cursor":"0/1111111"`] = regexp.MustCompile(`"cursor":"0/[0-9A-F]+"`)
-	//CaptureSanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
+	CaptureSanitizers[`"cursor":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"cursor":"[0-9A-Za-z+/=]+"`)
+	CaptureSanitizers[`"lsn":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"lsn":"[0-9A-Za-z+/=]+"`)
+	CaptureSanitizers[`"seqval":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"seqval":"[0-9A-Za-z+/=]+"`)
 }
 
 // CreateTable creates a new database table whose name is based on the current test
@@ -159,12 +166,20 @@ func argsTuple(argc int) string {
 
 // Update modifies preexisting rows to a new value.
 func (tb *testBackend) Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
-	panic("NOT YET IMPLEMENTED: Update")
+	t.Helper()
+	var query = fmt.Sprintf(`UPDATE %s SET %s = @p1 WHERE %s = @p2;`, table, setCol, whereCol)
+	log.WithField("query", query).Debug("updating rows")
+	var _, err = tb.conn.ExecContext(ctx, query, setVal, whereVal)
+	require.NoError(t, err, "update rows")
 }
 
 // Delete removes preexisting rows.
 func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}) {
-	panic("NOT YET IMPLEMENTED: Delete")
+	t.Helper()
+	var query = fmt.Sprintf(`DELETE FROM %s WHERE %s = @p1;`, table, whereCol)
+	log.WithField("query", query).Debug("deleting rows")
+	var _, err = tb.conn.ExecContext(ctx, query, whereVal)
+	require.NoError(t, err, "delete rows")
 }
 
 func TestSpec(t *testing.T) {
