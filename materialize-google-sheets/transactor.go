@@ -154,7 +154,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			// Verify that our in-memory view of the sheet has not grown excessively large would
 			// indicate we are reading from a high cardinality collection that will not fit into a
 			// reasonable amount of connector memory.
-			if err := checkCellCount(len(next), d.bindings[bindInd].columnCount()); err != nil {
+			if err := checkCellCount(len(next)+len(stores), d.bindings[bindInd].columnCount()); err != nil {
 				return nil, err
 			}
 
