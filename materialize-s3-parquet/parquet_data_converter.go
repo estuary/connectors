@@ -227,7 +227,9 @@ func NewParquetDataConverter(binding *pf.MaterializationSpec_Binding) (*ParquetD
 			return nil, fmt.Errorf("columns of multi-scalar types are not supported: %+v", projection.Inference.Types)
 		}
 
-		var optional = projection.Inference.Exists != pf.Inference_MUST || !projection.Inference.IsSingleScalarType()
+		// TODO(johnny): Clean this up. We're relying on types being
+		// either (for example) [string, null] or [null] at this point.
+		var optional = projection.Inference.Exists != pf.Inference_MUST || len(projection.Inference.Types) != 1
 		var fieldType string
 		for _, tp := range projection.Inference.Types {
 			if tp != pf.JsonTypeNull {
