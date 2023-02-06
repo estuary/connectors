@@ -400,7 +400,7 @@ var mysqlTypeToJSON = map[string]columnSchema{
 
 	"float":   {jsonType: "number"},
 	"double":  {jsonType: "number"},
-	"decimal": {jsonType: "string"},
+	"decimal": {jsonType: "string", format: "number"},
 
 	"char":    {jsonType: "string"},
 	"varchar": {jsonType: "string"},
