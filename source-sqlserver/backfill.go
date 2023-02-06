@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -139,33 +138,4 @@ func (db *sqlserverDatabase) buildScanQuery(start bool, keyColumns []string, col
 	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " OFFSET 0 ROWS FETCH FIRST %d ROWS ONLY;", db.config.Advanced.BackfillChunkSize)
 	return query.String()
-}
-
-func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
-	return key, nil
-}
-
-func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
-	return t, nil
-}
-
-func (db *sqlserverDatabase) translateRecordFields(columnTypes map[string]interface{}, f map[string]interface{}) error {
-	if columnTypes == nil {
-		return fmt.Errorf("unknown column types")
-	}
-	if f == nil {
-		return nil
-	}
-	for id, val := range f {
-		var translated, err = db.translateRecordField(columnTypes[id], val)
-		if err != nil {
-			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
-		}
-		f[id] = translated
-	}
-	return nil
-}
-
-func (db *sqlserverDatabase) translateRecordField(columnType interface{}, val interface{}) (interface{}, error) {
-	return val, nil
 }
