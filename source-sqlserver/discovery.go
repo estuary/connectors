@@ -75,6 +75,8 @@ const queryDiscoverColumns = `
   SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type
   FROM information_schema.columns
   WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
+    AND table_schema != 'sys' AND table_schema != 'cdc'
+	AND table_name != 'systranschemas'
   ORDER BY table_schema, table_name, ordinal_position;`
 
 func getColumns(ctx context.Context, conn *sql.DB) ([]sqlcapture.ColumnInfo, error) {
