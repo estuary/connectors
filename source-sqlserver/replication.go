@@ -41,7 +41,7 @@ func (si *sqlserverSourceInfo) Cursor() string {
 // ReplicationStream constructs a new ReplicationStream object, from which
 // a neverending sequence of change events can be read.
 func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
-	var stream = &sqlserverReplicationStream{conn: db.conn, cfg: db.config}
+	var stream = &sqlserverReplicationStream{db: db, conn: db.conn, cfg: db.config}
 	if err := stream.open(ctx); err != nil {
 		return nil, fmt.Errorf("error opening replication stream: %w", err)
 	}
@@ -64,6 +64,7 @@ func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursor 
 }
 
 type sqlserverReplicationStream struct {
+	db   *sqlserverDatabase
 	conn *sql.DB
 	cfg  *Config
 
@@ -104,7 +105,7 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 	return nil
 }
 
-func (rs *sqlserverReplicationStream) ActivateTable(streamID string, keyColumns []string, info *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+func (rs *sqlserverReplicationStream) ActivateTable(streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	var namePattern = "<schema>_<table>"
 	// TODO(wgd): It's rather inefficient to redo the 'list instances' work every time a
 	// table gets activated.
@@ -116,7 +117,6 @@ func (rs *sqlserverReplicationStream) ActivateTable(streamID string, keyColumns 
 	}
 
 	var instanceName = captureInstances[streamID]
-
 	if instanceName == "" {
 		log.WithFields(log.Fields{"stream": streamID}).Debug("enabling cdc for table")
 		instanceName, err = enableTableCDC(context.Background(), rs.conn, namePattern, streamID, rs.cfg.User)
@@ -126,11 +126,16 @@ func (rs *sqlserverReplicationStream) ActivateTable(streamID string, keyColumns 
 		}
 	}
 
+	var columnTypes = make(map[string]any)
+	for columnName, columnInfo := range discovery.Columns {
+		columnTypes[columnName] = columnInfo.DataType
+	}
+
 	rs.tables.Lock()
 	rs.tables.info[streamID] = &tableReplicationInfo{
 		CaptureInstance: instanceName,
 		KeyColumns:      keyColumns,
-		ColumnTypes:     nil, // TODO(wgd): Extract column-type information from `info.Columns` here, if/when it's needed.
+		ColumnTypes:     columnTypes,
 	}
 	rs.tables.Unlock()
 	log.WithFields(log.Fields{"stream": streamID, "instance": instanceName}).Debug("activated table")
@@ -339,7 +344,10 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, to
 
 		var rowKey, err = sqlcapture.EncodeRowKey(info.KeyColumns, fields, info.ColumnTypes, encodeKeyFDB)
 		if err != nil {
-			return fmt.Errorf("error encoding row key for %q: %w", info.StreamID, err)
+			return fmt.Errorf("error encoding stream %q row key: %w", info.StreamID, err)
+		}
+		if err := rs.db.translateRecordFields(info.ColumnTypes, fields); err != nil {
+			return fmt.Errorf("error translating stream %q change event: %w", info.StreamID, err)
 		}
 
 		// For inserts and updates the change event records the state after the

@@ -135,11 +135,11 @@ func (db *sqlserverDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo)
 	if typeName, ok := column.DataType.(string); ok {
 		schema, ok = sqlserverTypeToJSON[typeName]
 		if !ok {
-			return nil, fmt.Errorf("unhandled SQL Server type %q", typeName)
+			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeName, column.Name, column.TableName)
 		}
 		schema.nullable = column.IsNullable
 	} else {
-		return nil, fmt.Errorf("unhandled SQL Server type %#v", column.DataType)
+		return nil, fmt.Errorf("unhandled SQL Server type %#v (found on column %q of table %q)", column.DataType, column.Name, column.TableName)
 	}
 
 	// Pass-through the column description.
@@ -183,19 +183,39 @@ func (s columnSchema) toType() *jsonschema.Schema {
 }
 
 var sqlserverTypeToJSON = map[string]columnSchema{
-	"nvarchar": {jsonType: "string"},
-	"varchar":  {jsonType: "string"},
-	"nchar":    {jsonType: "string"},
-	"char":     {jsonType: "string"},
-	"ntext":    {jsonType: "string"},
-	"text":     {jsonType: "string"},
-
-	"datetime": {jsonType: "string", format: "date-time"},
-
-	"bit":      {jsonType: "integer"},
+	"bigint":   {jsonType: "integer"},
 	"int":      {jsonType: "integer"},
 	"smallint": {jsonType: "integer"},
+	"tinyint":  {jsonType: "integer"},
+
+	"numeric":    {jsonType: "string", format: "number"},
+	"decimal":    {jsonType: "string", format: "number"},
+	"money":      {jsonType: "string", format: "number"},
+	"smallmoney": {jsonType: "string", format: "number"},
+
+	"bit": {jsonType: "boolean"},
 
 	"float": {jsonType: "number"},
 	"real":  {jsonType: "number"},
+
+	"char":     {jsonType: "string"},
+	"varchar":  {jsonType: "string"},
+	"text":     {jsonType: "string"},
+	"nchar":    {jsonType: "string"},
+	"nvarchar": {jsonType: "string"},
+	"ntext":    {jsonType: "string"},
+
+	"binary":    {jsonType: "string", contentEncoding: "base64"},
+	"varbinary": {jsonType: "string", contentEncoding: "base64"},
+	"image":     {jsonType: "string", contentEncoding: "base64"},
+
+	"date":           {jsonType: "string", format: "date"},
+	"time":           {jsonType: "string", format: "time"},
+	"datetimeoffset": {jsonType: "string", format: "date-time"},
+
+	"uniqueidentifier": {jsonType: "string", format: "uuid"},
+
+	"xml": {jsonType: "string"},
+
+	//"datetime": {jsonType: "string", format: "date-time"},
 }
