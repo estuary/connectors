@@ -3,14 +3,19 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"math/rand"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/sqlcapture"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,6 +34,7 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 	t.Run("CatalogPrimaryKey", func(t *testing.T) { testCatalogPrimaryKey(ctx, t, tb) })
 	t.Run("CatalogPrimaryKeyOverride", func(t *testing.T) { testCatalogPrimaryKeyOverride(ctx, t, tb) })
 	t.Run("MissingTable", func(t *testing.T) { testMissingTable(ctx, t, tb) })
+	t.Run("StressCorrectness", func(t *testing.T) { testStressCorrectness(ctx, t, tb) })
 	//t.Run("ComplexDataset", func(t *testing.T) { testComplexDataset(ctx, t, tb) })
 }
 
@@ -228,4 +234,192 @@ func testMissingTable(ctx context.Context, t *testing.T, tb TestBackend) {
 		binding.ResourceSpecJson = bs
 	}
 	VerifiedCapture(ctx, t, cs)
+}
+
+// testStressCorrectness issues a lengthy stream of inserts, updates, and
+// deletes to the database with certain invariants, and verifies that the
+// capture result doesn't violate those invariants.
+//
+// The dataset for this test is a collection of (id, counter) tuples
+// which will progress through the following states:
+//
+//		(id, 1) ->  (id, 2) ->  (id, 3) -> (id, 4) -> deleted
+//	         ->  (id, 6) ->  (id, 7) -> (id, 8)
+//
+// The specific ordering of changes is randomly generated on every test run
+// and the capture introduces more variation depending on the precise timing
+// of the backfill queries and replication stream merging. However it is still
+// possible to verify many correctness properties by observing the output event
+// stream. For instance:
+//
+//   - When the capture completes, we know exactly how many IDs should exist
+//     and that they should all be in the final state with counter=8. If this
+//     is not the case then some data has been lost.
+//
+//   - We know that (modulo the deletion at id=5) counter values must always
+//     increase by exactly one for every successive update. If this is not the
+//     case then some changes have been skipped or duplicated.
+//     then we're not providing the intended exactly-once capture guarantees.
+func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
+	const numTotalIDs = 2000
+	const numActiveIDs = 100
+
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	var tableName = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, counter INTEGER)")
+	var cs = tb.CaptureSpec(t, tableName)
+	cs.Validator = &correctnessInvariantsCaptureValidator{
+		NumExpectedIDs: numTotalIDs,
+	}
+	cs.Validator.Reset()
+
+	// Run the load generator for at most 60s
+	loadgenCtx, cancelLoadgen := context.WithCancel(ctx)
+	time.AfterFunc(60*time.Second, cancelLoadgen)
+	defer cancelLoadgen()
+	go func(ctx context.Context) {
+		var nextID int
+		var activeIDs = make(map[int]int) // Map from ID to counter value
+		for {
+			// There should always be N active IDs (until we reach the end)
+			for nextID < numTotalIDs && len(activeIDs) < numActiveIDs {
+				activeIDs[nextID] = 1
+				nextID++
+			}
+			// Thus if we run out of active IDs we must be done
+			if len(activeIDs) == 0 {
+				log.Info("load generator complete")
+				return
+			}
+
+			// Randomly select an entry from the active set
+			var selected int
+			var sampleIndex int
+			for id := range activeIDs {
+				if sampleIndex == 0 || rand.Intn(sampleIndex) == 0 {
+					selected = id
+				}
+				sampleIndex++
+			}
+			var counter = activeIDs[selected]
+
+			// Issue an update/insert/delete depending on the counter value
+			switch counter {
+			case 1, 6:
+				tb.Insert(ctx, t, tableName, [][]any{{selected, counter}})
+			case 5:
+				tb.Delete(ctx, t, tableName, "id", selected)
+			default:
+				tb.Update(ctx, t, tableName, "id", selected, "counter", counter)
+			}
+
+			// Increment the counter state or delete the entry if we're done with it.
+			if counter := activeIDs[selected]; counter >= 8 {
+				delete(activeIDs, selected)
+			} else {
+				activeIDs[selected] = counter + 1
+			}
+
+			// Slow down database load generation to at most 500 QPS
+			time.Sleep(2 * time.Millisecond)
+		}
+	}(loadgenCtx)
+
+	// Start the capture in parallel with the ongoing database load
+	VerifiedCapture(ctx, t, cs)
+}
+
+// We can see new IDs occurring out of order, so long as they make it to
+// completion before the end.
+type correctnessInvariantsCaptureValidator struct {
+	NumExpectedIDs int
+
+	states     map[int]string
+	violations *strings.Builder
+}
+
+var correctnessInvariantsStateTransitions = map[string]string{
+	"New:Create(1)":     "1",
+	"New:Create(2)":     "2",
+	"New:Create(3)":     "3",
+	"New:Create(4)":     "4",
+	"New:Create(6)":     "6",
+	"New:Create(7)":     "7",
+	"New:Create(8)":     "Finished",
+	"1:Update(2)":       "2",
+	"2:Update(3)":       "3",
+	"3:Update(4)":       "4",
+	"4:Delete()":        "Deleted",
+	"Deleted:Create(6)": "6",
+	"6:Update(7)":       "7",
+	"7:Update(8)":       "Finished",
+}
+
+func (v *correctnessInvariantsCaptureValidator) Output(collection string, data json.RawMessage) {
+	var event struct {
+		ID      int `json:"ID"`
+		Counter int `json:"counter"`
+		Meta    struct {
+			Operation string `json:"op"`
+		} `json:"_meta"`
+	}
+	if err := json.Unmarshal(data, &event); err != nil {
+		fmt.Fprintf(v.violations, "error parsing change event: %v\n", err)
+		return
+	}
+
+	// Get the previous state for this ID.
+	var prevState = v.states[event.ID]
+	if prevState == "" {
+		prevState = "New"
+	}
+
+	// Compute a string representing the state machine edge corresponding to this change event.
+	var edge string
+	switch event.Meta.Operation {
+	case "c":
+		edge = fmt.Sprintf("%s:Create(%d)", prevState, event.Counter)
+	case "u":
+		edge = fmt.Sprintf("%s:Update(%d)", prevState, event.Counter)
+	case "d":
+		edge = fmt.Sprintf("%s:Delete()", prevState)
+	default:
+		edge = fmt.Sprintf("%s:UnknownOperation(%q)", prevState, event.Meta.Operation)
+	}
+	log.WithField("id", event.ID).WithField("event", edge).Trace("change event")
+
+	// This is the complete set of allowable state transitions in the dataset.
+	if nextState, ok := correctnessInvariantsStateTransitions[edge]; ok {
+		v.states[event.ID] = nextState
+	} else {
+		fmt.Fprintf(v.violations, "id %d: invalid state transition %q\n", event.ID, edge)
+		v.states[event.ID] = "Error"
+	}
+}
+
+func (v *correctnessInvariantsCaptureValidator) Reset() {
+	v.violations = new(strings.Builder)
+	v.states = make(map[int]string)
+}
+
+func (v *correctnessInvariantsCaptureValidator) Summarize(w io.Writer) error {
+	fmt.Fprintf(w, "# ================================\n")
+	fmt.Fprintf(w, "# Invariant Violations\n")
+	fmt.Fprintf(w, "# ================================\n")
+
+	for id := 0; id < v.NumExpectedIDs; id++ {
+		var state = v.states[id]
+		if state != "Finished" {
+			fmt.Fprintf(v.violations, "id %d in state %q (expected \"Finished\")\n", id, state)
+		}
+	}
+
+	if str := v.violations.String(); len(str) == 0 {
+		fmt.Fprintf(w, "no invariant violations observed\n\n")
+	} else {
+		fmt.Fprintf(w, "%s\n", str)
+	}
+	return nil
 }
