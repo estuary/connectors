@@ -50,10 +50,10 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "real", ExpectType: `{"type":["number","null"]}`, InputValue: 123.456, ExpectValue: `123.456`},
 
 		// Fixed-Precision Decimals
-		{ColumnType: "decimal(5,2)", ExpectType: `{"type":["string","null"]}`, InputValue: 123.45, ExpectValue: `"123.45"`},
-		{ColumnType: "decimal(15,2)", ExpectType: `{"type":["string","null"]}`, InputValue: 1234567890123.451, ExpectValue: `"1234567890123.45"`},
-		{ColumnType: "numeric(5,2)", ExpectType: `{"type":["string","null"]}`, InputValue: 123.45, ExpectValue: `"123.45"`},
-		{ColumnType: "numeric(15,2)", ExpectType: `{"type":["string","null"]}`, InputValue: 1234567890123.451, ExpectValue: `"1234567890123.45"`},
+		{ColumnType: "decimal(5,2)", ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: 123.45, ExpectValue: `"123.45"`},
+		{ColumnType: "decimal(15,2)", ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: 1234567890123.451, ExpectValue: `"1234567890123.45"`},
+		{ColumnType: "numeric(5,2)", ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: 123.45, ExpectValue: `"123.45"`},
+		{ColumnType: "numeric(15,2)", ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: 1234567890123.451, ExpectValue: `"1234567890123.45"`},
 
 		// MySQL strips trailing spaces from CHAR on retrieval, and doesn't do that for VARCHAR
 		{ColumnType: "char(5)", ExpectType: `{"type":["string","null"]}`, InputValue: "foo", ExpectValue: `"foo"`},

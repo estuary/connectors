@@ -35,9 +35,9 @@ func TestDatatypes(t *testing.T) {
 		// now I'm letting the `pgtype.Numeric.EncodeText()` implementation turn them into a
 		// string. Revisit whether this is correct behavior at some point.
 		// TODO(johnny): This will fail schema validation. They need to be output as JSON numbers (doubles).
-		{ColumnType: `decimal`, ExpectType: `{"type":["string","null"]}`, InputValue: `123.456`, ExpectValue: `"123456e-3"`},
-		{ColumnType: `numeric`, ExpectType: `{"type":["string","null"]}`, InputValue: `123.456`, ExpectValue: `"123456e-3"`},
-		{ColumnType: `numeric(4,2)`, ExpectType: `{"type":["string","null"]}`, InputValue: `12.34`, ExpectValue: `"1234e-2"`},
+		{ColumnType: `decimal`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `"123456e-3"`},
+		{ColumnType: `numeric`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `"123456e-3"`},
+		{ColumnType: `numeric(4,2)`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `12.34`, ExpectValue: `"1234e-2"`},
 		{ColumnType: `character varying(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
 		{ColumnType: `varchar(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
 		{ColumnType: `varchar`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
@@ -111,7 +111,7 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `double precision ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","null"]}`), InputValue: []interface{}{1.23, 4.56}, ExpectValue: `{"dimensions":[2],"elements":[1.23,4.56]}`},
 		{ColumnType: `inet ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: []interface{}{`192.168.100.0/24`, `2001:4f8:3:ba::/64`}, ExpectValue: `{"dimensions":[2],"elements":["192.168.100.0/24","2001:4f8:3:ba::/64"]}`},
 		{ColumnType: `integer ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: []interface{}{1, 2, nil, 4}, ExpectValue: `{"dimensions":[4],"elements":[1,2,null,4]}`},
-		{ColumnType: `numeric ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: []interface{}{`123.456`, `-789.0123`}, ExpectValue: `{"dimensions":[2],"elements":["123456e-3","-7890123e-4"]}`},
+		{ColumnType: `numeric ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"number"}`), InputValue: []interface{}{`123.456`, `-789.0123`}, ExpectValue: `{"dimensions":[2],"elements":["123456e-3","-7890123e-4"]}`},
 		{ColumnType: `real ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","null"]}`), InputValue: []interface{}{123.456, 789.0123}, ExpectValue: `{"dimensions":[2],"elements":[123.456,789.0123]}`},
 		{ColumnType: `smallint ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: []interface{}{123, 456, 789}, ExpectValue: `{"dimensions":[3],"elements":[123,456,789]}`},
 		{ColumnType: `text ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: []interface{}{`Hello, world!`, `asdf`}, ExpectValue: `{"dimensions":[2],"elements":["Hello, world!","asdf"]}`},
