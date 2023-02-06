@@ -34,7 +34,7 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 			testName = testName[:8]
 		}
 		t.Run(fmt.Sprintf("%d_%s", idx, testName), func(t *testing.T) {
-			var uniqueSuffix = fmt.Sprintf("scrabbled_quinine_%d", idx)
+			var uniqueSuffix = fmt.Sprintf("scrabbled_%d_quinine", idx)
 			var tableName = tb.CreateTable(ctx, t, uniqueSuffix, fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
 			var stream *capture.DiscoverResponse_Binding
 
