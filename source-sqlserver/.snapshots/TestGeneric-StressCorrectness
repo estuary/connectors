@@ -1,0 +1,10 @@
+# ================================
+# Invariant Violations
+# ================================
+no invariant violations observed
+
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_stresscorrectness_one":{"key_columns":["id"],"mode":"Active"}}}
+
