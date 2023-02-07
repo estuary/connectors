@@ -181,6 +181,7 @@ jobs:
             ]'), matrix.connector.path)
         run: |
           docker compose --file ${{ matrix.connector.path }}/docker-compose.yaml up --wait
+          docker logs ${{ matrix.connector.path }}-db-1
 
       - name: Build ${{ matrix.connector.path }} Docker Image
         uses: docker/build-push-action@v2

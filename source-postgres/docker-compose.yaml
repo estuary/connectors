@@ -7,6 +7,9 @@ services:
     ports:
       - "5432:5432"
     environment: {"POSTGRES_DB": "flow", "POSTGRES_USER": "flow", "POSTGRES_PASSWORD": "flow"}
+    healthcheck:
+      test: "true"
+      interval: 3s
     networks:
       - flow-test
     volumes:
