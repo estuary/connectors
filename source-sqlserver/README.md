@@ -46,3 +46,7 @@ Some useful commands for working with a test instance of SQL Server:
     > GO
     > EXEC sys.sp_cdc_enable_table @source_schema = N'dbo', @source_name = N'foobar', @role_name = N'sa', @capture_instance = N'dbo_foobar';
     > GO
+
+Building connector images:
+
+    $ docker build --network=flow-test -t source-sqlserver:local -f source-sqlserver/Dockerfile .
