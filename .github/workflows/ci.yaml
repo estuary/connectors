@@ -86,6 +86,7 @@ jobs:
             additionalTags:
               - source-alloydb
           - path: source-s3
+          - path: source-sqlserver
           - path: materialize-bigquery
           - path: materialize-elasticsearch
           - path: materialize-firebolt
@@ -172,7 +173,12 @@ jobs:
         run: docker network create flow-test
 
       - name: Start Dockerized test infrastructure
-        if: matrix.connector.path == 'source-postgres' || matrix.connector.path == 'source-mysql'
+        if: |
+          contains(fromJson('[
+            "source-mysql",
+            "source-postgres",
+            "source-sqlserver"
+            ]'), matrix.connector.path)
         run: |
           docker compose --file ${{ matrix.connector.path }}/docker-compose.yaml up --wait
 
@@ -201,7 +207,8 @@ jobs:
             "source-kinesis",
             "source-mysql",
             "source-postgres",
-            "source-s3"
+            "source-s3",
+            "source-sqlserver"
             ]'), matrix.connector.path)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
