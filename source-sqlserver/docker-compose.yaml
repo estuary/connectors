@@ -15,6 +15,9 @@ services:
       SA_PASSWORD: "gf6w6dkD"
       ACCEPT_EULA: "Y"
       MSSQL_AGENT_ENABLED: "true"
+    healthcheck:
+      test: "true"
+      interval: 10s
     networks:
       - flow-test
 
