@@ -40,10 +40,10 @@ func TestMain(m *testing.M) {
 
 	// SQL Server captures aren't just tailing the WAL directly, instead they're
 	// polling change tables which are updated by an asynchronous worker which in
-	// turn is reading the WAL, which has a higher latency than in other DBs. The
-	// default polling interval in our connector is 500ms, so 5s should be plenty
-	// of time for reliable shutdown.
-	tests.CaptureShutdownDelay = 10 * time.Second
+	// turn is reading the WAL, which has a higher latency than in other DBs. This
+	// means that our capture shutdown delay has to be substantially longer if we
+	// want to avoid having tests flake out sometimes.
+	tests.CaptureShutdownDelay = 15 * time.Second
 
 	os.Exit(m.Run())
 }
