@@ -17,7 +17,7 @@ services:
       MSSQL_AGENT_ENABLED: "true"
     healthcheck:
       test: "true"
-      interval: 10s
+      interval: 15s
     networks:
       - flow-test
 
