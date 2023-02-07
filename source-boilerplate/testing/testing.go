@@ -157,8 +157,10 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 		callback:   callback,
 	}
 	if err := cs.Driver.Pull(adapter); err != nil {
-		log.WithField("err", err).Error("capture terminated with error")
-		if !errors.Is(err, context.Canceled) {
+		if errors.Is(err, context.Canceled) {
+			log.Info("capture shut down")
+		} else {
+			log.WithField("err", err).Error("capture terminated with error")
 			cs.Errors = append(cs.Errors, err)
 		}
 	}
