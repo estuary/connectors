@@ -207,9 +207,8 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 				constraint.Type = pm.Constraint_FIELD_REQUIRED
 				constraint.Reason = "The root document is needed."
 			case isComplexField:
-				// TODO(jixiang): support Array and Object fields.
-				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
-				constraint.Reason = "Array and Object fields are not supported."
+				constraint.Type = pm.Constraint_FIELD_OPTIONAL
+				constraint.Reason = "Array and Object fields can be serialized as JSON-encoded strings if included."
 			case projection.Inference.IsSingleType():
 				constraint.Type = pm.Constraint_FIELD_REQUIRED
 				constraint.Reason = "The projection has a single scalar type."
