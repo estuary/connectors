@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -12,10 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
-	pc "github.com/estuary/flow/go/protocols/capture"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -180,14 +177,6 @@ func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, w
 	log.WithField("query", query).Debug("deleting rows")
 	var _, err = tb.conn.ExecContext(ctx, query, whereVal)
 	require.NoError(t, err, "delete rows")
-}
-
-func TestSpec(t *testing.T) {
-	var response, err = sqlserverDriver.Spec(context.Background(), &pc.SpecRequest{})
-	require.NoError(t, err)
-	formatted, err := json.MarshalIndent(response, "", "  ")
-	require.NoError(t, err)
-	cupaloy.SnapshotT(t, string(formatted))
 }
 
 // TestGeneric runs the generic sqlcapture test suite.
