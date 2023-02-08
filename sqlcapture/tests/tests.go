@@ -259,7 +259,6 @@ func testMissingTable(ctx context.Context, t *testing.T, tb TestBackend) {
 //   - We know that (modulo the deletion at id=5) counter values must always
 //     increase by exactly one for every successive update. If this is not the
 //     case then some changes have been skipped or duplicated.
-//     then we're not providing the intended exactly-once capture guarantees.
 func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 	const numTotalIDs = 2000
 	const numActiveIDs = 100

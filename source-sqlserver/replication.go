@@ -272,10 +272,6 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, to
 	}
 	defer rows.Close()
 
-	//ctypes, err := rows.ColumnTypes()
-	//if err != nil {
-	//	return err
-	//}
 	cnames, err := rows.Columns()
 	if err != nil {
 		return err

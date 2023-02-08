@@ -18,7 +18,7 @@ GO
 EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'dummy_table', @role_name = 'sa';
 GO
   " | /opt/mssql-tools/bin/sqlcmd -U sa -P gf6w6dkD
-  echo "[initdb] Database initialzation complete!"
+  echo "[initdb] Database initialization complete!"
   touch /var/opt/mssql/initdb-performed
 else
   echo "[initdb] Database previously initialized"
