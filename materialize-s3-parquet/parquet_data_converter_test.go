@@ -222,6 +222,56 @@ func TestOptionalBoolField(t *testing.T) {
 	require.EqualError(t, actualError, "invalid bool type (int)")
 }
 
+var jsonTests = []test{
+	{input: tuple.TupleElement(map[string]int{"test": 1}), expected: "{\"test\":1}"},
+	{input: tuple.TupleElement([]interface{}{ map[string]int{"test": 1}, map[string]string{"foo": "bar"} }), expected: "[{\"test\":1},{\"foo\":\"bar\"}]"},
+	{input: tuple.TupleElement([]interface{}{ "a", 1, 2.1, nil }), expected: "[\"a\",1,2.1,null]"},
+}
+
+func TestJsonField(t *testing.T) {
+	var fld = newJsonField("test/json_field", false)
+	require.Equal(t, `{"Tag": "name=test/json_field, inname=IORSXG5BPNJZW63S7MZUWK3DE, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"}`, fld.Tag())
+
+	var structField = fld.ToStructField()
+	require.Equal(t, "IORSXG5BPNJZW63S7MZUWK3DE", structField.Name)
+	require.Equal(t, "string", structField.Type.Name())
+
+	for _, test := range jsonTests {
+		var v = reflect.New(structField.Type).Elem()
+		fld.Set(test.input, v)
+		require.Equal(t, test.expected, v.Interface())
+	}
+
+	var v = reflect.New(structField.Type).Elem()
+	var err1 = fld.Set(nil, v)
+	require.EqualError(t, err1, "unexpected nil value to a non-optional field")
+
+	var err2 = fld.Set(tuple.TupleElement("bad input"), v)
+	require.EqualError(t, err2, "invalid json type (string)")
+}
+
+func TestOptionalJsonField(t *testing.T) {
+	var fld = newJsonField("test/json_field", true)
+	require.Equal(t, `{"Tag": "name=test/json_field, inname=IORSXG5BPNJZW63S7MZUWK3DE, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"}`, fld.Tag())
+
+	var structField = fld.ToStructField()
+	require.Equal(t, "IORSXG5BPNJZW63S7MZUWK3DE", structField.Name)
+	require.Equal(t, "string", structField.Type.Elem().Name())
+
+	for _, test := range jsonTests {
+		var v = reflect.New(structField.Type).Elem()
+		fld.Set(test.input, v)
+		require.Equal(t, test.expected, v.Elem().Interface())
+	}
+
+	var v = reflect.New(structField.Type).Elem()
+	fld.Set(nil, v)
+	require.True(t, v.IsNil())
+
+	var err2 = fld.Set(tuple.TupleElement("bad input"), v)
+	require.EqualError(t, err2, "invalid json type (string)")
+}
+
 func TestNewParquetDataConverter_empty(t *testing.T) {
 	var cvrt, err1 = NewParquetDataConverter(&pf.MaterializationSpec_Binding{})
 	require.NoError(t, err1)
@@ -242,7 +292,7 @@ func testConverterInput(mustExist bool) *pf.MaterializationSpec_Binding {
 	return &pf.MaterializationSpec_Binding{
 		FieldSelection: pf.FieldSelection{
 			Keys:   []string{"str", "bool"},
-			Values: []string{"int64", "uint64", "int", "uint", "float32", "float64"},
+			Values: []string{"int64", "uint64", "int", "uint", "float32", "float64", "obj", "arr"},
 		},
 		Collection: pf.CollectionSpec{
 			Projections: []pf.Projection{
@@ -254,6 +304,8 @@ func testConverterInput(mustExist bool) *pf.MaterializationSpec_Binding {
 				{Field: "uint", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
 				{Field: "float32", Inference: pf.Inference{Types: []string{"number"}, Exists: exists}},
 				{Field: "float64", Inference: pf.Inference{Types: []string{"number"}, Exists: exists}},
+				{Field: "obj", Inference: pf.Inference{Types: []string{"object"}, Exists: exists}},
+				{Field: "arr", Inference: pf.Inference{Types: []string{"array"}, Exists: exists}},
 			},
 		},
 	}
@@ -268,16 +320,23 @@ func expectedSchema(repetitiontype string) string {
 		`{"Tag": "name=int, inname=INFXHI___, type=INT64, repetitiontype=%[1]s"}, `+
 		`{"Tag": "name=uint, inname=IOVUW45A_, type=INT64, repetitiontype=%[1]s"}, `+
 		`{"Tag": "name=float32, inname=IMZWG6YLUGMZA____, type=DOUBLE, repetitiontype=%[1]s"}, `+
-		`{"Tag": "name=float64, inname=IMZWG6YLUGY2A____, type=DOUBLE, repetitiontype=%[1]s"}]}`,
+		`{"Tag": "name=float64, inname=IMZWG6YLUGY2A____, type=DOUBLE, repetitiontype=%[1]s"}, `+
+		`{"Tag": "name=obj, inname=IN5RGU___, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=%[1]s"}, `+
+		`{"Tag": "name=arr, inname=IMFZHE___, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=%[1]s"}]}`,
 		repetitiontype)
 
 }
 
 var multiTypeInputKey = []tuple.TupleElement{"test_str", true}
-var multiTypeInputValues = []tuple.TupleElement{int64(-64), uint64(64), int(-1), uint(1), float32(32.3232), float64(-64.64646464)}
+var multiTypeInputValues = []tuple.TupleElement{
+	int64(-64), uint64(64), int(-1),
+	uint(1), float32(32.3232), float64(-64.64646464),
+	map[string]interface{}{ "foo": "bar", "meaning": 42 },
+	[]interface{}{ "foo", 1, 9.8, nil },
+}
 
 var emptyInputKey = []tuple.TupleElement{nil, nil}
-var emptyInputValues = []tuple.TupleElement{nil, nil, nil, nil, nil, nil}
+var emptyInputValues = []tuple.TupleElement{nil, nil, nil, nil, nil, nil, nil, nil}
 
 func TestNewParquetDataConverter_allRequiredTypes(t *testing.T) {
 	var cvrt, err1 = NewParquetDataConverter(testConverterInput(true))
@@ -296,6 +355,8 @@ func TestNewParquetDataConverter_allRequiredTypes(t *testing.T) {
 	require.Equal(t, int64(1), actualValues.Field(5).Int())
 	require.Greater(t, math.Pow(0.1, 6), math.Abs(float64(32.3232)-actualValues.Field(6).Float()))
 	require.Greater(t, math.Pow(0.1, 12), math.Abs(float64(-64.64646464)-actualValues.Field(7).Float()))
+	require.Equal(t, "{\"foo\":\"bar\",\"meaning\":42}", actualValues.Field(8).String())
+	require.Equal(t, "[\"foo\",1,9.8,null]", actualValues.Field(9).String())
 }
 
 func TestNewParquetDataConverter_allOptionalTypes(t *testing.T) {
@@ -315,6 +376,8 @@ func TestNewParquetDataConverter_allOptionalTypes(t *testing.T) {
 	require.Equal(t, int64(1), actualValues.Field(5).Elem().Int())
 	require.Greater(t, math.Pow(0.1, 6), math.Abs(float64(32.3232)-actualValues.Field(6).Elem().Float()))
 	require.Greater(t, math.Pow(0.1, 12), math.Abs(float64(-64.64646464)-actualValues.Field(7).Elem().Float()))
+	require.Equal(t, "{\"foo\":\"bar\",\"meaning\":42}", actualValues.Field(8).Elem().String())
+	require.Equal(t, "[\"foo\",1,9.8,null]", actualValues.Field(9).Elem().String())
 }
 
 func TestNewParquetDataConverter_allOptionalTypesWithNullValues(t *testing.T) {
@@ -371,17 +434,4 @@ func TestNewParquetDataConverter_invalid(t *testing.T) {
 			},
 		})
 	require.EqualError(t, err1, "columns of multi-scalar types are not supported: [string int]")
-
-	var _, err2 = NewParquetDataConverter(
-		&pf.MaterializationSpec_Binding{
-			FieldSelection: pf.FieldSelection{
-				Keys: []string{"test_field"},
-			},
-			Collection: pf.CollectionSpec{
-				Projections: []pf.Projection{
-					{Field: "test_field", Inference: pf.Inference{Types: []string{"array"}}},
-				},
-			},
-		})
-	require.EqualError(t, err2, "field of unexpected type (array)")
 }

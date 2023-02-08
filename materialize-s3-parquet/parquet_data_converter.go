@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base32"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -191,6 +192,38 @@ func newBoolField(name string, optional bool) *pqField {
 	}
 }
 
+// jsonStrategy implements the typeStrategy interface for json objects and
+// arrays.
+type jsonStrategy struct{}
+
+func (b *jsonStrategy) tag(name, internalName, repetitionType string) string {
+	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=%s"}`,
+	name, internalName, repetitionType)
+}
+func (b *jsonStrategy) reflectType() reflect.Type {
+	return reflect.TypeOf("")
+}
+func (b *jsonStrategy) set(t tuple.TupleElement, fldToSet reflect.Value) error {
+	switch v := reflect.ValueOf(t); v.Kind() {
+	case reflect.Array, reflect.Interface, reflect.Map, reflect.Slice:
+		if encoded, err := json.Marshal(t); err != nil {
+			return err
+		} else {
+			fldToSet.SetString(string(encoded))
+		}
+		return nil
+	default:
+		return fmt.Errorf("invalid json type (%s)", v.Kind().String())
+	}
+}
+func newJsonField(name string, optional bool) *pqField {
+	return &pqField{
+		name:         name,
+		optional:     optional,
+		typeStrategy: &jsonStrategy{},
+	}
+}
+
 func newPqField(fieldType string, name string, optional bool) (*pqField, error) {
 	switch {
 	case fieldType == "string":
@@ -201,6 +234,8 @@ func newPqField(fieldType string, name string, optional bool) (*pqField, error) 
 		return newFloatField(name, optional), nil
 	case fieldType == "boolean":
 		return newBoolField(name, optional), nil
+	case fieldType == "object", fieldType == "array":
+		return newJsonField(name, optional), nil
 	default:
 		return nil, fmt.Errorf("field of unexpected type (%s)", fieldType)
 	}
