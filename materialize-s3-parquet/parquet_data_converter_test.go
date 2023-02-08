@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
@@ -222,15 +223,20 @@ func TestOptionalBoolField(t *testing.T) {
 	require.EqualError(t, actualError, "invalid bool type (int)")
 }
 
+var jsonRaw = json.RawMessage("2")
+
 var jsonTests = []test{
 	{input: tuple.TupleElement(map[string]int{"test": 1}), expected: "{\"test\":1}"},
+	{input: tuple.TupleElement(struct { Test *json.RawMessage `json:"test"` }{ Test: &jsonRaw }), expected: "{\"test\":2}"},
+	{input: tuple.TupleElement(jsonRaw), expected: "2"},
+	{input: tuple.TupleElement([]byte(`{"test": 2}`)), expected: `{"test": 2}`},
 	{input: tuple.TupleElement([]interface{}{ map[string]int{"test": 1}, map[string]string{"foo": "bar"} }), expected: "[{\"test\":1},{\"foo\":\"bar\"}]"},
 	{input: tuple.TupleElement([]interface{}{ "a", 1, 2.1, nil }), expected: "[\"a\",1,2.1,null]"},
 }
 
 func TestJsonField(t *testing.T) {
 	var fld = newJsonField("test/json_field", false)
-	require.Equal(t, `{"Tag": "name=test/json_field, inname=IORSXG5BPNJZW63S7MZUWK3DE, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=REQUIRED"}`, fld.Tag())
+	require.Equal(t, `{"Tag": "name=test/json_field, inname=IORSXG5BPNJZW63S7MZUWK3DE, type=BYTE_ARRAY, logicaltype=STRING, repetitiontype=REQUIRED"}`, fld.Tag())
 
 	var structField = fld.ToStructField()
 	require.Equal(t, "IORSXG5BPNJZW63S7MZUWK3DE", structField.Name)
@@ -252,7 +258,7 @@ func TestJsonField(t *testing.T) {
 
 func TestOptionalJsonField(t *testing.T) {
 	var fld = newJsonField("test/json_field", true)
-	require.Equal(t, `{"Tag": "name=test/json_field, inname=IORSXG5BPNJZW63S7MZUWK3DE, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=OPTIONAL"}`, fld.Tag())
+	require.Equal(t, `{"Tag": "name=test/json_field, inname=IORSXG5BPNJZW63S7MZUWK3DE, type=BYTE_ARRAY, logicaltype=STRING, repetitiontype=OPTIONAL"}`, fld.Tag())
 
 	var structField = fld.ToStructField()
 	require.Equal(t, "IORSXG5BPNJZW63S7MZUWK3DE", structField.Name)
@@ -321,8 +327,8 @@ func expectedSchema(repetitiontype string) string {
 		`{"Tag": "name=uint, inname=IOVUW45A_, type=INT64, repetitiontype=%[1]s"}, `+
 		`{"Tag": "name=float32, inname=IMZWG6YLUGMZA____, type=DOUBLE, repetitiontype=%[1]s"}, `+
 		`{"Tag": "name=float64, inname=IMZWG6YLUGY2A____, type=DOUBLE, repetitiontype=%[1]s"}, `+
-		`{"Tag": "name=obj, inname=IN5RGU___, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=%[1]s"}, `+
-		`{"Tag": "name=arr, inname=IMFZHE___, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=%[1]s"}]}`,
+		`{"Tag": "name=obj, inname=IN5RGU___, type=BYTE_ARRAY, logicaltype=STRING, repetitiontype=%[1]s"}, `+
+		`{"Tag": "name=arr, inname=IMFZHE___, type=BYTE_ARRAY, logicaltype=STRING, repetitiontype=%[1]s"}]}`,
 		repetitiontype)
 
 }
