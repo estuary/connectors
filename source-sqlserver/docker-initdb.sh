@@ -13,9 +13,11 @@ USE test;
 GO
 EXEC sys.sp_cdc_enable_db;
 GO
-CREATE TABLE dummy_table (id INTEGER PRIMARY KEY, data TEXT);
+CREATE TABLE dbo.flow_watermarks(slot INTEGER PRIMARY KEY, watermark TEXT);
 GO
-EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'dummy_table', @role_name = 'sa';
+EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'flow_watermarks', @role_name = 'sa', @capture_instance = 'dbo_flow_watermarks';
+GO
+INSERT INTO dbo.flow_watermarks VALUES (0, 'dummy-value');
 GO
   " | /opt/mssql-tools/bin/sqlcmd -U sa -P gf6w6dkD
   echo "[initdb] Database initialization complete!"
