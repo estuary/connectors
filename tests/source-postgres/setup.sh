@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-export PGHOST="${PGHOST:=source-postgres-postgres-1.flow-test}"
+export PGHOST="${PGHOST:=source-postgres-db-1.flow-test}"
 export PGPORT="${PGPORT:=5432}"
 export PGDATABASE="${PGDATABASE:=flow}"
 export PGPASSWORD="${PGPASSWORD:=flow}"
@@ -31,7 +31,7 @@ function sql {
       -e PGUSER=$PGUSER \
       -e PGPASSWORD=$PGPASSWORD \
       -e PGDATABASE=$PGDATABASE \
-      source-postgres-postgres-1 \
+      source-postgres-db-1 \
       psql -c "$@"
 }
 

@@ -9,7 +9,7 @@ function sql {
       -e PGUSER=$PGUSER \
       -e PGPASSWORD=$PGPASSWORD \
       -e PGDATABASE=$PGDATABASE \
-      source-postgres-postgres-1 \
+      source-postgres-db-1 \
       psql -c "$@"
 }
 
