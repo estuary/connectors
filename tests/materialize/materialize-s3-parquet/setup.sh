@@ -63,7 +63,14 @@ resources_json_template='[
       "pathPrefix": "${TEST_PATH_PREFIX_MULTIPLE_DATATYPES}",
       "compressionType": "none"
     },
-    "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}"
+    "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
+    "fields": {
+      "recommended": true,
+      "include": {
+        "nested": {},
+        "array_int": {}
+      }
+    }
   }
 ]'
 

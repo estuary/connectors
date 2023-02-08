@@ -197,7 +197,7 @@ func newBoolField(name string, optional bool) *pqField {
 type jsonStrategy struct{}
 
 func (b *jsonStrategy) tag(name, internalName, repetitionType string) string {
-	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BYTE_ARRAY, convertedtype=UTF8, repetitiontype=%s"}`,
+	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BYTE_ARRAY, logicaltype=STRING, repetitiontype=%s"}`,
 	name, internalName, repetitionType)
 }
 func (b *jsonStrategy) reflectType() reflect.Type {
@@ -205,12 +205,19 @@ func (b *jsonStrategy) reflectType() reflect.Type {
 }
 func (b *jsonStrategy) set(t tuple.TupleElement, fldToSet reflect.Value) error {
 	switch v := reflect.ValueOf(t); v.Kind() {
-	case reflect.Array, reflect.Interface, reflect.Map, reflect.Slice:
-		if encoded, err := json.Marshal(t); err != nil {
-			return err
+	case reflect.Array, reflect.Interface, reflect.Map, reflect.Slice, reflect.Struct:
+		// If the value is a byte slice []byte, we assume this to be a
+		// json.RawMessage, so we avoid re-encoding
+		if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 {
+			fldToSet.SetString(string(v.Bytes()))
 		} else {
-			fldToSet.SetString(string(encoded))
+			if encoded, err := json.Marshal(t); err != nil {
+				return err
+			} else {
+				fldToSet.SetString(string(encoded[:]))
+			}
 		}
+
 		return nil
 	default:
 		return fmt.Errorf("invalid json type (%s)", v.Kind().String())
