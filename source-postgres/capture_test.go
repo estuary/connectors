@@ -304,3 +304,82 @@ func TestComplexDataset(t *testing.T) {
 		cupaloy.SnapshotT(t, summary)
 	})
 }
+
+func TestUserTypes(t *testing.T) {
+	var tb, ctx = TestBackend, context.Background()
+
+	t.Run("Domain", func(t *testing.T) {
+		tb.Query(ctx, t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`)
+		tb.Query(ctx, t, `CREATE DOMAIN UserDomain AS TEXT`)
+		t.Cleanup(func() { tb.Query(ctx, t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`) })
+
+		var uniqueString = "bandoleer"
+		var tableName = tb.CreateTable(ctx, t, uniqueString, "(id INTEGER PRIMARY KEY, value UserDomain)")
+		t.Run("Discovery", func(t *testing.T) {
+			var cs = tb.CaptureSpec(t)
+			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueString))
+		})
+
+		t.Run("Capture", func(t *testing.T) {
+			tb.Insert(ctx, t, tableName, [][]any{{1, "hello"}, {2, "world"}})
+			var cs = tb.CaptureSpec(t, tableName)
+			tests.VerifiedCapture(ctx, t, cs)
+			t.Run("Replication", func(t *testing.T) {
+				tb.Insert(ctx, t, tableName, [][]any{{3, "foo"}, {4, "bar"}, {5, "baz"}})
+				tests.VerifiedCapture(ctx, t, cs)
+			})
+		})
+	})
+
+	t.Run("Enum", func(t *testing.T) {
+		tb.Query(ctx, t, `DROP TYPE IF EXISTS UserEnum CASCADE`)
+		tb.Query(ctx, t, `CREATE TYPE UserEnum AS ENUM ('red', 'green', 'blue')`)
+		t.Cleanup(func() { tb.Query(ctx, t, `DROP TYPE UserEnum CASCADE`) })
+
+		var uniqueString = "terror"
+		var tableName = tb.CreateTable(ctx, t, uniqueString, "(id INTEGER PRIMARY KEY, value UserEnum)")
+		t.Run("Discovery", func(t *testing.T) {
+			var cs = tb.CaptureSpec(t)
+			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueString))
+		})
+		t.Run("Capture", func(t *testing.T) {
+			tb.Insert(ctx, t, tableName, [][]any{{1, "red"}, {2, "green"}, {3, "blue"}})
+			var cs = tb.CaptureSpec(t, tableName)
+			tests.VerifiedCapture(ctx, t, cs)
+			t.Run("Replication", func(t *testing.T) {
+				tb.Insert(ctx, t, tableName, [][]any{{4, "blue"}, {5, "red"}, {6, "green"}})
+				tests.VerifiedCapture(ctx, t, cs)
+			})
+		})
+	})
+
+	t.Run("Tuple", func(t *testing.T) {
+		tb.Query(ctx, t, `DROP TYPE IF EXISTS UserTuple CASCADE`)
+		tb.Query(ctx, t, `CREATE TYPE UserTuple AS (epoch INTEGER, count INTEGER, data TEXT)`)
+		t.Cleanup(func() { tb.Query(ctx, t, `DROP TYPE UserTuple CASCADE`) })
+
+		var uniqueString = "byways"
+		var tableName = tb.CreateTable(ctx, t, uniqueString, "(id INTEGER PRIMARY KEY, value UserTuple)")
+
+		t.Run("Discovery", func(t *testing.T) {
+			var cs = tb.CaptureSpec(t)
+			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueString))
+		})
+
+		t.Run("Capture", func(t *testing.T) {
+			tb.Insert(ctx, t, tableName, [][]any{
+				{1, "(1234, 5678, 'hello')"},
+				{2, "(3456, 9876, 'world')"},
+			})
+			var cs = tb.CaptureSpec(t, tableName)
+			tests.VerifiedCapture(ctx, t, cs)
+			t.Run("Replication", func(t *testing.T) {
+				tb.Insert(ctx, t, tableName, [][]any{
+					{3, "(34, 64, 'asdf')"},
+					{4, "(83, 12, 'fdsa')"},
+				})
+				tests.VerifiedCapture(ctx, t, cs)
+			})
+		})
+	})
+}
