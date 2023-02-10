@@ -135,7 +135,7 @@ func (db *postgresDatabase) buildScanQuery(start bool, keyColumns []string, colu
 
 	// Construct the query itself
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM %s.%s", schemaName, tableName)
+	fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
 	if !start {
 		fmt.Fprintf(query, ` WHERE (%s) > (%s)`, strings.Join(pkey, ", "), strings.Join(args, ", "))
 	}

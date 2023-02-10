@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -11,11 +12,14 @@ import (
 	"time"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
+	"github.com/estuary/flow/go/protocols/flow"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -239,4 +243,35 @@ func argsTuple(argc int) string {
 func TestGeneric(t *testing.T) {
 	lowerTuningParameters(t)
 	tests.Run(context.Background(), t, TestBackend)
+}
+
+func TestCapitalizedTables(t *testing.T) {
+	var ctx, tb = context.Background(), TestBackend
+	tb.Query(ctx, t, `DROP TABLE IF EXISTS test."USERS"`)
+	tb.Query(ctx, t, `CREATE TABLE test."USERS" (id INTEGER PRIMARY KEY, data TEXT NOT NULL)`)
+	var cs = tb.CaptureSpec(t)
+	t.Run("Discover", func(t *testing.T) {
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(`(?i:users)`))
+	})
+	var resourceSpecJSON, err = json.Marshal(sqlcapture.Resource{
+		Namespace: "test",
+		Stream:    "USERS",
+	})
+	require.NoError(t, err)
+	cs.Bindings = []*flow.CaptureSpec_Binding{{
+		ResourceSpecJson: resourceSpecJSON,
+		ResourcePath:     []string{"test", "USERS"},
+	}}
+	t.Run("Validate", func(t *testing.T) {
+		var _, err = cs.Validate(ctx, t)
+		require.NoError(t, err)
+	})
+	t.Run("Capture", func(t *testing.T) {
+		tb.Query(ctx, t, `INSERT INTO test."USERS" VALUES (1, 'Alice'), (2, 'Bob')`)
+		tests.VerifiedCapture(ctx, t, cs)
+		t.Run("Replication", func(t *testing.T) {
+			tb.Query(ctx, t, `INSERT INTO test."USERS" VALUES (3, 'Carol'), (4, 'Dave')`)
+			tests.VerifiedCapture(ctx, t, cs)
+		})
+	})
 }
