@@ -117,17 +117,17 @@ func ResourceBindings(t testing.TB, streamIDs ...string) []*flow.CaptureSpec_Bin
 	t.Helper()
 	var bindings []*flow.CaptureSpec_Binding
 	for _, streamID := range streamIDs {
-		var parts = strings.SplitN(streamID, ".", 2)
+		var nameParts = strings.SplitN(streamID, ".", 2)
 		var bs, err = json.Marshal(sqlcapture.Resource{
-			Namespace: parts[0],
-			Stream:    parts[1],
+			Namespace: nameParts[0],
+			Stream:    nameParts[1],
 		})
 		if err != nil {
 			t.Fatalf("error marshalling resource json: %v", err)
 		}
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
 			ResourceSpecJson: bs,
-			ResourcePath:     []string{streamID},
+			ResourcePath:     nameParts,
 		})
 	}
 	return bindings

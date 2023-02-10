@@ -271,7 +271,7 @@ func (a *pullAdapter) Send(m *pc.PullResponse) error {
 		for _, documents := range a.transaction {
 			var binding string
 			if idx := documents.Binding; 0 <= idx && int(idx) < len(a.bindings) {
-				binding = strings.Join(a.bindings[idx].ResourcePath, "|")
+				binding = strings.Join(a.bindings[idx].ResourcePath, ".")
 			} else {
 				binding = fmt.Sprintf("Invalid Binding %d", idx)
 			}
