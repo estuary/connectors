@@ -136,9 +136,8 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.DiscoverResponse_B
 		}
 
 		var res = Resource{
-			Namespace:  table.Schema,
-			Stream:     table.Name,
-			PrimaryKey: table.PrimaryKey,
+			Namespace: table.Schema,
+			Stream:    table.Name,
 		}
 		resourceSpecJSON, err := json.Marshal(res)
 		if err != nil {
