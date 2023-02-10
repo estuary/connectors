@@ -119,7 +119,6 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 		}
 
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
-
 		if _, ok := discoveredTables[streamID]; !ok {
 			return nil, fmt.Errorf("could not find or access table %s", res.Stream)
 		}

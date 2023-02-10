@@ -53,11 +53,11 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 		tableMap[streamID] = info
 	}
 	for _, desc := range columnDescriptions {
-		var id = desc.TableSchema + "." + desc.TableName
-		if info, ok := tableMap[id]; ok {
+		var streamID = sqlcapture.JoinStreamID(desc.TableSchema, desc.TableName)
+		if info, ok := tableMap[streamID]; ok {
 			if column, ok := info.Columns[desc.ColumnName]; ok {
 				logrus.WithFields(logrus.Fields{
-					"table":  id,
+					"table":  streamID,
 					"column": desc.ColumnName,
 					"desc":   desc.Description,
 				}).Debug("got column description")
@@ -65,19 +65,19 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 				column.Description = &description
 				info.Columns[desc.ColumnName] = column
 			}
-			tableMap[id] = info
+			tableMap[streamID] = info
 		}
 	}
-	for id, key := range primaryKeys {
+	for streamID, key := range primaryKeys {
 		// The `getColumns()` query implements the "exclude system schemas" logic,
 		// so here we ignore primary key information for tables we don't care about.
-		var info, ok = tableMap[id]
+		var info, ok = tableMap[streamID]
 		if !ok {
 			continue
 		}
-		logrus.WithFields(logrus.Fields{"table": id, "key": key}).Debug("queried primary key")
+		logrus.WithFields(logrus.Fields{"table": streamID, "key": key}).Debug("queried primary key")
 		info.PrimaryKey = key
-		tableMap[id] = info
+		tableMap[streamID] = info
 	}
 	return tableMap, nil
 }
@@ -379,10 +379,10 @@ func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, e
 	var _, err = conn.QueryFunc(ctx, queryDiscoverPrimaryKeys, nil,
 		[]interface{}{&tableSchema, &tableName, &columnName, &columnIndex},
 		func(r pgx.QueryFuncRow) error {
-			var id = fmt.Sprintf("%s.%s", tableSchema, tableName)
-			keys[id] = append(keys[id], columnName)
-			if columnIndex != len(keys[id]) {
-				return fmt.Errorf("primary key column %q appears out of order (expected index %d, in context %q)", columnName, columnIndex, keys[id])
+			var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
+			keys[streamID] = append(keys[streamID], columnName)
+			if columnIndex != len(keys[streamID]) {
+				return fmt.Errorf("primary key column %q appears out of order (expected index %d, in context %q)", columnName, columnIndex, keys[streamID])
 			}
 			return nil
 		})
@@ -395,7 +395,7 @@ const queryColumnDescriptions = `
 		    isc.table_schema,
 			isc.table_name,
 			isc.column_name,
-			pg_catalog.col_description(format('%s.%s',isc.table_schema,isc.table_name)::regclass::oid,isc.ordinal_position) description
+			pg_catalog.col_description(format('"%s"."%s"',isc.table_schema,isc.table_name)::regclass::oid,isc.ordinal_position) description
 		FROM information_schema.columns isc
 	) as descriptions WHERE description != '';
 `
