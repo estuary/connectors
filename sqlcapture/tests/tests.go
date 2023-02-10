@@ -179,7 +179,7 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 	require.NoError(t, err)
 	cs.Bindings = append(cs.Bindings, &flow.CaptureSpec_Binding{
 		ResourceSpecJson: specJSON,
-		ResourcePath:     []string{tableName},
+		ResourcePath:     nameParts,
 	})
 
 	t.Run("capture1", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
@@ -207,7 +207,7 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 	require.NoError(t, err)
 	cs.Bindings = append(cs.Bindings, &flow.CaptureSpec_Binding{
 		ResourceSpecJson: specJSON,
-		ResourcePath:     []string{tableName},
+		ResourcePath:     nameParts,
 	})
 
 	t.Run("capture1", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
