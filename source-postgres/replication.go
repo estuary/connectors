@@ -210,7 +210,10 @@ func (s *replicationStream) StartReplication(ctx context.Context) error {
 		if errors.Is(err, context.Canceled) {
 			err = nil
 		}
-		s.conn.Close(ctx)
+		// Always take up to 1 second to notify the database that we're done
+		var closeCtx, cancel = context.WithTimeout(context.Background(), 1*time.Second)
+		s.conn.Close(closeCtx)
+		cancel()
 		close(s.events)
 		s.errCh <- err
 	}()
