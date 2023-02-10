@@ -53,7 +53,18 @@ func (cs *CaptureSpec) Validate(ctx context.Context, t testing.TB) ([]*pc.Valida
 	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
 
-	validation, err := cs.Driver.Validate(ctx, &pc.ValidateRequest{EndpointSpecJson: endpointSpecJSON})
+	var bindings []*pc.ValidateRequest_Binding
+	for _, b := range cs.Bindings {
+		bindings = append(bindings, &pc.ValidateRequest_Binding{
+			ResourceSpecJson: b.ResourceSpecJson,
+			Collection:       b.Collection,
+		})
+	}
+
+	validation, err := cs.Driver.Validate(ctx, &pc.ValidateRequest{
+		EndpointSpecJson: endpointSpecJSON,
+		Bindings:         bindings,
+	})
 	if err != nil {
 		return nil, err
 	}
