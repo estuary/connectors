@@ -80,6 +80,13 @@ func RestartingBackfillCapture(ctx context.Context, t testing.TB, cs *st.Capture
 
 		var captureCtx, cancelCapture = context.WithCancel(ctx)
 		cs.Capture(captureCtx, t, func(data json.RawMessage) {
+			// After the capture context is cancelled, don't do any of this processing
+			// on subsequent checkpoints that might be emitted. We want to act as though
+			// there's only the one new state checkpoint emitted by a capture and ignore
+			// anything after that.
+			if captureCtx.Err() != nil {
+				return
+			}
 			if checkpointRegex.Match(data) {
 				var nextKey string
 				if m := scanCursorRegex.FindStringSubmatch(string(data)); len(m) > 1 {
@@ -90,12 +97,16 @@ func RestartingBackfillCapture(ctx context.Context, t testing.TB, cs *st.Capture
 					cs.Checkpoint, startKey = data, nextKey
 					checkpoints = append(checkpoints, cs.Checkpoint)
 					cancelCapture()
+
+					// Copy the capture output so far into the summary *now* so that
+					// any documents emitted after this point won't be included. This
+					// should improve test stability.
+					io.Copy(summary, strings.NewReader(cs.Summary()))
+					fmt.Fprintf(summary, "\n\n")
 				}
 			}
 		})
 
-		io.Copy(summary, strings.NewReader(cs.Summary()))
-		fmt.Fprintf(summary, "\n\n")
 		if len(cs.Errors) > 0 {
 			fmt.Fprintf(summary, "####################################\n")
 			fmt.Fprintf(summary, "### Terminating Capture due to Errors\n")
