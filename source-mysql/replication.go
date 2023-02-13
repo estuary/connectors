@@ -508,7 +508,7 @@ func (rs *mysqlReplicationStream) keyColumns(streamID string) ([]string, bool) {
 	return keyColumns, ok
 }
 
-func (rs *mysqlReplicationStream) ActivateTable(streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	rs.tables.Lock()
 	defer rs.tables.Unlock()
 
