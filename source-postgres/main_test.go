@@ -103,7 +103,7 @@ func TestMain(m *testing.M) {
 
 	var exitCode = m.Run()
 	if err := replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, *TestReplicationSlot)).Close(); err != nil {
-		log.WithField("err", err).Fatal("error cleaning up replication slot")
+		log.WithField("err", err).Warn("error cleaning up replication slot")
 	}
 	os.Exit(exitCode)
 }
