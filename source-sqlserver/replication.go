@@ -105,25 +105,27 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 	return nil
 }
 
-func (rs *sqlserverReplicationStream) ActivateTable(streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+	log.WithField("table", streamID).Trace("activate table")
+
 	var namePattern = "<schema>_<table>"
 	// TODO(wgd): It's rather inefficient to redo the 'list instances' work every time a
 	// table gets activated.
-	// TODO(wgd): We should receive a context plumbed in from the caller rather than using
-	// context.Background() here.
-	var captureInstances, err = listCaptureInstances(context.Background(), rs.conn, namePattern)
+	var captureInstances, err = listCaptureInstances(ctx, rs.conn, namePattern)
 	if err != nil {
 		return err
 	}
 
 	var instanceName = captureInstances[streamID]
 	if instanceName == "" {
-		log.WithFields(log.Fields{"stream": streamID}).Debug("enabling cdc for table")
+		log.WithField("stream", streamID).Debug("enabling cdc for table")
 		instanceName, err = enableTableCDC(context.Background(), rs.conn, namePattern, streamID, rs.cfg.User)
 		if err != nil {
 			log.WithField("err", err).Fatal("error enabling cdc")
 			return err
 		}
+	} else {
+		log.WithField("stream", streamID).Debug("cdc already enabled")
 	}
 
 	var columnTypes = make(map[string]any)
@@ -233,11 +235,13 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	rs.tables.RUnlock()
 
 	for _, item := range queue {
+		log.WithField("table", item.StreamID).Trace("polling table")
 		if err := rs.pollTable(ctx, rs.fromLSN, toLSN, item); err != nil {
 			return fmt.Errorf("table %q: %w", sqlcapture.JoinStreamID(item.SchemaName, item.TableName), err)
 		}
 	}
 
+	log.WithField("lsn", toLSN).Trace("flushed up to LSN")
 	rs.events <- &sqlcapture.FlushEvent{
 		Source: &sqlserverSourceInfo{
 			LSN: toLSN,
@@ -297,8 +301,8 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, to
 		// Extract the event's LSN and remove it from the record fields, since
 		// it will be included in the source metadata already.
 		var changeLSN, ok = fields["__$start_lsn"].([]byte)
-		if !ok {
-			changeLSN = nil
+		if !ok || changeLSN == nil {
+			return fmt.Errorf("invalid '__$start_lsn' value (capture user may not have correct permissions): %v", changeLSN)
 		}
 		if bytes.Compare(changeLSN, fromLSN) <= 0 {
 			log.WithFields(log.Fields{
@@ -421,6 +425,7 @@ func cdcGetNextLSN(ctx context.Context, conn *sql.DB, fromLSN []byte, pollTransa
 // to the capture instance name, if a capture instance exists which matches the configured
 // naming pattern.
 func listCaptureInstances(ctx context.Context, conn *sql.DB, namePattern string) (map[string]string, error) {
+	log.Trace("listing capture instances")
 	// This query will enumerate all "capture instances" currently present, along with the
 	// schema/table names identifying the source table.
 	const query = `SELECT sch.name, tbl.name, ct.capture_instance

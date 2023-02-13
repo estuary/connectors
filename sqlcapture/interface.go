@@ -138,7 +138,7 @@ type Database interface {
 // received for that table. It is permitted and necessary to activate some
 // tables before starting replication.
 type ReplicationStream interface {
-	ActivateTable(streamID string, keyColumns []string, info *DiscoveryInfo, metadata json.RawMessage) error
+	ActivateTable(ctx context.Context, streamID string, keyColumns []string, info *DiscoveryInfo, metadata json.RawMessage) error
 
 	StartReplication(ctx context.Context) error
 	Events() <-chan DatabaseEvent
