@@ -13,9 +13,19 @@ USE test;
 GO
 EXEC sys.sp_cdc_enable_db;
 GO
+CREATE LOGIN flow_capture WITH PASSWORD = 'we2rie1E';
+GO
+CREATE USER flow_capture FOR LOGIN flow_capture;
+GO
+GRANT SELECT ON SCHEMA :: dbo TO flow_capture;
+GO
+GRANT SELECT ON SCHEMA :: cdc TO flow_capture;
+GO
 CREATE TABLE dbo.flow_watermarks(slot INTEGER PRIMARY KEY, watermark TEXT);
 GO
-EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'flow_watermarks', @role_name = 'sa', @capture_instance = 'dbo_flow_watermarks';
+GRANT UPDATE ON dbo.flow_watermarks TO flow_capture;
+GO
+EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'flow_watermarks', @role_name = 'flow_capture', @capture_instance = 'dbo_flow_watermarks';
 GO
 INSERT INTO dbo.flow_watermarks VALUES (0, 'dummy-value');
 GO

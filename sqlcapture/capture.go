@@ -142,14 +142,18 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	}
 	for streamID, state := range c.State.Streams {
 		if state.Mode == TableModeBackfill || state.Mode == TableModeActive {
-			replStream.ActivateTable(streamID, state.KeyColumns, c.discovery[streamID], state.Metadata)
+			if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
+				return fmt.Errorf("error activating table %q: %w", streamID, err)
+			}
 		}
 	}
 	var watermarks = c.Database.WatermarksTable()
 	if c.discovery[watermarks] == nil {
 		return fmt.Errorf("watermarks table %q does not exist", watermarks)
 	}
-	replStream.ActivateTable(watermarks, c.discovery[watermarks].PrimaryKey, c.discovery[watermarks], nil)
+	if err := replStream.ActivateTable(ctx, watermarks, c.discovery[watermarks].PrimaryKey, c.discovery[watermarks], nil); err != nil {
+		return fmt.Errorf("error activating table %q: %w", watermarks, err)
+	}
 	if err := replStream.StartReplication(ctx); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
@@ -176,7 +180,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		state.Mode = TableModeBackfill
 		state.dirty = true
 		c.State.Streams[streamID] = state
-		if err := replStream.ActivateTable(streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
+		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
 			return fmt.Errorf("error activating %q for replication: %w", streamID, err)
 		}
 	}

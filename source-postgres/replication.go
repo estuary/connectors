@@ -577,7 +577,7 @@ func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
 	return keyColumns, ok
 }
 
-func (s *replicationStream) ActivateTable(streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	s.tables.Lock()
 	s.tables.active[streamID] = struct{}{}
 	s.tables.keyColumns[streamID] = keyColumns

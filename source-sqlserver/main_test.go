@@ -18,10 +18,15 @@ import (
 )
 
 var (
-	dbAddress  = flag.String("db_addr", "127.0.0.1:1433", "Connect to the specified address/port for tests")
-	dbUser     = flag.String("db_user", "sa", "Connect as the specified user for tests")
-	dbPassword = flag.String("db_password", "gf6w6dkD", "Password for the specified database test user")
-	dbName     = flag.String("db_name", "test", "Connect to the named database for tests")
+	dbAddress = flag.String("db_addr", "127.0.0.1:1433", "Connect to the specified address/port for tests")
+	dbName    = flag.String("db_name", "test", "Connect to the named database for tests")
+
+	dbCaptureUser     = flag.String("db_user", "flow_capture", "Connect as the specified user for test captures")
+	dbCapturePassword = flag.String("db_password", "we2rie1E", "Password for the specified database test capture user")
+	dbTestUser        = flag.String("db_test_user", "sa", "Connect as the specified user for test manipulations")
+	dbTestPassword    = flag.String("db_test_pass", "gf6w6dkD", "Password for the test-manipulation user")
+
+	enableCDCWhenCreatingTables = flag.Bool("enable_cdc_when_creating_tables", true, "Set to true if CDC should be enabled before the test capture runs")
 )
 
 func TestMain(m *testing.M) {
@@ -45,15 +50,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func defaultConfig(t *testing.T) Config {
-	return Config{
-		Address:  *dbAddress,
-		User:     *dbUser,
-		Password: *dbPassword,
-		Database: *dbName,
-	}
-}
-
 func sqlserverTestBackend(t *testing.T) *testBackend {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
@@ -61,16 +57,29 @@ func sqlserverTestBackend(t *testing.T) *testBackend {
 		return nil
 	}
 
-	var cfg = defaultConfig(t)
+	var testCfg = &Config{
+		Address:  *dbAddress,
+		User:     *dbTestUser,
+		Password: *dbTestPassword,
+		Database: *dbName,
+	}
 	log.WithFields(log.Fields{
-		"address": cfg.Address,
-		"user":    cfg.User,
+		"address": testCfg.Address,
+		"user":    testCfg.User,
 	}).Info("connecting to test database")
-
-	var conn, err = sql.Open("sqlserver", cfg.ToURI())
+	var conn, err = sql.Open("sqlserver", testCfg.ToURI())
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
-	return &testBackend{cfg: cfg, conn: conn}
+
+	return &testBackend{
+		cfg: Config{
+			Address:  *dbAddress,
+			User:     *dbCaptureUser,
+			Password: *dbCapturePassword,
+			Database: *dbName,
+		},
+		conn: conn,
+	}
 }
 
 type testBackend struct {
@@ -107,29 +116,41 @@ func init() {
 func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
-	var tableName = "dbo.test_" + strings.TrimPrefix(t.Name(), "Test")
+	var tableName = "test_" + strings.TrimPrefix(t.Name(), "Test")
 	if suffix != "" {
 		tableName += "_" + suffix
 	}
 	for _, str := range []string{"/", "=", "(", ")"} {
 		tableName = strings.ReplaceAll(tableName, str, "_")
 	}
+	var fullTableName = "dbo." + tableName
 
-	log.WithFields(log.Fields{"table": tableName, "cols": tableDef}).Debug("creating test table")
+	log.WithFields(log.Fields{"table": fullTableName, "cols": tableDef}).Debug("creating test table")
 
-	var _, err = tb.conn.ExecContext(ctx, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", tableName, tableName))
+	var _, err = tb.conn.ExecContext(ctx, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
 	require.NoError(t, err)
 
-	_, err = tb.conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s%s;", tableName, tableDef))
+	_, err = tb.conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s%s;", fullTableName, tableDef))
 	require.NoError(t, err)
+
+	if *enableCDCWhenCreatingTables {
+		var instanceName = "dbo_" + strings.ToLower(tableName)
+		var query = fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = '%s', @role_name = '%s', @capture_instance = '%s';`,
+			tableName,
+			*dbCaptureUser,
+			instanceName,
+		)
+		_, err = tb.conn.ExecContext(ctx, query)
+		require.NoError(t, err)
+	}
 
 	t.Cleanup(func() {
-		log.WithField("table", tableName).Debug("destroying test table")
-		_, err = tb.conn.ExecContext(ctx, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", tableName, tableName))
+		log.WithField("table", fullTableName).Debug("destroying test table")
+		_, err = tb.conn.ExecContext(ctx, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
 		require.NoError(t, err)
 	})
 
-	return tableName
+	return fullTableName
 }
 
 // Insert adds all provided rows to the specified table in a single transaction.
