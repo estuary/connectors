@@ -24,13 +24,11 @@ RUN go build -o ./connector -v ./source-mongodb/...
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v1
+#FROM ghcr.io/estuary/base-image:v1
+FROM ghcr.io/estuary/base-image:v1@sha256:5f06b9903a74703b21564e45ed1371e30568ba9c78ea0ad17afe7183fdb3deb7
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
-
-# Grab the statically-built parser cli.
-COPY flow-bin/flow-parser ./
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./source-mongodb
