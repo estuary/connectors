@@ -64,7 +64,9 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		eg.Go(func() error { return c.BackfillCollection(ctx, client, uint32(idx), res) })
+		if err := c.BackfillCollection(ctx, client, uint32(idx), res); err != nil {
+			return fmt.Errorf("backfill: %w", err)
+		}
 		eg.Go(func() error { return c.ChangeStream(ctx, client, uint32(idx), res) })
 	}
 
