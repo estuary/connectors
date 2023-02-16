@@ -393,7 +393,7 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 // with the binlog Query Events for some statements like GRANT and CREATE USER.
 // TODO(johnny): SET STATEMENT is not safe in the general case, and we want to re-visit
 // by extracting and ignoring a SET STATEMENT stanza prior to parsing.
-var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|CREATE USER|CREATE DEFINER|DROP USER|ALTER USER|DROP PROCEDURE|SET STATEMENT|# )`)
+var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|CREATE DEFINER|DROP USER|ALTER USER|DROP PROCEDURE|SET STATEMENT|# )`)
 
 func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	// There are basically three types of query events we might receive:
