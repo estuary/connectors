@@ -24,8 +24,7 @@ RUN go build -o ./connector -v ./source-mongodb/...
 
 # Runtime Stage
 ################################################################################
-#FROM ghcr.io/estuary/base-image:v1
-FROM ghcr.io/estuary/base-image:v1@sha256:5f06b9903a74703b21564e45ed1371e30568ba9c78ea0ad17afe7183fdb3deb7
+FROM ghcr.io/estuary/base-image:v1
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

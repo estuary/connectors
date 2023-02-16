@@ -279,6 +279,13 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 		}
 	}()
 
+	for _, binding := range open.Open.Capture.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+			return fmt.Errorf("error parsing resource config: %w", err)
+		}
+	}
+
   return nil
 }
 
