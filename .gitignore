@@ -1,3 +1,5 @@
+.docker-cache/*
+!.docker-cache/.keep
 /.build/
 /source-gcs/source-gcs
 /source-hello-world/source-hello-world
