@@ -109,6 +109,9 @@ type changeEvent struct{
 	FullDocument bson.M `bson:"fullDocument"`
 }
 
+const changeStreamFatalErrorCode = 280
+const resumePointGoneErrorMessage = "the resume point may no longer be in the oplog"
+
 func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding uint32, res resource, resumeToken bson.Raw) error {
 	var db = client.Database(res.Database)
 
@@ -130,6 +133,20 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 	}
 	cursor, err := collection.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
 	if err != nil {
+		// This error means events from the starting point are no longer available,
+		// which means we have hit a gap in between last run of the connector and
+		// this one. We re-set the checkpoint and error out so the next run of the
+		// connector will run a backfill.
+		if e, ok := err.(mongo.ServerError); ok {
+			if e.HasErrorCode(changeStreamFatalErrorCode) && e.HasErrorMessage(resumePointGoneErrorMessage) {
+				if err = c.Output.Checkpoint([]byte("{}"), false); err != nil {
+					return fmt.Errorf("output checkpoint failed: %w", err)
+				}
+
+				return fmt.Errorf("change stream on collection %s cannot resume capture, the connector will restart and run a backfill: %w", res.Collection, err)
+			}
+		}
+
 		return fmt.Errorf("change stream on collection %s: %w", res.Collection, err)
 	}
 
