@@ -34,6 +34,13 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 		return fmt.Errorf("parsing config json: %w", err)
 	}
 
+	var prevState captureState
+	if open.Open.DriverCheckpointJson != nil {
+		if err := pf.UnmarshalStrict(open.Open.DriverCheckpointJson, &prevState); err != nil {
+			return fmt.Errorf("parsing state checkpoint: %w", err)
+		}
+	}
+
 	var ctx = context.Background()
 
 	client, err := d.Connect(ctx, cfg)
@@ -63,11 +70,16 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
+		var resState, _ = prevState.Resources[resourceId(res)]
 
-		if err := c.BackfillCollection(ctx, client, uint32(idx), res); err != nil {
-			return fmt.Errorf("backfill: %w", err)
+		// Only backfill the first time, and we know that when there is no state
+		if len(prevState.Resources) == 0 {
+			if err := c.BackfillCollection(ctx, client, uint32(idx), res); err != nil {
+				return fmt.Errorf("backfill: %w", err)
+			}
 		}
-		eg.Go(func() error { return c.ChangeStream(ctx, client, uint32(idx), res) })
+
+		eg.Go(func() error { return c.ChangeStream(ctx, client, uint32(idx), res, resState) })
 	}
 
 	if err := eg.Wait(); err != nil && !errors.Is(err, io.EOF) {
@@ -77,12 +89,24 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 	return nil
 }
 
+type capture struct{
+	Output   *boilerplate.PullOutput
+}
+
+type captureState struct{
+	Resources map[string]bson.Raw `json:"resources"`
+}
+
+func (s *captureState) Validate() error {
+	return nil
+}
+
 type changeEvent struct{
 	OperationType string `bson:"operationType"`
 	FullDocument bson.M `bson:"fullDocument"`
 }
 
-func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding uint32, res resource) error {
+func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding uint32, res resource, resumeToken bson.Raw) error {
 	var db = client.Database(res.Database)
 
 	var collection = db.Collection(res.Collection)
@@ -90,12 +114,16 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 	log.Debug("listening on changes on collection ", res.Collection)
 	var eventFilter = bson.D{{"$match", bson.D{{"$or",
 	bson.A{
-		// bson.D{{"operationType", "delete"}}, TODO: how do we handle deletion
-		// events
+		// TODO: handle deletion events
+		// bson.D{{"operationType", "delete"}}
 		bson.D{{"operationType", "insert"}},
 		bson.D{{"operationType", "update"}},
 	}}}}}
-	cursor, err := collection.Watch(ctx, mongo.Pipeline{eventFilter}, options.ChangeStream().SetFullDocument(options.UpdateLookup))
+	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
+	if resumeToken != nil {
+		opts = opts.SetResumeAfter(resumeToken)
+	}
+	cursor, err := collection.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
 	if err != nil {
 		return fmt.Errorf("change stream on collection %s: %w", res.Collection, err)
 	}
@@ -117,7 +145,18 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 			return fmt.Errorf("output documents failed: %w", err)
 		}
 
-		if err = c.Output.Checkpoint([]byte("{}"), true); err != nil {
+		var checkpoint = captureState{
+			Resources: map[string]bson.Raw{
+				resourceId(res): cursor.ResumeToken(),
+			},
+		}
+
+		checkpointJson, err := json.Marshal(checkpoint)
+		if err != nil {
+			return fmt.Errorf("encoding checkpoint to json failed: %w", err)
+		}
+
+		if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
 			return fmt.Errorf("output checkpoint failed: %w", err)
 		}
 	}
@@ -182,6 +221,10 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 	return nil
 }
 
+func resourceId(res resource) string {
+	return fmt.Sprintf("%s.%s", res.Database, res.Collection)
+}
+
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		switch v := value.(type) {
@@ -195,9 +238,5 @@ func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	}
 
 	return doc
-}
-
-type capture struct{
-	Output   *boilerplate.PullOutput
 }
 
