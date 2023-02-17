@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 	"math"
 	"errors"
 	"io"
@@ -16,6 +17,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -91,6 +93,7 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 
 type capture struct{
 	Output   *boilerplate.PullOutput
+	BackfillFinishedAt *primitive.Timestamp
 }
 
 type captureState struct{
@@ -122,6 +125,8 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
 	if resumeToken != nil {
 		opts = opts.SetResumeAfter(resumeToken)
+	} else if c.BackfillFinishedAt != nil {
+		opts = opts.SetStartAtOperationTime(c.BackfillFinishedAt)
 	}
 	cursor, err := collection.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
 	if err != nil {
@@ -209,6 +214,9 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			}
 		}
 	}
+
+	// minus five seconds for potential error
+	c.BackfillFinishedAt = &primitive.Timestamp{ T: uint32(time.Now().Unix()) - 5, I: 0 }
 
 	if err = c.Output.Checkpoint([]byte("{}"), true); err != nil {
 		return fmt.Errorf("sending checkpoint failed: %w", err)
