@@ -58,15 +58,21 @@ func (c *config) client(ctx context.Context) (*client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating bigquery client: %w", err)
 	}
+	log.WithField("projectID", billingProjectID).Info("bigquery client successfully created")
 
 	cloudStorageClient, err := storage.NewClient(ctx, clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating cloud storage client: %w", err)
 	}
+	log.Info("cloud storage client successfully created")
 
 	if _, err := bigqueryClient.DatasetInProject(c.ProjectID, c.Dataset).Metadata(ctx); err != nil {
 		return nil, fmt.Errorf("validating dataset & project: %w", err)
 	}
+	log.WithFields(log.Fields{
+		"projectID": c.ProjectID,
+		"dataset":   c.Dataset,
+	}).Info("dataset and project successfully validated")
 
 	return &client{
 		bigqueryClient:     bigqueryClient,
@@ -152,7 +158,7 @@ func newBigQueryDriver() pm.DriverServer {
 				"region":      cfg.Region,
 				"bucket":      cfg.Bucket,
 				"bucket_path": cfg.BucketPath,
-			}).Info("opening bigquery")
+			}).Info("creating bigquery endpoint")
 
 			var metaSpecs, metaCheckpoints = sql.MetaTables(cfg.DatasetPath())
 
@@ -207,6 +213,12 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 		return "", "", err
 	}
 
+	log.WithFields(log.Fields{
+		"table":           specs.Identifier,
+		"materialization": materialization.String(),
+		"version":         data.Version,
+	}).Info("existing materialization spec loaded")
+
 	return data.SpecB64, data.Version, nil
 }
 
@@ -224,6 +236,7 @@ func (c client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence) 
 		return fence, fmt.Errorf("evaluating fence template: %w", err)
 	}
 
+	log.Info("installing fence")
 	job, err := c.query(ctx, query.String())
 	if err != nil {
 		return fence, err
@@ -232,6 +245,7 @@ func (c client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence) 
 		Fence      int64  `bigquery:"fence"`
 		Checkpoint string `bigquery:"checkpoint"`
 	}
+	log.Info("reading installed fence")
 	if err = c.fetchOne(ctx, job, &bqFence); err != nil {
 		return fence, fmt.Errorf("read fence: %w", err)
 	}
@@ -243,6 +257,14 @@ func (c client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence) 
 
 	fence.Fence = bqFence.Fence
 	fence.Checkpoint = checkpoint
+
+	log.WithFields(log.Fields{
+		"fence":            fence.Fence,
+		"keyBegin":         fence.KeyBegin,
+		"keyEnd":           fence.KeyEnd,
+		"materialization":  fence.Materialization.String(),
+		"checkpointsTable": fence.TablePath,
+	}).Info("fence installed successfully")
 
 	return fence, nil
 }
