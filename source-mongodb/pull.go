@@ -75,13 +75,14 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 		var resState, _ = prevState.Resources[resourceId(res)]
 
 		// Only backfill the first time, and we know that when there is no state
+		var backfillFinishedAt *primitive.Timestamp = nil
 		if len(prevState.Resources) == 0 {
-			if err := c.BackfillCollection(ctx, client, uint32(idx), res); err != nil {
+			if backfillFinishedAt, err = c.BackfillCollection(ctx, client, uint32(idx), res); err != nil {
 				return fmt.Errorf("backfill: %w", err)
 			}
 		}
 
-		eg.Go(func() error { return c.ChangeStream(ctx, client, uint32(idx), res, resState) })
+		eg.Go(func() error { return c.ChangeStream(ctx, client, uint32(idx), res, backfillFinishedAt, resState) })
 	}
 
 	if err := eg.Wait(); err != nil && !errors.Is(err, io.EOF) {
@@ -93,7 +94,6 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 
 type capture struct{
 	Output   *boilerplate.PullOutput
-	BackfillFinishedAt *primitive.Timestamp
 }
 
 type captureState struct{
@@ -112,7 +112,7 @@ type changeEvent struct{
 const changeStreamFatalErrorCode = 280
 const resumePointGoneErrorMessage = "the resume point may no longer be in the oplog"
 
-func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding uint32, res resource, resumeToken bson.Raw) error {
+func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding uint32, res resource, backfillFinishedAt *primitive.Timestamp, resumeToken bson.Raw) error {
 	var db = client.Database(res.Database)
 
 	var collection = db.Collection(res.Collection)
@@ -128,8 +128,8 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
 	if resumeToken != nil {
 		opts = opts.SetResumeAfter(resumeToken)
-	} else if c.BackfillFinishedAt != nil {
-		opts = opts.SetStartAtOperationTime(c.BackfillFinishedAt)
+	} else if backfillFinishedAt != nil {
+		opts = opts.SetStartAtOperationTime(backfillFinishedAt)
 	}
 	cursor, err := collection.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
 	if err != nil {
@@ -137,6 +137,10 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 		// which means we have hit a gap in between last run of the connector and
 		// this one. We re-set the checkpoint and error out so the next run of the
 		// connector will run a backfill.
+		//
+		// There is potential for optimisation here by only resetting the checkpoint
+		// of the collection which can't resume instead of resetting the whole
+		// connector's checkpoint and backfilling everything
 		if e, ok := err.(mongo.ServerError); ok {
 			if e.HasErrorCode(changeStreamFatalErrorCode) && e.HasErrorMessage(resumePointGoneErrorMessage) {
 				if err = c.Output.Checkpoint([]byte("{}"), false); err != nil {
@@ -194,7 +198,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 
 const CHECKPOINT_EVERY = 100
 
-func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding uint32, res resource) error {
+func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding uint32, res resource) (*primitive.Timestamp, error) {
 	var db = client.Database(res.Database)
 
 	var collection = db.Collection(res.Collection)
@@ -202,7 +206,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 	log.Debug("finding documents in collection ", res.Collection)
 	cursor, err := collection.Find(ctx, bson.D{})
 	if err != nil {
-		return fmt.Errorf("could not run find query on collection %s: %w", res.Collection, err)
+		return nil, fmt.Errorf("could not run find query on collection %s: %w", res.Collection, err)
 	}
 
 	defer cursor.Close(ctx)
@@ -212,38 +216,36 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		i += 1
 		var doc bson.M
 		if err = cursor.Decode(&doc); err != nil {
-			return fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
+			return nil, fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
 		}
 		doc = sanitizeDocument(doc)
 
 		js, err := json.Marshal(doc)
 		if err != nil {
-			return fmt.Errorf("encoding document in collection %s as json: %w", res.Collection, err)
+			return nil, fmt.Errorf("encoding document in collection %s as json: %w", res.Collection, err)
 		}
 
 		if err = c.Output.Documents(binding, js); err != nil {
-			return fmt.Errorf("output documents failed: %w", err)
+			return nil, fmt.Errorf("output documents failed: %w", err)
 		}
 
 		if i % CHECKPOINT_EVERY == 0 {
 			if err = c.Output.Checkpoint([]byte("{}"), true); err != nil {
-				return fmt.Errorf("output checkpoint failed: %w", err)
+				return nil, fmt.Errorf("output checkpoint failed: %w", err)
 			}
 		}
 	}
 
-	// minus five seconds for potential error
-	c.BackfillFinishedAt = &primitive.Timestamp{ T: uint32(time.Now().Unix()) - 5, I: 0 }
-
 	if err = c.Output.Checkpoint([]byte("{}"), true); err != nil {
-		return fmt.Errorf("sending checkpoint failed: %w", err)
+		return nil, fmt.Errorf("sending checkpoint failed: %w", err)
 	}
 
 	if err := cursor.Err(); err != nil {
-		return fmt.Errorf("cursor error for backfill %s: %w", res.Collection, err)
+		return nil, fmt.Errorf("cursor error for backfill %s: %w", res.Collection, err)
 	}
 
-	return nil
+	// minus five seconds for potential error
+	return &primitive.Timestamp{ T: uint32(time.Now().Unix()) - 5, I: 0 }, nil
 }
 
 func resourceId(res resource) string {
