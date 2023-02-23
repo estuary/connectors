@@ -34,6 +34,14 @@ func newTransactor(
 ) (_ pm.Transactor, err error) {
 	cfg := ep.Config.(config)
 
+	log.WithFields(log.Fields{
+		"project_id":  cfg.ProjectID,
+		"dataset":     cfg.Dataset,
+		"region":      cfg.Region,
+		"bucket":      cfg.Bucket,
+		"bucket_path": cfg.BucketPath,
+	}).Info("creating transactor")
+
 	client, err := cfg.client(ctx)
 	if err != nil {
 		return nil, err
@@ -53,6 +61,7 @@ func newTransactor(
 		}
 	}
 
+	log.Info("transactor created successfully")
 	return t, nil
 }
 
