@@ -21,7 +21,6 @@ const idProperty = "_id"
 
 func generateMinimalSchema() json.RawMessage {
 	// Wrap metadata into an enclosing object schema with a /_meta property
-	// and a 'maximize by timestamp' reduction strategy.
 	var schema = &jsonschema.Schema{
 		Type:                 "object",
 		Required:             []string{idProperty},
