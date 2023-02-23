@@ -79,6 +79,7 @@ jobs:
           - path: source-firestore
           - path: source-kafka
           - path: source-kinesis
+          - path: source-mongodb
           - path: source-mysql
             additionalTags:
               - source-mariadb
