@@ -11,6 +11,7 @@ RUN go mod download
 
 # Build the connector projects we depend on.
 COPY source-boilerplate ./source-boilerplate
+COPY go-network-tunnel  ./go-network-tunnel
 COPY go-schema-gen  ./go-schema-gen
 RUN go get -v ./source-boilerplate ./go-schema-gen
 
@@ -30,6 +31,7 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
+COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 COPY --from=builder /builder/connector ./source-mongodb
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture

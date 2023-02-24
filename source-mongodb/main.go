@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"fmt"
 	"net/url"
 
+	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -15,6 +17,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+
+	"github.com/sirupsen/logrus"
 )
 
 
@@ -68,7 +72,8 @@ func (c *config) Validate() error {
 // ToURI converts the Config to a DSN string.
 func (c *config) ToURI() string {
 	var address = c.Address
-	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
+	// If SSH Tunnel is configured, we are going to create a tunnel from
+	// localhost:27020
 	// to address through the bastion server, so we use the tunnel's address
 	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
 		address = "localhost:27020"
@@ -88,6 +93,32 @@ func (c *config) ToURI() string {
 type driver struct{}
 
 func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error) {
+	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
+	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+		host, port, err := net.SplitHostPort(cfg.Address)
+		if err != nil {
+			return nil, fmt.Errorf("splitting address to host and port: %w", err)
+		}
+
+		var sshConfig = &networkTunnel.SshConfig{
+			SshEndpoint: cfg.NetworkTunnel.SSHForwarding.SSHEndpoint,
+			PrivateKey:  []byte(cfg.NetworkTunnel.SSHForwarding.PrivateKey),
+			ForwardHost: host,
+			ForwardPort: port,
+			LocalPort:   "27020",
+		}
+		var tunnel = sshConfig.CreateTunnel()
+
+		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
+		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
+		err = tunnel.Start()
+
+		if err != nil {
+			logrus.WithField("error", err).Error("network tunnel error")
+		}
+	}
+
+
 	// Create a new client and connect to the server
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.ToURI()))
 	if err != nil {
