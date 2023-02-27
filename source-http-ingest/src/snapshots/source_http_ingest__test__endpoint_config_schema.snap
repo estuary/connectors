@@ -1,0 +1,19 @@
+---
+source: src/lib.rs
+expression: schema
+---
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "title": "EndpointConfig",
+  "type": "object",
+  "properties": {
+    "requireAuthToken": {
+      "description": "Optional bearer token to authenticate webhook requests.\n\nWARNING: If this is empty or unset, then anyone who knows the URL of the connector will be able to write data to your collections.",
+      "default": null,
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
