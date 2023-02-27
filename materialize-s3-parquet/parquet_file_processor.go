@@ -332,10 +332,11 @@ func (b *pqBinding) Commit() error {
 		// might make sense to update this connector to use the version 2 SDK and get rid of this retry
 		// loop. For now we will use a reasonable maximum limit on the number of attempts to upload
 		// before failing without trying to distinguish between retry-able errors and terminal errors.
+		var err error
 		maxRetryAttempts := 10
 		for attempt, backoffInSec := 0, 1; attempt < maxRetryAttempts; attempt++ {
 			// If upload failed, keep retrying until succeed or canceled.
-			if err := b.upload(); err == nil {
+			if err = b.upload(); err == nil {
 				break
 			} else {
 				log.WithFields(log.Fields{
@@ -354,8 +355,11 @@ func (b *pqBinding) Commit() error {
 			if backoffInSec < 16 {
 				backoffInSec *= 2
 			}
-
 		}
+		if err != nil {
+			return fmt.Errorf("retry attempts exhausted: %w", err)
+		}
+
 		if err := os.Remove(b.localFileName()); err != nil {
 			return fmt.Errorf("removing local file: %w", err)
 
