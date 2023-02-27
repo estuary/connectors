@@ -328,7 +328,12 @@ func (b *pqBinding) Commit() error {
 			return fmt.Errorf("closing localFile: %w", err)
 		}
 
-		for attempt, backoffInSec := 0, 1; true; attempt++ {
+		// TODO(whb): The Go AWS SDK version 2 handles retryable errors out of the box. At some point it
+		// might make sense to update this connector to use the version 2 SDK and get rid of this retry
+		// loop. For now we will use a reasonable maximum limit on the number of attempts to upload
+		// before failing without trying to distinguish between retry-able errors and terminal errors.
+		maxRetryAttempts := 10
+		for attempt, backoffInSec := 0, 1; attempt < maxRetryAttempts; attempt++ {
 			// If upload failed, keep retrying until succeed or canceled.
 			if err := b.upload(); err == nil {
 				break
@@ -336,7 +341,7 @@ func (b *pqBinding) Commit() error {
 				log.WithFields(log.Fields{
 					"attempt": attempt,
 					"err":     err,
-				}).Warn("uploading file failed, Retrying...")
+				}).Warn(fmt.Sprintf("uploading file failed, Retrying (attempt %d of %d)...", attempt, maxRetryAttempts))
 			}
 
 			select {
