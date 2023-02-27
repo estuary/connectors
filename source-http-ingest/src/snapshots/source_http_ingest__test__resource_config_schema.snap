@@ -1,0 +1,27 @@
+---
+source: src/lib.rs
+expression: schema
+---
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "title": "ResourceConfig",
+  "type": "object",
+  "properties": {
+    "idFromHeader": {
+      "description": "Set the /_meta/webhookId from the given HTTP header in each request.\n\nIf not set, then a random id will be generated automatically. If set, then each request will be required to have the header, and the header value will be used as the value of `/_meta/webhookId`.",
+      "default": null,
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "description": "The URL path to use for adding documents to this binding. Defaults to the name of the collection.",
+      "default": null,
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
