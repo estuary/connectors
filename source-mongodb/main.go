@@ -30,7 +30,7 @@ func (r resource) Validate() error {
 	return nil
 }
 
-// config represents the endpoint configuration for postgres.
+// config represents the endpoint configuration for mongodb
 type config struct {
 	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database." jsonschema_extras:"order=0"`
 	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
