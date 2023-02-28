@@ -1,0 +1,18 @@
+
+	CREATE TABLE one."reserved".checkpoints (
+			materialization TEXT,
+			key_begin BIGINT,
+			key_end BIGINT,
+			fence BIGINT,
+			checkpoint TEXT,
+			PRIMARY KEY (materialization, key_begin, key_end)
+		
+	);
+
+	COMMENT ON TABLE one."reserved".checkpoints IS 'This table holds Flow processing checkpoints used for exactly-once processing of materializations';
+	COMMENT ON COLUMN one."reserved".checkpoints.materialization IS 'The name of the materialization.';
+	COMMENT ON COLUMN one."reserved".checkpoints.key_begin IS 'The inclusive lower-bound key hash covered by this checkpoint.';
+	COMMENT ON COLUMN one."reserved".checkpoints.key_end IS 'The inclusive upper-bound key hash covered by this checkpoint.';
+	COMMENT ON COLUMN one."reserved".checkpoints.fence IS 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.';
+	COMMENT ON COLUMN one."reserved".checkpoints.checkpoint IS 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.';
+	
