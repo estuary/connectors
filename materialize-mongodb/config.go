@@ -34,7 +34,7 @@ func (c *config) ToURI() string {
 	var address = c.Address
 	var uri, err = url.Parse(address)
 
-	if err != nil || uri.Scheme == "" {
+	if err != nil || uri.Scheme == "" || uri.Host == "" {
 		uri = &url.URL{
 			Scheme: "mongodb",
 			Host:   address,
