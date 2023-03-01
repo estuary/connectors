@@ -1,37 +1,67 @@
 Flow PostgreSQL Source Connector
 ================================
 
-This is an [Airbyte Specification](https://docs.airbyte.io/understanding-airbyte/airbyte-specification)
-compatible connector that captures change events from a PostgreSQL database via
+This is a Flow [capture connector](https://docs.estuary.dev/concepts/captures/)
+which captures change events from a PostgreSQL database via
 [Logical Replication](https://www.postgresql.org/docs/current/logical-replication.html).
 
-## Getting Started
+## Connector Development
 
-Prebuild connector images should be available at `ghcr.io/estuary/source-postgres`. See
-"Connector Development" for instructions to build locally.
+The connector has a fairly comprehensive suite of automated tests which can be
+run via `go test`. Most of them require an external database to interact with,
+so typical usage looks something like:
 
-The connector has several prerequisites:
+```bash
+## Start the test database running
+$ docker compose -f source-postgres/docker-compose.yaml up -d
+
+## Run the complete test suite against the database we just launched
+$ TEST_DATABASE=yes go test -v ./source-postgres/ -count=1
+```
+
+The `go test` suite only exercises connector behavior in isolation. There's another
+integration test which runs it as part of a Flow catalog as well:
+
+```bash
+## Build a local version of the connector image
+$ docker build --network=host -t ghcr.io/estuary/source-postgres:local -f source-postgres/Dockerfile .
+
+## Run the integration test
+$ CONNECTOR=source-postgres VERSION=local ./tests/run.sh
+```
+
+## Connector Usage
+
+Prebuilt connector images are available at [`ghcr.io/estuary/source-postgres`](ghcr.io/estuary/source-postgres).
+
+The connector requires some amount of database setup in order to run:
+
 * Logical replication must be enabled on the database ([`wal_level=logical`](https://www.postgresql.org/docs/current/runtime-config-wal.html)).
-* There must be a [replication slot](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION-SLOTS). The replication slot represents a "cursor" into
-  the PostgreSQL write-ahead log from which change events can be read.
-  - Unless overridden in the capture config this will be named `"flow_slot"`.
-  - This will be created automatically by the connector if it doesn’t already exist.
-* There must be a [publication](https://www.postgresql.org/docs/current/sql-createpublication.html). The publication represents the set of tables for which
-  change events will be reported.
-  - Unless overridden in the capture config this will be named `"flow_publication"`.
-  - This will be created automatically if the connector has suitable permissions,
-    but must be created manually (see below) in more restricted setups.
-* There must be a watermarks table. The watermarks table is a small "scratch space"
-  to which the connector occasionally writes a small amount of data (a UUID,
-  specifically) to ensure accuracy when backfilling preexisting table contents.
-  - Unless overridden this will be named `"public.flow_watermarks"`.
-  - This will be created automatically if the connector has suitable permissions,
-    but must be created manually (see below) in more restricted setups.
-* The connector must connect to PostgreSQL with appropriate permissions:
+
+* The user account performing the capture must have appropriate permissions:
   - The [`REPLICATION`](https://www.postgresql.org/docs/current/sql-createrole.html) attribute is required to open a replication connection.
   - Permission to write to the watermarks table is required.
   - Permission to read the tables being captured is required.
-  - Permission to read tables from `information_schema` and `pg_catalog` schemas is required for automatic discovery.
+
+* There must be a [publication](https://www.postgresql.org/docs/current/sql-createpublication.html) representing the set of tables for which change events should be reported.
+
+  - Unless overridden in the capture config this should be named `"flow_publication"`.
+  - If this doesn't exist the connector will attempt to create one, but this will
+    typically fail unless it's running with superuser credentials.
+
+* There must be a [replication slot](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION-SLOTS). The replication slot represents a "cursor" into
+  the PostgreSQL write-ahead log from which change events can be read.
+
+  - Unless overridden in the capture config this will be named `"flow_slot"`.
+  - This will be created automatically by the connector if it doesn’t already exist.
+
+* There must be a watermarks table. The watermarks table is a small "scratch space"
+  to which the connector occasionally writes a small amount of data (a UUID,
+  specifically) to ensure accuracy when backfilling preexisting table contents.
+
+  - Unless overridden this will be named `"public.flow_watermarks"`.
+  - This will be created automatically if the connector has suitable permissions,
+    but must be created manually (see below) in more restricted setups.
 
 The connector will attempt to create the replication slot, publication,
 and watermarks table if necessary and they don't already exist, so one
@@ -43,42 +73,21 @@ the following example:
 ```sql
 CREATE USER flow_capture WITH PASSWORD 'secret' REPLICATION;
 
-# The `pg_read_all_data` role is new in PostgreSQL v14. For older versions:
-#
-#   GRANT SELECT ON ALL TABLES IN SCHEMA public, <others> TO flow_capture;
-#   GRANT SELECT ON ALL TABLES IN SCHEMA information_schema, pg_catalog TO flow_capture;
-#
-# can be substituted, but all schemas which will be captured from must be listed.
-#
-# If an even more restricted set of permissions is desired, you can also grant SELECT on
-# just the specific table(s) which should be captured from. The ‘information_schema’ and
-# ‘pg_catalog’ access is required for stream auto-discovery, but not for capturing already
-# configured streams.
+-- The `pg_read_all_data` role is new in PostgreSQL v14. For older versions:
+--
+--   GRANT USAGE ON SCHEMA public, <others> TO flow_capture;
+--   ALTER DEFAULT PRIVILEGES IN SCHEMA public, <others> GRANT SELECT ON TABLES to flow_capture;
+--   GRANT SELECT ON ALL TABLES IN SCHEMA public, <others> TO flow_capture;
+--
+-- can be substituted, but all schemas which will be captured from must be listed.
 GRANT pg_read_all_data TO flow_capture;
-
-CREATE TABLE IF NOT EXISTS public.flow_watermarks (slot TEXT PRIMARY KEY, watermark TEXT);
-GRANT ALL PRIVILEGES ON TABLE public.flow_watermarks TO flow_capture;
 
 CREATE PUBLICATION flow_publication FOR ALL TABLES;
 
-# Set WAL level to logical. Note that changing this requires a database
-# restart to take effect.
+-- Set WAL level to logical. Note that changing this requires a database
+-- restart to take effect.
 ALTER SYSTEM SET wal_level = logical;
 ```
-
-A minimal `config.json` consists solely of the database connection parameters:
-
-```json
-{
-  "address": "localhost:5432",
-  "database": "flow",
-  "password": "flow_capture",
-  "user": "flow_capture"
-}
-```
-
-Refer to the output of `docker run --rm -it ghcr.io/estuary/source-postgres spec` for
-a list of other supported config options.
 
 ## Mechanism of Operation
 
@@ -114,47 +123,23 @@ In production use this shutdown watermark doesn't exist, so the capture
 will continue to run indefinitely until stopped.
 ```
 
-## Connector Development
+## Running Tests against Supabase PostgreSQL
 
-Any meaningful connector development will require a test database to run
-against. To set this up, run:
+The test database set up via `docker-compose.yaml` runs the script `init-user-db.sh` to
+set up a capture user with all necessary permissions to execute the test suite. However
+it can be annoying to have to juggle two distinct Postgres instances if you're running
+the whole Flow stack locally and thus have Supabase running.
 
-```bash
-docker-compose --file source-postgres/docker-compose.yaml up --detach postgres
-```
+It is possible to run the test suite against the Supabase Postgres instance with a
+little bit of manual setup (which, you may note, is exactly the same setup that is
+performed automatically by `init-user-db.sh` if you use `docker-compose.yaml`):
 
-The connector has a reasonably thorough `go test` suite which assumes the existence of
-this test database. The easy way to build the connector and run those tests is via
-`docker build`:
+    $ psql postgresql://postgres:postgres@localhost:5432/postgres
+    > CREATE USER flow_capture WITH PASSWORD 'secret1234' REPLICATION;
 
-```bash
-docker build --network=host -f source-postgres/Dockerfile -t ghcr.io/estuary/source-postgres:local .
-```
+    > CREATE SCHEMA IF NOT EXISTS test;
+    > GRANT USAGE ON SCHEMA test TO flow_capture;
+    > ALTER DEFAULT PRIVILEGES IN SCHEMA test GRANT SELECT ON TABLES to flow_capture;
+    > GRANT SELECT ON ALL TABLES IN SCHEMA test TO flow_capture;
 
-You can also run the resulting connector image manually:
-
-```bash
-docker run --rm -it --network=host -v <configsDir>:/cfg \
-  ghcr.io/estuary/source-postgres:local read \
-  --config=/cfg/config.json \
-  --catalog=/cfg/catalog.json \
-  --state=/cfg/state.json
-```
-
-However the connector is written entirely in Go and can also be built/tested/run via
-`go build` / `go test` / `go run`, so that might be an easier option for one-off
-manual testing:
-
-```bash
-go run . read --config=config.json --catalog=catalog.json --state=state.json
-```
-
-## Flow End-to-End Integration Test
-
-The `go test` suite only tests the connector in isolation. There's another test
-which runs it as part of a Flow catalog:
-
-```bash
-$ docker build -t ghcr.io/estuary/source-postgres:local -f source-postgres/Dockerfile . --network=host
-$ PGDATABASE=flow PGHOST=localhost PGPASSWORD=flow PGPORT=5432 PGUSER=flow CONNECTOR=source-postgres VERSION=local ./tests/run.sh
-```
+    > CREATE PUBLICATION flow_publication FOR ALL TABLES;

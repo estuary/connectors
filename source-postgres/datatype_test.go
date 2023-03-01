@@ -14,7 +14,7 @@ const arraySchemaPattern = `{"required":["dimensions","elements"],"type":"object
 // TestDatatypes runs the generic datatype discovery and round-tripping test on various datatypes.
 func TestDatatypes(t *testing.T) {
 	var ctx = context.Background()
-	tests.TestDatatypes(ctx, t, TestBackend, []tests.DatatypeTestCase{
+	tests.TestDatatypes(ctx, t, postgresTestBackend(t), []tests.DatatypeTestCase{
 		// Basic Boolean/Numeric/Text Types
 		{ColumnType: `boolean`, ExpectType: `{"type":["boolean","null"]}`, InputValue: `false`, ExpectValue: `false`},
 		{ColumnType: `boolean`, ExpectType: `{"type":["boolean","null"]}`, InputValue: `yes`, ExpectValue: `true`},
@@ -112,7 +112,7 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `inet ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: []interface{}{`192.168.100.0/24`, `2001:4f8:3:ba::/64`}, ExpectValue: `{"dimensions":[2],"elements":["192.168.100.0/24","2001:4f8:3:ba::/64"]}`},
 		{ColumnType: `integer ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: []interface{}{1, 2, nil, 4}, ExpectValue: `{"dimensions":[4],"elements":[1,2,null,4]}`},
 		{ColumnType: `numeric ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"number"}`), InputValue: []interface{}{`123.456`, `-789.0123`}, ExpectValue: `{"dimensions":[2],"elements":["123456e-3","-7890123e-4"]}`},
-		{ColumnType: `real ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","null"]}`), InputValue: []interface{}{123.456, 789.0123}, ExpectValue: `{"dimensions":[2],"elements":[123.456,789.0123]}`},
+		{ColumnType: `real ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","null"]}`), InputValue: []interface{}{123.456, 789.012}, ExpectValue: `{"dimensions":[2],"elements":[123.456,789.012]}`},
 		{ColumnType: `smallint ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: []interface{}{123, 456, 789}, ExpectValue: `{"dimensions":[3],"elements":[123,456,789]}`},
 		{ColumnType: `text ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: []interface{}{`Hello, world!`, `asdf`}, ExpectValue: `{"dimensions":[2],"elements":["Hello, world!","asdf"]}`},
 		{ColumnType: `uuid ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"uuid"}`), InputValue: []interface{}{`a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11`}, ExpectValue: `{"dimensions":[1],"elements":["a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"]}`},
@@ -122,7 +122,7 @@ func TestDatatypes(t *testing.T) {
 }
 
 func TestScanKeyTimestamps(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(ts TIMESTAMP PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{"1991-08-31T12:34:56.000Z", "aood"},
@@ -148,7 +148,7 @@ func TestScanKeyTimestamps(t *testing.T) {
 }
 
 func TestScanKeyTypes(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	for _, tc := range []struct {
 		Name       string
 		ColumnType string

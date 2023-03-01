@@ -3,9 +3,9 @@
 set -e
 export PGHOST="${PGHOST:=source-postgres-db-1.flow-test}"
 export PGPORT="${PGPORT:=5432}"
-export PGDATABASE="${PGDATABASE:=flow}"
-export PGPASSWORD="${PGPASSWORD:=flow}"
-export PGUSER="${PGUSER:=flow}"
+export PGDATABASE="${PGDATABASE:=postgres}"
+export PGPASSWORD="${PGPASSWORD:=postgres}"
+export PGUSER="${PGUSER:=postgres}"
 
 export TEST_STREAM="estuary_test_$(shuf -zer -n6 {a..z} | tr -d '\0')"
 export RESOURCE="{ \"namespace\": \"public\", \"stream\": \"${TEST_STREAM}\" }"

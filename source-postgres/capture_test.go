@@ -18,7 +18,7 @@ import (
 // which controls whether change events include full row contents or just the
 // primary keys of the "before" state.
 func TestReplicaIdentity(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 
@@ -38,7 +38,7 @@ func TestReplicaIdentity(t *testing.T) {
 }
 
 func TestToastColumns(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, other INTEGER, data TEXT)")
 
 	// Table is created with REPLICA IDENTITY DEFAULT, which does *not* include
@@ -82,16 +82,16 @@ func TestSlotLSNAdvances(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var cs = tb.CaptureSpec(t, tableName)
 
 	var lsnQuery = `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`
-	var slotName = *TestReplicationSlot
+	var slotName = tb.config.Advanced.SlotName
 
 	// Capture the current `restart_lsn` of the replication slot prior to our test
 	var beforeLSN pglogrepl.LSN
-	if err := TestDatabase.QueryRow(ctx, lsnQuery, slotName).Scan(&beforeLSN); err != nil {
+	if err := tb.control.QueryRow(ctx, lsnQuery, slotName).Scan(&beforeLSN); err != nil {
 		logrus.WithFields(logrus.Fields{"slot": slotName, "err": err}).Error("failed to query restart_lsn")
 	}
 
@@ -116,7 +116,7 @@ func TestSlotLSNAdvances(t *testing.T) {
 		t.Run("captureN", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 		var afterLSN pglogrepl.LSN
-		if err := TestDatabase.QueryRow(ctx, lsnQuery, slotName).Scan(&afterLSN); err != nil {
+		if err := tb.control.QueryRow(ctx, lsnQuery, slotName).Scan(&afterLSN); err != nil {
 			logrus.WithFields(logrus.Fields{"slot": slotName, "err": err}).Error("failed to query restart_lsn")
 		}
 		logrus.WithFields(logrus.Fields{"iter": iter, "before": beforeLSN, "after": afterLSN}).Debug("checking slot LSN")
@@ -126,11 +126,11 @@ func TestSlotLSNAdvances(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond)
 	}
-	t.Errorf("slot %q restart LSN failed to advance after %d retries", *TestReplicationSlot, retryCount)
+	t.Errorf("slot %q restart LSN failed to advance after %d retries", slotName, retryCount)
 }
 
 func TestViewDiscovery(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, grp INTEGER, data TEXT)")
 
 	var view = tableName + "_view"
@@ -163,17 +163,17 @@ func TestSkipBackfills(t *testing.T) {
 	// Set up three tables with some data in them, a catalog which captures all three,
 	// but a configuration which specifies that tables A and C should skip backfilling
 	// and only capture new changes.
-	var tb, ctx = &postgresTestBackend{pool: TestDatabase, cfg: TestDefaultConfig}, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.config.Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
 	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "one"}, {2, "two"}, {3, "three"}})
 	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
 	tb.Insert(ctx, t, tableC, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
 
 	// Run an initial capture, which should capture all three tables but only backfill events from table B
 	var cs = tb.CaptureSpec(t, tableA, tableB, tableC)
-	cs.EndpointSpec.(*Config).Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Insert additional data and verify that all three tables report new events
@@ -185,7 +185,7 @@ func TestSkipBackfills(t *testing.T) {
 
 func TestTruncatedTables(t *testing.T) {
 	// Set up two tables with some data in them
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "one"}, {2, "two"}, {3, "three"}})
@@ -209,7 +209,7 @@ func TestTruncatedTables(t *testing.T) {
 func TestTrickyColumnNames(t *testing.T) {
 	// Create a table with some 'difficult' column names (a reserved word, a capitalized
 	// name, and one containing special characters which also happens to be the primary key).
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	const uniqueString = "fizzed_cupcake"
 	var tableA = tb.CreateTable(ctx, t, uniqueString+"_a", `("Meta/""wtf""/ID" INTEGER PRIMARY KEY, data TEXT)`)
 	var tableB = tb.CreateTable(ctx, t, uniqueString+"_b", `("table" INTEGER PRIMARY KEY, data TEXT)`)
@@ -234,7 +234,7 @@ func TestTrickyColumnNames(t *testing.T) {
 // TestCursorResume sets up a capture with a (string, int) primary key and
 // and repeatedly restarts it after each row of capture output.
 func TestCursorResume(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(epoch VARCHAR(8), count INTEGER, data TEXT, PRIMARY KEY (epoch, count))")
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{"aaa", 1, "bvzf"}, {"aaa", 2, "ukwh"}, {"aaa", 3, "lntg"}, {"bbb", -100, "bycz"},
@@ -258,7 +258,7 @@ func TestCursorResume(t *testing.T) {
 // "chunks", two connector restarts at different points in the initial table scan, and
 // some concurrent modifications to row ranges already-scanned and not-yet-scanned.
 func TestComplexDataset(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
 	var cs = tb.CaptureSpec(t, tableName)
@@ -306,7 +306,7 @@ func TestComplexDataset(t *testing.T) {
 }
 
 func TestUserTypes(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 
 	t.Run("Domain", func(t *testing.T) {
 		tb.Query(ctx, t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`)
