@@ -3,10 +3,15 @@ version: "3.7"
 services:
   db:
     image: 'postgres:latest'
-    command: ["postgres", "-c", "wal_level=logical"]
+    command: [ "postgres", "-c", "wal_level=logical" ]
     ports:
       - "5432:5432"
-    environment: {"POSTGRES_DB": "flow", "POSTGRES_USER": "flow", "POSTGRES_PASSWORD": "flow"}
+    environment:
+      {
+        "POSTGRES_DB": "postgres",
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASSWORD": "postgres"
+      }
     healthcheck:
       test: "true"
       interval: 3s
@@ -28,4 +33,3 @@ networks:
 
 volumes:
   postgres_data: {}
-

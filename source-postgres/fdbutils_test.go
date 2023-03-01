@@ -66,6 +66,7 @@ func TestEncodeAndDecodePgNumericKeyFDB(t *testing.T) {
 	var k = 20000
 	var resumeKeyIndex = 100
 	var ctx, tableName, testCases = buildNumericKeyTestCases(t, k)
+	var tb = postgresTestBackend(t)
 
 	var preEncoded []byte
 	for i := 0; i < len(testCases); i++ {
@@ -88,7 +89,7 @@ func TestEncodeAndDecodePgNumericKeyFDB(t *testing.T) {
 		if i == resumeKeyIndex {
 			var query = fmt.Sprintf("SELECT count(1) FROM %s WHERE id < $1;", tableName)
 			var n int
-			require.NoError(t, TestDatabase.QueryRow(ctx, query, decoded).Scan(&n))
+			require.NoError(t, tb.control.QueryRow(ctx, query, decoded).Scan(&n))
 			require.Equal(t, n, resumeKeyIndex)
 		}
 	}
@@ -98,7 +99,7 @@ func TestEncodeAndDecodePgNumericKeyFDB(t *testing.T) {
 // returns the db tableName, and a list of pgtype.Numeric numbers in ascending order extracted from the table.
 func buildNumericKeyTestCases(t *testing.T, k int) (ctx context.Context, tableName string, testCases []pgtype.Numeric) {
 	ctx = context.Background()
-	var tb = TestBackend
+	var tb = postgresTestBackend(t)
 	tableName = tb.CreateTable(ctx, t, "", "(id NUMERIC PRIMARY KEY)")
 
 	tb.Query(ctx, t, fmt.Sprintf(
@@ -109,7 +110,7 @@ func buildNumericKeyTestCases(t *testing.T, k int) (ctx context.Context, tableNa
 		tableName, k),
 	)
 
-	var rows, err = TestDatabase.Query(ctx, fmt.Sprintf("SELECT id FROM %s ORDER BY id;", tableName))
+	var rows, err = tb.control.Query(ctx, fmt.Sprintf("SELECT id FROM %s ORDER BY id;", tableName))
 	require.NoError(t, err)
 	defer rows.Close()
 
