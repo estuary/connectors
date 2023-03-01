@@ -48,7 +48,7 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 		"tables":       numTables,
 	}).Info("initializing tables")
 
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = mysqlTestBackend(b), context.Background()
 	var tables []string
 	for i := 0; i < numTables; i++ {
 		var table = tb.CreateTable(ctx, b, fmt.Sprintf("table%d", i), "(id INTEGER PRIMARY KEY, uid TEXT, name TEXT, status INTEGER, modified DATE, foo_id INTEGER, padding TEXT)")
@@ -78,7 +78,7 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 	b.StopTimer()
 	b.ResetTimer()
 
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = mysqlTestBackend(b), context.Background()
 	var tables []string
 	for i := 0; i < numTables; i++ {
 		var table = tb.CreateTable(ctx, b, fmt.Sprintf("table%d", i), "(id INTEGER PRIMARY KEY, uid TEXT, name TEXT, status INTEGER, modified DATE, foo_id INTEGER, padding TEXT)")
@@ -114,7 +114,7 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 	}
 }
 
-func populateTable(ctx context.Context, t testing.TB, tb tests.TestBackend, table string, numRows int) error {
+func populateTable(ctx context.Context, t testing.TB, tb *testBackend, table string, numRows int) error {
 	t.Helper()
 
 	const chunkSize = 8192
@@ -135,22 +135,22 @@ func populateTable(ctx context.Context, t testing.TB, tb tests.TestBackend, tabl
 			padding,                     // (0-256) Variable amount of padding
 		})
 		if len(buffer) >= chunkSize {
-			bulkLoadData(ctx, t, table, columnNames, buffer)
+			bulkLoadData(ctx, t, tb, table, columnNames, buffer)
 			buffer = nil
 		}
 	}
 	if len(buffer) > 0 {
-		bulkLoadData(ctx, t, table, columnNames, buffer)
+		bulkLoadData(ctx, t, tb, table, columnNames, buffer)
 	}
 	return nil
 }
 
-func bulkLoadData(ctx context.Context, t testing.TB, table string, columnNames []string, rows [][]interface{}) {
+func bulkLoadData(ctx context.Context, t testing.TB, tb *testBackend, table string, columnNames []string, rows [][]interface{}) {
 	t.Helper()
 	if len(rows) == 0 {
 		return
 	}
-	if err := TestBackend.conn.Begin(); err != nil {
+	if err := tb.control.Begin(); err != nil {
 		t.Fatalf("error beginning transaction: %v", err)
 	}
 
@@ -168,10 +168,10 @@ func bulkLoadData(ctx context.Context, t testing.TB, table string, columnNames [
 	}
 
 	var query = fmt.Sprintf("INSERT INTO %s VALUES %s", table, strings.Join(placeholders, ","))
-	TestBackend.Query(ctx, t, query, values...)
+	tb.Query(ctx, t, query, values...)
 	log.WithFields(log.Fields{"table": table, "count": len(rows)}).Trace("inserted bulk data")
 
-	if err := TestBackend.conn.Commit(); err != nil {
+	if err := tb.control.Commit(); err != nil {
 		t.Fatalf("error committing transaction: %v", err)
 	}
 }
