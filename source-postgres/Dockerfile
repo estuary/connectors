@@ -24,10 +24,11 @@ RUN go get -v ./source-postgres
 
 ENV PATH="/builder/bin:$PATH"
 
-# Run the unit tests. To skip tests which access a test database, specify `--build-arg TEST_DATABASE=no` in the Docker command line.
+# Run automated tests. To skip tests which interact with an external database,
+# specify `--build-arg TEST_DATABASE=no` in the Docker command line.
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
-RUN go test -short -v ./source-postgres/...
+RUN go test -short -v ./source-postgres/... --db_address=localhost:5432
 
 # Build the connector.
 RUN go build -o ./connector -v ./source-postgres/...

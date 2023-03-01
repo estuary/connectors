@@ -8,7 +8,7 @@ import (
 )
 
 func TestDiscoveryComplex(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = postgresTestBackend(t), context.Background()
 
 	const uniqueString = "cheap_oxygenation"
 	var tableName = tb.CreateTable(ctx, t, uniqueString, `(

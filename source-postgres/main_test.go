@@ -9,46 +9,32 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/estuary/flow/go/protocols/flow"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	TestConnectionURI = flag.String("test_connection_uri",
-		"postgres://flow:flow@localhost:5432/flow",
-		"Connect to the specified database in tests")
-	TestReplicationSlot = flag.String("test_replication_slot",
-		"flow_test_slot",
-		"Use the specified replication slot name in tests")
-	TestPublicationName = flag.String("test_publication_name",
-		"flow_publication",
-		"Use the specified publication name in tests")
-	TestPollTimeoutSeconds = flag.Float64("test_poll_timeout_seconds",
-		0.250, "During test captures, wait at most this long for further replication events")
+	dbAddress = flag.String("db_address", "localhost:5432", "The database server address to use for tests")
+	dbName    = flag.String("db_name", "postgres", "Use the named database for tests")
+
+	dbControlUser = flag.String("db_control_user", "postgres", "The user for test setup/control operations")
+	dbControlPass = flag.String("db_control_pass", "postgres", "The password the the test setup/control user")
+	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
+	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
 )
 
-var (
-	TestDefaultConfig Config
-	TestDatabase      *pgxpool.Pool
-	TestBackend       *postgresTestBackend
-)
+const testSchemaName = "test"
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	var ctx = context.Background()
-
-	if testing.Verbose() {
-		log.SetLevel(log.DebugLevel)
-	}
 
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
 		level, err := log.ParseLevel(logLevel)
@@ -56,79 +42,67 @@ func TestMain(m *testing.M) {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
 		log.SetLevel(level)
+	} else {
+		log.SetLevel(log.DebugLevel)
 	}
 
-	// Open a connection to the database which will be used for creating and
-	// tearing down the replication slot.
-	var replConnConfig, err = pgconn.ParseConfig(*TestConnectionURI)
-	if err != nil {
-		log.WithFields(log.Fields{"uri": *TestConnectionURI, "err": err}).Fatal("error parsing connection config")
-	}
-	replConnConfig.ConnectTimeout = 30 * time.Second
-	replConnConfig.RuntimeParams["replication"] = "database"
-	replConn, err := pgconn.ConnectConfig(ctx, replConnConfig)
-	if err != nil {
-		log.WithField("err", err).Fatal("unable to connect to database")
-	}
-	replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, *TestReplicationSlot)).Close() // Ignore failures because it probably doesn't exist
-	if err := replConn.Exec(ctx, fmt.Sprintf(`CREATE_REPLICATION_SLOT %s LOGICAL pgoutput;`, *TestReplicationSlot)).Close(); err != nil {
-		log.WithField("err", err).Fatal("error creating replication slot")
-	}
-
-	// Initialize test config and database connection
-	TestDefaultConfig.Address = fmt.Sprintf("%s:%d", replConnConfig.Host, replConnConfig.Port)
-	TestDefaultConfig.Database = replConnConfig.Database
-	TestDefaultConfig.User = replConnConfig.User
-	TestDefaultConfig.Password = replConnConfig.Password
-
-	TestDefaultConfig.Advanced.SlotName = *TestReplicationSlot
-	TestDefaultConfig.Advanced.PublicationName = *TestPublicationName
-
-	if err := TestDefaultConfig.Validate(); err != nil {
-		log.WithFields(log.Fields{"err": err, "config": TestDefaultConfig}).Fatal("error validating test config")
-	}
-	TestDefaultConfig.SetDefaults()
-
-	pool, err := pgxpool.Connect(ctx, *TestConnectionURI)
-	if err != nil {
-		log.WithField("err", err).Fatal("error connecting to database")
-	}
-	defer pool.Close()
-	TestDatabase = pool
-	TestBackend = &postgresTestBackend{pool: pool, cfg: TestDefaultConfig}
-
-	if _, err := TestDatabase.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS test;"); err != nil {
-		log.WithField("err", err).Fatal("error creating test schema")
-	}
-
-	var exitCode = m.Run()
-	if err := replConn.Exec(ctx, fmt.Sprintf(`DROP_REPLICATION_SLOT %s;`, *TestReplicationSlot)).Close(); err != nil {
-		log.WithField("err", err).Warn("error cleaning up replication slot")
-	}
-	os.Exit(exitCode)
+	os.Exit(m.Run())
 }
 
-func lowerTuningParameters(t testing.TB) {
+func postgresTestBackend(t testing.TB) *testBackend {
+	t.Helper()
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
+		return nil
+	}
+
+	// Open control connection
+	var ctx = context.Background()
+	var controlURI = fmt.Sprintf(`postgres://%s:%s@%s/%s`, *dbControlUser, *dbControlPass, *dbAddress, *dbName)
+	logrus.WithFields(logrus.Fields{
+		"user": *dbControlUser,
+		"addr": *dbAddress,
+	}).Info("opening control connection")
+	var pool, err = pgxpool.Connect(ctx, controlURI)
+	require.NoError(t, err)
+	t.Cleanup(pool.Close)
+
+	// Construct the capture config
+	var captureConfig = Config{
+		Address:  *dbAddress,
+		User:     *dbCaptureUser,
+		Password: *dbCapturePass,
+		Database: *dbName,
+	}
+	if err := captureConfig.Validate(); err != nil {
+		t.Fatalf("error validating capture config: %v", err)
+	}
+	captureConfig.SetDefaults()
+
+	return &testBackend{control: pool, config: captureConfig}
+}
+
+type testBackend struct {
+	control *pgxpool.Pool // The open control connection to use for test setup
+	config  Config        // Default capture configuration for test captures
+}
+
+func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 	t.Helper()
 
 	// Within the scope of a single test, adjust some tuning parameters so that it's
 	// easier to exercise backfill chunking and replication buffering behavior.
-	var prevChunkSize = TestBackend.cfg.Advanced.BackfillChunkSize
-	t.Cleanup(func() { TestBackend.cfg.Advanced.BackfillChunkSize = prevChunkSize })
-	TestBackend.cfg.Advanced.BackfillChunkSize = 16
+	var prevChunkSize = tb.config.Advanced.BackfillChunkSize
+	t.Cleanup(func() { tb.config.Advanced.BackfillChunkSize = prevChunkSize })
+	tb.config.Advanced.BackfillChunkSize = 16
 
 	var prevBufferSize = replicationBufferSize
 	t.Cleanup(func() { replicationBufferSize = prevBufferSize })
 	replicationBufferSize = 0
 }
 
-type postgresTestBackend struct {
-	pool *pgxpool.Pool
-	cfg  Config
-}
-
-func (tb *postgresTestBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
-	var cfg = tb.cfg
+func (tb *testBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
+	var cfg = tb.config
 	return &st.CaptureSpec{
 		Driver:       postgresDriver,
 		EndpointSpec: &cfg,
@@ -152,10 +126,10 @@ func init() {
 // CreateTable is a test helper for creating a new database table and returning the
 // name of the new table. The table is named "test_<testName>", or "test_<testName>_<suffix>"
 // if the suffix is non-empty.
-func (tb *postgresTestBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
+func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
-	var tableName = "test." + strings.TrimPrefix(t.Name(), "Test")
+	var tableName = testSchemaName + "." + strings.TrimPrefix(t.Name(), "Test")
 	if suffix != "" {
 		tableName += "_" + suffix
 	}
@@ -173,13 +147,13 @@ func (tb *postgresTestBackend) CreateTable(ctx context.Context, t testing.TB, su
 	return tableName
 }
 
-func (tb *postgresTestBackend) Insert(ctx context.Context, t testing.TB, table string, rows [][]interface{}) {
+func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, rows [][]interface{}) {
 	t.Helper()
 
 	if len(rows) < 1 {
 		t.Fatalf("must insert at least one row")
 	}
-	var tx, err = tb.pool.BeginTx(ctx, pgx.TxOptions{})
+	var tx, err = tb.control.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		t.Fatalf("unable to begin transaction: %v", err)
 	}
@@ -201,20 +175,20 @@ func (tb *postgresTestBackend) Insert(ctx context.Context, t testing.TB, table s
 	}
 }
 
-func (tb *postgresTestBackend) Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
+func (tb *testBackend) Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
 	t.Helper()
 	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET %s = $1 WHERE %s = $2;", table, setCol, whereCol), setVal, whereVal)
 }
 
-func (tb *postgresTestBackend) Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}) {
+func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}) {
 	t.Helper()
 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE %s = $1;", table, whereCol), whereVal)
 }
 
-func (tb *postgresTestBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {
+func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {
 	t.Helper()
 	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
-	var rows, err = tb.pool.Query(ctx, query, args...)
+	var rows, err = tb.control.Query(ctx, query, args...)
 	if err != nil {
 		t.Fatalf("unable to execute query: %v", err)
 	}
@@ -241,36 +215,37 @@ func argsTuple(argc int) string {
 
 // TestGeneric runs the generic sqlcapture test suite.
 func TestGeneric(t *testing.T) {
-	lowerTuningParameters(t)
-	tests.Run(context.Background(), t, TestBackend)
+	var tb = postgresTestBackend(t)
+	tb.lowerTuningParameters(t)
+	tests.Run(context.Background(), t, tb)
 }
 
 func TestCapitalizedTables(t *testing.T) {
-	var ctx, tb = context.Background(), TestBackend
-	tb.Query(ctx, t, `DROP TABLE IF EXISTS test."USERS"`)
-	tb.Query(ctx, t, `CREATE TABLE test."USERS" (id INTEGER PRIMARY KEY, data TEXT NOT NULL)`)
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS "%s"."USERS"`, testSchemaName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE "%s"."USERS" (id INTEGER PRIMARY KEY, data TEXT NOT NULL)`, testSchemaName))
 	var cs = tb.CaptureSpec(t)
 	t.Run("Discover", func(t *testing.T) {
 		cs.VerifyDiscover(ctx, t, regexp.MustCompile(`(?i:users)`))
 	})
 	var resourceSpecJSON, err = json.Marshal(sqlcapture.Resource{
-		Namespace: "test",
+		Namespace: testSchemaName,
 		Stream:    "USERS",
 	})
 	require.NoError(t, err)
 	cs.Bindings = []*flow.CaptureSpec_Binding{{
 		ResourceSpecJson: resourceSpecJSON,
-		ResourcePath:     []string{"test", "USERS"},
+		ResourcePath:     []string{testSchemaName, "USERS"},
 	}}
 	t.Run("Validate", func(t *testing.T) {
 		var _, err = cs.Validate(ctx, t)
 		require.NoError(t, err)
 	})
 	t.Run("Capture", func(t *testing.T) {
-		tb.Query(ctx, t, `INSERT INTO test."USERS" VALUES (1, 'Alice'), (2, 'Bob')`)
+		tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (1, 'Alice'), (2, 'Bob')`, testSchemaName))
 		tests.VerifiedCapture(ctx, t, cs)
 		t.Run("Replication", func(t *testing.T) {
-			tb.Query(ctx, t, `INSERT INTO test."USERS" VALUES (3, 'Carol'), (4, 'Dave')`)
+			tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO "%s"."USERS" VALUES (3, 'Carol'), (4, 'Dave')`, testSchemaName))
 			tests.VerifiedCapture(ctx, t, cs)
 		})
 	})
