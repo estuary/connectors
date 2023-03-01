@@ -21,10 +21,10 @@ var (
 	dbAddress = flag.String("db_addr", "127.0.0.1:1433", "Connect to the specified address/port for tests")
 	dbName    = flag.String("db_name", "test", "Connect to the named database for tests")
 
-	dbCaptureUser     = flag.String("db_user", "flow_capture", "Connect as the specified user for test captures")
-	dbCapturePassword = flag.String("db_password", "we2rie1E", "Password for the specified database test capture user")
-	dbTestUser        = flag.String("db_test_user", "sa", "Connect as the specified user for test manipulations")
-	dbTestPassword    = flag.String("db_test_pass", "gf6w6dkD", "Password for the test-manipulation user")
+	dbControlUser = flag.String("db_control_user", "sa", "The user for test setup/control operations")
+	dbControlPass = flag.String("db_control_pass", "gf6w6dkD", "The password the the test setup/control user")
+	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
+	dbCapturePass = flag.String("db_capture_pass", "we2rie1E", "The password for the capture user")
 
 	enableCDCWhenCreatingTables = flag.Bool("enable_cdc_when_creating_tables", true, "Set to true if CDC should be enabled before the test capture runs")
 )
@@ -57,38 +57,43 @@ func sqlserverTestBackend(t *testing.T) *testBackend {
 		return nil
 	}
 
-	var testCfg = &Config{
+	// Open control connection
+	var controlURI = (&Config{
 		Address:  *dbAddress,
-		User:     *dbTestUser,
-		Password: *dbTestPassword,
+		User:     *dbControlUser,
+		Password: *dbControlPass,
 		Database: *dbName,
-	}
+	}).ToURI()
 	log.WithFields(log.Fields{
-		"address": testCfg.Address,
-		"user":    testCfg.User,
-	}).Info("connecting to test database")
-	var conn, err = sql.Open("sqlserver", testCfg.ToURI())
+		"user": *dbControlUser,
+		"addr": *dbAddress,
+	}).Info("opening control connection")
+	var conn, err = sql.Open("sqlserver", controlURI)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
 
-	return &testBackend{
-		cfg: Config{
-			Address:  *dbAddress,
-			User:     *dbCaptureUser,
-			Password: *dbCapturePassword,
-			Database: *dbName,
-		},
-		conn: conn,
+	// Construct the capture config
+	var captureConfig = Config{
+		Address:  *dbAddress,
+		User:     *dbCaptureUser,
+		Password: *dbCapturePass,
+		Database: *dbName,
 	}
+	if err := captureConfig.Validate(); err != nil {
+		t.Fatalf("error validating capture config: %v", err)
+	}
+	captureConfig.SetDefaults()
+
+	return &testBackend{control: conn, config: captureConfig}
 }
 
 type testBackend struct {
-	cfg  Config
-	conn *sql.DB
+	control *sql.DB
+	config  Config
 }
 
 func (tb *testBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
-	var cfg = tb.cfg
+	var cfg = tb.config
 	return &st.CaptureSpec{
 		Driver:       sqlserverDriver,
 		EndpointSpec: &cfg,
@@ -127,10 +132,10 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 
 	log.WithFields(log.Fields{"table": fullTableName, "cols": tableDef}).Debug("creating test table")
 
-	var _, err = tb.conn.ExecContext(ctx, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
+	var _, err = tb.control.ExecContext(ctx, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
 	require.NoError(t, err)
 
-	_, err = tb.conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s%s;", fullTableName, tableDef))
+	_, err = tb.control.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s%s;", fullTableName, tableDef))
 	require.NoError(t, err)
 
 	if *enableCDCWhenCreatingTables {
@@ -140,13 +145,13 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 			*dbCaptureUser,
 			instanceName,
 		)
-		_, err = tb.conn.ExecContext(ctx, query)
+		_, err = tb.control.ExecContext(ctx, query)
 		require.NoError(t, err)
 	}
 
 	t.Cleanup(func() {
 		log.WithField("table", fullTableName).Debug("destroying test table")
-		_, err = tb.conn.ExecContext(ctx, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
+		_, err = tb.control.ExecContext(ctx, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
 		require.NoError(t, err)
 	})
 
@@ -160,7 +165,7 @@ func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, r
 	if len(rows) < 1 {
 		t.Fatalf("must insert at least one row")
 	}
-	var tx, err = tb.conn.BeginTx(ctx, nil)
+	var tx, err = tb.control.BeginTx(ctx, nil)
 	require.NoErrorf(t, err, "begin transaction")
 
 	log.WithFields(log.Fields{"table": table, "count": len(rows), "first": rows[0]}).Debug("inserting data")
@@ -187,7 +192,7 @@ func (tb *testBackend) Update(ctx context.Context, t testing.TB, table string, w
 	t.Helper()
 	var query = fmt.Sprintf(`UPDATE %s SET %s = @p1 WHERE %s = @p2;`, table, setCol, whereCol)
 	log.WithField("query", query).Debug("updating rows")
-	var _, err = tb.conn.ExecContext(ctx, query, setVal, whereVal)
+	var _, err = tb.control.ExecContext(ctx, query, setVal, whereVal)
 	require.NoError(t, err, "update rows")
 }
 
@@ -196,7 +201,7 @@ func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, w
 	t.Helper()
 	var query = fmt.Sprintf(`DELETE FROM %s WHERE %s = @p1;`, table, whereCol)
 	log.WithField("query", query).Debug("deleting rows")
-	var _, err = tb.conn.ExecContext(ctx, query, whereVal)
+	var _, err = tb.control.ExecContext(ctx, query, whereVal)
 	require.NoError(t, err, "delete rows")
 }
 
