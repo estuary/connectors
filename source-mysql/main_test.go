@@ -20,15 +20,16 @@ import (
 )
 
 var (
-	dbAddress  = flag.String("db_addr", "127.0.0.1:3306", "Connect to the specified address/port for tests")
-	dbUser     = flag.String("db_user", "root", "Connect as the specified user for tests")
-	dbPassword = flag.String("db_password", "flow", "Password for the specified database test user")
-	dbName     = flag.String("db_name", "test", "Connect to the named database for tests")
+	dbAddress = flag.String("db_address", "localhost:3306", "The database server address to use for tests")
+	dbName    = flag.String("db_name", "mysql", "Use the named database for tests")
+
+	dbControlUser = flag.String("db_control_user", "root", "The user for test setup/control operations")
+	dbControlPass = flag.String("db_control_pass", "secret1234", "The password the the test setup/control user")
+	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
+	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
 )
 
-var (
-	TestBackend *mysqlTestBackend
-)
+const testSchemaName = "test"
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -39,53 +40,65 @@ func TestMain(m *testing.M) {
 			logrus.WithField("level", logLevel).Fatal("invalid log level")
 		}
 		logrus.SetLevel(level)
+	} else {
+		logrus.SetLevel(logrus.DebugLevel)
 	}
 	fixMysqlLogging()
 
-	// Initialize test config and database connection
-	var cfg = Config{
+	os.Exit(m.Run())
+}
+
+func mysqlTestBackend(t testing.TB) *testBackend {
+	t.Helper()
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
+		return nil
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"user": *dbControlUser,
+		"addr": *dbAddress,
+	}).Info("opening control connection")
+	var conn, err = client.Connect(*dbAddress, *dbControlUser, *dbControlPass, *dbName)
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+
+	// Construct the capture config
+	var captureConfig = Config{
 		Address:  *dbAddress,
-		User:     *dbUser,
-		Password: *dbPassword,
+		User:     *dbCaptureUser,
+		Password: *dbCapturePass,
 		Advanced: advancedConfig{
 			DBName: *dbName,
 		},
 	}
-	if err := cfg.Validate(); err != nil {
-		logrus.WithFields(logrus.Fields{"err": err, "config": cfg}).Fatal("error validating test config")
+	if err := captureConfig.Validate(); err != nil {
+		t.Fatalf("error validating capture config: %v", err)
 	}
-	cfg.SetDefaults("Test Config")
+	captureConfig.SetDefaults(t.Name())
 
-	var conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName)
-	if err != nil {
-		logrus.WithField("err", err).Fatal("error connecting to database")
-	}
-
-	TestBackend = &mysqlTestBackend{conn: conn, cfg: cfg}
-
-	var exitCode = m.Run()
-	os.Exit(exitCode)
+	return &testBackend{control: conn, config: captureConfig}
 }
 
-func lowerTuningParameters(t testing.TB) {
+type testBackend struct {
+	control *client.Conn
+	config  Config
+}
+
+func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 	// Within the scope of a single test, adjust some tuning parameters so that it's
 	// easier to exercise backfill chunking and replication buffering behavior.
-	var prevChunkSize = TestBackend.cfg.Advanced.BackfillChunkSize
-	t.Cleanup(func() { TestBackend.cfg.Advanced.BackfillChunkSize = prevChunkSize })
-	TestBackend.cfg.Advanced.BackfillChunkSize = 16
+	var prevChunkSize = tb.config.Advanced.BackfillChunkSize
+	t.Cleanup(func() { tb.config.Advanced.BackfillChunkSize = prevChunkSize })
+	tb.config.Advanced.BackfillChunkSize = 16
 
 	var prevBufferSize = replicationBufferSize
 	t.Cleanup(func() { replicationBufferSize = prevBufferSize })
 	replicationBufferSize = 0
 }
 
-type mysqlTestBackend struct {
-	conn *client.Conn
-	cfg  Config
-}
-
-func (tb *mysqlTestBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
-	var cfg = tb.cfg
+func (tb *testBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
+	var cfg = tb.config
 	return &st.CaptureSpec{
 		Driver:       mysqlDriver,
 		EndpointSpec: &cfg,
@@ -105,10 +118,10 @@ func init() {
 	CaptureSanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 }
 
-func (tb *mysqlTestBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
+func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
-	var tableName = "test." + strings.TrimPrefix(t.Name(), "Test")
+	var tableName = testSchemaName + "." + strings.TrimPrefix(t.Name(), "Test")
 	if suffix != "" {
 		tableName += "_" + suffix
 	}
@@ -126,12 +139,12 @@ func (tb *mysqlTestBackend) CreateTable(ctx context.Context, t testing.TB, suffi
 	return tableName
 }
 
-func (tb *mysqlTestBackend) Insert(ctx context.Context, t testing.TB, table string, rows [][]interface{}) {
+func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, rows [][]interface{}) {
 	t.Helper()
 	if len(rows) == 0 {
 		return
 	}
-	if err := tb.conn.Begin(); err != nil {
+	if err := tb.control.Begin(); err != nil {
 		t.Fatalf("error beginning transaction: %v", err)
 	}
 	var argc = len(rows[0])
@@ -142,7 +155,7 @@ func (tb *mysqlTestBackend) Insert(ctx context.Context, t testing.TB, table stri
 		}
 		tb.Query(ctx, t, query, row...)
 	}
-	if err := tb.conn.Commit(); err != nil {
+	if err := tb.control.Commit(); err != nil {
 		t.Fatalf("error committing transaction: %v", err)
 	}
 }
@@ -155,20 +168,20 @@ func argsTuple(argc int) string {
 	return tuple + ")"
 }
 
-func (tb *mysqlTestBackend) Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
+func (tb *testBackend) Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
 	t.Helper()
 	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ?;", table, setCol, whereCol), setVal, whereVal)
 }
 
-func (tb *mysqlTestBackend) Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}) {
+func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}) {
 	t.Helper()
 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE %s = ?;", table, whereCol), whereVal)
 }
 
-func (tb *mysqlTestBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {
+func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {
 	t.Helper()
 	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
-	var result, err = tb.conn.Execute(query, args...)
+	var result, err = tb.control.Execute(query, args...)
 	if err != nil {
 		t.Fatalf("error executing query %q: %v", query, err)
 	}
@@ -177,12 +190,13 @@ func (tb *mysqlTestBackend) Query(ctx context.Context, t testing.TB, query strin
 
 // TestGeneric runs the generic sqlcapture test suite.
 func TestGeneric(t *testing.T) {
-	lowerTuningParameters(t)
-	tests.Run(context.Background(), t, TestBackend)
+	var tb = mysqlTestBackend(t)
+	tb.lowerTuningParameters(t)
+	tests.Run(context.Background(), t, tb)
 }
 
 func TestAlterTable(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
@@ -224,7 +238,7 @@ func TestAlterTable(t *testing.T) {
 // TestBinlogExpirySanityCheck verifies that the "dangerously short binlog expiry"
 // sanity check is working as intended.
 func TestBinlogExpirySanityCheck(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var cs = tb.CaptureSpec(t)
 
 	for idx, tc := range []struct {
@@ -270,7 +284,7 @@ func TestSkipBackfills(t *testing.T) {
 	// Set up three tables with some data in them, a catalog which captures all three,
 	// but a configuration which specifies that tables A and C should skip backfilling
 	// and only capture new changes.
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
@@ -294,7 +308,7 @@ func TestSkipBackfills(t *testing.T) {
 // TestCursorResume sets up a capture with a (string, int) primary key and
 // and repeatedly restarts it after each row of capture output.
 func TestCursorResume(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(epoch VARCHAR(8), count INTEGER, data TEXT, PRIMARY KEY (epoch, count))")
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{"aaa", 1, "bvzf"}, {"aaa", 2, "ukwh"}, {"aaa", 3, "lntg"}, {"bbb", -100, "bycz"},
@@ -318,7 +332,7 @@ func TestCursorResume(t *testing.T) {
 // "chunks", two connector restarts at different points in the initial table scan, and
 // some concurrent modifications to row ranges already-scanned and not-yet-scanned.
 func TestComplexDataset(t *testing.T) {
-	var tb, ctx = TestBackend, context.Background()
+	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER, PRIMARY KEY (year, state))")
 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
 	var cs = tb.CaptureSpec(t, tableName)

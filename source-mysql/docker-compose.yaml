@@ -18,16 +18,14 @@ services:
         target: /b.csv
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "--silent"]
+      test: [ "CMD", "mysqladmin", "ping", "--silent" ]
     environment:
-      MYSQL_DATABASE: test
-      MYSQL_ROOT_PASSWORD: flow
-      MYSQL_USER: flow
-      MYSQL_PASSWORD: flow
+      MYSQL_DATABASE: mysql
+      MYSQL_ROOT_PASSWORD: secret1234
     networks:
       - flow-test
     cap_add:
-      - SYS_NICE  # Prevents 'mbind: Operation not permitted' errors. In theory those are benign but it's better to not have them.
+      - SYS_NICE # Prevents 'mbind: Operation not permitted' errors. In theory those are benign but it's better to not have them.
 
 networks:
   flow-test:
