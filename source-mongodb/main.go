@@ -51,6 +51,12 @@ func (c *config) Validate() error {
 		}
 	}
 
+	var uri, err = url.Parse(c.Address)
+	// mongodb+srv:// urls do not support port
+	if err == nil && uri.Scheme == "mongodb+srv" && uri.Port() != "" {
+		return fmt.Errorf("`mongodb+srv://` addresses do not support specifying the port.")
+	}
+
 	return nil
 }
 
