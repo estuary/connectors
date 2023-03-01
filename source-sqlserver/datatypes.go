@@ -51,11 +51,11 @@ func (db *sqlserverDatabase) translateRecordField(columnType interface{}, val in
 			val[0], val[1], val[2], val[3] = val[3], val[2], val[1], val[0]
 			val[4], val[5] = val[5], val[4]
 			val[6], val[7] = val[7], val[6]
-			if u, err := uuid.FromBytes(val); err != nil {
+			u, err := uuid.FromBytes(val)
+			if err != nil {
 				return nil, err
-			} else {
-				return u.String(), nil
 			}
+			return u.String(), nil
 		}
 	case time.Time:
 		switch columnType {
