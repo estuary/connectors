@@ -9,15 +9,15 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/protocol"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/sirupsen/logrus"
 )
 
 type Client interface {
 	// FetchSpecAndVersion retrieves the materialization from Table `specs`,
 	// or returns sql.ErrNoRows if no such spec exists.
-	FetchSpecAndVersion(ctx context.Context, specs Table, materialization pf.Materialization) (specB64, version string, _ error)
+	FetchSpecAndVersion(ctx context.Context, specs Table, materialization string) (specB64, version string, _ error)
 	ExecStatements(ctx context.Context, statements []string) error
 	InstallFence(ctx context.Context, checkpoints Table, fence Fence) (Fence, error)
 }
@@ -43,7 +43,7 @@ type Fence struct {
 	// TablePath of the checkpoints table in which this Fence lives.
 	TablePath TablePath
 	// Full name of the fenced Materialization.
-	Materialization pf.Materialization
+	Materialization string
 	// [KeyBegin, KeyEnd) identify the range of keys covered by this Fence.
 	KeyBegin uint32
 	KeyEnd   uint32
@@ -51,10 +51,10 @@ type Fence struct {
 	// to order and isolate instances of the Transactions RPCs.
 	// If fencing is not supported, Fence is zero.
 	Fence int64
-	// Checkpoint associated with this Fence.
+	// Checkpoint associated with this Fence as a base64-encoded byte slice.
 	// A zero-length Checkpoint indicates that the Endpoint is unable to supply
 	// a Checkpoint and that the recovery-log Checkpoint should be used instead.
-	Checkpoint []byte
+	Checkpoint string
 }
 
 // Endpoint is a driver description of the SQL endpoint being driven.
@@ -79,16 +79,16 @@ type Endpoint struct {
 	// NewResource returns an uninitialized or partially-initialized Resource
 	// which will be parsed into and validated from a resource configuration.
 	NewResource func(*Endpoint) Resource
-	// NewTransactor returns a Transactor ready for pm.RunTransactions.
-	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table) (pm.Transactor, error)
+	// NewTransactor returns a Transactor to handle Load and Store requests.
+	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table) (Transactor, error)
 }
 
 // loadSpec loads the named MaterializationSpec and its version that's stored within the Endpoint, if any.
-func loadSpec(ctx context.Context, endpoint *Endpoint, materialization pf.Materialization) (*pf.MaterializationSpec, string, error) {
+func loadSpec(ctx context.Context, endpoint *Endpoint, materialization string) (*StoredSpec, string, error) {
 	var (
 		err              error
 		metaSpecs        Table
-		spec             = new(pf.MaterializationSpec)
+		spec             = new(StoredSpec)
 		specB64, version string
 	)
 
@@ -111,13 +111,30 @@ func loadSpec(ctx context.Context, endpoint *Endpoint, materialization pf.Materi
 		return nil, "", nil
 	} else if specBytes, err := base64.StdEncoding.DecodeString(specB64); err != nil {
 		return nil, version, fmt.Errorf("base64.Decode: %w", err)
-	} else if err = spec.Unmarshal(specBytes); err != nil {
+		// TODO(whb): Replace unmarshalCompatible with json.Unmarshal once all sql materializations
+		// have converted to JSON protocol and have re-applied all specs in the new form.
+	} else if err = unmarshalCompatible(specBytes, spec); err != nil {
 		return nil, version, fmt.Errorf("spec.Unmarshal: %w", err)
-	} else if err = spec.Validate(); err != nil {
-		return nil, version, fmt.Errorf("validating spec: %w", err)
 	}
 
 	return spec, version, nil
+}
+
+func unmarshalCompatible(specBytes []byte, spec *StoredSpec) error {
+	// Try to unmarshal directly as a StoredSpec first.
+	if err := json.Unmarshal(specBytes, spec); err != nil {
+		// We're probably dealing with a legacy protobuf spec if that didn't work.
+		protobufSpec := &pf.MaterializationSpec{}
+		if err := protobufSpec.Unmarshal(specBytes); err != nil {
+			return fmt.Errorf("unmarshaling legacy protobufSpec: %w", err)
+		}
+		*spec = StoredSpec{
+			Materialization: protobufSpec.Materialization.String(),
+			Bindings:        protocol.MaterializationSpecPbToBindings(protobufSpec),
+		}
+	}
+
+	return nil
 }
 
 // resolveResourceToExistingBinding identifies an existing binding of `loadedSpec`
@@ -127,27 +144,27 @@ func loadSpec(ctx context.Context, endpoint *Endpoint, materialization pf.Materi
 func resolveResourceToExistingBinding(
 	endpoint *Endpoint,
 	resourceSpec json.RawMessage,
-	collection *pf.CollectionSpec,
-	loadedSpec *pf.MaterializationSpec,
+	collection protocol.CollectionSpec,
+	loadedSpec *StoredSpec,
 ) (
-	constraints map[string]*pm.Constraint,
-	loadedBinding *pf.MaterializationSpec_Binding,
+	constraints map[string]protocol.Constraint,
+	loadedBinding *protocol.ApplyBinding,
 	resource Resource,
 	err error,
 ) {
 	resource = endpoint.NewResource(endpoint)
 
 	if err = pf.UnmarshalStrict(resourceSpec, resource); err != nil {
-		err = fmt.Errorf("resource binding for collection %q: %w", &collection.Collection, err)
-	} else if loadedBinding, err = findBinding(resource.Path(), collection.Collection, loadedSpec); err != nil {
+		err = fmt.Errorf("resource binding for collection %q: %w", collection.Name, err)
+	} else if loadedBinding, err = findBinding(resource.Path(), collection.Name, loadedSpec); err != nil {
 	} else if loadedBinding != nil && loadedBinding.DeltaUpdates && !resource.DeltaUpdates() {
 		// We allow a binding to switch from standard => delta updates but not the other way.
 		// This is because a standard materialization is trivially a valid delta-updates
 		// materialization, but a delta-updates table may have multiple instances of a given
 		// key and can no longer be loaded correctly by a standard materialization.
-		err = fmt.Errorf("cannot disable delta-updates binding of collection %s", collection.Collection)
+		err = fmt.Errorf("cannot disable delta-updates binding of collection %s", collection.Name)
 	} else if loadedBinding != nil {
-		constraints = ValidateMatchesExisting(loadedBinding, collection)
+		constraints = ValidateMatchesExisting(*loadedBinding, collection)
 	} else {
 		constraints = ValidateNewSQLProjections(resource, collection)
 	}
@@ -155,18 +172,18 @@ func resolveResourceToExistingBinding(
 	return
 }
 
-func findBinding(path TablePath, collection pf.Collection, spec *pf.MaterializationSpec) (*pf.MaterializationSpec_Binding, error) {
+func findBinding(path TablePath, collection string, spec *StoredSpec) (*protocol.ApplyBinding, error) {
 	if spec == nil {
 		return nil, nil // Binding is trivially not found.
 	}
 	for i := range spec.Bindings {
 		var b = spec.Bindings[i]
 
-		if b.Collection.Collection == collection && path.equals(b.ResourcePath) {
-			return b, nil
+		if b.Collection.Name == collection && path.equals(b.ResourcePath) {
+			return &b, nil
 		} else if path.equals(b.ResourcePath) {
 			return nil, fmt.Errorf("cannot materialize %s to table %s because the table is already materializing collection %s",
-				path, &b.Collection.Collection, collection)
+				path, b.Collection.Name, collection)
 		}
 	}
 	return nil, nil
