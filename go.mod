@@ -39,6 +39,7 @@ require (
 	go.mongodb.org/mongo-driver v1.11.2
 	golang.org/x/oauth2 v0.3.0
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
+	golang.org/x/text v0.7.0
 	golang.org/x/time v0.0.0-20220609170525-579cf78fd858
 	google.golang.org/api v0.93.0
 	google.golang.org/genproto v0.0.0-20220822174746-9e6da59bd2fc
@@ -133,7 +134,6 @@ require (
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.17.0 // indirect
