@@ -3,23 +3,23 @@ package sql
 import (
 	"testing"
 
-	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/estuary/connectors/go/protocol"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAsFlatType(t *testing.T) {
 	tests := []struct {
 		name      string
-		inference pf.Inference
+		inference protocol.Inference
 		flatType  FlatType
 		mustExist bool
 	}{
 		{
 			name: "integer formatted string with integer",
-			inference: pf.Inference{
-				Exists: pf.Inference_MUST,
+			inference: protocol.Inference{
+				Exists: protocol.MustExist,
 				Types:  []string{"integer", "string"},
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "integer",
 				},
 			},
@@ -28,10 +28,10 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "number formatted string with number",
-			inference: pf.Inference{
-				Exists: pf.Inference_MAY,
+			inference: protocol.Inference{
+				Exists: protocol.MayExist,
 				Types:  []string{"number", "string"},
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "number",
 				},
 			},
@@ -40,10 +40,10 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "integer formatted string with number",
-			inference: pf.Inference{
-				Exists: pf.Inference_MAY,
+			inference: protocol.Inference{
+				Exists: protocol.MayExist,
 				Types:  []string{"number", "string"},
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "integer",
 				},
 			},
@@ -52,8 +52,8 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "single number type",
-			inference: pf.Inference{
-				Exists: pf.Inference_MAY,
+			inference: protocol.Inference{
+				Exists: protocol.MayExist,
 				Types:  []string{"number"},
 			},
 			flatType:  NUMBER,
@@ -61,10 +61,10 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "number formatted string with number and other field",
-			inference: pf.Inference{
-				Exists: pf.Inference_MAY,
+			inference: protocol.Inference{
+				Exists: protocol.MayExist,
 				Types:  []string{"number", "string", "array"},
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "number",
 				},
 			},
@@ -73,10 +73,10 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "number formatted string with integer",
-			inference: pf.Inference{
-				Exists: pf.Inference_MAY,
+			inference: protocol.Inference{
+				Exists: protocol.MayExist,
 				Types:  []string{"integer", "string"},
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "number",
 				},
 			},
@@ -85,8 +85,8 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "multiple types with null",
-			inference: pf.Inference{
-				Exists: pf.Inference_MUST,
+			inference: protocol.Inference{
+				Exists: protocol.MustExist,
 				Types:  []string{"integer", "string", "null"},
 			},
 			flatType:  MULTIPLE,
@@ -94,8 +94,8 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "no types",
-			inference: pf.Inference{
-				Exists: pf.Inference_MUST,
+			inference: protocol.Inference{
+				Exists: protocol.MustExist,
 				Types:  nil,
 			},
 			flatType:  NEVER,
@@ -103,10 +103,10 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "no types with format",
-			inference: pf.Inference{
-				Exists: pf.Inference_MUST,
+			inference: protocol.Inference{
+				Exists: protocol.MustExist,
 				Types:  nil,
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "number",
 				},
 			},
@@ -115,10 +115,10 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "other formatted string with integer",
-			inference: pf.Inference{
-				Exists: pf.Inference_MAY,
+			inference: protocol.Inference{
+				Exists: protocol.MayExist,
 				Types:  []string{"integer", "string"},
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "array",
 				},
 			},
@@ -127,10 +127,10 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "format with two non-string fields",
-			inference: pf.Inference{
-				Exists: pf.Inference_MAY,
+			inference: protocol.Inference{
+				Exists: protocol.MayExist,
 				Types:  []string{"integer", "number"},
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "number",
 				},
 			},
@@ -139,10 +139,10 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "format with two string fields",
-			inference: pf.Inference{
-				Exists: pf.Inference_MAY,
+			inference: protocol.Inference{
+				Exists: protocol.MayExist,
 				Types:  []string{"string", "string"},
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "number",
 				},
 			},
@@ -151,10 +151,10 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "allowable format with a null is not mustExist",
-			inference: pf.Inference{
-				Exists: pf.Inference_MUST,
+			inference: protocol.Inference{
+				Exists: protocol.MustExist,
 				Types:  []string{"string", "null"},
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "number",
 				},
 			},
@@ -163,10 +163,10 @@ func TestAsFlatType(t *testing.T) {
 		},
 		{
 			name: "single string formatted as numeric",
-			inference: pf.Inference{
-				Exists: pf.Inference_MUST,
+			inference: protocol.Inference{
+				Exists: protocol.MustExist,
 				Types:  []string{"string"},
-				String_: &pf.Inference_String{
+				String_: &protocol.StringInference{
 					Format: "number",
 				},
 			},
@@ -178,7 +178,7 @@ func TestAsFlatType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			projection := &Projection{
-				Projection: pf.Projection{
+				Projection: &protocol.Projection{
 					Inference: tt.inference,
 				},
 			}

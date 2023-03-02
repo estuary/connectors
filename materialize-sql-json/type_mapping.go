@@ -6,8 +6,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/estuary/connectors/go/protocol"
 )
 
 // FlatType is a flattened, database-friendly representation of a document location's type.
@@ -31,7 +30,7 @@ const (
 
 // Projection lifts a pf.Projection into a form that's more easily worked with for SQL column mapping.
 type Projection struct {
-	pf.Projection
+	*protocol.Projection
 	// Comment for this projection.
 	Comment string
 	// RawFieldConfig is (optional) field configuration supplied within the field selection.
@@ -39,11 +38,11 @@ type Projection struct {
 }
 
 // BuildProjections returns the Projections extracted from a Binding.
-func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Projection, document *Projection) {
+func BuildProjections(spec protocol.ApplyBinding) (keys, values []Projection, document *Projection) {
 	var do = func(field string) Projection {
 		var p = Projection{
-			Projection:     *spec.Collection.GetProjection(field),
-			RawFieldConfig: spec.FieldSelection.FieldConfigJson[field],
+			Projection:     spec.Collection.GetProjection(field),
+			RawFieldConfig: spec.FieldSelection.FieldConfig[field],
 		}
 
 		var source = "auto-generated"
@@ -69,9 +68,9 @@ func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Proj
 	for _, field := range spec.FieldSelection.Values {
 		values = append(values, do(field))
 	}
-	if field := spec.FieldSelection.Document; field != "" {
+	if field := spec.FieldSelection.Document; field != nil {
 		document = new(Projection)
-		*document = do(field)
+		*document = do(*field)
 	}
 
 	return
@@ -79,10 +78,10 @@ func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Proj
 
 // AsFlatType returns the Projection's FlatType.
 func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
-	mustExist = p.Inference.Exists == pf.Inference_MUST
+	mustExist = p.Inference.Exists == protocol.MustExist
 
 	var types []FlatType
-	for _, ty := range effectiveJsonTypes(&p.Projection) {
+	for _, ty := range effectiveJsonTypes(p.Projection) {
 		switch ty {
 		case "string":
 			types = append(types, STRING)
@@ -115,7 +114,7 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 // materialization. It currently supports strings formatted as numeric values, either as stand-alone
 // string types or as a string type formatted as numeric + that numeric type. It does not apply to
 // keyed fields.
-func effectiveJsonTypes(projection *pf.Projection) []string {
+func effectiveJsonTypes(projection *protocol.Projection) []string {
 	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
 		switch {
 		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"integer", "string"}):
@@ -137,26 +136,28 @@ func effectiveJsonTypes(projection *pf.Projection) []string {
 type MappedType struct {
 	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct inclusion in raw SQL.
 	DDL string
-	// Converter of tuple elements for this mapping, into SQL runtime values.
-	Converter ElementConverter
+	// Converter of JSON values for this mapping, into SQL runtime values.
+	Converter ValueConverter
 	// ParsedFieldConfig is a Dialect-defined parsed implementation of the (optional)
 	// additional field configuration supplied within the field selection.
 	ParsedFieldConfig interface{}
 }
 
-// ElementConverter maps from a TupleElement into a runtime type instance that's compatible with the SQL driver.
-type ElementConverter func(tuple.TupleElement) (interface{}, error)
+// ValueConverter maps from a JSON value into a runtime type instance that's compatible with the SQL
+// driver.
+type ValueConverter func(interface{}) (interface{}, error)
 
-// TupleConverter maps from a Tuple into a slice of runtime type instances that are compatible with the SQL driver.
-type TupleConverter func(tuple.Tuple) ([]interface{}, error)
+// ValuesConverter maps from a slice of JSON values into a slice of runtime type instances that are
+// compatible with the SQL driver.
+type ValuesConverter func([]interface{}) ([]interface{}, error)
 
-// NewTupleConverter builds a TupleConverter from an ordered list of ElementConverter.
-func NewTupleConverter(e ...ElementConverter) TupleConverter {
-	return func(t tuple.Tuple) (out []interface{}, err error) {
+// NewValuesConverter builds a ValuesConverter from an ordered list of ValueConverter.
+func NewValuesConverter(e ...ValueConverter) ValuesConverter {
+	return func(t []interface{}) (out []interface{}, err error) {
 		out = make([]interface{}, len(e))
 		for i := range e {
 			if out[i], err = e[i](t[i]); err != nil {
-				return nil, fmt.Errorf("converting tuple index %d: %w", i, err)
+				return nil, fmt.Errorf("converting value index %d: %w", i, err)
 			}
 		}
 		return out, nil
@@ -177,7 +178,7 @@ func (sm StaticMapper) MapType(*Projection) (MappedType, error) {
 func NewStaticMapper(ddl string, opts ...StaticMapperOption) StaticMapper {
 	sm := StaticMapper{
 		DDL:               ddl,
-		Converter:         func(te tuple.TupleElement) (interface{}, error) { return te, nil },
+		Converter:         func(te interface{}) (interface{}, error) { return te, nil },
 		ParsedFieldConfig: nil,
 	}
 
@@ -188,9 +189,29 @@ func NewStaticMapper(ddl string, opts ...StaticMapperOption) StaticMapper {
 	return sm
 }
 
-func WithElementConverter(converter ElementConverter) StaticMapperOption {
+func WithElementConverter(converter ValueConverter) StaticMapperOption {
 	return func(sm *StaticMapper) {
 		sm.Converter = converter
+	}
+}
+
+// JsonBytesConverter serializes a value to raw JSON bytes for storage in an endpoint compatible
+// with JSON bytes.
+func JsonBytesConverter(v interface{}) (interface{}, error) {
+	switch ii := v.(type) {
+	case []byte:
+		return json.RawMessage(ii), nil
+	case json.RawMessage:
+		return ii, nil
+	case nil:
+		return json.RawMessage(nil), nil
+	default:
+		bytes, err := json.Marshal(v)
+		if err != nil {
+			return nil, fmt.Errorf("could not serialize %q as json bytes: %w", v, err)
+		}
+
+		return json.RawMessage(bytes), nil
 	}
 }
 
@@ -198,20 +219,20 @@ func WithElementConverter(converter ElementConverter) StaticMapperOption {
 // types are returned without modification. This should be used for converting fields that have a
 // string type and one additional type. The callback should convert the string into the desired type
 // per the endpoint's requirements.
-func StringCastConverter(fn func(string) (interface{}, error)) ElementConverter {
-	return func(te tuple.TupleElement) (interface{}, error) {
-		switch tt := te.(type) {
+func StringCastConverter(fn func(string) (interface{}, error)) ValueConverter {
+	return func(v interface{}) (interface{}, error) {
+		switch tt := v.(type) {
 		case string:
 			return fn(tt)
 		default:
-			return te, nil
+			return v, nil
 		}
 	}
 }
 
 // StdStrToInt builds an ElementConverter that attempts to convert a string into an int64 value. It
 // can be used for endpoints that do not require more digits than an int64 can provide.
-func StdStrToInt() ElementConverter {
+func StdStrToInt() ValueConverter {
 	return StringCastConverter(func(str string) (interface{}, error) {
 		out, err := strconv.ParseInt(str, 10, 64)
 		if err != nil {
@@ -224,7 +245,7 @@ func StdStrToInt() ElementConverter {
 
 // StdStrToFloat builds an ElementConverter that attempts to convert a string into an float64 value.
 // It can be used for endpoints that do not require more digits than an float64 can provide.
-func StdStrToFloat() ElementConverter {
+func StdStrToFloat() ValueConverter {
 	return StringCastConverter(func(str string) (interface{}, error) {
 		out, err := strconv.ParseFloat(str, 64)
 		if err != nil {

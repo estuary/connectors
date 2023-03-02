@@ -1,8 +1,6 @@
 package sql
 
-import (
-	"github.com/estuary/flow/go/protocols/flow"
-)
+import "github.com/estuary/connectors/go/protocol"
 
 const (
 	// DefaultFlowCheckpoints is the default table for checkpoints.
@@ -29,34 +27,34 @@ func FlowCheckpointsTable(path ...string) TableShape {
 		DeltaUpdates: false,
 		Keys: []Projection{
 			{
-				Projection: flow.Projection{
+				Projection: &protocol.Projection{
 					Field: "materialization",
-					Inference: flow.Inference{
+					Inference: protocol.Inference{
 						Types:   []string{"string"},
-						Exists:  flow.Inference_MUST,
-						String_: &flow.Inference_String{},
+						Exists:  protocol.MustExist,
+						String_: &protocol.StringInference{},
 					},
 				},
 				RawFieldConfig: nil,
 				Comment:        "The name of the materialization.",
 			},
 			{
-				Projection: flow.Projection{
+				Projection: &protocol.Projection{
 					Field: "key_begin",
-					Inference: flow.Inference{
+					Inference: protocol.Inference{
 						Types:  []string{"integer"},
-						Exists: flow.Inference_MUST,
+						Exists: protocol.MustExist,
 					},
 				},
 				RawFieldConfig: nil,
 				Comment:        "The inclusive lower-bound key hash covered by this checkpoint.",
 			},
 			{
-				Projection: flow.Projection{
+				Projection: &protocol.Projection{
 					Field: "key_end",
-					Inference: flow.Inference{
+					Inference: protocol.Inference{
 						Types:  []string{"integer"},
-						Exists: flow.Inference_MUST,
+						Exists: protocol.MustExist,
 					},
 				},
 				RawFieldConfig: nil,
@@ -65,23 +63,23 @@ func FlowCheckpointsTable(path ...string) TableShape {
 		},
 		Values: []Projection{
 			{
-				Projection: flow.Projection{
+				Projection: &protocol.Projection{
 					Field: "fence",
-					Inference: flow.Inference{
+					Inference: protocol.Inference{
 						Types:  []string{"integer"},
-						Exists: flow.Inference_MUST,
+						Exists: protocol.MustExist,
 					},
 				},
 				RawFieldConfig: nil,
 				Comment:        "This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.",
 			},
 			{
-				Projection: flow.Projection{
+				Projection: &protocol.Projection{
 					Field: "checkpoint",
-					Inference: flow.Inference{
+					Inference: protocol.Inference{
 						Types:  []string{"string"},
-						Exists: flow.Inference_MUST,
-						String_: &flow.Inference_String{
+						Exists: protocol.MustExist,
+						String_: &protocol.StringInference{
 							// NOTE(johnny): Checkpoints *are* base64, but we lie to the
 							// connector to coerce it to select a regular text column type
 							// rather than a binary one for historical reasons. We should
@@ -110,12 +108,12 @@ func FlowMaterializationsTable(path ...string) TableShape {
 		DeltaUpdates: false,
 		Keys: []Projection{
 			{
-				Projection: flow.Projection{
+				Projection: &protocol.Projection{
 					Field: "materialization",
-					Inference: flow.Inference{
+					Inference: protocol.Inference{
 						Types:   []string{"string"},
-						Exists:  flow.Inference_MUST,
-						String_: &flow.Inference_String{},
+						Exists:  protocol.MustExist,
+						String_: &protocol.StringInference{},
 					},
 				},
 				RawFieldConfig: nil,
@@ -124,24 +122,24 @@ func FlowMaterializationsTable(path ...string) TableShape {
 		},
 		Values: []Projection{
 			{
-				Projection: flow.Projection{
+				Projection: &protocol.Projection{
 					Field: "version",
-					Inference: flow.Inference{
+					Inference: protocol.Inference{
 						Types:   []string{"string"},
-						Exists:  flow.Inference_MUST,
-						String_: &flow.Inference_String{},
+						Exists:  protocol.MustExist,
+						String_: &protocol.StringInference{},
 					},
 				},
 				RawFieldConfig: nil,
 				Comment:        "Version of the materialization.",
 			},
 			{
-				Projection: flow.Projection{
+				Projection: &protocol.Projection{
 					Field: "spec",
-					Inference: flow.Inference{
+					Inference: protocol.Inference{
 						Types:  []string{"string"},
-						Exists: flow.Inference_MUST,
-						String_: &flow.Inference_String{
+						Exists: protocol.MustExist,
+						String_: &protocol.StringInference{
 							// NOTE(johnny): Specifications *are* base64, but we lie to the
 							// connector to coerce it to select a regular text column type
 							// rather than a binary one for historical reasons. We should

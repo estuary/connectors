@@ -1,10 +1,10 @@
 
 	CREATE TABLE one."reserved".checkpoints (
-			materialization TEXT,
-			key_begin BIGINT,
-			key_end BIGINT,
-			fence BIGINT,
-			checkpoint TEXT,
+			materialization TEXT NOT NULL,
+			key_begin BIGINT NOT NULL,
+			key_end BIGINT NOT NULL,
+			fence BIGINT NOT NULL,
+			checkpoint TEXT NOT NULL,
 			PRIMARY KEY (materialization, key_begin, key_end)
 		
 	);

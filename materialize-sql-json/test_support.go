@@ -3,6 +3,7 @@ package sql
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"math"
 	"testing"
@@ -53,7 +54,7 @@ func RunFenceTestCases(
 				KeyBegin:        ranges[i*2],
 				KeyEnd:          ranges[i*2+1],
 				Fence:           5,
-				Checkpoint:      bytes.Repeat([]byte{byte(i + 1)}, 10),
+				Checkpoint:      base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{byte(i + 1)}, 10)),
 			})
 			require.NoError(t, err)
 		}
@@ -65,7 +66,7 @@ func RunFenceTestCases(
 			KeyBegin:        0,
 			KeyEnd:          math.MaxUint32,
 			Fence:           99,
-			Checkpoint:      []byte("other-checkpoint"),
+			Checkpoint:      base64.StdEncoding.EncodeToString([]byte("other-checkpoint")),
 		})
 		require.NoError(t, err)
 
@@ -79,15 +80,18 @@ func RunFenceTestCases(
 			KeyBegin:        testCase[0],
 			KeyEnd:          testCase[1],
 			Fence:           0,
-			Checkpoint:      nil,
+			Checkpoint:      base64.StdEncoding.EncodeToString([]byte(nil)),
 		})
 		require.NoError(t, err)
 
 		dump2, err := dumpTable(metaTable)
 		require.NoError(t, err)
 
+		decodedCheckpoint, err := base64.StdEncoding.DecodeString(fence.Checkpoint)
+		require.NoError(t, err)
+
 		// Update it once.
-		fence.Checkpoint = append(fence.Checkpoint, []byte{0, 0, 0, 0, 0, 0, 0, 0}...)
+		fence.Checkpoint = base64.StdEncoding.EncodeToString(append(decodedCheckpoint, []byte{0, 0, 0, 0, 0, 0, 0, 0}...))
 		require.NoError(t, updateFence(metaTable, fence))
 
 		dump3, err := dumpTable(metaTable)

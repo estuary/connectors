@@ -3,17 +3,15 @@ package sql
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"fmt"
 	"strings"
 
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/sirupsen/logrus"
 )
 
 // StdFetchSpecAndVersion is a convenience for Client implementations which
 // use Go's standard `sql.DB` type under the hood.
-func StdFetchSpecAndVersion(ctx context.Context, db *sql.DB, specs Table, materialization pf.Materialization) (specB64, version string, err error) {
+func StdFetchSpecAndVersion(ctx context.Context, db *sql.DB, specs Table, materialization string) (specB64, version string, err error) {
 	// Fail-fast: surface a connection issue.
 	if err = db.PingContext(ctx); err != nil {
 		err = fmt.Errorf("connecting to DB: %w", err)
@@ -27,7 +25,7 @@ func StdFetchSpecAndVersion(ctx context.Context, db *sql.DB, specs Table, materi
 			specs.Identifier,
 			specs.Keys[0].Placeholder,
 		),
-		materialization.String(),
+		materialization,
 	).Scan(&version, &specB64)
 
 	return
@@ -95,7 +93,6 @@ func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence F
 
 	// Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
 	var readBegin, readEnd uint32
-	var checkpointB64 string
 
 	if err = txn.QueryRow(
 		fmt.Sprintf(`
@@ -116,13 +113,11 @@ func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence F
 		fence.Materialization,
 		fence.KeyBegin,
 		fence.KeyEnd,
-	).Scan(&fence.Fence, &readBegin, &readEnd, &checkpointB64); err == sql.ErrNoRows {
+	).Scan(&fence.Fence, &readBegin, &readEnd, &fence.Checkpoint); err == sql.ErrNoRows {
 		// Set an invalid range, which compares as unequal to trigger an insertion below.
 		readBegin, readEnd = 1, 0
 	} else if err != nil {
 		return Fence{}, fmt.Errorf("scanning fence and checkpoint: %w", err)
-	} else if fence.Checkpoint, err = base64.StdEncoding.DecodeString(checkpointB64); err != nil {
-		return Fence{}, fmt.Errorf("base64.Decode(checkpoint): %w", err)
 	}
 
 	// If a checkpoint for this exact range doesn't exist then insert it now.
@@ -142,7 +137,7 @@ func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence F
 		fence.KeyBegin,
 		fence.KeyEnd,
 		fence.Fence,
-		base64.StdEncoding.EncodeToString(fence.Checkpoint),
+		fence.Checkpoint,
 	); err != nil {
 		return Fence{}, fmt.Errorf("inserting fence: %w", err)
 	}
@@ -173,7 +168,7 @@ func StdUpdateFence(ctx context.Context, txn *sql.Tx, checkpoints Table, fence F
 		fence.KeyBegin,
 		fence.KeyEnd,
 		fence.Fence,
-		base64.StdEncoding.EncodeToString(fence.Checkpoint),
+		fence.Checkpoint,
 	)
 
 	if err != nil {
