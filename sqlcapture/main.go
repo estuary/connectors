@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
@@ -45,6 +46,28 @@ type Driver struct {
 	DocumentationURL string
 
 	Connect func(ctx context.Context, name string, cfg json.RawMessage) (Database, error)
+}
+
+type prerequisitesError struct {
+	errs []error
+}
+
+func (e *prerequisitesError) Error() string {
+	if len(e.errs) == 1 {
+		return e.errs[0].Error()
+	}
+
+	var b = new(strings.Builder)
+	fmt.Fprintf(b, "multiple prerequisites missing:")
+	for _, err := range e.errs {
+		b.WriteString("\n - ")
+		b.WriteString(err.Error())
+	}
+	return b.String()
+}
+
+func (e *prerequisitesError) Unwrap() []error {
+	return e.errs
 }
 
 // Spec returns the specification definition of this driver.
@@ -111,6 +134,7 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 		return nil, err
 	}
 
+	var errs = db.SetupPrerequisites(ctx)
 	var out []*pc.ValidateResponse_Binding
 	for _, binding := range req.Bindings {
 		var res Resource
@@ -120,12 +144,20 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
 		if _, ok := discoveredTables[streamID]; !ok {
-			return nil, fmt.Errorf("could not find or access table %s", res.Stream)
+			errs = append(errs, fmt.Errorf("could not find or access table %q", streamID))
+			continue
+		}
+		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
+			errs = append(errs, err)
+			continue
 		}
 
 		out = append(out, &pc.ValidateResponse_Binding{
 			ResourcePath: []string{res.Namespace, res.Stream},
 		})
+	}
+	if len(errs) > 0 {
+		return nil, &prerequisitesError{errs}
 	}
 	return &pc.ValidateResponse{Bindings: out}, nil
 }
@@ -190,6 +222,13 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 		return fmt.Errorf("error connecting to database: %w", err)
 	}
 	defer db.Close(ctx)
+
+	if errs := db.SetupPrerequisites(ctx); len(errs) > 0 {
+		for _, err := range errs {
+			log.Error(err)
+		}
+		log.Fatal("missing prerequisites for capture")
+	}
 
 	// Build a mapping from stream IDs to capture binding information
 	var bindings = make(map[string]*Binding)
