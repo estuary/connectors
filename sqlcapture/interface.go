@@ -128,6 +128,16 @@ type Database interface {
 	EmptySourceMetadata() SourceMetadata
 	// ShouldBackfill returns true if a given table's contents should be backfilled.
 	ShouldBackfill(streamID string) bool
+
+	// SetupPrerequisites verifies that various database requirements (things like
+	// "Is CDC enabled on this DB?" and "Does the user have replication access?")
+	// are met, and possibly attempts to perform some setup. It may return multiple
+	// errors if multiple distinct problems are identified, so that the user can be
+	// informed about all of them at once.
+	SetupPrerequisites(ctx context.Context) []error
+	// SetupTablePrerequisites is like SetupPrerequisites but for any table-specific
+	// verification or setup that needs to be performed.
+	SetupTablePrerequisites(ctx context.Context, schema, table string) error
 }
 
 // ReplicationStream represents the process of receiving change events
