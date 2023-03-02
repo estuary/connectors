@@ -93,6 +93,7 @@ jobs:
           - path: materialize-firebolt
           - path: materialize-google-pubsub
           - path: materialize-google-sheets
+          - path: materialize-mongodb
           - path: materialize-postgres
             additionalTags:
               - materialize-timescaledb
