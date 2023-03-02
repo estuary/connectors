@@ -11,10 +11,9 @@ import (
 	"text/template"
 
 	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/estuary/connectors/go/boilerplate"
+	"github.com/estuary/connectors/go/protocol"
+	sql "github.com/estuary/connectors/materialize-sql-json"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -116,14 +115,14 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-func newPostgresDriver() pm.DriverServer {
+func newPostgresDriver() boilerplate.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-postgresql",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage) (*sql.Endpoint, error) {
 			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
+			if err := protocol.UnmarshalStrict(raw, cfg); err != nil {
 				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
 			}
 
@@ -184,7 +183,7 @@ type client struct {
 	uri string
 }
 
-func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
+func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization string) (specB64, version string, err error) {
 	err = c.withDB(func(db *stdsql.DB) error {
 		specB64, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
 		return err
@@ -236,7 +235,7 @@ func newTransactor(
 	ep *sql.Endpoint,
 	fence sql.Fence,
 	bindings []sql.Table,
-) (_ pm.Transactor, err error) {
+) (_ sql.Transactor, err error) {
 	var d = &transactor{}
 	d.store.fence = fence
 
@@ -303,9 +302,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	return nil
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	var ctx = it.Context()
-
+func (d *transactor) Load(ctx context.Context, reqs <-chan protocol.LoadRequest, loaded func(protocol.LoadResponse)) error {
 	// We send SQL commands in batches to amortize network round-trips.
 	// All operations of Load run as a single transaction.
 	var batch = newPGBatch()
@@ -316,10 +313,10 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		batch.queue(nil, b.prepLoadInsertSQL)
 	}
 
-	for it.Next() {
-		var b = d.bindings[it.Binding]
+	for req := range reqs {
+		var b = d.bindings[req.Binding]
 
-		if converted, err := b.target.ConvertKey(it.Key); err != nil {
+		if converted, err := b.target.ConvertKey(req.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
 		} else {
 			batch.queueParams(nil, b.execLoadInsertSQL, converted...)
@@ -331,9 +328,6 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			}
 		}
 	}
-	if it.Err() != nil {
-		return it.Err()
-	}
 
 	var loadFn = func(rr *pgconn.ResultReader) error {
 		var fields = rr.FieldDescriptions()
@@ -343,9 +337,12 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 			if err := scanRow(d.load.conn.ConnInfo(), fields, rr.Values(), &binding, &document); err != nil {
 				return fmt.Errorf("scanning Load document: %w", err)
-			} else if err = loaded(binding, json.RawMessage(document)); err != nil {
-				return err
 			}
+
+			loaded(protocol.LoadResponse{
+				Binding: binding,
+				Doc:     json.RawMessage(document),
+			})
 		}
 		return nil
 	}
@@ -360,7 +357,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return batch.roundTrip(ctx, d.load.conn.PgConn())
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (d *transactor) Store(ctx context.Context, reqs <-chan protocol.StoreRequest) (boilerplate.StartCommitFn, error) {
 	var batch = newPGBatch()
 	batch.queue(nil, "begin;")
 
@@ -369,33 +366,33 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		batch.queue(nil, b.prepStoreUpdateSQL)
 	}
 
-	for it.Next() {
-		var b = d.bindings[it.Binding]
+	for req := range reqs {
+		var b = d.bindings[req.Binding]
 
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+		if converted, err := b.target.ConvertAll(req.Key, req.Values, req.Doc); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if it.Exists {
+		} else if req.Exists {
 			batch.queueParams(nil, b.execStoreUpdateSQL, converted...)
 		} else {
 			batch.queueParams(nil, b.execStoreInsertSQL, converted...)
 		}
 
 		if len(batch.buf) > 1024*1024 {
-			if err := batch.roundTrip(it.Context(), d.store.conn.PgConn()); err != nil {
+			if err := batch.roundTrip(ctx, d.store.conn.PgConn()); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint string, runtimeAckCh <-chan struct{}) (*protocol.StartCommitResponse, boilerplate.OpFuture) {
 		d.store.fence.Checkpoint = runtimeCheckpoint
 		var fenceUpdate strings.Builder
 		if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
+			return nil, boilerplate.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 		batch.queue(nil, fenceUpdate.String())
 
-		return nil, pf.RunAsyncOperation(func() error {
+		return nil, boilerplate.RunAsyncOperation(func() error {
 			batch.queue(nil, "deallocate prepare all;") // Cleanup prepared statements.
 			batch.queue(nil, "commit;")
 			return batch.roundTrip(ctx, d.store.conn.PgConn())
@@ -409,5 +406,5 @@ func (d *transactor) Destroy() {
 }
 
 func main() {
-	boilerplate.RunMain(newPostgresDriver())
+	boilerplate.RunMaterialization(newPostgresDriver())
 }

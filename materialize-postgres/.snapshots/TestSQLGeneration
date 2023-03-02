@@ -193,9 +193,9 @@ install_new as (
 			where (select count(*) from best_match) = 0
 	returning *
 )
-select fence, decode(checkpoint, 'base64') from install_new
+select fence, checkpoint from install_new
 union all
-select fence, decode(checkpoint, 'base64') from best_match
+select fence, checkpoint from best_match
 limit 1
 ;
 --- End Fence Install ---
