@@ -1,0 +1,2 @@
+the capture cannot run due to the following error(s):
+ - user "flow_capture" cannot read from table "test.prerequisites_ccc"
