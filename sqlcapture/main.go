@@ -53,12 +53,8 @@ type prerequisitesError struct {
 }
 
 func (e *prerequisitesError) Error() string {
-	if len(e.errs) == 1 {
-		return e.errs[0].Error()
-	}
-
 	var b = new(strings.Builder)
-	fmt.Fprintf(b, "multiple prerequisites missing:")
+	fmt.Fprintf(b, "the capture cannot run due to the following error(s):")
 	for _, err := range e.errs {
 		b.WriteString("\n - ")
 		b.WriteString(err.Error())
@@ -129,11 +125,6 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 		return nil, err
 	}
 
-	discoveredTables, err := db.DiscoverTables(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	var errs = db.SetupPrerequisites(ctx)
 	var out []*pc.ValidateResponse_Binding
 	for _, binding := range req.Bindings {
@@ -142,11 +133,6 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 
-		var streamID = JoinStreamID(res.Namespace, res.Stream)
-		if _, ok := discoveredTables[streamID]; !ok {
-			errs = append(errs, fmt.Errorf("could not find or access table %q", streamID))
-			continue
-		}
 		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
 			errs = append(errs, err)
 			continue
@@ -223,12 +209,7 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 	}
 	defer db.Close(ctx)
 
-	if errs := db.SetupPrerequisites(ctx); len(errs) > 0 {
-		for _, err := range errs {
-			log.Error(err)
-		}
-		log.Fatal("missing prerequisites for capture")
-	}
+	var errs = db.SetupPrerequisites(ctx)
 
 	// Build a mapping from stream IDs to capture binding information
 	var bindings = make(map[string]*Binding)
@@ -237,11 +218,19 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return fmt.Errorf("error parsing resource config: %w", err)
 		}
+		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
+			errs = append(errs, err)
+			continue
+		}
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
 		bindings[streamID] = &Binding{
 			Index:    uint32(idx),
 			Resource: res,
 		}
+	}
+
+	if len(errs) > 0 {
+		return &prerequisitesError{errs}
 	}
 
 	var c = Capture{
