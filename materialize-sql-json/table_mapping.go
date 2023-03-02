@@ -3,6 +3,8 @@ package sql
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/estuary/connectors/go/protocol"
 )
 
 // TablePath is a fully qualified table name (for example, with its schema).
@@ -147,11 +149,11 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 }
 
 // BuildTableShape for the indexed specification binding, which has a corresponding database Resource.
-func BuildTableShape(spec *StoredSpec, index int, resource Resource) TableShape {
+func BuildTableShape(name string, bindings []protocol.ApplyBinding, index int, resource Resource) TableShape {
 	var (
-		binding = spec.Bindings[index]
+		binding = bindings[index]
 		comment = fmt.Sprintf("Generated for materialization %s of collection %s",
-			spec.Materialization, binding.Collection.Name)
+			name, binding.Collection.Name)
 		keys, values, document = BuildProjections(binding)
 	)
 

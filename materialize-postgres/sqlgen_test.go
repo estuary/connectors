@@ -15,27 +15,27 @@ import (
 )
 
 func TestSQLGeneration(t *testing.T) {
-	var spec *sqlDriver.StoredSpec
+	var bindings []protocol.ApplyBinding
 	require.NoError(t, testsupport.CatalogExtract(t, "testdata/flow.yaml",
 		func(db *sql.DB) error {
 			var err error
-			spec, err = testsupport.BindingsFromCatalog(db, "test/sqlite")
+			bindings, err = testsupport.BindingsFromCatalog(db, "test/sqlite")
 			return err
 		}))
 
 	// TODO(whb): These keys are manually set as "nullable" for now to test the query generation
 	// with nullable keys. Once flow supports nullable keys natively, this should be cleaned up.
-	spec.Bindings[0].Collection.Projections[7].Inference.Exists = protocol.MayExist
-	spec.Bindings[0].Collection.Projections[7].Inference.Types = append(spec.Bindings[0].Collection.Projections[7].Inference.Types, "null")
-	spec.Bindings[1].Collection.Projections[2].Inference.Exists = protocol.MayExist
-	spec.Bindings[1].Collection.Projections[2].Inference.Types = append(spec.Bindings[1].Collection.Projections[2].Inference.Types, "null")
+	bindings[0].Collection.Projections[7].Inference.Exists = protocol.MayExist
+	bindings[0].Collection.Projections[7].Inference.Types = append(bindings[0].Collection.Projections[7].Inference.Types, "null")
+	bindings[1].Collection.Projections[2].Inference.Exists = protocol.MayExist
+	bindings[1].Collection.Projections[2].Inference.Types = append(bindings[1].Collection.Projections[2].Inference.Types, "null")
 
-	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
+	var shape1 = sqlDriver.BuildTableShape("first", bindings, 0, tableConfig{
 		Schema: "a-schema",
 		Table:  "target_table",
 		Delta:  false,
 	})
-	var shape2 = sqlDriver.BuildTableShape(spec, 1, tableConfig{
+	var shape2 = sqlDriver.BuildTableShape("second", bindings, 1, tableConfig{
 		Schema: "",
 		Table:  "Delta Updates",
 		Delta:  true,
