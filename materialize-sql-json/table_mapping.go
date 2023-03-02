@@ -3,9 +3,6 @@ package sql
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 // TablePath is a fully qualified table name (for example, with its schema).
@@ -18,7 +15,7 @@ type TableShape struct {
 	// The index of the binding which produced this table, or -1 if not from a binding.
 	Binding int
 	// The source Collection of the table, or empty if not sourced from a collection.
-	Source pf.Collection
+	Source string
 	// Comment for this table.
 	Comment string
 	// User-defined additional SQL to be executed transactionally with table creation.
@@ -55,12 +52,12 @@ type Column struct {
 }
 
 // ConvertKey converts a key Tuple to database parameters.
-func (t *Table) ConvertKey(key tuple.Tuple) (out []interface{}, err error) {
+func (t *Table) ConvertKey(key []interface{}) (out []interface{}, err error) {
 	return convertTuple(key, t.Keys, out)
 }
 
 // ConvertAll concerts key and values Tuples, as well as a document RawMessage into database parameters.
-func (t *Table) ConvertAll(key, values tuple.Tuple, doc json.RawMessage) (out []interface{}, err error) {
+func (t *Table) ConvertAll(key, values []interface{}, doc json.RawMessage) (out []interface{}, err error) {
 	out = make([]interface{}, 0, len(t.Keys)+len(t.Values)+1)
 	if out, err = convertTuple(key, t.Keys, out); err != nil {
 		return nil, err
@@ -79,7 +76,7 @@ func (t *Table) ConvertAll(key, values tuple.Tuple, doc json.RawMessage) (out []
 	return out, nil
 }
 
-func convertTuple(in tuple.Tuple, columns []Column, out []interface{}) ([]interface{}, error) {
+func convertTuple(in []interface{}, columns []Column, out []interface{}) ([]interface{}, error) {
 	if a, b := len(in), len(columns); a != b {
 		panic(fmt.Sprintf("len(in) is %d but len(columns) is %d", a, b))
 	}
@@ -150,18 +147,18 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 }
 
 // BuildTableShape for the indexed specification binding, which has a corresponding database Resource.
-func BuildTableShape(spec *pf.MaterializationSpec, index int, resource Resource) TableShape {
+func BuildTableShape(spec *StoredSpec, index int, resource Resource) TableShape {
 	var (
 		binding = spec.Bindings[index]
 		comment = fmt.Sprintf("Generated for materialization %s of collection %s",
-			spec.Materialization, binding.Collection.Collection)
+			spec.Materialization, binding.Collection.Name)
 		keys, values, document = BuildProjections(binding)
 	)
 
 	return TableShape{
 		Path:          resource.Path(),
 		Binding:       index,
-		Source:        binding.Collection.Collection,
+		Source:        binding.Collection.Name,
 		Comment:       comment,
 		AdditionalSql: resource.GetAdditionalSql(),
 		DeltaUpdates:  resource.DeltaUpdates(),
