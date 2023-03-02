@@ -128,7 +128,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.DiscoverResponse_B
 			"namespace": table.Schema,
 			"columns":   table.Columns,
 			"schema":    string(rawSchema),
-		}).Debug("translated table schema")
+		}).Trace("translated table schema")
 
 		var keyPointers []string
 		for _, colName := range table.PrimaryKey {
