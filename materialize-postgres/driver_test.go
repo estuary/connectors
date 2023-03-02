@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-json"
 )
 
 func TestFencingCases(t *testing.T) {

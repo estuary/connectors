@@ -1,5 +1,6 @@
 {
-  "endpoint_spec_schema_json": {
+  "documentationUrl": "https://go.estuary.dev/materialize-postgresql",
+  "configSchema": {
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-postgres/config",
     "properties": {
@@ -76,7 +77,7 @@
     ],
     "title": "SQL Connection"
   },
-  "resource_spec_schema_json": {
+  "resourceConfigSchema": {
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-postgres/table-config",
     "properties": {
@@ -109,6 +110,5 @@
       "table"
     ],
     "title": "SQL Table"
-  },
-  "documentation_url": "https://go.estuary.dev/materialize-postgresql"
+  }
 }

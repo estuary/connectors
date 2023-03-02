@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-json"
 )
 
 var pgDialect = func() sql.Dialect {
@@ -12,8 +12,8 @@ var pgDialect = func() sql.Dialect {
 		sql.INTEGER: sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
 		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
 		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
-		sql.OBJECT:  sql.NewStaticMapper("JSON"),
-		sql.ARRAY:   sql.NewStaticMapper("JSON"),
+		sql.OBJECT:  sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
+		sql.ARRAY:   sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.BINARY:  sql.NewStaticMapper("BYTEA"),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("TEXT"),
@@ -200,7 +200,7 @@ with
 update_covered as (
 	update {{ Identifier $.TablePath }}
 		set   fence = fence + 1
-		where materialization = {{ Literal $.Materialization.String }}
+		where materialization = {{ Literal $.Materialization }}
 		and   key_end >= {{ $.KeyBegin }}
 		and   key_begin <= {{ $.KeyEnd }}
 	returning *
@@ -208,7 +208,7 @@ update_covered as (
 -- Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
 best_match as (
 	select materialization, key_begin, key_end, fence, checkpoint from update_covered
-		where materialization = {{ Literal $.Materialization.String }}
+		where materialization = {{ Literal $.Materialization }}
 		and 	key_begin <= {{ $.KeyBegin }}
 		and   key_end >= {{ $.KeyEnd }}
 		order by key_end - key_begin asc
@@ -218,17 +218,17 @@ best_match as (
 install_new as (
 	insert into {{ Identifier $.TablePath }} (materialization, key_begin, key_end, fence, checkpoint)
 		-- Case: best_match is a non-empty covering span but not an exact match
-		select {{ Literal $.Materialization.String }}, {{ $.KeyBegin}}, {{ $.KeyEnd }}, fence, checkpoint
+		select {{ Literal $.Materialization }}, {{ $.KeyBegin}}, {{ $.KeyEnd }}, fence, checkpoint
 			from best_match where key_begin != {{ $.KeyBegin }} or key_end != {{ $.KeyEnd }}
 		union all
 		-- Case: best_match is empty
-		select {{ Literal $.Materialization.String }}, {{ $.KeyBegin}}, {{ $.KeyEnd }}, {{ $.Fence }}, {{ Literal (Base64Std $.Checkpoint) }}
+		select {{ Literal $.Materialization }}, {{ $.KeyBegin}}, {{ $.KeyEnd }}, {{ $.Fence }}, {{ Literal $.Checkpoint }}
 			where (select count(*) from best_match) = 0
 	returning *
 )
-select fence, decode(checkpoint, 'base64') from install_new
+select fence, checkpoint from install_new
 union all
-select fence, decode(checkpoint, 'base64') from best_match
+select fence, checkpoint from best_match
 limit 1
 ;
 {{ end }}
@@ -237,8 +237,8 @@ limit 1
 DO $$
 BEGIN
 	UPDATE {{ Identifier $.TablePath }}
-		SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
-		WHERE materialization = {{ Literal $.Materialization.String }}
+		SET   checkpoint = {{ Literal $.Checkpoint }}
+		WHERE materialization = {{ Literal $.Materialization }}
 		AND   key_begin = {{ $.KeyBegin }}
 		AND   key_end   = {{ $.KeyEnd }}
 		AND   fence     = {{ $.Fence }};
