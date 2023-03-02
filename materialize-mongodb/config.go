@@ -59,11 +59,16 @@ func (c *config) ToURI() string {
 type resource struct {
 	Database   string `json:"database" jsonschema=title=Database name"`
 	Collection string `json:"collection" jsonschema:"title=Collection name"`
+	DeltaUpdates bool `json:"delta_updates,omitempty" jsonschema:"title=Delta updates,default=false"`
 }
 
 func (r resource) Validate() error {
 	if r.Collection == "" {
 		return fmt.Errorf("collection is required")
+	}
+
+	if r.Database == "" {
+		return fmt.Errorf("database is required")
 	}
 	return nil
 }
