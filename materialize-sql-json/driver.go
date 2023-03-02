@@ -52,15 +52,15 @@ func (d *Driver) Spec(ctx context.Context, req protocol.SpecRequest) (*protocol.
 
 func (d *Driver) Validate(ctx context.Context, req protocol.ValidateRequest) (*protocol.ValidateResponse, error) {
 	var (
-		err        error
-		endpoint   *Endpoint
-		loadedSpec *StoredSpec
-		resp       = new(protocol.ValidateResponse)
+		err            error
+		endpoint       *Endpoint
+		loadedBindings []protocol.ApplyBinding
+		resp           = new(protocol.ValidateResponse)
 	)
 
 	if endpoint, err = d.NewEndpoint(ctx, req.Config); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if loadedSpec, _, err = loadSpec(ctx, endpoint, req.Name); err != nil {
+	} else if loadedBindings, _, err = loadBindings(ctx, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
 
@@ -70,7 +70,7 @@ func (d *Driver) Validate(ctx context.Context, req protocol.ValidateRequest) (*p
 			endpoint,
 			bindingSpec.ResourceConfig,
 			bindingSpec.Collection,
-			loadedSpec,
+			loadedBindings,
 		)
 		if err != nil {
 			return nil, err
@@ -97,23 +97,18 @@ func (d *Driver) Apply(ctx context.Context, req protocol.ApplyRequest) (*protoco
 	}
 
 	var (
-		endpoint      *Endpoint
-		loadedSpec    *StoredSpec
-		loadedVersion string
-		specBytes     []byte
-		err           error
+		endpoint         *Endpoint
+		loadedBindings   []protocol.ApplyBinding
+		loadedVersion    string
+		reqBindingsBytes []byte
+		err              error
 	)
-
-	applyReq := StoredSpec{
-		Materialization: req.Name,
-		Bindings:        req.Bindings,
-	}
 
 	if endpoint, err = d.NewEndpoint(ctx, req.Config); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if loadedSpec, loadedVersion, err = loadSpec(ctx, endpoint, req.Name); err != nil {
+	} else if loadedBindings, loadedVersion, err = loadBindings(ctx, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
-	} else if specBytes, err = json.Marshal(applyReq); err != nil {
+	} else if reqBindingsBytes, err = json.Marshal(req.Bindings); err != nil {
 		panic(err) // Cannot fail to marshal.
 	}
 
@@ -138,13 +133,10 @@ func (d *Driver) Apply(ctx context.Context, req protocol.ApplyRequest) (*protoco
 			endpoint,
 			bindingSpec.ResourceConfig,
 			bindingSpec.Collection,
-			loadedSpec,
+			loadedBindings,
 		)
 
-		var tableShape = BuildTableShape(&StoredSpec{
-			Materialization: req.Name,
-			Bindings:        req.Bindings,
-		}, bindingIndex, resource)
+		var tableShape = BuildTableShape(req.Name, req.Bindings, bindingIndex, resource)
 
 		if err != nil {
 			return nil, err
@@ -214,10 +206,10 @@ func (d *Driver) Apply(ctx context.Context, req protocol.ApplyRequest) (*protoco
 	var args = []interface{}{
 		endpoint.Identifier(endpoint.MetaSpecs.Path...),
 		endpoint.Literal(req.Version),
-		endpoint.Literal(base64.StdEncoding.EncodeToString(specBytes)),
+		endpoint.Literal(base64.StdEncoding.EncodeToString(reqBindingsBytes)),
 		endpoint.Literal(req.Name),
 	}
-	if loadedSpec == nil {
+	if loadedBindings == nil {
 		statements = append(statements, fmt.Sprintf(
 			"INSERT INTO %[1]s (version, spec, materialization) VALUES (%[2]s, %[3]s, %[4]s);", args...))
 	} else {
@@ -237,15 +229,15 @@ func (d *Driver) Apply(ctx context.Context, req protocol.ApplyRequest) (*protoco
 
 func (d *Driver) applyDelete(ctx context.Context, req protocol.ApplyRequest) (*protocol.ApplyResponse, error) {
 	var (
-		endpoint      *Endpoint
-		loadedSpec    *StoredSpec
-		loadedVersion string
-		err           error
+		endpoint       *Endpoint
+		loadedBindings []protocol.ApplyBinding
+		loadedVersion  string
+		err            error
 	)
 
 	if endpoint, err = d.NewEndpoint(ctx, req.Config); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if loadedSpec, loadedVersion, err = loadSpec(ctx, endpoint, req.Name); err != nil {
+	} else if loadedBindings, loadedVersion, err = loadBindings(ctx, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
 	} else if loadedVersion == "" {
 		return &protocol.ApplyResponse{
@@ -275,10 +267,10 @@ func (d *Driver) applyDelete(ctx context.Context, req protocol.ApplyRequest) (*p
 	}
 
 	// Drop all bound tables.
-	for _, bindingSpec := range loadedSpec.Bindings {
+	for _, binding := range loadedBindings {
 		statements = append(statements, fmt.Sprintf(
 			"DROP TABLE IF EXISTS %s;",
-			endpoint.Identifier(bindingSpec.ResourcePath...)))
+			endpoint.Identifier(binding.ResourcePath...)))
 	}
 
 	if req.DryRun {
@@ -297,7 +289,7 @@ func (d *Driver) Open(ctx context.Context, req protocol.OpenRequest) (*protocol.
 	var endpoint, err = d.NewEndpoint(ctx, req.Config)
 	if err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if _, loadedVersion, err = loadSpec(ctx, endpoint, req.Name); err != nil {
+	} else if _, loadedVersion, err = loadBindings(ctx, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
 	} else if loadedVersion == "" {
 		return nil, fmt.Errorf("materialization has not been applied")
@@ -314,10 +306,7 @@ func (d *Driver) Open(ctx context.Context, req protocol.OpenRequest) (*protocol.
 		if err := protocol.UnmarshalStrict(binding.ResourceConfig, resource); err != nil {
 			return nil, fmt.Errorf("resource binding for collection %q: %w", binding.Collection.Name, err)
 		}
-		var shape = BuildTableShape(&StoredSpec{
-			Materialization: req.Name,
-			Bindings:        req.Bindings,
-		}, index, resource)
+		var shape = BuildTableShape(req.Name, req.Bindings, index, resource)
 
 		if table, err := ResolveTable(shape, endpoint.Dialect); err != nil {
 			return nil, err

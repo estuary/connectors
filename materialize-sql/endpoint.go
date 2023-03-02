@@ -82,7 +82,7 @@ type Endpoint struct {
 	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table) (pm.Transactor, error)
 }
 
-// loadSpec loads the named MaterializationSpec and its version that's stored within the Endpoint, if any.
+// loadBindings loads the named MaterializationSpec and its version that's stored within the Endpoint, if any.
 func loadSpec(ctx context.Context, endpoint *Endpoint, materialization pf.Materialization) (*pf.MaterializationSpec, string, error) {
 	var (
 		err              error

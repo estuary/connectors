@@ -83,12 +83,12 @@ type Endpoint struct {
 	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table) (Transactor, error)
 }
 
-// loadSpec loads the named MaterializationSpec and its version that's stored within the Endpoint, if any.
-func loadSpec(ctx context.Context, endpoint *Endpoint, materialization string) (*StoredSpec, string, error) {
+// loadSpec loads the named materialization's bindings and its version that's stored within the Endpoint, if any.
+func loadBindings(ctx context.Context, endpoint *Endpoint, materialization string) ([]protocol.ApplyBinding, string, error) {
 	var (
 		err              error
 		metaSpecs        Table
-		spec             = new(StoredSpec)
+		loadedBindings   []protocol.ApplyBinding
 		specB64, version string
 	)
 
@@ -113,39 +113,36 @@ func loadSpec(ctx context.Context, endpoint *Endpoint, materialization string) (
 		return nil, version, fmt.Errorf("base64.Decode: %w", err)
 		// TODO(whb): Replace unmarshalCompatible with json.Unmarshal once all sql materializations
 		// have converted to JSON protocol and have re-applied all specs in the new form.
-	} else if err = unmarshalCompatible(specBytes, spec); err != nil {
+	} else if err = unmarshalCompatible(specBytes, &loadedBindings); err != nil {
 		return nil, version, fmt.Errorf("spec.Unmarshal: %w", err)
 	}
 
-	return spec, version, nil
+	return loadedBindings, version, nil
 }
 
-func unmarshalCompatible(specBytes []byte, spec *StoredSpec) error {
+func unmarshalCompatible(specBytes []byte, bindings *[]protocol.ApplyBinding) error {
 	// Try to unmarshal directly as a StoredSpec first.
-	if err := json.Unmarshal(specBytes, spec); err != nil {
+	if err := json.Unmarshal(specBytes, bindings); err != nil {
 		// We're probably dealing with a legacy protobuf spec if that didn't work.
 		protobufSpec := &pf.MaterializationSpec{}
 		if err := protobufSpec.Unmarshal(specBytes); err != nil {
 			return fmt.Errorf("unmarshaling legacy protobufSpec: %w", err)
 		}
-		*spec = StoredSpec{
-			Materialization: protobufSpec.Materialization.String(),
-			Bindings:        protocol.MaterializationSpecPbToBindings(protobufSpec),
-		}
+		*bindings = protocol.MaterializationSpecPbToBindings(protobufSpec)
 	}
 
 	return nil
 }
 
-// resolveResourceToExistingBinding identifies an existing binding of `loadedSpec`
-// which matches the parsed `resourceSpec`. It further identifies field constraints
-// of the resolved binding, and performs initial validation that the resource is
-// well-formed and is a valid transition for an existing binding (if present).
+// resolveResourceToExistingBinding identifies an existing binding which matches the parsed
+// `resourceSpec`. It further identifies field constraints of the resolved binding, and performs
+// initial validation that the resource is well-formed and is a valid transition for an existing
+// binding (if present).
 func resolveResourceToExistingBinding(
 	endpoint *Endpoint,
 	resourceSpec json.RawMessage,
 	collection protocol.CollectionSpec,
-	loadedSpec *StoredSpec,
+	loadedBindings []protocol.ApplyBinding,
 ) (
 	constraints map[string]protocol.Constraint,
 	loadedBinding *protocol.ApplyBinding,
@@ -156,7 +153,7 @@ func resolveResourceToExistingBinding(
 
 	if err = pf.UnmarshalStrict(resourceSpec, resource); err != nil {
 		err = fmt.Errorf("resource binding for collection %q: %w", collection.Name, err)
-	} else if loadedBinding, err = findBinding(resource.Path(), collection.Name, loadedSpec); err != nil {
+	} else if loadedBinding, err = findBinding(resource.Path(), collection.Name, loadedBindings); err != nil {
 	} else if loadedBinding != nil && loadedBinding.DeltaUpdates && !resource.DeltaUpdates() {
 		// We allow a binding to switch from standard => delta updates but not the other way.
 		// This is because a standard materialization is trivially a valid delta-updates
@@ -172,12 +169,12 @@ func resolveResourceToExistingBinding(
 	return
 }
 
-func findBinding(path TablePath, collection string, spec *StoredSpec) (*protocol.ApplyBinding, error) {
-	if spec == nil {
+func findBinding(path TablePath, collection string, bindings []protocol.ApplyBinding) (*protocol.ApplyBinding, error) {
+	if bindings == nil {
 		return nil, nil // Binding is trivially not found.
 	}
-	for i := range spec.Bindings {
-		var b = spec.Bindings[i]
+	for i := range bindings {
+		var b = bindings[i]
 
 		if b.Collection.Name == collection && path.equals(b.ResourcePath) {
 			return &b, nil
