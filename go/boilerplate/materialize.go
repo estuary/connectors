@@ -8,8 +8,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/estuary/connectors/go/protocol"
 	"github.com/jessevdk/go-flags"
@@ -128,7 +126,7 @@ func RunMaterialization(driver MaterializeDriver) {
 	}
 	logConfig.Configure()
 
-	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	ctx := context.Background()
 
 	if err := handleCmds(ctx, driver); err != nil {
 		log.Error(err)
@@ -248,11 +246,7 @@ func handleCmds(ctx context.Context, driver MaterializeDriver) error {
 				}()
 			}
 
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case state.loadChan <- cmd:
-			}
+			state.loadChan <- cmd
 		case protocol.FlushRequest:
 			log.Debug("received flush request")
 
@@ -266,14 +260,10 @@ func handleCmds(ctx context.Context, driver MaterializeDriver) error {
 			// Close the loadChan of the in-progress driver Load function so that it can complete.
 			close(state.loadChan)
 
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-state.loadComplete:
-				state.loadChan = nil // Prepare for the next round
+			<-state.loadComplete
+			state.loadChan = nil // Prepare for the next round
 
-				mustEmit(protocol.Flushed, protocol.FlushResponse{})
-			}
+			mustEmit(protocol.Flushed, protocol.FlushResponse{})
 		case protocol.StoreRequest:
 			log.Debug("received store request")
 
@@ -289,55 +279,47 @@ func handleCmds(ctx context.Context, driver MaterializeDriver) error {
 				}()
 			}
 
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case state.storeChan <- cmd:
-			}
+			state.storeChan <- cmd
 		case protocol.StartCommitRequest:
 			log.Debug("received startCommit request")
 
 			// Close the storeChan of the in-progress driver Store function so that it can complete.
 			close(state.storeChan)
 
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-state.storeComplete:
-				state.storeChan = nil // Prepare for the next round
+			<-state.storeComplete
+			state.storeChan = nil // Prepare for the next round
 
-				var driverCheckpoint *protocol.StartCommitResponse
-				if state.driverStartCommitFn != nil {
-					driverCheckpoint, state.driverCommitFuture = state.driverStartCommitFn(ctx, cmd.RuntimeCheckpoint, state.runtimeAck)
+			var driverCheckpoint *protocol.StartCommitResponse
+			if state.driverStartCommitFn != nil {
+				driverCheckpoint, state.driverCommitFuture = state.driverStartCommitFn(ctx, cmd.RuntimeCheckpoint, state.runtimeAck)
 
-					state.driverStartCommitFn = nil // Prepare for the next round
-				}
-
-				// As a convenience, map a nil OpFuture to a pre-resolved one so the rest of our
-				// handling can ignore the nil case.
-				if state.driverCommitFuture == nil {
-					state.driverCommitFuture = FinishedOperation(nil)
-				}
-
-				// If startCommit returned a pre-resolved error, fail-fast and don't send
-				// StartedCommit to the runtime, as `driverCheckpoint` may be invalid.
-				select {
-				case <-state.driverCommitFuture.Done():
-					if err := state.driverCommitFuture.Err(); err != nil {
-						return fmt.Errorf("driver.StartCommit: %w", err)
-					}
-				default:
-				}
-
-				if driverCheckpoint == nil {
-					driverCheckpoint = &protocol.StartCommitResponse{
-						DriverCheckpoint: json.RawMessage("{}"),
-						MergePatch:       true,
-					}
-				}
-
-				mustEmit(protocol.StartedCommit, driverCheckpoint)
+				state.driverStartCommitFn = nil // Prepare for the next round
 			}
+
+			// As a convenience, map a nil OpFuture to a pre-resolved one so the rest of our
+			// handling can ignore the nil case.
+			if state.driverCommitFuture == nil {
+				state.driverCommitFuture = FinishedOperation(nil)
+			}
+
+			// If startCommit returned a pre-resolved error, fail-fast and don't send
+			// StartedCommit to the runtime, as `driverCheckpoint` may be invalid.
+			select {
+			case <-state.driverCommitFuture.Done():
+				if err := state.driverCommitFuture.Err(); err != nil {
+					return fmt.Errorf("driver.StartCommit: %w", err)
+				}
+			default:
+			}
+
+			if driverCheckpoint == nil {
+				driverCheckpoint = &protocol.StartCommitResponse{
+					DriverCheckpoint: json.RawMessage("{}"),
+					MergePatch:       true,
+				}
+			}
+
+			mustEmit(protocol.StartedCommit, driverCheckpoint)
 		}
 	}
 
