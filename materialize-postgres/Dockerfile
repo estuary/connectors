@@ -15,12 +15,12 @@ RUN go mod download
 RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz"| tar -zx -C /usr/local/bin/
 
 # Build the connector projects we depend on.
-COPY go-schema-gen           ./go-schema-gen
-COPY materialize-boilerplate ./materialize-boilerplate
-COPY materialize-postgres    ./materialize-postgres
-COPY materialize-sql         ./materialize-sql
-COPY testsupport             ./testsupport
-COPY go-network-tunnel       ./go-network-tunnel
+COPY go-schema-gen          ./go-schema-gen
+COPY go                     ./go
+COPY materialize-postgres   ./materialize-postgres
+COPY materialize-sql-json   ./materialize-sql-json
+COPY testsupport            ./testsupport
+COPY go-network-tunnel      ./go-network-tunnel
 
 # Test and build the connector.
 RUN go test  -tags nozstd,nodb -v ./materialize-postgres/...
@@ -39,6 +39,6 @@ COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flo
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-LABEL FLOW_RUNTIME_PROTOCOL=materialize
+LABEL FLOW_RUNTIME_CODEC=json FLOW_RUNTIME_PROTOCOL=materialize
 
 ENTRYPOINT ["/connector/materialize-postgres"]
