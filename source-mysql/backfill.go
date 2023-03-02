@@ -15,7 +15,7 @@ func (db *mysqlDatabase) WriteWatermark(ctx context.Context, watermark string) e
 	var query = fmt.Sprintf(`REPLACE INTO %s (slot, watermark) VALUES (?,?);`, db.config.Advanced.WatermarksTable)
 	var results, err = db.conn.Execute(query, db.config.Advanced.NodeID, watermark)
 	if err != nil {
-		return fmt.Errorf("error upserting new watermark for slot %q: %w", db.config.Advanced.NodeID, err)
+		return fmt.Errorf("error upserting new watermark for slot %d: %w", db.config.Advanced.NodeID, err)
 	}
 	results.Close()
 	return nil
