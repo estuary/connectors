@@ -60,7 +60,7 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 					"table":  streamID,
 					"column": desc.ColumnName,
 					"desc":   desc.Description,
-				}).Debug("got column description")
+				}).Trace("got column description")
 				var description = desc.Description
 				column.Description = &description
 				info.Columns[desc.ColumnName] = column
@@ -75,7 +75,7 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 		if !ok {
 			continue
 		}
-		logrus.WithFields(logrus.Fields{"table": streamID, "key": key}).Debug("queried primary key")
+		logrus.WithFields(logrus.Fields{"table": streamID, "key": key}).Trace("queried primary key")
 		info.PrimaryKey = key
 		tableMap[streamID] = info
 	}
