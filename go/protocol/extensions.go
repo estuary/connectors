@@ -2,9 +2,11 @@ package protocol
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 
+	"github.com/estuary/flow/go/protocols/catalog"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -242,4 +244,13 @@ func inferenceStringPbToBindings(in *pf.Inference_String) *StringInference {
 		IsBase64:        in.IsBase64,
 		MaxLength:       int(in.MaxLength),
 	}
+}
+
+func BindingsFromCatalog(db *sql.DB, name string) ([]ApplyBinding, error) {
+	protobufSpec, err := catalog.LoadMaterialization(db, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return MaterializationSpecPbToBindings(protobufSpec), nil
 }

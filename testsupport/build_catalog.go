@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/estuary/connectors/go/protocol"
 	"github.com/estuary/flow/go/protocols/catalog"
 	"github.com/stretchr/testify/require"
 )
@@ -32,13 +31,4 @@ func CatalogExtract(t *testing.T, sourcePath string, fn func(*sql.DB) error) err
 	require.NoError(t, cmd.Run())
 
 	return catalog.Extract(filepath.Join(tempdir, "catalog"), fn)
-}
-
-func BindingsFromCatalog(db *sql.DB, name string) ([]protocol.ApplyBinding, error) {
-	protobufSpec, err := catalog.LoadMaterialization(db, name)
-	if err != nil {
-		return nil, err
-	}
-
-	return protocol.MaterializationSpecPbToBindings(protobufSpec), nil
 }

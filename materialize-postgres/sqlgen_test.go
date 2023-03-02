@@ -19,7 +19,7 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, testsupport.CatalogExtract(t, "testdata/flow.yaml",
 		func(db *sql.DB) error {
 			var err error
-			bindings, err = testsupport.BindingsFromCatalog(db, "test/sqlite")
+			bindings, err = protocol.BindingsFromCatalog(db, "test/sqlite")
 			return err
 		}))
 
