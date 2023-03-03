@@ -108,24 +108,21 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	log.WithField("table", streamID).Trace("activate table")
 
-	var namePattern = "<schema>_<table>"
 	// TODO(wgd): It's rather inefficient to redo the 'list instances' work every time a
 	// table gets activated.
-	var captureInstances, err = listCaptureInstances(ctx, rs.conn, namePattern)
+	var captureInstances, err = listCaptureInstances(ctx, rs.conn)
 	if err != nil {
 		return err
 	}
 
-	var instanceName = captureInstances[streamID]
-	if instanceName == "" {
-		log.WithField("stream", streamID).Debug("enabling cdc for table")
-		instanceName, err = enableTableCDC(context.Background(), rs.conn, namePattern, streamID, rs.cfg.User)
-		if err != nil {
-			log.WithField("err", err).Fatal("error enabling cdc")
-			return err
-		}
+	var instanceNames = captureInstances[streamID]
+	var instanceName string
+	if len(instanceNames) > 0 {
+		// TODO(wgd): We should support using whichever capture instance is newer, here
+		// to enable schema migrations in the recommended SQL Server way.
+		instanceName = instanceNames[0]
 	} else {
-		log.WithField("stream", streamID).Debug("cdc already enabled")
+		return fmt.Errorf("no capture instance for table %q", streamID)
 	}
 
 	var columnTypes = make(map[string]any)
@@ -419,68 +416,6 @@ func cdcGetNextLSN(ctx context.Context, conn *sql.DB, fromLSN []byte, pollTransa
 		return fromLSN, nil
 	}
 	return nextLSN, nil
-}
-
-// listCaptureInstances queries SQL Server system tables and returns a map from stream IDs
-// to the capture instance name, if a capture instance exists which matches the configured
-// naming pattern.
-func listCaptureInstances(ctx context.Context, conn *sql.DB, namePattern string) (map[string]string, error) {
-	log.Trace("listing capture instances")
-	// This query will enumerate all "capture instances" currently present, along with the
-	// schema/table names identifying the source table.
-	const query = `SELECT sch.name, tbl.name, ct.capture_instance
-	                 FROM cdc.change_tables AS ct
-					 JOIN sys.tables AS tbl ON ct.source_object_id = tbl.object_id
-					 JOIN sys.schemas AS sch ON tbl.schema_id = sch.schema_id;`
-	var rows, err = conn.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("error listing CDC instances: %w", err)
-	}
-	defer rows.Close()
-
-	// Process result rows from the above query
-	var captureInstances = make(map[string]string)
-	for rows.Next() {
-		var schemaName, tableName, instanceName string
-		if err := rows.Scan(&schemaName, &tableName, &instanceName); err != nil {
-			return nil, fmt.Errorf("error scanning result row: %w", err)
-		}
-
-		// In SQL Server, every source table may have up to two "capture instances" associated with it.
-		// If a capture instance exists which satisfies the configured naming pattern, then that's one
-		// that we should use (and thus if the pattern is "flow_<schema>_<table>" we can be fairly sure
-		// not to collide with any other uses of CDC on this database).
-		var streamID = sqlcapture.JoinStreamID(schemaName, tableName)
-		var expectedName = captureInstanceName(namePattern, schemaName, tableName)
-		log.WithFields(log.Fields{
-			"stream":   streamID,
-			"instance": instanceName,
-			"expected": expectedName,
-			"matched":  instanceName == expectedName,
-		}).Debug("discovered capture instance")
-		if instanceName == expectedName {
-			captureInstances[streamID] = instanceName
-		}
-	}
-	return captureInstances, nil
-}
-
-// enableTableCDC instructs SQL Server to activate CDC from the specified table.
-func enableTableCDC(ctx context.Context, conn *sql.DB, namePattern string, streamID string, roleName string) (string, error) {
-	var schemaName, tableName = splitStreamID(streamID)
-	var instanceName = captureInstanceName(namePattern, schemaName, tableName)
-	const query = `EXEC sys.sp_cdc_enable_table @source_schema = @p1, @source_name = @p2, @role_name = @p3, @capture_instance = @p4;`
-	if _, err := conn.ExecContext(ctx, query, schemaName, tableName, roleName, instanceName); err != nil {
-		return "", fmt.Errorf("error enabling cdc for table %q: %w", tableName, err)
-	}
-	return instanceName, nil
-}
-
-func captureInstanceName(namePattern, schemaName, tableName string) string {
-	var name = namePattern
-	name = strings.ReplaceAll(name, "<schema>", strings.ToLower(schemaName))
-	name = strings.ReplaceAll(name, "<table>", strings.ToLower(tableName))
-	return name
 }
 
 func splitStreamID(streamID string) (string, string) {
