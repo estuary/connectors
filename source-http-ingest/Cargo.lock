@@ -227,16 +227,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "connector-protocol"
-version = "0.0.0"
-source = "git+https://github.com/estuary/flow#68deaae9bdbf4792b77a3b91c15008bfd6782853"
-dependencies = [
- "schemars",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "console"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1409,7 +1399,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
- "connector-protocol",
  "doc",
  "futures",
  "http",

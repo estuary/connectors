@@ -5,7 +5,6 @@ edition = "2021"
 
 
 [dependencies]
-connector-protocol = { git = "https://github.com/estuary/flow" }
 doc = { git = "https://github.com/estuary/flow" }
 json = { git = "https://github.com/estuary/flow" }
 
