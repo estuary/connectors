@@ -81,8 +81,14 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 		constraints := make(map[string]*pm.Constraint)
 		for _, projection := range b.Collection.Projections {
 			var constraint = new(pm.Constraint)
-			constraint.Type = pm.Constraint_LOCATION_RECOMMENDED
-			constraint.Reason = "JSON fields are supported and included by default"
+			switch {
+			case projection.IsRootDocumentProjection():
+				constraint.Type = pm.Constraint_LOCATION_REQUIRED
+				constraint.Reason = "The root document must be materialized"
+			default:
+				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
+				constraint.Reason = "MongoDB only materializes the full document"
+			}
 			constraints[projection.Field] = constraint
 		}
 
