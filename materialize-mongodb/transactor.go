@@ -29,6 +29,7 @@ type binding struct {
 }
 
 type fenceRecord struct {
+	Checkpoint []byte `bson:"checkpoint"`
 	Materialization string `bson:"materialization"`
 	Fence int `bson:"fence"`
 }
@@ -121,6 +122,12 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
 		return nil, pf.RunAsyncOperation(func() error {
+			var bump = bson.D{{"$set", bson.D{{"checkpoint", runtimeCheckpoint}}}}
+			var updateOpts = options.Update()
+			if _, err = t.fenceCollection.UpdateOne(ctx, filter, bump, updateOpts); err != nil {
+				return fmt.Errorf("updating checkpoint: %w", err)
+			}
+
 			defer sess.EndSession(ctx)
 			return sess.CommitTransaction(context.Background())
 		})
