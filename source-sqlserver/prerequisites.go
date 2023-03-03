@@ -73,6 +73,8 @@ func (db *sqlserverDatabase) prerequisiteWatermarksTable(ctx context.Context) er
 		if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
 			logEntry.Info("successfully created watermarks table")
 			return nil
+		} else {
+			logEntry.WithField("err", err).Error("watermark write failed")
 		}
 	} else {
 		logEntry.WithField("err", err).Error("failed to create watermarks table")
@@ -90,10 +92,9 @@ func (db *sqlserverDatabase) prerequisiteWatermarksCaptureInstance(ctx context.C
 func (db *sqlserverDatabase) prerequisiteMaximumLSN(ctx context.Context) error {
 	// By writing a watermark here we ensure that there is at least one change event for
 	// the agent process to observe, and thus the "get max LSN" query should eventually
-	// yield a non-empty result.
-	if err := db.WriteWatermark(ctx, "dummy-value"); err != nil {
-		return fmt.Errorf("error writing to watermarks table: %w", err)
-	}
+	// yield a non-empty result. We ignore errors here, because the watermarks table
+	// prerequisite is responsible for reporting those.
+	_ = db.WriteWatermark(ctx, "dummy-value")
 
 	var maxLSN []byte
 	// Retry loop with a 1s delay between retries, in case the watermarks table
@@ -108,7 +109,7 @@ func (db *sqlserverDatabase) prerequisiteMaximumLSN(ctx context.Context) error {
 		}
 		time.Sleep(1 * time.Second)
 	}
-	return fmt.Errorf("the agent process is not running: maximum CDC LSN is currently unset")
+	return fmt.Errorf("the agent process may not be running: maximum CDC LSN is currently unset")
 }
 
 func (db *sqlserverDatabase) SetupTablePrerequisites(ctx context.Context, schema, table string) error {

@@ -23,11 +23,9 @@ GRANT SELECT ON SCHEMA :: cdc TO flow_capture;
 GO
 CREATE TABLE dbo.flow_watermarks(slot INTEGER PRIMARY KEY, watermark TEXT);
 GO
-GRANT UPDATE ON dbo.flow_watermarks TO flow_capture;
+GRANT INSERT, UPDATE ON dbo.flow_watermarks TO flow_capture;
 GO
-EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'flow_watermarks', @role_name = 'flow_capture', @capture_instance = 'dbo_flow_watermarks';
-GO
-INSERT INTO dbo.flow_watermarks VALUES (0, 'dummy-value');
+EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'flow_watermarks', @role_name = 'flow_capture';
 GO
   " | /opt/mssql-tools/bin/sqlcmd -U sa -P gf6w6dkD
   echo "[initdb] Database initialization complete!"
