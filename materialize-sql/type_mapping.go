@@ -194,6 +194,26 @@ func WithElementConverter(converter ElementConverter) StaticMapperOption {
 	}
 }
 
+// JsonBytesConverter serializes a value to raw JSON bytes for storage in an endpoint compatible
+// with JSON bytes.
+func JsonBytesConverter(te tuple.TupleElement) (interface{}, error) {
+	switch ii := te.(type) {
+	case []byte:
+		return json.RawMessage(ii), nil
+	case json.RawMessage:
+		return ii, nil
+	case nil:
+		return json.RawMessage(nil), nil
+	default:
+		bytes, err := json.Marshal(te)
+		if err != nil {
+			return nil, fmt.Errorf("could not serialize %q as json bytes: %w", te, err)
+		}
+
+		return json.RawMessage(bytes), nil
+	}
+}
+
 // StringCastConverter builds an ElementConverter from the string-handling callback. Any non-string
 // types are returned without modification. This should be used for converting fields that have a
 // string type and one additional type. The callback should convert the string into the desired type
