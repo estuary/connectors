@@ -187,10 +187,6 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 	db.conn = conn
-
-	if err := db.createWatermarksTable(ctx); err != nil {
-		return err
-	}
 	return nil
 }
 
