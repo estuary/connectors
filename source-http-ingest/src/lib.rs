@@ -1,3 +1,8 @@
+/// The connector_protocol module is just a copypasta of the `connector-protocol` crate in the flow repo.
+/// There's a number of breaking changes planned for that, and this copy/paste just insulates the connector
+/// from those anticipated changes a bit. The intent is to rip this out in favor of using a json-encoding of
+/// the protobuf message types from `capture.proto` and `flow.proto`.
+pub mod connector_protocol;
 pub mod server;
 pub mod transactor;
 
