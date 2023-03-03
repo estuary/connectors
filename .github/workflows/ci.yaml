@@ -94,6 +94,7 @@ jobs:
             additionalTags:
               - source-azure-sqlserver
           - path: materialize-bigquery
+          - path: materialize-redshift
           - path: materialize-elasticsearch
           - path: materialize-firebolt
           - path: materialize-google-pubsub
