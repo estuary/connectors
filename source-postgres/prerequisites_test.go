@@ -24,9 +24,9 @@ func TestPrerequisites(t *testing.T) {
 	tableA = strings.ToLower(tableA)
 	tableB = strings.ToLower(tableB)
 	tableC = strings.ToLower(tableC)
-	var cs = tb.CaptureSpec(t, tableA, tableB, tableC)
 
-	t.Run("validate", func(t *testing.T) {
+	t.Run("validateAB", func(t *testing.T) {
+		var cs = tb.CaptureSpec(t, tableA, tableB)
 		_, err := cs.Validate(ctx, t)
 		if err != nil {
 			cupaloy.SnapshotT(t, err.Error())
@@ -34,7 +34,21 @@ func TestPrerequisites(t *testing.T) {
 			cupaloy.SnapshotT(t, "no error")
 		}
 	})
-	t.Run("capture", func(t *testing.T) {
+	t.Run("validateABC-fails", func(t *testing.T) {
+		var cs = tb.CaptureSpec(t, tableA, tableB, tableC)
+		_, err := cs.Validate(ctx, t)
+		if err != nil {
+			cupaloy.SnapshotT(t, err.Error())
+		} else {
+			cupaloy.SnapshotT(t, "no error")
+		}
+	})
+	t.Run("captureAB", func(t *testing.T) {
+		var cs = tb.CaptureSpec(t, tableA, tableB)
+		tests.VerifiedCapture(ctx, t, cs)
+	})
+	t.Run("captureABC-fails", func(t *testing.T) {
+		var cs = tb.CaptureSpec(t, tableA, tableB, tableC)
 		tests.VerifiedCapture(ctx, t, cs)
 	})
 }
