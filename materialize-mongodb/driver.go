@@ -198,7 +198,9 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 			bindings: bindings,
 			fenceCollection: fenceCollection,
 			fence: &fence,
-		}, &pm.TransactionResponse_Opened{}, nil
+		}, &pm.TransactionResponse_Opened{
+			RuntimeCheckpoint: fence.Checkpoint,
+		}, nil
 	})
 }
 
