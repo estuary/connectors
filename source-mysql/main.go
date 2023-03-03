@@ -250,20 +250,6 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("error setting session time_zone: %w", err)
 	}
 
-	// Sanity-check binlog retention and error out if it's insufficiently long.
-	// By doing this during the Connect operation it will occur both during
-	// actual captures and when performing discovery/config validation, which
-	// is likely what we want.
-	if !db.config.Advanced.SkipBinlogRetentionCheck {
-		expiryTime, err := getBinlogExpiry(conn)
-		if err != nil {
-			return fmt.Errorf("error querying binlog expiry time: %w", err)
-		}
-		if expiryTime < minimumExpiryTime {
-			return fmt.Errorf("binlog retention period is too short (go.estuary.dev/PoMlNf): server reports %s but at least %s is required (and 30 days is preferred wherever possible)", expiryTime.String(), minimumExpiryTime.String())
-		}
-	}
-
 	return nil
 }
 
@@ -299,36 +285,6 @@ func queryTimeZone(conn *client.Conn) (*time.Location, error) {
 	return nil, fmt.Errorf("unknown or invalid time_zone %q: %w", tzName, errDatabaseTimezoneUnknown)
 }
 
-func getBinlogExpiry(conn *client.Conn) (time.Duration, error) {
-	// When running on Amazon RDS MySQL there's an RDS-specific configuration
-	// for binlog retention, so that takes precedence if it exists.
-	rdsRetentionHours, err := queryNumericVariable(conn, `SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
-	if err == nil {
-		return time.Duration(rdsRetentionHours) * time.Hour, nil
-	}
-
-	// The newer 'binlog_expire_logs_seconds' variable takes priority if it exists and is nonzero.
-	expireLogsSeconds, err := queryNumericVariable(conn, `SHOW VARIABLES LIKE 'binlog_expire_logs_seconds';`)
-	if err == nil && expireLogsSeconds > 0 {
-		return time.Duration(expireLogsSeconds * float64(time.Second)), nil
-	}
-
-	// And as the final resort we'll check 'expire_logs_days' if 'seconds' was zero or nonexistent.
-	expireLogsDays, err := queryNumericVariable(conn, `SHOW VARIABLES LIKE 'expire_logs_days';`)
-	if err != nil {
-		return 0, err
-	}
-	if expireLogsDays > 0 {
-		return time.Duration(expireLogsDays) * 24 * time.Hour, nil
-	}
-
-	// If both 'binlog_expire_logs_seconds' and 'expire_logs_days' are set to zero
-	// MySQL will not automatically purge binlog segments. For simplicity we just
-	// represent that as a 'one year' expiry time, since all we need the value for
-	// is to make sure it's not too short.
-	return 365 * 24 * time.Hour, nil
-}
-
 func queryStringVariable(conn *client.Conn, query string) (string, error) {
 	var results, err = conn.Execute(query)
 	if err != nil {
@@ -342,35 +298,6 @@ func queryStringVariable(conn *client.Conn, query string) (string, error) {
 		return string(value.AsString()), nil
 	}
 	return fmt.Sprintf("%s", value.Value()), nil
-}
-
-func queryNumericVariable(conn *client.Conn, query string) (float64, error) {
-	var results, err = conn.Execute(query)
-	if err != nil {
-		return 0, fmt.Errorf("error executing query %q: %w", query, err)
-	}
-	if len(results.Values) == 0 {
-		return 0, fmt.Errorf("no results from query %q", query)
-	}
-
-	// Return the second column of the first row. It has to be the second
-	// column because that's how the `SHOW VARIABLES LIKE` query does it.
-	var value = &results.Values[0][1]
-	switch value.Type {
-	case mysql.FieldValueTypeNull:
-		return 0, nil
-	case mysql.FieldValueTypeString:
-		var n, err = strconv.ParseFloat(string(value.AsString()), 64)
-		if err != nil {
-			return 0, fmt.Errorf("couldn't parse string value as number: %w", err)
-		}
-		return n, nil
-	case mysql.FieldValueTypeUnsigned:
-		return float64(value.AsUint64()), nil
-	case mysql.FieldValueTypeSigned:
-		return float64(value.AsInt64()), nil
-	}
-	return value.AsFloat64(), nil
 }
 
 func (db *mysqlDatabase) Close(ctx context.Context) error {
