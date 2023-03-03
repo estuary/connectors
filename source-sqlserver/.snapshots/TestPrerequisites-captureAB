@@ -1,0 +1,10 @@
+# ================================
+# Collection "dbo.test_Prerequisites_aaa": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Prerequisites_aaa"}},"data":"hello","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Prerequisites_aaa"}},"data":"world","id":1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_prerequisites_aaa":{"key_columns":["id"],"mode":"Active"},"dbo.test_prerequisites_bbb":{"key_columns":["id"],"mode":"Active"}}}
+
