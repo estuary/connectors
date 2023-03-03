@@ -1,6 +1,6 @@
+use crate::connector_protocol::capture::{Request, Response};
 use crate::{read_capture_request, to_raw_value, write_capture_response};
 use anyhow::Context;
-use connector_protocol::capture::{Request, Response};
 use serde::Serialize;
 use tokio::{
     io,
