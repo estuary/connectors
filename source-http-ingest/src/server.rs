@@ -339,13 +339,28 @@ pub fn openapi_spec<'a>(
         let openapi_schema = serde_json::from_str::<openapi::Schema>(raw_schema.get())
             .context("deserializing collection schema")?;
 
-        let content = openapi::content::ContentBuilder::new()
-            .schema(openapi_schema)
-            .build();
+        let mut content_builder = openapi::content::ContentBuilder::new().schema(openapi_schema);
+
+        // As a special case, if the key of the target collection is `[/_meta/webhookId]`, then
+        // we use an empty document as the example document instead of allowing the example to
+        // be generated automatically from the JSON schema. The `/_meta/webhook`, and other values
+        // under `/_meta/` are added automatically by the connector. So it's confusing to see them
+        // in the example documents, and doubly confusing when the connector _overwrites_ the values
+        // you sent in the payload. This hack makes for a much less confusing first-time experience
+        // when using the default discovered collection. Checking the collection key is just a
+        // convenient, though imperfect, means of checking whether this binding is for the discovered
+        // "webhook-data" collection, which allows any valid JSON object by default.
+        if let Some(key_ptr) = binding.collection.key.first() {
+            if key_ptr.as_str() == "/_meta/webhookId" {
+                content_builder =
+                    content_builder.example(Some(serde_json::json!({"hello": "world!"})));
+            }
+        }
         let request_body = openapi::request_body::RequestBodyBuilder::new()
-            .content(JSON_CONTENT_TYPE, content)
+            .content(JSON_CONTENT_TYPE, content_builder.build())
             .description(Some(format!(
-                "a JSON object conforming to the write schema of the collection '{}'",
+                "a JSON object conforming to the schema of the collection '{}'. \
+                Note that '_meta' properties will be added automatically by the connector",
                 binding.collection.name
             )))
             .required(Some(openapi::Required::True)) // lol IDK why
@@ -416,4 +431,70 @@ lazy_static::lazy_static! {
         ];
         headers.iter().map(|s| axum::http::HeaderName::from_static(*s)).collect()
     };
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn openapi_spec_generation() {
+        let endpoint_config = EndpointConfig::default();
+        let binding0 = Binding {
+            collection: serde_json::from_value(serde_json::json!({
+                "name": "aliceCo/test/webhook-data",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "_meta": {
+                            "type": "object",
+                            "properties": { "webhookId": {"type": "string"}},
+                            "required": ["webhookId"]
+                        }
+                    },
+                    "required": ["_meta"]
+                },
+                "key": ["/_meta/webhookId"],
+                "partitionFields": [],
+                "projections": []
+            }))
+            .unwrap(),
+            resource_path: vec!["/aliceCo/test/webhook-data".to_string()],
+            resource_config: crate::ResourceConfig {
+                path: None,
+                id_from_header: Some("X-Webhook-Id".to_string()),
+            },
+        };
+
+        let binding1 = Binding {
+            collection: serde_json::from_value(serde_json::json!({
+                "name": "aliceCo/another/collection",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "foo": {
+                            "type": "object",
+                            "properties": { "bar": {"type": "string"}},
+                            "required": ["bar"]
+                        }
+                    },
+                    "required": ["foo"]
+                },
+                "key": ["/foo/bar"],
+                "partitionFields": [],
+                "projections": []
+            }))
+            .unwrap(),
+            resource_path: vec!["/another.json".to_string()],
+            resource_config: crate::ResourceConfig {
+                path: Some("/another.json".to_string()),
+                id_from_header: None,
+            },
+        };
+
+        let spec =
+            openapi_spec(&endpoint_config, &[binding0, binding1]).expect("failed to generate spec");
+        let json = spec.to_pretty_json().expect("failed to serialize json");
+        insta::assert_snapshot!(json);
+    }
 }
