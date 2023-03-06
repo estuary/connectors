@@ -236,20 +236,21 @@ fn discovered_webhook_collection() -> DiscoveredBinding {
             "properties": {
                 "_meta": {
                     "type": "object",
+                    "description": "These fields are automatically added by the connector, and do not need to be specified in the request body",
                     "properties": {
                         "webhookId": {
                             "type": "string",
-                            "description": "id of the webhook request"
+                            "description": "The id of the webhook request, which is automatically added by the connector"
                         },
                         "headers": {
                             "type": "object",
-                            "description": "any HTTP headers that were sent with the request. Headers that are known to be sensitive will not be included here",
+                            "description": "HTTP headers that were sent with the request will get added here. Headers that are known to be sensitive or not useful will not be included",
                             "additionalProperties": { "type": "string" }
                         },
                         "receivedAt": {
                             "type": "string",
                             "format": "date-time",
-                            "description": "timestamp of when the request was received"
+                            "description": "Timestamp of when the request was received by the connector"
                         }
                     },
                     "required": ["webhookId", "receivedAt"]
