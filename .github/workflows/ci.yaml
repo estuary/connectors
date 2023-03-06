@@ -230,7 +230,8 @@ jobs:
               "materialize-elasticsearch",
               "materialize-google-sheets",
               "materialize-postgres",
-              "materialize-s3-parquet"
+              "materialize-s3-parquet",
+              "materialize-mongodb"
             ]'), matrix.connector.path)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}

@@ -1,0 +1,10 @@
+{"id":{"$numberInt":"1"},"int":{"$numberInt":"7"},"str":"str 6"}
+{"id":{"$numberInt":"2"},"int":{"$numberInt":"9"},"str":"str 7"}
+{"id":{"$numberInt":"3"},"int":{"$numberInt":"11"},"str":"str 8"}
+{"id":{"$numberInt":"4"},"int":{"$numberInt":"13"},"str":"str 9"}
+{"id":{"$numberInt":"5"},"int":{"$numberInt":"15"},"str":"str 10"}
+{"id":{"$numberInt":"1"},"int":{"$numberInt":"7"},"str":"str 6"}
+{"id":{"$numberInt":"2"},"int":{"$numberInt":"9"},"str":"str 7"}
+{"id":{"$numberInt":"3"},"int":{"$numberInt":"11"},"str":"str 8"}
+{"id":{"$numberInt":"4"},"int":{"$numberInt":"13"},"str":"str 9"}
+{"id":{"$numberInt":"5"},"int":{"$numberInt":"15"},"str":"str 10"}
