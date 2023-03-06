@@ -380,6 +380,18 @@ pub fn openapi_spec<'a>(
                 Option::<String>::None,
             ));
         }
+        if let Some(header_name) = binding.resource_config.id_from_header.as_ref() {
+            op_builder = op_builder.parameter(
+                openapi::path::ParameterBuilder::new()
+                    .name(header_name.to_owned())
+                    .parameter_in(openapi::path::ParameterIn::Header)
+                    .required(openapi::Required::True)
+                    .description(Some(
+                        "Required header that will be bound to the /_meta/webhookId property",
+                    ))
+                    .example(Some(serde_json::json!("abcd1234"))),
+            )
+        }
         let operation = op_builder.build();
         let path_item = openapi::path::PathItemBuilder::new()
             .operation(openapi::PathItemType::Post, operation.clone())
@@ -439,7 +451,9 @@ mod test {
 
     #[test]
     fn openapi_spec_generation() {
-        let endpoint_config = EndpointConfig::default();
+        let endpoint_config = EndpointConfig {
+            require_auth_token: Some("testToken".to_string()),
+        };
         let binding0 = Binding {
             collection: serde_json::from_value(serde_json::json!({
                 "name": "aliceCo/test/webhook-data",
