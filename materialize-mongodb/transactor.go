@@ -95,12 +95,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, fmt.Errorf("bson unmarshalling json doc: %w", err)
 		}
 
-		if binding.res.DeltaUpdates == true {
-			_, err := binding.collection.InsertOne(tx, doc, options.InsertOne())
-			if err != nil {
-				return nil, fmt.Errorf("inserting document into collection %s: %w", binding.collection.Name(), err)
-			}
-		} else {
+		if it.Exists {
 			// When we specify the _id field below in the `ReplaceOne` call, the value
 			// of _id for the upserted document will be taken from there, so we can
 			// safely remove this field from the document here to avoid a conflict.
@@ -110,6 +105,11 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			_, err := binding.collection.ReplaceOne(tx, bson.D{{idField, bson.D{{"$eq", it.Key.String()}}}}, doc, opts)
 			if err != nil {
 				return nil, fmt.Errorf("upserting document into collection %s: %w", binding.collection.Name(), err)
+			}
+		} else {
+			_, err := binding.collection.InsertOne(tx, doc, options.InsertOne())
+			if err != nil {
+				return nil, fmt.Errorf("inserting document into collection %s: %w", binding.collection.Name(), err)
 			}
 		}
 	}
@@ -132,9 +132,6 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return sess.CommitTransaction(context.Background())
 		})
 	}, nil
-
-
-	return nil, nil
 }
 
 func (t *transactor) Destroy() {

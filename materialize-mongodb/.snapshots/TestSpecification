@@ -1,0 +1,63 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-mongodb/config",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Address",
+        "description": "Host and port of the database. Optionally can specify scheme for the URL such as mongodb+srv://host.",
+        "order": 0
+      },
+      "user": {
+        "type": "string",
+        "title": "User",
+        "description": "Database user to connect as.",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "description": "Password for the specified database user.",
+        "order": 2,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Name of the database to materialize to.",
+        "order": 3
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "user",
+      "password",
+      "database"
+    ],
+    "title": "Materialize MongoDB Spec"
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-mongodb/resource",
+    "properties": {
+      "collection": {
+        "type": "string",
+        "title": "Collection name",
+        "x-collection-name": true
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta updates",
+        "default": false
+      }
+    },
+    "type": "object",
+    "required": [
+      "collection"
+    ],
+    "title": "MongoDB Collection"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-mongodb"
+}
