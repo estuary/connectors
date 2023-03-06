@@ -1,0 +1,215 @@
+---
+source: src/server.rs
+expression: json
+---
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Flow HTTP ingest",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/aliceCo/test/webhook-data": {
+      "post": {
+        "description": "append a document to the flow collection",
+        "requestBody": {
+          "description": "a JSON object conforming to the schema of the collection 'aliceCo/test/webhook-data'. Note that '_meta' properties will be added automatically by the connector",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "_meta"
+                ],
+                "properties": {
+                  "_meta": {
+                    "type": "object",
+                    "required": [
+                      "webhookId"
+                    ],
+                    "properties": {
+                      "webhookId": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "hello": "world!"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/successResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/failureResponse"
+          }
+        }
+      },
+      "put": {
+        "description": "append a document to the flow collection",
+        "requestBody": {
+          "description": "a JSON object conforming to the schema of the collection 'aliceCo/test/webhook-data'. Note that '_meta' properties will be added automatically by the connector",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "_meta"
+                ],
+                "properties": {
+                  "_meta": {
+                    "type": "object",
+                    "required": [
+                      "webhookId"
+                    ],
+                    "properties": {
+                      "webhookId": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "hello": "world!"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/successResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/failureResponse"
+          }
+        }
+      }
+    },
+    "/another.json": {
+      "post": {
+        "description": "append a document to the flow collection",
+        "requestBody": {
+          "description": "a JSON object conforming to the schema of the collection 'aliceCo/another/collection'. Note that '_meta' properties will be added automatically by the connector",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "foo"
+                ],
+                "properties": {
+                  "foo": {
+                    "type": "object",
+                    "required": [
+                      "bar"
+                    ],
+                    "properties": {
+                      "bar": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/successResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/failureResponse"
+          }
+        }
+      },
+      "put": {
+        "description": "append a document to the flow collection",
+        "requestBody": {
+          "description": "a JSON object conforming to the schema of the collection 'aliceCo/another/collection'. Note that '_meta' properties will be added automatically by the connector",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "foo"
+                ],
+                "properties": {
+                  "foo": {
+                    "type": "object",
+                    "required": [
+                      "bar"
+                    ],
+                    "properties": {
+                      "bar": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/successResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/failureResponse"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "failureResponse": {
+        "description": "",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              }
+            },
+            "example": {
+              "error": "missing required header 'X-Webhook-Id'"
+            }
+          }
+        }
+      },
+      "successResponse": {
+        "description": "",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "published": {
+                  "type": "integer"
+                }
+              }
+            },
+            "example": {
+              "published": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}
