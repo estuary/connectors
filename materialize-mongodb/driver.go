@@ -96,7 +96,7 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 
 		out = append(out, &pm.ValidateResponse_Binding{
 			Constraints:  constraints,
-			DeltaUpdates: false,
+			DeltaUpdates: res.DeltaUpdates,
 			ResourcePath: resourcePath,
 		})
 	}
