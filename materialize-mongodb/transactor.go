@@ -94,14 +94,14 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		if err := json.Unmarshal(it.RawJSON, &doc); err != nil {
 			return nil, fmt.Errorf("bson unmarshalling json doc: %w", err)
 		}
+		// In case of delta updates, we don't want to set the _id. We want
+		// MongoDB to generate a new _id for each record we insert
+		if !binding.res.DeltaUpdates {
+			doc[idField] = it.Key.String()
+		}
 
 		if it.Exists {
-			// When we specify the _id field below in the `ReplaceOne` call, the value
-			// of _id for the upserted document will be taken from there, so we can
-			// safely remove this field from the document here to avoid a conflict.
-			delete(doc, idField)
-
-			var opts = options.Replace().SetUpsert(true)
+			var opts = options.Replace()
 			_, err := binding.collection.ReplaceOne(tx, bson.D{{idField, bson.D{{"$eq", it.Key.String()}}}}, doc, opts)
 			if err != nil {
 				return nil, fmt.Errorf("upserting document into collection %s: %w", binding.collection.Name(), err)
