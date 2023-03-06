@@ -75,6 +75,7 @@ jobs:
           - path: source-gcs
           - path: source-hello-world
           - path: source-http-file
+          - path: source-http-ingest
           - path: source-test
           - path: source-firestore
           - path: source-kafka
