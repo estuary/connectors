@@ -14,7 +14,11 @@ use connector_protocol::{
     },
     CollectionSpec, RawValue,
 };
-use schemars::{schema::RootSchema, JsonSchema};
+use schemars::{
+    gen,
+    schema::{self, RootSchema},
+    JsonSchema,
+};
 use serde::{Deserialize, Serialize};
 use tokio::io::{self, AsyncBufReadExt};
 
@@ -26,7 +30,16 @@ pub struct EndpointConfig {
     /// WARNING: If this is empty or unset, then anyone who knows the URL of the connector
     /// will be able to write data to your collections.
     #[serde(default)]
+    #[schemars(schema_with = "require_auth_token_schema")]
     require_auth_token: Option<String>,
+}
+
+fn require_auth_token_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
+    serde_json::from_value(serde_json::json!({
+        "type": ["string", "null"],
+        "secret": true,
+    }))
+    .unwrap()
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Default)]

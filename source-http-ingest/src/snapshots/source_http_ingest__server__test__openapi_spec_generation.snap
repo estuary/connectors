@@ -12,6 +12,15 @@ expression: json
     "/aliceCo/test/webhook-data": {
       "post": {
         "description": "append a document to the flow collection",
+        "parameters": [
+          {
+            "name": "X-Webhook-Id",
+            "in": "header",
+            "description": "Required header that will be bound to the /_meta/webhookId property",
+            "required": true,
+            "example": "abcd1234"
+          }
+        ],
         "requestBody": {
           "description": "a JSON object conforming to the schema of the collection 'aliceCo/test/webhook-data'. Note that '_meta' properties will be added automatically by the connector",
           "content": {
@@ -49,10 +58,24 @@ expression: json
           "400": {
             "$ref": "#/components/responses/failureResponse"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "put": {
         "description": "append a document to the flow collection",
+        "parameters": [
+          {
+            "name": "X-Webhook-Id",
+            "in": "header",
+            "description": "Required header that will be bound to the /_meta/webhookId property",
+            "required": true,
+            "example": "abcd1234"
+          }
+        ],
         "requestBody": {
           "description": "a JSON object conforming to the schema of the collection 'aliceCo/test/webhook-data'. Note that '_meta' properties will be added automatically by the connector",
           "content": {
@@ -90,7 +113,12 @@ expression: json
           "400": {
             "$ref": "#/components/responses/failureResponse"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/another.json": {
@@ -130,7 +158,12 @@ expression: json
           "400": {
             "$ref": "#/components/responses/failureResponse"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "put": {
         "description": "append a document to the flow collection",
@@ -168,7 +201,12 @@ expression: json
           "400": {
             "$ref": "#/components/responses/failureResponse"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     }
   },
@@ -209,6 +247,12 @@ expression: json
             }
           }
         }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
       }
     }
   }
