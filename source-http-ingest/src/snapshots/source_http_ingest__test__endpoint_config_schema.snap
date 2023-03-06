@@ -13,7 +13,8 @@ expression: schema
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "secret": true
     }
   }
 }
