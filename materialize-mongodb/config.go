@@ -7,10 +7,10 @@ import (
 )
 
 type config struct {
-	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database." jsonschema_extras:"order=0"`
+	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database. Optionally can specify scheme for the URL such as mongodb+srv://host." jsonschema_extras:"order=0"`
 	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string `json:"database" jsonschema:"title=Database,description=Name of the database to capture from." jsonschema_extras:"order=3"`
+	Database string `json:"database" jsonschema:"title=Database,description=Name of the database to materialize to." jsonschema_extras:"order=3"`
 }
 
 func (c *config) Validate() error {
@@ -29,7 +29,7 @@ func (c *config) Validate() error {
 	var uri, err = url.Parse(c.Address)
 	// mongodb+srv:// urls do not support port
 	if err == nil && uri.Scheme == "mongodb+srv" && uri.Port() != "" {
-		return fmt.Errorf("`mongodb+srv://` addresses do not support specifying the port.")
+		return fmt.Errorf("`mongodb+srv://` addresses do not support specifying the port")
 	}
 
 	return nil
@@ -57,18 +57,13 @@ func (c *config) ToURI() string {
 }
 
 type resource struct {
-	Database   string `json:"database" jsonschema=title=Database name"`
-	Collection string `json:"collection" jsonschema:"title=Collection name"`
+	Collection string `json:"collection" jsonschema:"title=Collection name" jsonschema_extras:"x-collection-name=true"`
 	DeltaUpdates bool `json:"delta_updates,omitempty" jsonschema:"title=Delta updates,default=false"`
 }
 
 func (r resource) Validate() error {
 	if r.Collection == "" {
 		return fmt.Errorf("collection is required")
-	}
-
-	if r.Database == "" {
-		return fmt.Errorf("database is required")
 	}
 	return nil
 }
