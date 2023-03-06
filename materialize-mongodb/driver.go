@@ -19,7 +19,7 @@ import (
 // driver implements the DriverServer interface.
 type driver struct{}
 
-func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error) {
+func (d *driver) connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	// Create a new client and connect to the server
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.ToURI()))
 	if err != nil {
@@ -64,7 +64,7 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 		return nil, err
 	}
 
-	_, err = d.Connect(ctx, cfg)
+	_, err = d.connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
 	}
@@ -92,7 +92,7 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 			constraints[projection.Field] = constraint
 		}
 
-		resourcePath := []string{res.Database, res.Collection}
+		resourcePath := []string{cfg.Database, res.Collection}
 
 		out = append(out, &pm.ValidateResponse_Binding{
 			Constraints:  constraints,
@@ -116,7 +116,7 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		return nil, err
 	}
 
-	_, err = d.Connect(ctx, cfg)
+	_, err = d.connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
 	}
@@ -138,7 +138,7 @@ func (d driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		return nil, err
 	}
 
-	_, err = d.Connect(ctx, cfg)
+	_, err = d.connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
 	}
@@ -156,7 +156,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 			return nil, nil, err
 		}
 
-		client, err := d.Connect(ctx, cfg)
+		client, err := d.connect(ctx, cfg)
 		if err != nil {
 			return nil, nil, fmt.Errorf("connecting to database: %w", err)
 		}
@@ -167,7 +167,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 			if err != nil {
 				return nil, nil, err
 			}
-			var collection = client.Database(res.Database).Collection(res.Collection)
+			var collection = client.Database(cfg.Database).Collection(res.Collection)
 
 			bindings = append(bindings, &binding{
 				collection: collection,
@@ -226,10 +226,6 @@ func resolveResourceConfig(specJson json.RawMessage) (resource, error) {
 	}
 
 	return res, nil
-}
-
-func resourceId(res resource) string {
-	return fmt.Sprintf("%s.%s", res.Database, res.Collection)
 }
 
 func main() {
