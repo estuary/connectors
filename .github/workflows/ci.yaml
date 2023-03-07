@@ -12,7 +12,7 @@ on:
 
 jobs:
   build_base_image:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
     steps:
@@ -65,7 +65,7 @@ jobs:
           tags: ghcr.io/estuary/base-image:dev,ghcr.io/estuary/base-image:${{ steps.prep.outputs.version }}
 
   build_connectors:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: build_base_image
     strategy:
       fail-fast: false
