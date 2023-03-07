@@ -239,22 +239,11 @@ func (c *alpacaWorker) doBackfill(ctx context.Context, startLimit, endLimit time
 
 		docsChan := make(chan tradeDocument)
 
-		// TODO(whb): This is a temporary hack to handle a long-running backfill. Data doesn't start
-		// until 2016.
-		minCheckpointDate := func(t time.Time) time.Time {
-			minTime, _ := time.Parse(time.RFC3339Nano, "2016-01-01T00:00:00Z")
-			if t.Before(minTime) {
-				return minTime
-			} else {
-				return t
-			}
-		}
-
 		eg := errgroup.Group{}
 		eg.Go(func() error {
 			checkpoint := captureState{
 				BackfilledUntil: map[string]time.Time{
-					c.resourceName: minCheckpointDate(end),
+					c.resourceName: end,
 				},
 			}
 
