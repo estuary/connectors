@@ -259,7 +259,9 @@ jobs:
 
       - name: Install psql
         if: ${{ github.event_name == 'push' }}
-        run: sudo apt install postgresql
+        run: |
+          sudo apt update
+          sudo apt install postgresql
 
       - name: Refresh connector tags for ${{ matrix.connector.path }}
         if: ${{ github.event_name == 'push' }}
