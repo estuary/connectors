@@ -109,9 +109,13 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 		return new(pm.ApplyResponse), nil
 	}
 
-	// The Materialization specifications meta table is always required.
+	// The Materialization specifications meta table is almost always requied.
+	// It is only not required if the database is ephemeral (i.e. sqlite).
 	// The Checkpoints table is optional; include it if set by the Endpoint.
-	var tableShapes = []TableShape{endpoint.MetaSpecs}
+	var tableShapes = []TableShape{}
+	if endpoint.MetaSpecs != nil {
+		tableShapes = append(tableShapes, *endpoint.MetaSpecs)
+	}
 	if endpoint.MetaCheckpoints != nil {
 		tableShapes = append(tableShapes, *endpoint.MetaCheckpoints)
 	}
@@ -193,19 +197,21 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 		}
 	}
 
-	// Insert or update the materialization specification.
-	var args = []interface{}{
-		endpoint.Identifier(endpoint.MetaSpecs.Path...),
-		endpoint.Literal(req.Version),
-		endpoint.Literal(base64.StdEncoding.EncodeToString(specBytes)),
-		endpoint.Literal(req.Materialization.Materialization.String()),
-	}
-	if loadedSpec == nil {
-		statements = append(statements, fmt.Sprintf(
-			"INSERT INTO %[1]s (version, spec, materialization) VALUES (%[2]s, %[3]s, %[4]s);", args...))
-	} else {
-		statements = append(statements, fmt.Sprintf(
-			"UPDATE %[1]s SET version = %[2]s, spec = %[3]s WHERE materialization = %[4]s;", args...))
+	if endpoint.MetaSpecs != nil {
+		// Insert or update the materialization specification.
+		var args = []interface{}{
+			endpoint.Identifier(endpoint.MetaSpecs.Path...),
+			endpoint.Literal(req.Version),
+			endpoint.Literal(base64.StdEncoding.EncodeToString(specBytes)),
+			endpoint.Literal(req.Materialization.Materialization.String()),
+		}
+		if loadedSpec == nil {
+			statements = append(statements, fmt.Sprintf(
+				"INSERT INTO %[1]s (version, spec, materialization) VALUES (%[2]s, %[3]s, %[4]s);", args...))
+		} else {
+			statements = append(statements, fmt.Sprintf(
+				"UPDATE %[1]s SET version = %[2]s, spec = %[3]s WHERE materialization = %[4]s;", args...))
+		}
 	}
 
 	if req.DryRun {
@@ -245,13 +251,16 @@ func (d *Driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 
 	var materialization = req.Materialization.Materialization.String()
 
+	var statements = []string{}
 	// Delete the materialization from the specs metadata table,
 	// and also the checkpoints table if it exists.
-	var statements = []string{
-		fmt.Sprintf("DELETE FROM %s WHERE materialization = %s AND version = %s;",
-			endpoint.Identifier(endpoint.MetaSpecs.Path...),
-			endpoint.Literal(materialization),
-			endpoint.Literal(req.Version)),
+	if endpoint.MetaSpecs != nil {
+		statements = append(statements,
+			fmt.Sprintf("DELETE FROM %s WHERE materialization = %s AND version = %s;",
+				endpoint.Identifier(endpoint.MetaSpecs.Path...),
+				endpoint.Literal(materialization),
+				endpoint.Literal(req.Version)),
+			)
 	}
 	if endpoint.MetaCheckpoints != nil {
 		statements = append(statements,
@@ -287,16 +296,19 @@ func (d *Driver) newTransactor(ctx context.Context, open pm.TransactionRequest_O
 	var loadedVersion string
 
 	var endpoint, err = d.NewEndpoint(ctx, open.Materialization.EndpointSpecJson)
-	if err != nil {
-		return nil, nil, fmt.Errorf("building endpoint: %w", err)
-	} else if _, loadedVersion, err = loadSpec(ctx, endpoint, open.Materialization.Materialization); err != nil {
-		return nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
-	} else if loadedVersion == "" {
-		return nil, nil, fmt.Errorf("materialization has not been applied")
-	} else if loadedVersion != open.Version {
-		return nil, nil, fmt.Errorf(
-			"applied and current materializations are different versions (applied: %s vs current: %s)",
-			loadedVersion, open.Version)
+
+	if endpoint.MetaSpecs != nil {
+		if err != nil {
+			return nil, nil, fmt.Errorf("building endpoint: %w", err)
+		} else if _, loadedVersion, err = loadSpec(ctx, endpoint, open.Materialization.Materialization); err != nil {
+			return nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
+		} else if loadedVersion == "" {
+			return nil, nil, fmt.Errorf("materialization has not been applied")
+		} else if loadedVersion != open.Version {
+			return nil, nil, fmt.Errorf(
+				"applied and current materializations are different versions (applied: %s vs current: %s)",
+				loadedVersion, open.Version)
+		}
 	}
 
 	var tables []Table

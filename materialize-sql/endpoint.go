@@ -63,7 +63,7 @@ type Endpoint struct {
 	// Dialect of the Endpoint.
 	Dialect
 	// MetaSpecs is the specification meta-table of the Endpoint.
-	MetaSpecs TableShape
+	MetaSpecs *TableShape
 	// MetaCheckpoints is the checkpoints meta-table of the Endpoint.
 	// It's optional, and won't be created or used if it's nil.
 	MetaCheckpoints *TableShape
@@ -91,7 +91,10 @@ func loadSpec(ctx context.Context, endpoint *Endpoint, materialization pf.Materi
 		specB64, version string
 	)
 
-	if metaSpecs, err = ResolveTable(endpoint.MetaSpecs, endpoint.Dialect); err != nil {
+	if endpoint.MetaSpecs == nil {
+		return nil, "", nil
+	}
+	if metaSpecs, err = ResolveTable(*endpoint.MetaSpecs, endpoint.Dialect); err != nil {
 		return nil, "", fmt.Errorf("resolving specifications table: %w", err)
 	}
 	specB64, version, err = endpoint.Client.FetchSpecAndVersion(ctx, metaSpecs, materialization)
