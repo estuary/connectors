@@ -158,7 +158,7 @@ func newSnowflakeDriver() *sql.Driver {
 			return &sql.Endpoint{
 				Config:                      parsed,
 				Dialect:                     snowflakeDialect,
-				MetaSpecs:                   metaSpecs,
+				MetaSpecs:                   &metaSpecs,
 				MetaCheckpoints:             &metaCheckpoints,
 				Client:                      client{uri: dsn},
 				CreateTableTemplate:         tplCreateTargetTable,

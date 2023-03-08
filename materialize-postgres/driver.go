@@ -167,7 +167,7 @@ func newPostgresDriver() pm.DriverServer {
 			return &sql.Endpoint{
 				Config:                      cfg,
 				Dialect:                     pgDialect,
-				MetaSpecs:                   metaSpecs,
+				MetaSpecs:                   &metaSpecs,
 				MetaCheckpoints:             &metaCheckpoints,
 				Client:                      client{uri: cfg.ToURI()},
 				CreateTableTemplate:         tplCreateTargetTable,

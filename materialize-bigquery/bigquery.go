@@ -170,7 +170,7 @@ func newBigQueryDriver() pm.DriverServer {
 			return &sql.Endpoint{
 				Config:                      cfg,
 				Dialect:                     bqDialect,
-				MetaSpecs:                   metaSpecs,
+				MetaSpecs:                   &metaSpecs,
 				MetaCheckpoints:             &metaCheckpoints,
 				Client:                      client,
 				CreateTableTemplate:         tplCreateTargetTable,
