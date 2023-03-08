@@ -11,6 +11,9 @@ import (
 const (
 	defaultMaxBackfillInterval = 15 * time.Minute
 	defaultMinBackfillInterval = 1 * time.Minute
+	// Unix Nano time of 2016-01-01T00:00:00Z, which is as far back as any Alpaca plan is able to
+	// get historical data for.
+	minStartTimeNanos = 1451606400000000000
 )
 
 type resource struct {
@@ -35,7 +38,7 @@ type config struct {
 	ApiSecretKey string         `json:"api_secret_key" jsonschema:"title=Alpaca API Secret Key,description=Your Alpaca API Secret key." jsonschema_extras:"secret=true"`
 	Feed         string         `json:"feed" jsonschema:"title=Feed,description=The feed to pull market data from.,enum=iex,enum=sip"`
 	Symbols      string         `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor." jsonschema_extras:"multiline=true"`
-	StartDate    time.Time      `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after the capture has started."`
+	StartDate    time.Time      `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after the capture has started. Must be no earlier than 2016-01-01T00:00:00Z."`
 	Advanced     advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
 	effectiveMaxBackfillInterval time.Duration
@@ -75,6 +78,10 @@ func (c *config) Validate() error {
 
 	if c.StartDate.IsZero() {
 		return fmt.Errorf("must provide a value for start_date")
+	}
+
+	if c.StartDate.Before(time.Unix(0, minStartTimeNanos)) {
+		return fmt.Errorf("start_date must not be before 2016-01-01T00:00:00Z")
 	}
 
 	if !c.Advanced.StopDate.IsZero() && c.Advanced.StopDate.Before(c.StartDate) {

@@ -34,7 +34,7 @@
         "type": "string",
         "format": "date-time",
         "title": "Start Date",
-        "description": "Get trades starting at this date. Has no effect if changed after the capture has started."
+        "description": "Get trades starting at this date. Has no effect if changed after the capture has started. Must be no earlier than 2016-01-01T00:00:00Z."
       },
       "advanced": {
         "properties": {

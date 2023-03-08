@@ -34,6 +34,9 @@ func TestConfigValidate(t *testing.T) {
 	missingStart := valid
 	missingStart.StartDate = time.Time{}
 
+	tooEarlyStartDate := valid
+	tooEarlyStartDate.StartDate = time.Unix(0, minStartTimeNanos).Add(-1 * time.Second)
+
 	wrongFeed := valid
 	wrongFeed.Feed = "otherThing"
 
@@ -64,6 +67,11 @@ func TestConfigValidate(t *testing.T) {
 			name:   "missing start date",
 			config: missingStart,
 			want:   fmt.Errorf("must provide a value for start_date"),
+		},
+		{
+			name:   "start date too early",
+			config: tooEarlyStartDate,
+			want:   fmt.Errorf("start_date must not be before 2016-01-01T00:00:00Z"),
 		},
 		{
 			name:   "invalid feed",
