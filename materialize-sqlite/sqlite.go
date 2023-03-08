@@ -101,13 +101,10 @@ func (c client) ExecStatements(ctx context.Context, statements []string) error {
 	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
 }
 
+// We don't need a fence since there is only going to be a single sqlite
+// materialization instance writing to the file, and it's ephemeral
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	var err = c.withDB(func(db *stdsql.DB) error {
-		var err error
-		fence, err = sql.StdInstallFence(ctx, db, checkpoints, fence)
-		return err
-	})
-	return fence, err
+	return sql.Fence{}, nil
 }
 
 func (c client) withDB(fn func(*stdsql.DB) error) error {
@@ -330,22 +327,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint []byte, _ <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
-		d.store.fence.Checkpoint = runtimeCheckpoint
-
-		var fenceUpdate strings.Builder
-		if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
-		}
-
 		return nil, pf.RunAsyncOperation(func() error {
-			if result, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating fence: %w", err)
-			} else if rowsAffected, err := result.RowsAffected(); err != nil {
-				return fmt.Errorf("result.RowsAffected: %w", err)
-			} else if rowsAffected == 0 {
-				return fmt.Errorf("this instance is fenced off by another")
-			}
-
 			if err = txn.Commit(); err != nil {
 				return fmt.Errorf("commit transaction: %w", err)
 			}
