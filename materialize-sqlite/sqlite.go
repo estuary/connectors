@@ -57,7 +57,7 @@ func NewSQLiteDriver() *sql.Driver {
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
 		NewEndpoint: func(ctx context.Context, _ json.RawMessage) (*sql.Endpoint, error) {
-			var path = "file:///db"
+			var path = "/tmp/sqlite.db"
 
 			// SQLite / go-sqlite3 is a bit fickle about raced opens of a newly created database,
 			// often returning "database is locked" errors. We can resolve by ensuring one sql.Open
@@ -73,14 +73,11 @@ func NewSQLiteDriver() *sql.Driver {
 				return nil, fmt.Errorf("opening SQLite database %q: %w", path, err)
 			}
 
-			var metaBase sql.TablePath
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
-
 			return &sql.Endpoint{
 				Config: config{path: path},
 				Dialect: sqliteDialect,
-				MetaSpecs: metaSpecs,
-				MetaCheckpoints: &metaCheckpoints,
+				MetaSpecs: nil,
+				MetaCheckpoints: nil,
 				Client: client{path: path},
 				CreateTableTemplate: tplCreateTargetTable,
 				NewResource: newTableConfig,
@@ -94,12 +91,10 @@ type client struct {
 	path string
 }
 
+// We don't use specs table for sqlite since it is ephemeral and won't be
+// persisted between ApplyUpsert and Transactions calls
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
-	err = c.withDB(func(db *stdsql.DB) error {
-		specB64, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
-		return err
-	})
-	return
+	return "", "", stdsql.ErrNoRows
 }
 
 func (c client) ExecStatements(ctx context.Context, statements []string) error {

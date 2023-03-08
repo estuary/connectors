@@ -31,6 +31,8 @@ FROM ${BASE_IMAGE}
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
+RUN DEBIAN_FRONTEND=noninteractive apt update && apt install sqlite3 -y --no-install-recommends
+
 COPY --from=builder /builder/connector ./materialize-sqlite
 
 # Avoid running the connector as root.
