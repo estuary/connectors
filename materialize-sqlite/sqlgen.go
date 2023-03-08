@@ -60,10 +60,6 @@ var (
     )
     {{- end }}
   );
-  COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
-  {{- range $col := .Columns }}
-  COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment}};
-  {{- end}}
   {{ end }}
 
   -- Create temporary table for loading keys
