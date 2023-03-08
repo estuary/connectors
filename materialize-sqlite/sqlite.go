@@ -155,6 +155,24 @@ func newTransactor(
 		}
 	}
 
+	// Since sqlite is ephemeral, we have to re-create tables before transactions
+	var statements []string
+	for _, table := range bindings {
+		if statement, err := sql.RenderTableTemplate(table, ep.CreateTableTemplate); err != nil {
+			return nil, err
+		} else {
+			statements = append(statements, statement)
+		}
+
+		if table.AdditionalSql != "" {
+			statements = append(statements, table.AdditionalSql)
+		}
+	}
+
+	if err = ep.Client.ExecStatements(ctx, statements); err != nil {
+		return nil, fmt.Errorf("applying schema updates: %w", err)
+	}
+
 	// Build a query which unions the results of each load subquery.
 	var subqueries []string
 	for _, b := range d.bindings {
@@ -297,13 +315,13 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		var b = d.bindings[it.Binding]
 
 		if it.Exists {
-			if converted, err := b.target.ConvertKey(it.Key); err != nil {
+			if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 				return nil, fmt.Errorf("converting update store key: %w", err)
 			} else if _, err = txn.ExecContext(ctx, b.store.updateSQL, converted...); err != nil {
 				return nil, fmt.Errorf("updating store: %w", err)
 			}
 		} else {
-			if converted, err := b.target.ConvertKey(it.Key); err != nil {
+			if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 				return nil, fmt.Errorf("converting update store key: %w", err)
 			} else if _, err = txn.ExecContext(ctx, b.store.insertSQL, converted...); err != nil {
 				return nil, fmt.Errorf("updating store: %w", err)
