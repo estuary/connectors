@@ -84,11 +84,15 @@ jobs:
           - path: source-mysql
             additionalTags:
               - source-mariadb
+              - source-amazonaurora
           - path: source-postgres
             additionalTags:
               - source-alloydb
+              - source-amazonaurora
           - path: source-s3
           - path: source-sqlserver
+            additionalTags:
+              - source-azuresqlserver
           - path: materialize-bigquery
           - path: materialize-elasticsearch
           - path: materialize-firebolt
@@ -99,6 +103,7 @@ jobs:
             additionalTags:
               - materialize-timescaledb
               - materialize-alloydb
+              - materialize-amazonaurora
           - path: materialize-rockset
           - path: materialize-s3-parquet
           - path: materialize-snowflake
