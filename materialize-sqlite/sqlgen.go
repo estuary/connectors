@@ -146,15 +146,6 @@ var (
   {{- end -}}
   ;
   {{ end }}
-
-  {{ define "updateFence" }}
-  UPDATE {{ Identifier $.TablePath }}
-  SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
-  WHERE materialization = {{ Literal $.Materialization.String }}
-  AND   key_begin = {{ $.KeyBegin }}
-  AND   key_end   = {{ $.KeyEnd }}
-  AND   fence     = {{ $.Fence }};
-  {{ end }}
   `)
   tplCreateTargetTable = tplAll.Lookup("createTargetTable")
   tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
@@ -165,8 +156,6 @@ var (
 
   tplStoreInsert       = tplAll.Lookup("storeInsert")
   tplStoreUpdate       = tplAll.Lookup("storeUpdate")
-
-  tplUpdateFence       = tplAll.Lookup("updateFence")
 )
 
 const createStageSQL = `
