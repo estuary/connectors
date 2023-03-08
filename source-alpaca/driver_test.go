@@ -26,9 +26,9 @@ func TestDiscover(t *testing.T) {
 	// can always test it as part of the normal unit tests.
 	t.Setenv("TEST_DATABASE", "yes")
 
-	startDate, err := time.Parse(time.RFC3339Nano, "2006-01-02T15:04:05.999999999Z")
+	startDate, err := time.Parse(time.RFC3339Nano, "2019-01-02T15:04:05.999999999Z")
 	require.NoError(t, err)
-	endDate, err := time.Parse(time.RFC3339Nano, "2007-02-03T15:04:05.999999999Z")
+	endDate, err := time.Parse(time.RFC3339Nano, "2019-02-03T15:04:05.999999999Z")
 	require.NoError(t, err)
 
 	capture := captureSpec(t, []string{"trades"}, []string{"AAPL"}, startDate, endDate, nil)
