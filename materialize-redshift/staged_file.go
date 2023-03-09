@@ -30,7 +30,6 @@ import (
 // uploading the file, the file location is returned as well as a callback that can be used to
 // delete the created file.
 type stagedFile struct {
-	// in sorted order: first the keys, then the values, then the document. for loads it will be only keys.
 	cols         []*sql.Column
 	client       *s3.Client
 	uploader     *manager.Uploader

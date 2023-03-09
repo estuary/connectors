@@ -11,6 +11,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -33,31 +34,30 @@ type tunnelConfig struct {
 }
 
 type config struct {
-	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database." jsonschema_extras:"order=0"`
+	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database. Example: red-shift-cluster-name.randomstring.us-east-2.redshift.amazonaws.com:5439" jsonschema_extras:"order=0"`
 	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to. The materialization will attempt to connect to the default database for the provided user if omitted." jsonschema_extras:"order=3"`
+	Schema   string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=4"`
 
-	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID" jsonschema_extras:"order=0"`
-	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key" jsonschema_extras:"secret=true,order=1"`
-	Region             string `json:"region" jsonschema:"title=Region,description=Region for the staging bucket. Should be in the same region as the Redshift database cluster." jsonschema_extras:"order=2"`
-	Bucket             string `json:"bucket" jsonschema:"title=Bucket,description=Name of the staging bucket." jsonschema_extras:"order=3"`
+	Bucket             string `json:"bucket" jsonschema:"title=S3 Staging Bucket,description=Name of the S3 bucket to use for staging data loads." jsonschema_extras:"order=5"`
+	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for reading and writing data to the S3 staging bucket." jsonschema_extras:"order=6"`
+	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS Secret Access Key for reading and writing data to the S3 staging bucket." jsonschema_extras:"secret=true,order=7"`
+	Region             string `json:"region" jsonschema:"title=Region,description=Region of the S3 staging bucket. For optimal performance this should be in the same region as the Redshift database cluster." jsonschema_extras:"order=8"`
 
-	Schema string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
-
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
 }
 
 func (c *config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
+		{"password", c.Password},
+		{"bucket", c.Bucket},
 		{"awsAccessKeyId", c.AWSAccessKeyID},
 		{"awsSecretAccessKey", c.AWSSecretAccessKey},
 		{"region", c.Region},
-		{"bucket", c.Bucket},
 	}
-	// TODO: Is database required?
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
@@ -66,8 +66,7 @@ func (c *config) Validate() error {
 	return nil
 }
 
-// ToURI converts the Config to a DSN string.
-func (c *config) ToURI() string {
+func (c *config) toURI() string {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432 to address
 	// through the bastion server, so we use the tunnel's address
@@ -85,10 +84,23 @@ func (c *config) ToURI() string {
 	return uri.String()
 }
 
-// TODO: Support schema as well
+func (c *config) toS3Client(ctx context.Context) (*s3.Client, error) {
+	awsCfg, err := awsConfig.LoadDefaultConfig(ctx,
+		awsConfig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(c.AWSAccessKeyID, c.AWSSecretAccessKey, ""),
+		),
+		awsConfig.WithRegion(c.Region),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return s3.NewFromConfig(awsCfg), nil
+}
+
 type tableConfig struct {
-	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
-	Schema        string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)"`
+	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
+	Schema        string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)."`
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run in the same transaction that creates the table." jsonschema_extras:"multiline=true"`
 	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
 }
@@ -124,6 +136,40 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
+func verifyS3Access(ctx context.Context, cfg *config) error {
+	s3client, err := cfg.toS3Client(ctx)
+	if err != nil {
+		return err
+	}
+
+	testCol := &sql.Column{}
+	testCol.Field = "testing"
+
+	// Verify that we can write data to the configured bucket.
+	s3file := newStagedFile(s3client, cfg.Bucket, []*sql.Column{testCol})
+	s3file.start(ctx)
+	s3file.encodeRow([]interface{}{"testing"})
+	_, delete, err := s3file.flush()
+	if err != nil {
+		return err
+	}
+
+	// Verify that we can read data that we have written.
+	if _, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(cfg.Bucket),
+		Key:    s3file.uploadOutput.Key,
+	}); err != nil {
+		return err
+	}
+
+	// Verify that we can delete the object we wrote.
+	if err := delete(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func newRedshiftDriver() pm.DriverServer {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-redshift",
@@ -135,7 +181,9 @@ func newRedshiftDriver() pm.DriverServer {
 				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
 			}
 
-			// TODO: Add checks for S3 access.
+			if err := verifyS3Access(ctx, cfg); err != nil {
+				return nil, fmt.Errorf("failed to validate S3 staging bucket configuration: %w", err)
+			}
 
 			log.WithFields(log.Fields{
 				"database": cfg.Database,
@@ -177,7 +225,7 @@ func newRedshiftDriver() pm.DriverServer {
 				Dialect:                     rsDialect,
 				MetaSpecs:                   metaSpecs,
 				MetaCheckpoints:             &metaCheckpoints,
-				Client:                      client{uri: cfg.ToURI()},
+				Client:                      client{uri: cfg.toURI()},
 				CreateTableTemplate:         tplCreateTargetTable,
 				AlterColumnNullableTemplate: tplAlterColumnNullable,
 				NewResource:                 newTableConfig,
@@ -249,25 +297,20 @@ func newTransactor(
 	var cfg = ep.Config.(*config)
 	d.cfg = cfg
 
-	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
+	if d.load.conn, err = pgx.Connect(ctx, cfg.toURI()); err != nil {
 		return nil, fmt.Errorf("load pgx.Connect: %w", err)
 	}
-	if d.store.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
+	if d.store.conn, err = pgx.Connect(ctx, cfg.toURI()); err != nil {
 		return nil, fmt.Errorf("store pgx.Connect: %w", err)
 	}
 
-	awsCfg, err := awsConfig.LoadDefaultConfig(ctx,
-		awsConfig.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, ""),
-		),
-		awsConfig.WithRegion(cfg.Region),
-	)
+	s3client, err := cfg.toS3Client(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, cfg.Bucket, s3.NewFromConfig(awsCfg)); err != nil {
+		if err = d.addBinding(ctx, binding, cfg.Bucket, s3client); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
