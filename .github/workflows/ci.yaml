@@ -101,6 +101,7 @@ jobs:
               - materialize-alloydb
           - path: materialize-rockset
           - path: materialize-s3-parquet
+          - path: materialize-sqlite
           - path: materialize-snowflake
           - path: materialize-webhook
 
