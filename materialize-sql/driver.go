@@ -296,11 +296,12 @@ func (d *Driver) newTransactor(ctx context.Context, open pm.TransactionRequest_O
 	var loadedVersion string
 
 	var endpoint, err = d.NewEndpoint(ctx, open.Materialization.EndpointSpecJson)
+	if err != nil {
+		return nil, nil, fmt.Errorf("building endpoint: %w", err)
+	}
 
 	if endpoint.MetaSpecs != nil {
-		if err != nil {
-			return nil, nil, fmt.Errorf("building endpoint: %w", err)
-		} else if _, loadedVersion, err = loadSpec(ctx, endpoint, open.Materialization.Materialization); err != nil {
+		if _, loadedVersion, err = loadSpec(ctx, endpoint, open.Materialization.Materialization); err != nil {
 			return nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
 		} else if loadedVersion == "" {
 			return nil, nil, fmt.Errorf("materialization has not been applied")

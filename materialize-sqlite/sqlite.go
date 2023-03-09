@@ -43,7 +43,7 @@ func (c tableConfig) Path() sql.TablePath {
 }
 
 func (c tableConfig) DeltaUpdates() bool {
-	return false // SQLite doesn't support delta updates.
+	return false // SQLite doesn't support delta updates. We probably _could_ support it though.
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
