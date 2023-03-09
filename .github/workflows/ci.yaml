@@ -84,11 +84,11 @@ jobs:
           - path: source-mysql
             additionalTags:
               - source-mariadb
-              - source-amazonaurora
+              - source-amazon-aurora-mysql
           - path: source-postgres
             additionalTags:
               - source-alloydb
-              - source-amazonaurora
+              - source-amazon-aurora-postgres
           - path: source-s3
           - path: source-sqlserver
             additionalTags:
