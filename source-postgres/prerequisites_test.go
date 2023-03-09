@@ -19,12 +19,6 @@ func TestPrerequisites(t *testing.T) {
 	tb.Insert(ctx, t, tableA, [][]any{{0, "hello"}, {1, "world"}})
 	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tb.config.Advanced.WatermarksTable))
 
-	// Lowercase the table names to simulate what happens when the names are
-	// obtained from discovery.
-	tableA = strings.ToLower(tableA)
-	tableB = strings.ToLower(tableB)
-	tableC = strings.ToLower(tableC)
-
 	t.Run("validateAB", func(t *testing.T) {
 		var cs = tb.CaptureSpec(t, tableA, tableB)
 		_, err := cs.Validate(ctx, t)

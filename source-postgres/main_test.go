@@ -136,10 +136,11 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 	for _, str := range []string{"/", "=", "(", ")"} {
 		tableName = strings.ReplaceAll(tableName, str, "_")
 	}
+	tableName = strings.ToLower(tableName)
 
 	log.WithFields(log.Fields{"table": tableName, "cols": tableDef}).Debug("creating test table")
 	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
-	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %s %s;`, tableName, tableDef))
 	t.Cleanup(func() {
 		log.WithField("table", tableName).Debug("destroying test table")
 		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE %s;`, tableName))
@@ -177,12 +178,12 @@ func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, r
 
 func (tb *testBackend) Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
 	t.Helper()
-	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET %s = $1 WHERE %s = $2;", table, setCol, whereCol), setVal, whereVal)
+	tb.Query(ctx, t, fmt.Sprintf(`UPDATE %s SET %s = $1 WHERE %s = $2;`, table, setCol, whereCol), setVal, whereVal)
 }
 
 func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}) {
 	t.Helper()
-	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE %s = $1;", table, whereCol), whereVal)
+	tb.Query(ctx, t, fmt.Sprintf(`DELETE FROM %s WHERE %s = $1;`, table, whereCol), whereVal)
 }
 
 func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {

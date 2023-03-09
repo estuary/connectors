@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":-1.1}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "IUAOZmZmZmZl"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":-1}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "IUAP////////"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":-0.9}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "IUATMzMzMzMy"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":0}
 # ================================
@@ -54,7 +54,7 @@
 ### Capture from Key "IYAAAAAAAAAA"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 4","key":0.9}
 # ================================
@@ -67,7 +67,7 @@
 ### Capture from Key "Ib/szMzMzMzN"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 5","key":1}
 # ================================
@@ -80,7 +80,7 @@
 ### Capture from Key "Ib/wAAAAAAAA"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 6","key":1.111}
 # ================================
@@ -93,7 +93,7 @@
 ### Capture from Key "Ib/xxqfvnbIt"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 7","key":1.222}
 # ================================
@@ -106,7 +106,7 @@
 ### Capture from Key "Ib/zjU/fO2Ra"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 8","key":1.333}
 # ================================
@@ -119,7 +119,7 @@
 ### Capture from Key "Ib/1U/fO2RaH"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 9","key":1.444}
 # ================================
@@ -132,7 +132,7 @@
 ### Capture from Key "Ib/3Gp++dsi0"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 10","key":1.555}
 # ================================
@@ -145,7 +145,7 @@
 ### Capture from Key "Ib/44UeuFHrh"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 11","key":1.666}
 # ================================
@@ -158,7 +158,7 @@
 ### Capture from Key "Ib/6p++dsi0O"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 12","key":1.777}
 # ================================
@@ -171,7 +171,7 @@
 ### Capture from Key "Ib/8bpeNT987"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 13","key":1.888}
 # ================================
@@ -184,7 +184,7 @@
 ### Capture from Key "Ib/+NT987ZFo"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 14","key":1.999}
 # ================================
@@ -197,7 +197,7 @@
 ### Capture from Key "Ib//++dsi0OW"
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Double": 1 Documents
+# Collection "test.scankeytypes_double": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double","loc":[11111111,11111111,11111111]}},"data":"Data 15","key":2}
 # ================================

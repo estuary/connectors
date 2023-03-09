@@ -1,5 +1,5 @@
 # ================================
-# Collection "test.Generic_MultipleStreams_two": 4 Documents
+# Collection "test.generic_multiplestreams_two": 4 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_two","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_two","loc":[11111111,11111111,11111111]}},"data":"four","id":4}
