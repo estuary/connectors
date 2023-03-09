@@ -92,7 +92,7 @@ jobs:
           - path: source-s3
           - path: source-sqlserver
             additionalTags:
-              - source-azuresqlserver
+              - source-azure-sqlserver
           - path: materialize-bigquery
           - path: materialize-elasticsearch
           - path: materialize-firebolt
@@ -103,7 +103,7 @@ jobs:
             additionalTags:
               - materialize-timescaledb
               - materialize-alloydb
-              - materialize-amazonaurora
+              - materialize-amazon-aurora-postgres
           - path: materialize-rockset
           - path: materialize-s3-parquet
           - path: materialize-snowflake
