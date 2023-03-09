@@ -53,6 +53,12 @@ var rsDialect = func() sql.Dialect {
 	}
 }()
 
+type copyFromS3Params struct {
+	Destination    string
+	ObjectLocation string
+	Config         config
+}
+
 var (
 	tplAll = sql.MustParseTemplate(rsDialect, "root", `
 {{ define "temp_name" -}}
@@ -171,6 +177,14 @@ SELECT 1 FROM {{ Identifier $.TablePath }} WHERE
 	AND   key_end   = {{ $.KeyEnd }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
+
+{{ define "copyFromS3" }}
+COPY {{ $.Destination }}
+FROM '{{ $.ObjectLocation }}'
+CREDENTIALS 'aws_access_key_id={{ $.Config.AWSAccessKeyID }};aws_secret_access_key={{ $.Config.AWSSecretAccessKey }}'
+REGION '{{ $.Config.Region }}'
+json 'auto';
+{{ end }}
 `)
 	tplCreateTargetTable         = tplAll.Lookup("createTargetTable")
 	tplCreateLoadTable           = tplAll.Lookup("createLoadTable")
@@ -179,7 +193,8 @@ SELECT 1 FROM {{ Identifier $.TablePath }} WHERE
 	tplStoreUpdateDeleteExisting = tplAll.Lookup("storeUpdateDeleteExisting")
 	tplStoreUpdate               = tplAll.Lookup("storeUpdate")
 	tplLoadQuery                 = tplAll.Lookup("loadQuery")
+	tplAlterColumnNullable       = tplAll.Lookup("alterColumnNullable")
 	tplGetFence                  = tplAll.Lookup("getFence")
 	tplUpdateFence               = tplAll.Lookup("updateFence")
-	tplAlterColumnNullable       = tplAll.Lookup("alterColumnNullable")
+	tplCopyFromS3                = tplAll.Lookup("copyFromS3")
 )

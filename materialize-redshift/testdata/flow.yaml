@@ -1,0 +1,51 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        key1:
+          type: integer
+          title: Key One Title
+          description: Key One Description
+        key!2: { type: boolean }
+        nullableKey: { type: string }
+        value: { type: string }
+        "a Time": { type: string, format: "date-time" }
+        array: { type: array, title: This is an array! }
+        Camel_Case: { type: integer }
+        lower_case: { type: integer }
+      required: [key1, key!2, nullableKey]
+    key: [/key1, /key!2, /nullableKey]
+
+  delta/updates:
+    schema:
+      type: object
+      properties:
+        theKey: { type: string }
+        nullableKey: { type: string }
+        aValue:
+          type: integer
+          description: A super-awesome value.
+      required: [theKey, nullableKey]
+    key: [/theKey, /nullableKey]
+
+materializations:
+  test/sqlite:
+    endpoint:
+      sqlite:
+        path: ":memory:"
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: true
+          include:
+            array: {}
+
+      - source: delta/updates
+        resource:
+          table: "Delta Updates"
+          #deltaUpdates: true
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }
