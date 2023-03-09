@@ -1,5 +1,5 @@
 # ================================
-# Collection "test.UserTypes_Domain_bandoleer": 2 Documents
+# Collection "test.usertypes_domain_bandoleer": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"usertypes_domain_bandoleer","loc":[11111111,11111111,11111111]}},"id":1,"value":"hello"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"usertypes_domain_bandoleer","loc":[11111111,11111111,11111111]}},"id":2,"value":"world"}

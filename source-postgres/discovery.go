@@ -382,7 +382,7 @@ func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, e
 			var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
 			keys[streamID] = append(keys[streamID], columnName)
 			if columnIndex != len(keys[streamID]) {
-				return fmt.Errorf("primary key column %q appears out of order (expected index %d, in context %q)", columnName, columnIndex, keys[streamID])
+				return fmt.Errorf("primary key column %q of table %q appears out of order (expected index %d, in context %q)", columnName, streamID, columnIndex, keys[streamID])
 			}
 			return nil
 		})
