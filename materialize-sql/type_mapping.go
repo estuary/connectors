@@ -339,7 +339,7 @@ func (m MaxLengthMapper) MapType(p *Projection) (MappedType, error) {
 	} else if mapped, err := m.WithLength.MapType(p); err != nil {
 		return MappedType{}, err
 	} else {
-		mapped.DDL = fmt.Sprintf(m.WithLengthFmtPattern, mapped.DDL, p.Inference.String_.MaxLength)
+		mapped.DDL = fmt.Sprintf(mapped.DDL, p.Inference.String_.MaxLength)
 		return mapped, nil
 	}
 }

@@ -3,12 +3,12 @@
 CREATE TABLE IF NOT EXISTS "a-schema".target_table (
 		key1 BIGINT NOT NULL,
 		"key!2" BOOLEAN NOT NULL,
-		nullableKey VARCHAR(max),
+		nullableKey TEXT,
 		Camel_Case BIGINT,
 		"a Time" TIMESTAMPTZ,
 		"array" SUPER,
 		lower_case BIGINT,
-		value VARCHAR(max),
+		value VARCHAR(4096),
 		flow_document SUPER NOT NULL,
 
 		-- TODO: Sort key? Primary key here doesn't do what you might think it does.
@@ -33,8 +33,8 @@ COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'user-provided projec
 --- Begin "Delta Updates" createTargetTable ---
 
 CREATE TABLE IF NOT EXISTS "Delta Updates" (
-		theKey VARCHAR(max) NOT NULL,
-		nullableKey VARCHAR(max),
+		theKey TEXT NOT NULL,
+		nullableKey TEXT,
 		aValue BIGINT
 );
 
@@ -50,15 +50,15 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]';
 CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_0 (
 		key1 BIGINT NOT NULL,
 		"key!2" BOOLEAN NOT NULL,
-		nullableKey VARCHAR(max)
+		nullableKey TEXT
 );
 --- End "a-schema".target_table createLoadTable ---
 
 --- Begin "Delta Updates" createLoadTable ---
 
 CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_1 (
-		theKey VARCHAR(max) NOT NULL,
-		nullableKey VARCHAR(max)
+		theKey TEXT NOT NULL,
+		nullableKey TEXT
 );
 --- End "Delta Updates" createLoadTable ---
 
