@@ -1,5 +1,5 @@
 # ================================
-# Collection "test.UserTypes_Enum_terror": 3 Documents
+# Collection "test.usertypes_enum_terror": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_enum_terror","loc":[11111111,11111111,11111111]}},"id":4,"value":"blue"}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_enum_terror","loc":[11111111,11111111,11111111]}},"id":5,"value":"red"}

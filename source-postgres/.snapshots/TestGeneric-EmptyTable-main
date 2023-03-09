@@ -1,5 +1,5 @@
 # ================================
-# Collection "test.Generic_EmptyTable": 3 Documents
+# Collection "test.generic_emptytable": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_emptytable","loc":[11111111,11111111,11111111]}},"data":"more","id":1000}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_emptytable","loc":[11111111,11111111,11111111]}},"data":"rows","id":1001}

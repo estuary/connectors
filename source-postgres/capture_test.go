@@ -383,3 +383,26 @@ func TestUserTypes(t *testing.T) {
 		})
 	})
 }
+
+func TestCaptureCapitalization(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var tablePrefix = strings.TrimPrefix(t.Name(), "Test")
+
+	var tableA = tablePrefix + "_AaAaA"                  // Name containing capital letters
+	var tableB = strings.ToLower(tablePrefix + "_BbBbB") // Name which is all lowercase (like all our other test table names)
+
+	var cleanup = func() {
+		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS "%s"."%s";`, testSchemaName, tableA))
+		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS "%s"."%s";`, testSchemaName, tableB))
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data TEXT);`, testSchemaName, tableA))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data TEXT);`, testSchemaName, tableB))
+
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (0, 'hello'), (1, 'asdf');`, testSchemaName, tableA))
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (2, 'world'), (3, 'fdsa');`, testSchemaName, tableB))
+
+	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(t, testSchemaName+"."+tableA, testSchemaName+"."+tableB))
+}

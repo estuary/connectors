@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Bool": 1 Documents
+# Collection "test.scankeytypes_bool": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_bool","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":false}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "Jg=="
 ####################################
 # ================================
-# Collection "test.ScanKeyTypes_Bool": 1 Documents
+# Collection "test.scankeytypes_bool": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_bool","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":true}
 # ================================
