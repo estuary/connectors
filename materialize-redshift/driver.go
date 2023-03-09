@@ -32,7 +32,6 @@ type tunnelConfig struct {
 	SshForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
 }
 
-// config represents the endpoint configuration for postgres.
 type config struct {
 	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database." jsonschema_extras:"order=0"`
 	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
@@ -49,7 +48,6 @@ type config struct {
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
-// Validate the configuration.
 func (c *config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
@@ -71,8 +69,8 @@ func (c *config) Validate() error {
 // ToURI converts the Config to a DSN string.
 func (c *config) ToURI() string {
 	var address = c.Address
-	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
-	// to address through the bastion server, so we use the tunnel's address
+	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432 to address
+	// through the bastion server, so we use the tunnel's address
 	if c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "" {
 		address = "localhost:5432"
 	}
@@ -375,15 +373,16 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		}
 		defer delete(ctx)
 
-		copyQuery := fmt.Sprintf("COPY flow_temp_table_%d from '%s' CREDENTIALS 'aws_access_key_id=%s;aws_secret_access_key=%s' REGION '%s' json 'auto';",
-			idx,
-			objectLocation,
-			d.cfg.AWSAccessKeyID,
-			d.cfg.AWSSecretAccessKey,
-			d.cfg.Region,
-		)
+		var copySql strings.Builder
+		if err := tplCopyFromS3.Execute(&copySql, copyFromS3Params{
+			Destination:    fmt.Sprintf("flow_temp_table_%d", idx),
+			ObjectLocation: objectLocation,
+			Config:         *d.cfg,
+		}); err != nil {
+			return fmt.Errorf("evaluating copy from s3 template: %w", err)
+		}
 
-		loadBatch.Queue(copyQuery)
+		loadBatch.Queue(copySql.String())
 	}
 
 	if err := runBatch(loadBatch.Len(), txn.SendBatch(ctx, &loadBatch)); err != nil {
@@ -422,8 +421,18 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	log.Info("storing")
 
-	var ctx = it.Context()
+	ctx := it.Context()
+
+	// hasUpdates is used to track if a given binding includes only insertions for this store round
+	// or if it includes any updates. If it is only insertions a more efficient direct copy from S3
+	// can be performed into the target table rather than copying into a staging table and merging
+	// into the target table.
+	hasUpdates := make([]bool, len(d.bindings))
 	for it.Next() {
+		if it.Exists {
+			hasUpdates[it.Binding] = true
+		}
+
 		var b = d.bindings[it.Binding]
 		b.storeFile.start(ctx)
 
@@ -452,11 +461,11 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceGet.String(), fenceUpdate.String()) })
+		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceGet.String(), fenceUpdate.String(), hasUpdates) })
 	}, nil
 }
 
-func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate string) error {
+func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate string, hasUpdates []bool) error {
 	log.Info("committing")
 
 	if err := d.prepareTempTables(ctx, false); err != nil {
@@ -481,18 +490,30 @@ func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate st
 		}
 		defer delete(ctx)
 
-		storeCopyQuery := fmt.Sprintf("COPY flow_temp_table_%d from '%s' CREDENTIALS 'aws_access_key_id=%s;aws_secret_access_key=%s' REGION '%s' json 'auto';",
-			idx,
-			objectLocation,
-			d.cfg.AWSAccessKeyID,
-			d.cfg.AWSSecretAccessKey,
-			d.cfg.Region,
-		)
+		var dest string
+		if hasUpdates[idx] {
+			// Must merge from the staging table.
+			dest = fmt.Sprintf("flow_temp_table_%d", idx)
+		} else {
+			// Can copy directly into the target table.
+			dest = b.target.Identifier
+		}
 
-		// TODO: Use a more efficient direct copy rather than merge if everything existed already.
-		batch.Queue(storeCopyQuery)
-		batch.Queue(b.storeUpdateDeleteExistingSQL)
-		batch.Queue(b.storeUpdateSQL)
+		var copySql strings.Builder
+		if err := tplCopyFromS3.Execute(&copySql, copyFromS3Params{
+			Destination:    dest,
+			ObjectLocation: objectLocation,
+			Config:         *d.cfg,
+		}); err != nil {
+			return fmt.Errorf("evaluating copy from s3 template: %w", err)
+		}
+
+		batch.Queue(copySql.String())
+
+		if hasUpdates[idx] {
+			batch.Queue(b.storeUpdateDeleteExistingSQL)
+			batch.Queue(b.storeUpdateSQL)
+		}
 	}
 
 	batch.Queue(fenceUpdate)
