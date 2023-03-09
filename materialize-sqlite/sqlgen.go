@@ -26,7 +26,7 @@ var sqliteDialect = func () sql.Dialect {
     Identifierer:       sql.IdentifierFn(sql.JoinTransform(".", 
     sql.PassThroughTransform(
       func(s string) bool {
-        return sql.IsSimpleIdentifier(s) && !sliceContains(strings.ToLower(s), SQLITE_RESERVED_WORDS)
+        return sql.IsSimpleIdentifier(s) && !sql.SliceContains(strings.ToLower(s), SQLITE_RESERVED_WORDS)
       },
       sql.QuoteTransform("\"", "\\\""),
     ))),
@@ -168,12 +168,3 @@ COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored document
 ;`
 
 const attachSQL = "ATTACH DATABASE '' AS load ;"
-
-func sliceContains(expected string, actual []string) bool {
-  for _, ty := range actual {
-    if ty == expected {
-      return true
-    }
-  }
-  return false
-}
