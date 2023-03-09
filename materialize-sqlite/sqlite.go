@@ -24,7 +24,7 @@ func (c config) Validate() error {
 }
 
 type tableConfig struct {
-	Table string `json:"table"`
+	Table string `json:"table" jsonschema_extras:"x-collection-name:true"`
 }
 
 func (c tableConfig) Validate() error {
