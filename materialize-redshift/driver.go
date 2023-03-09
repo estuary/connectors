@@ -15,7 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -226,12 +225,12 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 type transactor struct {
 	// Variables exclusively used by Load.
 	load struct {
-		// conn     *pgx.Conn
+		conn     *pgx.Conn
 		unionSQL string
 	}
 	// Variables exclusively used by Store.
 	store struct {
-		// conn  *pgx.Conn
+		conn  *pgx.Conn
 		fence sql.Fence
 	}
 	bindings []*binding
@@ -250,12 +249,12 @@ func newTransactor(
 	var cfg = ep.Config.(*config)
 	d.cfg = cfg
 
-	// if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
-	// 	return nil, fmt.Errorf("load pgx.Connect: %w", err)
-	// }
-	// if d.store.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
-	// 	return nil, fmt.Errorf("store pgx.Connect: %w", err)
-	// }
+	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
+		return nil, fmt.Errorf("load pgx.Connect: %w", err)
+	}
+	if d.store.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
+		return nil, fmt.Errorf("store pgx.Connect: %w", err)
+	}
 
 	awsCfg, err := awsConfig.LoadDefaultConfig(ctx,
 		awsConfig.WithCredentialsProvider(
@@ -289,6 +288,7 @@ type binding struct {
 	storeFile                    *stagedFile
 	createLoadTableSQL           string
 	createStoreTableSQL          string
+	truncateTempTableSQL         string
 	storeUpdateDeleteExistingSQL string
 	storeUpdateSQL               string
 	loadQuerySQL                 string
@@ -307,6 +307,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, bucket st
 	}{
 		{&b.createLoadTableSQL, tplCreateLoadTable},
 		{&b.createStoreTableSQL, tplCreateStoreTable},
+		{&b.truncateTempTableSQL, tplTruncateTempTable},
 		{&b.storeUpdateDeleteExistingSQL, tplStoreUpdateDeleteExisting},
 		{&b.storeUpdateSQL, tplStoreUpdate},
 		{&b.loadQuerySQL, tplLoadQuery},
@@ -321,6 +322,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, bucket st
 	return nil
 }
 
+// TODO: Handling non-serializable errors :(.
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	log.Info("loading")
 
@@ -350,23 +352,20 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		return nil
 	}
 
-	conn, err := pgx.Connect(ctx, d.cfg.ToURI())
-	if err != nil {
-		return fmt.Errorf("load pgx.Connect: %w", err)
+	if err := d.prepareTempTables(ctx, true); err != nil {
+		return fmt.Errorf("preparing load temp tables: %w", err)
 	}
-	defer conn.Close(ctx)
 
-	txn, err := conn.BeginTx(ctx, pgx.TxOptions{})
+	// Transaction for processing the loads.
+	txn, err := d.load.conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return fmt.Errorf("DB.BeginTx: %w", err)
+		return fmt.Errorf("load BeginTx: %w", err)
 	}
-	var batch pgx.Batch
 
+	var loadBatch pgx.Batch
 	for idx, b := range d.bindings {
-		batch.Queue(b.createLoadTableSQL)
-
 		if !b.loadFile.started {
-			// no loads for this binding
+			// No loads for this binding.
 			continue
 		}
 
@@ -384,24 +383,18 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			d.cfg.Region,
 		)
 
-		batch.Queue(copyQuery)
+		loadBatch.Queue(copyQuery)
 	}
 
-	var results = txn.SendBatch(ctx, &batch)
-	for i := 0; i != batch.Len(); i++ {
-		if _, err := results.Exec(); err != nil {
-			return fmt.Errorf("load at index %d: %w", i, err)
-		}
-	}
-	if err = results.Close(); err != nil {
-		return fmt.Errorf("closing batch: %w", err)
+	if err := runBatch(loadBatch.Len(), txn.SendBatch(ctx, &loadBatch)); err != nil {
+		return fmt.Errorf("sending load batch: %w", err)
 	}
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
 	rows, err := txn.Query(ctx, d.load.unionSQL)
 	if err != nil {
-		return fmt.Errorf("querying Load documents: %w", err)
+		return fmt.Errorf("querying load documents: %w", err)
 	}
 	defer rows.Close()
 
@@ -410,7 +403,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		var document json.RawMessage
 
 		if err = rows.Scan(&binding, &document); err != nil {
-			return fmt.Errorf("scanning Load document: %w", err)
+			return fmt.Errorf("scanning load document: %w", err)
 		} else if err = loaded(binding, json.RawMessage(document)); err != nil {
 			return err
 		}
@@ -466,18 +459,15 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate string) error {
 	log.Info("committing")
 
-	conn, err := pgx.Connect(ctx, d.cfg.ToURI())
-	if err != nil {
-		return fmt.Errorf("load pgx.Connect: %w", err)
+	if err := d.prepareTempTables(ctx, false); err != nil {
+		return fmt.Errorf("preparing store temp tables: %w", err)
 	}
-	defer conn.Close(ctx)
 
-	txn, err := conn.BeginTx(ctx, pgx.TxOptions{})
+	txn, err := d.store.conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return fmt.Errorf("DB.BeginTx: %w", err)
+		return fmt.Errorf("store BeginTx: %w", err)
 	}
 	var batch pgx.Batch
-	batch.Queue(fenceUpdate)
 
 	for idx, b := range d.bindings {
 		if !b.storeFile.started {
@@ -491,10 +481,6 @@ func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate st
 		}
 		defer delete(ctx)
 
-		if _, err := txn.Exec(ctx, b.createStoreTableSQL); err != nil {
-			return fmt.Errorf("creating temporary store table for binding[%d]: %w", idx, err)
-		}
-
 		storeCopyQuery := fmt.Sprintf("COPY flow_temp_table_%d from '%s' CREDENTIALS 'aws_access_key_id=%s;aws_secret_access_key=%s' REGION '%s' json 'auto';",
 			idx,
 			objectLocation,
@@ -503,43 +489,32 @@ func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate st
 			d.cfg.Region,
 		)
 
+		// TODO: Use a more efficient direct copy rather than merge if everything existed already.
 		batch.Queue(storeCopyQuery)
 		batch.Queue(b.storeUpdateDeleteExistingSQL)
 		batch.Queue(b.storeUpdateSQL)
 	}
 
-	rows, err := txn.Query(ctx, fenceGet)
-	if err != nil {
-		return err
-	}
+	batch.Queue(fenceUpdate)
+	batch.Queue(fenceGet)
 
-	var gotRow bool
-	var count int
-	for rows.Next() {
-		if gotRow {
-			return errors.New("get fence query returned multiple results")
-		}
-		if err := rows.Scan(&count); err != nil {
-			return err
-		}
-		gotRow = true
-	}
-	if err = rows.Err(); err != nil {
-		return err
-	}
+	res := txn.SendBatch(ctx, &batch)
 
-	if !gotRow || count != 1 {
-		return errors.New("this instance was fenced off by another")
-	}
-
-	results := txn.SendBatch(ctx, &batch)
-	for i := 0; i < batch.Len(); i++ {
-		if _, err := results.Exec(); err != nil {
-			return err
+	for idx := 0; idx < batch.Len()-1; idx++ {
+		if _, err := res.Exec(); err != nil {
+			return fmt.Errorf("exec store batch: %w", err)
 		}
 	}
-	if err = results.Close(); err != nil {
-		return err
+
+	// The fence confirmation is always the last query in the batch.
+	if err := res.QueryRow().Scan(nil); err != nil {
+		if err == stdsql.ErrNoRows {
+			return errors.New("this instance was fenced off by another")
+		}
+		return fmt.Errorf("checking fence: %w", err)
+	}
+	if err := res.Close(); err != nil {
+		return fmt.Errorf("closing store batch: %w", err)
 	}
 
 	if err := txn.Commit(ctx); err != nil {
@@ -551,6 +526,48 @@ func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate st
 
 func (d *transactor) Destroy() {}
 
-func main() {
-	boilerplate.RunMain(newRedshiftDriver())
+// Initialize temp tables for all bindings. They will be created if they don't yet exist and
+// truncated. The TRUNCATE operation will commit a current transaction, so it must be run
+// separately.
+func (d *transactor) prepareTempTables(ctx context.Context, load bool) error {
+	conn := d.store.conn
+	if load {
+		conn = d.load.conn
+	}
+
+	var initBatch pgx.Batch
+	for _, b := range d.bindings {
+		sql := b.createStoreTableSQL
+		if load {
+			sql = b.createLoadTableSQL
+		}
+		initBatch.Queue(sql)
+	}
+
+	if err := runBatch(initBatch.Len(), conn.SendBatch(ctx, &initBatch)); err != nil {
+		return fmt.Errorf("temp table init: %w", err)
+	}
+
+	var truncateBatch pgx.Batch
+	for _, b := range d.bindings {
+		truncateBatch.Queue(b.truncateTempTableSQL)
+	}
+	if err := runBatch(truncateBatch.Len(), conn.SendBatch(ctx, &truncateBatch)); err != nil {
+		return fmt.Errorf("truncating temp table: %w", err)
+	}
+
+	return nil
+}
+
+func runBatch(l int, b pgx.BatchResults) error {
+	for idx := 0; idx < l; idx++ {
+		if _, err := b.Exec(); err != nil {
+			return fmt.Errorf("exec index %d: %w", idx, err)
+		}
+	}
+	if err := b.Close(); err != nil {
+		return fmt.Errorf("closing batch: %w", err)
+	}
+
+	return nil
 }
