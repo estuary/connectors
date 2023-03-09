@@ -22,7 +22,15 @@ var rsDialect = func() sql.Dialect {
 		sql.ARRAY:   sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.BINARY:  sql.NewStaticMapper("VARBYTE"),
 		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("VARCHAR(max)"), // TODO: Figure out what to do with this. Use max length mapper?
+			Fallback: sql.MaxLengthMapper{
+				WithLength: sql.NewStaticMapper("VARCHAR(%d)"),
+				// The Redshift TEXT type is currently equivalent to VARCHAR(256). 256 is pretty
+				// long, but probably not long enough to handle everything. Using the
+				// MaxLengthMapper allows for longer strings to be handled by setting the maxLength
+				// constraint for the desired string fields in the JSON schema for the materialized
+				// collection.
+				Fallback: sql.NewStaticMapper("TEXT"),
+			},
 			WithFormat: map[string]sql.TypeMapper{
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMPTZ"),
