@@ -1,18 +1,14 @@
 --- Begin "a-schema".target_table createTargetTable ---
-
 CREATE TABLE IF NOT EXISTS "a-schema".target_table (
-		key1 BIGINT NOT NULL,
-		"key!2" BOOLEAN NOT NULL,
-		nullableKey TEXT,
-		Camel_Case BIGINT,
-		"a Time" TIMESTAMPTZ,
-		"array" SUPER,
-		lower_case BIGINT,
-		value VARCHAR(4096),
-		flow_document SUPER NOT NULL,
-
-		-- TODO: Sort key? Primary key here doesn't do what you might think it does.
-		PRIMARY KEY (key1, "key!2", nullableKey)
+	key1 BIGINT,
+	"key!2" BOOLEAN,
+	nullableKey TEXT,
+	Camel_Case BIGINT,
+	"a Time" TIMESTAMPTZ,
+	"array" SUPER,
+	lower_case BIGINT,
+	value VARCHAR(4096),
+	flow_document SUPER
 );
 
 COMMENT ON TABLE "a-schema".target_table IS 'Generated for materialization test/sqlite of collection key/value';
@@ -31,11 +27,10 @@ COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'user-provided projec
 --- End "a-schema".target_table createTargetTable ---
 
 --- Begin "Delta Updates" createTargetTable ---
-
 CREATE TABLE IF NOT EXISTS "Delta Updates" (
-		theKey TEXT NOT NULL,
-		nullableKey TEXT,
-		aValue BIGINT
+	theKey TEXT,
+	nullableKey TEXT,
+	aValue BIGINT
 );
 
 COMMENT ON TABLE "Delta Updates" IS 'Generated for materialization test/sqlite of collection delta/updates';
@@ -46,99 +41,84 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]';
 --- End "Delta Updates" createTargetTable ---
 
 --- Begin "a-schema".target_table createLoadTable ---
-
 CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_0 (
-		key1 BIGINT NOT NULL,
-		"key!2" BOOLEAN NOT NULL,
-		nullableKey TEXT
+	key1 BIGINT,
+	"key!2" BOOLEAN,
+	nullableKey TEXT
 );
 --- End "a-schema".target_table createLoadTable ---
 
 --- Begin "Delta Updates" createLoadTable ---
-
 CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_1 (
-		theKey TEXT NOT NULL,
-		nullableKey TEXT
+	theKey TEXT,
+	nullableKey TEXT
 );
 --- End "Delta Updates" createLoadTable ---
 
 --- Begin "a-schema".target_table createStoreTable ---
-
 CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_0 (
 	LIKE "a-schema".target_table
 );
 --- End "a-schema".target_table createStoreTable ---
 
 --- Begin "Delta Updates" createStoreTable ---
-
 CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_1 (
 	LIKE "Delta Updates"
 );
 --- End "Delta Updates" createStoreTable ---
 
 --- Begin "a-schema".target_table truncateTempTable ---
-
 TRUNCATE flow_temp_table_0;
 --- End "a-schema".target_table truncateTempTable ---
 
 --- Begin "Delta Updates" truncateTempTable ---
-
 TRUNCATE flow_temp_table_1;
 --- End "Delta Updates" truncateTempTable ---
 
 --- Begin "a-schema".target_table storeUpdateDeleteExisting ---
-
 DELETE FROM "a-schema".target_table
 USING flow_temp_table_0
 WHERE "a-schema".target_table.key1 = flow_temp_table_0.key1 AND "a-schema".target_table."key!2" = flow_temp_table_0."key!2" AND "a-schema".target_table.nullableKey = flow_temp_table_0.nullableKey;
 --- End "a-schema".target_table storeUpdateDeleteExisting ---
 
 --- Begin "Delta Updates" storeUpdateDeleteExisting ---
-
 DELETE FROM "Delta Updates"
 USING flow_temp_table_1
 WHERE "Delta Updates".theKey = flow_temp_table_1.theKey AND "Delta Updates".nullableKey = flow_temp_table_1.nullableKey;
 --- End "Delta Updates" storeUpdateDeleteExisting ---
 
 --- Begin "a-schema".target_table storeUpdate ---
-
 INSERT INTO "a-schema".target_table  
 SELECT * FROM flow_temp_table_0;
 --- End "a-schema".target_table storeUpdate ---
 
 --- Begin "Delta Updates" storeUpdate ---
-
 INSERT INTO "Delta Updates"  
 SELECT * FROM flow_temp_table_1;
 --- End "Delta Updates" storeUpdate ---
 
 --- Begin "a-schema".target_table loadQuery ---
-
 SELECT 0, r.flow_document
 	FROM flow_temp_table_0 AS l
 	JOIN "a-schema".target_table AS r
 		 ON  l.key1 = r.key1
 		 AND l."key!2" = r."key!2"
 		 AND l.nullableKey = r.nullableKey
-
 --- End "a-schema".target_table loadQuery ---
 
 --- Begin "Delta Updates" loadQuery ---
-
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
-
 --- End "Delta Updates" loadQuery ---
 
 --- Begin Fence Get ---
-
 SELECT 1 FROM path."To".checkpoints WHERE
 	materialization = 'some/Materialization'
 	AND   key_begin = 1122867
 	AND   key_end   = 4293844428
 	AND   fence     = 123;
 --- End Fence Get ---
---- Begin Fence Update ---
 
+--- Begin Fence Update ---
 UPDATE path."To".checkpoints
 	SET   checkpoint = 'AAECAwQFBgcICQ=='
 	WHERE materialization = 'some/Materialization'
@@ -146,12 +126,13 @@ UPDATE path."To".checkpoints
 	AND   key_end   = 4293844428
 	AND   fence     = 123;
 --- End Fence Update ---
---- Begin Copy From S3 ---
 
+--- Begin Copy From S3 ---
 COPY my_temp_table
 FROM 's3://some_bucket'
 CREDENTIALS 'aws_access_key_id=accessKeyID;aws_secret_access_key=secretKey'
 REGION 'us-somewhere-1'
 json 'auto';
 --- End Copy From S3 ---
+
 
