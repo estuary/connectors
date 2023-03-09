@@ -135,6 +135,8 @@ func newRedshiftDriver() pm.DriverServer {
 				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
 			}
 
+			// TODO: Add checks for S3 access.
+
 			log.WithFields(log.Fields{
 				"database": cfg.Database,
 				"address":  cfg.Address,
@@ -145,7 +147,7 @@ func newRedshiftDriver() pm.DriverServer {
 			if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
 			}
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
+			var metaSpecs, metaCheckpoints = metaTables(metaBase)
 
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
@@ -591,4 +593,30 @@ func runBatch(l int, b pgx.BatchResults) error {
 	}
 
 	return nil
+}
+
+func metaTables(metaBase sql.TablePath) (specs sql.TableShape, checkpoints sql.TableShape) {
+	metaSpecs, metaCheckpoints := sql.MetaTables(metaBase)
+
+	// Our stored base64-encoded specs and checkpoints can be quite long, so we need to use a
+	// permissive text column size.
+
+	maxColumnLength := uint32(65535) // (64K-1), which is the maximum allowable in Redshift.
+
+	for _, p := range metaSpecs.Values {
+		if p.Field == "spec" {
+			p.Inference.String_.MaxLength = maxColumnLength
+		}
+	}
+
+	// Napkin math suggests that each source journal adds about ~350 bytes to the checkpoint size,
+	// so a 64K maximum checkpoint size allows for somewhere in the ballpark of 100-200 source
+	// journals.
+	for _, p := range metaCheckpoints.Values {
+		if p.Field == "checkpoint" {
+			p.Inference.String_.MaxLength = maxColumnLength
+		}
+	}
+
+	return metaSpecs, metaCheckpoints
 }
