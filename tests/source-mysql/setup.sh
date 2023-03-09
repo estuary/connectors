@@ -8,7 +8,7 @@ export MYSQL_DATABASE=test
 export MYSQL_HOST="${MYSQL_HOST:=source-mysql-db-1.flow-test}"
 export MYSQL_PORT="${MYSQL_PORT:=3306}"
 export MYSQL_USER="${MYSQL_USER:=root}"
-export MYSQL_PASSWORD="${MYSQL_PASSWORD:=flow}"
+export MYSQL_PASSWORD="${MYSQL_PASSWORD:=secret1234}"
 
 docker compose -f source-mysql/docker-compose.yaml up --wait
 
