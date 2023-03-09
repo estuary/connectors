@@ -38,10 +38,11 @@ var rsDialect = func() sql.Dialect {
 			},
 		},
 	}
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
+
+	// NB: We are not using sql.NullableMapper so that all columns are created as nullable. This is
+	// necessary because Redshift does not support dropping a NOT NULL constraint, so we need to
+	// create columns as nullable to preserve the ability to change collection schema fields from
+	// required to not required.
 
 	return sql.Dialect{
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
@@ -73,24 +74,16 @@ var (
 flow_temp_table_{{ $.Binding }}
 {{- end }}
 
--- Templated creation of a materialized table definition and comments:
+-- Templated creation of a materialized table definition and comments.
+-- DISTSTYLE and SORTKEY are omitted to allow for automatic optimization by Redshift.
+-- Note that Redshift does not support primary keys or unique constraints.
 
 {{ define "createTargetTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
-	{{- range $ind, $col := $.Columns }}
-		{{- if $ind }},{{ end }}
-		{{$col.Identifier}} {{$col.DDL}}
-	{{- end }}
-	{{- if not $.DeltaUpdates }},
-
-		-- TODO: Sort key? Primary key here doesn't do what you might think it does.
-		PRIMARY KEY (
-	{{- range $ind, $key := $.Keys }}
-		{{- if $ind }}, {{end -}}
-		{{$key.Identifier}}
-	{{- end -}}
-	)
-	{{- end }}
+{{- range $ind, $col := $.Columns }}
+	{{- if $ind }},{{ end }}
+	{{$col.Identifier}} {{$col.DDL}}
+{{- end }}
 );
 
 COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
@@ -99,21 +92,21 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 {{- end}}
 {{ end }}
 
--- Alter column and mark it as nullable
--- TODO: See if this works
+-- Redshift does not support dropping NOT NULL constraints. Instead, Redshift columns are always
+-- created as nullable and alterColumnNullable is a noop.
 
 {{ define "alterColumnNullable" }}
-ALTER TABLE {{ $.Table.Identifier }} ALTER COLUMN {{ $.Identifier }} DROP NOT NULL;
+SELECT NULL LIMIT 0;
 {{ end }}
 
 -- Idempotent creation of the load table for staging load keys.
 
 {{ define "createLoadTable" }}
 CREATE TEMPORARY TABLE IF NOT EXISTS {{ template "temp_name" . }} (
-	{{- range $ind, $key := $.Keys }}
-		{{- if $ind }},{{ end }}
-		{{ $key.Identifier }} {{ $key.DDL }}
-	{{- end }}
+{{- range $ind, $key := $.Keys }}
+	{{- if $ind }},{{ end }}
+	{{ $key.Identifier }} {{ $key.DDL }}
+{{- end }}
 );
 {{ end }}
 
@@ -161,9 +154,9 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 		{{ if $ind }} AND {{ else }} ON  {{ end -}}
 			l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
-{{ else -}}
+{{- else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
-{{ end }}
+{{- end }}
 {{ end }}
 
 -- Templated update and retrieval of the materialization fence. Getting the fence as part of a

@@ -61,7 +61,7 @@ func TestSQLGeneration(t *testing.T) {
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
-			snap.WriteString("--- Begin " + testcase + " ---\n")
+			snap.WriteString("--- Begin " + testcase + " ---")
 			require.NoError(t, tpl.Execute(&snap, &tbl))
 			snap.WriteString("--- End " + testcase + " ---\n\n")
 		}
@@ -75,13 +75,13 @@ func TestSQLGeneration(t *testing.T) {
 		KeyBegin:        0x00112233,
 		KeyEnd:          0xffeeddcc,
 	}
-	snap.WriteString("--- Begin Fence Get ---\n")
+	snap.WriteString("--- Begin Fence Get ---")
 	require.NoError(t, tplGetFence.Execute(&snap, fence))
-	snap.WriteString("--- End Fence Get ---\n")
+	snap.WriteString("--- End Fence Get ---\n\n")
 
-	snap.WriteString("--- Begin Fence Update ---\n")
+	snap.WriteString("--- Begin Fence Update ---")
 	require.NoError(t, tplUpdateFence.Execute(&snap, fence))
-	snap.WriteString("--- End Fence Update ---\n")
+	snap.WriteString("--- End Fence Update ---\n\n")
 
 	var copyParams = copyFromS3Params{
 		Destination:    "my_temp_table",
@@ -93,9 +93,9 @@ func TestSQLGeneration(t *testing.T) {
 		},
 	}
 
-	snap.WriteString("--- Begin Copy From S3 ---\n")
+	snap.WriteString("--- Begin Copy From S3 ---")
 	require.NoError(t, tplCopyFromS3.Execute(&snap, copyParams))
-	snap.WriteString("--- End Copy From S3 ---\n")
+	snap.WriteString("--- End Copy From S3 ---\n\n")
 
 	cupaloy.SnapshotT(t, snap.String())
 }
