@@ -63,14 +63,19 @@ func (c *config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+
 	return nil
+}
+
+func (c *config) networkTunnelEnabled() bool {
+	return c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != ""
 }
 
 func (c *config) toURI() string {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432 to address
 	// through the bastion server, so we use the tunnel's address
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "" {
+	if c.networkTunnelEnabled() {
 		address = "localhost:5432"
 	}
 	var uri = url.URL{
@@ -81,6 +86,12 @@ func (c *config) toURI() string {
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
 	}
+
+	// Always require encryption when not connecting through a tunnel.
+	if !c.networkTunnelEnabled() {
+		uri.RawQuery = "sslmode=require"
+	}
+
 	return uri.String()
 }
 
@@ -198,7 +209,7 @@ func newRedshiftDriver() pm.DriverServer {
 			var metaSpecs, metaCheckpoints = metaTables(metaBase)
 
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
+			if cfg.networkTunnelEnabled() {
 				host, port, err := net.SplitHostPort(cfg.Address)
 				if err != nil {
 					return nil, fmt.Errorf("splitting address to host and port: %w", err)
