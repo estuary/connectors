@@ -92,8 +92,10 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 ALTER TABLE {{ $.Table.Identifier }} ALTER COLUMN {{ $.Identifier }} DROP NOT NULL;
 {{ end }}
 
+-- Idempotent creation of the load table for staging load keys.
+
 {{ define "createLoadTable" }}
-CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
+CREATE TEMPORARY TABLE IF NOT EXISTS {{ template "temp_name" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
@@ -101,11 +103,23 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 );
 {{ end }}
 
+-- Idempotent creation of the store table for staging new records.
+
 {{ define "createStoreTable" }}
-CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
+CREATE TEMPORARY TABLE IF NOT EXISTS {{ template "temp_name" . }} (
 	LIKE {{$.Identifier}}
 );
 {{ end }}
+
+-- The load and store tables will be truncated on each transaction round.
+
+{{ define "truncateTempTable" }}
+TRUNCATE {{ template "temp_name" . }};
+{{ end }}
+
+-- Merging data from a source table to a target table in redshift is accomplish
+-- by first deleting comming records from the target table then copying all records
+-- from the source into the target.
 
 {{ define "storeUpdateDeleteExisting" }}
 DELETE FROM {{$.Identifier}}
@@ -138,13 +152,8 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 
-{{ define "getFence" }}
-SELECT COUNT(*) FROM {{ Identifier $.TablePath }} WHERE
-	materialization = {{ Literal $.Materialization.String }}
-	AND   key_begin = {{ $.KeyBegin }}
-	AND   key_end   = {{ $.KeyEnd }}
-	AND   fence     = {{ $.Fence }};
-{{ end }}
+-- Templated update and retrieval of the materialization fence. Getting the fence as part of a
+-- transaction will confirm that this instance has not been fenced off.
 
 {{ define "updateFence" }}
 UPDATE {{ Identifier $.TablePath }}
@@ -154,10 +163,19 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   key_end   = {{ $.KeyEnd }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
+
+{{ define "getFence" }}
+SELECT 1 FROM {{ Identifier $.TablePath }} WHERE
+	materialization = {{ Literal $.Materialization.String }}
+	AND   key_begin = {{ $.KeyBegin }}
+	AND   key_end   = {{ $.KeyEnd }}
+	AND   fence     = {{ $.Fence }};
+{{ end }}
 `)
 	tplCreateTargetTable         = tplAll.Lookup("createTargetTable")
 	tplCreateLoadTable           = tplAll.Lookup("createLoadTable")
 	tplCreateStoreTable          = tplAll.Lookup("createStoreTable")
+	tplTruncateTempTable         = tplAll.Lookup("truncateTempTable")
 	tplStoreUpdateDeleteExisting = tplAll.Lookup("storeUpdateDeleteExisting")
 	tplStoreUpdate               = tplAll.Lookup("storeUpdate")
 	tplLoadQuery                 = tplAll.Lookup("loadQuery")
