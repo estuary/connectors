@@ -41,7 +41,7 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]';
 --- End "Delta Updates" createTargetTable ---
 
 --- Begin "a-schema".target_table createLoadTable ---
-CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_0 (
+CREATE TEMPORARY TABLE flow_temp_table_0 (
 	key1 BIGINT,
 	"key!2" BOOLEAN,
 	nullableKey TEXT
@@ -49,31 +49,23 @@ CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_0 (
 --- End "a-schema".target_table createLoadTable ---
 
 --- Begin "Delta Updates" createLoadTable ---
-CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_1 (
+CREATE TEMPORARY TABLE flow_temp_table_1 (
 	theKey TEXT,
 	nullableKey TEXT
 );
 --- End "Delta Updates" createLoadTable ---
 
 --- Begin "a-schema".target_table createStoreTable ---
-CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_0 (
+CREATE TEMPORARY TABLE flow_temp_table_0 (
 	LIKE "a-schema".target_table
 );
 --- End "a-schema".target_table createStoreTable ---
 
 --- Begin "Delta Updates" createStoreTable ---
-CREATE TEMPORARY TABLE IF NOT EXISTS flow_temp_table_1 (
+CREATE TEMPORARY TABLE flow_temp_table_1 (
 	LIKE "Delta Updates"
 );
 --- End "Delta Updates" createStoreTable ---
-
---- Begin "a-schema".target_table truncateTempTable ---
-TRUNCATE flow_temp_table_0;
---- End "a-schema".target_table truncateTempTable ---
-
---- Begin "Delta Updates" truncateTempTable ---
-TRUNCATE flow_temp_table_1;
---- End "Delta Updates" truncateTempTable ---
 
 --- Begin "a-schema".target_table storeUpdateDeleteExisting ---
 DELETE FROM "a-schema".target_table
