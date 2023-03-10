@@ -134,12 +134,21 @@ func (d *driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 		}
 	}()
 
+	existingDatabases, err := client.ListDatabaseNames(ctx, bson.D{})
+	if err != nil {
+		return nil, fmt.Errorf("getting list of databases: %w", err)
+	}
+
 	var bindings = []*pc.ValidateResponse_Binding{}
 
 	for _, binding := range req.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
+		}
+
+		if !SliceContains(res.Database, existingDatabases) {
+			return nil, fmt.Errorf("database %s does not exist", res.Database)
 		}
 
 		var db = client.Database(res.Database)
