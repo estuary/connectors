@@ -20,6 +20,7 @@ func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 	var client = client{uri: "postgresql://postgres:postgres@localhost:5432/postgres"}
 	sql.RunFenceTestCases(t,
+		sql.FenceSnapshotPath,
 		client,
 		[]string{"temp_test_fencing_checkpoints"},
 		pgDialect,

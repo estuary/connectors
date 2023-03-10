@@ -12,10 +12,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// FenceSnapshotPath is a common set of fence test snapshots that may be used by clients that
+// produce standard table dump outputs.
+var FenceSnapshotPath = "../materialize-sql/.snapshots"
+
 // RunFenceTestCases is a generalized form of test cases over fencing behavior,
 // which ought to function with any Client implementation.
 func RunFenceTestCases(
 	t *testing.T,
+	snapshotPath string,
 	client Client,
 	checkpointsPath []string,
 	dialect Dialect,
@@ -93,7 +98,9 @@ func RunFenceTestCases(
 		dump3, err := dumpTable(metaTable)
 		require.NoError(t, err)
 
-		cupaloy.SnapshotT(t,
+		snapshotter := cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath))
+
+		snapshotter.SnapshotT(t,
 			"After installing fixtures:\n"+dump1+
 				"\nAfter install fence under test:\n"+dump2+
 				"\nAfter update:\n"+dump3)

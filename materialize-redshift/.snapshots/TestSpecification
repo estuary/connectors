@@ -1,0 +1,143 @@
+{
+  "endpoint_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-redshift/config",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Address",
+        "description": "Host and port of the database. Example: red-shift-cluster-name.account.us-east-2.redshift.amazonaws.com:5439",
+        "order": 0
+      },
+      "user": {
+        "type": "string",
+        "title": "User",
+        "description": "Database user to connect as.",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "description": "Password for the specified database user.",
+        "order": 2,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Name of the logical database to materialize to. The materialization will attempt to connect to the default database for the provided user if omitted.",
+        "order": 3
+      },
+      "schema": {
+        "type": "string",
+        "title": "Database Schema",
+        "description": "Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables.",
+        "default": "public",
+        "order": 4
+      },
+      "bucket": {
+        "type": "string",
+        "title": "S3 Staging Bucket",
+        "description": "Name of the S3 bucket to use for staging data loads.",
+        "order": 5
+      },
+      "awsAccessKeyId": {
+        "type": "string",
+        "title": "Access Key ID",
+        "description": "AWS Access Key ID for reading and writing data to the S3 staging bucket.",
+        "order": 6
+      },
+      "awsSecretAccessKey": {
+        "type": "string",
+        "title": "Secret Access Key",
+        "description": "AWS Secret Access Key for reading and writing data to the S3 staging bucket.",
+        "order": 7,
+        "secret": true
+      },
+      "region": {
+        "type": "string",
+        "title": "Region",
+        "description": "Region of the S3 staging bucket. For optimal performance this should be in the same region as the Redshift database cluster.",
+        "order": 8
+      },
+      "networkTunnel": {
+        "properties": {
+          "sshForwarding": {
+            "properties": {
+              "sshEndpoint": {
+                "type": "string",
+                "title": "SSH Endpoint",
+                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                "pattern": "^ssh://.+@.+$"
+              },
+              "privateKey": {
+                "type": "string",
+                "title": "SSH Private Key",
+                "description": "Private key to connect to the remote SSH server.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sshEndpoint",
+              "privateKey"
+            ],
+            "title": "SSH Forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Network Tunnel",
+        "description": "Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "user",
+      "password",
+      "bucket",
+      "awsAccessKeyId",
+      "awsSecretAccessKey",
+      "region"
+    ],
+    "title": "SQL Connection"
+  },
+  "resource_spec_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-redshift/table-config",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the database table.",
+        "x-collection-name": true
+      },
+      "schema": {
+        "type": "string",
+        "title": "Alternative Schema",
+        "description": "Alternative schema for this table (optional)."
+      },
+      "additional_table_create_sql": {
+        "type": "string",
+        "title": "Additional Table Create SQL",
+        "description": "Additional SQL statement(s) to be run in the same transaction that creates the table.",
+        "multiline": true
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Update",
+        "description": "Should updates to this table be done via delta updates. Default is false.",
+        "default": false
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "SQL Table"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-redshift"
+}
