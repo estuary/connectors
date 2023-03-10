@@ -75,9 +75,6 @@ func TestSQLGeneration(t *testing.T) {
 		KeyBegin:        0x00112233,
 		KeyEnd:          0xffeeddcc,
 	}
-	snap.WriteString("--- Begin Fence Get ---")
-	require.NoError(t, tplGetFence.Execute(&snap, fence))
-	snap.WriteString("--- End Fence Get ---\n\n")
 
 	snap.WriteString("--- Begin Fence Update ---")
 	require.NoError(t, tplUpdateFence.Execute(&snap, fence))
