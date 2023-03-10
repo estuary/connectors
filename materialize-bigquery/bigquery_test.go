@@ -12,7 +12,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bradleyjkemp/cupaloy"
-	driverSql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
@@ -73,12 +73,13 @@ func TestFencingCases(t *testing.T) {
 	client, err := cfg.client(ctx)
 	require.NoError(t, err)
 
-	driverSql.RunFenceTestCases(t,
+	sql.RunFenceTestCases(t,
+		sql.FenceSnapshotPath,
 		client,
 		tablePath,
 		bqDialect,
 		tplCreateTargetTable,
-		func(table driverSql.Table, fence driverSql.Fence) error {
+		func(table sql.Table, fence sql.Fence) error {
 			var fenceUpdate strings.Builder
 			if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
@@ -88,7 +89,7 @@ func TestFencingCases(t *testing.T) {
 
 			return nil
 		},
-		func(table driverSql.Table) (out string, err error) {
+		func(table sql.Table) (out string, err error) {
 			job, err := client.query(ctx, fmt.Sprintf("SELECT * FROM %s;", table.Identifier))
 			if err != nil {
 				return "", err
