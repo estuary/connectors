@@ -376,10 +376,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, bucket st
 	return nil
 }
 
-// TODO: Handling non-serializable errors :(.
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	log.Info("loading")
-
 	var ctx = it.Context()
 	gotLoads := false
 	for it.Next() {
@@ -401,8 +398,9 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 
 	if !gotLoads {
-		// Optimization to avoid the remaining load query logic if no loads were received, as would
-		// be the case if all bindings of the materialization were set to use delta updates.
+		// Early return as an optimization to avoid the remaining load queries if no loads were
+		// received, as would be the case if all bindings of the materialization were set to use
+		// delta updates.
 		return nil
 	}
 
@@ -475,8 +473,6 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
-	log.Info("storing")
-
 	ctx := it.Context()
 
 	// hasUpdates is used to track if a given binding includes only insertions for this store round
@@ -522,8 +518,6 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 }
 
 func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate string, hasUpdates []bool) error {
-	log.Info("committing")
-
 	if err := d.prepareTempTables(ctx, false); err != nil {
 		return fmt.Errorf("preparing store temp tables: %w", err)
 	}
@@ -534,9 +528,19 @@ func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate st
 	}
 	var batch pgx.Batch
 
+	// If there are multiple materializations operating on different tables within the same database
+	// using the same metadata table path, they will need to concurrently update the checkpoints
+	// table. Aquiring a table-level lock prevents "serializable isolation violation" errors in this
+	// case (they still happen even though the queries update different _rows_ in the same table),
+	// although it means each materialization will have to take turns updating the checkpoints
+	// table. For best performance, a single materialization per database should be used, or
+	// separate materializations within the same database should use a different schema for their
+	// metadata.
+	batch.Queue(fmt.Sprintf("lock %s;", rsDialect.Identifier(d.store.fence.TablePath...)))
+
 	for idx, b := range d.bindings {
 		if !b.storeFile.started {
-			// no loads for this binding
+			// No loads for this binding.
 			continue
 		}
 
