@@ -159,21 +159,12 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 {{- end }}
 {{ end }}
 
--- Templated update and retrieval of the materialization fence. Getting the fence as part of a
--- transaction will confirm that this instance has not been fenced off.
+-- Templated update of a fence checkpoint.
 
 {{ define "updateFence" }}
 UPDATE {{ Identifier $.TablePath }}
 	SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
 	WHERE materialization = {{ Literal $.Materialization.String }}
-	AND   key_begin = {{ $.KeyBegin }}
-	AND   key_end   = {{ $.KeyEnd }}
-	AND   fence     = {{ $.Fence }};
-{{ end }}
-
-{{ define "getFence" }}
-SELECT 1 FROM {{ Identifier $.TablePath }} WHERE
-	materialization = {{ Literal $.Materialization.String }}
 	AND   key_begin = {{ $.KeyBegin }}
 	AND   key_end   = {{ $.KeyEnd }}
 	AND   fence     = {{ $.Fence }};
@@ -195,7 +186,6 @@ json 'auto';
 	tplStoreUpdate               = tplAll.Lookup("storeUpdate")
 	tplLoadQuery                 = tplAll.Lookup("loadQuery")
 	tplAlterColumnNullable       = tplAll.Lookup("alterColumnNullable")
-	tplGetFence                  = tplAll.Lookup("getFence")
 	tplUpdateFence               = tplAll.Lookup("updateFence")
 	tplCopyFromS3                = tplAll.Lookup("copyFromS3")
 )
