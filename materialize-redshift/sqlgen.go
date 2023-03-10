@@ -9,8 +9,9 @@ import (
 )
 
 // Identifiers matching the this pattern do not need to be quoted. See
-// https://docs.aws.amazon.com/redshift/latest/dg/r_names.html.
-// Identifiers are case-insensitive, even if they are quoted. There is a cluster setting to make them case-sensitive.
+// https://docs.aws.amazon.com/redshift/latest/dg/r_names.html. Identifiers (table names and column
+// names) are case-insensitive, even if they are quoted. They are always converted to lowercase by
+// default.
 var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
 var rsDialect = func() sql.Dialect {
@@ -34,7 +35,9 @@ var rsDialect = func() sql.Dialect {
 			WithFormat: map[string]sql.TypeMapper{
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMPTZ"),
-				"time":      sql.NewStaticMapper("TIMETZ"),
+				// "time" is not currently support due to limitations with loading time values from
+				// staged JSON.
+				// "time": sql.NewStaticMapper("TIMETZ"),
 			},
 		},
 	}
@@ -124,8 +127,8 @@ CREATE TEMPORARY TABLE IF NOT EXISTS {{ template "temp_name" . }} (
 TRUNCATE {{ template "temp_name" . }};
 {{ end }}
 
--- Merging data from a source table to a target table in redshift is accomplish
--- by first deleting comming records from the target table then copying all records
+-- Merging data from a source table to a target table in redshift is accomplished
+-- by first deleting common records from the target table then copying all records
 -- from the source into the target.
 
 {{ define "storeUpdateDeleteExisting" }}
@@ -170,12 +173,17 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 
+-- Templated command to copy data from an S3 file into the destination table. Note the 'ignorecase'
+-- JSON option: This is necessary since be default Redshift lowercases all identifiers.
+
 {{ define "copyFromS3" }}
 COPY {{ $.Destination }}
 FROM '{{ $.ObjectLocation }}'
 CREDENTIALS 'aws_access_key_id={{ $.Config.AWSAccessKeyID }};aws_secret_access_key={{ $.Config.AWSSecretAccessKey }}'
 REGION '{{ $.Config.Region }}'
-json 'auto';
+JSON 'auto ignorecase'
+DATEFORMAT 'auto'
+TIMEFORMAT 'auto';
 {{ end }}
 `)
 	tplCreateTargetTable         = tplAll.Lookup("createTargetTable")
