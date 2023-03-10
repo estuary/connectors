@@ -124,7 +124,9 @@ COPY my_temp_table
 FROM 's3://some_bucket'
 CREDENTIALS 'aws_access_key_id=accessKeyID;aws_secret_access_key=secretKey'
 REGION 'us-somewhere-1'
-json 'auto';
+JSON 'auto ignorecase'
+DATEFORMAT 'auto'
+TIMEFORMAT 'auto';
 --- End Copy From S3 ---
 
 
