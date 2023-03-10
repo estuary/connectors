@@ -282,16 +282,8 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 }
 
 type transactor struct {
-	// Variables exclusively used by Load.
-	load struct {
-		conn     *pgx.Conn
-		unionSQL string
-	}
-	// Variables exclusively used by Store.
-	store struct {
-		conn  *pgx.Conn
-		fence sql.Fence
-	}
+	unionSQL string
+	fence    sql.Fence
 	bindings []*binding
 	cfg      *config
 }
@@ -303,25 +295,16 @@ func newTransactor(
 	bindings []sql.Table,
 ) (_ pm.Transactor, err error) {
 	var d = &transactor{}
-	d.store.fence = fence
+	d.fence = fence
+	d.cfg = ep.Config.(*config)
 
-	var cfg = ep.Config.(*config)
-	d.cfg = cfg
-
-	if d.load.conn, err = pgx.Connect(ctx, cfg.toURI()); err != nil {
-		return nil, fmt.Errorf("load pgx.Connect: %w", err)
-	}
-	if d.store.conn, err = pgx.Connect(ctx, cfg.toURI()); err != nil {
-		return nil, fmt.Errorf("store pgx.Connect: %w", err)
-	}
-
-	s3client, err := cfg.toS3Client(ctx)
+	s3client, err := d.cfg.toS3Client(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, cfg.Bucket, s3client); err != nil {
+		if err = d.addBinding(ctx, binding, d.cfg.Bucket, s3client); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -331,7 +314,7 @@ func newTransactor(
 	for _, b := range d.bindings {
 		subqueries = append(subqueries, b.loadQuerySQL)
 	}
-	d.load.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
+	d.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 
 	return d, nil
 }
@@ -342,7 +325,6 @@ type binding struct {
 	storeFile                    *stagedFile
 	createLoadTableSQL           string
 	createStoreTableSQL          string
-	truncateTempTableSQL         string
 	storeUpdateDeleteExistingSQL string
 	storeUpdateSQL               string
 	loadQuerySQL                 string
@@ -361,7 +343,6 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, bucket st
 	}{
 		{&b.createLoadTableSQL, tplCreateLoadTable},
 		{&b.createStoreTableSQL, tplCreateStoreTable},
-		{&b.truncateTempTableSQL, tplTruncateTempTable},
 		{&b.storeUpdateDeleteExistingSQL, tplStoreUpdateDeleteExisting},
 		{&b.storeUpdateSQL, tplStoreUpdate},
 		{&b.loadQuerySQL, tplLoadQuery},
@@ -404,18 +385,26 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		return nil
 	}
 
-	if err := d.prepareTempTables(ctx, true); err != nil {
-		return fmt.Errorf("preparing load temp tables: %w", err)
+	conn, err := pgx.Connect(ctx, d.cfg.toURI())
+	if err != nil {
+		return fmt.Errorf("load pgx.Connect: %w", err)
 	}
+	defer conn.Close(ctx)
 
 	// Transaction for processing the loads.
-	txn, err := d.load.conn.BeginTx(ctx, pgx.TxOptions{})
+	txn, err := conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("load BeginTx: %w", err)
 	}
+	defer txn.Rollback(ctx)
 
-	var loadBatch pgx.Batch
+	var batch pgx.Batch
 	for idx, b := range d.bindings {
+		// The temporary load table for each binding always needs to be created because it is used
+		// in the UNION ALL load query. This may be an opportunity for a (minor) future
+		// optimization.
+		batch.Queue(b.createLoadTableSQL)
+
 		if !b.loadFile.started {
 			// No loads for this binding.
 			continue
@@ -436,16 +425,22 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			return fmt.Errorf("evaluating copy from s3 template: %w", err)
 		}
 
-		loadBatch.Queue(copySql.String())
+		batch.Queue(copySql.String())
 	}
 
-	if err := runBatch(loadBatch.Len(), txn.SendBatch(ctx, &loadBatch)); err != nil {
-		return fmt.Errorf("sending load batch: %w", err)
+	res := txn.SendBatch(ctx, &batch)
+	for idx := 0; idx < batch.Len(); idx++ {
+		if _, err := res.Exec(); err != nil {
+			return fmt.Errorf("exec load batch index %d: %w", idx, err)
+		}
+	}
+	if err := res.Close(); err != nil {
+		return fmt.Errorf("closing load batch: %w", err)
 	}
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
-	rows, err := txn.Query(ctx, d.load.unionSQL)
+	rows, err := txn.Query(ctx, d.unionSQL)
 	if err != nil {
 		return fmt.Errorf("querying load documents: %w", err)
 	}
@@ -501,10 +496,10 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
-		d.store.fence.Checkpoint = runtimeCheckpoint
+		d.fence.Checkpoint = runtimeCheckpoint
 
 		var fenceUpdate strings.Builder
-		if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+		if err := tplUpdateFence.Execute(&fenceUpdate, d.fence); err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
 		}
 
@@ -513,14 +508,18 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 }
 
 func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates []bool) error {
-	if err := d.prepareTempTables(ctx, false); err != nil {
-		return fmt.Errorf("preparing store temp tables: %w", err)
+	conn, err := pgx.Connect(ctx, d.cfg.toURI())
+	if err != nil {
+		return fmt.Errorf("store pgx.Connect: %w", err)
 	}
+	defer conn.Close(ctx)
 
-	txn, err := d.store.conn.BeginTx(ctx, pgx.TxOptions{})
+	txn, err := conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("store BeginTx: %w", err)
 	}
+	defer txn.Rollback(ctx)
+
 	var batch pgx.Batch
 
 	// If there are multiple materializations operating on different tables within the same database
@@ -531,7 +530,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 	// table. For best performance, a single materialization per database should be used, or
 	// separate materializations within the same database should use a different schema for their
 	// metadata.
-	batch.Queue(fmt.Sprintf("lock %s;", rsDialect.Identifier(d.store.fence.TablePath...)))
+	batch.Queue(fmt.Sprintf("lock %s;", rsDialect.Identifier(d.fence.TablePath...)))
 
 	for idx, b := range d.bindings {
 		if !b.storeFile.started {
@@ -566,6 +565,11 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		batch.Queue(copySql.String())
 
 		if hasUpdates[idx] {
+			// This command must be executed separately so that the table is "visible" for the batch
+			// commands.
+			if _, err := txn.Exec(ctx, b.createStoreTableSQL); err != nil {
+				return fmt.Errorf("creating store table: %w", err)
+			}
 			batch.Queue(b.storeUpdateDeleteExistingSQL)
 			batch.Queue(b.storeUpdateSQL)
 		}
@@ -578,7 +582,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 
 	for idx := 0; idx < batch.Len()-1; idx++ {
 		if _, err := res.Exec(); err != nil {
-			return fmt.Errorf("exec store batch: %w", err)
+			return fmt.Errorf("exec store batch index %d: %w", idx, err)
 		}
 	}
 
@@ -593,59 +597,13 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 	}
 
 	if err := txn.Commit(ctx); err != nil {
-		return fmt.Errorf("commiting store transaction: %w", err)
+		return fmt.Errorf("committing store transaction: %w", err)
 	}
 
 	return nil
 }
 
 func (d *transactor) Destroy() {}
-
-// Initialize temp tables for all bindings. They will be created if they don't yet exist and
-// truncated. The TRUNCATE operation will commit a current transaction, so it must be run
-// separately.
-func (d *transactor) prepareTempTables(ctx context.Context, load bool) error {
-	conn := d.store.conn
-	if load {
-		conn = d.load.conn
-	}
-
-	var initBatch pgx.Batch
-	for _, b := range d.bindings {
-		sql := b.createStoreTableSQL
-		if load {
-			sql = b.createLoadTableSQL
-		}
-		initBatch.Queue(sql)
-	}
-
-	if err := runBatch(initBatch.Len(), conn.SendBatch(ctx, &initBatch)); err != nil {
-		return fmt.Errorf("temp table init: %w", err)
-	}
-
-	var truncateBatch pgx.Batch
-	for _, b := range d.bindings {
-		truncateBatch.Queue(b.truncateTempTableSQL)
-	}
-	if err := runBatch(truncateBatch.Len(), conn.SendBatch(ctx, &truncateBatch)); err != nil {
-		return fmt.Errorf("truncating temp table: %w", err)
-	}
-
-	return nil
-}
-
-func runBatch(l int, b pgx.BatchResults) error {
-	for idx := 0; idx < l; idx++ {
-		if _, err := b.Exec(); err != nil {
-			return fmt.Errorf("exec index %d: %w", idx, err)
-		}
-	}
-	if err := b.Close(); err != nil {
-		return fmt.Errorf("closing batch: %w", err)
-	}
-
-	return nil
-}
 
 func metaTables(metaBase sql.TablePath) (specs sql.TableShape, checkpoints sql.TableShape) {
 	metaSpecs, metaCheckpoints := sql.MetaTables(metaBase)

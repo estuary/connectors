@@ -53,7 +53,6 @@ func TestSQLGeneration(t *testing.T) {
 		tplCreateTargetTable,
 		tplCreateLoadTable,
 		tplCreateStoreTable,
-		tplTruncateTempTable,
 		tplStoreUpdateDeleteExisting,
 		tplStoreUpdate,
 		tplLoadQuery,
