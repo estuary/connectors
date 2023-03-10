@@ -105,7 +105,7 @@ SELECT NULL LIMIT 0;
 -- Idempotent creation of the load table for staging load keys.
 
 {{ define "createLoadTable" }}
-CREATE TEMPORARY TABLE IF NOT EXISTS {{ template "temp_name" . }} (
+CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 {{- range $ind, $key := $.Keys }}
 	{{- if $ind }},{{ end }}
 	{{ $key.Identifier }} {{ $key.DDL }}
@@ -116,7 +116,7 @@ CREATE TEMPORARY TABLE IF NOT EXISTS {{ template "temp_name" . }} (
 -- Idempotent creation of the store table for staging new records.
 
 {{ define "createStoreTable" }}
-CREATE TEMPORARY TABLE IF NOT EXISTS {{ template "temp_name" . }} (
+CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 	LIKE {{$.Identifier}}
 );
 {{ end }}
@@ -189,7 +189,6 @@ TIMEFORMAT 'auto';
 	tplCreateTargetTable         = tplAll.Lookup("createTargetTable")
 	tplCreateLoadTable           = tplAll.Lookup("createLoadTable")
 	tplCreateStoreTable          = tplAll.Lookup("createStoreTable")
-	tplTruncateTempTable         = tplAll.Lookup("truncateTempTable")
 	tplStoreUpdateDeleteExisting = tplAll.Lookup("storeUpdateDeleteExisting")
 	tplStoreUpdate               = tplAll.Lookup("storeUpdate")
 	tplLoadQuery                 = tplAll.Lookup("loadQuery")
