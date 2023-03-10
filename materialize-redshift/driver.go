@@ -503,21 +503,16 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
 		d.store.fence.Checkpoint = runtimeCheckpoint
 
-		var fenceGet strings.Builder
-		if err := tplGetFence.Execute(&fenceGet, d.store.fence); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence get template: %w", err))
-		}
-
 		var fenceUpdate strings.Builder
 		if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceGet.String(), fenceUpdate.String(), hasUpdates) })
+		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String(), hasUpdates) })
 	}, nil
 }
 
-func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate string, hasUpdates []bool) error {
+func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates []bool) error {
 	if err := d.prepareTempTables(ctx, false); err != nil {
 		return fmt.Errorf("preparing store temp tables: %w", err)
 	}
@@ -576,8 +571,8 @@ func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate st
 		}
 	}
 
+	// The fence update is always the last query in the batch.
 	batch.Queue(fenceUpdate)
-	batch.Queue(fenceGet)
 
 	res := txn.SendBatch(ctx, &batch)
 
@@ -587,12 +582,11 @@ func (d *transactor) commit(ctx context.Context, fenceGet string, fenceUpdate st
 		}
 	}
 
-	// The fence confirmation is always the last query in the batch.
-	if err := res.QueryRow().Scan(nil); err != nil {
-		if err == stdsql.ErrNoRows {
-			return errors.New("this instance was fenced off by another")
-		}
-		return fmt.Errorf("checking fence: %w", err)
+	fenceRes, err := res.Exec()
+	if err != nil {
+		return fmt.Errorf("fetching fence update rows: %w", err)
+	} else if fenceRes.RowsAffected() != 1 {
+		return errors.New("this instance was fenced off by another")
 	}
 	if err := res.Close(); err != nil {
 		return fmt.Errorf("closing store batch: %w", err)

@@ -110,14 +110,6 @@ SELECT 0, r.flow_document
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 --- End "Delta Updates" loadQuery ---
 
---- Begin Fence Get ---
-SELECT 1 FROM path."To".checkpoints WHERE
-	materialization = 'some/Materialization'
-	AND   key_begin = 1122867
-	AND   key_end   = 4293844428
-	AND   fence     = 123;
---- End Fence Get ---
-
 --- Begin Fence Update ---
 UPDATE path."To".checkpoints
 	SET   checkpoint = 'AAECAwQFBgcICQ=='
