@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -206,7 +208,7 @@ func newRedshiftDriver() pm.DriverServer {
 			if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
 			}
-			var metaSpecs, metaCheckpoints = metaTables(metaBase)
+			metaSpecs, metaCheckpoints := sql.MetaTables(metaBase)
 
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.networkTunnelEnabled() {
@@ -253,7 +255,18 @@ type client struct {
 
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
 	err = c.withDB(func(db *stdsql.DB) error {
-		specB64, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
+		var specHex string
+		specHex, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
+		if err != nil {
+			return err
+		}
+
+		specBytes, err := hex.DecodeString(specHex)
+		if err != nil {
+			return err
+		}
+
+		specB64 = string(specBytes)
 		return err
 	})
 	return
@@ -266,7 +279,14 @@ func (c client) ExecStatements(ctx context.Context, statements []string) error {
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	var err = c.withDB(func(db *stdsql.DB) error {
 		var err error
-		fence, err = sql.StdInstallFence(ctx, db, checkpoints, fence)
+		fence, err = sql.StdInstallFence(ctx, db, checkpoints, fence, func(fenceHex string) ([]byte, error) {
+			fenceHexBytes, err := hex.DecodeString(fenceHex)
+			if err != nil {
+				return nil, err
+			}
+
+			return base64.StdEncoding.DecodeString(string(fenceHexBytes))
+		})
 		return err
 	})
 	return fence, err
@@ -604,29 +624,3 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 }
 
 func (d *transactor) Destroy() {}
-
-func metaTables(metaBase sql.TablePath) (specs sql.TableShape, checkpoints sql.TableShape) {
-	metaSpecs, metaCheckpoints := sql.MetaTables(metaBase)
-
-	// Our stored base64-encoded specs and checkpoints can be quite long, so we need to use a
-	// permissive text column size.
-
-	maxColumnLength := uint32(65535) // (64K-1), which is the maximum allowable in Redshift.
-
-	for _, p := range metaSpecs.Values {
-		if p.Field == "spec" {
-			p.Inference.String_.MaxLength = maxColumnLength
-		}
-	}
-
-	// Napkin math suggests that each source journal adds about ~350 bytes to the checkpoint size,
-	// so a 64K maximum checkpoint size allows for somewhere in the ballpark of 100-200 source
-	// journals.
-	for _, p := range metaCheckpoints.Values {
-		if p.Field == "checkpoint" {
-			p.Inference.String_.MaxLength = maxColumnLength
-		}
-	}
-
-	return metaSpecs, metaCheckpoints
-}
