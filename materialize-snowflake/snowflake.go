@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	stdsql "database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -190,7 +191,7 @@ func (c client) ExecStatements(ctx context.Context, statements []string) error {
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	var err = c.withDB(func(db *stdsql.DB) error {
 		var err error
-		fence, err = sql.StdInstallFence(ctx, db, checkpoints, fence)
+		fence, err = sql.StdInstallFence(ctx, db, checkpoints, fence, base64.StdEncoding.DecodeString)
 		return err
 	})
 	return fence, err
