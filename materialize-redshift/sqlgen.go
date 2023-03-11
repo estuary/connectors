@@ -39,6 +39,13 @@ var rsDialect = func() sql.Dialect {
 				// staged JSON.
 				// "time": sql.NewStaticMapper("TIMETZ"),
 			},
+			WithContentType: map[string]sql.TypeMapper{
+				// The largest allowable size for a VARBYTE is 1,024,000 bytes. Our stored specs and
+				// checkpoints can be quite long, so we need to use as large of column size as
+				// possible for these tables.
+				"application/x-protobuf; proto=flow.MaterializationSpec": sql.NewStaticMapper("VARBYTE(1024000)"),
+				"application/x-protobuf; proto=consumer.Checkpoint":      sql.NewStaticMapper("VARBYTE(1024000)"),
+			},
 		},
 	}
 

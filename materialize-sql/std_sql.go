@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -13,7 +14,7 @@ import (
 
 // StdFetchSpecAndVersion is a convenience for Client implementations which
 // use Go's standard `sql.DB` type under the hood.
-func StdFetchSpecAndVersion(ctx context.Context, db *sql.DB, specs Table, materialization pf.Materialization) (specB64, version string, err error) {
+func StdFetchSpecAndVersion(ctx context.Context, db *sql.DB, specs Table, materialization pf.Materialization) (spec, version string, err error) {
 	// Fail-fast: surface a connection issue.
 	if err = db.PingContext(ctx); err != nil {
 		err = fmt.Errorf("connecting to DB: %w", err)
@@ -27,7 +28,7 @@ func StdFetchSpecAndVersion(ctx context.Context, db *sql.DB, specs Table, materi
 			specs.Keys[0].Placeholder,
 		),
 		materialization.String(),
-	).Scan(&version, &specB64)
+	).Scan(&version, &spec)
 
 	return
 }
@@ -59,7 +60,7 @@ func StdSQLExecStatements(ctx context.Context, db *sql.DB, statements []string) 
 
 // StdInstallFence is a convenience for Client implementations which
 // use Go's standard `sql.DB` type under the hood.
-func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence Fence) (Fence, error) {
+func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence Fence, decodeFence func(string) ([]byte, error)) (Fence, error) {
 	var txn, err = db.BeginTx(ctx, nil)
 	if err != nil {
 		return Fence{}, fmt.Errorf("db.BeginTx: %w", err)
@@ -94,7 +95,7 @@ func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence F
 
 	// Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
 	var readBegin, readEnd uint32
-	var checkpointB64 string
+	var checkpoint string
 
 	if err = txn.QueryRow(
 		fmt.Sprintf(`
@@ -115,13 +116,13 @@ func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence F
 		fence.Materialization,
 		fence.KeyBegin,
 		fence.KeyEnd,
-	).Scan(&fence.Fence, &readBegin, &readEnd, &checkpointB64); err == sql.ErrNoRows {
+	).Scan(&fence.Fence, &readBegin, &readEnd, &checkpoint); err == sql.ErrNoRows {
 		// Set an invalid range, which compares as unequal to trigger an insertion below.
 		readBegin, readEnd = 1, 0
 	} else if err != nil {
 		return Fence{}, fmt.Errorf("scanning fence and checkpoint: %w", err)
-	} else if fence.Checkpoint, err = base64.StdEncoding.DecodeString(checkpointB64); err != nil {
-		return Fence{}, fmt.Errorf("base64.Decode(checkpoint): %w", err)
+	} else if fence.Checkpoint, err = decodeFence(checkpoint); err != nil {
+		return Fence{}, fmt.Errorf("decodeFence(checkpoint): %w", err)
 	}
 
 	// If a checkpoint for this exact range doesn't exist then insert it now.
@@ -241,9 +242,19 @@ type anyColumn string
 
 func (col *anyColumn) Scan(i interface{}) error {
 	var sval string
-	if b, ok := i.([]byte); ok {
-		sval = string(b)
-	} else {
+
+	switch ii := i.(type) {
+	case []byte:
+		sval = string(ii)
+	case string:
+		// Redshift checkpoint columns have an additional layer of hex encoding.
+		if hexBytes, err := hex.DecodeString(ii); err == nil {
+			sval = string(hexBytes)
+		} else {
+			sval = fmt.Sprint(i)
+		}
+
+	default:
 		sval = fmt.Sprint(i)
 	}
 	*col = anyColumn(sval)
