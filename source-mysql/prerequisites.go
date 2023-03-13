@@ -30,8 +30,10 @@ func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 
 func (db *mysqlDatabase) prerequisiteBinlogFormat(ctx context.Context) error {
 	var results, err = db.conn.Execute(`SELECT @@GLOBAL.binlog_format;`)
-	if err != nil || len(results.Values) == 0 {
+	if err != nil {
 		return fmt.Errorf("unable to query 'binlog_format' system variable: %w", err)
+	} else if len(results.Values) != 1 || len(results.Values[0]) != 1 {
+		return fmt.Errorf("unable to query 'binlog_format' system variable: malformed response")
 	}
 	var format = string(results.Values[0][0].AsString())
 	if format != "ROW" {
