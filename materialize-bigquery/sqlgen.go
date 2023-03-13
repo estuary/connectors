@@ -127,6 +127,17 @@ CLUSTER BY {{ range $ind, $key := $.Keys }}
 ALTER TABLE {{ $.Table.Identifier }} ALTER COLUMN {{ $.Identifier }} DROP NOT NULL;
 {{ end }}
 
+-- Alter table and add a new column
+
+{{ define "alterTableAddColumn" }}
+ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
+	{{ range $ind, $col := $.Table.Columns -}}
+		{{- if (eq $col.Identifier $.Identifier) -}}
+			{{ $col.Identifier }} {{ $col.DDL }}
+		{{- end -}}
+	{{- end }};
+{{ end }}
+
 -- Templated query which joins keys from the load table with the target table,
 -- and returns values. It deliberately skips the trailing semi-colon
 -- as these queries are composed with a UNION ALL.
@@ -274,4 +285,5 @@ UPDATE {{ Identifier $.TablePath }}
 	tplStoreInsert         = tplAll.Lookup("storeInsert")
 	tplStoreUpdate         = tplAll.Lookup("storeUpdate")
 	tplAlterColumnNullable = tplAll.Lookup("alterColumnNullable")
+	tplAlterTableAddColumn = tplAll.Lookup("alterTableAddColumn")
 )

@@ -175,6 +175,7 @@ func newBigQueryDriver() pm.DriverServer {
 				Client:                      client,
 				CreateTableTemplate:         tplCreateTargetTable,
 				AlterColumnNullableTemplate: tplAlterColumnNullable,
+				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
 			}, nil

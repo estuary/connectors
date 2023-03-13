@@ -88,6 +88,17 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 ALTER TABLE {{ $.Table.Identifier }} ALTER COLUMN {{ $.Identifier }} DROP NOT NULL;
 {{ end }}
 
+-- Alter table and add a new column
+
+{{ define "alterTableAddColumn" }}
+ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
+	{{ range $ind, $col := $.Table.Columns -}}
+		{{- if (eq $col.Identifier $.Identifier) -}}
+			{{ $col.Identifier }} {{ $col.DDL }}
+		{{- end -}}
+	{{- end }};
+{{ end }}
+
 -- Templated creation of a temporary load table:
 
 {{ define "createLoadTable" }}
@@ -261,4 +272,5 @@ END $$;
 	tplInstallFence        = tplAll.Lookup("installFence")
 	tplUpdateFence         = tplAll.Lookup("updateFence")
 	tplAlterColumnNullable = tplAll.Lookup("alterColumnNullable")
+	tplAlterTableAddColumn = tplAll.Lookup("alterTableAddColumn")
 )
