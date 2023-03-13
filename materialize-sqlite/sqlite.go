@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,8 @@ import (
 	_ "github.com/mattn/go-sqlite3" // Import for register side-effects.
 	log "github.com/sirupsen/logrus"
 )
+
+const databasePath = "/tmp/sqlite.db"
 
 type config struct {
 	path string
@@ -57,7 +60,7 @@ func NewSQLiteDriver() *sql.Driver {
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
 		NewEndpoint: func(ctx context.Context, _ json.RawMessage) (*sql.Endpoint, error) {
-			var path = "/tmp/sqlite.db"
+			var path = databasePath
 
 			// SQLite / go-sqlite3 is a bit fickle about raced opens of a newly created database,
 			// often returning "database is locked" errors. We can resolve by ensuring one sql.Open
@@ -302,6 +305,10 @@ func (d *transactor) Load(
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+	if var err = checkDatabaseSize() {
+		return err
+	}
+
 	var txn, err = d.store.conn.BeginTx(it.Context(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("conn.BeginTx: %w", err)
@@ -335,6 +342,20 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil
 		})
 	}, nil
+}
+
+const maximumDatabaseSize = 500 * 1024 * 1024 // 500 megabytes
+const maximumDatabaseSizeText = "500mb"
+func checkDatabaseSize() error {
+	if var file, err = os.Open(databasePath); err != nil {
+		return fmt.Errorf("cannot open database file to check for size: %w", err)
+	} else if stat, err = file.Stat(); err != nil {
+		return fmt.Errorf("cannot stat file to check for size: %w", err)
+	} else if stat.Size() > maximumDatabaseSize {
+		return fmt.Errorf("sqlite database has exceeded maximum size %s", maximumDatabaseSizeText)
+	}
+
+	return nil
 }
 
 // RuntimeCommitted is a no-op since the SQLite database is authoritative.
