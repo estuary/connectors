@@ -88,6 +88,17 @@ var (
   );
   {{ end }}
 
+	-- Alter table and add a new column
+
+	{{ define "alterTableAddColumn" }}
+	ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
+		{{ range $ind, $col := $.Table.Columns -}}
+			{{- if (eq $col.Identifier $.Identifier) -}}
+				{{ $col.Identifier }} {{ $col.DDL }}
+			{{- end -}}
+		{{- end }};
+	{{ end }}
+
   -- Load
   {{ define "loadQuery" }}
   {{ if $.Document -}}
@@ -147,15 +158,17 @@ var (
   ;
   {{ end }}
   `)
-  tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-  tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
+  tplCreateTargetTable   = tplAll.Lookup("createTargetTable")
+  tplCreateLoadTable     = tplAll.Lookup("createLoadTable")
 
-  tplLoadInsert        = tplAll.Lookup("loadInsert")
-  tplLoadQuery         = tplAll.Lookup("loadQuery")
-  tplLoadTruncate      = tplAll.Lookup("loadTruncate")
+  tplLoadInsert          = tplAll.Lookup("loadInsert")
+  tplLoadQuery           = tplAll.Lookup("loadQuery")
+  tplLoadTruncate        = tplAll.Lookup("loadTruncate")
 
-  tplStoreInsert       = tplAll.Lookup("storeInsert")
-  tplStoreUpdate       = tplAll.Lookup("storeUpdate")
+  tplStoreInsert         = tplAll.Lookup("storeInsert")
+  tplStoreUpdate         = tplAll.Lookup("storeUpdate")
+
+	tplAlterTableAddColumn = tplAll.Lookup("alterTableAddColumn")
 )
 
 const createStageSQL = `

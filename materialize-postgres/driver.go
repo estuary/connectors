@@ -172,6 +172,7 @@ func newPostgresDriver() pm.DriverServer {
 				Client:                      client{uri: cfg.ToURI()},
 				CreateTableTemplate:         tplCreateTargetTable,
 				AlterColumnNullableTemplate: tplAlterColumnNullable,
+				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
 			}, nil

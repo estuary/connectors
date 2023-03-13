@@ -163,6 +163,7 @@ func newSnowflakeDriver() *sql.Driver {
 				Client:                      client{uri: dsn},
 				CreateTableTemplate:         tplCreateTargetTable,
 				AlterColumnNullableTemplate: tplAlterColumnNullable,
+				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
 			}, nil

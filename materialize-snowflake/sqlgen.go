@@ -123,6 +123,17 @@ var (
 ALTER TABLE {{ $.Table.Identifier }} ALTER COLUMN {{ $.Identifier }} DROP NOT NULL;
 {{ end }}
 
+-- Alter table and add a new column
+
+{{ define "alterTableAddColumn" }}
+ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
+	{{ range $ind, $col := $.Table.Columns -}}
+		{{- if (eq $col.Identifier $.Identifier) -}}
+			{{ $col.Identifier }} {{ $col.DDL }}
+		{{- end -}}
+	{{- end }};
+{{ end }}
+
 {{ define "loadQuery" }}
 	SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
 	FROM {{ $.Table.Identifier }}
@@ -217,6 +228,7 @@ END $$;
 	tplMergeInto           = tplAll.Lookup("mergeInto")
 	tplUpdateFence         = tplAll.Lookup("updateFence")
 	tplAlterColumnNullable = tplAll.Lookup("alterColumnNullable")
+	tplAlterTableAddColumn = tplAll.Lookup("alterTableAddColumn")
 )
 
 var createStageSQL = `

@@ -74,6 +74,9 @@ type Endpoint struct {
 	CreateTableTemplate *template.Template
 	// AlterFieldNullable alters a column and marks it as nullable
 	AlterColumnNullableTemplate *template.Template
+	// AlterTableAddColumn alters a table and adds a new column (usually with
+	// default null value)
+	AlterTableAddColumnTemplate *template.Template
 
 	// NewResource returns an uninitialized or partially-initialized Resource
 	// which will be parsed into and validated from a resource configuration.
@@ -145,7 +148,7 @@ func resolveResourceToExistingBinding(
 		// key and can no longer be loaded correctly by a standard materialization.
 		err = fmt.Errorf("cannot disable delta-updates binding of collection %s", collection.Collection)
 	} else if loadedBinding != nil {
-		constraints = ValidateMatchesExisting(loadedBinding, collection)
+		constraints = ValidateMatchesExisting(resource, loadedBinding, collection)
 	} else {
 		constraints = ValidateNewSQLProjections(resource, collection)
 	}
