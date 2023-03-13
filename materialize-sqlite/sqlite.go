@@ -83,6 +83,7 @@ func NewSQLiteDriver() *sql.Driver {
 				MetaCheckpoints: nil,
 				Client: client{path: path},
 				CreateTableTemplate: tplCreateTargetTable,
+				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
 				NewResource: newTableConfig,
 				NewTransactor: newTransactor,
 			}, nil
@@ -305,8 +306,8 @@ func (d *transactor) Load(
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
-	if var err = checkDatabaseSize() {
-		return err
+	if err := checkDatabaseSize(); err != nil {
+		return nil, err
 	}
 
 	var txn, err = d.store.conn.BeginTx(it.Context(), nil)
@@ -347,9 +348,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 const maximumDatabaseSize = 500 * 1024 * 1024 // 500 megabytes
 const maximumDatabaseSizeText = "500mb"
 func checkDatabaseSize() error {
-	if var file, err = os.Open(databasePath); err != nil {
+	if file, err := os.Open(databasePath); err != nil {
 		return fmt.Errorf("cannot open database file to check for size: %w", err)
-	} else if stat, err = file.Stat(); err != nil {
+	} else if stat, err := file.Stat(); err != nil {
 		return fmt.Errorf("cannot stat file to check for size: %w", err)
 	} else if stat.Size() > maximumDatabaseSize {
 		return fmt.Errorf("sqlite database has exceeded maximum size %s", maximumDatabaseSizeText)

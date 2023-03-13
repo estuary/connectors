@@ -31,12 +31,12 @@ func RenderTableTemplate(table Table, tpl *template.Template) (string, error) {
 	return w.String(), nil
 }
 
-type AlterColumnNullableInput struct {
+type AlterInput struct {
 	Table Table
 	Identifier string
 }
 
-func RenderAlterColumnNullableTemplate(input AlterColumnNullableInput, tpl *template.Template) (string, error) {
+func RenderAlterTemplate(input AlterInput, tpl *template.Template) (string, error) {
 	var w strings.Builder
 	if err := tpl.Execute(&w, &input); err != nil {
 		return "", err

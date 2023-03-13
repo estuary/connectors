@@ -138,40 +138,57 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 		} else if err = ValidateSelectedFields(constraints, bindingSpec); err != nil {
 			// The applied binding is not a valid solution for its own constraints.
 			return nil, fmt.Errorf("binding for %s: %w", collection, err)
-		} else if loadedBinding != nil && !bindingSpec.FieldSelection.Equal(&loadedBinding.FieldSelection) {
-			// We don't handle any form of schema migrations, so we require that the list of
+		} else if loadedBinding != nil && !bindingSpec.FieldSelection.Equal(&loadedBinding.FieldSelection) && !isBindingMigratable(loadedBinding, bindingSpec) {
+			// if the binding is not migratable, we require that the list of
 			// fields in the request is identical to the current fields.
 			return nil, fmt.Errorf(
 				"the set of binding %s fields in the request differs from the existing fields,"+
-					"which is disallowed because this driver does not perform schema migrations. "+
+					"which is disallowed because this driver only supports autoamtic migration for adding new fields. "+
 					"Request fields: %s , Existing fields: %s",
 				collection,
 				bindingSpec.FieldSelection.String(),
 				loadedBinding.FieldSelection.String(),
 			)
 		} else if loadedBinding != nil {
-			// If the table has already been created, make sure all non-null fields
-			// are marked as such
 			for _, field := range bindingSpec.FieldSelection.Values {
 				var p = bindingSpec.Collection.GetProjection(field)
 				var previousProjection = loadedBinding.Collection.GetProjection(field)
 
-				var previousNullable = previousProjection.Inference.Exists != pf.Inference_MUST || SliceContains("null", p.Inference.Types)
-				var newNullable = p.Inference.Exists != pf.Inference_MUST || SliceContains("null", p.Inference.Types)
-
-				if !previousNullable && newNullable {
+				// Make sure new columns are added to the table
+				if previousProjection == nil {
 					var table, err = ResolveTable(tableShape, endpoint.Dialect)
 					if err != nil {
 						return nil, err
 					}
-					var input = AlterColumnNullableInput {
+					var input = AlterInput {
 						Table: table,
 						Identifier: field,
 					}
-					if statement, err := RenderAlterColumnNullableTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
+					if statement, err := RenderAlterTemplate(input, endpoint.AlterTableAddColumnTemplate); err != nil {
 						return nil, err
 					} else {
 						statements = append(statements, statement)
+					}
+				} else {
+					var previousNullable = previousProjection.Inference.Exists != pf.Inference_MUST || SliceContains("null", p.Inference.Types)
+					var newNullable = p.Inference.Exists != pf.Inference_MUST || SliceContains("null", p.Inference.Types)
+
+					// If the table has already been created, make sure all non-null fields
+					// are marked as such
+					if !previousNullable && newNullable {
+						var table, err = ResolveTable(tableShape, endpoint.Dialect)
+						if err != nil {
+							return nil, err
+						}
+						var input = AlterInput {
+							Table: table,
+							Identifier: field,
+						}
+						if statement, err := RenderAlterTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
+							return nil, err
+						} else {
+							statements = append(statements, statement)
+						}
 					}
 				}
 			}
@@ -362,4 +379,35 @@ func (d *Driver) newTransactor(ctx context.Context, open pm.TransactionRequest_O
 	}
 
 	return transactor, &pm.TransactionResponse_Opened{RuntimeCheckpoint: fence.Checkpoint}, nil
+}
+
+func isBindingMigratable(existingBinding *pf.MaterializationSpec_Binding, newBinding *pf.MaterializationSpec_Binding) bool {
+	var existingFields = existingBinding.FieldSelection
+	var allExistingFields = existingFields.AllFields()
+	var newFields = newBinding.FieldSelection
+	var allNewFields = newFields.AllFields()
+
+	for _, field := range allExistingFields {
+		// All fields in the existing binding must also be present in the new binding
+		if !SliceContains(field, allNewFields) {
+			return false
+		}
+
+		if string(existingFields.FieldConfigJson[field]) != string(newFields.FieldConfigJson[field]) {
+			return false
+		}
+	}
+
+	for _, field := range allNewFields {
+		// Make sure new fields are nullable
+		if !SliceContains(field, allExistingFields) {
+			var p = newBinding.Collection.GetProjection(field)
+			var isNullable = p.Inference.Exists != pf.Inference_MUST || SliceContains("null", p.Inference.Types)
+			if !isNullable {
+				return false
+			}
+		}
+	}
+
+	return true
 }
