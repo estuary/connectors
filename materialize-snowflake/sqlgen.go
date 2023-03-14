@@ -134,8 +134,12 @@ ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
 	{{- end }};
 {{ end }}
 
+-- Templated query which joins keys from the load table with the target table, and returns values. It
+-- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL.
+
 {{ define "loadQuery" }}
-	SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
+{{ if $.Table.Document -}}
+SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
 	FROM {{ $.Table.Identifier }}
 	JOIN (
 		SELECT {{ range $ind, $key := $.Table.Keys }}
@@ -148,16 +152,19 @@ ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
 	{{- if $ind }} AND {{ end -}}
 	{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
+{{ else -}}
+SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
+{{ end -}}
 {{ end }}
 
 {{ define "copyInto" }}
 	COPY INTO {{ $.Table.Identifier }} (
-		{{ range $ind, $key := (AllFields $.Table) }}
+		{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
 			{{$key.Identifier -}}
 		{{- end }}
 	) FROM (
-		SELECT {{ range $ind, $key := (AllFields $.Table) }}
+		SELECT {{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
 		$1[{{$ind}}] AS {{$key.Identifier -}}
 		{{- end }}
@@ -169,7 +176,7 @@ ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
 {{ define "mergeInto" }}
 	MERGE INTO {{ $.Table.Identifier }}
 	USING (
-		SELECT {{ range $ind, $key := (AllFields $.Table) }}
+		SELECT {{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
 			$1[{{$ind}}] AS {{$key.Identifier -}}
 		{{- end }}
@@ -179,23 +186,27 @@ ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
 		{{- if $ind }} AND {{ end -}}
 		{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
+	{{- if $.Table.Document }}
 	WHEN MATCHED AND IS_NULL_VALUE(r.{{ $.Table.Document.Identifier }}) THEN
 		DELETE
+	{{- end }}
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Table.Values }}
 		{{- if $ind }}, {{ end -}}
 		{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end -}}
+	{{- if $.Table.Document -}}
 	, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
+	{{- end }}
 	WHEN NOT MATCHED THEN
 		INSERT (
-		{{- range $ind, $key := (AllFields $.Table) }}
+		{{- range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
 			{{$key.Identifier -}}
 		{{- end -}}
 	)
 		VALUES (
-		{{- range $ind, $key := (AllFields $.Table) }}
+		{{- range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
 			r.{{$key.Identifier -}}
 		{{- end -}}
