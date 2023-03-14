@@ -160,6 +160,15 @@ EXECUTE update_0--- End "a-schema".target_table execStoreUpdate ---
 --- Begin "Delta Updates" execStoreUpdate ---
 EXECUTE update_1--- End "Delta Updates" execStoreUpdate ---
 
+--- Begin target_table_no_values_materialized storeUpdate ---
+
+PREPARE update_2 AS
+UPDATE target_table_no_values_materialized SET
+		flow_document = $3
+	 WHERE key1 = $1
+	 AND   key2 = $2;
+--- End target_table_no_values_materialized storeUpdate ---
+
 --- Begin Fence Install ---
 
 with
