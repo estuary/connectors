@@ -143,7 +143,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 			// fields in the request is identical to the current fields.
 			return nil, fmt.Errorf(
 				"the set of binding %s fields in the request differs from the existing fields,"+
-					"which is disallowed because this driver only supports autoamtic migration for adding new fields. "+
+					"which is disallowed because this driver only supports automatic migration for adding new fields. "+
 					"Request fields: %s , Existing fields: %s",
 				collection,
 				bindingSpec.FieldSelection.String(),
