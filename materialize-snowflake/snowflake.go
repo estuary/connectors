@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -524,4 +525,10 @@ func (f *scratchFile) put(ctx context.Context, conn *stdsql.Conn, cfg *config) e
 	return nil
 }
 
-func main() { boilerplate.RunMain(newSnowflakeDriver()) }
+func main() {
+	// gosnowflake also uses logrus for logging and the logs it produces may be confusing when
+	// intermixed with our connector logs. We disable the gosnowflake logger here and log as needed
+	// when handling errors from the sql driver.
+	sf.GetLogger().SetOutput(io.Discard)
+	boilerplate.RunMain(newSnowflakeDriver())
+}
