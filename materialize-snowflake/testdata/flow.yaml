@@ -12,6 +12,27 @@ collections:
       required: [key1, key2]
     key: [/key1, /key2]
 
+  delta/updates:
+    schema:
+      type: object
+      properties:
+        theKey: { type: string }
+        nullableKey: { type: string }
+        aValue:
+          type: integer
+          description: A super-awesome value.
+      required: [theKey, nullableKey]
+    key: [/theKey, /nullableKey]
+
+  no_values:
+    schema:
+      type: object
+      properties:
+        key1: { type: integer }
+        key2: { type: boolean }
+      required: [key1, key2]
+    key: [/key1, /key2]
+
 materializations:
   test/sqlite:
     endpoint:
@@ -20,6 +41,10 @@ materializations:
     bindings:
       - source: key/value
         resource: { table: key_value }
+      - source: delta/updates
+        resource: { table: "Delta Updates" }
+      - source: no_values
+        resource: { table: "No Values" }
 
 storageMappings:
   "": { stores: [{ provider: S3, bucket: a-bucket }] }

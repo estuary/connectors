@@ -148,7 +148,7 @@ ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
 	{{- if $ind }} AND {{ end -}}
 	{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
-{{- end }}
+{{ end }}
 
 {{ define "copyInto" }}
 	COPY INTO {{ $.Table.Identifier }} (
@@ -163,7 +163,7 @@ ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
 		{{- end }}
 		FROM @flow_v1/{{ $.RandomUUID }}
 	);
-{{- end }}
+{{ end }}
 
 
 {{ define "mergeInto" }}
@@ -200,7 +200,7 @@ ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
 			r.{{$key.Identifier -}}
 		{{- end -}}
 	);
-{{- end }}
+{{ end }}
 
 {{ define "updateFence" }}
 EXECUTE IMMEDIATE $$
