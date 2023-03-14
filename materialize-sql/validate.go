@@ -111,9 +111,8 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 
 		constraints[field] = constraint
 	}
-	// We'll loop through the proposed projections and forbid any that aren't already in our map.
-	// This is done solely so that we can supply a descriptive reason, since any fields we fail to
-	// mention are implicitly forbidden.
+	// We'll loop through the proposed projections and create a new constraint for
+	// fields that are not among our existing binding projections
 	for _, proj := range proposed.Projections {
 		if _, ok := constraints[proj.Field]; !ok {
 			var constraint = validateNewProjection(resource, &proj)
