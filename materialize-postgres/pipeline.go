@@ -12,8 +12,6 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgtype"
-
-	log "github.com/sirupsen/logrus"
 )
 
 type pgBatch struct {
@@ -80,8 +78,6 @@ func (b *pgBatch) roundTrip(ctx context.Context, conn *pgconn.PgConn) error {
 
 	binary.BigEndian.PutUint32(b.buf[1:], uint32(len(b.buf)))
 	b.buf = append(b.buf, 0)
-
-	log.WithField("query", string(b.buf)).Debug("batch roundTrip")
 
 	if err := conn.SendBytes(ctx, b.buf); err != nil {
 		return fmt.Errorf("sending SQL body: %w", err)
