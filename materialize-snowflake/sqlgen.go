@@ -196,7 +196,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 		{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end -}}
 	{{- if $.Table.Document -}}
-	, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
+	{{ if $.Table.Values }}, {{ end }}{{ $.Table.Identifier }}.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
 	{{- end }}
 	WHEN NOT MATCHED THEN
 		INSERT (
