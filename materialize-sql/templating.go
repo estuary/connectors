@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"strings"
 	"text/template"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // MustParseTemplate is a convenience which parses the template `body` and
@@ -28,7 +30,9 @@ func RenderTableTemplate(table Table, tpl *template.Template) (string, error) {
 	if err := tpl.Execute(&w, &table); err != nil {
 		return "", err
 	}
-	return w.String(), nil
+	var s = w.String()
+	log.WithField("rendered", s).WithField("table", table).Debug("rendered template")
+	return s, nil
 }
 
 type AlterInput struct {
@@ -41,5 +45,7 @@ func RenderAlterTemplate(input AlterInput, tpl *template.Template) (string, erro
 	if err := tpl.Execute(&w, &input); err != nil {
 		return "", err
 	}
-	return w.String(), nil
+	var s = w.String()
+	log.WithField("rendered", s).WithField("input", input).Debug("rendered template")
+	return s, nil
 }
