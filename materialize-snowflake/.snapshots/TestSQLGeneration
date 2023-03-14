@@ -107,7 +107,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 	WHEN MATCHED AND IS_NULL_VALUE(r.flow_document) THEN
 		DELETE
 	WHEN MATCHED THEN
-		UPDATE SET , target_table_no_values_materialized.flow_document = r.flow_document
+		UPDATE SET target_table_no_values_materialized.flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
 		INSERT (key1, key2, flow_document)
 		VALUES (r.key1, r.key2, r.flow_document);
