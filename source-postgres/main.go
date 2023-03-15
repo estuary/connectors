@@ -16,6 +16,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
@@ -241,7 +242,11 @@ func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 	switch key := key.(type) {
 	case [16]uint8:
-		return key[:], nil
+		var id, err = uuid.FromBytes(key[:])
+		if err != nil {
+			return nil, fmt.Errorf("error parsing uuid: %w", err)
+		}
+		return id.String(), nil
 	case time.Time:
 		return key.Format(sortableRFC3339Nano), nil
 	case pgtype.Numeric:
