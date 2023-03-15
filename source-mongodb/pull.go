@@ -104,7 +104,11 @@ func (s *captureState) Validate() error {
 	return nil
 }
 
+type docKey struct{
+	Id interface{} `bson:"_id"`
+}
 type changeEvent struct{
+	DocumentKey docKey `bson:"documentKey"`
 	OperationType string `bson:"operationType"`
 	FullDocument bson.M `bson:"fullDocument"`
 }
@@ -120,8 +124,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 	log.Debug("listening on changes on collection ", res.Collection)
 	var eventFilter = bson.D{{"$match", bson.D{{"$or",
 	bson.A{
-		// TODO: handle deletion events
-		// bson.D{{"operationType", "delete"}}
+		bson.D{{"operationType", "delete"}},
 		bson.D{{"operationType", "insert"}},
 		bson.D{{"operationType", "update"}},
 	}}}}}
@@ -160,15 +163,33 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 			return fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
 		}
 
-		var doc = sanitizeDocument(ev.FullDocument)
+		if ev.OperationType == "delete" {
+			var doc = map[string]interface{}{
+				idProperty: ev.DocumentKey.Id,
+				metaProperty: map[string]interface{}{
+					deletedProperty: true,
+				},
+			}
 
-		js, err := json.Marshal(doc)
-		if err != nil {
-			return fmt.Errorf("encoding document in collection %s as json: %w", res.Collection, err)
-		}
+			js, err := json.Marshal(doc)
+			if err != nil {
+				return fmt.Errorf("encoding document in collection %s as json: %w", res.Collection, err)
+			}
 
-		if err = c.Output.Documents(binding, js); err != nil {
-			return fmt.Errorf("output documents failed: %w", err)
+			if err = c.Output.Documents(binding, js); err != nil {
+				return fmt.Errorf("output documents failed: %w", err)
+			}
+		} else {
+			var doc = sanitizeDocument(ev.FullDocument)
+
+			js, err := json.Marshal(doc)
+			if err != nil {
+				return fmt.Errorf("encoding document in collection %s as json: %w", res.Collection, err)
+			}
+
+			if err = c.Output.Documents(binding, js); err != nil {
+				return fmt.Errorf("output documents failed: %w", err)
+			}
 		}
 
 		var checkpoint = captureState{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -19,7 +20,29 @@ import (
 var minimalSchema = generateMinimalSchema()
 const idProperty = "_id"
 
+const (
+	metaProperty  = "_meta"
+	deletedProperty = "deleted"
+)
+
+type documentMetadata struct {
+	Deleted    bool       `json:"deleted,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted, unset otherwise."`
+}
+
 func generateMinimalSchema() json.RawMessage {
+	var reflector = jsonschema.Reflector{
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}
+	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
+	metadataSchema.Definitions = nil
+	metadataSchema.AdditionalProperties = nil
+	metadataSchema.Extras = map[string]interface{}{
+		"reduce": map[string]interface{}{
+			"strategy": "merge",
+		},
+	}
+
 	// Wrap metadata into an enclosing object schema with a /_meta property
 	var schema = &jsonschema.Schema{
 		Type:                 "object",
@@ -30,8 +53,12 @@ func generateMinimalSchema() json.RawMessage {
 				idProperty: &jsonschema.Schema{
 					Type: "string",
 				},
+				metaProperty: metadataSchema,
 			},
 			"x-infer-schema": true,
+			"reduce": map[string]interface{}{
+				"strategy": "merge",
+			},
 		},
 	}
 
