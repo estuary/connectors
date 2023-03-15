@@ -236,7 +236,7 @@ func newRedshiftDriver() pm.DriverServer {
 			return &sql.Endpoint{
 				Config:                      cfg,
 				Dialect:                     rsDialect,
-				MetaSpecs:                   metaSpecs,
+				MetaSpecs:                   &metaSpecs,
 				MetaCheckpoints:             &metaCheckpoints,
 				Client:                      client{uri: cfg.toURI()},
 				CreateTableTemplate:         tplCreateTargetTable,
