@@ -168,6 +168,7 @@ func TestScanKeyTypes(t *testing.T) {
 		{"VarChar", "VARCHAR(10)", []interface{}{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
 		{"Char", "CHAR(3)", []interface{}{"   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
 		{"Text", "TEXT", []interface{}{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
+		{"UUID", "UUID", []interface{}{"66b968a7-aeca-4401-8239-5d57958d1572", "4ab4044a-9aab-415c-96c6-17fa338060fa", "c32fb585-fc7f-4347-8fe2-97448f4e93cd"}},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
 			var tableName = tb.CreateTable(ctx, t, "", fmt.Sprintf("(key %s PRIMARY KEY, data TEXT)", tc.ColumnType))

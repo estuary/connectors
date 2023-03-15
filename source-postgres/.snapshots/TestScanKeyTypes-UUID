@@ -1,0 +1,49 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_UUID": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_uuid","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":"4ab4044a-9aab-415c-96c6-17fa338060fa"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"key_columns":["key"],"mode":"Backfill","scanned":"AUq0BEqaq0FclsYX+jOAYPoA"}}}
+
+
+####################################
+### Capture from Key "AUq0BEqaq0FclsYX+jOAYPoA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_UUID": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_uuid","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":"66b968a7-aeca-4401-8239-5d57958d1572"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"key_columns":["key"],"mode":"Backfill","scanned":"AWa5aKeuykQBgjldV5WNFXIA"}}}
+
+
+####################################
+### Capture from Key "AWa5aKeuykQBgjldV5WNFXIA"
+####################################
+# ================================
+# Collection "test.ScanKeyTypes_UUID": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_uuid","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":"c32fb585-fc7f-4347-8fe2-97448f4e93cd"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"key_columns":["key"],"mode":"Backfill","scanned":"AcMvtYX8f0NHj+KXRI9Ok80A"}}}
+
+
+####################################
+### Capture from Key "AcMvtYX8f0NHj+KXRI9Ok80A"
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"key_columns":["key"],"mode":"Active"}}}
+
+
+
