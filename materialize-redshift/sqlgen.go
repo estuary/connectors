@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -51,8 +52,23 @@ var rsDialect = func() sql.Dialect {
 					})),
 			},
 			WithFormat: map[string]sql.TypeMapper{
-				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("TIMESTAMPTZ"),
+				"date": sql.NewStaticMapper("DATE"),
+				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(
+					func(te tuple.TupleElement) (interface{}, error) {
+						// Redshift supports timestamps with microsecond precision. It will reject
+						// timestamps with higher precision than that, so we truncate anything
+						// beyond microseconds.
+						if s, ok := te.(string); ok {
+							parsed, err := time.Parse(time.RFC3339Nano, s)
+							if err != nil {
+								return nil, fmt.Errorf("could not parse date-time value %q as time: %w", s, err)
+							}
+
+							return parsed.Truncate(time.Microsecond).Format(time.RFC3339Nano), nil
+						}
+
+						return te, nil
+					})),
 				// "time" is not currently support due to limitations with loading time values from
 				// staged JSON.
 				// "time": sql.NewStaticMapper("TIMETZ"),
