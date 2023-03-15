@@ -240,6 +240,8 @@ func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 	switch key := key.(type) {
+	case [16]uint8:
+		return key[:], nil
 	case time.Time:
 		return key.Format(sortableRFC3339Nano), nil
 	case pgtype.Numeric:
