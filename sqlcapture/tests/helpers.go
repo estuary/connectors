@@ -111,6 +111,9 @@ func RestartingBackfillCapture(ctx context.Context, t testing.TB, cs *st.Capture
 			fmt.Fprintf(summary, "####################################\n")
 			fmt.Fprintf(summary, "### Terminating Capture due to Errors\n")
 			fmt.Fprintf(summary, "####################################\n")
+			for _, err := range cs.Errors {
+				fmt.Fprintf(summary, "%v\n", err)
+			}
 			break
 		}
 		cs.Reset()
