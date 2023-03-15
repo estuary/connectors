@@ -213,7 +213,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 func resolveEndpointConfig(specJson json.RawMessage) (config, error) {
 	var cfg = config{}
 	if err := pf.UnmarshalStrict(specJson, &cfg); err != nil {
-		return cfg, fmt.Errorf("parsing PubSub config: %w", err)
+		return cfg, fmt.Errorf("parsing MongoDB config: %w", err)
 	}
 
 	return cfg, nil
