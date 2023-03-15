@@ -8,11 +8,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"key_columns":["key"],"mode":"Backfill","scanned":"AUq0BEqaq0FclsYX+jOAYPoA"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"key_columns":["key"],"mode":"Backfill","scanned":"AjRhYjQwNDRhLTlhYWItNDE1Yy05NmM2LTE3ZmEzMzgwNjBmYQA="}}}
 
 
 ####################################
-### Capture from Key "AUq0BEqaq0FclsYX+jOAYPoA"
+### Capture from Key "AjRhYjQwNDRhLTlhYWItNDE1Yy05NmM2LTE3ZmEzMzgwNjBmYQA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTypes_UUID": 1 Documents
@@ -21,11 +21,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"key_columns":["key"],"mode":"Backfill","scanned":"AWa5aKeuykQBgjldV5WNFXIA"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"key_columns":["key"],"mode":"Backfill","scanned":"AjY2Yjk2OGE3LWFlY2EtNDQwMS04MjM5LTVkNTc5NThkMTU3MgA="}}}
 
 
 ####################################
-### Capture from Key "AWa5aKeuykQBgjldV5WNFXIA"
+### Capture from Key "AjY2Yjk2OGE3LWFlY2EtNDQwMS04MjM5LTVkNTc5NThkMTU3MgA="
 ####################################
 # ================================
 # Collection "test.ScanKeyTypes_UUID": 1 Documents
@@ -34,11 +34,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"key_columns":["key"],"mode":"Backfill","scanned":"AcMvtYX8f0NHj+KXRI9Ok80A"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"key_columns":["key"],"mode":"Backfill","scanned":"AmMzMmZiNTg1LWZjN2YtNDM0Ny04ZmUyLTk3NDQ4ZjRlOTNjZAA="}}}
 
 
 ####################################
-### Capture from Key "AcMvtYX8f0NHj+KXRI9Ok80A"
+### Capture from Key "AmMzMmZiNTg1LWZjN2YtNDM0Ny04ZmUyLTk3NDQ4ZjRlOTNjZAA="
 ####################################
 # ================================
 # Final State Checkpoint
