@@ -71,10 +71,8 @@ func connectPostgres(ctx context.Context, name string, cfg json.RawMessage) (sql
 
 		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
 		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-		err = tunnel.Start()
-
-		if err != nil {
-			logrus.WithField("error", err).Error("network tunnel error")
+		if err := tunnel.Start(); err != nil {
+			return nil, fmt.Errorf("error starting network tunnel: %w", err)
 		}
 	}
 

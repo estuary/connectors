@@ -160,7 +160,7 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
 		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
 		if err := tunnel.Start(); err != nil {
-			log.WithField("error", err).Error("network tunnel error")
+			return nil, fmt.Errorf("error starting network tunnel: %w", err)
 		}
 	}
 

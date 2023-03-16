@@ -226,10 +226,8 @@ func newRedshiftDriver() pm.DriverServer {
 				}
 				var tunnel = sshConfig.CreateTunnel()
 
-				err = tunnel.Start()
-
-				if err != nil {
-					log.WithField("error", err).Error("network tunnel error")
+				if err := tunnel.Start(); err != nil {
+					return nil, fmt.Errorf("error starting network tunnel: %w", err)
 				}
 			}
 
