@@ -71,45 +71,33 @@ jobs:
       fail-fast: false
       matrix:
         connector:
-          - path: source-alpaca
-          - path: source-gcs
-          - path: source-hello-world
-          - path: source-http-file
-          - path: source-http-ingest
-          - path: source-test
-          - path: source-firestore
-          - path: source-kafka
-          - path: source-kinesis
-          - path: source-mongodb
-          - path: source-mysql
-            additionalTags:
-              - source-mariadb
-              - source-amazon-aurora-mysql
-          - path: source-postgres
-            additionalTags:
-              - source-alloydb
-              - source-amazon-aurora-postgres
-          - path: source-s3
-          - path: source-sqlserver
-            additionalTags:
-              - source-azure-sqlserver
-          - path: materialize-bigquery
-          - path: materialize-redshift
-          - path: materialize-elasticsearch
-          - path: materialize-firebolt
-          - path: materialize-google-pubsub
-          - path: materialize-google-sheets
-          - path: materialize-mongodb
-          - path: materialize-postgres
-            additionalTags:
-              - materialize-timescaledb
-              - materialize-alloydb
-              - materialize-amazon-aurora-postgres
-          - path: materialize-rockset
-          - path: materialize-s3-parquet
-          - path: materialize-sqlite
-          - path: materialize-snowflake
-          - path: materialize-webhook
+          - source-alpaca
+          - source-gcs
+          - source-hello-world
+          - source-http-file
+          - source-http-ingest
+          - source-test
+          - source-firestore
+          - source-kafka
+          - source-kinesis
+          - source-mongodb
+          - source-mysql
+          - source-postgres
+          - source-s3
+          - source-sqlserver
+          - materialize-bigquery
+          - materialize-redshift
+          - materialize-elasticsearch
+          - materialize-firebolt
+          - materialize-google-pubsub
+          - materialize-google-sheets
+          - materialize-mongodb
+          - materialize-postgres
+          - materialize-rockset
+          - materialize-s3-parquet
+          - materialize-sqlite
+          - materialize-snowflake
+          - materialize-webhook
 
     steps:
       - uses: actions/checkout@v2
@@ -121,20 +109,8 @@ jobs:
         run: |
           TAG=$(echo $GITHUB_SHA | head -c7)
           echo ::set-output name=tag::${TAG}
-
-          VERSION=$(cat ${{ matrix.connector.path }}/VERSION | tr -d '\n')
-          THIS_COMMIT_TAGS=ghcr.io/estuary/${{ matrix.connector.path }}:$TAG
-          THIS_PUSH_TAGS=ghcr.io/estuary/${{ matrix.connector.path }}:dev,ghcr.io/estuary/${{ matrix.connector.path }}:$VERSION
-
-          # Add any additional tags that should be pushed for this connector image.
-          for additional in ${{ join(matrix.connector.additionalTags, ' ') }}
-          do
-              THIS_COMMIT_TAGS+=",${{ format('ghcr.io/estuary/{0}:$TAG', '$additional') }}"
-              THIS_PUSH_TAGS+=",${{ format('ghcr.io/estuary/{0}:dev,ghcr.io/estuary/{1}:$VERSION', '$additional', '$additional') }}"
-          done
-
-          echo ::set-output name=this_commit_tags::${THIS_COMMIT_TAGS}
-          echo ::set-output name=this_push_tags::${THIS_PUSH_TAGS}
+          VERSION=$(cat ${{ matrix.connector }}/VERSION | tr -d '\n')
+          echo ::set-output name=version::${VERSION}
 
       - name: Download latest Flow release binaries and add them to $PATH
         run: |
@@ -142,7 +118,7 @@ jobs:
           echo "${PWD}/flow-bin" >> $GITHUB_PATH
 
       - name: Install kafkactl
-        if: matrix.connector.path == 'source-kafka'
+        if: matrix.connector == 'source-kafka'
         env:
           version: 1.20.0
           checksum: ff285ce7eefa956234e65f9ff98160c2c365973ca598187cee81da1377b139d1
@@ -153,7 +129,7 @@ jobs:
           rm "kafkactl_${version}_linux_amd64.deb"
 
       - name: Set up Cloud SDK
-        if: matrix.connector.path == 'source-gcs'
+        if: matrix.connector == 'source-gcs'
         uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
@@ -161,7 +137,7 @@ jobs:
           export_default_credentials: true
 
       - name: Configure AWS credentials from Test account
-        if: matrix.connector.path == 'source-kinesis' || matrix.connector.path == 'source-s3'
+        if: matrix.connector == 'source-kinesis' || matrix.connector == 'source-s3'
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -188,29 +164,29 @@ jobs:
             "source-mysql",
             "source-postgres",
             "source-sqlserver"
-            ]'), matrix.connector.path)
+            ]'), matrix.connector)
         run: |
-          docker compose --file ${{ matrix.connector.path }}/docker-compose.yaml up --wait
-          docker logs ${{ matrix.connector.path }}-db-1
+          docker compose --file ${{ matrix.connector }}/docker-compose.yaml up --wait
+          docker logs ${{ matrix.connector }}-db-1
 
-      - name: Build ${{ matrix.connector.path }} Docker Image
+      - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ${{ matrix.connector.path }}/Dockerfile
+          file: ${{ matrix.connector }}/Dockerfile
           load: true
           build-args: BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
-          tags: ghcr.io/estuary/${{ matrix.connector.path }}:local
+          tags: ghcr.io/estuary/${{ matrix.connector }}:local
           secrets: |
             "rockset_api_key=${{ secrets.ROCKSET_API_KEY }}"
 
       - name: Start Dockerized test infrastructure
-        if: matrix.connector.path == 'source-kafka'
+        if: matrix.connector == 'source-kafka'
         run: |
           docker compose --file infra/docker-compose.yaml up --detach zookeeper
           docker compose --file infra/docker-compose.yaml up --detach kafka
 
-      - name: Source connector ${{ matrix.connector.path }} integration tests
+      - name: Source connector ${{ matrix.connector }} integration tests
         if: |
           contains(fromJson('[
             "source-gcs",
@@ -220,7 +196,7 @@ jobs:
             "source-postgres",
             "source-s3",
             "source-sqlserver"
-            ]'), matrix.connector.path)
+            ]'), matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -230,9 +206,9 @@ jobs:
           ROCKSET_API_KEY: ${{ secrets.ROCKSET_API_KEY }}
           MYSQL_DATABASE: test
 
-        run: CONNECTOR=${{ matrix.connector.path }} VERSION=local ./tests/run.sh;
+        run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
 
-      - name: Materialization connector ${{ matrix.connector.path }} integration tests
+      - name: Materialization connector ${{ matrix.connector }} integration tests
         if: |
           contains(fromJson('[
               "materialize-elasticsearch",
@@ -240,29 +216,29 @@ jobs:
               "materialize-postgres",
               "materialize-s3-parquet",
               "materialize-mongodb"
-            ]'), matrix.connector.path)
+            ]'), matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
-        run: CONNECTOR=${{ matrix.connector.path }} VERSION=local tests/materialize/run.sh;
+        run: CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
-      - name: Push ${{ matrix.connector.path }} image with commit SHA tag
+      - name: Push ${{ matrix.connector }} image with commit SHA tag
         uses: docker/build-push-action@v2
         with:
           context: .
           build-args: BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
-          file: ${{ matrix.connector.path }}/Dockerfile
+          file: ${{ matrix.connector }}/Dockerfile
           push: true
-          tags: ${{ steps.prep.outputs.this_commit_tags }}
+          tags: ghcr.io/estuary/${{ matrix.connector }}:${{ steps.prep.outputs.tag }}
 
-      - name: Push ${{ matrix.connector.path }} image with 'dev' and $VERSION tag
+      - name: Push ${{ matrix.connector }} image with 'dev' and $VERSION tag
         if: ${{ github.event_name == 'push' }}
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ${{ matrix.connector.path }}/Dockerfile
+          file: ${{ matrix.connector }}/Dockerfile
           push: true # See 'if' above
-          tags: ${{ steps.prep.outputs.this_push_tags }}
+          tags: ghcr.io/estuary/${{ matrix.connector }}:dev,ghcr.io/estuary/${{ matrix.connector }}:${{ steps.prep.outputs.version }}
 
       - name: Install psql
         if: ${{ github.event_name == 'push' }}
@@ -270,7 +246,7 @@ jobs:
           sudo apt update
           sudo apt install postgresql
 
-      - name: Refresh connector tags for ${{ matrix.connector.path }}
+      - name: Refresh connector tags for ${{ matrix.connector }}
         if: ${{ github.event_name == 'push' }}
         env:
           PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
@@ -278,21 +254,112 @@ jobs:
           PGPASSWORD: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
           PGDATABASE: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
         run: |
-          VERSION=$(cat ${{ matrix.connector.path }}/VERSION | tr -d '\n')
           echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
                   WHERE connector_id IN (
-                    SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${{ matrix.connector.path }}'
+                    SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${{ matrix.connector }}'
                   )
                   AND
-                  image_tag IN (':$VERSION', ':dev');" | psql
+                  image_tag IN (':${{ steps.prep.outputs.version }}', ':dev');" | psql
+          done
 
-          # Add any additional tags that should be updated for this connector image.
-          for additional in ${{ join(matrix.connector.additionalTags, ' ') }}
-          do
-            echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
-                    WHERE connector_id IN (
-                      SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/$additional'
-                    )
-                    AND
-                    image_tag IN (':$VERSION', ':dev');" | psql
+  build_variants:
+    runs-on: ubuntu-20.04
+    needs: build_connectors
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          # Additional image variants, which are built by extending existing "base" dockerfiles and
+          # tagged as `tag`. The `docsURL` value is provided to the connector as an environment
+          # variable to override the default value. Currently only SQL capture and SQL
+          # materialization connectors support being built as variants in this way.
+          - tag: source-mariadb
+            base: source-mysql
+            docsURL: "https://go.estuary.dev/source-mariadb"
+          - tag: source-amazon-aurora-mysql
+            base: source-mysql
+            docsURL: "https://go.estuary.dev/source-amazon-aurora-mysql"
+          - tag: source-alloydb
+            base: source-postgres
+            docsURL: "https://go.estuary.dev/source-alloydb"
+          - tag: source-amazon-aurora-postgres
+            base: source-postgres
+            docsURL: "https://go.estuary.dev/source-amazon-aurora-postgres"
+          - tag: source-azure-sqlserver
+            base: source-sqlserver
+            docsURL: "https://go.estuary.dev/source-azure-sqlserver"
+          - tag: materialize-timescaledb
+            base: materialize-postgres
+            docsURL: "https://go.estuary.dev/materialize-timescaledb"
+          - tag: materialize-alloydb
+            base: materialize-postgres
+            docsURL: "https://go.estuary.dev/materialize-alloydb"
+          - tag: materialize-amazon-aurora-postgres
+            base: materialize-postgres
+            docsURL: "https://go.estuary.dev/materialize-amazon-aurora-postgres"
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Prepare
+        id: prep
+        run: |
+          TAG=$(echo $GITHUB_SHA | head -c7)
+          echo ::set-output name=tag::${TAG}
+          VERSION=$(cat $DOCKERFILE/VERSION | tr -d '\n')
+          echo ::set-output name=version::${VERSION}
+
+      - name: Login to GitHub package docker registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login --username ${{ github.actor }} --password-stdin ghcr.io
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Push ${{ matrix.variant.tag }} image with commit SHA tag
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          build-args: |
+            BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.variant.base }}:${{ steps.prep.outputs.tag }}
+            DOCS_URL=${{ matrix.variant.docsURL }}
+          file: connector-variant.Dockerfile
+          push: true
+          tags: ghcr.io/estuary/${{ matrix.variant.tag }}:${{ steps.prep.outputs.tag }}
+
+      - name: Push ${{ matrix.variant.tag }} image with 'dev' and $VERSION tag
+        if: ${{ github.event_name == 'push' }}
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          build-args: |
+            BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
+            DOCS_URL=${{ matrix.variant.docsURL }}
+          file: connector-variant.Dockerfile
+          push: true # See 'if' above
+          tags: ghcr.io/estuary/${{ matrix.variant.tag }}:dev,ghcr.io/estuary/${{ matrix.variant.tag }}:${{ steps.prep.outputs.version }}
+
+      - name: Install psql
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          sudo apt update
+          sudo apt install postgresql
+
+      - name: Refresh connector tags for ${{ matrix.variant.tag }}
+        if: ${{ github.event_name == 'push' }}
+        env:
+          PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
+          PGUSER: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
+          PGPASSWORD: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
+          PGDATABASE: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
+        run: |
+          echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
+                  WHERE connector_id IN (
+                    SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${{ matrix.variant.tag }}'
+                  )
+                  AND
+                  image_tag IN (':${{ steps.prep.outputs.version }}', ':dev');" | psql
           done
