@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
@@ -26,6 +27,18 @@ type Driver struct {
 
 var _ pm.DriverServer = &Driver{}
 
+// docsUrlFromEnv looks for an environment variable set as DOCS_URL to use for the spec response
+// documentation URL. It uses that instead of the default documentation URL from the connector if
+// found.
+func docsUrlFromEnv(providedURL string) string {
+	fromEnv := os.Getenv("DOCS_URL")
+	if fromEnv != "" {
+		return fromEnv
+	}
+
+	return providedURL
+}
+
 // Spec implements the DriverServer interface.
 func (d *Driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
 	var endpoint, resource []byte
@@ -41,7 +54,7 @@ func (d *Driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecRespons
 	return &pm.SpecResponse{
 		EndpointSpecSchemaJson: json.RawMessage(endpoint),
 		ResourceSpecSchemaJson: json.RawMessage(resource),
-		DocumentationUrl:       d.DocumentationURL,
+		DocumentationUrl:       docsUrlFromEnv(d.DocumentationURL),
 	}, nil
 }
 
@@ -160,8 +173,8 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 					if err != nil {
 						return nil, err
 					}
-					var input = AlterInput {
-						Table: table,
+					var input = AlterInput{
+						Table:      table,
 						Identifier: field,
 					}
 					if statement, err := RenderAlterTemplate(input, endpoint.AlterTableAddColumnTemplate); err != nil {
@@ -180,8 +193,8 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 						if err != nil {
 							return nil, err
 						}
-						var input = AlterInput {
-							Table: table,
+						var input = AlterInput{
+							Table:      table,
 							Identifier: field,
 						}
 						if statement, err := RenderAlterTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
@@ -277,7 +290,7 @@ func (d *Driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 				endpoint.Identifier(endpoint.MetaSpecs.Path...),
 				endpoint.Literal(materialization),
 				endpoint.Literal(req.Version)),
-			)
+		)
 	}
 	if endpoint.MetaCheckpoints != nil {
 		statements = append(statements,
