@@ -260,7 +260,6 @@ jobs:
                   )
                   AND
                   image_tag IN (':${{ steps.prep.outputs.version }}', ':dev');" | psql
-          done
 
   build_variants:
     runs-on: ubuntu-20.04
@@ -362,4 +361,3 @@ jobs:
                   )
                   AND
                   image_tag IN (':${{ steps.prep.outputs.version }}', ':dev');" | psql
-          done
