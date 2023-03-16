@@ -307,7 +307,7 @@ jobs:
         run: |
           TAG=$(echo $GITHUB_SHA | head -c7)
           echo ::set-output name=tag::${TAG}
-          VERSION=$(cat ${{ matrix.base }}/VERSION | tr -d '\n')
+          VERSION=$(cat ${{ matrix.variant.base }}/VERSION | tr -d '\n')
           echo ::set-output name=version::${VERSION}
 
       - name: Login to GitHub package docker registry
