@@ -56,7 +56,7 @@ func newTableConfig(ep *sql.Endpoint) sql.Resource {
 // NewSQLiteDriver creates a new Driver for sqlite.
 func NewSQLiteDriver() *sql.Driver {
 	return &sql.Driver{
-		DocumentationURL: "https://docs.estuary.dev/#FIXME",
+		DocumentationURL: "https://go.estuary.dev/materialize-sqlite",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
 		NewEndpoint: func(ctx context.Context, _ json.RawMessage) (*sql.Endpoint, error) {
