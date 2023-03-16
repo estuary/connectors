@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
@@ -66,6 +67,18 @@ func (e *prerequisitesError) Unwrap() []error {
 	return e.errs
 }
 
+// docsUrlFromEnv looks for an environment variable set as DOCS_URL to use for the spec response
+// documentation URL. It uses that instead of the default documentation URL from the connector if
+// found.
+func docsUrlFromEnv(providedURL string) string {
+	fromEnv := os.Getenv("DOCS_URL")
+	if fromEnv != "" {
+		return fromEnv
+	}
+
+	return providedURL
+}
+
 // Spec returns the specification definition of this driver.
 // Notably this includes its endpoint and resource configuration JSON schema.
 func (d *Driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecResponse, error) {
@@ -76,7 +89,7 @@ func (d *Driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecRespons
 	return &pc.SpecResponse{
 		EndpointSpecSchemaJson: d.ConfigSchema,
 		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       d.DocumentationURL,
+		DocumentationUrl:       docsUrlFromEnv(d.DocumentationURL),
 	}, nil
 }
 
