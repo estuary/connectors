@@ -335,7 +335,7 @@ jobs:
         with:
           context: .
           build-args: |
-            BASE_CONNECTOR=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
+            BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.variant.base }}:${{ steps.prep.outputs.tag }}
             DOCS_URL=${{ matrix.variant.docsURL }}
           file: connector-variant.Dockerfile
           push: true # See 'if' above
