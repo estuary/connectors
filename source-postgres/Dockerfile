@@ -28,6 +28,7 @@ ENV PATH="/builder/bin:$PATH"
 # specify `--build-arg TEST_DATABASE=no` in the Docker command line.
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
+ENV CI_BUILD=yes
 RUN go test -short -v ./source-postgres/... --db_address=localhost:5432
 
 # Build the connector.
