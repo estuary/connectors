@@ -13,7 +13,7 @@ func (db *postgresDatabase) SetupPrerequisites(ctx context.Context) []error {
 
 	for _, prereq := range []func(ctx context.Context) error{
 		db.prerequisiteLogicalReplication,
-		db.prerequisiteReplicationUser,
+		//db.prerequisiteReplicationUser,
 		db.prerequisiteReplicationSlot,
 		db.prerequisitePublication,
 		db.prerequisiteWatermarksTable,
