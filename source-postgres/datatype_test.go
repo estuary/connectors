@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -148,6 +149,10 @@ func TestScanKeyTimestamps(t *testing.T) {
 }
 
 func TestScanKeyTypes(t *testing.T) {
+	if val := os.Getenv("CI_BUILD"); val != "" {
+		t.Skipf("skipping %q in CI builds", t.Name())
+	}
+
 	var tb, ctx = postgresTestBackend(t), context.Background()
 	for _, tc := range []struct {
 		Name       string

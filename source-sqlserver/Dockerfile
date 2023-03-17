@@ -27,6 +27,7 @@ ENV PATH="/builder/bin:$PATH"
 # Run the unit tests. To skip tests which access a test database, specify `--build-arg TEST_DATABASE=no` in the Docker command line.
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
+ENV CI_BUILD=yes
 RUN go test -short -v ./source-sqlserver/... -timeout=60m
 
 # Build the connector.

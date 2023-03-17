@@ -25,6 +25,7 @@ RUN go get -v ./source-mysql
 # Run the unit tests. To skip tests which access a test database, specify `--build-arg TEST_DATABASE=no` in the Docker command line.
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
+ENV CI_BUILD=yes
 RUN go test -v ./source-mysql/...
 
 # Build the connector.
