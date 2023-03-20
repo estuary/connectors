@@ -5,11 +5,13 @@ import (
 	stdsql "database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
 	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -174,9 +176,58 @@ func newPostgresDriver() pm.DriverServer {
 				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
+				CheckPrerequisites:          prereqs,
 			}, nil
 		},
 	}
+}
+
+func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
+	errs := &sql.PrereqErr{}
+
+	var cfg = new(config)
+	if err := pf.UnmarshalStrict(raw, cfg); err != nil {
+		errs.Err(fmt.Errorf("cannot parse endpoint configuration: %w", err))
+		return errs
+	}
+
+	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
+	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
+	// bail out well before then.
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	if db, err := stdsql.Open("pgx", cfg.ToURI()); err != nil {
+		errs.Err(err)
+	} else if err := db.PingContext(ctx); err != nil {
+		// Provide a more user-friendly representation of some common error causes.
+		var pgErr *pgconn.PgError
+		var netConnErr *net.DNSError
+		var netOpErr *net.OpError
+
+		if errors.As(err, &pgErr) {
+			switch pgErr.Code {
+			case "28P01":
+				err = fmt.Errorf("incorrect username or password")
+			case "3D000":
+				err = fmt.Errorf("database %q does not exist", cfg.Database)
+			}
+		} else if errors.As(err, &netConnErr) {
+			if netConnErr.IsNotFound {
+				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
+			}
+		} else if errors.As(err, &netOpErr) {
+			if netOpErr.Timeout() {
+				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
+			}
+		}
+
+		errs.Err(err)
+	} else {
+		db.Close()
+	}
+
+	return errs
 }
 
 // client implements the sql.Client interface.
