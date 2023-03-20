@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/storage"
@@ -31,10 +30,7 @@ func (t *transactor) NewExternalDataConnectionFile(ctx context.Context, file str
 		return nil, fmt.Errorf("external data connection file only supports json at this time")
 	}
 
-	// If BucketPath starts with a /, then so will the result of the Join. Trim the leading / so
-	// that we don't end up with repeated / chars in the URI and so that the object key does not
-	// start with a /.
-	objectKey := strings.TrimPrefix(path.Join(t.bucketPath, file), "/")
+	objectKey := path.Join(t.bucketPath, file)
 
 	f := &ExternalDataConnectionFile{
 		URI:       fmt.Sprintf("gs://%s/%s", t.bucket, objectKey),

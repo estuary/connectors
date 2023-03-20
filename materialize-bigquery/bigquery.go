@@ -5,7 +5,10 @@ import (
 	dbSql "database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	"path"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
@@ -14,6 +17,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 )
 
@@ -41,6 +45,13 @@ func (c *config) Validate() error {
 	if c.Bucket == "" {
 		return fmt.Errorf("expected bucket")
 	}
+
+	if c.BucketPath != "" {
+		// If BucketPath starts with a / trim the leading / so that we don't end up with repeated /
+		// chars in the URI and so that the object key does not start with a /.
+		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
+	}
+
 	return nil
 }
 
@@ -65,14 +76,6 @@ func (c *config) client(ctx context.Context) (*client, error) {
 		return nil, fmt.Errorf("creating cloud storage client: %w", err)
 	}
 	log.Info("cloud storage client successfully created")
-
-	if _, err := bigqueryClient.DatasetInProject(c.ProjectID, c.Dataset).Metadata(ctx); err != nil {
-		return nil, fmt.Errorf("validating dataset & project: %w", err)
-	}
-	log.WithFields(log.Fields{
-		"projectID": c.ProjectID,
-		"dataset":   c.Dataset,
-	}).Info("dataset and project successfully validated")
 
 	return &client{
 		bigqueryClient:     bigqueryClient,
@@ -178,9 +181,105 @@ func newBigQueryDriver() pm.DriverServer {
 				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
+				CheckPrerequisites:          prereqs,
 			}, nil
 		},
 	}
+}
+
+func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
+	errs := &sql.PrereqErr{}
+
+	var cfg = new(config)
+	if err := pf.UnmarshalStrict(raw, cfg); err != nil {
+		// An error here is a logic error in the connector code.
+		errs.Err(fmt.Errorf("cannot parse endpoint configuration: %w", err))
+		return errs
+	}
+
+	client, err := cfg.client(ctx)
+	if err != nil {
+		// The user-provided JSON credentials could not be parsed and no further checks are
+		// possible.
+		errs.Err(fmt.Errorf("cannot parse JSON credentials"))
+		return errs
+	}
+
+	var googleErr *googleapi.Error
+
+	if _, err := client.bigqueryClient.DatasetInProject(client.config.ProjectID, client.config.Dataset).Metadata(ctx); err != nil {
+		if errors.As(err, &googleErr) {
+			// Not found or forbidden means that either the dataset or project is not found or the
+			// credentials are not authorized for them. In these cases the returned error message
+			// contains the differentiation between "was it the project or dataset" as unstructured
+			// text and we can remove some of the error wrapping to make the message returned to the
+			// user more clear.
+			if googleErr.Code == http.StatusNotFound || googleErr.Code == http.StatusForbidden {
+				err = fmt.Errorf(googleErr.Message)
+			}
+		}
+		errs.Err(err)
+	}
+
+	// Verification that the client can perform queries in the configured region. There's not a
+	// whole lot we can do for interpreting this error as far as I can tell, but we can at least
+	// check before moving on further with the upsert process.
+	query := client.newQuery("SELECT 1")
+	query.Location = cfg.Region
+	if _, err := query.Run(ctx); err != nil {
+		errs.Err(err)
+	}
+
+	// Verify cloud storage abilities.
+	data := []byte("test")
+
+	objectDir := path.Join(client.config.Bucket, client.config.BucketPath)
+	objectKey := path.Join(objectDir, tmpFileName())
+	objectHandle := client.cloudStorageClient.Bucket(client.config.Bucket).Object(objectKey)
+
+	writer := objectHandle.NewWriter(ctx)
+	if _, err := writer.Write(data); err != nil {
+		// This won't err until the writer is closed in the case of having the wrong bucket or
+		// authorization configured, and would most likely be caused by a logic error in the
+		// connector code.
+		errs.Err(err)
+	} else if err := writer.Close(); err != nil {
+		// Handling for the two most comman cases: The bucket doesn't exist, or the bucket does
+		// exist but the configured credentials aren't authorized to write to it.
+		if errors.As(err, &googleErr) {
+			if googleErr.Code == http.StatusNotFound {
+				err = fmt.Errorf("bucket %q does not exist", cfg.Bucket)
+			} else if googleErr.Code == http.StatusForbidden {
+				err = fmt.Errorf("not authorized to write to bucket %q", objectDir)
+			}
+		}
+		errs.Err(err)
+	} else {
+		// Verify that the created object can be read and deleted. The unauthorized case is handled
+		// & formatted specifically in these checks since the existence of the bucket has already
+		// been verified by creating the temporary test object.
+		if reader, err := objectHandle.NewReader(ctx); err != nil {
+			errs.Err(err)
+		} else if _, err := reader.Read(make([]byte, len(data))); err != nil {
+			if errors.As(err, &googleErr) && googleErr.Code == http.StatusForbidden {
+				err = fmt.Errorf("not authorized to read from bucket %q", objectDir)
+			}
+			errs.Err(err)
+		} else {
+			reader.Close()
+		}
+
+		// It's technically possible to be able to delete but not read, so delete is checked even if
+		// read failed.
+		if err := objectHandle.Delete(ctx); err != nil {
+			if errors.As(err, &googleErr) && googleErr.Code == http.StatusForbidden {
+				err = fmt.Errorf("not authorized to delete from bucket %q", objectDir)
+			}
+			errs.Err(err)
+		}
+	}
+
+	return errs
 }
 
 // client implements the sql.Client interface.
