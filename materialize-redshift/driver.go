@@ -9,18 +9,22 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	awsHttp "github.com/aws/smithy-go/transport/http"
 	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	log "github.com/sirupsen/logrus"
@@ -149,40 +153,6 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-func verifyS3Access(ctx context.Context, cfg *config) error {
-	s3client, err := cfg.toS3Client(ctx)
-	if err != nil {
-		return err
-	}
-
-	testCol := &sql.Column{}
-	testCol.Field = "testing"
-
-	// Verify that we can write data to the configured bucket.
-	s3file := newStagedFile(s3client, cfg.Bucket, []*sql.Column{testCol})
-	s3file.start(ctx)
-	s3file.encodeRow([]interface{}{"testing"})
-	_, delete, err := s3file.flush()
-	if err != nil {
-		return err
-	}
-
-	// Verify that we can read data that we have written.
-	if _, err := s3client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(cfg.Bucket),
-		Key:    s3file.uploadOutput.Key,
-	}); err != nil {
-		return err
-	}
-
-	// Verify that we can delete the object we wrote.
-	if err := delete(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func newRedshiftDriver() pm.DriverServer {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-redshift",
@@ -191,11 +161,7 @@ func newRedshiftDriver() pm.DriverServer {
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage) (*sql.Endpoint, error) {
 			var cfg = new(config)
 			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
-			}
-
-			if err := verifyS3Access(ctx, cfg); err != nil {
-				return nil, fmt.Errorf("failed to validate S3 staging bucket configuration: %w", err)
+				return nil, fmt.Errorf("could not parse endpoint configuration: %w", err)
 			}
 
 			log.WithFields(log.Fields{
@@ -241,9 +207,113 @@ func newRedshiftDriver() pm.DriverServer {
 				AlterColumnNullableTemplate: tplAlterColumnNullable,
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
+				CheckPrerequisites:          prereqs,
 			}, nil
 		},
 	}
+}
+
+func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
+	errs := &sql.PrereqErr{}
+
+	var cfg = new(config)
+	if err := pf.UnmarshalStrict(raw, cfg); err != nil {
+		errs.Err(fmt.Errorf("cannot parse endpoint configuration: %w", err))
+		return errs
+	}
+
+	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
+	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
+	// bail out well before then.
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	if db, err := stdsql.Open("pgx", cfg.toURI()); err != nil {
+		errs.Err(err)
+	} else if err := db.PingContext(ctx); err != nil {
+		// Provide a more user-friendly representation of some common error causes.
+		var pgErr *pgconn.PgError
+		var netConnErr *net.DNSError
+		var netOpErr *net.OpError
+
+		if errors.As(err, &pgErr) {
+			switch pgErr.Code {
+			case "28000":
+				err = fmt.Errorf("incorrect username or password")
+			case "3D000":
+				err = fmt.Errorf("database %q does not exist", cfg.Database)
+			}
+		} else if errors.As(err, &netConnErr) {
+			if netConnErr.IsNotFound {
+				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
+			}
+		} else if errors.As(err, &netOpErr) {
+			if netOpErr.Timeout() {
+				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
+			}
+		}
+
+		errs.Err(err)
+	} else {
+		db.Close()
+	}
+
+	s3client, err := cfg.toS3Client(ctx)
+	if err != nil {
+		// This is not caused by invalid S3 credentials, and would most likely be a logic error in
+		// the connector code.
+		errs.Err(err)
+		return errs
+	}
+
+	testCol := &sql.Column{}
+	testCol.Field = "test"
+
+	s3file := newStagedFile(s3client, cfg.Bucket, []*sql.Column{testCol})
+	s3file.start(ctx)
+
+	var awsErr *awsHttp.ResponseError
+
+	if err := s3file.encodeRow([]interface{}{[]byte("test")}); err != nil {
+		// This won't err immediately until the file is flushed in the case of having the wrong
+		// bucket or authorization configured, and would most likely be caused by a logic error in
+		// the connector code.
+		errs.Err(err)
+	} else if _, delete, err := s3file.flush(); err != nil {
+		if errors.As(err, &awsErr) {
+			// Handling for the two most common cases: The bucket doesn't exist, or the bucket does
+			// exist but the configured credentials aren't authorized to write to it.
+			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
+				err = fmt.Errorf("bucket %q does not exist", cfg.Bucket)
+			} else if awsErr.Response.Response.StatusCode == http.StatusForbidden {
+				err = fmt.Errorf("not authorized to write to bucket %q", cfg.Bucket)
+			}
+		}
+
+		errs.Err(err)
+	} else {
+		// Verify that the created object can be read and deleted. The unauthorized case is handled
+		// & formatted specifically in these checks since the existence of the bucket has already
+		// been verified by creating the temporary test object.
+		if _, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: aws.String(cfg.Bucket),
+			Key:    s3file.uploadOutput.Key,
+		}); err != nil {
+			if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+				err = fmt.Errorf("not authorized to read from bucket %q", cfg.Bucket)
+			}
+			errs.Err(err)
+		}
+
+		if err := delete(ctx); err != nil {
+			if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+				err = fmt.Errorf("not authorized to delete from bucket %q", cfg.Bucket)
+			}
+			errs.Err(err)
+		}
+	}
+
+	return errs
 }
 
 // client implements the sql.Client interface.
