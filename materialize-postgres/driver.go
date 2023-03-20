@@ -172,6 +172,7 @@ func newPostgresDriver() pm.DriverServer {
 				CreateTableTemplate:         tplCreateTargetTable,
 				AlterColumnNullableTemplate: tplAlterColumnNullable,
 				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
+				AlterColumnTypeTemplate:     tplAlterColumnType,
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
 			}, nil

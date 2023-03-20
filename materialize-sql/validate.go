@@ -9,7 +9,7 @@ import (
 
 // ValidateSelectedFields validates a proposed MaterializationSpec against a set of constraints. If
 // any constraints would be violated, then an error is returned.
-func ValidateSelectedFields(constraints map[string]*pm.Constraint, proposed *pf.MaterializationSpec_Binding) error {
+func (ep *Endpoint) ValidateSelectedFields(constraints map[string]*pm.Constraint, proposed *pf.MaterializationSpec_Binding) error {
 	// Track all the location pointers for each included field so that we can verify all the
 	// LOCATION_REQUIRED constraints are met.
 	var includedPointers = make(map[string]bool)
@@ -50,7 +50,7 @@ func ValidateSelectedFields(constraints map[string]*pm.Constraint, proposed *pf.
 // **new** materialization (one that is not running and has never been Applied). Note that this will
 // "recommend" all projections of single scalar types, which is what drives the default field
 // selection in flowctl.
-func ValidateNewSQLProjections(resource Resource, proposed *pf.CollectionSpec) map[string]*pm.Constraint {
+func (ep *Endpoint) ValidateNewSQLProjections(resource Resource, proposed *pf.CollectionSpec) map[string]*pm.Constraint {
 	var constraints = make(map[string]*pm.Constraint)
 	for _, projection := range proposed.Projections {
 		var constraint = validateNewProjection(resource, &projection)
@@ -96,11 +96,11 @@ func validateNewProjection(resource Resource, projection *pf.Projection) *pm.Con
 // CollectionSpec for a materialization that is already running, or has been Applied. The returned
 // constraints will explicitly require all fields that are currently materialized, as long as they
 // are not unsatisfiable, and give new constraints for additionally supplied fields.
-func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec_Binding, proposed *pf.CollectionSpec) map[string]*pm.Constraint {
+func (ep *Endpoint) ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec_Binding, proposed *pf.CollectionSpec) map[string]*pm.Constraint {
 	var constraints = make(map[string]*pm.Constraint)
 	for _, field := range existing.FieldSelection.AllFields() {
 		var constraint = new(pm.Constraint)
-		var typeError = checkTypeError(field, &existing.Collection, proposed)
+		var typeError = ep.checkTypeError(field, &existing.Collection, proposed)
 		if len(typeError) > 0 {
 			constraint.Type = pm.Constraint_UNSATISFIABLE
 			constraint.Reason = typeError
@@ -123,7 +123,7 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 	return constraints
 }
 
-func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.CollectionSpec) string {
+func (ep *Endpoint) checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.CollectionSpec) string {
 	// existingProjection is guaranteed to exist since the MaterializationSpec has already been
 	// validated.
 	var existingProjection = existing.GetProjection(field)
@@ -138,7 +138,10 @@ func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.Coll
 	// compatible if they do not alter the effective FlatType, such as adding a string formatted as
 	// an integer to an existing integer type.
 	for _, pt := range effectiveJsonTypes(proposedProjection) {
-		if !SliceContains(pt, effectiveJsonTypes(existingProjection)) && pt != "null" {
+		// If a data-type migration is possible
+		var typeMigration = ep.AlterColumnTypeTemplate != nil && projectionTypeMigratable(existingProjection, proposedProjection)
+
+		if !SliceContains(pt, effectiveJsonTypes(existingProjection)) && pt != "null" && !typeMigration {
 			return fmt.Sprintf("The proposed projection may contain the type '%s', which is not part of the original projection", pt)
 		}
 	}

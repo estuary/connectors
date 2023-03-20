@@ -77,6 +77,9 @@ type Endpoint struct {
 	// AlterTableAddColumn alters a table and adds a new column (usually with
 	// default null value)
 	AlterTableAddColumnTemplate *template.Template
+	// AlterColumnType alters a table and changes a column's data type (only
+	// supply this if this kind of migration is supported by the endpoint)
+	AlterColumnTypeTemplate *template.Template
 
 	// NewResource returns an uninitialized or partially-initialized Resource
 	// which will be parsed into and validated from a resource configuration.
@@ -148,9 +151,9 @@ func resolveResourceToExistingBinding(
 		// key and can no longer be loaded correctly by a standard materialization.
 		err = fmt.Errorf("cannot disable delta-updates binding of collection %s", collection.Collection)
 	} else if loadedBinding != nil {
-		constraints = ValidateMatchesExisting(resource, loadedBinding, collection)
+		constraints = endpoint.ValidateMatchesExisting(resource, loadedBinding, collection)
 	} else {
-		constraints = ValidateNewSQLProjections(resource, collection)
+		constraints = endpoint.ValidateNewSQLProjections(resource, collection)
 	}
 
 	return

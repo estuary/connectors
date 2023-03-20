@@ -99,6 +99,17 @@ ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
 	{{- end }};
 {{ end }}
 
+-- Alter table and update a column type
+
+{{ define "alterColumnType" }}
+ALTER TABLE {{ $.Table.Identifier }} ALTER COLUMN
+	{{ range $ind, $col := $.Table.Columns -}}
+		{{- if (eq $col.Identifier $.Identifier) -}}
+			{{ $col.Identifier }} TYPE {{ $col.DDL }}
+		{{- end -}}
+	{{- end }};
+{{ end }}
+
 -- Templated creation of a temporary load table:
 
 {{ define "createLoadTable" }}
@@ -274,4 +285,5 @@ END $$;
 	tplUpdateFence         = tplAll.Lookup("updateFence")
 	tplAlterColumnNullable = tplAll.Lookup("alterColumnNullable")
 	tplAlterTableAddColumn = tplAll.Lookup("alterTableAddColumn")
+	tplAlterColumnType     = tplAll.Lookup("alterColumnType")
 )

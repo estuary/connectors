@@ -134,6 +134,25 @@ func effectiveJsonTypes(projection *pf.Projection) []string {
 	return projection.Inference.Types
 }
 
+// Can the existing projection type be migrated to the proposed type?
+func projectionTypeMigratable(existing *pf.Projection, proposed *pf.Projection) bool {
+  // At the moment we only migrate to string
+  if !SliceContains("string", proposed.Inference.Types) {
+    return false
+  }
+  var migratableTypes = []string{"string", "integer", "numeric", "boolean"}
+
+  var isMigratable = false
+  for _, t := range migratableTypes {
+    if SliceContains(t, existing.Inference.Types) {
+      isMigratable = true
+      break
+    }
+  }
+
+  return isMigratable
+}
+
 type MappedType struct {
 	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct inclusion in raw SQL.
 	DDL string

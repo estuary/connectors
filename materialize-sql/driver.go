@@ -148,7 +148,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 
 		if err != nil {
 			return nil, err
-		} else if err = ValidateSelectedFields(constraints, bindingSpec); err != nil {
+		} else if err = endpoint.ValidateSelectedFields(constraints, bindingSpec); err != nil {
 			// The applied binding is not a valid solution for its own constraints.
 			return nil, fmt.Errorf("binding for %s: %w", collection, err)
 		} else if loadedBinding != nil && !bindingSpec.FieldSelection.Equal(&loadedBinding.FieldSelection) && !isBindingMigratable(loadedBinding, bindingSpec) {
@@ -167,12 +167,13 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 				var p = bindingSpec.Collection.GetProjection(field)
 				var previousProjection = loadedBinding.Collection.GetProjection(field)
 
+				var table, err = ResolveTable(tableShape, endpoint.Dialect)
+				if err != nil {
+					return nil, err
+				}
+
 				// Make sure new columns are added to the table
 				if previousProjection == nil {
-					var table, err = ResolveTable(tableShape, endpoint.Dialect)
-					if err != nil {
-						return nil, err
-					}
 					var input = AlterInput{
 						Table:      table,
 						Identifier: field,
@@ -189,15 +190,23 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 					// If the table has already been created, make sure all non-null fields
 					// are marked as such
 					if !previousNullable && newNullable {
-						var table, err = ResolveTable(tableShape, endpoint.Dialect)
-						if err != nil {
-							return nil, err
-						}
 						var input = AlterInput{
 							Table:      table,
 							Identifier: field,
 						}
 						if statement, err := RenderAlterTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
+							return nil, err
+						} else {
+							statements = append(statements, statement)
+						}
+					}
+
+					if endpoint.AlterColumnTypeTemplate != nil && fieldNeedsTypeMigration(previousProjection, p) {
+						var input = AlterInput{
+							Table:      table,
+							Identifier: field,
+						}
+						if statement, err := RenderAlterTemplate(input, endpoint.AlterColumnTypeTemplate); err != nil {
 							return nil, err
 						} else {
 							statements = append(statements, statement)
@@ -423,4 +432,25 @@ func isBindingMigratable(existingBinding *pf.MaterializationSpec_Binding, newBin
 	}
 
 	return true
+}
+
+func fieldNeedsTypeMigration(existing *pf.Projection, proposed *pf.Projection) bool {
+  var existingType string
+  var proposedType string
+
+  for _, t := range existing.Inference.Types {
+    if t != "null" {
+      existingType = t
+      break
+    }
+  }
+
+  for _, t := range proposed.Inference.Types {
+    if t != "null" {
+      proposedType = t
+      break
+    }
+  }
+
+  return existingType != proposedType
 }
