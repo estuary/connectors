@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"text/template"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -83,6 +84,39 @@ type Endpoint struct {
 	NewResource func(*Endpoint) Resource
 	// NewTransactor returns a Transactor ready for pm.RunTransactions.
 	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table) (pm.Transactor, error)
+	// CheckPrerequisites validates that the proposed configuration is able to connect to the
+	// endpoint and perform the required actions. It assumes that any required SSH tunneling is
+	// setup prior to its call.
+	CheckPrerequisites func(ctx context.Context, endpointConfig json.RawMessage) *PrereqErr
+}
+
+// PrereqErr is a wrapper for recording accumulated errors during prerequisite checking and
+// formatting them for user presentation.
+type PrereqErr struct {
+	errs []error
+}
+
+// Err adds an error to the accumulated list of errors.
+func (e *PrereqErr) Err(err error) {
+	e.errs = append(e.errs, err)
+}
+
+func (e *PrereqErr) Len() int {
+	return len(e.errs)
+}
+
+func (e *PrereqErr) Unwrap() []error {
+	return e.errs
+}
+
+func (e *PrereqErr) Error() string {
+	var b = new(strings.Builder)
+	fmt.Fprintf(b, "the materialization cannot run due to the following error(s):")
+	for _, err := range e.errs {
+		b.WriteString("\n - ")
+		b.WriteString(err.Error())
+	}
+	return b.String()
 }
 
 // loadSpec loads the named MaterializationSpec and its version that's stored within the Endpoint, if any.
