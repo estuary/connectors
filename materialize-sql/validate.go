@@ -100,13 +100,16 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 	var constraints = make(map[string]*pm.Constraint)
 	for _, field := range existing.FieldSelection.AllFields() {
 		var constraint = new(pm.Constraint)
+		if proposed.GetProjection(field) == nil {
+			continue
+		}
 		var typeError = checkTypeError(field, &existing.Collection, proposed)
 		if len(typeError) > 0 {
 			constraint.Type = pm.Constraint_UNSATISFIABLE
 			constraint.Reason = typeError
 		} else {
-			constraint.Type = pm.Constraint_FIELD_REQUIRED
-			constraint.Reason = "This field is part of the current materialization"
+			constraint.Type = pm.Constraint_LOCATION_RECOMMENDED
+			constraint.Reason = "This location is part of the current materialization"
 		}
 
 		constraints[field] = constraint
@@ -124,12 +127,11 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 }
 
 func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.CollectionSpec) string {
-	// existingProjection is guaranteed to exist since the MaterializationSpec has already been
-	// validated.
 	var existingProjection = existing.GetProjection(field)
 	var proposedProjection = proposed.GetProjection(field)
-	if proposedProjection == nil {
-		return "The proposed materialization is missing the projection, which is required because it's included in the existing materialization"
+
+	if existingProjection == nil {
+		return ""
 	}
 
 	// Ensure that the possible types of the proposed are compatible with the possible types of the
