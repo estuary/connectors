@@ -6,10 +6,12 @@ import (
 	stdsql "database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -24,7 +26,7 @@ import (
 // config represents the endpoint configuration for snowflake.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
 type config struct {
-	Host      string `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0"`
+	Host      string `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0"`
 	Account   string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier." jsonschema_extras:"order=1"`
 	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=2"`
 	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=3"`
@@ -74,6 +76,12 @@ func (c *config) asSnowflakeConfig() sf.Config {
 	}
 }
 
+var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)
+
+func validHost(h string) bool {
+	return hostRe.MatchString(h) && !strings.Contains(h, ":")
+}
+
 func (c *config) Validate() error {
 	var requiredProperties = [][]string{
 		{"account", c.Account},
@@ -88,12 +96,14 @@ func (c *config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+
+	if !validHost(c.Host) {
+		return fmt.Errorf("invalid host %q (must match end in snowflakecomputing.com and not include a protocol)", c.Host)
+	}
 	return nil
 }
 
 type tableConfig struct {
-	base *config
-
 	Table string `json:"table" jsonschema_extras:"x-collection-name=true"`
 	Delta bool   `json:"delta_updates,omitempty"`
 }
@@ -145,15 +155,6 @@ func newSnowflakeDriver() *sql.Driver {
 				"schema":   parsed.Schema,
 			}).Info("opening Snowflake")
 
-			db, err := stdsql.Open("snowflake", dsn)
-			if err == nil {
-				err = db.PingContext(ctx)
-			}
-
-			if err != nil {
-				return nil, fmt.Errorf("opening Snowflake database: %w", err)
-			}
-
 			var metaBase sql.TablePath
 			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
@@ -168,9 +169,52 @@ func newSnowflakeDriver() *sql.Driver {
 				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
+				CheckPrerequisites:          prereqs,
 			}, nil
 		},
 	}
+}
+
+func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
+	errs := &sql.PrereqErr{}
+
+	var cfg = new(config)
+	if err := pf.UnmarshalStrict(raw, cfg); err != nil {
+		// An error here is a logic error in the connector code.
+		errs.Err(fmt.Errorf("cannot parse endpoint configuration: %w", err))
+		return errs
+	}
+
+	if db, err := stdsql.Open("snowflake", cfg.ToURI()); err != nil {
+		errs.Err(err)
+	} else if err := db.PingContext(ctx); err != nil {
+		var sfError *sf.SnowflakeError
+		if errors.As(err, &sfError) {
+			switch sfError.Number {
+			case 260008:
+				// This is the error if the host URL has an incorrect account identifier. The error
+				// message from the Snowflake driver will accurately report that the account name is
+				// incorrect, but would be confusing for a user because we have a separate "Account"
+				// input field. We want to be specific here and report that it is the account
+				// identifier in the host URL.
+				err = fmt.Errorf("incorrect account identifier %q in host URL", strings.TrimSuffix(cfg.Host, ".snowflakecomputing.com"))
+			case 390100:
+				err = fmt.Errorf("incorrect username or password")
+			case 390201:
+				// This means "doesn't exist or not authorized", and we don't have a way to
+				// distinguish between that for the database, schema, or warehouse. The snowflake
+				// error message in these cases is fairly decent fortunately.
+			case 390189:
+				err = fmt.Errorf("role %q does not exist", cfg.Role)
+			}
+		}
+
+		errs.Err(err)
+	} else {
+		db.Close()
+	}
+
+	return errs
 }
 
 // client implements the sql.Client interface.
@@ -209,9 +253,7 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 }
 
 type transactor struct {
-	cfg     *config
-	dialect *sql.Dialect
-
+	cfg *config
 	// Variables exclusively used by Load.
 	load struct {
 		conn *stdsql.Conn

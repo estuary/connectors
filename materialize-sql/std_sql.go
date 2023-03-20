@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -247,8 +248,12 @@ func (col *anyColumn) Scan(i interface{}) error {
 	case []byte:
 		sval = string(ii)
 	case string:
-		// Redshift checkpoint columns have an additional layer of hex encoding.
-		if hexBytes, err := hex.DecodeString(ii); err == nil {
+		if _, err := strconv.Atoi(ii); err == nil {
+			// Snowflake integer value columns scan into an interface{} with a concrete type of
+			// string.
+			sval = fmt.Sprint(i)
+		} else if hexBytes, err := hex.DecodeString(ii); err == nil {
+			// Redshift checkpoint columns have an additional layer of hex encoding.
 			sval = string(hexBytes)
 		} else {
 			sval = fmt.Sprint(i)
