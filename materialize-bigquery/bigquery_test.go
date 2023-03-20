@@ -3,7 +3,6 @@ package connector
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -15,57 +14,44 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/iterator"
 )
 
-var testCredentialsPath = flag.String(
-	"creds_path",
-	"/path/to/credentials",
-	"Path to the credentials JSON to use for test authentication",
-)
-var testProjectID = flag.String(
-	"project_id",
-	"(project_id)",
-	"The project ID to interact with during automated tests",
-)
-var testDataset = flag.String(
-	"dataset",
-	"(dataset)",
-	"The bigquery dataset used during automated tests",
-)
-var testRegion = flag.String(
-	"region",
-	"(region)",
-	"The region of the resources used during automated tests",
-)
-var testBucket = flag.String(
-	"bucket",
-	"(bucket)",
-	"The bucket to interact with during automated tests",
-)
+func mustGetCfg(t *testing.T) config {
+	if os.Getenv("TESTDB") != "yes" {
+		t.Skipf("skipping %q: ${TESTDB} != \"yes\"", t.Name())
+		return config{}
+	}
+
+	out := config{}
+
+	for _, prop := range []struct {
+		key  string
+		dest *string
+	}{
+		{"GCP_SERVICE_ACCOUNT_KEY", &out.CredentialsJSON},
+		{"GCP_BQ_PROJECT_ID", &out.ProjectID},
+		{"GCP_BQ_DATASET", &out.Dataset},
+		{"GCP_BQ_REGION", &out.Region},
+		{"GCP_BQ_BUCKET", &out.Bucket},
+	} {
+		*prop.dest = os.Getenv(prop.key)
+	}
+
+	if err := out.Validate(); err != nil {
+		t.Fatal(err)
+	}
+
+	return out
+}
 
 func TestFencingCases(t *testing.T) {
 	// Because of the number of round-trips to bigquery required for this test to run it is not run
 	// normally. Enable it via the RUN_FENCE_TESTS environment variable. It will take several
 	// minutes for this test to complete.
-
-	if os.Getenv("RUN_FENCE_TESTS") != "yes" {
-		t.Skipf("skipping %q: ${RUN_FENCE_TESTS} != \"yes\"", t.Name())
-	}
-
-	flag.Parse()
-
-	f, err := os.ReadFile(*testCredentialsPath)
-	require.NoError(t, err)
-
-	var cfg = config{
-		ProjectID:       *testProjectID,
-		Dataset:         *testDataset,
-		Region:          *testRegion,
-		Bucket:          *testBucket,
-		CredentialsJSON: string(f),
-	}
+	cfg := mustGetCfg(t)
 
 	tablePath := []string{cfg.ProjectID, cfg.Dataset, "temp_test_fencing_checkpoints"}
 
@@ -146,6 +132,56 @@ func TestFencingCases(t *testing.T) {
 			return b.String(), nil
 		},
 	)
+}
+
+func TestPrereqs(t *testing.T) {
+	// These tests assume that the configuration obtained from environment variables forms a valid
+	// config that could be used to materialize into Bigquery. Various parameters of the
+	// configuration are then manipulated to test assertions for incorrect configs.
+
+	// Due to the nature of configuring the connector with a JSON service account key and the
+	// difficulties in discriminating between error responses from BigQuery there's only a handful
+	// of cases that can be explicitly tested.
+
+	cfg := mustGetCfg(t)
+
+	nonExistentBucket := uuid.NewString()
+
+	tests := []struct {
+		name string
+		cfg  func(config) config
+		want []error
+	}{
+		{
+			name: "valid",
+			cfg:  func(cfg config) config { return cfg },
+			want: nil,
+		},
+		{
+			name: "can't parse credentials",
+			cfg: func(cfg config) config {
+				cfg.CredentialsJSON = cfg.CredentialsJSON + "wrong"
+				return cfg
+			},
+			want: []error{fmt.Errorf("cannot parse JSON credentials")},
+		},
+		{
+			name: "bucket doesn't exist",
+			cfg: func(cfg config) config {
+				cfg.Bucket = nonExistentBucket
+				return cfg
+			},
+			want: []error{fmt.Errorf("bucket %q does not exist", nonExistentBucket)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rawBytes, err := json.Marshal(tt.cfg(cfg))
+			require.NoError(t, err)
+			require.Equal(t, tt.want, prereqs(context.Background(), rawBytes).Unwrap())
+		})
+	}
 }
 
 func TestSpecification(t *testing.T) {
