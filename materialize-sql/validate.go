@@ -94,19 +94,24 @@ func validateNewProjection(resource Resource, projection *pf.Projection) *pm.Con
 
 // ValidateMatchesExisting returns a set of constraints to use when there is a new proposed
 // CollectionSpec for a materialization that is already running, or has been Applied. The returned
-// constraints will explicitly require all fields that are currently materialized, as long as they
-// are not unsatisfiable, and give new constraints for additionally supplied fields.
+// constraints will check type compatibility of projections that exist both in
+// the new and the existing binding, and give new constraints for additionally supplied fields.
 func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec_Binding, proposed *pf.CollectionSpec) map[string]*pm.Constraint {
 	var constraints = make(map[string]*pm.Constraint)
 	for _, field := range existing.FieldSelection.AllFields() {
 		var constraint = new(pm.Constraint)
+		// If a field has been removed from the proposed projection, we will migrate
+		// it at ApplyUpsert
+		if proposed.GetProjection(field) == nil {
+			continue
+		}
 		var typeError = checkTypeError(field, &existing.Collection, proposed)
 		if len(typeError) > 0 {
 			constraint.Type = pm.Constraint_UNSATISFIABLE
 			constraint.Reason = typeError
 		} else {
-			constraint.Type = pm.Constraint_FIELD_REQUIRED
-			constraint.Reason = "This field is part of the current materialization"
+			constraint.Type = pm.Constraint_LOCATION_RECOMMENDED
+			constraint.Reason = "This location is part of the current materialization"
 		}
 
 		constraints[field] = constraint
@@ -124,13 +129,8 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 }
 
 func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.CollectionSpec) string {
-	// existingProjection is guaranteed to exist since the MaterializationSpec has already been
-	// validated.
 	var existingProjection = existing.GetProjection(field)
 	var proposedProjection = proposed.GetProjection(field)
-	if proposedProjection == nil {
-		return "The proposed materialization is missing the projection, which is required because it's included in the existing materialization"
-	}
 
 	// Ensure that the possible types of the proposed are compatible with the possible types of the
 	// existing. The new projection is always allowed to contain fewer types than the original since
