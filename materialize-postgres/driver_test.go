@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFencingCases(t *testing.T) {
@@ -58,4 +60,65 @@ func TestFencingCases(t *testing.T) {
 			return
 		},
 	)
+}
+
+func TestPrereqs(t *testing.T) {
+	cfg := config{
+		Address:  "localhost:5432",
+		User:     "postgres",
+		Password: "postgres",
+		Database: "postgres",
+	}
+
+	tests := []struct {
+		name string
+		cfg  func(config) config
+		want []error
+	}{
+		{
+			name: "valid",
+			cfg:  func(cfg config) config { return cfg },
+			want: nil,
+		},
+		{
+			name: "wrong username",
+			cfg: func(cfg config) config {
+				cfg.User = "wrong" + cfg.User
+				return cfg
+			},
+			want: []error{fmt.Errorf("incorrect username or password")},
+		},
+		{
+			name: "wrong password",
+			cfg: func(cfg config) config {
+				cfg.Password = "wrong" + cfg.Password
+				return cfg
+			},
+			want: []error{fmt.Errorf("incorrect username or password")},
+		},
+		{
+			name: "wrong database",
+			cfg: func(cfg config) config {
+				cfg.Database = "wrong" + cfg.Database
+				return cfg
+			},
+			want: []error{fmt.Errorf("database %q does not exist", "wrong"+cfg.Database)},
+		},
+		{
+			name: "wrong address",
+			cfg: func(cfg config) config {
+				cfg.Address = "wrong." + cfg.Address
+				return cfg
+			},
+			want: []error{fmt.Errorf("host at address %q cannot be found", "wrong."+cfg.Address)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rawBytes, err := json.Marshal(tt.cfg(cfg))
+			require.NoError(t, err)
+			require.Equal(t, tt.want, prereqs(context.Background(), rawBytes).Unwrap())
+		})
+	}
 }
