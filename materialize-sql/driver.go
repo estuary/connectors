@@ -156,7 +156,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 			// fields in the request is identical to the current fields.
 			return nil, fmt.Errorf(
 				"the set of binding %s fields in the request differs from the existing fields,"+
-					"which is disallowed because this driver only supports automatic migration for adding new fields. "+
+					"which is disallowed because this driver only supports automatic migration for adding new nullable fields and removing non-key fields. "+
 					"Request fields: %s , Existing fields: %s",
 				collection,
 				bindingSpec.FieldSelection.String(),
@@ -203,6 +203,30 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 							statements = append(statements, statement)
 						}
 					}
+				}
+			}
+
+			var allNewFields = bindingSpec.FieldSelection.AllFields()
+
+			// Mark columns that have been removed from field selection as nullable
+			for _, projection := range loadedBinding.Collection.Projections {
+				// If the projection is part of the new field selection, just skip
+				if SliceContains(projection.Field, allNewFields) {
+					continue
+				}
+
+				var table, err = ResolveTable(tableShape, endpoint.Dialect)
+				if err != nil {
+					return nil, err
+				}
+				var input = AlterInput{
+					Table:      table,
+					Identifier: projection.Field,
+				}
+				if statement, err := RenderAlterTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
+					return nil, err
+				} else {
+					statements = append(statements, statement)
 				}
 			}
 
@@ -397,12 +421,14 @@ func (d *Driver) newTransactor(ctx context.Context, open pm.TransactionRequest_O
 func isBindingMigratable(existingBinding *pf.MaterializationSpec_Binding, newBinding *pf.MaterializationSpec_Binding) bool {
 	var existingFields = existingBinding.FieldSelection
 	var allExistingFields = existingFields.AllFields()
+	var allExistingKeys = existingFields.Keys
 	var newFields = newBinding.FieldSelection
 	var allNewFields = newFields.AllFields()
+	var allNewKeys = newFields.Keys
 
-	for _, field := range allExistingFields {
-		// All fields in the existing binding must also be present in the new binding
-		if !SliceContains(field, allNewFields) {
+	for _, field := range allExistingKeys {
+		// All keys in the existing binding must also be present in the new binding
+		if !SliceContains(field, allNewKeys) {
 			return false
 		}
 
