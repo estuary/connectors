@@ -323,11 +323,36 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 }
 
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	// We don't explicitly wrap `statements` in a transaction, as not all databases support
-	// transactional DDL statements, but we do run them through a single connection. This allows a
-	// driver to explicitly run `BEGIN;` and `COMMIT;` statements around a transactional operation.
-	_, err := c.query(ctx, strings.Join(statements, "\n"))
-	return err
+	// BigQuery does not support transactional DDL statements and has a maximum limit of 1024k
+	// characters in a single multi-statement query. It is possible for a materialization created
+	// with a large number of bindings to exceed this limit. Because of this we process large lists
+	// of statements in batches that are comfortably below the character limit.
+	return batchStatements(1024*1000/2, statements, func(batch []string) error {
+		_, err := c.query(ctx, strings.Join(batch, "\n"))
+		return err
+	})
+}
+
+func batchStatements(charLimit int, statements []string, flush func([]string) error) error {
+	for {
+		chars := 0
+		for idx := 0; idx < len(statements); idx++ {
+			chars += len(statements[idx])
+			if chars > charLimit || idx == len(statements)-1 {
+				if err := flush(statements[:idx+1]); err != nil {
+					return err
+				}
+				statements = statements[idx+1:]
+				break
+			}
+		}
+
+		if len(statements) == 0 {
+			break
+		}
+	}
+
+	return nil
 }
 
 func (c client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence) (sql.Fence, error) {

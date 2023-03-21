@@ -194,3 +194,73 @@ func TestSpecification(t *testing.T) {
 
 	cupaloy.SnapshotT(t, formatted)
 }
+
+func TestBatchStatements(t *testing.T) {
+	tests := []struct {
+		name        string
+		charLimit   int
+		statements  []string
+		wantBatches [][]string
+	}{
+		{
+			name:        "nil statements",
+			charLimit:   100,
+			statements:  nil,
+			wantBatches: [][]string{},
+		},
+		{
+			name:        "no statements",
+			charLimit:   100,
+			statements:  []string{},
+			wantBatches: [][]string{},
+		},
+		{
+			name:        "all statements in a single batch",
+			charLimit:   100,
+			statements:  []string{"one", "two", "three"},
+			wantBatches: [][]string{{"one", "two", "three"}},
+		},
+		{
+			name:        "all statements in individual batches",
+			charLimit:   1,
+			statements:  []string{"one", "two", "three"},
+			wantBatches: [][]string{{"one"}, {"two"}, {"three"}},
+		},
+		{
+			name:        "single statement < charLimit",
+			charLimit:   100,
+			statements:  []string{"one"},
+			wantBatches: [][]string{{"one"}},
+		},
+		{
+			name:        "single statement > charLimit",
+			charLimit:   1,
+			statements:  []string{"one"},
+			wantBatches: [][]string{{"one"}},
+		},
+		{
+			name:        "last statement in its own batch",
+			charLimit:   5,
+			statements:  []string{"one", "two", "three"},
+			wantBatches: [][]string{{"one", "two"}, {"three"}},
+		},
+		{
+			name:        "first statement in its own batch",
+			charLimit:   5,
+			statements:  []string{"longlonglong", "2", "3"},
+			wantBatches: [][]string{{"longlonglong"}, {"2", "3"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotBatches := [][]string{}
+			flush := func(ss []string) error {
+				gotBatches = append(gotBatches, ss)
+				return nil
+			}
+			require.NoError(t, batchStatements(tt.charLimit, tt.statements, flush))
+			require.Equal(t, tt.wantBatches, gotBatches)
+		})
+	}
+}
