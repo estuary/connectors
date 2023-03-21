@@ -5,7 +5,8 @@ set -e
 # This spreadsheet lives under the Estuary org and is shared with our CI service account
 # and engineering@. If you're an engineer, feel free to add additional service accounts
 # as needed for your own testing:
-export SPREADSHEET_URL="https://docs.google.com/spreadsheets/d/1aki_PfFU-RCXCvm4-U0O4QoElZBIC7F9lfR-RBG0CTc/edit#gid=0"
+export SPREADSHEET_ID="1aki_PfFU-RCXCvm4-U0O4QoElZBIC7F9lfR-RBG0CTc"
+export SPREADSHEET_URL="https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit#gid=0"
 export GCP_SERVICE_ACCOUNT_KEY_QUOTED=$(echo ${GCP_SERVICE_ACCOUNT_KEY} | jq 'tojson')
 
 config_json_template='{
