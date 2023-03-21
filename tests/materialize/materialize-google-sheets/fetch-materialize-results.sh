@@ -1,8 +1,7 @@
 #!/bin/bash
 set -e
 
-if [ $# -ne 1 ]
-then
+if [ $# -ne 1 ]; then
     echo "execution using: $0 <test-output-jsonl-dir>"
     exit 1
 fi
@@ -15,13 +14,11 @@ result_dir="$1"
 sleep 2
 
 function exportToJsonl() {
-    # TODO(johnny): Consolidate with declaration in setup.sh?
-    export SPREADSHEET_ID="1aki_PfFU-RCXCvm4-U0O4QoElZBIC7F9lfR-RBG0CTc"
     export SHEET_NAME="$1"
 
     go run ${TEST_BASE_DIR}/materialize-google-sheets/fetch-sheets.go
 }
 
-exportToJsonl "Simple" > "${TEST_DIR}/${result_dir}/simple.jsonl"
-exportToJsonl "duplicate_keys" > "${TEST_DIR}/${result_dir}/duplicated-keys-non-delta.jsonl"
-exportToJsonl "Multiple Types" > "${TEST_DIR}/${result_dir}/multiple-data-types.jsonl"
+exportToJsonl "Simple" >"${TEST_DIR}/${result_dir}/simple.jsonl"
+exportToJsonl "duplicate_keys" >"${TEST_DIR}/${result_dir}/duplicated-keys-non-delta.jsonl"
+exportToJsonl "Multiple Types" >"${TEST_DIR}/${result_dir}/multiple-data-types.jsonl"

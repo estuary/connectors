@@ -193,18 +193,33 @@ func loadSheetStates(
 			l1, sheetNames)
 	}
 
+	// Arrange returned sheet data in the same order as configured bindings. A quadratic loop here
+	// should be fine since the number of bindings & sheets will not be very large.
+	var responseSheets []*sheets.Sheet
+	for _, bindingSheetName := range sheetNames {
+		var matched bool
+		for _, sheet := range resp.Sheets {
+			if sheet.Properties.Title == bindingSheetName {
+				responseSheets = append(responseSheets, sheet)
+				matched = true
+				break
+			}
+		}
+
+		if !matched {
+			return nil, fmt.Errorf("sheet response missing expected sheet %q", bindingSheetName)
+		}
+	}
+
 	var states []SheetState
 
-	for sheetInd, sheet := range resp.Sheets {
+	for sheetInd, sheet := range responseSheets {
 		var state = SheetState{
 			SheetName: sheet.Properties.Title,
 			SheetID:   sheet.Properties.SheetId,
 		}
 
-		if state.SheetName != sheetNames[sheetInd] {
-			return nil, fmt.Errorf("response sheets in unexpected order: %s but expected %s",
-				state.SheetName, sheetNames[sheetInd])
-		} else if ll := len(sheet.Data); ll != 1 {
+		if ll := len(sheet.Data); ll != 1 {
 			return nil, fmt.Errorf("wrong number of sheet data grids: %d but expected 1", ll)
 		}
 
@@ -270,7 +285,7 @@ func loadSheetIDMapping(client *sheets.Service, spreadsheetID string) (map[strin
 	return out, nil
 }
 
-// batchRequestWithRetry applies all `requests`` in a single batch,
+// batchRequestWithRetry applies all `requests` in a single batch,
 // wrapped in a retry loop which handles rate limit errors from the sheets API.
 func batchRequestWithRetry(
 	ctx context.Context,
