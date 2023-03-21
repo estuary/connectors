@@ -95,7 +95,9 @@ func validateNewProjection(resource Resource, projection *pf.Projection) *pm.Con
 // ValidateMatchesExisting returns a set of constraints to use when there is a new proposed
 // CollectionSpec for a materialization that is already running, or has been Applied. The returned
 // constraints will check type compatibility of projections that exist both in
-// the new and the existing binding, and give new constraints for additionally supplied fields.
+// the new and the existing binding, and give new constraints for additionally
+// supplied fields. Additional requires that keys from the existing binding must
+// be present in the proposed spec as well.
 func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec_Binding, proposed *pf.CollectionSpec) map[string]*pm.Constraint {
 	var constraints = make(map[string]*pm.Constraint)
 	for _, field := range existing.FieldSelection.AllFields() {
@@ -115,6 +117,18 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 		}
 
 		constraints[field] = constraint
+	}
+	for _, field := range existing.FieldSelection.Keys {
+		// we already have a constraint for this field
+		if _, ok := constraints[field]; ok {
+			continue
+		}
+		if proposed.GetProjection(field) == nil {
+			var constraint = new(pm.Constraint)
+			constraint.Type = pm.Constraint_FIELD_REQUIRED
+			constraint.Reason = "This field is a key in the current materialization"
+			constraints[field] = constraint
+		}
 	}
 	// We'll loop through the proposed projections and create a new constraint for
 	// fields that are not among our existing binding projections
