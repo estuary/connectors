@@ -207,7 +207,7 @@ func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
 
 	var googleErr *googleapi.Error
 
-	if _, err := client.bigqueryClient.DatasetInProject(client.config.ProjectID, client.config.Dataset).Metadata(ctx); err != nil {
+	if meta, err := client.bigqueryClient.DatasetInProject(client.config.ProjectID, client.config.Dataset).Metadata(ctx); err != nil {
 		if errors.As(err, &googleErr) {
 			// Not found or forbidden means that either the dataset or project is not found or the
 			// credentials are not authorized for them. In these cases the returned error message
@@ -219,15 +219,8 @@ func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
 			}
 		}
 		errs.Err(err)
-	}
-
-	// Verification that the client can perform queries in the configured region. There's not a
-	// whole lot we can do for interpreting this error as far as I can tell, but we can at least
-	// check before moving on further with the upsert process.
-	query := client.newQuery("SELECT 1")
-	query.Location = cfg.Region
-	if _, err := query.Run(ctx); err != nil {
-		errs.Err(err)
+	} else if meta.Location != cfg.Region {
+		errs.Err(fmt.Errorf("dataset %q is actually in region %q, which is different than the configured region %q", client.config.Dataset, meta.Location, cfg.Region))
 	}
 
 	// Verify cloud storage abilities.
@@ -295,10 +288,7 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 		specs.Identifier,
 		specs.Keys[0].Placeholder,
 	), materialization.String())
-
-	if err == errNotFound {
-		return "", "", dbSql.ErrNoRows
-	} else if err != nil {
+	if err != nil {
 		return "", "", err
 	}
 
