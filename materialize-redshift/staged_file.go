@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -34,6 +35,7 @@ type stagedFile struct {
 	client       *s3.Client
 	uploader     *manager.Uploader
 	bucket       string
+	bucketPath   string
 	group        *errgroup.Group
 	uploadOutput *manager.UploadOutput
 	pipeWriter   *io.PipeWriter
@@ -41,12 +43,13 @@ type stagedFile struct {
 	started      bool
 }
 
-func newStagedFile(client *s3.Client, bucket string, cols []*sql.Column) *stagedFile {
+func newStagedFile(client *s3.Client, bucket string, bucketPath string, cols []*sql.Column) *stagedFile {
 	return &stagedFile{
-		cols:     cols,
-		client:   client,
-		uploader: manager.NewUploader(client),
-		bucket:   bucket,
+		cols:       cols,
+		client:     client,
+		uploader:   manager.NewUploader(client),
+		bucket:     bucket,
+		bucketPath: bucketPath,
 	}
 }
 
@@ -67,7 +70,7 @@ func (f *stagedFile) start(ctx context.Context) {
 	f.group.Go(func() error {
 		o, err := f.uploader.Upload(ctx, &s3.PutObjectInput{
 			Bucket: aws.String(f.bucket),
-			Key:    aws.String(uuid.NewString()),
+			Key:    aws.String(path.Join(f.bucketPath, uuid.NewString())),
 			Body:   r,
 		})
 		if err != nil {
