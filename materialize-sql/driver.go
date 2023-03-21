@@ -136,9 +136,12 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 	}
 
 	var statements []string
+	var newCollections []string
 
 	for bindingIndex, bindingSpec := range req.Materialization.Bindings {
 		var collection = bindingSpec.Collection.Collection
+		newCollections = append(newCollections, string(collection))
+
 		var constraints, loadedBinding, resource, err = resolveResourceToExistingBinding(
 			endpoint,
 			bindingSpec.ResourceSpecJson,
@@ -236,6 +239,19 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 		}
 
 		tableShapes = append(tableShapes, tableShape)
+	}
+
+	if loadedSpec != nil {
+		// If a binding from loaded spec is missing from new spec, we drop the table
+		for _, bindingSpec := range loadedSpec.Bindings {
+			var collection = string(bindingSpec.Collection.Collection)
+
+			if !SliceContains(collection, newCollections) {
+				statements = append(statements, fmt.Sprintf(
+					"DROP TABLE IF EXISTS %s;",
+					endpoint.Identifier(bindingSpec.ResourcePath...)))
+			}
+		}
 	}
 
 	for _, shape := range tableShapes {
