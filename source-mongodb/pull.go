@@ -275,16 +275,28 @@ func resourceId(res resource) string {
 
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
-		switch v := value.(type) {
-		case float64:
-			if math.IsNaN(v) {
-				doc[key] = "NaN"
+		// Make sure `_id` is always captured as string
+		if key == "_id" {
+			switch value.(type) {
+				case string:
+				default:
+					var j, err = json.Marshal(value)
+					if err != nil {
+						panic(fmt.Sprintf("could not marshal interface{} to json: %s", err))
+					}
+					doc[key] = string(j)
 			}
-		case map[string]interface{}:
-			doc[key] = sanitizeDocument(v)
+		} else {
+			switch v := value.(type) {
+			case float64:
+				if math.IsNaN(v) {
+					doc[key] = "NaN"
+				}
+			case map[string]interface{}:
+				doc[key] = sanitizeDocument(v)
+			}
 		}
 	}
 
 	return doc
 }
-
