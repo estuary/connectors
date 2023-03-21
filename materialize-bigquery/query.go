@@ -73,8 +73,7 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 			// since these errors may actually be terminal.
 			if e, ok := err.(*googleapi.Error); ok {
 				if e.Code == 404 {
-					logEntry.Warn("project, dataset, or table was not found")
-					return nil, errNotFound
+					return nil, err
 				} else if e.Code != 400 {
 					logEntry.Error("job failed")
 					return nil, err // The error isn't considered retryable
