@@ -277,15 +277,7 @@ func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		// Make sure `_id` is always captured as string
 		if key == "_id" {
-			switch value.(type) {
-				case string:
-				default:
-					var j, err = json.Marshal(value)
-					if err != nil {
-						panic(fmt.Sprintf("could not marshal interface{} to json: %s", err))
-					}
-					doc[key] = string(j)
-			}
+			doc[key] = idToString(value)
 		} else {
 			switch v := value.(type) {
 			case float64:
@@ -299,4 +291,19 @@ func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	}
 
 	return doc
+}
+
+func idToString(value interface{}) string {
+	switch v := value.(type) {
+		case string:
+			return v
+		case primitive.ObjectID:
+			return v.Hex()
+	}
+
+	var j, err = json.Marshal(value)
+	if err != nil {
+		panic(fmt.Sprintf("could not marshal interface{} to json: %s", err))
+	}
+	return string(j)
 }
