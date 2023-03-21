@@ -78,8 +78,19 @@ func (c *config) asSnowflakeConfig() sf.Config {
 
 var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)
 
-func validHost(h string) bool {
-	return hostRe.MatchString(h) && !strings.Contains(h, ":")
+func validHost(h string) error {
+	hasProtocol := strings.Contains(h, "://")
+	missingDomain := !hostRe.MatchString(h)
+
+	if hasProtocol && missingDomain {
+		return fmt.Errorf("invalid host %q (must end in snowflakecomputing.com and not include a protocol)", h)
+	} else if hasProtocol {
+		return fmt.Errorf("invalid host %q (must not include a protocol)", h)
+	} else if missingDomain {
+		return fmt.Errorf("invalid host %q (must end in snowflakecomputing.com)", h)
+	}
+
+	return nil
 }
 
 func (c *config) Validate() error {
@@ -97,10 +108,7 @@ func (c *config) Validate() error {
 		}
 	}
 
-	if !validHost(c.Host) {
-		return fmt.Errorf("invalid host %q (must match end in snowflakecomputing.com and not include a protocol)", c.Host)
-	}
-	return nil
+	return validHost(c.Host)
 }
 
 type tableConfig struct {
