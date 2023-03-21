@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"text/template"
 	"time"
@@ -50,6 +51,7 @@ type config struct {
 	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for reading and writing data to the S3 staging bucket." jsonschema_extras:"order=6"`
 	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS Secret Access Key for reading and writing data to the S3 staging bucket." jsonschema_extras:"secret=true,order=7"`
 	Region             string `json:"region" jsonschema:"title=Region,description=Region of the S3 staging bucket. For optimal performance this should be in the same region as the Redshift database cluster." jsonschema_extras:"order=8"`
+	BucketPath         string `json:"bucketPath,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
 }
@@ -68,6 +70,12 @@ func (c *config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if c.BucketPath != "" {
+		// If BucketPath starts with a / trim the leading / so that we don't end up with repeated /
+		// chars in the URI and so that the object key does not start with a /.
+		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
 	}
 
 	return nil
@@ -269,10 +277,12 @@ func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
 	testCol := &sql.Column{}
 	testCol.Field = "test"
 
-	s3file := newStagedFile(s3client, cfg.Bucket, []*sql.Column{testCol})
+	s3file := newStagedFile(s3client, cfg.Bucket, cfg.BucketPath, []*sql.Column{testCol})
 	s3file.start(ctx)
 
 	var awsErr *awsHttp.ResponseError
+
+	objectDir := path.Join(cfg.BucketPath, cfg.Bucket)
 
 	if err := s3file.encodeRow([]interface{}{[]byte("test")}); err != nil {
 		// This won't err immediately until the file is flushed in the case of having the wrong
@@ -286,7 +296,7 @@ func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
 				err = fmt.Errorf("bucket %q does not exist", cfg.Bucket)
 			} else if awsErr.Response.Response.StatusCode == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to write to bucket %q", cfg.Bucket)
+				err = fmt.Errorf("not authorized to write to bucket %q", objectDir)
 			}
 		}
 
@@ -300,14 +310,14 @@ func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
 			Key:    s3file.uploadOutput.Key,
 		}); err != nil {
 			if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to read from bucket %q", cfg.Bucket)
+				err = fmt.Errorf("not authorized to read from bucket %q", objectDir)
 			}
 			errs.Err(err)
 		}
 
 		if err := delete(ctx); err != nil {
 			if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to delete from bucket %q", cfg.Bucket)
+				err = fmt.Errorf("not authorized to delete from bucket %q", objectDir)
 			}
 			errs.Err(err)
 		}
@@ -392,7 +402,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, d.cfg.Bucket, s3client); err != nil {
+		if err = d.addBinding(ctx, binding, d.cfg.Bucket, d.cfg.BucketPath, s3client); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -418,11 +428,11 @@ type binding struct {
 	loadQuerySQL                 string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, bucket string, client *s3.Client) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, bucket string, bucketPath string, client *s3.Client) error {
 	var b = &binding{
 		target:    target,
-		loadFile:  newStagedFile(client, bucket, target.KeyPtrs()),
-		storeFile: newStagedFile(client, bucket, target.Columns()),
+		loadFile:  newStagedFile(client, bucket, bucketPath, target.KeyPtrs()),
+		storeFile: newStagedFile(client, bucket, bucketPath, target.Columns()),
 	}
 
 	for _, m := range []struct {

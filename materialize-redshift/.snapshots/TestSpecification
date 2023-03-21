@@ -60,6 +60,12 @@
         "description": "Region of the S3 staging bucket. For optimal performance this should be in the same region as the Redshift database cluster.",
         "order": 8
       },
+      "bucketPath": {
+        "type": "string",
+        "title": "Bucket Path",
+        "description": "A prefix that will be used to store objects in S3.",
+        "order": 9
+      },
       "networkTunnel": {
         "properties": {
           "sshForwarding": {
