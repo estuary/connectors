@@ -1,5 +1,5 @@
 # ================================
-# Collection "dbo.test_Generic_IgnoredStreams_one": 2 Documents
+# Collection "acmeCo/test/test_generic_ignoredstreams_one": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_ignoredstreams_one","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"eight","id":8}
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_ignoredstreams_one","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"six","id":6}

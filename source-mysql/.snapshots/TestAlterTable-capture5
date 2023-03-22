@@ -1,5 +1,5 @@
 # ================================
-# Collection "test.AlterTable_bbb": 2 Documents
+# Collection "acmeCo/test/altertable_bbb": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_bbb"}},"data":"ghi","extra":null,"id":3}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_bbb"}},"data":"jkl","extra":null,"id":4}

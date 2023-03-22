@@ -1,5 +1,5 @@
 # ================================
-# Collection "test.truncatedtables_aaa": 3 Documents
+# Collection "acmeCo/test/truncatedtables_aaa": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"truncatedtables_aaa","loc":[11111111,11111111,11111111]}},"data":"one","id":1}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"truncatedtables_aaa","loc":[11111111,11111111,11111111]}},"data":"three","id":3}
