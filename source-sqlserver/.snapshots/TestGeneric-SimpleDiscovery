@@ -3,10 +3,7 @@ Binding 0:
     "recommended_name": "test_generic_simplediscovery_magnanimous_outshine",
     "resource_spec_json": {
       "namespace": "dbo",
-      "stream": "test_Generic_SimpleDiscovery_magnanimous_outshine",
-      "primary_key": [
-        "a"
-      ]
+      "stream": "test_Generic_SimpleDiscovery_magnanimous_outshine"
     },
     "document_schema_json": {
       "$defs": {
