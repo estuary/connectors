@@ -250,35 +250,47 @@ func (c *Capture) updateState(ctx context.Context) error {
 	// initialize new state entries for these streams, and while we're at
 	// it this is a good time to sanity-check the primary key configuration.
 	for streamID, binding := range c.Bindings {
-		// If the `PrimaryKey` property is specified in the catalog then use that,
-		// otherwise use the "native" primary key of this table in the database.
-		// Print a warning if the two are not the same.
-		var primaryKey []string
 		var discoveryInfo = c.discovery[streamID]
 		if discoveryInfo == nil {
 			return fmt.Errorf("table %q is a configured binding of this capture, but doesn't exist or isn't visible with current permissions", streamID)
 		}
-		if len(discoveryInfo.PrimaryKey) > 0 {
-			primaryKey = discoveryInfo.PrimaryKey
-			if len(primaryKey) != 0 {
-				logrus.WithFields(logrus.Fields{
-					"table": streamID,
-					"key":   primaryKey,
-				}).Debug("queried primary key")
-			}
-		}
-		if len(binding.Resource.PrimaryKey) != 0 {
-			if strings.Join(primaryKey, ",") != strings.Join(binding.Resource.PrimaryKey, ",") {
-				logrus.WithFields(logrus.Fields{
-					"stream":      streamID,
-					"catalogKey":  binding.Resource.PrimaryKey,
-					"databaseKey": primaryKey,
-				}).Warn("primary key in catalog differs from database table")
-			}
+
+		// Select the primary key from the first available source. In order of priority:
+		//   - If the resource config specifies a primary key override then we'll use that.
+		//   - Normally we'll use the primary key from the collection spec.
+		//   - And as a fallback which *should* no longer be reachable, we'll use the
+		//     primary key from the startup discovery run.
+		logrus.WithFields(logrus.Fields{
+			"stream":     streamID,
+			"resource":   binding.Resource.PrimaryKey,
+			"collection": binding.CollectionKey,
+			"discovery":  discoveryInfo.PrimaryKey,
+		}).Debug("selecting primary key")
+		var primaryKey []string
+		if len(binding.Resource.PrimaryKey) > 0 {
 			primaryKey = binding.Resource.PrimaryKey
+			logrus.WithFields(logrus.Fields{"stream": streamID, "key": primaryKey}).Debug("using resource primary key")
+		} else if len(binding.CollectionKey) > 0 {
+			// TODO(wgd): This logic isn't correct for all possible column names, but
+			// I need to implement a unit test demonstrating that issue first.
+			for _, ptr := range binding.CollectionKey {
+				primaryKey = append(primaryKey, strings.TrimPrefix(ptr, "/"))
+			}
+			logrus.WithFields(logrus.Fields{"stream": streamID, "key": primaryKey}).Debug("using collection primary key")
+		} else if len(discoveryInfo.PrimaryKey) > 0 {
+			primaryKey = discoveryInfo.PrimaryKey
+			logrus.WithFields(logrus.Fields{"stream": streamID, "key": primaryKey}).Warn("using discovery primary key -- this is DEPRECATED and also shouldn't be possible")
+		} else {
+			return fmt.Errorf("stream %q: primary key must be specified", streamID)
 		}
-		if len(primaryKey) == 0 {
-			return fmt.Errorf("stream %q: primary key unspecified in the catalog and no primary key found in database", streamID)
+
+		// Print a warning if the primary key we'll be using differs from the database's primary key.
+		if strings.Join(primaryKey, ",") != strings.Join(discoveryInfo.PrimaryKey, ",") {
+			logrus.WithFields(logrus.Fields{
+				"stream":      streamID,
+				"backfillKey": primaryKey,
+				"databaseKey": discoveryInfo.PrimaryKey,
+			}).Warn("primary key for backfill differs from database table primary key")
 		}
 
 		// See if the stream is already initialized. If it's not, then create it.
@@ -288,6 +300,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 			continue
 		}
 
+		// Error out if the stream state was previously initialized with a different key
 		if strings.Join(streamState.KeyColumns, ",") != strings.Join(primaryKey, ",") {
 			return fmt.Errorf("stream %q: primary key %q doesn't match initialized scan key %q", streamID, primaryKey, streamState.KeyColumns)
 		}
