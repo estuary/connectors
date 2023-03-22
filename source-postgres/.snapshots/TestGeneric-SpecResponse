@@ -116,14 +116,6 @@
         "type": "string",
         "title": "Table Name",
         "description": "The name of the table to be captured."
-      },
-      "primary_key": {
-        "items": {
-          "type": "string"
-        },
-        "type": "array",
-        "title": "Primary Key Columns",
-        "description": "The columns which together form the primary key of the table."
       }
     },
     "type": "object",

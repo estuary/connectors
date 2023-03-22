@@ -3,10 +3,7 @@ Binding 0:
     "recommended_name": "discoverycapitalization_aaaaa",
     "resource_spec_json": {
       "namespace": "test",
-      "stream": "DiscoveryCapitalization_AaAaA",
-      "primary_key": [
-        "id"
-      ]
+      "stream": "DiscoveryCapitalization_AaAaA"
     },
     "document_schema_json": {
       "$defs": {
@@ -117,10 +114,7 @@ Binding 1:
     "recommended_name": "discoverycapitalization_bbbbb",
     "resource_spec_json": {
       "namespace": "test",
-      "stream": "discoverycapitalization_bbbbb",
-      "primary_key": [
-        "id"
-      ]
+      "stream": "discoverycapitalization_bbbbb"
     },
     "document_schema_json": {
       "$defs": {
@@ -231,10 +225,7 @@ Binding 2:
     "recommended_name": "discoverycapitalization_ccccc",
     "resource_spec_json": {
       "namespace": "test",
-      "stream": "discoverycapitalization_ccccc",
-      "primary_key": [
-        "id"
-      ]
+      "stream": "discoverycapitalization_ccccc"
     },
     "document_schema_json": {
       "$defs": {

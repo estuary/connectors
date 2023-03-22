@@ -41,10 +41,6 @@
 ### Capture from Key "FQI="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeytypes_bigint": 1 Documents
-# ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_bigint","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":1723}
-# ================================
 # Final State Checkpoint
 # ================================
 {"cursor":"0/1111111","streams":{"test.scankeytypes_bigint":{"key_columns":["key"],"mode":"Backfill","scanned":"Fga7"}}}
