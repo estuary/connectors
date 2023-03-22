@@ -12,6 +12,8 @@ COPY go.* ./
 RUN go mod download
 
 # Build the connector projects we depend on.
+COPY go-schema-gen ./go-schema-gen
+COPY source-boilerplate ./source-boilerplate
 COPY source-test ./source-test
 
 # Run the unit tests.
@@ -36,8 +38,7 @@ COPY --from=builder /builder/connector ./source-test
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-COPY --from=ghcr.io/estuary/airbyte-to-flow:dev /airbyte-to-flow ./
-ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/source-test"]
+ENTRYPOINT ["/connector/source-test"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
-LABEL CONNECTOR_PROTOCOL=flow-capture
+ENV FLOW_RUNTIME_CODEC=json
