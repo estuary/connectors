@@ -16,9 +16,15 @@ import (
 
 // Resource represents the capture configuration of a single table.
 type Resource struct {
-	Namespace  string   `json:"namespace" jsonschema:"title=Namespace,description=The schema (namespace) in which the table resides."`
-	Stream     string   `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured."`
-	PrimaryKey []string `json:"primary_key,omitempty" jsonschema:"title=Primary Key Columns,description=The columns which together form the primary key of the table."`
+	Namespace string `json:"namespace" jsonschema:"title=Namespace,description=The schema (namespace) in which the table resides."`
+	Stream    string `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured."`
+
+	// PrimaryKey allows the user to override the "scan key" columns which will be used
+	// to perform backfill queries and merge replicated changes. If left unset we default
+	// to the collection's key, which is basically always what the user wants, so we omit
+	// this property from the config schema to avoid confusion. However it is still supported,
+	// if any captures set it.
+	PrimaryKey []string `json:"primary_key,omitempty" jsonschema:"-"`
 
 	DeprecatedSyncMode string `json:"syncMode,omitempty" jsonschema:"-"` // Unused, only supported to avoid breaking existing captures
 }
@@ -36,8 +42,9 @@ func (r Resource) Validate() error {
 
 // Binding represents a capture binding, and includes a Resource config and a binding index.
 type Binding struct {
-	Index    uint32
-	Resource Resource
+	Index         uint32
+	Resource      Resource
+	CollectionKey []string // JSON pointers
 }
 
 // Driver is an implementation of the pc.DriverServer interface which performs
@@ -237,8 +244,9 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 		}
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
 		bindings[streamID] = &Binding{
-			Index:    uint32(idx),
-			Resource: res,
+			Index:         uint32(idx),
+			Resource:      res,
+			CollectionKey: binding.Collection.KeyPtrs,
 		}
 	}
 
