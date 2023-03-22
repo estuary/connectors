@@ -1,5 +1,5 @@
 # ================================
-# Collection "first": 35 Documents
+# Collection "acmeCo/test/first": 35 Documents
 # ================================
 {"ID":21,"Symbol":"MSFT","Exchange":"V","Price":245.46,"Size":34,"Timestamp":"2022-12-19T14:01:11.870242689Z","Conditions":["@","T","I"],"Tape":"C"}
 {"ID":22,"Symbol":"MSFT","Exchange":"V","Price":245.48,"Size":34,"Timestamp":"2022-12-19T14:01:11.870255162Z","Conditions":["@","T","I"],"Tape":"C"}
@@ -37,7 +37,7 @@
 {"ID":89,"Symbol":"AAPL","Exchange":"V","Price":135.14,"Size":50,"Timestamp":"2022-12-19T14:08:52.525046219Z","Conditions":["@","T","I"],"Tape":"C"}
 {"ID":90,"Symbol":"AAPL","Exchange":"V","Price":135.06,"Size":50,"Timestamp":"2022-12-19T14:09:19.360480961Z","Conditions":["@","T","I"],"Tape":"C"}
 # ================================
-# Collection "second": 35 Documents
+# Collection "acmeCo/test/second": 35 Documents
 # ================================
 {"ID":21,"Symbol":"MSFT","Exchange":"V","Price":245.46,"Size":34,"Timestamp":"2022-12-19T14:01:11.870242689Z","Conditions":["@","T","I"],"Tape":"C"}
 {"ID":22,"Symbol":"MSFT","Exchange":"V","Price":245.48,"Size":34,"Timestamp":"2022-12-19T14:01:11.870255162Z","Conditions":["@","T","I"],"Tape":"C"}

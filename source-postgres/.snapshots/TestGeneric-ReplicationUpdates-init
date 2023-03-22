@@ -1,5 +1,5 @@
 # ================================
-# Collection "test.generic_replicationupdates": 3 Documents
+# Collection "acmeCo/test/generic_replicationupdates": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_replicationupdates","loc":[11111111,11111111,11111111]}},"data":"A","id":0}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_replicationupdates","loc":[11111111,11111111,11111111]}},"data":"CDEFGHIJKLMNOP","id":2}
