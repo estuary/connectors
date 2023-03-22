@@ -87,9 +87,9 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 }
 
 type capture struct {
-	Config   config
-	State    *captureState
-	Output   *boilerplate.PullOutput
+	Config config
+	State  *captureState
+	Output *boilerplate.PullOutput
 }
 
 type captureState struct {

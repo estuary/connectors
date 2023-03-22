@@ -3,21 +3,21 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"time"
-	"math"
 	"errors"
+	"fmt"
 	"io"
+	"math"
+	"time"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"golang.org/x/sync/errgroup"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -92,11 +92,11 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 	return nil
 }
 
-type capture struct{
-	Output   *boilerplate.PullOutput
+type capture struct {
+	Output *boilerplate.PullOutput
 }
 
-type captureState struct{
+type captureState struct {
 	Resources map[string]bson.Raw `json:"resources"`
 }
 
@@ -104,13 +104,13 @@ func (s *captureState) Validate() error {
 	return nil
 }
 
-type docKey struct{
+type docKey struct {
 	Id interface{} `bson:"_id"`
 }
-type changeEvent struct{
-	DocumentKey docKey `bson:"documentKey"`
+type changeEvent struct {
+	DocumentKey   docKey `bson:"documentKey"`
 	OperationType string `bson:"operationType"`
-	FullDocument bson.M `bson:"fullDocument"`
+	FullDocument  bson.M `bson:"fullDocument"`
 }
 
 const changeStreamFatalErrorCode = 280
@@ -123,11 +123,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 
 	log.Debug("listening on changes on collection ", res.Collection)
 	var eventFilter = bson.D{{"$match", bson.D{{"$or",
-	bson.A{
-		bson.D{{"operationType", "delete"}},
-		bson.D{{"operationType", "insert"}},
-		bson.D{{"operationType", "update"}},
-	}}}}}
+		bson.A{
+			bson.D{{"operationType", "delete"}},
+			bson.D{{"operationType", "insert"}},
+			bson.D{{"operationType", "update"}},
+		}}}}}
 	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
 	if resumeToken != nil {
 		opts = opts.SetResumeAfter(resumeToken)
@@ -250,7 +250,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			return nil, fmt.Errorf("output documents failed: %w", err)
 		}
 
-		if i % CHECKPOINT_EVERY == 0 {
+		if i%CHECKPOINT_EVERY == 0 {
 			if err = c.Output.Checkpoint([]byte("{}"), true); err != nil {
 				return nil, fmt.Errorf("output checkpoint failed: %w", err)
 			}
@@ -266,7 +266,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 	}
 
 	// minus five seconds for potential error
-	return &primitive.Timestamp{ T: uint32(time.Now().Unix()) - 5, I: 0 }, nil
+	return &primitive.Timestamp{T: uint32(time.Now().Unix()) - 5, I: 0}, nil
 }
 
 func resourceId(res resource) string {
@@ -295,10 +295,10 @@ func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 
 func idToString(value interface{}) string {
 	switch v := value.(type) {
-		case string:
-			return v
-		case primitive.ObjectID:
-			return v.Hex()
+	case string:
+		return v
+	case primitive.ObjectID:
+		return v.Hex()
 	}
 
 	var j, err = json.Marshal(value)
