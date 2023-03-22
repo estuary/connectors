@@ -235,6 +235,7 @@ func TestCapitalizedTables(t *testing.T) {
 	})
 	require.NoError(t, err)
 	cs.Bindings = []*flow.CaptureSpec_Binding{{
+		Collection:       flow.CollectionSpec{Collection: flow.Collection("acmeCo/test/users")},
 		ResourceSpecJson: resourceSpecJSON,
 		ResourcePath:     []string{testSchemaName, "USERS"},
 	}}

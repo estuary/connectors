@@ -238,6 +238,7 @@ func TestMassiveBackfill(t *testing.T) {
 		"groups/*/users/*/events",
 	} {
 		capture.Bindings = append(capture.Bindings, &flow.CaptureSpec_Binding{
+			Collection:       flow.CollectionSpec{Collection: flow.Collection("acmeCo/test/" + name)},
 			ResourceSpecJson: json.RawMessage(fmt.Sprintf(`{"path": %q, "backfillMode": "async"}`, name)),
 			ResourcePath:     []string{name},
 		})

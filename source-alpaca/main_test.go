@@ -268,6 +268,9 @@ func makeBindings(t testing.TB, names []string, start, end time.Time) []*flow.Ca
 		require.NoError(t, err)
 
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
+			Collection: flow.CollectionSpec{
+				Collection: flow.Collection("acmeCo/test/" + name),
+			},
 			ResourceSpecJson: json.RawMessage(specBytes),
 			ResourcePath:     []string{name},
 		})

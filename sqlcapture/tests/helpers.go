@@ -140,6 +140,9 @@ func ResourceBindings(t testing.TB, streamIDs ...string) []*flow.CaptureSpec_Bin
 			t.Fatalf("error marshalling resource json: %v", err)
 		}
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
+			Collection: flow.CollectionSpec{
+				Collection: flow.Collection("acmeCo/test/" + strings.ToLower(nameParts[1])),
+			},
 			ResourceSpecJson: bs,
 			ResourcePath:     nameParts,
 		})
