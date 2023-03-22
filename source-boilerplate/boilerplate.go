@@ -2,6 +2,7 @@ package boilerplate
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/json"
@@ -16,278 +17,133 @@ import (
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	protoio "github.com/gogo/protobuf/io"
+	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
-	"github.com/jessevdk/go-flags"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 )
 
-// RunMain is the boilerplate main function of a capture connector.
-func RunMain(srv pc.DriverServer) {
-	var logConfig = &logConfig{}
-	var parser = flags.NewParser(logConfig, flags.Default)
-	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+type Connector interface {
+	Spec(context.Context, *pc.Request_Spec) (*pc.Response_Spec, error)
+	Discover(context.Context, *pc.Request_Discover) (*pc.Response_Discovered, error)
+	Validate(context.Context, *pc.Request_Validate) (*pc.Response_Validated, error)
+	Apply(context.Context, *pc.Request_Apply) (*pc.Response_Applied, error)
+	Pull(open *pc.Request_Open, stream *PullOutput) error
+}
 
-	var cmd = cmdCommon{
-		ctx:     ctx,
-		srv:     srv,
-		r:       bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
-		w:       protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
-		logging: logConfig,
+// ConnectorServer wraps a Connector to implement the pc.ConnectorServer gRPC service interface.
+type ConnectorServer struct {
+	Connector
+}
+
+// RunMain is the boilerplate main function of a capture connector.
+func RunMain(connector Connector) {
+	switch format := getEnvDefault("LOG_FORMAT", "color"); format {
+	case "json":
+		log.SetFormatter(&log.JSONFormatter{})
+	case "text":
+		log.SetFormatter(&log.TextFormatter{})
+	case "color":
+		log.SetFormatter(&log.TextFormatter{ForceColors: true})
+	default:
+		log.WithField("format", format).Fatal("invalid LOG_FORMAT (expected 'json', 'text', or 'color')")
 	}
 
-	parser.AddCommand("spec", "Write the connector specification",
-		"Write the connector specification to stdout, then exit", &specCmd{cmd})
-	parser.AddCommand("validate", "Validate a materialization",
-		"Validate a proposed ValidateRequest read from stdin", &validateCmd{cmd})
-	parser.AddCommand("discover", "Enumerate available streams",
-		"Connect to the target system and enumerate streams available to be captured", &discoverCmd{cmd})
-	parser.AddCommand("apply-upsert", "Apply an insert or update of a materialization",
-		"Apply a proposed insert or update ApplyRequest read from stdin", &applyUpsertCmd{cmd})
-	parser.AddCommand("apply-delete", "Apply a deletion of a materialization",
-		"Apply a proposed delete ApplyRequest read from stdin", &applyDeleteCmd{cmd})
-	parser.AddCommand("pull", "Pull data from the target system",
-		"Connect to the target system and begin pulling data from the selected streams", &pullCmd{cmd})
+	if lvl, err := log.ParseLevel(getEnvDefault("LOG_LEVEL", "info")); err != nil {
+		log.WithFields(log.Fields{"level": lvl, "error": err}).Fatal("unrecognized log level")
+	} else {
+		log.SetLevel(lvl)
+	}
 
-	if _, err := parser.Parse(); err != nil {
+	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	var stream pc.Connector_CaptureServer
+
+	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
+	case "proto":
+		log.Debug("using protobuf codec")
+		stream = newProtoCodec(ctx)
+	case "json":
+		log.Debug("using json codec")
+		stream = newJsonCodec(ctx)
+	default:
+		log.WithField("codec", codec).Fatal("invalid FLOW_RUNTIME_CODEC (expected 'json', or 'proto')")
+	}
+
+	var server = ConnectorServer{connector}
+
+	if err := server.Capture(stream); err != nil {
+		_, _ = os.Stderr.WriteString(err.Error())
+		_, _ = os.Stderr.Write([]byte("\n"))
 		os.Exit(1)
 	}
 	os.Exit(0)
 }
 
-type cmdCommon struct {
-	ctx context.Context
-	srv pc.DriverServer
-	r   *bufio.Reader
-	w   protoio.Writer
-
-	logging *logConfig
+func getEnvDefault(name, def string) string {
+	var s = os.Getenv(name)
+	if s == "" {
+		return def
+	}
+	return s
 }
 
-// logConfig configures handling of application log events.
-type logConfig struct {
-	Level  string `long:"log.level" env:"LOG_LEVEL" default:"info" choice:"info" choice:"INFO" choice:"debug" choice:"DEBUG" choice:"warn" choice:"WARN" description:"Logging level"`
-	Format string `long:"log.format" env:"LOG_FORMAT" default:"text" choice:"json" choice:"text" choice:"color" description:"Logging output format"`
-}
+var _ pc.ConnectorServer = &ConnectorServer{}
 
-func (c *logConfig) Configure() {
-	if c.Format == "json" {
-		log.SetFormatter(&log.JSONFormatter{})
-	} else if c.Format == "text" {
-		log.SetFormatter(&log.TextFormatter{})
-	} else if c.Format == "color" {
-		log.SetFormatter(&log.TextFormatter{ForceColors: true})
-	}
-
-	if lvl, err := log.ParseLevel(c.Level); err != nil {
-		log.WithField("err", err).Fatal("unrecognized log level")
-	} else {
-		log.SetLevel(lvl)
-	}
-}
-
-type protoValidator interface {
-	proto.Message
-	Validate() error
-}
-
-func (c *cmdCommon) readMsg(m protoValidator) error {
-	var lengthBytes [4]byte
-
-	if _, err := io.ReadFull(c.r, lengthBytes[:]); err == io.EOF {
-		return err
-	} else if err != nil {
-		return fmt.Errorf("reading message length: %w", err)
-	}
-
-	var len = int(binary.LittleEndian.Uint32(lengthBytes[:]))
-
-	var b, err = peekMessage(c.r, len)
-	if err != nil {
-		return err
-	}
-
-	if err := proto.Unmarshal(b, m); err != nil {
-		return fmt.Errorf("decoding message: %w", err)
-	} else if err = m.Validate(); err != nil {
-		return fmt.Errorf("validating message: %w", err)
-	}
-
-	return nil
-}
-
-func peekMessage(br *bufio.Reader, size int) ([]byte, error) {
-	// Fetch next length-delimited message into a buffer.
-	// In the garden-path case, we decode directly from the
-	// bufio.Reader internal buffer without copying
-	// (having just read the length, the message itself
-	// is probably _already_ in the bufio.Reader buffer).
-	//
-	// If the message is larger than the internal buffer,
-	// we allocate and read it directly.
-	var bs, err = br.Peek(size)
-	if err == nil {
-		// The Discard contract guarantees we won't error.
-		// It's safe to reference |bs| until the next Peek.
-		if _, err = br.Discard(size); err != nil {
-			panic(err)
+func (s *ConnectorServer) Capture(stream pc.Connector_CaptureServer) error {
+	var ctx = stream.Context()
+	for {
+		var request, err = stream.Recv()
+		if err == io.EOF {
+			return nil
+		} else if err != nil {
+			return err
+		} else if err = request.Validate_(); err != nil {
+			return fmt.Errorf("validating request: %w", err)
 		}
-		return bs, nil
-	}
 
-	// Non-garden path: we must allocate and read a larger buffer.
-	if errors.Is(err, bufio.ErrBufferFull) {
-		bs = make([]byte, size)
-		if _, err = io.ReadFull(br, bs); err != nil {
-			return nil, fmt.Errorf("reading message (directly): %w", err)
+		switch {
+		case request.Spec != nil:
+			var response, err = s.Connector.Spec(ctx, request.Spec)
+			if err != nil {
+				return err
+			}
+			response.Protocol = 3032023
+
+			if err := stream.Send(&pc.Response{Spec: response}); err != nil {
+				return err
+			}
+		case request.Discover != nil:
+			if response, err := s.Connector.Discover(ctx, request.Discover); err != nil {
+				return err
+			} else if err := stream.Send(&pc.Response{Discovered: response}); err != nil {
+				return err
+			}
+		case request.Validate != nil:
+			if response, err := s.Connector.Validate(ctx, request.Validate); err != nil {
+				return err
+			} else if err := stream.Send(&pc.Response{Validated: response}); err != nil {
+				return err
+			}
+		case request.Apply != nil:
+			if response, err := s.Connector.Apply(ctx, request.Apply); err != nil {
+				return err
+			} else if err := stream.Send(&pc.Response{Applied: response}); err != nil {
+				return err
+			}
+		case request.Open != nil:
+			return s.Connector.Pull(request.Open, &PullOutput{Connector_CaptureServer: stream})
+		default:
+			return fmt.Errorf("unexpected request %#v", request)
 		}
-		return bs, nil
 	}
-
-	return nil, fmt.Errorf("reading message (into buffer): %w", err)
 }
 
-type specCmd struct{ cmdCommon }
-type validateCmd struct{ cmdCommon }
-type discoverCmd struct{ cmdCommon }
-type applyUpsertCmd struct{ cmdCommon }
-type applyDeleteCmd struct{ cmdCommon }
-type pullCmd struct{ cmdCommon }
-
-func (c specCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	var req pc.SpecRequest
-	log.Debug("executing Spec subcommand")
-
-	if err := c.readMsg(&req); err != nil {
-		return fmt.Errorf("reading request: %w", err)
-	} else if resp, err := c.srv.Spec(c.ctx, &req); err != nil {
-		return err
-	} else if err = c.w.WriteMsg(resp); err != nil {
-		return fmt.Errorf("writing response: %w", err)
-	}
-	return nil
-}
-
-func (c validateCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	var req pc.ValidateRequest
-	log.Debug("executing Validate subcommand")
-
-	if err := c.readMsg(&req); err != nil {
-		return fmt.Errorf("reading request: %w", err)
-	} else if resp, err := c.srv.Validate(c.ctx, &req); err != nil {
-		return err
-	} else if err = c.w.WriteMsg(resp); err != nil {
-		return fmt.Errorf("writing response: %w", err)
-	}
-	return nil
-}
-
-func (c discoverCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	var req pc.DiscoverRequest
-	log.Debug("executing Discover subcommand")
-
-	if err := c.readMsg(&req); err != nil {
-		return fmt.Errorf("reading request: %w", err)
-	} else if resp, err := c.srv.Discover(c.ctx, &req); err != nil {
-		return err
-	} else if err = c.w.WriteMsg(resp); err != nil {
-		return fmt.Errorf("writing response: %w", err)
-	}
-	return nil
-}
-
-func (c applyUpsertCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	var req pc.ApplyRequest
-	log.Debug("executing ApplyUpsert subcommand")
-
-	if err := c.readMsg(&req); err != nil {
-		return fmt.Errorf("reading request: %w", err)
-	} else if resp, err := c.srv.ApplyUpsert(c.ctx, &req); err != nil {
-		return err
-	} else if err = c.w.WriteMsg(resp); err != nil {
-		return fmt.Errorf("writing response: %w", err)
-	}
-
-	return nil
-}
-
-func (c applyDeleteCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	var req pc.ApplyRequest
-	log.Debug("executing ApplyDelete subcommand")
-
-	if err := c.readMsg(&req); err != nil {
-		return fmt.Errorf("reading request: %w", err)
-	} else if resp, err := c.srv.ApplyDelete(c.ctx, &req); err != nil {
-		// Translate delete errors into a successful response so that task
-		// deletion cannot fail.
-		resp = &pc.ApplyResponse{ActionDescription: err.Error()}
-		logrus.WithFields(logrus.Fields{"error": err}).
-			Error("failed to delete the capture cleanly")
-	} else if err = c.w.WriteMsg(resp); err != nil {
-		return fmt.Errorf("writing response: %w", err)
-	}
-
-	return nil
-}
-
-func (c pullCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	log.Debug("executing Pull subcommand")
-	return c.srv.Pull(&pullAdapter{cmdCommon: c.cmdCommon})
-}
-
-// pullAdapter is a pc.Driver_PullServer built from
-// os.Stdin and os.Stdout.
-type pullAdapter struct{ cmdCommon }
-
-func (a *pullAdapter) Context() context.Context {
-	return a.ctx
-}
-
-func (a *pullAdapter) Send(m *pc.PullResponse) error {
-	return a.SendMsg(m)
-}
-func (a *pullAdapter) Recv() (*pc.PullRequest, error) {
-	m := new(pc.PullRequest)
-	if err := a.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-func (a *pullAdapter) SendMsg(m interface{}) error {
-	return a.w.WriteMsg(m.(proto.Message))
-}
-func (a *pullAdapter) RecvMsg(m interface{}) error {
-	return a.readMsg(m.(protoValidator))
-}
-func (a *pullAdapter) SendHeader(metadata.MD) error {
-	panic("SendHeader is not supported")
-}
-func (a *pullAdapter) SetHeader(metadata.MD) error {
-	panic("SetHeader is not supported")
-}
-func (a *pullAdapter) SetTrailer(metadata.MD) {
-	panic("SetTrailer is not supported")
-}
-
-// PullOutput is a convenience wrapper around a pc.Driver_PullServer which makes it simpler
-// to emit documents and state checkpoints.
+// PullOutput is a convenience wrapper around a pc.Connector_CaptureServer
+// which makes it simpler to emit documents and state checkpoints.
+// TODO(johnny): A better name would be PullStream, but I'm refraining right now to avoid churn.
 type PullOutput struct {
 	sync.Mutex
-
-	Stream pc.Driver_PullServer
+	pc.Connector_CaptureServer
 }
 
 // Ready sends a PullResponse_Opened message to indicate that the capture has started.
@@ -295,28 +151,22 @@ func (out *PullOutput) Ready() error {
 	log.Debug("sending PullResponse.Opened")
 	out.Lock()
 	defer out.Unlock()
-	if err := out.Stream.Send(&pc.PullResponse{Opened: &pc.PullResponse_Opened{}}); err != nil {
+	if err := out.Send(&pc.Response{Opened: &pc.Response_Opened{}}); err != nil {
 		return fmt.Errorf("error sending PullResponse.Opened: %w", err)
 	}
 	return nil
 }
 
 // Documents emits one or more documents to the specified binding index.
-func (out *PullOutput) Documents(binding uint32, docs ...json.RawMessage) error {
+func (out *PullOutput) Documents(binding int, docs ...json.RawMessage) error {
 	log.WithField("count", len(docs)).Trace("emitting documents")
 
-	// Construct one or more `PullResponse.Documents` messages from the provided documents.
-	//
-	// TODO(wgd): It might be theoretically more efficient to combine multiple documents into
-	//   a single message, but currently no captures produce multiple documents at once so it's
-	//   kind of a moot point.
-	var messages []*pc.PullResponse
+	var messages []*pc.Response
 	for _, doc := range docs {
-		messages = append(messages, &pc.PullResponse{
-			Documents: &pc.Documents{
-				Binding:  binding,
-				Arena:    []byte(doc),
-				DocsJson: []pf.Slice{{Begin: 0, End: uint32(len(doc))}},
+		messages = append(messages, &pc.Response{
+			Captured: &pc.Response_Captured{
+				Binding: uint32(binding),
+				DocJson: doc,
 			},
 		})
 	}
@@ -327,9 +177,8 @@ func (out *PullOutput) Documents(binding uint32, docs ...json.RawMessage) error 
 	out.Lock()
 	defer out.Unlock()
 	for _, msg := range messages {
-		if err := out.Stream.Send(msg); err != nil {
-			log.WithField("err", err).Error("stream send error")
-			return fmt.Errorf("error emitting documents: %w", err)
+		if err := out.Send(msg); err != nil {
+			return fmt.Errorf("writing captured documents: %w", err)
 		}
 	}
 	return nil
@@ -342,18 +191,174 @@ func (out *PullOutput) Checkpoint(checkpoint json.RawMessage, merge bool) error 
 		"merge":      merge,
 	}).Trace("emitting checkpoint")
 
-	var msg = &pc.PullResponse{
-		Checkpoint: &pf.DriverCheckpoint{
-			DriverCheckpointJson: []byte(checkpoint),
-			Rfc7396MergePatch:    merge,
+	var msg = &pc.Response{
+		Checkpoint: &pc.Response_Checkpoint{
+			State: &pf.ConnectorState{
+				UpdatedJson: checkpoint,
+				MergePatch:  merge,
+			},
 		},
 	}
 
 	out.Lock()
 	defer out.Unlock()
-	if err := out.Stream.Send(msg); err != nil {
-		log.WithField("err", err).Error("stream send error")
-		return fmt.Errorf("error emitting checkpoint: %w", err)
+	if err := out.Send(msg); err != nil {
+		return fmt.Errorf("writing checkpoint: %w", err)
 	}
 	return nil
+}
+
+func newProtoCodec(ctx context.Context) pc.Connector_CaptureServer {
+	return &protoCodec{
+		ctx: ctx,
+		r:   bufio.NewReaderSize(os.Stdin, 1<<21),
+		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+	}
+}
+
+type protoCodec struct {
+	ctx context.Context
+	r   *bufio.Reader
+	w   protoio.Writer
+}
+
+func (c *protoCodec) Context() context.Context {
+	return c.ctx
+}
+
+func (c *protoCodec) Send(m *pc.Response) error {
+	return c.SendMsg(m)
+}
+func (c *protoCodec) Recv() (*pc.Request, error) {
+	var m = new(pc.Request)
+	if err := c.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+func (c *protoCodec) SendMsg(m interface{}) error {
+	return c.w.WriteMsg(m.(proto.Message))
+}
+func (c *protoCodec) RecvMsg(m interface{}) error {
+	var lengthBytes [4]byte
+
+	if _, err := io.ReadFull(c.r, lengthBytes[:]); err == io.EOF {
+		return err
+	} else if err != nil {
+		return fmt.Errorf("reading message length: %w", err)
+	}
+
+	var len = int(binary.LittleEndian.Uint32(lengthBytes[:]))
+
+	var b, err = c.peekMessage(len)
+	if err != nil {
+		return err
+	}
+
+	if err := proto.Unmarshal(b, m.(proto.Message)); err != nil {
+		return fmt.Errorf("decoding message: %w", err)
+	}
+	return nil
+}
+func (c *protoCodec) SendHeader(metadata.MD) error {
+	panic("SendHeader is not supported")
+}
+func (c *protoCodec) SetHeader(metadata.MD) error {
+	panic("SetHeader is not supported")
+}
+func (c *protoCodec) SetTrailer(metadata.MD) {
+	panic("SetTrailer is not supported")
+}
+
+func (c *protoCodec) peekMessage(size int) ([]byte, error) {
+	// Fetch next length-delimited message into a buffer.
+	// In the garden-path case, we decode directly from the
+	// bufio.Reader internal buffer without copying
+	// (having just read the length, the message itself
+	// is probably _already_ in the bufio.Reader buffer).
+	//
+	// If the message is larger than the internal buffer,
+	// we allocate and read it directly.
+	var bs, err = c.r.Peek(size)
+	if err == nil {
+		// The Discard contract guarantees we won't error.
+		// It's safe to reference |bs| until the next Peek.
+		if _, err = c.r.Discard(size); err != nil {
+			panic(err)
+		}
+		return bs, nil
+	}
+
+	// Non-garden path: we must allocate and read a larger buffer.
+	if errors.Is(err, bufio.ErrBufferFull) {
+		bs = make([]byte, size)
+		if _, err = io.ReadFull(c.r, bs); err != nil {
+			return nil, fmt.Errorf("reading message (directly): %w", err)
+		}
+		return bs, nil
+	}
+
+	return nil, fmt.Errorf("reading message (into buffer): %w", err)
+}
+
+func newJsonCodec(ctx context.Context) pc.Connector_CaptureServer {
+	return &jsonCodec{
+		ctx: ctx,
+		marshaler: jsonpb.Marshaler{
+			EnumsAsInts:  false,
+			EmitDefaults: false,
+			Indent:       "", // Compact.
+			OrigName:     false,
+			AnyResolver:  nil,
+		},
+		unmarshaler: jsonpb.Unmarshaler{
+			AllowUnknownFields: true,
+			AnyResolver:        nil,
+		},
+		decoder: json.NewDecoder(bufio.NewReaderSize(os.Stdin, 1<<21)),
+	}
+}
+
+type jsonCodec struct {
+	ctx         context.Context
+	marshaler   jsonpb.Marshaler
+	unmarshaler jsonpb.Unmarshaler
+	decoder     *json.Decoder
+}
+
+func (c *jsonCodec) Context() context.Context {
+	return c.ctx
+}
+func (c *jsonCodec) Send(m *pc.Response) error {
+	return c.SendMsg(m)
+}
+func (c *jsonCodec) Recv() (*pc.Request, error) {
+	var m = new(pc.Request)
+	if err := c.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+func (c *jsonCodec) SendMsg(m interface{}) error {
+	var w bytes.Buffer
+
+	if err := c.marshaler.Marshal(&w, m.(proto.Message)); err != nil {
+		return fmt.Errorf("marshal response to json: %w", err)
+	}
+	_ = w.WriteByte('\n')
+
+	var _, err = os.Stdout.Write(w.Bytes())
+	return err
+}
+func (c *jsonCodec) RecvMsg(m interface{}) error {
+	return c.unmarshaler.UnmarshalNext(c.decoder, m.(proto.Message))
+}
+func (c *jsonCodec) SendHeader(metadata.MD) error {
+	panic("SendHeader is not supported")
+}
+func (c *jsonCodec) SetHeader(metadata.MD) error {
+	panic("SetHeader is not supported")
+}
+func (c *jsonCodec) SetTrailer(metadata.MD) {
+	panic("SetTrailer is not supported")
 }
