@@ -214,9 +214,9 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 			var allNewFields = bindingSpec.FieldSelection.AllFields()
 
 			// Mark columns that have been removed from field selection as nullable
-			for _, projection := range loadedBinding.Collection.Projections {
+			for _, field := range loadedBinding.FieldSelection.AllFields() {
 				// If the projection is part of the new field selection, just skip
-				if SliceContains(projection.Field, allNewFields) {
+				if SliceContains(field, allNewFields) {
 					continue
 				}
 
@@ -226,7 +226,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 				}
 				var input = AlterInput{
 					Table:      table,
-					Identifier: endpoint.Identifier(projection.Field),
+					Identifier: endpoint.Identifier(field),
 				}
 				if statement, err := RenderAlterTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
 					return nil, err
