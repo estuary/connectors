@@ -76,7 +76,7 @@ func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
 			awsSecretKey: cfg.AWSSecretKey,
 			awsRegion:    cfg.AWSRegion,
 			bucket:       cfg.S3Bucket,
-			prefix:       fmt.Sprintf("%s/%s/", CleanPrefix(cfg.S3Prefix), open.Materialization.Materialization),
+			prefix:       strings.TrimLeft(fmt.Sprintf("%s/%s/", CleanPrefix(cfg.S3Prefix), open.Materialization.Materialization), "/"),
 		}
 
 		return transactor, &pm.TransactionResponse_Opened{}, nil

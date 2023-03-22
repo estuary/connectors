@@ -167,15 +167,39 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		tables = append(tables, string(req.Materialization.Bindings[i].ResourceSpecJson))
 	}
 
+	existing, err := LoadSpec(cfg, string(req.Materialization.Materialization))
+	if err != nil {
+		return nil, fmt.Errorf("loading materialization spec: %w", err)
+	}
+
+	var droppedTables []string
+	for table, existingSpec := range existing {
+		// A binding that has been removed, we drop the corresponding table
+		if !SliceContains(string(existingSpec.ResourceSpecJson), tables) {
+			query, err := schemalate.GetDropQuery(table)
+			if err != nil {
+				return nil, fmt.Errorf("building drop query: %w", err)
+			}
+			if !req.DryRun {
+				_, err := fb.Query(query)
+				if err != nil {
+					return nil, fmt.Errorf("running table creation query: %w", err)
+				}
+			}
+
+			droppedTables = append(droppedTables, table)
+		}
+	}
+
 	if req.DryRun {
-		return &pm.ApplyResponse{ActionDescription: fmt.Sprint("to create tables: ", strings.Join(tables, ","))}, nil
+		return &pm.ApplyResponse{ActionDescription: fmt.Sprint("to create tables: ", strings.Join(tables, ","), " and drop tables: ", strings.Join(droppedTables, ","))}, nil
 	}
 
 	err = WriteSpec(cfg, req.Materialization, req.Version)
 	if err != nil {
 		return nil, fmt.Errorf("writing materialization spec to s3: %w", err)
 	}
-	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("created tables: ", strings.Join(tables, ","))}, nil
+	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("created tables: ", strings.Join(tables, ","), " and dropped tables: ", strings.Join(droppedTables, ","))}, nil
 }
 
 // ApplyDelete deletes main and external tables
@@ -245,4 +269,14 @@ func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("deleted tables: ", strings.Join(tables, ","))}, nil
 }
 
+func SliceContains(expected string, actual []string) bool {
+	for _, ty := range actual {
+		if ty == expected {
+			return true
+		}
+	}
+	return false
+}
+
 func main() { boilerplate.RunMain(new(driver)) }
+

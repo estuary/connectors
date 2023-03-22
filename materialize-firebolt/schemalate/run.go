@@ -54,6 +54,19 @@ func GetQueriesBundle(
 	return &bundle, nil
 }
 
+func GetDropQuery(
+	table string,
+) (string, error) {
+	var args = []string{"firebolt-schema", "drop-query"}
+
+	out, err := Run(args, []byte(table))
+	if err != nil {
+		return "", fmt.Errorf("error running command %w", err)
+	}
+
+	return string(out), nil
+}
+
 func ValidateNewProjection(
 	spec *pm.ValidateRequest_Binding,
 ) (map[string]*pm.Constraint, error) {
