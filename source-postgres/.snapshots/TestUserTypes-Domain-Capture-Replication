@@ -1,5 +1,5 @@
 # ================================
-# Collection "test.usertypes_domain_bandoleer": 3 Documents
+# Collection "acmeCo/test/usertypes_domain_bandoleer": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_domain_bandoleer","loc":[11111111,11111111,11111111]}},"id":3,"value":"foo"}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_domain_bandoleer","loc":[11111111,11111111,11111111]}},"id":4,"value":"bar"}

@@ -1,5 +1,5 @@
 # ================================
-# Collection "test.AlterTable_ccc": 2 Documents
+# Collection "acmeCo/test/altertable_ccc": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_ccc"}},"data":"mno","evenmore":null,"extra":null,"id":5}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_ccc"}},"data":"pqr","evenmore":null,"extra":null,"id":6}
