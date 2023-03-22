@@ -178,6 +178,9 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 	})
 	require.NoError(t, err)
 	cs.Bindings = append(cs.Bindings, &flow.CaptureSpec_Binding{
+		Collection: flow.CollectionSpec{
+			Collection: flow.Collection("acmeCo/test/" + strings.ToLower(nameParts[1])),
+		},
 		ResourceSpecJson: specJSON,
 		ResourcePath:     nameParts,
 	})
@@ -206,6 +209,9 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 	})
 	require.NoError(t, err)
 	cs.Bindings = append(cs.Bindings, &flow.CaptureSpec_Binding{
+		Collection: flow.CollectionSpec{
+			Collection: flow.Collection("acmeCo/test/" + strings.ToLower(nameParts[1])),
+		},
 		ResourceSpecJson: specJSON,
 		ResourcePath:     nameParts,
 	})
