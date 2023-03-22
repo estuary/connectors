@@ -16,8 +16,10 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 // VerifiedCapture performs a capture using the provided st.CaptureSpec and shuts it down after
@@ -126,28 +128,56 @@ func RestartingBackfillCapture(ctx context.Context, t testing.TB, cs *st.Capture
 	return summary.String(), checkpoints
 }
 
-// ResourceBindings returns a new list of capture bindings for the specified streamIDs.
-func ResourceBindings(t testing.TB, streamIDs ...string) []*flow.CaptureSpec_Binding {
+func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamIDs ...string) []*flow.CaptureSpec_Binding {
 	t.Helper()
+	var cs = tb.CaptureSpec(ctx, t)
+
+	// Perform discovery and build a map from streamID to discovery binding response
+	var discoveredBindings = cs.Discover(ctx, t, regexp.MustCompile(`.*`))
+	var discovery = make(map[string]*capture.DiscoverResponse_Binding)
+	for _, d := range discoveredBindings {
+		var res sqlcapture.Resource
+		require.NoError(t, json.Unmarshal(d.ResourceSpecJson, &res))
+		var streamID = sqlcapture.JoinStreamID(res.Namespace, res.Stream)
+		discovery[strings.ToLower(streamID)] = d
+	}
+
+	// For each streamID named in our arguments, select the matching discovery result
+	// and generate a corresponding capture binding.
 	var bindings []*flow.CaptureSpec_Binding
 	for _, streamID := range streamIDs {
-		var nameParts = strings.SplitN(streamID, ".", 2)
-		var bs, err = json.Marshal(sqlcapture.Resource{
-			Namespace: nameParts[0],
-			Stream:    nameParts[1],
-		})
-		if err != nil {
-			t.Fatalf("error marshalling resource json: %v", err)
+		var b, ok = discovery[strings.ToLower(streamID)]
+		if !ok {
+			t.Fatalf("stream %q not found in discovery", streamID)
 		}
+		var res sqlcapture.Resource
+		require.NoError(t, json.Unmarshal(b.ResourceSpecJson, &res))
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
+			ResourceSpecJson: b.ResourceSpecJson,
 			Collection: flow.CollectionSpec{
-				Collection: flow.Collection("acmeCo/test/" + strings.ToLower(nameParts[1])),
+				Collection:     "acmeCo/test/" + b.RecommendedName,
+				ReadSchemaJson: b.DocumentSchemaJson,
+				KeyPtrs:        b.KeyPtrs,
 			},
-			ResourceSpecJson: bs,
-			ResourcePath:     nameParts,
+			ResourcePath: []string{res.Namespace, res.Stream},
 		})
 	}
 	return bindings
+}
+
+// BindingReplace returns a copy of a "template" binding with the string substitution
+// `s/old/new` applied to the collection name, resource spec, and resource path values.
+// This allows tests to exercise missing-table functionality by creating and discovering
+// a table (for instance `foobar_aaa`) and then by string substitution turning that into
+// a binding for table `foobar_bbb` which doesn't actually exist.
+func BindingReplace(b *flow.CaptureSpec_Binding, old, new string) *flow.CaptureSpec_Binding {
+	var x = *b
+	x.Collection.Collection = flow.Collection(strings.ReplaceAll(string(x.Collection.Collection), old, new))
+	x.ResourceSpecJson = json.RawMessage(strings.ReplaceAll(string(x.ResourceSpecJson), old, new))
+	for idx := range x.ResourcePath {
+		x.ResourcePath[idx] = strings.ReplaceAll(x.ResourcePath[idx], old, new)
+	}
+	return &x
 }
 
 // LoadCSV is a test helper which opens a CSV file and inserts its contents

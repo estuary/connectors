@@ -27,5 +27,5 @@ type TestBackend interface {
 	// Delete removes preexisting rows.
 	Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{})
 	// CaptureSpec returns a new st.CaptureSpec which can be used to run discovery and captures.
-	CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec
+	CaptureSpec(ctx context.Context, t testing.TB, streamIDs ...string) *st.CaptureSpec
 }

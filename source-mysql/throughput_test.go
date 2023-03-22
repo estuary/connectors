@@ -58,7 +58,7 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 
 	log.WithField("iterations", iterations).Info("running backfill benchmark")
 	for i := 0; i < iterations; i++ {
-		var cs = tb.CaptureSpec(b, tables...)
+		var cs = tb.CaptureSpec(ctx, b, tables...)
 		var validator = &benchmarkCaptureValidator{}
 		cs.Validator = validator
 		b.StartTimer()
@@ -85,7 +85,7 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 		tables = append(tables, table)
 	}
 
-	var cs = tb.CaptureSpec(b, tables...)
+	var cs = tb.CaptureSpec(ctx, b, tables...)
 	tests.RunCapture(ctx, b, cs)
 	if len(cs.Errors) > 0 {
 		b.Fatalf("capture failed with error: %v", cs.Errors[0])

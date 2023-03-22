@@ -40,7 +40,7 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 
 			// Perform discovery and verify that the generated JSON schema looks correct
 			t.Run("discovery", func(t *testing.T) {
-				var bindings = tb.CaptureSpec(t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueSuffix)))
+				var bindings = tb.CaptureSpec(ctx, t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueSuffix)))
 				if len(bindings) == 0 {
 					t.Errorf("column type %q: no table named %q discovered", tc.ColumnType, tableName)
 					return
@@ -69,7 +69,7 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 
 			// Insert a test row and scan it back out, then do the same via replication
 			t.Run("roundtrip", func(t *testing.T) {
-				var cs = tb.CaptureSpec(t, tableName)
+				var cs = tb.CaptureSpec(ctx, t, tableName)
 
 				// Don't sanitize anything, we're only looking for the output value field
 				// and sometimes that could contain a timestamp-looking value.

@@ -41,7 +41,7 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 // testConfigSchema serializes the response to a SpecRequest RPC and verifies it
 // against a snapshot.
 func testConfigSchema(ctx context.Context, t *testing.T, tb TestBackend) {
-	response, err := tb.CaptureSpec(t).Driver.Spec(ctx, &pc.SpecRequest{})
+	response, err := tb.CaptureSpec(ctx, t).Driver.Spec(ctx, &pc.SpecRequest{})
 	require.NoError(t, err)
 	formatted, err := json.MarshalIndent(response, "", "  ")
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func testConfigSchema(ctx context.Context, t *testing.T, tb TestBackend) {
 func testSimpleDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 	const uniqueString = "magnanimous_outshine"
 	tb.CreateTable(ctx, t, uniqueString, "(a INTEGER PRIMARY KEY, b TEXT, c REAL NOT NULL, d VARCHAR(255))")
-	tb.CaptureSpec(t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
 }
 
 // testSimpleCapture initializes a DB table with a few rows, then runs a capture
@@ -63,7 +63,7 @@ func testSimpleDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 func testSimpleCapture(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
-	VerifiedCapture(ctx, t, tb.CaptureSpec(t, tableName))
+	VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, tableName))
 }
 
 // testReplicationInserts runs two captures, where the first will perform the
@@ -71,7 +71,7 @@ func testSimpleCapture(ctx context.Context, t *testing.T, tb TestBackend) {
 // additional inserts performed after the first capture.
 func testReplicationInserts(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	t.Run("init", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
@@ -84,7 +84,7 @@ func testReplicationInserts(ctx context.Context, t *testing.T, tb TestBackend) {
 // additional inserts and row updates performed after the first capture.
 func testReplicationUpdates(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}})
 	t.Run("init", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
@@ -99,7 +99,7 @@ func testReplicationUpdates(ctx context.Context, t *testing.T, tb TestBackend) {
 // additional inserts and deletions performed after the first capture.
 func testReplicationDeletes(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	t.Run("init", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
@@ -113,7 +113,7 @@ func testReplicationDeletes(ctx context.Context, t *testing.T, tb TestBackend) {
 // and only adds data after replication has begun.
 func testEmptyTable(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 
 	t.Run("init", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
 	tb.Insert(ctx, t, tableName, [][]interface{}{{1002, "some"}, {1000, "more"}, {1001, "rows"}})
@@ -128,7 +128,7 @@ func testIgnoredStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 	tb.Insert(ctx, t, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
 	tb.Insert(ctx, t, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
 
-	var cs = tb.CaptureSpec(t, table1)
+	var cs = tb.CaptureSpec(ctx, t, table1)
 	t.Run("capture1", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
 	tb.Insert(ctx, t, table1, [][]interface{}{{6, "six"}})
 	tb.Insert(ctx, t, table2, [][]interface{}{{7, "seven"}})
@@ -147,11 +147,11 @@ func testMultipleStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 	tb.Insert(ctx, t, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
 	tb.Insert(ctx, t, table3, [][]interface{}{{6, "six"}, {7, "seven"}, {8, "eight"}})
 
-	var cs = tb.CaptureSpec(t, table1)
+	var cs = tb.CaptureSpec(ctx, t, table1)
 	t.Run("capture1", func(t *testing.T) { VerifiedCapture(ctx, t, cs) }) // Scan table1
-	cs.Bindings = ResourceBindings(t, table1, table2, table3)
+	cs.Bindings = DiscoverBindings(ctx, t, tb, table1, table2, table3)
 	t.Run("capture2", func(t *testing.T) { VerifiedCapture(ctx, t, cs) }) // Add table2 and table3
-	cs.Bindings = ResourceBindings(t, table1, table3)
+	cs.Bindings = DiscoverBindings(ctx, t, tb, table1, table3)
 	t.Run("capture3", func(t *testing.T) { VerifiedCapture(ctx, t, cs) }) // Forget about table2
 
 	tb.Insert(ctx, t, table1, [][]interface{}{{9, "nine"}})
@@ -159,7 +159,7 @@ func testMultipleStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 	tb.Insert(ctx, t, table3, [][]interface{}{{11, "eleven"}})
 	t.Run("capture4", func(t *testing.T) { VerifiedCapture(ctx, t, cs) }) // Replicate changes from table1 and table3 only
 
-	cs.Bindings = ResourceBindings(t, table1, table2, table3)
+	cs.Bindings = DiscoverBindings(ctx, t, tb, table1, table2, table3)
 	t.Run("capture5", func(t *testing.T) { VerifiedCapture(ctx, t, cs) }) // Re-scan table2 including the new row
 }
 
@@ -168,7 +168,7 @@ func testMultipleStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER)")
 	LoadCSV(ctx, t, tb, tableName, "statepop.csv", 100)
-	var cs = tb.CaptureSpec(t)
+	var cs = tb.CaptureSpec(ctx, t)
 
 	var nameParts = strings.SplitN(tableName, ".", 2)
 	var specJSON, err = json.Marshal(sqlcapture.Resource{
@@ -199,7 +199,7 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBackend) {
 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER, PRIMARY KEY (year, state))")
 	LoadCSV(ctx, t, tb, tableName, "statepop.csv", 100)
-	var cs = tb.CaptureSpec(t)
+	var cs = tb.CaptureSpec(ctx, t)
 
 	var nameParts = strings.SplitN(tableName, ".", 2)
 	var specJSON, err = json.Marshal(sqlcapture.Resource{
@@ -229,16 +229,10 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 // binding doesn't actually exist.
 func testMissingTable(ctx context.Context, t *testing.T, tb TestBackend) {
 	var table1 = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var table2 = strings.ReplaceAll(table1, "one", "two") // This table doesn't actually exist
-	var cs = tb.CaptureSpec(t, table1, table2)
-	for _, binding := range cs.Bindings {
-		var res sqlcapture.Resource
-		require.NoError(t, json.Unmarshal(binding.ResourceSpecJson, &res))
-		res.PrimaryKey = []string{"id"}
-		var bs, err = json.Marshal(res)
-		require.NoError(t, err)
-		binding.ResourceSpecJson = bs
-	}
+	var binding1 = DiscoverBindings(ctx, t, tb, table1)[0]
+	var binding2 = BindingReplace(binding1, "one", "two")
+	var cs = tb.CaptureSpec(ctx, t)
+	cs.Bindings = []*flow.CaptureSpec_Binding{binding1, binding2}
 	VerifiedCapture(ctx, t, cs)
 }
 
@@ -274,7 +268,7 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 	}
 
 	var tableName = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, counter INTEGER)")
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 	cs.Validator = &correctnessInvariantsCaptureValidator{
 		NumExpectedIDs: numTotalIDs,
 	}

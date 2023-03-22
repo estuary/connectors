@@ -66,13 +66,13 @@ func benchmarkBackfills(b *testing.B, iterations, numTables, rowsPerTable int) {
 		// has fully processed and flushed all of the bulk data loading before we begin
 		// timing the actual capture of data we care about.
 		var emptyTable = tb.CreateTable(ctx, b, "empty", "(id INTEGER PRIMARY KEY, data TEXT)")
-		var dummy = tb.CaptureSpec(b, emptyTable)
+		var dummy = tb.CaptureSpec(ctx, b, emptyTable)
 		tests.RunCapture(ctx, b, dummy)
 		if len(dummy.Errors) > 0 {
 			b.Fatalf("capture failed with error: %v", dummy.Errors[0])
 		}
 
-		var cs = tb.CaptureSpec(b, tables...)
+		var cs = tb.CaptureSpec(ctx, b, tables...)
 		var validator = &benchmarkCaptureValidator{}
 		cs.Validator = validator
 		b.StartTimer()
@@ -99,7 +99,7 @@ func benchmarkReplication(b *testing.B, iterations, numTables, rowsPerTable int)
 		tables = append(tables, table)
 	}
 
-	var cs = tb.CaptureSpec(b, tables...)
+	var cs = tb.CaptureSpec(ctx, b, tables...)
 	tests.RunCapture(ctx, b, cs)
 	if len(cs.Errors) > 0 {
 		b.Fatalf("capture failed with error: %v", cs.Errors[0])
