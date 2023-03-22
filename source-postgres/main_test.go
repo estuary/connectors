@@ -101,15 +101,18 @@ func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 	replicationBufferSize = 0
 }
 
-func (tb *testBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
+func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs ...string) *st.CaptureSpec {
 	var cfg = tb.config
-	return &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       postgresDriver,
 		EndpointSpec: &cfg,
-		Bindings:     tests.ResourceBindings(t, streamIDs...),
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   CaptureSanitizers,
 	}
+	if len(streamIDs) > 0 {
+		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamIDs...)
+	}
+	return cs
 }
 
 var CaptureSanitizers = make(map[string]*regexp.Regexp)
@@ -225,7 +228,7 @@ func TestCapitalizedTables(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
 	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS "%s"."USERS"`, testSchemaName))
 	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE "%s"."USERS" (id INTEGER PRIMARY KEY, data TEXT NOT NULL)`, testSchemaName))
-	var cs = tb.CaptureSpec(t)
+	var cs = tb.CaptureSpec(ctx, t)
 	t.Run("Discover", func(t *testing.T) {
 		cs.VerifyDiscover(ctx, t, regexp.MustCompile(`(?i:users)`))
 	})

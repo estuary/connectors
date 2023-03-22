@@ -25,7 +25,7 @@ func TestDiscoveryComplex(t *testing.T) {
 	tb.Query(ctx, t, fmt.Sprintf("COMMENT ON COLUMN %s.foo IS 'This is a text field!';", tableName))
 	tb.Query(ctx, t, fmt.Sprintf("COMMENT ON COLUMN %s.k1 IS 'I think this is a key ?';", tableName))
 
-	tb.CaptureSpec(t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
 }
 
 func TestDiscoveryCapitalization(t *testing.T) {
@@ -47,5 +47,5 @@ func TestDiscoveryCapitalization(t *testing.T) {
 	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE "%s".%s (id INTEGER PRIMARY KEY, data TEXT);`, testSchemaName, tableB))
 	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data TEXT);`, testSchemaName, tableC))
 
-	tb.CaptureSpec(t).VerifyDiscover(ctx, t, regexp.MustCompile(fmt.Sprintf(`(?i:%s)`, regexp.QuoteMeta(tablePrefix))))
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(fmt.Sprintf(`(?i:%s)`, regexp.QuoteMeta(tablePrefix))))
 }
