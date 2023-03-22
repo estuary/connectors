@@ -2,17 +2,17 @@ package main
 
 import (
 	"context"
-	"os"
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	sql "github.com/estuary/connectors/materialize-sql"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	_ "github.com/mattn/go-sqlite3" // Import for register side-effects.
 	log "github.com/sirupsen/logrus"
 )
@@ -22,6 +22,7 @@ const databasePath = "/tmp/sqlite.db"
 type config struct {
 	path string
 }
+
 func (c config) Validate() error {
 	return nil
 }
@@ -77,15 +78,16 @@ func NewSQLiteDriver() *sql.Driver {
 			}
 
 			return &sql.Endpoint{
-				Config: config{path: path},
-				Dialect: sqliteDialect,
-				MetaSpecs: nil,
-				MetaCheckpoints: nil,
-				Client: client{path: path},
-				CreateTableTemplate: tplCreateTargetTable,
+				Config:                      config{path: path},
+				Dialect:                     sqliteDialect,
+				MetaSpecs:                   nil,
+				MetaCheckpoints:             nil,
+				Client:                      client{path: path},
+				CreateTableTemplate:         tplCreateTargetTable,
 				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
-				NewResource: newTableConfig,
-				NewTransactor: newTransactor,
+				NewResource:                 newTableConfig,
+				NewTransactor:               newTransactor,
+				CheckPrerequisites:          func(_ context.Context, _ json.RawMessage) *sql.PrereqErr { return &sql.PrereqErr{} },
 			}, nil
 		},
 	}
@@ -206,8 +208,8 @@ type binding struct {
 	target sql.Table
 	// Variables exclusively used by Load.
 	load struct {
-		insertSQL string
-		querySQL string
+		insertSQL   string
+		querySQL    string
 		truncateSQL string
 	}
 	// Variables accessed by Prepare, Store, and Commit.
@@ -347,6 +349,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 const maximumDatabaseSize = 500 * 1024 * 1024 // 500 megabytes
 const maximumDatabaseSizeText = "500mb"
+
 func checkDatabaseSize() error {
 	if file, err := os.Open(databasePath); err != nil {
 		return fmt.Errorf("cannot open database file to check for size: %w", err)
@@ -370,7 +373,6 @@ func (d *transactor) Destroy() {
 		log.WithField("err", err).Error("failed to close store connection")
 	}
 }
-
 
 func main() {
 	boilerplate.RunMain(NewSQLiteDriver())
