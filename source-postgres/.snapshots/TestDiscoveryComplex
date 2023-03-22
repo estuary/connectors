@@ -3,11 +3,7 @@ Binding 0:
     "recommended_name": "discoverycomplex_cheap_oxygenation",
     "resource_spec_json": {
       "namespace": "test",
-      "stream": "discoverycomplex_cheap_oxygenation",
-      "primary_key": [
-        "k2",
-        "k1"
-      ]
+      "stream": "discoverycomplex_cheap_oxygenation"
     },
     "document_schema_json": {
       "$defs": {

@@ -3,10 +3,7 @@ Binding 0:
     "recommended_name": "usertypes_domain_bandoleer",
     "resource_spec_json": {
       "namespace": "test",
-      "stream": "usertypes_domain_bandoleer",
-      "primary_key": [
-        "id"
-      ]
+      "stream": "usertypes_domain_bandoleer"
     },
     "document_schema_json": {
       "$defs": {
