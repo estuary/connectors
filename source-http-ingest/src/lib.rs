@@ -246,6 +246,7 @@ fn discovered_webhook_collection() -> DiscoveredBinding {
         resource_config: to_raw_value(&ResourceConfig::default()).unwrap(),
         document_schema: to_raw_value(&serde_json::json!({
             "type": "object",
+            "x-infer-schema": true,
             "properties": {
                 "_meta": {
                     "type": "object",

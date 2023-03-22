@@ -2,9 +2,47 @@ use anyhow::Context;
 use reqwest::header::HeaderMap;
 use source_http_ingest::connector_protocol::capture::Response;
 
-//use std::process::{ChildStdin, ChildStdout, Command, Stdio};
 use std::process::Stdio;
-use tokio::process::{ChildStdin, ChildStdout, Command};
+use tokio::io::AsyncBufReadExt;
+use tokio::{
+    io::BufReader,
+    process::{ChildStdin, ChildStdout, Command},
+};
+
+#[tokio::test]
+async fn test_discover() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_source-http-ingest"))
+        .kill_on_drop(true)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        // This is just easier than having it listen on a random port and then
+        // needing to figure out what it is by parsing log output.
+        .env("SOURCE_HTTP_INGEST_PORT", "27173")
+        .env("LOG_LEVEL", "info")
+        .spawn()
+        .expect("spawning child process");
+
+    let mut stdin = child.stdin.take().unwrap();
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+
+    let discover_req = serde_json::json!({
+        "discover": {
+            "config": {}
+        }
+    });
+    write_capture_request(&discover_req, &mut stdin)
+        .await
+        .expect("failed to wrtie req");
+
+    let mut buf = String::new();
+    stdout
+        .read_line(&mut buf)
+        .await
+        .expect("failed to read stdout");
+    let result: serde_json::Value = serde_json::from_str(&buf).expect("deserialize response");
+    insta::assert_json_snapshot!(result);
+}
 
 #[tokio::test]
 async fn test_http_request_processing() -> Result<(), anyhow::Error> {
@@ -20,15 +58,18 @@ async fn test_http_request_processing() -> Result<(), anyhow::Error> {
 
     let stdin = child.stdin.take().unwrap();
     let stdout = child.stdout.take().unwrap();
-    let result = run_test(stdin, stdout).await;
+    let result = run_http_request_processing(stdin, stdout).await;
     let kill_result = child.kill().await;
     result?;
     kill_result?;
     Ok(())
 }
 
-async fn run_test(mut stdin: ChildStdin, stdout: ChildStdout) -> anyhow::Result<()> {
-    let mut reader = tokio::io::BufReader::new(stdout);
+async fn run_http_request_processing(
+    mut stdin: ChildStdin,
+    stdout: ChildStdout,
+) -> anyhow::Result<()> {
+    let mut reader = BufReader::new(stdout);
 
     // Write open and expect to read opened.
     write_capture_request(&open_json(), &mut stdin).await?;
@@ -117,8 +158,7 @@ async fn run_test(mut stdin: ChildStdin, stdout: ChildStdout) -> anyhow::Result<
     Ok(())
 }
 
-async fn read_response(stdout: &mut tokio::io::BufReader<ChildStdout>) -> anyhow::Result<Response> {
-    use tokio::io::AsyncBufReadExt;
+async fn read_response(stdout: &mut BufReader<ChildStdout>) -> anyhow::Result<Response> {
     let mut line = String::with_capacity(256);
 
     tokio::time::timeout(
