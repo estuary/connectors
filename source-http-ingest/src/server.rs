@@ -335,7 +335,12 @@ pub fn openapi_spec<'a>(
     for binding in bindings.iter() {
         let url_path = ensure_slash_prefix(binding.resource_path[0].as_str());
 
-        let raw_schema = binding.collection.schema.as_ref().unwrap();
+        let raw_schema = binding
+            .collection
+            .write_schema
+            .as_ref()
+            .or(binding.collection.schema.as_ref())
+            .unwrap();
         let openapi_schema = serde_json::from_str::<openapi::Schema>(raw_schema.get())
             .context("deserializing collection schema")?;
 
