@@ -180,7 +180,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 					}
 					var input = AlterInput{
 						Table:      table,
-						Identifier: field,
+						Identifier: endpoint.Identifier(field),
 					}
 					if statement, err := RenderAlterTemplate(input, endpoint.AlterTableAddColumnTemplate); err != nil {
 						return nil, err
@@ -200,7 +200,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 						}
 						var input = AlterInput{
 							Table:      table,
-							Identifier: field,
+							Identifier: endpoint.Identifier(field),
 						}
 						if statement, err := RenderAlterTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
 							return nil, err
@@ -226,7 +226,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 				}
 				var input = AlterInput{
 					Table:      table,
-					Identifier: projection.Field,
+					Identifier: endpoint.Identifier(projection.Field),
 				}
 				if statement, err := RenderAlterTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
 					return nil, err
