@@ -22,7 +22,7 @@ func TestReplicaIdentity(t *testing.T) {
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Default REPLICA IDENTITY logs only the old primary key for deletions and updates.
@@ -54,7 +54,7 @@ func TestToastColumns(t *testing.T) {
 	// Initial capture backfill.
 	tb.Insert(ctx, t, tableName, [][]interface{}{{1, 32, "smol"}})
 	tb.Insert(ctx, t, tableName, [][]interface{}{{2, 42, data}})
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Insert TOAST value, update TOAST value, and change an unrelated value.
@@ -84,7 +84,7 @@ func TestSlotLSNAdvances(t *testing.T) {
 
 	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 
 	var lsnQuery = `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`
 	var slotName = tb.config.Advanced.SlotName
@@ -147,7 +147,7 @@ func TestViewDiscovery(t *testing.T) {
 		tb.Query(ctx, t, fmt.Sprintf(`DROP MATERIALIZED VIEW IF EXISTS %s;`, matview))
 	})
 
-	var bindings = tb.CaptureSpec(t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(strings.TrimPrefix(tableName, "test."))))
+	var bindings = tb.CaptureSpec(ctx, t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(strings.TrimPrefix(tableName, "test."))))
 	for _, binding := range bindings {
 		logrus.WithField("name", binding.RecommendedName).Debug("discovered stream")
 		if strings.Contains(string(binding.RecommendedName), "_view") {
@@ -173,7 +173,7 @@ func TestSkipBackfills(t *testing.T) {
 	tb.Insert(ctx, t, tableC, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
 
 	// Run an initial capture, which should capture all three tables but only backfill events from table B
-	var cs = tb.CaptureSpec(t, tableA, tableB, tableC)
+	var cs = tb.CaptureSpec(ctx, t, tableA, tableB, tableC)
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Insert additional data and verify that all three tables report new events
@@ -192,7 +192,7 @@ func TestTruncatedTables(t *testing.T) {
 	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
 
 	// Set up and run a capture of Table A only
-	var cs = tb.CaptureSpec(t, tableA)
+	var cs = tb.CaptureSpec(ctx, t, tableA)
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Add data to table A and truncate table B. Captures should still succeed because we
@@ -218,11 +218,11 @@ func TestTrickyColumnNames(t *testing.T) {
 
 	// Discover the catalog and verify that the table schemas looks correct
 	t.Run("discover", func(t *testing.T) {
-		tb.CaptureSpec(t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
 	})
 
 	// Perform an initial backfill
-	var cs = tb.CaptureSpec(t, tableA, tableB)
+	var cs = tb.CaptureSpec(ctx, t, tableA, tableB)
 	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Add more data and read it via replication
@@ -242,7 +242,7 @@ func TestCursorResume(t *testing.T) {
 		{"ccc", 1234, "bikh"}, {"ddd", -10000, "dhqc"}, {"x", 1, "djsf"}, {"y", 1, "iwnx"},
 		{"z", 1, "qmjp"}, {"", 0, "xakg"}, {"", -1, "kvxr"}, {"   ", 3, "gboj"},
 	})
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 
 	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
 	// restarted after each scan key update, this means we'll advance over the keys
@@ -261,7 +261,7 @@ func TestComplexDataset(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 
 	// Reduce the backfill chunk size to 10 rows for this test.
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10
@@ -316,13 +316,13 @@ func TestUserTypes(t *testing.T) {
 		var uniqueString = "bandoleer"
 		var tableName = tb.CreateTable(ctx, t, uniqueString, "(id INTEGER PRIMARY KEY, value UserDomain)")
 		t.Run("Discovery", func(t *testing.T) {
-			var cs = tb.CaptureSpec(t)
+			var cs = tb.CaptureSpec(ctx, t)
 			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueString))
 		})
 
 		t.Run("Capture", func(t *testing.T) {
 			tb.Insert(ctx, t, tableName, [][]any{{1, "hello"}, {2, "world"}})
-			var cs = tb.CaptureSpec(t, tableName)
+			var cs = tb.CaptureSpec(ctx, t, tableName)
 			tests.VerifiedCapture(ctx, t, cs)
 			t.Run("Replication", func(t *testing.T) {
 				tb.Insert(ctx, t, tableName, [][]any{{3, "foo"}, {4, "bar"}, {5, "baz"}})
@@ -339,12 +339,12 @@ func TestUserTypes(t *testing.T) {
 		var uniqueString = "terror"
 		var tableName = tb.CreateTable(ctx, t, uniqueString, "(id INTEGER PRIMARY KEY, value UserEnum)")
 		t.Run("Discovery", func(t *testing.T) {
-			var cs = tb.CaptureSpec(t)
+			var cs = tb.CaptureSpec(ctx, t)
 			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueString))
 		})
 		t.Run("Capture", func(t *testing.T) {
 			tb.Insert(ctx, t, tableName, [][]any{{1, "red"}, {2, "green"}, {3, "blue"}})
-			var cs = tb.CaptureSpec(t, tableName)
+			var cs = tb.CaptureSpec(ctx, t, tableName)
 			tests.VerifiedCapture(ctx, t, cs)
 			t.Run("Replication", func(t *testing.T) {
 				tb.Insert(ctx, t, tableName, [][]any{{4, "blue"}, {5, "red"}, {6, "green"}})
@@ -362,7 +362,7 @@ func TestUserTypes(t *testing.T) {
 		var tableName = tb.CreateTable(ctx, t, uniqueString, "(id INTEGER PRIMARY KEY, value UserTuple)")
 
 		t.Run("Discovery", func(t *testing.T) {
-			var cs = tb.CaptureSpec(t)
+			var cs = tb.CaptureSpec(ctx, t)
 			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueString))
 		})
 
@@ -371,7 +371,7 @@ func TestUserTypes(t *testing.T) {
 				{1, "(1234, 5678, 'hello')"},
 				{2, "(3456, 9876, 'world')"},
 			})
-			var cs = tb.CaptureSpec(t, tableName)
+			var cs = tb.CaptureSpec(ctx, t, tableName)
 			tests.VerifiedCapture(ctx, t, cs)
 			t.Run("Replication", func(t *testing.T) {
 				tb.Insert(ctx, t, tableName, [][]any{
@@ -404,5 +404,5 @@ func TestCaptureCapitalization(t *testing.T) {
 	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (0, 'hello'), (1, 'asdf');`, testSchemaName, tableA))
 	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (2, 'world'), (3, 'fdsa');`, testSchemaName, tableB))
 
-	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(t, testSchemaName+"."+tableA, testSchemaName+"."+tableB))
+	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, testSchemaName+"."+tableA, testSchemaName+"."+tableB))
 }

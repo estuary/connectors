@@ -97,15 +97,18 @@ func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 	replicationBufferSize = 0
 }
 
-func (tb *testBackend) CaptureSpec(t testing.TB, streamIDs ...string) *st.CaptureSpec {
+func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs ...string) *st.CaptureSpec {
 	var cfg = tb.config
-	return &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       mysqlDriver,
 		EndpointSpec: &cfg,
-		Bindings:     tests.ResourceBindings(t, streamIDs...),
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   CaptureSanitizers,
 	}
+	if len(streamIDs) > 0 {
+		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamIDs...)
+	}
+	return cs
 }
 
 var CaptureSanitizers = make(map[string]*regexp.Regexp)
@@ -204,7 +207,7 @@ func TestAlterTable(t *testing.T) {
 	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ghi"}, {4, "jkl"}})
 	tb.Insert(ctx, t, tableC, [][]interface{}{{5, "mno"}, {6, "pqr"}})
 
-	var cs = tb.CaptureSpec(t, tableA, tableB)
+	var cs = tb.CaptureSpec(ctx, t, tableA, tableB)
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Altering tableC, which is not being captured, should be fine
@@ -219,11 +222,11 @@ func TestAlterTable(t *testing.T) {
 	t.Run("capture3-fails", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// But removing the problematic table should fix it
-	cs.Bindings = tests.ResourceBindings(t, tableA)
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, tableA)
 	t.Run("capture4", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// And we can then re-add the table and it should start over after the problem
-	cs.Bindings = tests.ResourceBindings(t, tableA, tableB)
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, tableA, tableB)
 	t.Run("capture5", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Finally we exercise the trickiest edge case, in which a new table (C)
@@ -231,7 +234,7 @@ func TestAlterTable(t *testing.T) {
 	// checkpoint*. This should still work, because tables only become active
 	// after the first stream-to-watermark operation.
 	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN evenmore TEXT;", tableC))
-	cs.Bindings = tests.ResourceBindings(t, tableA, tableB, tableC)
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, tableA, tableB, tableC)
 	t.Run("capture6", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
@@ -239,7 +242,7 @@ func TestAlterTable(t *testing.T) {
 // sanity check is working as intended.
 func TestBinlogExpirySanityCheck(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var cs = tb.CaptureSpec(t)
+	var cs = tb.CaptureSpec(ctx, t)
 
 	for idx, tc := range []struct {
 		VarName     string
@@ -292,7 +295,7 @@ func TestSkipBackfills(t *testing.T) {
 	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
 	tb.Insert(ctx, t, tableC, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
 
-	var cs = tb.CaptureSpec(t, tableA, tableB, tableC)
+	var cs = tb.CaptureSpec(ctx, t, tableA, tableB, tableC)
 	cs.EndpointSpec.(*Config).Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
 
 	// Run an initial capture, which should only backfill events from table B
@@ -316,7 +319,7 @@ func TestCursorResume(t *testing.T) {
 		{"ccc", 1234, "bikh"}, {"ddd", -10000, "dhqc"}, {"x", 1, "djsf"}, {"y", 1, "iwnx"},
 		{"z", 1, "qmjp"}, {"", 0, "xakg"}, {"", -1, "kvxr"}, {"   ", 3, "gboj"},
 	})
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 
 	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
 	// restarted after each scan key update, this means we'll advance over the keys
@@ -335,7 +338,7 @@ func TestComplexDataset(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER, PRIMARY KEY (year, state))")
 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 
 	// Reduce the backfill chunk size to 10 rows for this test.
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10

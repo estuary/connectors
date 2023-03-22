@@ -168,7 +168,7 @@ func TestScanKeyDatetimes(t *testing.T) {
 		{"1991-08-31 12:34:56.888", "vdug"},
 		{"1991-08-31 12:34:56.999", "xerk"},
 	})
-	var cs = tb.CaptureSpec(t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, tableName)
 
 	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
 	// restarted after each scan key update, this means we'll advance over the keys
@@ -209,7 +209,7 @@ func TestScanKeyTypes(t *testing.T) {
 			}
 			tb.Insert(ctx, t, tableName, rows)
 
-			var cs = tb.CaptureSpec(t, tableName)
+			var cs = tb.CaptureSpec(ctx, t, tableName)
 			cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
 			var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 			cupaloy.SnapshotT(t, summary)
