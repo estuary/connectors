@@ -15,6 +15,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	_ "github.com/mattn/go-sqlite3" // Import for register side-effects.
 	log "github.com/sirupsen/logrus"
+	"go.gazette.dev/core/consumer/protocol"
 )
 
 const databasePath = "/tmp/sqlite.db"
@@ -336,7 +337,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint []byte, _ <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
 		return nil, pf.RunAsyncOperation(func() error {
 			if err = txn.Commit(); err != nil {
 				return fmt.Errorf("commit transaction: %w", err)
