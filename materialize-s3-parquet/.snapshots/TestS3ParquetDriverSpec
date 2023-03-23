@@ -1,5 +1,5 @@
 {
-  "endpoint_spec_schema_json": {
+  "config_schema_json": {
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-s3-parquet/config",
     "properties": {
@@ -58,7 +58,7 @@
     ],
     "title": "S3 Connection"
   },
-  "resource_spec_schema_json": {
+  "resource_config_schema_json": {
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-s3-parquet/resource",
     "properties": {

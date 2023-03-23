@@ -15,6 +15,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/xitongsys/parquet-go/parquet"
+	"go.gazette.dev/core/consumer/protocol"
 )
 
 type config struct {
@@ -158,7 +159,9 @@ func unmarshalDriverCheckpointJSON(raw json.RawMessage) (flowCheckpoint []byte, 
 // driver implements the DriverServer interface.
 type driver struct{}
 
-func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+var _ boilerplate.Connector = &driver{}
+
+func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	endpointSchema, err := schemagen.GenerateSchema("S3 Connection", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
@@ -169,28 +172,28 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/materialize-s3-parquet",
+	return &pm.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/materialize-s3-parquet",
 	}, nil
 }
 
-func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
+func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var out []*pm.ValidateResponse_Binding
+	var out []*pm.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		var constraints = make(map[string]*pm.Constraint)
+		var constraints = make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range binding.Collection.Projections {
 			var isComplexField = false
 			for _, ty := range projection.Inference.Types {
@@ -200,26 +203,26 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 				}
 			}
 
-			var constraint = &pm.Constraint{}
+			var constraint = &pm.Response_Validated_Constraint{}
 			switch {
 			case projection.IsRootDocumentProjection():
 				// TODO(jixiang) update MaterializationSpec_Binding.Validate and remove the required document field here.
-				constraint.Type = pm.Constraint_FIELD_REQUIRED
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
 				constraint.Reason = "The root document is needed."
 			case isComplexField:
-				constraint.Type = pm.Constraint_FIELD_OPTIONAL
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 				constraint.Reason = "Array and Object fields can be serialized as JSON-encoded strings if included."
 			case projection.Inference.IsSingleType():
-				constraint.Type = pm.Constraint_FIELD_REQUIRED
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
 				constraint.Reason = "The projection has a single scalar type."
 			default:
 				// Fields with multiple types e.g. ["int", "string"] are forbidden.
-				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 				constraint.Reason = "Cannot materialize this field."
 			}
 			constraints[projection.Field] = constraint
 		}
-		out = append(out, &pm.ValidateResponse_Binding{
+		out = append(out, &pm.Response_Validated_Binding{
 			Constraints: constraints,
 			// Only delta updates are supported by file materializations.
 			DeltaUpdates: true,
@@ -227,65 +230,62 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		})
 	}
 
-	return &pm.ValidateResponse{Bindings: out}, nil
+	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-// ApplyUpsert is a no-op.
-func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	return &pm.ApplyResponse{}, nil
+// Apply is a no-op.
+func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	return &pm.Response_Applied{}, nil
 }
 
-// ApplyDelete is a no-op.
-// TODO(johnny): Should this remove data ?
-func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	return &pm.ApplyResponse{}, nil
-}
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+	var cfg config
+	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
+		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
 
-func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
-		var cfg config
-		if err := pf.UnmarshalStrict(open.Materialization.EndpointSpecJson, &cfg); err != nil {
-			return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
-		}
+	runtimeCheckpoint, nextSeqNumList, err := unmarshalDriverCheckpointJSON(open.StateJson)
+	if err != nil {
+		// TODO(jixiang): How to resume the flow if there is a corrupt checkpoint? Always reset in code, or after a manual evaluation?
+		return nil, nil, fmt.Errorf("parsing CheckpointJson: %w", err)
+	}
 
-		runtimeCheckpoint, nextSeqNumList, err := unmarshalDriverCheckpointJSON(open.DriverCheckpointJson)
-		if err != nil {
-			// TODO(jixiang): How to resume the flow if there is a corrupt checkpoint? Always reset in code, or after a manual evaluation?
-			return nil, nil, fmt.Errorf("parsing CheckpointJson: %w", err)
-		}
+	s3Uploader, err := NewS3Uploader(cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating s3 uploader: %w", err)
+	}
 
-		s3Uploader, err := NewS3Uploader(cfg)
-		if err != nil {
-			return nil, nil, fmt.Errorf("creating s3 uploader: %w", err)
-		}
+	var fileProcessor FileProcessor
+	fileProcessor, err = NewParquetFileProcessor(ctx, s3Uploader, nextSeqNumList, &open)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating parquet file processor: %w", err)
+	}
 
-		var fileProcessor FileProcessor
-		fileProcessor, err = NewParquetFileProcessor(ctx, s3Uploader, nextSeqNumList, &open)
-		if err != nil {
-			return nil, nil, fmt.Errorf("creating parquet file processor: %w", err)
-		}
+	var clock = clock.New()
 
-		var clock = clock.New()
+	var fileProcessorProxy = NewFileProcessorProxy(
+		ctx,
+		fileProcessor,
+		// The time interval for the proxy to trigger an upload-to-cloud action is set to be twice as long as the interval of the driver.
+		// To make sure - as long as the files are uploaded on a reasonable schedule from the driver, no upload is triggered by the proxy.
+		time.Duration(cfg.UploadIntervalInSeconds*2)*time.Second,
+		clock,
+	)
 
-		var fileProcessorProxy = NewFileProcessorProxy(
-			ctx,
-			fileProcessor,
-			// The time interval for the proxy to trigger an upload-to-cloud action is set to be twice as long as the interval of the driver.
-			// To make sure - as long as the files are uploaded on a reasonable schedule from the driver, no upload is triggered by the proxy.
-			time.Duration(cfg.UploadIntervalInSeconds*2)*time.Second,
-			clock,
-		)
+	var transactor = &transactor{
+		clock:             clock,
+		fileProcessor:     fileProcessorProxy,
+		runtimeCheckpoint: runtimeCheckpoint,
+		uploadInterval:    time.Duration(cfg.UploadIntervalInSeconds) * time.Second,
+		lastUploadTime:    clock.Now(),
+	}
 
-		var transactor = &transactor{
-			clock:             clock,
-			fileProcessor:     fileProcessorProxy,
-			runtimeCheckpoint: runtimeCheckpoint,
-			uploadInterval:    time.Duration(cfg.UploadIntervalInSeconds) * time.Second,
-			lastUploadTime:    clock.Now(),
-		}
+	var cp *protocol.Checkpoint
+	if err := cp.Unmarshal(runtimeCheckpoint); err != nil {
+		return nil, nil, fmt.Errorf("unmarshalling runtimeCheckpoint, %w", err)
+	}
 
-		return transactor, &pm.TransactionResponse_Opened{RuntimeCheckpoint: runtimeCheckpoint}, nil
-	})
+	return transactor, &pm.Response_Opened{RuntimeCheckpoint: cp}, nil
 }
 
 // transactor implements the Transactor interface.
@@ -312,17 +312,22 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
 		// Retain runtime checkpoint for it to be potentially encoded in a
 		// driverCheckpointJSON produced as part of a future call to maybeUpload().
-		t.runtimeCheckpoint = runtimeCheckpoint
+		var err error
+		if t.runtimeCheckpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
 
 		// We don't await `runtimeAckCh` because it's not required for correctness.
 		// If this file is uploaded but the recovery log commit fails, we'll resume
 		// with a previous driver checkpoint which will re-produce and upload this
 		// same file.
-		var err = t.maybeUpload()
-		return &pf.DriverCheckpoint{DriverCheckpointJson: t.driverCheckpointJSON},
+		if err := t.maybeUpload(); err != nil {
+			return nil, pf.FinishedOperation(err)
+		}
+		return &pf.ConnectorState{UpdatedJson: t.driverCheckpointJSON},
 			pf.FinishedOperation(err)
 	}, nil
 }
