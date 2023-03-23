@@ -8,6 +8,11 @@ fn main() -> anyhow::Result<()> {
     let stdin = io::BufReader::new(io::stdin());
     let stdout = io::stdout();
     let result = runtime.block_on(run_connector(stdin, stdout));
+    if let Err(err) = result.as_ref() {
+        tracing::error!(error = %err, "operation failed");
+    } else {
+        tracing::debug!("connector run successful");
+    }
 
     runtime.shutdown_background();
 

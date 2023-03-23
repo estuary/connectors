@@ -176,11 +176,14 @@ impl Handler {
             let binding_index = i as u32;
 
             let Binding {
-                mut resource_path,
-                mut collection,
+                resource_path,
+                collection,
                 resource_config,
             } = binding;
-            let url_path = resource_path.pop().unwrap();
+            let url_path = resource_path
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("missing resource path for binding: {i}"))?;
             tracing::info!(%url_path, collection = %collection.name, "binding http url path to collection");
 
             // In documentation and configuration, we always represent the path with the leading /.
@@ -192,14 +195,9 @@ impl Handler {
                 url_path
             };
 
-            let schema_json = collection.write_schema.take().unwrap_or_else(|| {
-                collection
-                    .schema
-                    .take()
-                    .expect("collection must have schema if write_schema is missing")
-            });
             let schema_value =
-                serde_json::from_str::<serde_json::Value>(schema_json.get()).unwrap();
+                serde_json::from_str::<serde_json::Value>(&collection.write_schema_json)
+                    .context("parsing write_schema_json")?;
             let uri = url::Url::parse("http://not.areal.host/").unwrap();
             let schema = json::schema::build::build_schema(uri, &schema_value)?;
             let validator = doc::Validator::new(schema)?;
@@ -335,14 +333,9 @@ pub fn openapi_spec<'a>(
     for binding in bindings.iter() {
         let url_path = ensure_slash_prefix(binding.resource_path[0].as_str());
 
-        let raw_schema = binding
-            .collection
-            .write_schema
-            .as_ref()
-            .or(binding.collection.schema.as_ref())
-            .unwrap();
-        let openapi_schema = serde_json::from_str::<openapi::Schema>(raw_schema.get())
-            .context("deserializing collection schema")?;
+        let openapi_schema =
+            serde_json::from_str::<openapi::Schema>(&binding.collection.write_schema_json)
+                .context("deserializing collection schema")?;
 
         let mut content_builder = openapi::content::ContentBuilder::new().schema(openapi_schema);
 
@@ -462,7 +455,7 @@ mod test {
         let binding0 = Binding {
             collection: serde_json::from_value(serde_json::json!({
                 "name": "aliceCo/test/webhook-data",
-                "schema": {
+                "write_schema_json": {
                     "type": "object",
                     "properties": {
                         "_meta": {
@@ -488,7 +481,7 @@ mod test {
         let binding1 = Binding {
             collection: serde_json::from_value(serde_json::json!({
                 "name": "aliceCo/another/collection",
-                "schema": {
+                "write_schema_json": {
                     "type": "object",
                     "properties": {
                         "foo": {

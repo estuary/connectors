@@ -1,18 +1,18 @@
-/// The connector_protocol module is just a copypasta of the `connector-protocol` crate in the flow repo.
-/// There's a number of breaking changes planned for that, and this copy/paste just insulates the connector
-/// from those anticipated changes a bit. The intent is to rip this out in favor of using a json-encoding of
-/// the protobuf message types from `capture.proto` and `flow.proto`.
-pub mod connector_protocol;
 pub mod server;
 pub mod transactor;
 
 use anyhow::Context;
 
-use connector_protocol::{
+use proto_flow::{
     capture::{
-        ApplyBinding, DiscoveredBinding, Request, Response, ValidateBinding, ValidatedBinding,
+        request::validate::Binding as ValidateBinding,
+        request::Open,
+        response::validated::Binding as ValidatedBinding,
+        response::{discovered::Binding as DiscoveredBinding, Applied},
+        response::{Discovered, Opened, Spec, Validated},
+        Request, Response,
     },
-    CollectionSpec, RawValue,
+    flow::{capture_spec::Binding as ApplyBinding, CaptureSpec, CollectionSpec},
 };
 use schemars::{
     gen,
@@ -77,43 +77,56 @@ pub async fn run_connector(
     let req = read_capture_request(&mut stdin)
         .await
         .context("reading request")?;
-    let result = match req {
-        Request::Spec {} => do_spec(stdout).await,
-        Request::Discover { config } => do_discover(config, stdout).await,
-        Request::Validate {
-            config, bindings, ..
-        } => do_validate(config, bindings, stdout).await,
-        Request::Apply { .. } => do_apply(stdout).await,
-        Request::Open {
-            config, bindings, ..
-        } => do_pull(config, bindings, stdin, stdout).await,
-        Request::Acknowledge {} => Err(anyhow::anyhow!("unexpected 'Acknowledge' request")),
-    };
-
-    if let Err(err) = result.as_ref() {
-        tracing::error!(error = %err, "operation failed");
-    } else {
-        tracing::debug!("connector run successful");
+    let Request {
+        spec,
+        discover,
+        validate,
+        apply,
+        open,
+        ..
+    } = req;
+    if let Some(_) = spec {
+        return do_spec(stdout).await;
     }
-    result
+    if let Some(discover_req) = discover {
+        return do_discover(discover_req.config_json, stdout).await;
+    }
+    if let Some(validate_req) = validate {
+        return do_validate(validate_req.config_json, validate_req.bindings, stdout).await;
+    }
+    if let Some(_) = apply {
+        return do_apply(stdout).await;
+    }
+    if let Some(open_req) = open {
+        return do_pull(open_req, stdin, stdout).await;
+    }
+    Err(anyhow::anyhow!(
+        "invalid request, expected spec|discover|validate|apply|open"
+    ))
 }
 
 async fn do_pull(
-    endpoint_config: RawValue,
-    bindings: Vec<ApplyBinding>,
+    Open { capture, .. }: Open,
     stdin: io::BufReader<io::Stdin>,
     mut stdout: io::Stdout,
 ) -> anyhow::Result<()> {
-    let config = serde_json::from_str::<EndpointConfig>(endpoint_config.get())
+    let Some(CaptureSpec { config_json, bindings, .. }) = capture else {
+        anyhow::bail!("open request is missing capture spec");
+    };
+
+    let config = serde_json::from_str::<EndpointConfig>(&config_json)
         .context("deserializing endpoint config")?;
     let mut typed_bindings = Vec::with_capacity(bindings.len());
     for ApplyBinding {
         collection,
-        resource_config,
+        resource_config_json,
         resource_path,
     } in bindings
     {
-        let resource_config = serde_json::from_str::<ResourceConfig>(resource_config.get())
+        let Some(collection) = collection else {
+            anyhow::bail!("binding is missing collection spec");
+        };
+        let resource_config = serde_json::from_str::<ResourceConfig>(&resource_config_json)
             .context("deserializing resource config")?;
         typed_bindings.push(Binding {
             collection,
@@ -121,13 +134,14 @@ async fn do_pull(
             resource_config,
         });
     }
-    write_capture_response(
-        Response::Opened {
+
+    let resp = Response {
+        opened: Some(Opened {
             explicit_acknowledgements: true,
-        },
-        &mut stdout,
-    )
-    .await?;
+        }),
+        ..Default::default()
+    };
+    write_capture_response(resp, &mut stdout).await?;
 
     server::run_server(config, typed_bindings, stdin, stdout).await
 }
@@ -135,8 +149,11 @@ async fn do_pull(
 async fn do_apply(mut stdout: io::Stdout) -> anyhow::Result<()> {
     // There's nothing to apply
     write_capture_response(
-        Response::Applied {
-            action_description: String::new(),
+        Response {
+            applied: Some(Applied {
+                action_description: String::new(),
+            }),
+            ..Default::default()
         },
         &mut stdout,
     )
@@ -144,41 +161,50 @@ async fn do_apply(mut stdout: io::Stdout) -> anyhow::Result<()> {
 }
 
 async fn do_spec(mut stdout: io::Stdout) -> anyhow::Result<()> {
-    let config_schema = to_raw_value(&schema_for::<EndpointConfig>())?;
-    let resource_config_schema = to_raw_value(&schema_for::<ResourceConfig>())?;
-    let response = Response::Spec {
-        documentation_url: "https://go.estuary.dev/http-ingest".to_string(),
-        config_schema,
-        resource_config_schema,
-        oauth2: None,
+    let config_schema_json = serde_json::to_string(&schema_for::<EndpointConfig>())?;
+    let resource_config_schema_json = serde_json::to_string(&schema_for::<ResourceConfig>())?;
+    let response = Response {
+        spec: Some(Spec {
+            protocol: 3032023,
+            config_schema_json,
+            resource_config_schema_json,
+            documentation_url: "https://go.estuary.dev/http-ingest".to_string(),
+            oauth2: None,
+        }),
+        ..Default::default()
     };
     write_capture_response(response, &mut stdout).await
 }
 
-async fn do_discover(config: RawValue, mut stdout: io::Stdout) -> anyhow::Result<()> {
+async fn do_discover(config: String, mut stdout: io::Stdout) -> anyhow::Result<()> {
     // make sure we can parse the config, just as an extra sanity check
-    let _ =
-        serde_json::from_str::<EndpointConfig>(config.get()).context("parsing endpoint config")?;
+    let _ = serde_json::from_str::<EndpointConfig>(&config).context("parsing endpoint config")?;
     let bindings = vec![discovered_webhook_collection()];
-    let response = Response::Discovered { bindings };
+    let response = Response {
+        discovered: Some(Discovered { bindings }),
+        ..Default::default()
+    };
     write_capture_response(response, &mut stdout).await
 }
 
 async fn do_validate(
-    config: RawValue,
+    config: String,
     bindings: Vec<ValidateBinding>,
     mut stdout: io::Stdout,
 ) -> anyhow::Result<()> {
-    let config = serde_json::from_str::<EndpointConfig>(config.get())
-        .context("deserializing endpoint config")?;
+    let config =
+        serde_json::from_str::<EndpointConfig>(&config).context("deserializing endpoint config")?;
     let mut output = Vec::with_capacity(bindings.len());
     let mut typed_bindings = Vec::with_capacity(bindings.len());
     for ValidateBinding {
         collection,
-        resource_config,
+        resource_config_json,
     } in bindings
     {
-        let resource_config = serde_json::from_str::<ResourceConfig>(resource_config.get())
+        let Some(collection) = collection else {
+            anyhow::bail!("missing collection in binding");
+        };
+        let resource_config = serde_json::from_str::<ResourceConfig>(&resource_config_json)
             .context("deserializing resource config")?;
 
         let resource_path = if let Some(path) = resource_config.path.as_ref() {
@@ -200,7 +226,10 @@ async fn do_validate(
     // Check to make sure we can successfully create an openapi spec
     server::openapi_spec(&config, &typed_bindings)
         .context("cannot create openapi spec from bindings")?;
-    let response = Response::Validated { bindings: output };
+    let response = Response {
+        validated: Some(Validated { bindings: output }),
+        ..Default::default()
+    };
     write_capture_response(response, &mut stdout).await
 }
 
@@ -235,16 +264,11 @@ pub async fn write_capture_response(
     Ok(())
 }
 
-pub fn to_raw_value(val: &impl serde::Serialize) -> anyhow::Result<RawValue> {
-    let ser = serde_json::to_string(val)?;
-    Ok(RawValue(serde_json::value::RawValue::from_string(ser)?))
-}
-
 fn discovered_webhook_collection() -> DiscoveredBinding {
     DiscoveredBinding {
         recommended_name: "webhook-data".to_string(),
-        resource_config: to_raw_value(&ResourceConfig::default()).unwrap(),
-        document_schema: to_raw_value(&serde_json::json!({
+        resource_config_json: serde_json::to_string(&ResourceConfig::default()).unwrap(),
+        document_schema_json: serde_json::to_string(&serde_json::json!({
             "type": "object",
             "x-infer-schema": true,
             "properties": {
