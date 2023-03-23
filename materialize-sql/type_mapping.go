@@ -43,7 +43,7 @@ func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Proj
 	var do = func(field string) Projection {
 		var p = Projection{
 			Projection:     *spec.Collection.GetProjection(field),
-			RawFieldConfig: spec.FieldSelection.FieldConfigJson[field],
+			RawFieldConfig: spec.FieldSelection.FieldConfigJsonMap[field],
 		}
 
 		var source = "auto-generated"

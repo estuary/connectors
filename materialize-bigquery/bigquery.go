@@ -15,7 +15,6 @@ import (
 	storage "cloud.google.com/go/storage"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
@@ -140,11 +139,11 @@ func decodeCredentials(credentialString string) []byte {
 	return []byte(credentialString)
 }
 
-func Driver() pm.DriverServer {
+func Driver() *sql.Driver {
 	return newBigQueryDriver()
 }
 
-func newBigQueryDriver() pm.DriverServer {
+func newBigQueryDriver() *sql.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
 		EndpointSpecType: config{},

@@ -154,14 +154,14 @@ func BuildTableShape(spec *pf.MaterializationSpec, index int, resource Resource)
 	var (
 		binding = spec.Bindings[index]
 		comment = fmt.Sprintf("Generated for materialization %s of collection %s",
-			spec.Materialization, binding.Collection.Collection)
+			spec.Name, binding.Collection.Name)
 		keys, values, document = BuildProjections(binding)
 	)
 
 	return TableShape{
 		Path:          resource.Path(),
 		Binding:       index,
-		Source:        binding.Collection.Collection,
+		Source:        binding.Collection.Name,
 		Comment:       comment,
 		AdditionalSql: resource.GetAdditionalSql(),
 		DeltaUpdates:  resource.DeltaUpdates(),
