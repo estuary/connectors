@@ -179,9 +179,9 @@ func NewParquetFileProcessor(
 	ctx context.Context,
 	S3Uploader Uploader,
 	nextSeqNumList []int,
-	open *pm.TransactionRequest_Open) (*ParquetFileProcessor, error) {
+	open *pm.Request_Open) (*ParquetFileProcessor, error) {
 
-	tmpDir, err := ioutil.TempDir("", strings.Replace(string(open.Materialization.Materialization), "/", "_", -1))
+	tmpDir, err := ioutil.TempDir("", strings.Replace(string(open.Materialization.Name), "/", "_", -1))
 	if err != nil {
 		return nil, fmt.Errorf("creating temp dir: %w", err)
 	}
@@ -189,14 +189,14 @@ func NewParquetFileProcessor(
 	var pqBindings = make([]*pqBinding, 0, len(open.Materialization.Bindings))
 	for i, binding := range open.Materialization.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 		// Ensure exactly one / between the given prefix and the shard range, and in between the
 		// shard range and the filename. The prefixe only encodes the `KeyBegin`, so that the
 		// prefix will not change after a shard is split.
-		var s3PathPrefix = fmt.Sprintf("%s/%08x/", strings.TrimSuffix(res.PathPrefix, "/"), open.KeyBegin)
-		var localPathPrefix = fmt.Sprintf("%s/%d_%08x_", tmpDir, i, open.KeyBegin)
+		var s3PathPrefix = fmt.Sprintf("%s/%08x/", strings.TrimSuffix(res.PathPrefix, "/"), open.Range.KeyBegin)
+		var localPathPrefix = fmt.Sprintf("%s/%d_%08x_", tmpDir, i, open.Range.KeyBegin)
 
 		pqDataConverter, err := NewParquetDataConverter(binding)
 		if err != nil {
