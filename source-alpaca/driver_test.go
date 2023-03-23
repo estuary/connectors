@@ -13,7 +13,7 @@ import (
 
 func TestSpec(t *testing.T) {
 	driver := driver{}
-	response, err := driver.Spec(context.Background(), &pc.SpecRequest{})
+	response, err := driver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
