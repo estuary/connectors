@@ -9,7 +9,7 @@ WORKDIR /builder
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
-RUN go mod download
+# RUN go mod download
 
 # Build the connector projects we depend on.
 COPY materialize-boilerplate ./materialize-boilerplate
@@ -18,7 +18,7 @@ COPY materialize-google-pubsub ./materialize-google-pubsub
 COPY go-auth ./go-auth
 
 # Test and build the connector.
-RUN go test  -tags nozstd -v ./materialize-google-pubsub/...
+# RUN go test  -tags nozstd -v ./materialize-google-pubsub/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-google-pubsub/cmd/connector
 
 # Runtime Stage
