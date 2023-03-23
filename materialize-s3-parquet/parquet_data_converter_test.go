@@ -227,11 +227,13 @@ var jsonRaw = json.RawMessage("2")
 
 var jsonTests = []test{
 	{input: tuple.TupleElement(map[string]int{"test": 1}), expected: "{\"test\":1}"},
-	{input: tuple.TupleElement(struct { Test *json.RawMessage `json:"test"` }{ Test: &jsonRaw }), expected: "{\"test\":2}"},
+	{input: tuple.TupleElement(struct {
+		Test *json.RawMessage `json:"test"`
+	}{Test: &jsonRaw}), expected: "{\"test\":2}"},
 	{input: tuple.TupleElement(jsonRaw), expected: "2"},
 	{input: tuple.TupleElement([]byte(`{"test": 2}`)), expected: `{"test": 2}`},
-	{input: tuple.TupleElement([]interface{}{ map[string]int{"test": 1}, map[string]string{"foo": "bar"} }), expected: "[{\"test\":1},{\"foo\":\"bar\"}]"},
-	{input: tuple.TupleElement([]interface{}{ "a", 1, 2.1, nil }), expected: "[\"a\",1,2.1,null]"},
+	{input: tuple.TupleElement([]interface{}{map[string]int{"test": 1}, map[string]string{"foo": "bar"}}), expected: "[{\"test\":1},{\"foo\":\"bar\"}]"},
+	{input: tuple.TupleElement([]interface{}{"a", 1, 2.1, nil}), expected: "[\"a\",1,2.1,null]"},
 }
 
 func TestJsonField(t *testing.T) {
@@ -302,16 +304,16 @@ func testConverterInput(mustExist bool) *pf.MaterializationSpec_Binding {
 		},
 		Collection: pf.CollectionSpec{
 			Projections: []pf.Projection{
-				{Field: "str", Inference: pf.Inference{Types: []string{"string"}, Exists: exists}},
+				{Field: "arr", Inference: pf.Inference{Types: []string{"array"}, Exists: exists}},
 				{Field: "bool", Inference: pf.Inference{Types: []string{"boolean"}, Exists: exists}},
-				{Field: "int64", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
-				{Field: "uint64", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
-				{Field: "int", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
-				{Field: "uint", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
 				{Field: "float32", Inference: pf.Inference{Types: []string{"number"}, Exists: exists}},
 				{Field: "float64", Inference: pf.Inference{Types: []string{"number"}, Exists: exists}},
+				{Field: "int", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
+				{Field: "int64", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
 				{Field: "obj", Inference: pf.Inference{Types: []string{"object"}, Exists: exists}},
-				{Field: "arr", Inference: pf.Inference{Types: []string{"array"}, Exists: exists}},
+				{Field: "str", Inference: pf.Inference{Types: []string{"string"}, Exists: exists}},
+				{Field: "uint", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
+				{Field: "uint64", Inference: pf.Inference{Types: []string{"integer"}, Exists: exists}},
 			},
 		},
 	}
@@ -337,8 +339,8 @@ var multiTypeInputKey = []tuple.TupleElement{"test_str", true}
 var multiTypeInputValues = []tuple.TupleElement{
 	int64(-64), uint64(64), int(-1),
 	uint(1), float32(32.3232), float64(-64.64646464),
-	map[string]interface{}{ "foo": "bar", "meaning": 42 },
-	[]interface{}{ "foo", 1, 9.8, nil },
+	map[string]interface{}{"foo": "bar", "meaning": 42},
+	[]interface{}{"foo", 1, 9.8, nil},
 }
 
 var emptyInputKey = []tuple.TupleElement{nil, nil}

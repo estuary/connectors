@@ -193,8 +193,8 @@ func TestFileProcessorProxy_TimerTriggered(t *testing.T) {
 
 func TestParquetFileProcessor_NoBinding(t *testing.T) {
 	var mockS3Uploader = newMockS3Uploader(t)
-	var open = &pm.TransactionRequest_Open{Materialization: &pf.MaterializationSpec{
-		Materialization: pf.Materialization("test_materialization"),
+	var open = &pm.Request_Open{Materialization: &pf.MaterializationSpec{
+		Name: pf.Materialization("test_materialization"),
 	}}
 
 	fileProcessor, _ := NewParquetFileProcessor(context.Background(), mockS3Uploader, nil, open)
@@ -203,7 +203,7 @@ func TestParquetFileProcessor_NoBinding(t *testing.T) {
 	require.Equal(t, []int{}, nextSeqNumList)
 }
 
-func buildTestOpenRequest(numOfBindings int) *pm.TransactionRequest_Open {
+func buildTestOpenRequest(numOfBindings int) *pm.Request_Open {
 	var bindings = make([]*pf.MaterializationSpec_Binding, 0, numOfBindings)
 	for i := 0; i < numOfBindings; i++ {
 		resourceSpecJSON, _ := json.Marshal(
@@ -212,8 +212,8 @@ func buildTestOpenRequest(numOfBindings int) *pm.TransactionRequest_Open {
 			},
 		)
 		var binding = &pf.MaterializationSpec_Binding{
-			ResourceSpecJson: resourceSpecJSON,
-			FieldSelection:   pf.FieldSelection{Keys: []string{"Id"}, Values: []string{"Message"}},
+			ResourceConfigJson: resourceSpecJSON,
+			FieldSelection:     pf.FieldSelection{Keys: []string{"Id"}, Values: []string{"Message"}},
 			Collection: pf.CollectionSpec{Projections: []pf.Projection{
 				{Field: "Id", Inference: pf.Inference{Types: []string{"integer"}, Exists: pf.Inference_MUST}},
 				{Field: "Message", Inference: pf.Inference{Types: []string{"string"}, Exists: pf.Inference_MUST}},
@@ -222,13 +222,15 @@ func buildTestOpenRequest(numOfBindings int) *pm.TransactionRequest_Open {
 
 		bindings = append(bindings, binding)
 	}
-	return &pm.TransactionRequest_Open{
+	return &pm.Request_Open{
 		Materialization: &pf.MaterializationSpec{
-			Materialization: pf.Materialization("test_materialization"),
-			Bindings:        bindings,
+			Name:     pf.Materialization("test_materialization"),
+			Bindings: bindings,
 		},
-		KeyBegin: 123,
-		KeyEnd:   456,
+		Range: &pf.RangeSpec{
+			KeyBegin: 123,
+			KeyEnd:   456,
+		},
 	}
 }
 
