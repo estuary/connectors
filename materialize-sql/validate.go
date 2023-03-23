@@ -9,7 +9,7 @@ import (
 
 // ValidateSelectedFields validates a proposed MaterializationSpec against a set of constraints. If
 // any constraints would be violated, then an error is returned.
-func ValidateSelectedFields(constraints map[string]*pm.Constraint, proposed *pf.MaterializationSpec_Binding) error {
+func ValidateSelectedFields(constraints map[string]*pm.Response_Validated_Constraint, proposed *pf.MaterializationSpec_Binding) error {
 	// Track all the location pointers for each included field so that we can verify all the
 	// LOCATION_REQUIRED constraints are met.
 	var includedPointers = make(map[string]bool)
@@ -31,11 +31,11 @@ func ValidateSelectedFields(constraints map[string]*pm.Constraint, proposed *pf.
 	// Are all of the required fields and locations included?
 	for field, constraint := range constraints {
 		switch constraint.Type {
-		case pm.Constraint_FIELD_REQUIRED:
+		case pm.Response_Validated_Constraint_FIELD_REQUIRED:
 			if !SliceContains(field, allFields) {
 				return fmt.Errorf("Required field '%s' is missing. It is required because: %s", field, constraint.Reason)
 			}
-		case pm.Constraint_LOCATION_REQUIRED:
+		case pm.Response_Validated_Constraint_LOCATION_REQUIRED:
 			var projection = proposed.Collection.GetProjection(field)
 			if !includedPointers[projection.Ptr] {
 				return fmt.Errorf("The materialization must include a projections of location '%s', but no such projection is included", projection.Ptr)
@@ -50,8 +50,8 @@ func ValidateSelectedFields(constraints map[string]*pm.Constraint, proposed *pf.
 // **new** materialization (one that is not running and has never been Applied). Note that this will
 // "recommend" all projections of single scalar types, which is what drives the default field
 // selection in flowctl.
-func ValidateNewSQLProjections(resource Resource, proposed *pf.CollectionSpec) map[string]*pm.Constraint {
-	var constraints = make(map[string]*pm.Constraint)
+func ValidateNewSQLProjections(resource Resource, proposed *pf.CollectionSpec) map[string]*pm.Response_Validated_Constraint {
+	var constraints = make(map[string]*pm.Response_Validated_Constraint)
 	for _, projection := range proposed.Projections {
 		var constraint = validateNewProjection(resource, &projection)
 		constraints[projection.Field] = constraint
@@ -59,34 +59,34 @@ func ValidateNewSQLProjections(resource Resource, proposed *pf.CollectionSpec) m
 	return constraints
 }
 
-func validateNewProjection(resource Resource, projection *pf.Projection) *pm.Constraint {
-	var constraint = new(pm.Constraint)
+func validateNewProjection(resource Resource, projection *pf.Projection) *pm.Response_Validated_Constraint {
+	var constraint = new(pm.Response_Validated_Constraint)
 	switch {
 	case len(projection.Field) > 63:
-		constraint.Type = pm.Constraint_FIELD_FORBIDDEN
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Field names must be less than 63 bytes in length."
 	case projection.IsPrimaryKey:
-		constraint.Type = pm.Constraint_LOCATION_REQUIRED
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "All Locations that are part of the collections key are required"
 	case projection.IsRootDocumentProjection() && resource.DeltaUpdates():
-		constraint.Type = pm.Constraint_LOCATION_RECOMMENDED
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The root document should usually be materialized"
 	case projection.IsRootDocumentProjection():
-		constraint.Type = pm.Constraint_LOCATION_REQUIRED
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "The root document must be materialized"
 	case projection.Inference.IsSingleScalarType():
-		constraint.Type = pm.Constraint_LOCATION_RECOMMENDED
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
 
 	case projection.Inference.IsSingleType() || len(effectiveJsonTypes(projection)) == 1:
-		constraint.Type = pm.Constraint_FIELD_OPTIONAL
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "This field is able to be materialized"
 	default:
 		// If we got here, then either the field may have multiple incompatible types, or the
 		// only possible type is "null". In either case, we're not going to allow it.
 		// Technically, we could allow the null type to be materialized, but I can't think of a
 		// use case where that would be desirable.
-		constraint.Type = pm.Constraint_FIELD_FORBIDDEN
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Cannot materialize this field"
 	}
 	return constraint
@@ -98,10 +98,10 @@ func validateNewProjection(resource Resource, projection *pf.Projection) *pm.Con
 // the new and the existing binding, and give new constraints for additionally
 // supplied fields. Additional requires that keys from the existing binding must
 // be present in the proposed spec as well.
-func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec_Binding, proposed *pf.CollectionSpec) map[string]*pm.Constraint {
-	var constraints = make(map[string]*pm.Constraint)
+func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec_Binding, proposed *pf.CollectionSpec) map[string]*pm.Response_Validated_Constraint {
+	var constraints = make(map[string]*pm.Response_Validated_Constraint)
 	for _, field := range existing.FieldSelection.AllFields() {
-		var constraint = new(pm.Constraint)
+		var constraint = new(pm.Response_Validated_Constraint)
 		// If a field has been removed from the proposed projection, we will migrate
 		// it at ApplyUpsert
 		if proposed.GetProjection(field) == nil {
@@ -109,10 +109,10 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 		}
 		var typeError = checkTypeError(field, &existing.Collection, proposed)
 		if len(typeError) > 0 {
-			constraint.Type = pm.Constraint_UNSATISFIABLE
+			constraint.Type = pm.Response_Validated_Constraint_UNSATISFIABLE
 			constraint.Reason = typeError
 		} else {
-			constraint.Type = pm.Constraint_LOCATION_RECOMMENDED
+			constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 			constraint.Reason = "This location is part of the current materialization"
 		}
 
@@ -124,8 +124,8 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 			continue
 		}
 		if proposed.GetProjection(field) == nil {
-			var constraint = new(pm.Constraint)
-			constraint.Type = pm.Constraint_FIELD_REQUIRED
+			var constraint = new(pm.Response_Validated_Constraint)
+			constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
 			constraint.Reason = "This field is a key in the current materialization"
 			constraints[field] = constraint
 		}

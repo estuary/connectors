@@ -12,6 +12,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
+	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/iterator"
 )
 
@@ -259,8 +260,12 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
-		t.fence.Checkpoint = runtimeCheckpoint
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		var err error
+		if t.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
+
 		return nil, pf.RunAsyncOperation(func() error { return t.commit(ctx) })
 	}, nil
 }

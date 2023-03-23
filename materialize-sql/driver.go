@@ -9,11 +9,12 @@ import (
 	"strings"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"go.gazette.dev/core/consumer/protocol"
 )
 
-// Driver implements the pm.DriverServer interface.
 type Driver struct {
 	// URL at which documentation for the driver may be found.
 	DocumentationURL string
@@ -25,7 +26,7 @@ type Driver struct {
 	NewEndpoint func(_ context.Context, endpointConfig json.RawMessage) (*Endpoint, error)
 }
 
-var _ pm.DriverServer = &Driver{}
+var _ boilerplate.Connector = &Driver{}
 
 // docsUrlFromEnv looks for an environment variable set as DOCS_URL to use for the spec response
 // documentation URL. It uses that instead of the default documentation URL from the connector if
@@ -40,7 +41,7 @@ func docsUrlFromEnv(providedURL string) string {
 }
 
 // Spec implements the DriverServer interface.
-func (d *Driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+func (d *Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	var endpoint, resource []byte
 
 	if err := req.Validate(); err != nil {
@@ -51,29 +52,29 @@ func (d *Driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecRespons
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpoint),
-		ResourceSpecSchemaJson: json.RawMessage(resource),
-		DocumentationUrl:       docsUrlFromEnv(d.DocumentationURL),
+	return &pm.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpoint),
+		ResourceConfigSchemaJson: json.RawMessage(resource),
+		DocumentationUrl:         docsUrlFromEnv(d.DocumentationURL),
 	}, nil
 }
 
 // Validate implements the DriverServer interface.
-func (d *Driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
+func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var (
 		err        error
 		endpoint   *Endpoint
 		loadedSpec *pf.MaterializationSpec
-		resp       = new(pm.ValidateResponse)
+		resp       = new(pm.Response_Validated)
 	)
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
-	} else if endpoint, err = d.NewEndpoint(ctx, req.EndpointSpecJson); err != nil {
+	} else if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if prereqErrs := endpoint.CheckPrerequisites(ctx, req.EndpointSpecJson); prereqErrs.Len() != 0 {
+	} else if prereqErrs := endpoint.CheckPrerequisites(ctx, req.ConfigJson); prereqErrs.Len() != 0 {
 		return nil, prereqErrs
-	} else if loadedSpec, _, err = loadSpec(ctx, endpoint, req.Materialization); err != nil {
+	} else if loadedSpec, _, err = loadSpec(ctx, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
 
@@ -81,7 +82,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Val
 	for _, bindingSpec := range req.Bindings {
 		var constraints, _, resource, err = resolveResourceToExistingBinding(
 			endpoint,
-			bindingSpec.ResourceSpecJson,
+			bindingSpec.ResourceConfigJson,
 			&bindingSpec.Collection,
 			loadedSpec,
 		)
@@ -90,7 +91,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Val
 		}
 
 		resp.Bindings = append(resp.Bindings,
-			&pm.ValidateResponse_Binding{
+			&pm.Response_Validated_Binding{
 				Constraints:  constraints,
 				DeltaUpdates: resource.DeltaUpdates(),
 				ResourcePath: resource.Path(),
@@ -100,7 +101,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Val
 }
 
 // ApplyUpsert implements the DriverServer interface.
-func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	var (
 		endpoint      *Endpoint
 		loadedSpec    *pf.MaterializationSpec
@@ -111,9 +112,9 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
-	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.EndpointSpecJson); err != nil {
+	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if loadedSpec, loadedVersion, err = loadSpec(ctx, endpoint, req.Materialization.Materialization); err != nil {
+	} else if loadedSpec, loadedVersion, err = loadSpec(ctx, endpoint, req.Materialization.Name); err != nil {
 		return nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
 	} else if specBytes, err = req.Materialization.Marshal(); err != nil {
 		panic(err) // Cannot fail to marshal.
@@ -121,7 +122,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 
 	if loadedVersion == req.Version {
 		// A re-application of the current version is a no-op.
-		return new(pm.ApplyResponse), nil
+		return new(pm.Response_Applied), nil
 	}
 
 	// The Materialization specifications meta table is almost always requied.
@@ -139,12 +140,12 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 	var newCollections []string
 
 	for bindingIndex, bindingSpec := range req.Materialization.Bindings {
-		var collection = bindingSpec.Collection.Collection
+		var collection = bindingSpec.Collection.Name
 		newCollections = append(newCollections, string(collection))
 
 		var constraints, loadedBinding, resource, err = resolveResourceToExistingBinding(
 			endpoint,
-			bindingSpec.ResourceSpecJson,
+			bindingSpec.ResourceConfigJson,
 			&bindingSpec.Collection,
 			loadedSpec,
 		)
@@ -244,7 +245,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 	if loadedSpec != nil {
 		// If a binding from loaded spec is missing from new spec, we drop the table
 		for _, bindingSpec := range loadedSpec.Bindings {
-			var collection = string(bindingSpec.Collection.Collection)
+			var collection = string(bindingSpec.Collection.Name)
 
 			if !SliceContains(collection, newCollections) {
 				statements = append(statements, fmt.Sprintf(
@@ -275,7 +276,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 			endpoint.Identifier(endpoint.MetaSpecs.Path...),
 			endpoint.Literal(req.Version),
 			endpoint.Literal(base64.StdEncoding.EncodeToString(specBytes)),
-			endpoint.Literal(req.Materialization.Materialization.String()),
+			endpoint.Literal(req.Materialization.Name.String()),
 		}
 		if loadedSpec == nil {
 			statements = append(statements, fmt.Sprintf(
@@ -293,87 +294,19 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 	}
 
 	// Build and return a description of what happened (or would have happened).
-	return &pm.ApplyResponse{ActionDescription: strings.Join(statements, "\n")}, nil
+	return &pm.Response_Applied{ActionDescription: strings.Join(statements, "\n")}, nil
 }
 
-// ApplyDelete implements the DriverServer interface.
-func (d *Driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	var (
-		endpoint      *Endpoint
-		loadedVersion string
-		err           error
-	)
-
-	if err = req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.EndpointSpecJson); err != nil {
-		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if _, loadedVersion, err = loadSpec(ctx, endpoint, req.Materialization.Materialization); err != nil {
-		return nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
-	} else if loadedVersion == "" {
-		return &pm.ApplyResponse{
-			ActionDescription: "Could not find materialization in the database. " +
-				"Doing nothing, on the assumption that the table was manually dropped.",
-		}, nil
-	} else if loadedVersion != req.Version {
-		return nil, fmt.Errorf(
-			"applied and current materializations are different versions (applied: %s vs current: %s)",
-			loadedVersion, req.Version)
-	}
-
-	var materialization = req.Materialization.Materialization.String()
-
-	var statements = []string{}
-	// Delete the materialization from the specs metadata table,
-	// and also the checkpoints table if it exists.
-	if endpoint.MetaSpecs != nil {
-		statements = append(statements,
-			fmt.Sprintf("DELETE FROM %s WHERE materialization = %s AND version = %s;",
-				endpoint.Identifier(endpoint.MetaSpecs.Path...),
-				endpoint.Literal(materialization),
-				endpoint.Literal(req.Version)),
-		)
-	}
-	if endpoint.MetaCheckpoints != nil {
-		statements = append(statements,
-			fmt.Sprintf("DELETE FROM %s WHERE materialization = %s;",
-				endpoint.Identifier(endpoint.MetaCheckpoints.Path...),
-				endpoint.Literal(materialization)),
-		)
-	}
-
-	// Drop all bound tables.
-	for _, bindingSpec := range req.Materialization.Bindings {
-		statements = append(statements, fmt.Sprintf(
-			"DROP TABLE IF EXISTS %s;",
-			endpoint.Identifier(bindingSpec.ResourcePath...)))
-	}
-
-	if req.DryRun {
-		// No-op.
-	} else if err = endpoint.Client.ExecStatements(ctx, statements); err != nil {
-		return nil, fmt.Errorf("removing dropped tables: %w", err)
-	}
-
-	// Build and return a description of what happened (or would have happened).
-	return &pm.ApplyResponse{ActionDescription: strings.Join(statements, "\n")}, nil
-}
-
-// Transactions implements the DriverServer interface.
-func (d *Driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	return pm.RunTransactions(stream, d.newTransactor)
-}
-
-func (d *Driver) newTransactor(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
+func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
 	var loadedVersion string
 
-	var endpoint, err = d.NewEndpoint(ctx, open.Materialization.EndpointSpecJson)
+	var endpoint, err = d.NewEndpoint(ctx, open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building endpoint: %w", err)
 	}
 
 	if endpoint.MetaSpecs != nil {
-		if _, loadedVersion, err = loadSpec(ctx, endpoint, open.Materialization.Materialization); err != nil {
+		if _, loadedVersion, err = loadSpec(ctx, endpoint, open.Materialization.Name); err != nil {
 			return nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
 		} else if loadedVersion == "" {
 			return nil, nil, fmt.Errorf("materialization has not been applied")
@@ -388,8 +321,8 @@ func (d *Driver) newTransactor(ctx context.Context, open pm.TransactionRequest_O
 	for index, spec := range open.Materialization.Bindings {
 		var resource = endpoint.NewResource(endpoint)
 
-		if err := pf.UnmarshalStrict(spec.ResourceSpecJson, resource); err != nil {
-			return nil, nil, fmt.Errorf("resource binding for collection %q: %w", spec.Collection.Collection, err)
+		if err := pf.UnmarshalStrict(spec.ResourceConfigJson, resource); err != nil {
+			return nil, nil, fmt.Errorf("resource binding for collection %q: %w", spec.Collection.Name, err)
 		}
 		var shape = BuildTableShape(open.Materialization, index, resource)
 
@@ -402,9 +335,9 @@ func (d *Driver) newTransactor(ctx context.Context, open pm.TransactionRequest_O
 
 	var fence = Fence{
 		TablePath:       nil, // Set later iff endpoint.MetaCheckpoints != nil.
-		Materialization: open.Materialization.Materialization,
-		KeyBegin:        open.KeyBegin,
-		KeyEnd:          open.KeyEnd,
+		Materialization: open.Materialization.Name,
+		KeyBegin:        open.Range.KeyBegin,
+		KeyEnd:          open.Range.KeyEnd,
 		Fence:           0,
 		Checkpoint:      nil, // Set later iff endpoint.MetaCheckpoints != nil.
 	}
@@ -433,7 +366,12 @@ func (d *Driver) newTransactor(ctx context.Context, open pm.TransactionRequest_O
 		return nil, nil, fmt.Errorf("building transactor: %w", err)
 	}
 
-	return transactor, &pm.TransactionResponse_Opened{RuntimeCheckpoint: fence.Checkpoint}, nil
+	var cp *protocol.Checkpoint
+	if err := cp.Unmarshal(fence.Checkpoint); err != nil {
+		return nil, nil, fmt.Errorf("unmarshalling pm.ExplicitZeroCheckpoint, %w", err)
+	}
+
+	return transactor, &pm.Response_Opened{RuntimeCheckpoint: cp}, nil
 }
 
 func isBindingMigratable(existingBinding *pf.MaterializationSpec_Binding, newBinding *pf.MaterializationSpec_Binding) bool {
@@ -450,7 +388,7 @@ func isBindingMigratable(existingBinding *pf.MaterializationSpec_Binding, newBin
 			return false
 		}
 
-		if string(existingFields.FieldConfigJson[field]) != string(newFields.FieldConfigJson[field]) {
+		if string(existingFields.FieldConfigJsonMap[field]) != string(newFields.FieldConfigJsonMap[field]) {
 			return false
 		}
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	log "github.com/sirupsen/logrus"
+	"go.gazette.dev/core/consumer/protocol"
 )
 
 type sshForwarding struct {
@@ -119,7 +120,7 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-func newPostgresDriver() pm.DriverServer {
+func newPostgresDriver() *sql.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-postgresql",
 		EndpointSpecType: new(config),
@@ -438,8 +439,12 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
-		d.store.fence.Checkpoint = runtimeCheckpoint
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		var err error
+		if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
+
 		var fenceUpdate strings.Builder
 		if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
