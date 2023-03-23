@@ -9,6 +9,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	google_auth "github.com/estuary/connectors/go-auth/google"
 	schemagen "github.com/estuary/connectors/go-schema-gen"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"google.golang.org/api/option"
@@ -91,7 +92,9 @@ func Driver() driver {
 
 type driver struct{}
 
-func (d driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+var _ boilerplate.Connector = &driver{}
+
+func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -107,18 +110,18 @@ func (d driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/materialize-google-pubsub",
-		Oauth2Spec:             google_auth.Spec(pubsub.ScopePubSub),
+	return &pm.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/materialize-google-pubsub",
+		Oauth2:                   google_auth.Spec(pubsub.ScopePubSub),
 	}, nil
 }
 
 // Validate verifies that the provided credentials are valid for authentication and specifies the
 // constraints for the connector.
-func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
-	cfg, err := resolveEndpointConfig(req.EndpointSpecJson)
+func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
+	cfg, err := resolveEndpointConfig(req.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -131,24 +134,24 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 	// Bindings are uniquely identified by their topic & identifier, but may have duplicated topic
 	// names among bindings. Topic names are collected here in a set to be later verified.
 	topicNames := make(map[string]struct{})
-	var out []*pm.ValidateResponse_Binding
+	var out []*pm.Response_Validated_Binding
 	for _, b := range req.Bindings {
-		res, err := resolveResourceConfig(b.ResourceSpecJson)
+		res, err := resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, err
 		}
 
 		topicNames[res.TopicName] = struct{}{}
 
-		constraints := make(map[string]*pm.Constraint)
+		constraints := make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range b.Collection.Projections {
-			var constraint = new(pm.Constraint)
+			var constraint = new(pm.Response_Validated_Constraint)
 			switch {
 			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Constraint_LOCATION_REQUIRED
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = "The root document must be materialized"
 			default:
-				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 				constraint.Reason = "PubSub only materializes the full document"
 			}
 			constraints[projection.Field] = constraint
@@ -160,7 +163,7 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 			resourcePath = append(resourcePath, res.Identifier)
 		}
 
-		out = append(out, &pm.ValidateResponse_Binding{
+		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: true,
 			ResourcePath: resourcePath,
@@ -177,16 +180,16 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 		}
 	}
 
-	return &pm.ValidateResponse{Bindings: out}, nil
+	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-// ApplyUpsert creates any new topics for the materialization, leaving existing topics as-is.
-func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+// Apply creates any new topics for the materialization, leaving existing topics as-is.
+func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	cfg, err := resolveEndpointConfig(req.Materialization.EndpointSpecJson)
+	cfg, err := resolveEndpointConfig(req.Materialization.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +202,7 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 	checkedTopics := make(map[string]struct{})
 	var newTopics []resource
 	for _, b := range req.Materialization.Bindings {
-		res, err := resolveResourceConfig(b.ResourceSpecJson)
+		res, err := resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, err
 		}
@@ -248,108 +251,47 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		}
 	}
 
-	return &pm.ApplyResponse{
+	return &pm.Response_Applied{
 		ActionDescription: strings.Join(actions, ", "),
 	}, nil
 }
 
-// ApplyDelete deletes topics for the materialization. It is idempotent - topics listed in the
-// materialization that do not exist do not result in an error.
-func (d driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	}
-
-	cfg, err := resolveEndpointConfig(req.Materialization.EndpointSpecJson)
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	client, err := cfg.client(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	checkedTopics := make(map[string]struct{})
-	var topicsToDelete []string
-	for _, b := range req.Materialization.Bindings {
-		res, err := resolveResourceConfig(b.ResourceSpecJson)
-		if err != nil {
-			return nil, err
-		}
-
-		// Do not check a topic that has already been checked.
-		if _, ok := checkedTopics[res.TopicName]; ok {
-			continue
-		}
-		checkedTopics[res.TopicName] = struct{}{}
-
-		exists, err := client.Topic(res.TopicName).Exists(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("pubsub apply delete topic check error: %w", err)
-		}
-
-		if exists {
-			topicsToDelete = append(topicsToDelete, res.TopicName)
-		}
-	}
-
-	action := ""
-	if len(topicsToDelete) > 0 {
-		action = fmt.Sprintf("deleted topics: %s", strings.Join(topicsToDelete, ","))
-	}
-
-	if !req.DryRun {
-		for _, topicName := range topicsToDelete {
-			if err := client.Topic(topicName).Delete(ctx); err != nil {
-				return nil, fmt.Errorf("pubsub apply delete topic delete error: %w", err)
-			}
-		}
-	}
-
-	return &pm.ApplyResponse{
-		ActionDescription: action,
-	}, nil
-}
-
-func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
-		var cfg, err = resolveEndpointConfig(open.Materialization.EndpointSpecJson)
+	var topicBindings []*topicBinding
+	for _, b := range open.Materialization.Bindings {
+		res, err := resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, nil, err
 		}
+		t := client.Topic(res.TopicName)
 
-		client, err := cfg.client(stream.Context())
-		if err != nil {
-			return nil, nil, err
-		}
+		// Have calls to publish block when the number of queued messages exceeds the default limit
+		// of 1000, per topic. This bounds the connector memory usage when the store iterator is
+		// read from faster than the rate of publishing.
+		t.PublishSettings.FlowControlSettings.LimitExceededBehavior = pubsub.FlowControlBlock
 
-		var topicBindings []*topicBinding
-		for _, b := range open.Materialization.Bindings {
-			res, err := resolveResourceConfig(b.ResourceSpecJson)
-			if err != nil {
-				return nil, nil, err
-			}
-			t := client.Topic(res.TopicName)
+		// Allows for the reading of messages in-order with a provided ordering key. See
+		// https://cloud.google.com/pubsub/docs/ordering
+		t.EnableMessageOrdering = true
+		topicBindings = append(topicBindings, &topicBinding{
+			identifier: res.Identifier,
+			topic:      t,
+		})
+	}
 
-			// Have calls to publish block when the number of queued messages exceeds the default limit
-			// of 1000, per topic. This bounds the connector memory usage when the store iterator is
-			// read from faster than the rate of publishing.
-			t.PublishSettings.FlowControlSettings.LimitExceededBehavior = pubsub.FlowControlBlock
-
-			// Allows for the reading of messages in-order with a provided ordering key. See
-			// https://cloud.google.com/pubsub/docs/ordering
-			t.EnableMessageOrdering = true
-			topicBindings = append(topicBindings, &topicBinding{
-				identifier: res.Identifier,
-				topic:      t,
-			})
-		}
-
-		return &transactor{
-			bindings: topicBindings,
-		}, &pm.TransactionResponse_Opened{}, nil
-	})
+	return &transactor{
+		bindings: topicBindings,
+	}, &pm.Response_Opened{}, nil
 }
 
 func resolveEndpointConfig(specJson json.RawMessage) (config, error) {
