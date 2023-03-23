@@ -22,40 +22,33 @@ type captureState struct {
 
 type resourceState struct {
 	startDate    time.Time
-	bindingIndex uint32
+	bindingIndex int
 }
 
-func (driver) Pull(stream pc.Driver_PullServer) error {
+func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
 
-	var open, err = stream.Recv()
-	if err != nil {
-		return fmt.Errorf("error reading PullRequest: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected PullRequest.Open, got %#v", open)
-	}
-
 	var cfg config
-	if err := pf.UnmarshalStrict(open.Open.Capture.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	var checkpoint captureState
-	if open.Open.DriverCheckpointJson != nil {
-		if err := json.Unmarshal(open.Open.DriverCheckpointJson, &checkpoint); err != nil {
+	if open.StateJson != nil {
+		if err := json.Unmarshal(open.StateJson, &checkpoint); err != nil {
 			return fmt.Errorf("parsing driver checkpoint: %w", err)
 		}
 	}
 
 	resourceStates := make(map[string]*resourceState)
-	for idx, binding := range open.Open.Capture.Bindings {
+	for idx, binding := range open.Capture.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 
 		resourceState := &resourceState{
-			bindingIndex: uint32(idx),
+			bindingIndex: idx,
 			startDate:    cfg.StartDate,
 		}
 
@@ -76,23 +69,21 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 		stream:         stream,
 		config:         cfg,
 		state:          checkpoint,
-		output:         &boilerplate.PullOutput{Stream: stream},
 		resourceStates: resourceStates,
 	}
 	return capture.Run()
 }
 
 type capture struct {
-	stream         pc.Driver_PullServer
+	stream         *boilerplate.PullOutput
 	config         config
 	state          captureState
-	output         *boilerplate.PullOutput
 	resourceStates map[string]*resourceState
 }
 
 func (c *capture) Run() error {
 	// Notify Flow that we're starting.
-	if err := c.output.Ready(); err != nil {
+	if err := c.stream.Ready(); err != nil {
 		return err
 	}
 
@@ -121,7 +112,7 @@ func (c *capture) captureResource(ctx context.Context, name string, r *resourceS
 	)
 
 	worker := alpacaWorker{
-		output:       c.output,
+		flowStream:   c.stream,
 		bindingIdx:   r.bindingIndex,
 		dataClient:   dataClient,
 		streamClient: streamClient,
