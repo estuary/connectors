@@ -124,11 +124,6 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 
 	var db = client.Database(cfg.Database)
 
-	existing, err := d.LoadSpec(ctx, cfg, string(req.Materialization.Materialization))
-	if err != nil {
-		return nil, fmt.Errorf("loading spec: %w", err)
-	}
-
 	var newCollections []string
 	for _, binding := range req.Materialization.Bindings {
 		var r resource
@@ -137,6 +132,11 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		}
 
 		newCollections = append(newCollections, r.Collection)
+	}
+
+	existing, err := d.LoadSpec(ctx, cfg, string(req.Materialization.Materialization))
+	if err != nil {
+		return nil, fmt.Errorf("loading spec: %w", err)
 	}
 
 	var actions []string
@@ -178,18 +178,39 @@ func (d driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		return nil, err
 	}
 
-	_, err = d.connect(ctx, cfg)
+	client, err := d.connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
 	}
 
+	var db = client.Database(cfg.Database)
+
+	existing, err := d.LoadSpec(ctx, cfg, string(req.Materialization.Materialization))
+	if err != nil {
+		return nil, fmt.Errorf("loading spec: %w", err)
+	}
+
+	var actions []string
+	if existing != nil {
+		for collection, _ := range existing {
+			if !req.DryRun {
+				var col = db.Collection(collection)
+				if err := col.Drop(ctx); err != nil {
+					return nil, fmt.Errorf("dropping collection %s: %w", collection, err)
+				}
+			}
+
+			actions = append(actions, fmt.Sprintf("drop collection %s", collection))
+		}
+	}
+
 	err = d.CleanSpec(ctx, cfg, string(req.Materialization.Materialization))
 	if err != nil {
-		return nil, fmt.Errorf("writing spec: %w", err)
+		return nil, fmt.Errorf("cleaning spec: %w", err)
 	}
 
 	return &pm.ApplyResponse{
-		ActionDescription: "",
+		ActionDescription: strings.Join(actions, "\n"),
 	}, nil
 }
 
