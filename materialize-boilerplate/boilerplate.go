@@ -2,8 +2,10 @@ package boilerplate
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,80 +15,158 @@ import (
 
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	protoio "github.com/gogo/protobuf/io"
+	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
-	"github.com/jessevdk/go-flags"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 )
 
-// RunMain is the boilerplate main function of a materialization connector.
-func RunMain(srv pm.DriverServer) {
-	var logConfig = &logConfig{}
-	var parser = flags.NewParser(logConfig, flags.Default)
-	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+type Connector interface {
+	Spec(context.Context, *pm.Request_Spec) (*pm.Response_Spec, error)
+	Validate(context.Context, *pm.Request_Validate) (*pm.Response_Validated, error)
+	Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error)
+	NewTransactor(context.Context, pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error)
+	// Transactions(context.Context, pm.Request_Open) error
+}
 
-	var cmd = cmdCommon{
-		ctx:     ctx,
-		srv:     srv,
-		r:       bufio.NewReaderSize(os.Stdin, 1<<21), // 2MB buffer.
-		w:       protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
-		logging: logConfig,
+// ConnectorServer wraps a Connector to implement the pc.ConnectorServer gRPC service interface.
+type ConnectorServer struct {
+	Connector
+}
+
+// RunMain is the boilerplate main function of a materialization connector.
+func RunMain(connector Connector) {
+	switch format := getEnvDefault("LOG_FORMAT", "color"); format {
+	case "json":
+		log.SetFormatter(&log.JSONFormatter{})
+	case "text":
+		log.SetFormatter(&log.TextFormatter{})
+	case "color":
+		log.SetFormatter(&log.TextFormatter{ForceColors: true})
+	default:
+		log.WithField("format", format).Fatal("invalid LOG_FORMAT (expected 'json', 'text', or 'color')")
 	}
 
-	parser.AddCommand("spec", "Write the connector specification",
-		"Write the connector specification to stdout, then exit", &specCmd{cmd})
-	parser.AddCommand("validate", "Validate a materialization",
-		"Validate a proposed ValidateRequest read from stdin", &validateCmd{cmd})
-	parser.AddCommand("apply-upsert", "Apply an insert or update of a materialization",
-		"Apply a proposed insert or update ApplyRequest read from stdin", &applyUpsertCmd{cmd})
-	parser.AddCommand("apply-delete", "Apply a deletion of a materialization",
-		"Apply a proposed delete ApplyRequest read from stdin", &applyDeleteCmd{cmd})
-	parser.AddCommand("transactions", "Run materialization transactions",
-		"Run a stream of transactions read from stdin", &transactionsCmd{cmd})
+	if lvl, err := log.ParseLevel(getEnvDefault("LOG_LEVEL", "info")); err != nil {
+		log.WithFields(log.Fields{"level": lvl, "error": err}).Fatal("unrecognized log level")
+	} else {
+		log.SetLevel(lvl)
+	}
 
-	if _, err := parser.Parse(); err != nil {
+	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	var stream pm.Connector_MaterializeServer
+
+	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
+	case "proto":
+		log.Debug("using protobuf codec")
+		stream = newProtoCodec(ctx)
+	case "json":
+		log.Debug("using json codec")
+		stream = newJsonCodec(ctx)
+	default:
+		log.WithField("codec", codec).Fatal("invalid FLOW_RUNTIME_CODEC (expected 'json', or 'proto')")
+	}
+
+	var server = ConnectorServer{connector}
+
+	if err := server.Materialize(stream); err != nil {
+		_, _ = os.Stderr.WriteString(err.Error())
+		_, _ = os.Stderr.Write([]byte("\n"))
 		os.Exit(1)
 	}
 	os.Exit(0)
 }
 
-type cmdCommon struct {
+func getEnvDefault(name, def string) string {
+	var s = os.Getenv(name)
+	if s == "" {
+		return def
+	}
+	return s
+}
+
+var _ pm.ConnectorServer = &ConnectorServer{}
+
+func (s *ConnectorServer) Materialize(stream pm.Connector_MaterializeServer) error {
+	var ctx = stream.Context()
+
+	for {
+		var request, err = stream.Recv()
+		if err == io.EOF {
+			return nil
+		} else if err != nil {
+			return err
+		} else if err = request.Validate_(); err != nil {
+			return fmt.Errorf("validating request: %w", err)
+		}
+
+		switch {
+		case request.Spec != nil:
+			var response, err = s.Connector.Spec(ctx, request.Spec)
+			if err != nil {
+				return err
+			}
+			response.Protocol = 3032023
+
+			if err := stream.Send(&pm.Response{Spec: response}); err != nil {
+				return err
+			}
+		case request.Validate != nil:
+			if response, err := s.Connector.Validate(ctx, request.Validate); err != nil {
+				return err
+			} else if err := stream.Send(&pm.Response{Validated: response}); err != nil {
+				return err
+			}
+		case request.Apply != nil:
+			if response, err := s.Connector.Apply(ctx, request.Apply); err != nil {
+				return err
+			} else if err := stream.Send(&pm.Response{Applied: response}); err != nil {
+				return err
+			}
+		case request.Open != nil:
+			transactor, opened, err := s.Connector.NewTransactor(ctx, *request.Open)
+			if err != nil {
+				return err
+			}
+			return pm.RunTransactions(stream, *request.Open, *opened, transactor)
+		default:
+			return fmt.Errorf("unexpected request %#v", request)
+		}
+	}
+}
+
+func newProtoCodec(ctx context.Context) pm.Connector_MaterializeServer {
+	return &protoCodec{
+		ctx: ctx,
+		r:   bufio.NewReaderSize(os.Stdin, 1<<21),
+		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+	}
+}
+
+type protoCodec struct {
 	ctx context.Context
-	srv pm.DriverServer
 	r   *bufio.Reader
 	w   protoio.Writer
-
-	logging *logConfig
 }
 
-// logConfig configures handling of application log events.
-type logConfig struct {
-	Level  string `long:"log.level" env:"LOG_LEVEL" default:"info" choice:"info" choice:"INFO" choice:"debug" choice:"DEBUG" choice:"warn" choice:"WARN" description:"Logging level"`
-	Format string `long:"log.format" env:"LOG_FORMAT" default:"text" choice:"json" choice:"text" choice:"color" description:"Logging output format"`
+func (c *protoCodec) Context() context.Context {
+	return c.ctx
 }
 
-func (c *logConfig) Configure() {
-	if c.Format == "json" {
-		logrus.SetFormatter(&logrus.JSONFormatter{})
-	} else if c.Format == "text" {
-		logrus.SetFormatter(&logrus.TextFormatter{})
-	} else if c.Format == "color" {
-		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
+func (c *protoCodec) Send(m *pm.Response) error {
+	return c.SendMsg(m)
+}
+func (c *protoCodec) Recv() (*pm.Request, error) {
+	var m = new(pm.Request)
+	if err := c.RecvMsg(m); err != nil {
+		return nil, err
 	}
-
-	if lvl, err := logrus.ParseLevel(c.Level); err != nil {
-		logrus.WithField("err", err).Fatal("unrecognized log level")
-	} else {
-		logrus.SetLevel(lvl)
-	}
+	return m, nil
 }
-
-type protoValidator interface {
-	proto.Message
-	Validate() error
+func (c *protoCodec) SendMsg(m interface{}) error {
+	return c.w.WriteMsg(m.(proto.Message))
 }
-
-func (c *cmdCommon) readMsg(m protoValidator) error {
+func (c *protoCodec) RecvMsg(m interface{}) error {
 	var lengthBytes [4]byte
 
 	if _, err := io.ReadFull(c.r, lengthBytes[:]); err == io.EOF {
@@ -97,21 +177,27 @@ func (c *cmdCommon) readMsg(m protoValidator) error {
 
 	var len = int(binary.LittleEndian.Uint32(lengthBytes[:]))
 
-	var b, err = peekMessage(c.r, len)
+	var b, err = c.peekMessage(len)
 	if err != nil {
 		return err
 	}
 
-	if err := proto.Unmarshal(b, m); err != nil {
+	if err := proto.Unmarshal(b, m.(proto.Message)); err != nil {
 		return fmt.Errorf("decoding message: %w", err)
-	} else if err = m.Validate(); err != nil {
-		return fmt.Errorf("validating message: %w", err)
 	}
-
 	return nil
 }
+func (c *protoCodec) SendHeader(metadata.MD) error {
+	panic("SendHeader is not supported")
+}
+func (c *protoCodec) SetHeader(metadata.MD) error {
+	panic("SetHeader is not supported")
+}
+func (c *protoCodec) SetTrailer(metadata.MD) {
+	panic("SetTrailer is not supported")
+}
 
-func peekMessage(br *bufio.Reader, size int) ([]byte, error) {
+func (c *protoCodec) peekMessage(size int) ([]byte, error) {
 	// Fetch next length-delimited message into a buffer.
 	// In the garden-path case, we decode directly from the
 	// bufio.Reader internal buffer without copying
@@ -120,11 +206,11 @@ func peekMessage(br *bufio.Reader, size int) ([]byte, error) {
 	//
 	// If the message is larger than the internal buffer,
 	// we allocate and read it directly.
-	var bs, err = br.Peek(size)
+	var bs, err = c.r.Peek(size)
 	if err == nil {
 		// The Discard contract guarantees we won't error.
 		// It's safe to reference |bs| until the next Peek.
-		if _, err = br.Discard(size); err != nil {
+		if _, err = c.r.Discard(size); err != nil {
 			panic(err)
 		}
 		return bs, nil
@@ -133,7 +219,7 @@ func peekMessage(br *bufio.Reader, size int) ([]byte, error) {
 	// Non-garden path: we must allocate and read a larger buffer.
 	if errors.Is(err, bufio.ErrBufferFull) {
 		bs = make([]byte, size)
-		if _, err = io.ReadFull(br, bs); err != nil {
+		if _, err = io.ReadFull(c.r, bs); err != nil {
 			return nil, fmt.Errorf("reading message (directly): %w", err)
 		}
 		return bs, nil
@@ -142,124 +228,64 @@ func peekMessage(br *bufio.Reader, size int) ([]byte, error) {
 	return nil, fmt.Errorf("reading message (into buffer): %w", err)
 }
 
-type specCmd struct{ cmdCommon }
-type validateCmd struct{ cmdCommon }
-type applyUpsertCmd struct{ cmdCommon }
-type applyDeleteCmd struct{ cmdCommon }
-type transactionsCmd struct{ cmdCommon }
-
-func (c specCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	var req pm.SpecRequest
-	logrus.Debug("executing Spec subcommand")
-
-	if err := c.readMsg(&req); err != nil {
-		return fmt.Errorf("reading request: %w", err)
-	} else if resp, err := c.srv.Spec(c.ctx, &req); err != nil {
-		return err
-	} else if err = c.w.WriteMsg(resp); err != nil {
-		return fmt.Errorf("writing response: %w", err)
+func newJsonCodec(ctx context.Context) pm.Connector_MaterializeServer {
+	return &jsonCodec{
+		ctx: ctx,
+		marshaler: jsonpb.Marshaler{
+			EnumsAsInts:  false,
+			EmitDefaults: false,
+			Indent:       "", // Compact.
+			OrigName:     false,
+			AnyResolver:  nil,
+		},
+		unmarshaler: jsonpb.Unmarshaler{
+			AllowUnknownFields: true,
+			AnyResolver:        nil,
+		},
+		decoder: json.NewDecoder(bufio.NewReaderSize(os.Stdin, 1<<21)),
 	}
-	return nil
 }
 
-func (c validateCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	var req pm.ValidateRequest
-	logrus.Debug("executing Validate subcommand")
-
-	if err := c.readMsg(&req); err != nil {
-		return fmt.Errorf("reading request: %w", err)
-	} else if resp, err := c.srv.Validate(c.ctx, &req); err != nil {
-		return err
-	} else if err = c.w.WriteMsg(resp); err != nil {
-		return fmt.Errorf("writing response: %w", err)
-	}
-	return nil
+type jsonCodec struct {
+	ctx         context.Context
+	marshaler   jsonpb.Marshaler
+	unmarshaler jsonpb.Unmarshaler
+	decoder     *json.Decoder
 }
 
-func (c applyUpsertCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	var req pm.ApplyRequest
-	logrus.Debug("executing ApplyUpsert subcommand")
-
-	if err := c.readMsg(&req); err != nil {
-		return fmt.Errorf("reading request: %w", err)
-	} else if resp, err := c.srv.ApplyUpsert(c.ctx, &req); err != nil {
-		return err
-	} else if err = c.w.WriteMsg(resp); err != nil {
-		return fmt.Errorf("writing response: %w", err)
-	}
-
-	return nil
+func (c *jsonCodec) Context() context.Context {
+	return c.ctx
 }
-
-func (c applyDeleteCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	var req pm.ApplyRequest
-	logrus.Debug("executing ApplyDelete subcommand")
-
-	if err := c.readMsg(&req); err != nil {
-		return fmt.Errorf("reading request: %w", err)
-	}
-
-	// TODO(johnny): Individual connectors need to be better behaved around deletion.
-	// This is a stop-gap measure to get task deletion unblocked in the control plane.
-	var resp, err = c.srv.ApplyDelete(c.ctx, &req)
-	if err != nil {
-		resp = &pm.ApplyResponse{ActionDescription: err.Error()}
-
-		logrus.WithFields(logrus.Fields{"error": err}).
-			Error("failed to delete the materialization from the endpoint")
-	}
-
-	if err = c.w.WriteMsg(resp); err != nil {
-		return fmt.Errorf("writing response: %w", err)
-	}
-
-	return nil
+func (c *jsonCodec) Send(m *pm.Response) error {
+	return c.SendMsg(m)
 }
-
-func (c transactionsCmd) Execute(args []string) error {
-	c.cmdCommon.logging.Configure()
-
-	logrus.Debug("executing Transactions subcommand")
-	return c.srv.Transactions(&txnAdapter{cmdCommon: c.cmdCommon})
-}
-
-// txnAdapter is a pm.Driver_TransactionsServer built from
-// os.Stdin and os.Stdout.
-type txnAdapter struct{ cmdCommon }
-
-func (a *txnAdapter) Send(m *pm.TransactionResponse) error {
-	return a.SendMsg(m)
-}
-func (a *txnAdapter) Recv() (*pm.TransactionRequest, error) {
-	m := new(pm.TransactionRequest)
-	if err := a.RecvMsg(m); err != nil {
+func (c *jsonCodec) Recv() (*pm.Request, error) {
+	var m = new(pm.Request)
+	if err := c.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
-func (a *txnAdapter) Context() context.Context {
-	return a.ctx
+func (c *jsonCodec) SendMsg(m interface{}) error {
+	var w bytes.Buffer
+
+	if err := c.marshaler.Marshal(&w, m.(proto.Message)); err != nil {
+		return fmt.Errorf("marshal response to json: %w", err)
+	}
+	_ = w.WriteByte('\n')
+
+	var _, err = os.Stdout.Write(w.Bytes())
+	return err
 }
-func (a *txnAdapter) SetHeader(metadata.MD) error {
-	panic("SetHeader is not supported")
+func (c *jsonCodec) RecvMsg(m interface{}) error {
+	return c.unmarshaler.UnmarshalNext(c.decoder, m.(proto.Message))
 }
-func (a *txnAdapter) SendHeader(metadata.MD) error {
+func (c *jsonCodec) SendHeader(metadata.MD) error {
 	panic("SendHeader is not supported")
 }
-func (a *txnAdapter) SetTrailer(metadata.MD) {
+func (c *jsonCodec) SetHeader(metadata.MD) error {
+	panic("SetHeader is not supported")
+}
+func (c *jsonCodec) SetTrailer(metadata.MD) {
 	panic("SetTrailer is not supported")
-}
-func (a *txnAdapter) SendMsg(m interface{}) error {
-	return a.w.WriteMsg(m.(proto.Message))
-}
-func (a *txnAdapter) RecvMsg(m interface{}) error {
-	return a.readMsg(m.(protoValidator))
 }
