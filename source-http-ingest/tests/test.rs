@@ -1,6 +1,9 @@
 use anyhow::Context;
+use proto_flow::capture::{
+    response::{Captured, Opened},
+    Response,
+};
 use reqwest::header::HeaderMap;
-use source_http_ingest::connector_protocol::capture::Response;
 
 use std::process::Stdio;
 use tokio::io::AsyncBufReadExt;
@@ -74,8 +77,11 @@ async fn run_http_request_processing(
     // Write open and expect to read opened.
     write_capture_request(&open_json(), &mut stdin).await?;
     match read_response(&mut reader).await.context("reading opened")? {
-        Response::Opened {
-            explicit_acknowledgements,
+        Response {
+            opened: Some(Opened {
+                explicit_acknowledgements,
+            }),
+            ..
         } => assert!(explicit_acknowledgements),
         _ => anyhow::bail!("unexpected repsonse type, expected opened"),
     };
@@ -118,32 +124,36 @@ async fn run_http_request_processing(
         let expect_commit = i % 2 == 1;
         let expect_document = !expect_commit;
 
-        match read_response(&mut reader).await {
-            Ok(Response::Checkpoint { .. }) if expect_commit => {
+        let response = read_response(&mut reader).await?;
+        let Response {
+            checkpoint,
+            captured,
+            ..
+        } = &response;
+
+        match (checkpoint.as_ref(), captured.as_ref()) {
+            (Some(_), None) if expect_commit => {
                 write_capture_request(&ack_request, &mut stdin)
                     .await
                     .context("writing acknowledge")?;
             }
-            Ok(Response::Document { binding, doc }) if expect_document => {
-                if binding == 0 {
+            (None, Some(Captured { binding, doc_json })) if expect_document => {
+                if *binding == 0 {
                     a_docs += 1;
-                } else if binding == 1 {
+                } else if *binding == 1 {
                     b_docs += 1;
                 } else {
                     anyhow::bail!(
                         "got document with unexpected binding {binding}: {}",
-                        doc.get()
+                        doc_json
                     );
                 }
             }
-            Ok(other) => {
-                let json = serde_json::to_string(&other).unwrap();
+            _ => {
                 anyhow::bail!(
-                    "unexpecte response on round {i}, expect_commit: {expect_commit}: {json}"
+                    "got unexpected response on round {i}, expect_commit: {expect_commit}: {:?}",
+                    response
                 );
-            }
-            Err(err) => {
-                anyhow::bail!("error on round {i}, a_docs: {a_docs}, b_docs: {b_docs}, err: {err}");
             }
         }
     }
@@ -228,60 +238,64 @@ async fn write_capture_request(
 fn open_json() -> serde_json::Value {
     serde_json::json!({
         "open": {
-            "name": "aliceCo/test/ingest",
-            "config": {},
             "version": "canary-version",
-            "keyBegin": 0,
-            "keyEnd": 4294967295i64,
-            "driverCheckpoint": {},
-            "intervalSeconds": 10,
-            "bindings": [
-                {
-                    "collection": {
-                        "name": "aliceCo/test/webhook-data",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "_meta": {
-                                    "type": "object",
-                                    "properties": { "webhookId": {"type": "string"}},
-                                    "required": ["webhookId"]
-                                }
+            "range": {
+                "keyBegin": 0,
+                "keyEnd": 4294967295i64,
+            },
+            "state_json": "{}",
+            "capture": {
+                "name": "aliceCo/test/ingest",
+                "config": {},
+                "intervalSeconds": 10,
+                "bindings": [
+                    {
+                        "collection": {
+                            "name": "aliceCo/test/webhook-data",
+                            "write_schema_json": {
+                                "type": "object",
+                                "properties": {
+                                    "_meta": {
+                                        "type": "object",
+                                        "properties": { "webhookId": {"type": "string"}},
+                                        "required": ["webhookId"]
+                                    }
+                                },
+                                "required": ["_meta"]
                             },
-                            "required": ["_meta"]
+                            "key": ["/_meta/webhookId"],
+                            "partitionFields": [],
+                            "projections": []
                         },
-                        "key": ["/_meta/webhookId"],
-                        "partitionFields": [],
-                        "projections": []
+                        "resourceConfig": {},
+                        "resourcePath": ["aliceCo/test/webhook-data"]
                     },
-                    "resourceConfig": {},
-                    "resourcePath": ["aliceCo/test/webhook-data"]
-                },
-                {
-                    "collection": {
-                        "name": "aliceCo/test/webhook-data",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "_meta": {
-                                    "type": "object",
-                                    "properties": { "webhookId": {"type": "string"}},
-                                    "required": ["webhookId"]
-                                }
+                    {
+                        "collection": {
+                            "name": "aliceCo/test/webhook-data",
+                            "write_schema_json": {
+                                "type": "object",
+                                "properties": {
+                                    "_meta": {
+                                        "type": "object",
+                                        "properties": { "webhookId": {"type": "string"}},
+                                        "required": ["webhookId"]
+                                    }
+                                },
+                                "required": ["_meta"]
                             },
-                            "required": ["_meta"]
+                            "key": ["/_meta/webhookId"],
+                            "partitionFields": [],
+                            "projections": []
                         },
-                        "key": ["/_meta/webhookId"],
-                        "partitionFields": [],
-                        "projections": []
-                    },
-                    "resourceConfig": {
-                        "path": "another.json",
-                        "idFromHeader": "X-Webhook-Id"
-                    },
-                    "resourcePath": ["/another.json"]
-                }
-            ]
+                        "resourceConfig": {
+                            "path": "another.json",
+                            "idFromHeader": "X-Webhook-Id"
+                        },
+                        "resourcePath": ["/another.json"]
+                    }
+                ]
+            }
         }
     })
 }
