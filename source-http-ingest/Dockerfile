@@ -2,13 +2,15 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM rust:1.66-slim-buster as builder
-
-RUN rustup component add clippy
+FROM golang:1.19-buster as builder
 
 RUN apt-get update \
- && apt-get install -y ca-certificates pkg-config cmake g++ \
+ && apt-get install -y curl ca-certificates pkg-config cmake g++ protobuf-compiler \
  && rm -rf /var/lib/apt/lists/*
+
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain 1.66.1
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup component add clippy
 
 WORKDIR /connector
 
@@ -30,7 +32,7 @@ RUN touch src/main.rs \
  && touch src/lib.rs \
  && cargo test --release --locked --offline \
  && cargo clippy --locked --offline --no-deps \
- && cargo install --path . --locked --offline
+ && cargo build --release --locked --offline
 
 
 # Runtime Stage
@@ -45,7 +47,7 @@ COPY --from=busybox:latest /bin/sh /bin/sh
 # Copy in the shared library files we linked against.
 
 # Copy in the connector artifact.
-COPY --from=builder /usr/local/cargo/bin/source-http-ingest ./
+COPY --from=builder /connector/target/release/source-http-ingest ./
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
