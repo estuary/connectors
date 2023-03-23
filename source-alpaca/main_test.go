@@ -220,9 +220,6 @@ func TestLargeCapture(t *testing.T) {
 
 func captureSpec(t testing.TB, names []string, symbols []string, start, end time.Time, validator st.CaptureValidator) *st.CaptureSpec {
 	t.Helper()
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
-	}
 
 	// Use credentials if provided by flags, otherwise use placeholders for tests that don't
 	// interact with a real API.
@@ -268,11 +265,8 @@ func makeBindings(t testing.TB, names []string, start, end time.Time) []*flow.Ca
 		require.NoError(t, err)
 
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
-			Collection: flow.CollectionSpec{
-				Collection: flow.Collection("acmeCo/test/" + name),
-			},
-			ResourceSpecJson: json.RawMessage(specBytes),
-			ResourcePath:     []string{name},
+			ResourceConfigJson: json.RawMessage(specBytes),
+			ResourcePath:       []string{name},
 		})
 	}
 	return bindings
