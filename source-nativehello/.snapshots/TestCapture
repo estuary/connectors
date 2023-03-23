@@ -1,0 +1,14 @@
+# ================================
+# Collection "hellCollection": 6 Documents
+# ================================
+{"ts":"<TIMESTAMP>","message":"Hello 0"}
+{"ts":"<TIMESTAMP>","message":"Hello 1"}
+{"ts":"<TIMESTAMP>","message":"Hello 2"}
+{"ts":"<TIMESTAMP>","message":"Hello 3"}
+{"ts":"<TIMESTAMP>","message":"Hello 4"}
+{"ts":"<TIMESTAMP>","message":"Hello 5"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":6}
+
