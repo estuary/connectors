@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"encoding/json"
 	"fmt"
 
@@ -104,8 +105,8 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 	return &pm.ValidateResponse{Bindings: out}, nil
 }
 
-// ApplyUpsert is no-op for MongoDB since collections are created on the fly. We
-// only check for connection to database.
+// ApplyUpsert checks for bindings that have been removed by comparing them with
+// previously persisted spec, and deletes the corresponding collection
 func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
@@ -116,13 +117,52 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		return nil, err
 	}
 
-	_, err = d.connect(ctx, cfg)
+	client, err := d.connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
 	}
 
+	var db = client.Database(cfg.Database)
+
+	var newCollections []string
+	for _, binding := range req.Materialization.Bindings {
+		var r resource
+		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &r); err != nil {
+			return nil, fmt.Errorf("parsing resource config: %w", err)
+		}
+
+		newCollections = append(newCollections, r.Collection)
+	}
+
+	existing, err := d.LoadSpec(ctx, cfg, string(req.Materialization.Materialization))
+	if err != nil {
+		return nil, fmt.Errorf("loading spec: %w", err)
+	}
+
+	var actions []string
+	if existing != nil {
+		for collection, _ := range existing {
+			// A binding that has been removed
+			if !SliceContains(collection, newCollections) {
+				if !req.DryRun {
+					var col = db.Collection(collection)
+					if err := col.Drop(ctx); err != nil {
+						return nil, fmt.Errorf("dropping collection %s: %w", collection, err)
+					}
+				}
+
+				actions = append(actions, fmt.Sprintf("drop collection %s", collection))
+			}
+		}
+	}
+
+	err = d.WriteSpec(ctx, cfg, req.Materialization, req.Version)
+	if err != nil {
+		return nil, fmt.Errorf("writing spec: %w", err)
+	}
+
 	return &pm.ApplyResponse{
-		ActionDescription: "",
+		ActionDescription: strings.Join(actions, "\n"),
 	}, nil
 }
 
@@ -226,6 +266,15 @@ func resolveResourceConfig(specJson json.RawMessage) (resource, error) {
 	}
 
 	return res, nil
+}
+
+func SliceContains(expected string, actual []string) bool {
+	for _, ty := range actual {
+		if ty == expected {
+			return true
+		}
+	}
+	return false
 }
 
 func main() {
