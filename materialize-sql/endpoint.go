@@ -165,7 +165,7 @@ func resolveResourceToExistingBinding(
 	collection *pf.CollectionSpec,
 	loadedSpec *pf.MaterializationSpec,
 ) (
-	constraints map[string]*pm.Constraint,
+	constraints map[string]*pm.Response_Validated_Constraint,
 	loadedBinding *pf.MaterializationSpec_Binding,
 	resource Resource,
 	err error,
@@ -173,14 +173,14 @@ func resolveResourceToExistingBinding(
 	resource = endpoint.NewResource(endpoint)
 
 	if err = pf.UnmarshalStrict(resourceSpec, resource); err != nil {
-		err = fmt.Errorf("resource binding for collection %q: %w", &collection.Collection, err)
-	} else if loadedBinding, err = findBinding(resource.Path(), collection.Collection, loadedSpec); err != nil {
+		err = fmt.Errorf("resource binding for collection %q: %w", &collection.Name, err)
+	} else if loadedBinding, err = findBinding(resource.Path(), collection.Name, loadedSpec); err != nil {
 	} else if loadedBinding != nil && loadedBinding.DeltaUpdates && !resource.DeltaUpdates() {
 		// We allow a binding to switch from standard => delta updates but not the other way.
 		// This is because a standard materialization is trivially a valid delta-updates
 		// materialization, but a delta-updates table may have multiple instances of a given
 		// key and can no longer be loaded correctly by a standard materialization.
-		err = fmt.Errorf("cannot disable delta-updates binding of collection %s", collection.Collection)
+		err = fmt.Errorf("cannot disable delta-updates binding of collection %s", collection.Name)
 	} else if loadedBinding != nil {
 		constraints = ValidateMatchesExisting(resource, loadedBinding, collection)
 	} else {
@@ -197,11 +197,11 @@ func findBinding(path TablePath, collection pf.Collection, spec *pf.Materializat
 	for i := range spec.Bindings {
 		var b = spec.Bindings[i]
 
-		if b.Collection.Collection == collection && path.equals(b.ResourcePath) {
+		if b.Collection.Name == collection && path.equals(b.ResourcePath) {
 			return b, nil
 		} else if path.equals(b.ResourcePath) {
 			return nil, fmt.Errorf("cannot materialize %s to table %s because the table is already materializing collection %s",
-				path, &b.Collection.Collection, collection)
+				path, &b.Collection.Name, collection)
 		}
 	}
 	return nil, nil

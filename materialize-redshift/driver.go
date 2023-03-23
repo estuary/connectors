@@ -29,6 +29,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	log "github.com/sirupsen/logrus"
+	"go.gazette.dev/core/consumer/protocol"
 )
 
 type sshForwarding struct {
@@ -161,7 +162,7 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-func newRedshiftDriver() pm.DriverServer {
+func newRedshiftDriver() *sql.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-redshift",
 		EndpointSpecType: new(config),
@@ -593,8 +594,11 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
-		d.fence.Checkpoint = runtimeCheckpoint
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		var err error
+		if d.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
 
 		var fenceUpdate strings.Builder
 		if err := tplUpdateFence.Execute(&fenceUpdate, d.fence); err != nil {

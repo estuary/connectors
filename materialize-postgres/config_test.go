@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +42,7 @@ func TestPostgresConfig(t *testing.T) {
 
 func TestSpecification(t *testing.T) {
 	var resp, err = newPostgresDriver().
-		Spec(context.Background(), &pm.SpecRequest{EndpointType: pf.EndpointType_AIRBYTE_SOURCE})
+		Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(resp, "", "  ")

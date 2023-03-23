@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake"
+	"go.gazette.dev/core/consumer/protocol"
 )
 
 // config represents the endpoint configuration for snowflake.
@@ -448,8 +449,12 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint []byte, _ <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
-		d.store.fence.Checkpoint = runtimeCheckpoint
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		var err error
+		if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
+
 		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx) })
 	}, nil
 }

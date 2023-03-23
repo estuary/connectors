@@ -11,7 +11,6 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -185,7 +184,7 @@ func TestPrereqs(t *testing.T) {
 
 func TestSpecification(t *testing.T) {
 	var resp, err = newRedshiftDriver().
-		Spec(context.Background(), &pm.SpecRequest{EndpointType: pf.EndpointType_AIRBYTE_SOURCE})
+		Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(resp, "", "  ")
