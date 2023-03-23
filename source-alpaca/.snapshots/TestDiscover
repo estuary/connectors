@@ -1,7 +1,7 @@
 Binding 0:
 {
     "recommended_name": "iex",
-    "resource_spec_json": {
+    "resource_config_json": {
       "name": "iex"
     },
     "document_schema_json": {
@@ -65,7 +65,7 @@ Binding 0:
         "Tape"
       ]
     },
-    "key_ptrs": [
+    "key": [
       "/ID",
       "/Symbol",
       "/Exchange",

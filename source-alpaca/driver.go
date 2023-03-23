@@ -8,13 +8,16 @@ import (
 
 	"github.com/alpacahq/alpaca-trade-api-go/v2/marketdata"
 	schemagen "github.com/estuary/connectors/go-schema-gen"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 type driver struct{}
 
-func (driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecResponse, error) {
+var _ boilerplate.Connector = &driver{}
+
+func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
 	var endpointSchema, err = schemagen.GenerateSchema("Source Alpaca Spec", &config{}).MarshalJSON()
 	if err != nil {
 		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
@@ -24,27 +27,27 @@ func (driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecResponse, 
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pc.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/source-alpaca",
+	return &pc.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/source-alpaca",
 	}, nil
 }
 
-func (driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.ValidateResponse, error) {
+func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var out []*pc.ValidateResponse_Binding
+	var out []*pc.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		out = append(out, &pc.ValidateResponse_Binding{
+		out = append(out, &pc.Response_Validated_Binding{
 			ResourcePath: []string{res.Name},
 		})
 	}
@@ -65,12 +68,12 @@ func (driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Valida
 		return nil, fmt.Errorf("error when connecting to feed %s: %w", cfg.Feed, err)
 	}
 
-	return &pc.ValidateResponse{Bindings: out}, nil
+	return &pc.Response_Validated{Bindings: out}, nil
 }
 
-func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.DiscoverResponse, error) {
+func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
@@ -86,26 +89,18 @@ func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Discov
 		return nil, fmt.Errorf("serializing resource json: %w", err)
 	}
 
-	return &pc.DiscoverResponse{
-		Bindings: []*pc.DiscoverResponse_Binding{{
+	return &pc.Response_Discovered{
+		Bindings: []*pc.Response_Discovered_Binding{{
 			RecommendedName:    pf.Collection(cfg.Feed),
-			ResourceSpecJson:   resourceJSON,
+			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: documentSchema,
-			KeyPtrs:            []string{"/ID", "/Symbol", "/Exchange", "/Timestamp"},
+			Key:                []string{"/ID", "/Symbol", "/Exchange", "/Timestamp"},
 		}},
 	}, nil
 }
 
-func (d driver) ApplyUpsert(ctx context.Context, req *pc.ApplyRequest) (*pc.ApplyResponse, error) {
-	return d.apply(ctx, req, false)
-}
-
-func (d driver) ApplyDelete(ctx context.Context, req *pc.ApplyRequest) (*pc.ApplyResponse, error) {
-	return d.apply(ctx, req, true)
-}
-
-func (driver) apply(ctx context.Context, req *pc.ApplyRequest, isDelete bool) (*pc.ApplyResponse, error) {
-	return &pc.ApplyResponse{
+func (d driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
+	return &pc.Response_Applied{
 		ActionDescription: "",
 	}, nil
 }

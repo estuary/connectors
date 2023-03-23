@@ -34,8 +34,8 @@ type tradeDocument struct {
 
 type alpacaWorker struct {
 	mu           sync.Mutex
-	output       *boilerplate.PullOutput
-	bindingIdx   uint32
+	flowStream   *boilerplate.PullOutput
+	bindingIdx   int
 	dataClient   marketdata.Client
 	streamClient marketdataStream.StocksClient
 	resourceName string
@@ -53,12 +53,12 @@ func (c *alpacaWorker) handleDocuments(docs <-chan tradeDocument, checkpointJSON
 	for doc := range docs {
 		if docJSON, err := json.Marshal(doc); err != nil {
 			return fmt.Errorf("error serializing document: %w", err)
-		} else if err := c.output.Documents(uint32(c.bindingIdx), docJSON); err != nil {
+		} else if err := c.flowStream.Documents(c.bindingIdx, docJSON); err != nil {
 			return err
 		}
 	}
 
-	return c.output.Checkpoint(json.RawMessage(checkpointJSON), true)
+	return c.flowStream.Checkpoint(json.RawMessage(checkpointJSON), true)
 }
 
 func (c *alpacaWorker) streamTrades(ctx context.Context) error {
