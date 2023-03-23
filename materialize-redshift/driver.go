@@ -282,7 +282,7 @@ func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
 
 	var awsErr *awsHttp.ResponseError
 
-	objectDir := path.Join(cfg.BucketPath, cfg.Bucket)
+	objectDir := path.Join(cfg.Bucket, cfg.BucketPath)
 
 	if err := s3file.encodeRow([]interface{}{[]byte("test")}); err != nil {
 		// This won't err immediately until the file is flushed in the case of having the wrong
