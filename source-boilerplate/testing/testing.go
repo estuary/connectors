@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
 	jsonpatch "github.com/evanphx/json-patch/v5"
@@ -26,17 +27,16 @@ import (
 
 // CaptureSpec represents a configured capture task which can be run in an automated test.
 //
-// It consists of a pc.DriverServer, endpoint configuration, state checkpoint, and a list
-// of bindings. This is roughly equivalent to the configuration and runtime state of a real
-// capture running within Flow.
+// It consists of a boilerplate.Connector, endpoint configuration, state checkpoint, and a list of
+// bindings. This is roughly equivalent to the configuration and runtime state of a real capture
+// running within Flow.
 //
-// In addition there is a set of "sanitizers" which replace specified regexes with constant
-// strings (this allows variable data such as timestamps to pass snapshot validation) and a
-// generic CaptureValidator interface which summarizes capture output (this allows validation
-// even of captures which are too large to fit entirely in memory, or other properties of
-// interest).
+// In addition there is a set of "sanitizers" which replace specified regexes with constant strings
+// (this allows variable data such as timestamps to pass snapshot validation) and a generic
+// CaptureValidator interface which summarizes capture output (this allows validation even of
+// captures which are too large to fit entirely in memory, or other properties of interest).
 type CaptureSpec struct {
-	Driver       pc.DriverServer
+	Driver       boilerplate.Connector
 	EndpointSpec interface{}
 	Bindings     []*flow.CaptureSpec_Binding
 	Checkpoint   json.RawMessage
@@ -47,23 +47,23 @@ type CaptureSpec struct {
 }
 
 // Validate performs validation against the target database.
-func (cs *CaptureSpec) Validate(ctx context.Context, t testing.TB) ([]*pc.ValidateResponse_Binding, error) {
+func (cs *CaptureSpec) Validate(ctx context.Context, t testing.TB) ([]*pc.Response_Validated_Binding, error) {
 	t.Helper()
 
 	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
 
-	var bindings []*pc.ValidateRequest_Binding
+	var bindings []*pc.Request_Validate_Binding
 	for _, b := range cs.Bindings {
-		bindings = append(bindings, &pc.ValidateRequest_Binding{
-			ResourceSpecJson: b.ResourceSpecJson,
-			Collection:       b.Collection,
+		bindings = append(bindings, &pc.Request_Validate_Binding{
+			ResourceConfigJson: b.ResourceConfigJson,
+			Collection:         b.Collection,
 		})
 	}
 
-	validation, err := cs.Driver.Validate(ctx, &pc.ValidateRequest{
-		EndpointSpecJson: endpointSpecJSON,
-		Bindings:         bindings,
+	validation, err := cs.Driver.Validate(ctx, &pc.Request_Validate{
+		ConfigJson: endpointSpecJSON,
+		Bindings:   bindings,
 	})
 	if err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func (cs *CaptureSpec) VerifyDiscover(ctx context.Context, t testing.TB, matcher
 // Discover performs catalog discovery against the target database and returns
 // a sorted (by recommended name) list of all discovered bindings whose resource
 // spec matches one of the provided regexes.
-func (cs *CaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*regexp.Regexp) []*pc.DiscoverResponse_Binding {
+func (cs *CaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*regexp.Regexp) []*pc.Response_Discovered_Binding {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
@@ -101,15 +101,15 @@ func (cs *CaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*
 	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
 
-	discovery, err := cs.Driver.Discover(ctx, &pc.DiscoverRequest{
-		EndpointSpecJson: endpointSpecJSON,
+	discovery, err := cs.Driver.Discover(ctx, &pc.Request_Discover{
+		ConfigJson: endpointSpecJSON,
 	})
 	require.NoError(t, err)
 
-	var matchedBindings = make(map[string]*pc.DiscoverResponse_Binding)
+	var matchedBindings = make(map[string]*pc.Response_Discovered_Binding)
 	var matchedNames []string
 	for _, binding := range discovery.Bindings {
-		if matchers == nil || matchesAny(matchers, string(binding.ResourceSpecJson)) {
+		if matchers == nil || matchesAny(matchers, string(binding.ResourceConfigJson)) {
 			var name = binding.RecommendedName.String()
 			matchedNames = append(matchedNames, name)
 			matchedBindings[name] = binding
@@ -117,7 +117,7 @@ func (cs *CaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*
 	}
 	sort.Strings(matchedNames)
 
-	var resultBindings []*pc.DiscoverResponse_Binding
+	var resultBindings []*pc.Response_Discovered_Binding
 	for _, name := range matchedNames {
 		resultBindings = append(resultBindings, matchedBindings[name])
 	}
@@ -147,16 +147,15 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
 
-	var open = &pc.PullRequest{
-		Open: &pc.PullRequest_Open{
-			DriverCheckpointJson: cs.Checkpoint,
+	var open = &pc.Request{
+		Open: &pc.Request_Open{
+			StateJson: cs.Checkpoint,
 			Capture: &flow.CaptureSpec{
-				Capture:          flow.Capture("acmeCo/" + strings.Replace(t.Name(), "/", "-", -1) + "capture"),
-				EndpointSpecJson: endpointSpecJSON,
-				Bindings:         cs.Bindings,
+				Name:       flow.Capture("acmeCo/" + strings.Replace(t.Name(), "/", "-", -1) + "capture"),
+				ConfigJson: endpointSpecJSON,
+				Bindings:   cs.Bindings,
 			},
-		},
-	}
+		}}
 
 	var adapter = &pullAdapter{
 		ctx:        ctx,
@@ -167,7 +166,10 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 		sanitizers: cs.Sanitizers,
 		callback:   callback,
 	}
-	if err := cs.Driver.Pull(adapter); err != nil {
+
+	if err := cs.Driver.Pull(open.Open, &boilerplate.PullOutput{
+		Connector_CaptureServer: adapter,
+	}); err != nil {
 		if errors.Is(err, context.Canceled) {
 			log.Info("capture shut down")
 		} else {
@@ -218,22 +220,22 @@ func (cs *CaptureSpec) Summary() string {
 
 type pullAdapter struct {
 	ctx         context.Context
-	openReq     *pc.PullRequest
+	openReq     *pc.Request
 	checkpoint  []byte
 	bindings    []*flow.CaptureSpec_Binding
 	validator   CaptureValidator
 	callback    func(data json.RawMessage)
 	sanitizers  map[string]*regexp.Regexp
-	transaction []*pc.Documents
+	transaction []*pc.Response_Captured
 }
 
-func (a *pullAdapter) Recv() (*pc.PullRequest, error) {
+func (a *pullAdapter) Recv() (*pc.Request, error) {
 	if msg := a.openReq; msg != nil {
 		a.openReq = nil
 		return msg, nil
 	}
 	time.Sleep(10 * time.Millisecond)
-	return &pc.PullRequest{Acknowledge: &pc.Acknowledge{}}, nil
+	return &pc.Request{Acknowledge: &pc.Request_Acknowledge{}}, nil
 }
 
 func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {
@@ -244,14 +246,14 @@ func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {
 	return json.Marshal(x)
 }
 
-func (a *pullAdapter) Send(m *pc.PullResponse) error {
-	if m.Documents != nil {
-		a.transaction = append(a.transaction, m.Documents)
+func (a *pullAdapter) Send(m *pc.Response) error {
+	if m.Captured != nil {
+		a.transaction = append(a.transaction, m.Captured)
 	}
 	if m.Checkpoint != nil {
-		if !m.Checkpoint.Rfc7396MergePatch || a.checkpoint == nil {
-			a.checkpoint = m.Checkpoint.DriverCheckpointJson
-		} else if checkpoint, err := jsonpatch.MergePatch(a.checkpoint, m.Checkpoint.DriverCheckpointJson); err != nil {
+		if !m.Checkpoint.State.MergePatch || a.checkpoint == nil {
+			a.checkpoint = m.Checkpoint.State.UpdatedJson
+		} else if checkpoint, err := jsonpatch.MergePatch(a.checkpoint, m.Checkpoint.State.UpdatedJson); err != nil {
 			return fmt.Errorf("test error merging checkpoint: %w", err)
 		} else if normalized, err := normalizeJSON(checkpoint); err != nil {
 			return fmt.Errorf("test error normalizing checkpoint: %w", err)
@@ -259,28 +261,25 @@ func (a *pullAdapter) Send(m *pc.PullResponse) error {
 			a.checkpoint = normalized
 		}
 		if logLevel := log.TraceLevel; log.IsLevelEnabled(logLevel) {
-			if !bytes.Equal(m.Checkpoint.DriverCheckpointJson, []byte("{}")) {
+			if !bytes.Equal(m.Checkpoint.State.UpdatedJson, []byte("{}")) {
 				log.WithFields(log.Fields{
-					"checkpoint": m.Checkpoint.DriverCheckpointJson,
-					"patch":      m.Checkpoint.Rfc7396MergePatch,
+					"checkpoint": m.Checkpoint.State.UpdatedJson,
+					"patch":      m.Checkpoint.State.MergePatch,
 					"result":     json.RawMessage(a.checkpoint),
 				}).Log(logLevel, "checkpoint")
 			}
 		}
 
-		for _, documents := range a.transaction {
+		for _, doc := range a.transaction {
 			var binding string
-			if idx := documents.Binding; 0 <= idx && int(idx) < len(a.bindings) {
-				binding = string(a.bindings[idx].Collection.Collection)
+			if idx := doc.Binding; int(idx) < len(a.bindings) {
+				binding = strings.Join(a.bindings[idx].ResourcePath, ".")
 			} else {
 				binding = fmt.Sprintf("Invalid Binding %d", idx)
 			}
-			for _, slice := range documents.DocsJson {
-				var doc = json.RawMessage(documents.Arena[slice.Begin:slice.End])
-				a.validator.Output(binding, sanitize(a.sanitizers, doc))
-				if a.callback != nil {
-					a.callback(doc)
-				}
+			a.validator.Output(binding, sanitize(a.sanitizers, doc.DocJson))
+			if a.callback != nil {
+				a.callback(doc.DocJson)
 			}
 		}
 		a.transaction = nil
