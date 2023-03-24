@@ -49,7 +49,7 @@ func LoadSpec(cfg config, materialization string) (map[string]*pf.Materializatio
 
 	for _, binding := range existing.Bindings {
 		var r resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &r); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &r); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 		bindingsByTable[r.Table] = binding
@@ -69,7 +69,7 @@ func WriteSpec(cfg config, materialization *pf.MaterializationSpec, version stri
 	if err != nil {
 		return fmt.Errorf("marshalling materialization spec: %w", err)
 	}
-	specKey := fmt.Sprintf("%s/%s.flow.materialization_spec", CleanPrefix(cfg.S3Prefix), materialization.Materialization)
+	specKey := fmt.Sprintf("%s/%s.flow.materialization_spec", CleanPrefix(cfg.S3Prefix), materialization.Name)
 
 	_, err = uploader.Upload(&s3manager.UploadInput{
 		Bucket: &cfg.S3Bucket,

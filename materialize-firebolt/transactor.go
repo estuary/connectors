@@ -17,70 +17,67 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
+	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
 )
 
-// Transactions implements the DriverServer interface.
-func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+	var cfg config
+	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
+		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
 
-		var cfg config
-		if err := pf.UnmarshalStrict(open.Materialization.EndpointSpecJson, &cfg); err != nil {
-			return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+	var checkpoint FireboltCheckpoint
+	if open.StateJson != nil {
+		if err := json.Unmarshal(open.StateJson, &checkpoint); err != nil {
+			return nil, nil, fmt.Errorf("parsing driver config: %w", err)
 		}
+	}
 
-		var checkpoint FireboltCheckpoint
-		if open.DriverCheckpointJson != nil {
-			if err := json.Unmarshal(open.DriverCheckpointJson, &checkpoint); err != nil {
-				return nil, nil, fmt.Errorf("parsing driver config: %w", err)
-			}
-		}
-
-		var fb, err = firebolt.New(firebolt.Config{
-			EngineURL: cfg.EngineURL,
-			Database:  cfg.Database,
-			Username:  cfg.Username,
-			Password:  cfg.Password,
-		})
-		if err != nil {
-			return nil, nil, fmt.Errorf("creating firebolt client: %w", err)
-		}
-
-		if err = applyCheckpoint(ctx, fb, checkpoint); err != nil {
-			return nil, nil, fmt.Errorf("applying recovered checkpoint: %w", err)
-		}
-
-		var bindings []*binding
-		for _, b := range open.Materialization.Bindings {
-			var res resource
-			if err := pf.UnmarshalStrict(b.ResourceSpecJson, &res); err != nil {
-				return nil, nil, fmt.Errorf("parsing resource config: %w", err)
-			}
-			bindings = append(bindings,
-				&binding{
-					table: res.Table,
-					spec:  b,
-				})
-		}
-
-		queries, err := schemalate.GetQueriesBundle(open.Materialization)
-		if err != nil {
-			return nil, nil, fmt.Errorf("building firebolt search schema: %w", err)
-		}
-
-		var transactor = &transactor{
-			fb:           fb,
-			queries:      queries,
-			bindings:     bindings,
-			awsKeyId:     cfg.AWSKeyId,
-			awsSecretKey: cfg.AWSSecretKey,
-			awsRegion:    cfg.AWSRegion,
-			bucket:       cfg.S3Bucket,
-			prefix:       strings.TrimLeft(fmt.Sprintf("%s/%s/", CleanPrefix(cfg.S3Prefix), open.Materialization.Materialization), "/"),
-		}
-
-		return transactor, &pm.TransactionResponse_Opened{}, nil
+	var fb, err = firebolt.New(firebolt.Config{
+		EngineURL: cfg.EngineURL,
+		Database:  cfg.Database,
+		Username:  cfg.Username,
+		Password:  cfg.Password,
 	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating firebolt client: %w", err)
+	}
+
+	if err = applyCheckpoint(ctx, fb, checkpoint); err != nil {
+		return nil, nil, fmt.Errorf("applying recovered checkpoint: %w", err)
+	}
+
+	var bindings []*binding
+	for _, b := range open.Materialization.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
+			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
+		}
+		bindings = append(bindings,
+			&binding{
+				table: res.Table,
+				spec:  b,
+			})
+	}
+
+	queries, err := schemalate.GetQueriesBundle(open.Materialization)
+	if err != nil {
+		return nil, nil, fmt.Errorf("building firebolt search schema: %w", err)
+	}
+
+	var transactor = &transactor{
+		fb:           fb,
+		queries:      queries,
+		bindings:     bindings,
+		awsKeyId:     cfg.AWSKeyId,
+		awsSecretKey: cfg.AWSSecretKey,
+		awsRegion:    cfg.AWSRegion,
+		bucket:       cfg.S3Bucket,
+		prefix:       strings.TrimLeft(fmt.Sprintf("%s/%s/", CleanPrefix(cfg.S3Prefix), open.Materialization.Name), "/"),
+	}
+
+	return transactor, &pm.Response_Opened{}, nil
 }
 
 type binding struct {
@@ -232,7 +229,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 	// Return a StartCommitFunc closure which returns our encoded `checkpoint`,
 	// and will apply it only after the runtime acknowledges its commit.
-	return func(ctx context.Context, _ []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+	return func(ctx context.Context, _ *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
 		var checkpointJSON, err = json.Marshal(checkpoint)
 		if err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
@@ -246,7 +243,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 				return ctx.Err()
 			}
 		})
-		return &pf.DriverCheckpoint{DriverCheckpointJson: checkpointJSON}, commitOp
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, commitOp
 	}, nil
 }
 
