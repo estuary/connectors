@@ -11,15 +11,14 @@ import (
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-
 type resource struct {
-	Database   string `json:"database" jsonschema=title=Database name"`
+	Database   string `json:"database" jsonschema:"title=Database name"`
 	Collection string `json:"collection" jsonschema:"title=Collection name"`
 }
 
@@ -54,7 +53,7 @@ func (c *config) Validate() error {
 	var uri, err = url.Parse(c.Address)
 	// mongodb+srv:// urls do not support port
 	if err == nil && uri.Scheme == "mongodb+srv" && uri.Port() != "" {
-		return fmt.Errorf("`mongodb+srv://` addresses do not support specifying the port.")
+		return fmt.Errorf("`mongodb+srv://` addresses do not support specifying the port")
 	}
 
 	return nil
@@ -80,7 +79,6 @@ func (c *config) ToURI() string {
 	return uri.String()
 }
 
-
 type driver struct{}
 
 func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error) {
@@ -98,7 +96,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	return client, nil
 }
 
-func (driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecResponse, error) {
+func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
 	var endpointSchema, err = schemagen.GenerateSchema("MongoDB", &config{}).MarshalJSON()
 	if err != nil {
 		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
@@ -108,18 +106,17 @@ func (driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecResponse, 
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pc.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/source-mongodb",
+	return &pc.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/source-mongodb",
 	}, nil
 }
 
-
 // Validate that store resources and proposed collection bindings are compatible.
-func (d *driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.ValidateResponse, error) {
+func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing config json: %w", err)
 	}
 
@@ -139,11 +136,11 @@ func (d *driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 		return nil, fmt.Errorf("getting list of databases: %w", err)
 	}
 
-	var bindings = []*pc.ValidateResponse_Binding{}
+	var bindings = []*pc.Response_Validated_Binding{}
 
 	for _, binding := range req.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 
@@ -162,22 +159,17 @@ func (d *driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 			return nil, fmt.Errorf("could not find collection %s in database %s", res.Collection, db.Name())
 		}
 
-		bindings = append(bindings, &pc.ValidateResponse_Binding{
+		bindings = append(bindings, &pc.Response_Validated_Binding{
 			ResourcePath: []string{res.Database, res.Collection},
 		})
 	}
 
-	return &pc.ValidateResponse{Bindings: bindings}, nil
+	return &pc.Response_Validated{Bindings: bindings}, nil
 }
 
 // ApplyUpsert applies a new or updated capture to the store.
-func (d *driver) ApplyUpsert(ctx context.Context, req *pc.ApplyRequest) (*pc.ApplyResponse, error) {
-	return &pc.ApplyResponse{ActionDescription: ""}, nil
-}
-
-// ApplyDelete deletes an existing capture from the store.
-func (driver) ApplyDelete(ctx context.Context, req *pc.ApplyRequest) (*pc.ApplyResponse, error) {
-	return &pc.ApplyResponse{ActionDescription: ""}, nil
+func (d *driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
+	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
 func main() {

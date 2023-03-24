@@ -18,15 +18,16 @@ import (
 // _id key. The schema of collections is minimalSchema as we
 // rely on Flow's schema inference to infer the collection schema
 var minimalSchema = generateMinimalSchema()
+
 const idProperty = "_id"
 
 const (
-	metaProperty  = "_meta"
+	metaProperty    = "_meta"
 	deletedProperty = "deleted"
 )
 
 type documentMetadata struct {
-	Deleted    bool       `json:"deleted,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted, unset otherwise."`
+	Deleted bool `json:"deleted,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted, unset otherwise."`
 }
 
 func generateMinimalSchema() json.RawMessage {
@@ -50,7 +51,7 @@ func generateMinimalSchema() json.RawMessage {
 		AdditionalProperties: nil,
 		Extras: map[string]interface{}{
 			"properties": map[string]*jsonschema.Schema{
-				idProperty: &jsonschema.Schema{
+				idProperty: {
 					Type: "string",
 				},
 				metaProperty: metadataSchema,
@@ -71,9 +72,9 @@ func generateMinimalSchema() json.RawMessage {
 }
 
 // Discover returns the set of resources available from this Driver.
-func (d *driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.DiscoverResponse, error) {
+func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing config json: %w", err)
 	}
 
@@ -95,20 +96,20 @@ func (d *driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Dis
 		return nil, fmt.Errorf("listing collections: %w", err)
 	}
 
-	var bindings = []*pc.DiscoverResponse_Binding{}
+	var bindings = []*pc.Response_Discovered_Binding{}
 	for _, collection := range collections {
 		resourceJSON, err := json.Marshal(resource{Database: db.Name(), Collection: collection.Name})
 		if err != nil {
 			return nil, fmt.Errorf("serializing resource json: %w", err)
 		}
 
-		bindings = append(bindings, &pc.DiscoverResponse_Binding{
-			RecommendedName: pf.Collection(fmt.Sprintf("%s/%s", db.Name(), collection.Name)),
-			ResourceSpecJson: resourceJSON,
+		bindings = append(bindings, &pc.Response_Discovered_Binding{
+			RecommendedName:    pf.Collection(fmt.Sprintf("%s/%s", db.Name(), collection.Name)),
+			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: minimalSchema,
-			KeyPtrs: []string{"/" + idProperty},
+			Key:                []string{"/" + idProperty},
 		})
 	}
 
-	return &pc.DiscoverResponse{Bindings: bindings}, nil
+	return &pc.Response_Discovered{Bindings: bindings}, nil
 }
