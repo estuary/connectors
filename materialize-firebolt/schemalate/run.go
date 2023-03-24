@@ -6,13 +6,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/gogo/protobuf/jsonpb"
 	proto "github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"os"
-	"os/exec"
 )
 
 // ProgramName is the name of schemalate binary built from rust.
@@ -68,8 +69,8 @@ func GetDropQuery(
 }
 
 func ValidateNewProjection(
-	spec *pm.ValidateRequest_Binding,
-) (map[string]*pm.Constraint, error) {
+	spec *pm.Request_Validate_Binding,
+) (map[string]*pm.Response_Validated_Constraint, error) {
 	var args = []string{"firebolt-schema", "validate-new-projection"}
 
 	var specBytes, err = proto.Marshal(spec)
@@ -88,9 +89,9 @@ func ValidateNewProjection(
 		return nil, fmt.Errorf("parsing constraints map %w with stdout %s", err, out)
 	}
 
-	var finalConstraints = map[string]*pm.Constraint{}
+	var finalConstraints = map[string]*pm.Response_Validated_Constraint{}
 	for key, val := range constraints {
-		var finalConstraint pm.Constraint
+		var finalConstraint pm.Response_Validated_Constraint
 		err = jsonpb.Unmarshal(bytes.NewReader(val), &finalConstraint)
 		if err != nil {
 			return nil, fmt.Errorf("parsing constraints map %w with stdout %s", err, out)
@@ -103,8 +104,8 @@ func ValidateNewProjection(
 
 func ValidateExistingProjection(
 	existing *pf.MaterializationSpec_Binding,
-	proposed *pm.ValidateRequest_Binding,
-) (map[string]*pm.Constraint, error) {
+	proposed *pm.Request_Validate_Binding,
+) (map[string]*pm.Response_Validated_Constraint, error) {
 	var args = []string{"firebolt-schema", "validate-existing-projection"}
 
 	var req = pm.Extra_ValidateExistingProjectionRequest{
@@ -128,9 +129,9 @@ func ValidateExistingProjection(
 		return nil, fmt.Errorf("parsing constraints map %w with stdout %s", err, out)
 	}
 
-	var finalConstraints = map[string]*pm.Constraint{}
+	var finalConstraints = map[string]*pm.Response_Validated_Constraint{}
 	for key, val := range constraints {
-		var finalConstraint pm.Constraint
+		var finalConstraint pm.Response_Validated_Constraint
 		err = jsonpb.Unmarshal(bytes.NewReader(val), &finalConstraint)
 		if err != nil {
 			return nil, fmt.Errorf("parsing constraints map %w with stdout %s", err, out)
@@ -143,7 +144,7 @@ func ValidateExistingProjection(
 
 func ValidateBindingAgainstConstraints(
 	binding *pf.MaterializationSpec_Binding,
-	constraints map[string]*pm.Constraint,
+	constraints map[string]*pm.Response_Validated_Constraint,
 ) error {
 	var args = []string{"firebolt-schema", "validate-binding-against-constraints"}
 

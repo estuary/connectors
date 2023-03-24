@@ -12,13 +12,12 @@ import (
 	"github.com/estuary/connectors/materialize-firebolt/schemalate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	log "github.com/sirupsen/logrus"
 )
 
 // driver implements the DriverServer interface.
 type driver struct{}
 
-func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	var endpointSchema, err = schemagen.GenerateSchema("Firebolt Connection", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
@@ -29,28 +28,28 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/materialize-firebolt",
+	return &pm.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/materialize-firebolt",
 	}, nil
 }
 
-func ValidateBindings(cfg config, materialization string, bindings []*pm.ValidateRequest_Binding) ([]map[string]*pm.Constraint, error) {
+func ValidateBindings(cfg config, materialization string, bindings []*pm.Request_Validate_Binding) ([]map[string]*pm.Response_Validated_Constraint, error) {
 	existing, err := LoadSpec(cfg, materialization)
 	if err != nil {
 		return nil, fmt.Errorf("loading materialization spec: %w", err)
 	}
 
-	var out []map[string]*pm.Constraint
+	var out []map[string]*pm.Response_Validated_Constraint
 	for _, proposed := range bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(proposed.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(proposed.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
 		// Make sure the specified resource is valid to build
-		var constraints map[string]*pm.Constraint
+		var constraints map[string]*pm.Response_Validated_Constraint
 
 		if existingBinding, ok := existing[res.Table]; ok {
 			constraints, err = schemalate.ValidateExistingProjection(existingBinding, proposed)
@@ -71,41 +70,41 @@ func ValidateBindings(cfg config, materialization string, bindings []*pm.Validat
 
 // Validate retrieves existing materialization spec and validates the new bindings either against
 // the old materialization spec, or validate it as new
-func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
+func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var constraints, err = ValidateBindings(cfg, req.Materialization.String(), req.Bindings)
+	var constraints, err = ValidateBindings(cfg, req.Name.String(), req.Bindings)
 	if err != nil {
 		return nil, err
 	}
 
-	var out []*pm.ValidateResponse_Binding
+	var out []*pm.Response_Validated_Binding
 	for i, proposed := range req.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(proposed.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(proposed.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		out = append(out, &pm.ValidateResponse_Binding{
+		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints[i],
 			DeltaUpdates: true,
 			ResourcePath: []string{res.Table},
 		})
 	}
 
-	return &pm.ValidateResponse{Bindings: out}, nil
+	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-// ApplyUpsert creates main and external table and persist materialization spec on S3
-func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+// Apply creates main and external table and persist materialization spec on S3
+func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 	var cfg config
-	if err := pf.UnmarshalStrict(req.Materialization.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
@@ -124,16 +123,16 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 
 	// Validate the new MaterializationSpec against its own constraints as a sanity check
 	// Map the materialization bindings to ValidateRequest_Binding to generate constraints again
-	var mappedBindings = []*pm.ValidateRequest_Binding{}
+	var mappedBindings = []*pm.Request_Validate_Binding{}
 	for _, proposed := range req.Materialization.Bindings {
-		mappedBinding := pm.ValidateRequest_Binding{
-			ResourceSpecJson: proposed.ResourceSpecJson,
-			Collection:       proposed.Collection,
+		mappedBinding := pm.Request_Validate_Binding{
+			ResourceConfigJson: proposed.ResourceConfigJson,
+			Collection:         proposed.Collection,
 		}
 		mappedBindings = append(mappedBindings, &mappedBinding)
 	}
 
-	constraints, err := ValidateBindings(cfg, req.Materialization.Materialization.String(), mappedBindings)
+	constraints, err := ValidateBindings(cfg, req.Materialization.Name.String(), mappedBindings)
 	if err != nil {
 		return nil, err
 	}
@@ -164,10 +163,10 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 			}
 		}
 
-		tables = append(tables, string(req.Materialization.Bindings[i].ResourceSpecJson))
+		tables = append(tables, string(req.Materialization.Bindings[i].ResourceConfigJson))
 	}
 
-	existing, err := LoadSpec(cfg, string(req.Materialization.Materialization))
+	existing, err := LoadSpec(cfg, string(req.Materialization.Name))
 	if err != nil {
 		return nil, fmt.Errorf("loading materialization spec: %w", err)
 	}
@@ -175,7 +174,7 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 	var droppedTables []string
 	for table, existingSpec := range existing {
 		// A binding that has been removed, we drop the corresponding table
-		if !SliceContains(string(existingSpec.ResourceSpecJson), tables) {
+		if !SliceContains(string(existingSpec.ResourceConfigJson), tables) {
 			query, err := schemalate.GetDropQuery(table)
 			if err != nil {
 				return nil, fmt.Errorf("building drop query: %w", err)
@@ -192,81 +191,14 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 	}
 
 	if req.DryRun {
-		return &pm.ApplyResponse{ActionDescription: fmt.Sprint("to create tables: ", strings.Join(tables, ","), " and drop tables: ", strings.Join(droppedTables, ","))}, nil
+		return &pm.Response_Applied{ActionDescription: fmt.Sprint("to create tables: ", strings.Join(tables, ","), " and drop tables: ", strings.Join(droppedTables, ","))}, nil
 	}
 
 	err = WriteSpec(cfg, req.Materialization, req.Version)
 	if err != nil {
 		return nil, fmt.Errorf("writing materialization spec to s3: %w", err)
 	}
-	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("created tables: ", strings.Join(tables, ","), " and dropped tables: ", strings.Join(droppedTables, ","))}, nil
-}
-
-// ApplyDelete deletes main and external tables
-func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	}
-
-	var cfg config
-	if err := pf.UnmarshalStrict(req.Materialization.EndpointSpecJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
-	}
-
-	var fb, err = firebolt.New(firebolt.Config{
-		EngineURL: cfg.EngineURL,
-		Database:  cfg.Database,
-		Username:  cfg.Username,
-		Password:  cfg.Password,
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("creating firebolt client: %w", err)
-	}
-
-	var tables []string
-	queries, err := schemalate.GetQueriesBundle(req.Materialization)
-	if err != nil {
-		return nil, fmt.Errorf("building firebolt search schema: %w", err)
-	}
-
-	for i, bundle := range queries.Bindings {
-		if !req.DryRun {
-			_, err := fb.Query(bundle.DropTable)
-			if err != nil {
-				if strings.Contains(err.Error(), "Did not find a table") {
-					log.WithFields(log.Fields{
-						"query": bundle.DropTable,
-					}).Warn("could not drop table because it does not exist.")
-				} else {
-					return nil, fmt.Errorf("running table drop query: %w", err)
-				}
-			}
-
-			_, err = fb.Query(bundle.DropExternalTable)
-			if err != nil {
-				if strings.Contains(err.Error(), "Did not find a table") {
-					log.WithFields(log.Fields{
-						"query": bundle.DropExternalTable,
-					}).Warn("could not drop table because it does not exist.")
-				} else {
-					return nil, fmt.Errorf("running external table drop query: %w", err)
-				}
-			}
-		}
-
-		tables = append(tables, string(req.Materialization.Bindings[i].ResourceSpecJson))
-	}
-
-	if req.DryRun {
-		return &pm.ApplyResponse{ActionDescription: fmt.Sprint("to delete tables: ", strings.Join(tables, ","))}, nil
-	}
-
-	err = CleanSpec(cfg, req.Materialization.Materialization.String())
-	if err != nil {
-		return nil, fmt.Errorf("cleaning up materialization spec: %w", err)
-	}
-	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("deleted tables: ", strings.Join(tables, ","))}, nil
+	return &pm.Response_Applied{ActionDescription: fmt.Sprint("created tables: ", strings.Join(tables, ","), " and dropped tables: ", strings.Join(droppedTables, ","))}, nil
 }
 
 func SliceContains(expected string, actual []string) bool {
@@ -279,4 +211,3 @@ func SliceContains(expected string, actual []string) bool {
 }
 
 func main() { boilerplate.RunMain(new(driver)) }
-
