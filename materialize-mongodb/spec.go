@@ -20,7 +20,7 @@ type SavedSpec struct {
 }
 
 // LoadSpec loads existing spec from spec collection and create a map of it by table name
-func (d driver) LoadSpec(ctx context.Context, cfg config, materialization string) (map[string]*pf.MaterializationSpec_Binding, error) {
+func (d driver) LoadSpec(ctx context.Context, cfg config, materialization string) (*pf.MaterializationSpec, error) {
 	var client, err = d.connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
@@ -44,17 +44,7 @@ func (d driver) LoadSpec(ctx context.Context, cfg config, materialization string
 		return nil, fmt.Errorf("parsing existing materialization spec: %w", err)
 	}
 
-	bindingsByTable := make(map[string]*pf.MaterializationSpec_Binding)
-
-	for _, binding := range existing.Bindings {
-		var r resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &r); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
-		}
-		bindingsByTable[r.Collection] = binding
-	}
-
-	return bindingsByTable, nil
+	return &existing, nil
 }
 
 func (d driver) WriteSpec(ctx context.Context, cfg config, materialization *pf.MaterializationSpec, version string) error {
