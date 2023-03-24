@@ -114,12 +114,12 @@ func validateRocksetName(field string, value string) error {
 
 type rocksetDriver struct{}
 
-func NewRocksetDriver() pm.DriverServer {
+func NewRocksetDriver() *rocksetDriver {
 	return new(rocksetDriver)
 }
 
 // pm.DriverServer interface.
-func (d *rocksetDriver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+func (d *rocksetDriver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -133,53 +133,52 @@ func (d *rocksetDriver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.Spec
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/materialize-rockset",
+	return &pm.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/materialize-rockset",
 	}, nil
 }
 
 // pm.DriverServer interface.
-func (d *rocksetDriver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
+func (d *rocksetDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	var bindings = []*pm.ValidateResponse_Binding{}
+	var bindings = []*pm.Response_Validated_Binding{}
 	for i, binding := range req.Bindings {
-		res, err := ResolveResourceConfig(binding.ResourceSpecJson)
+		res, err := ResolveResourceConfig(binding.ResourceConfigJson)
 		if err != nil {
 			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
 
-		var constraints = make(map[string]*pm.Constraint)
+		var constraints = make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range binding.Collection.Projections {
-			var constraint = &pm.Constraint{}
+			var constraint = &pm.Response_Validated_Constraint{}
 			if projection.Inference.IsSingleScalarType() {
-				constraint.Type = pm.Constraint_LOCATION_RECOMMENDED
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 				constraint.Reason = "The projection has a single scalar type."
 			} else {
-				constraint.Type = pm.Constraint_FIELD_OPTIONAL
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 				constraint.Reason = "The projection may materialize this field."
 			}
 			constraints[projection.Field] = constraint
 		}
 
-		bindings = append(bindings, &pm.ValidateResponse_Binding{
+		bindings = append(bindings, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			ResourcePath: []string{res.Workspace, res.Collection},
 			DeltaUpdates: true,
 		})
 	}
-	var response = &pm.ValidateResponse{Bindings: bindings}
+	var response = &pm.Response_Validated{Bindings: bindings}
 
 	return response, nil
 }
 
-// pm.DriverServer interface.
-func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	var cfg, err = ResolveEndpointConfig(req.Materialization.EndpointSpecJson)
+func (d *rocksetDriver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	var cfg, err = ResolveEndpointConfig(req.Materialization.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +191,7 @@ func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (
 	actionLog := []string{}
 	for i, binding := range req.Materialization.Bindings {
 		var res resource
-		if res, err = ResolveResourceConfig(binding.ResourceSpecJson); err != nil {
+		if res, err = ResolveResourceConfig(binding.ResourceConfigJson); err != nil {
 			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
 		}
 
@@ -209,122 +208,53 @@ func (d *rocksetDriver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (
 		}
 	}
 
-	response := &pm.ApplyResponse{
+	response := &pm.Response_Applied{
 		ActionDescription: strings.Join(actionLog, ", "),
 	}
 
 	return response, nil
 }
 
-// ApplyDelete implements pm.DriverServer and deletes all the rockset collections for all bindings.
-// It does not attempt to delete any workspaces, even if they would be left empty. This is because
-// deletion of collections is asynchronous and takes a while, and the workspace can't be deleted
-// until all the deletions complete.
-func (d *rocksetDriver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	var cfg, err = ResolveEndpointConfig(req.Materialization.EndpointSpecJson)
+func (d *rocksetDriver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+	cfg, err := ResolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
 	client, err := cfg.client()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	var actionDescription strings.Builder
-	if req.DryRun {
-		actionDescription.WriteString("Dry Run (skipping all actions):\n")
-	}
-
-	for _, binding := range req.Materialization.Bindings {
-		var res resource
-		// I think it's appropriate to ignore validation errors here, since we're in the process of
-		// deleting this thing anyway. But we should only try to delete the rockset collection if
-		// the resource validation is successful, since otherwise it's likely to result in a bad
-		// request.
-		if res, err = ResolveResourceConfig(binding.ResourceSpecJson); err != nil {
-			log.WithFields(log.Fields{
-				"resource": binding.ResourceSpecJson,
-				"error":    err,
-			}).Warn("Will skip deleting the Rockset collection for this binding because the resource spec failed validation")
-			fmt.Fprintf(&actionDescription, "skipping deletion due to failed validation of resource: '%s', error: %s\n", string(binding.ResourceSpecJson), err)
-			continue
-		}
-
-		fmt.Fprintf(&actionDescription, "Deleting Rockset Collection: '%s', Workspace: '%s'\n", res.Collection, res.Workspace)
-		if req.DryRun {
-			continue
-		}
-		var logEntry = log.WithFields(log.Fields{
-			"rocksetCollection": res.Collection,
-			"rocksetWorkspace":  res.Workspace,
-		})
-		var delErr = client.DeleteCollection(ctx, res.Workspace, res.Collection)
-		if delErr != nil {
-			if typedErr, ok := delErr.(rockset.Error); ok && typedErr.IsNotFoundError() {
-				logEntry.Info("Did not delete the collection because it does not exist")
-			} else {
-				logEntry.WithField("error", delErr).Error("Failed to delete rockset collection")
-				// We'll return the first deletion error we encounter, but only after deleting
-				// the rest of the collections.
-				if err == nil {
-					err = delErr
-				}
-			}
+	var bindings = make([]*binding, 0, len(open.Materialization.Bindings))
+	for i, spec := range open.Materialization.Bindings {
+		if res, err := ResolveResourceConfig(spec.ResourceConfigJson); err != nil {
+			return nil, nil, fmt.Errorf("building resource for binding %v: %w", i, err)
+		} else {
+			bindings = append(bindings, NewBinding(spec, &res))
 		}
 	}
 
-	if err != nil {
-		return nil, err
+	// Ensure that all the collections are ready to accept writes before returning the opened
+	// response. The error that's returned when attempting to write to a non-ready collection is
+	// not considered retryable by the client library.
+	log.Info("Waiting for Rockset collections to be ready to accept writes")
+	for _, b := range bindings {
+		if err := client.WaitUntilCollectionReady(ctx, b.rocksetWorkspace(), b.rocksetCollection()); err != nil {
+			return nil, nil, fmt.Errorf("waiting for rockset collection %q to be ready: %w", b.rocksetCollection(), err)
+		}
+		log.WithFields(log.Fields{
+			"workspace":  b.rocksetWorkspace(),
+			"collection": b.rocksetCollection(),
+		}).Info("Rockset collection is ready to accept writes")
 	}
+	log.Info("All Rockset collections are ready to accept writes")
 
-	return &pm.ApplyResponse{
-		ActionDescription: actionDescription.String(),
-	}, nil
-}
-
-// pm.DriverServer interface.
-func (d *rocksetDriver) Transactions(stream pm.Driver_TransactionsServer) error {
-	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
-		cfg, err := ResolveEndpointConfig(open.Materialization.EndpointSpecJson)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		client, err := cfg.client()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		var bindings = make([]*binding, 0, len(open.Materialization.Bindings))
-		for i, spec := range open.Materialization.Bindings {
-			if res, err := ResolveResourceConfig(spec.ResourceSpecJson); err != nil {
-				return nil, nil, fmt.Errorf("building resource for binding %v: %w", i, err)
-			} else {
-				bindings = append(bindings, NewBinding(spec, &res))
-			}
-		}
-
-		// Ensure that all the collections are ready to accept writes before returning the opened
-		// response. The error that's returned when attempting to write to a non-ready collection is
-		// not considered retryable by the client library.
-		log.Info("Waiting for Rockset collections to be ready to accept writes")
-		for _, b := range bindings {
-			if err := client.WaitUntilCollectionReady(ctx, b.rocksetWorkspace(), b.rocksetCollection()); err != nil {
-				return nil, nil, fmt.Errorf("waiting for rockset collection %q to be ready: %w", b.rocksetCollection(), err)
-			}
-			log.WithFields(log.Fields{
-				"workspace":  b.rocksetWorkspace(),
-				"collection": b.rocksetCollection(),
-			}).Info("Rockset collection is ready to accept writes")
-		}
-		log.Info("All Rockset collections are ready to accept writes")
-
-		return &transactor{
-			config:   &cfg,
-			client:   client,
-			bindings: bindings,
-		}, &pm.TransactionResponse_Opened{}, nil
-	})
+	return &transactor{
+		config:   &cfg,
+		client:   client,
+		bindings: bindings,
+	}, &pm.Response_Opened{}, nil
 }
 
 func ResolveEndpointConfig(specJson json.RawMessage) (config, error) {
