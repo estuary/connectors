@@ -1,5 +1,5 @@
 {
-  "endpoint_spec_schema_json": {
+  "config_schema_json": {
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/source-firestore/config",
     "properties": {
@@ -22,7 +22,7 @@
     ],
     "title": "Google Firestore"
   },
-  "resource_spec_schema_json": {
+  "resource_config_schema_json": {
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/source-firestore/resource",
     "properties": {
