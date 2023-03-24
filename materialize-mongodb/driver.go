@@ -126,12 +126,7 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 
 	var newCollections []string
 	for _, binding := range req.Materialization.Bindings {
-		var r resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &r); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		newCollections = append(newCollections, r.Collection)
+		newCollections = append(newCollections, binding.ResourcePath[1])
 	}
 
 	existing, err := d.LoadSpec(ctx, cfg, string(req.Materialization.Materialization))
@@ -141,7 +136,8 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 
 	var actions []string
 	if existing != nil {
-		for collection, _ := range existing {
+		for _, binding := range existing.Bindings {
+			var collection = binding.ResourcePath[1]
 			// A binding that has been removed
 			if !SliceContains(collection, newCollections) {
 				if !req.DryRun {
