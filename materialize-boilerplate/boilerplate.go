@@ -26,7 +26,6 @@ type Connector interface {
 	Validate(context.Context, *pm.Request_Validate) (*pm.Response_Validated, error)
 	Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error)
 	NewTransactor(context.Context, pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error)
-	// Transactions(context.Context, pm.Request_Open) error
 }
 
 // ConnectorServer wraps a Connector to implement the pc.ConnectorServer gRPC service interface.
