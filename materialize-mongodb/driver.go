@@ -2,17 +2,18 @@ package main
 
 import (
 	"context"
-	"strings"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"go.gazette.dev/core/consumer/protocol"
 
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
@@ -35,7 +36,7 @@ func (d *driver) connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	return client, nil
 }
 
-func (d driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -51,16 +52,16 @@ func (d driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/materialize-mongodb",
-		Oauth2Spec:             nil,
+	return &pm.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/materialize-mongodb",
+		Oauth2:                   nil,
 	}, nil
 }
 
-func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
-	cfg, err := resolveEndpointConfig(req.EndpointSpecJson)
+func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
+	cfg, err := resolveEndpointConfig(req.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -72,22 +73,22 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 
 	// MongoDB supports arbitrary JSON documents so there are no constraints on
 	// any fields and all fields are marked as "recommended"
-	var out []*pm.ValidateResponse_Binding
+	var out []*pm.Response_Validated_Binding
 	for _, b := range req.Bindings {
-		res, err := resolveResourceConfig(b.ResourceSpecJson)
+		res, err := resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, err
 		}
 
-		constraints := make(map[string]*pm.Constraint)
+		constraints := make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range b.Collection.Projections {
-			var constraint = new(pm.Constraint)
+			var constraint = new(pm.Response_Validated_Constraint)
 			switch {
 			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Constraint_LOCATION_REQUIRED
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = "The root document must be materialized"
 			default:
-				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 				constraint.Reason = "MongoDB only materializes the full document"
 			}
 			constraints[projection.Field] = constraint
@@ -95,24 +96,24 @@ func (d driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Vali
 
 		resourcePath := []string{cfg.Database, res.Collection}
 
-		out = append(out, &pm.ValidateResponse_Binding{
+		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: res.DeltaUpdates,
 			ResourcePath: resourcePath,
 		})
 	}
 
-	return &pm.ValidateResponse{Bindings: out}, nil
+	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-// ApplyUpsert checks for bindings that have been removed by comparing them with
+// Apply checks for bindings that have been removed by comparing them with
 // previously persisted spec, and deletes the corresponding collection
-func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	cfg, err := resolveEndpointConfig(req.Materialization.EndpointSpecJson)
+	cfg, err := resolveEndpointConfig(req.Materialization.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +130,7 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		newCollections = append(newCollections, binding.ResourcePath[1])
 	}
 
-	existing, err := d.LoadSpec(ctx, cfg, string(req.Materialization.Materialization))
+	existing, err := d.LoadSpec(ctx, cfg, string(req.Materialization.Name))
 	if err != nil {
 		return nil, fmt.Errorf("loading spec: %w", err)
 	}
@@ -157,93 +158,73 @@ func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.Appl
 		return nil, fmt.Errorf("writing spec: %w", err)
 	}
 
-	return &pm.ApplyResponse{
+	return &pm.Response_Applied{
 		ActionDescription: strings.Join(actions, "\n"),
 	}, nil
 }
 
-// ApplyDelete is no-op as well, since this operation is going to be superseded
-// by an "Apply" operation with no bindings specified
-func (d driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	}
-
-	cfg, err := resolveEndpointConfig(req.Materialization.EndpointSpecJson)
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	_, err = d.connect(ctx, cfg)
+	client, err := d.connect(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("connecting to database: %w", err)
+		return nil, nil, fmt.Errorf("connecting to database: %w", err)
 	}
 
-	return &pm.ApplyResponse{
-		ActionDescription: "",
-	}, nil
-}
-
-
-func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
-		var cfg, err = resolveEndpointConfig(open.Materialization.EndpointSpecJson)
+	var bindings []*binding
+	for _, b := range open.Materialization.Bindings {
+		res, err := resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, nil, err
 		}
+		var collection = client.Database(cfg.Database).Collection(res.Collection)
 
-		client, err := d.connect(ctx, cfg)
-		if err != nil {
-			return nil, nil, fmt.Errorf("connecting to database: %w", err)
+		bindings = append(bindings, &binding{
+			collection: collection,
+			res:        res,
+		})
+	}
+
+	var fenceCollection = client.Database(cfg.Database).Collection(fenceCollectionName)
+
+	var materialization = string(open.Materialization.Name)
+	var filter = bson.D{{
+		"materialization", bson.D{{"$eq", materialization}},
+	}}
+
+	var fence fenceRecord
+	if err := fenceCollection.FindOne(ctx, filter, options.FindOne()).Decode(&fence); err != nil && err != mongo.ErrNoDocuments {
+		return nil, nil, fmt.Errorf("finding existing fence: %w", err)
+	} else if err == mongo.ErrNoDocuments {
+		fence.Materialization = materialization
+		if _, err = fenceCollection.InsertOne(ctx, fence, options.InsertOne()); err != nil {
+			return nil, nil, fmt.Errorf("inserting new fence: %w", err)
 		}
+	}
 
-		var bindings []*binding
-		for _, b := range open.Materialization.Bindings {
-			res, err := resolveResourceConfig(b.ResourceSpecJson)
-			if err != nil {
-				return nil, nil, err
-			}
-			var collection = client.Database(cfg.Database).Collection(res.Collection)
+	var bump = bson.D{{"$inc", bson.D{{"fence", 1}}}}
+	var updateOpts = options.FindOneAndUpdate().SetReturnDocument(options.After)
+	if err = fenceCollection.FindOneAndUpdate(ctx, filter, bump, updateOpts).Decode(&fence); err != nil {
+		return nil, nil, fmt.Errorf("bumping fence: %w", err)
+	}
 
-			bindings = append(bindings, &binding{
-				collection: collection,
-				res: res,
-			})
-		}
+	var cp *protocol.Checkpoint
+	if err := cp.Unmarshal(fence.Checkpoint); err != nil {
+		return nil, nil, fmt.Errorf("unmarshalling checkpoint, %w", err)
+	}
 
-		var fenceCollection = client.Database(cfg.Database).Collection(fenceCollectionName)
-
-		var materialization = string(open.Materialization.Materialization)
-		var filter = bson.D{{
-			"materialization", bson.D{{"$eq", materialization}},
-		}}
-
-		var fence fenceRecord
-		if err := fenceCollection.FindOne(ctx, filter, options.FindOne()).Decode(&fence); err != nil && err != mongo.ErrNoDocuments {
-			return nil, nil, fmt.Errorf("finding existing fence: %w", err)
-		} else if err == mongo.ErrNoDocuments {
-			fence.Materialization = materialization
-			if _, err = fenceCollection.InsertOne(ctx, fence, options.InsertOne()); err != nil {
-				return nil, nil, fmt.Errorf("inserting new fence: %w", err)
-			}
-		}
-
-		var bump = bson.D{{"$inc", bson.D{{"fence", 1}}}}
-		var updateOpts = options.FindOneAndUpdate().SetReturnDocument(options.After)
-		if err = fenceCollection.FindOneAndUpdate(ctx, filter, bump, updateOpts).Decode(&fence); err != nil {
-			return nil, nil, fmt.Errorf("bumping fence: %w", err)
-		}
-
-		return &transactor{
+	return &transactor{
 			materialization: materialization,
-			client: client,
-			bindings: bindings,
+			client:          client,
+			bindings:        bindings,
 			fenceCollection: fenceCollection,
-			fence: &fence,
-		}, &pm.TransactionResponse_Opened{
-			RuntimeCheckpoint: fence.Checkpoint,
+			fence:           &fence,
+		}, &pm.Response_Opened{
+			RuntimeCheckpoint: cp,
 		}, nil
-	})
 }
 
 func resolveEndpointConfig(specJson json.RawMessage) (config, error) {
