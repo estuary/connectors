@@ -103,9 +103,9 @@ func generateMinimalSchema() json.RawMessage {
 }
 
 // Discover RPC
-func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.DiscoverResponse, error) {
+func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
@@ -126,7 +126,7 @@ func (driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Discov
 		return nil, fmt.Errorf("discovery error: %w", err)
 	}
 	log.WithField("collections", len(bindings)).Info("discovery complete")
-	return &pc.DiscoverResponse{
+	return &pc.Response_Discovered{
 		Bindings: bindings,
 	}, nil
 }
@@ -139,12 +139,12 @@ type discoveryState struct {
 	// Mutex-guarded state which may be modified from within worker goroutines.
 	shared struct {
 		sync.Mutex
-		counts   map[resourcePath]int                  // Map from resource paths to the number of documents processed.
-		bindings []*pc.DiscoverResponse_Binding        // List of output bindings from inference workers which have terminated.
+		counts   map[resourcePath]int              // Map from resource paths to the number of documents processed.
+		bindings []*pc.Response_Discovered_Binding // List of output bindings from inference workers which have terminated.
 	}
 }
 
-func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.DiscoverResponse_Binding, error) {
+func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.Response_Discovered_Binding, error) {
 	scanners, ctx := errgroup.WithContext(ctx)
 	var state = &discoveryState{
 		client:        client,
@@ -231,11 +231,11 @@ func (ds *discoveryState) discoverCollection(ctx context.Context, coll *firestor
 	if err != nil {
 		return fmt.Errorf("error serializing resource json: %w", err)
 	}
-	var binding = &pc.DiscoverResponse_Binding{
+	var binding = &pc.Response_Discovered_Binding{
 		RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
-		ResourceSpecJson:   resourceJSON,
+		ResourceConfigJson: resourceJSON,
 		DocumentSchemaJson: minimalSchema,
-		KeyPtrs:            []string{documentPath},
+		Key:                []string{documentPath},
 	}
 	ds.shared.Lock()
 	ds.shared.bindings = append(ds.shared.bindings, binding)
