@@ -14,7 +14,7 @@ func TestSpec(t *testing.T) {
 	t.Parallel()
 
 	driver := driver{}
-	response, err := driver.Spec(context.Background(), &pm.SpecRequest{})
+	response, err := driver.Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
