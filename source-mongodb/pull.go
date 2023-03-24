@@ -23,27 +23,20 @@ import (
 
 // Pull is a very long lived RPC through which the Flow runtime and a
 // Driver cooperatively execute an unbounded number of transactions.
-func (d *driver) Pull(stream pc.Driver_PullServer) error {
-	var open, err = stream.Recv()
-	if err != nil {
-		return fmt.Errorf("error reading PullRequest: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected PullRequest.Open, got %#v", open)
-	}
-
+func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	var cfg config
-	if err := pf.UnmarshalStrict(open.Open.Capture.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing config json: %w", err)
 	}
 
 	var prevState captureState
-	if open.Open.DriverCheckpointJson != nil {
-		if err := pf.UnmarshalStrict(open.Open.DriverCheckpointJson, &prevState); err != nil {
+	if open.StateJson != nil {
+		if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
 			return fmt.Errorf("parsing state checkpoint: %w", err)
 		}
 	}
 
-	var ctx = context.Background()
+	var ctx = stream.Context()
 
 	client, err := d.Connect(ctx, cfg)
 	if err != nil {
@@ -58,7 +51,7 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 	}()
 
 	var c = capture{
-		Output: &boilerplate.PullOutput{Stream: stream},
+		Output: stream,
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
@@ -67,9 +60,11 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 		return err
 	}
 
-	for idx, binding := range open.Open.Capture.Bindings {
+	for idx, binding := range open.Capture.Bindings {
+		idx := idx
+
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 		var resState, _ = prevState.Resources[resourceId(res)]
@@ -77,12 +72,12 @@ func (d *driver) Pull(stream pc.Driver_PullServer) error {
 		// Only backfill the first time, and we know that when there is no state
 		var backfillFinishedAt *primitive.Timestamp = nil
 		if len(prevState.Resources) == 0 {
-			if backfillFinishedAt, err = c.BackfillCollection(ctx, client, uint32(idx), res); err != nil {
+			if backfillFinishedAt, err = c.BackfillCollection(ctx, client, idx, res); err != nil {
 				return fmt.Errorf("backfill: %w", err)
 			}
 		}
 
-		eg.Go(func() error { return c.ChangeStream(ctx, client, uint32(idx), res, backfillFinishedAt, resState) })
+		eg.Go(func() error { return c.ChangeStream(ctx, client, idx, res, backfillFinishedAt, resState) })
 	}
 
 	if err := eg.Wait(); err != nil && !errors.Is(err, io.EOF) {
@@ -116,7 +111,7 @@ type changeEvent struct {
 const changeStreamFatalErrorCode = 280
 const resumePointGoneErrorMessage = "the resume point may no longer be in the oplog"
 
-func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding uint32, res resource, backfillFinishedAt *primitive.Timestamp, resumeToken bson.Raw) error {
+func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding int, res resource, backfillFinishedAt *primitive.Timestamp, resumeToken bson.Raw) error {
 	var db = client.Database(res.Database)
 
 	var collection = db.Collection(res.Collection)
@@ -219,7 +214,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 
 const CHECKPOINT_EVERY = 100
 
-func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding uint32, res resource) (*primitive.Timestamp, error) {
+func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding int, res resource) (*primitive.Timestamp, error) {
 	var db = client.Database(res.Database)
 
 	var collection = db.Collection(res.Collection)
