@@ -39,17 +39,17 @@ func TestRocksetResource(t *testing.T) {
 
 func TestRocksetDriverSpec(t *testing.T) {
 	var driver = new(rocksetDriver)
-	var specReq = pm.SpecRequest{}
+	var specReq = pm.Request_Spec{}
 	var response, err = driver.Spec(context.Background(), &specReq)
 	require.NoError(t, err)
 
 	t.Run("TestEndpointSpecSchema", func(t *testing.T) {
-		formatted, err := json.MarshalIndent(response.EndpointSpecSchemaJson, "", "  ")
+		formatted, err := json.MarshalIndent(response.ConfigSchemaJson, "", "  ")
 		require.NoError(t, err)
 		cupaloy.SnapshotT(t, string(formatted))
 	})
 	t.Run("TestResourceSpecSchema", func(t *testing.T) {
-		formatted, err := json.MarshalIndent(response.ResourceSpecSchemaJson, "", "  ")
+		formatted, err := json.MarshalIndent(response.ResourceConfigSchemaJson, "", "  ")
 		require.NoError(t, err)
 		cupaloy.SnapshotT(t, string(formatted))
 	})
@@ -75,14 +75,6 @@ func TestRocksetDriverValidate(t *testing.T) {
 
 	projections := []pf.Projection{
 		{
-			Ptr:            "/id",
-			Field:          "id",
-			Explicit:       true,
-			IsPartitionKey: true,
-			IsPrimaryKey:   true,
-			Inference:      pf.Inference{Types: []string{"string"}},
-		},
-		{
 			Ptr:            "/foo",
 			Field:          "foo",
 			Explicit:       true,
@@ -90,12 +82,19 @@ func TestRocksetDriverValidate(t *testing.T) {
 			IsPrimaryKey:   true,
 			Inference:      pf.Inference{Types: []string{"object"}},
 		},
+		{
+			Ptr:            "/id",
+			Field:          "id",
+			Explicit:       true,
+			IsPartitionKey: true,
+			IsPrimaryKey:   true,
+			Inference:      pf.Inference{Types: []string{"string"}},
+		},
 	}
 	collection := pf.CollectionSpec{
-		Collection:     "widgets",
-		WriteSchemaUri: "file:///schema.local",
-		KeyPtrs:        []string{"/id"},
-		Projections:    projections,
+		Name:        "widgets",
+		Key:         []string{"/id"},
+		Projections: projections,
 		PartitionTemplate: &pf.JournalSpec{
 			Name:        "widgets",
 			Replication: 1,
@@ -108,18 +107,18 @@ func TestRocksetDriverValidate(t *testing.T) {
 	}
 	fieldConfigJson := make(map[string]json.RawMessage)
 
-	bindings := []*pm.ValidateRequest_Binding{
+	bindings := []*pm.Request_Validate_Binding{
 		{
-			ResourceSpecJson: resourceSpecJson,
-			Collection:       collection,
-			FieldConfigJson:  fieldConfigJson,
+			ResourceConfigJson: resourceSpecJson,
+			Collection:         collection,
+			FieldConfigJsonMap: fieldConfigJson,
 		},
 	}
 
-	var validateReq = pm.ValidateRequest{
-		Materialization:  "just-a-test",
-		EndpointSpecJson: endpointSpecJson,
-		Bindings:         bindings,
+	var validateReq = pm.Request_Validate{
+		Name:       "just-a-test",
+		ConfigJson: endpointSpecJson,
+		Bindings:   bindings,
 	}
 	response, err := driver.Validate(context.Background(), &validateReq)
 
@@ -165,28 +164,26 @@ func TestRocksetDriverApply(t *testing.T) {
 		},
 	}
 	collection := pf.CollectionSpec{
-		Collection:     pf.Collection(collectionName),
-		WriteSchemaUri: "file:///schema.local",
-		KeyPtrs:        []string{"/id"},
-		Projections:    projections,
+		Name:        pf.Collection(collectionName),
+		Key:         []string{"/id"},
+		Projections: projections,
 	}
 
 	bindings := []*pf.MaterializationSpec_Binding{
 		{
-			ResourceSpecJson: resourceSpecJson,
-			ResourcePath:     []string{workspaceName, collectionName},
-			Collection:       collection,
-			FieldSelection:   pf.FieldSelection{},
-			DeltaUpdates:     true,
-			Shuffle:          pf.Shuffle{},
+			ResourceConfigJson: resourceSpecJson,
+			ResourcePath:       []string{workspaceName, collectionName},
+			Collection:         collection,
+			FieldSelection:     pf.FieldSelection{},
+			DeltaUpdates:       true,
 		},
 	}
 
-	var applyReq = pm.ApplyRequest{
+	var applyReq = pm.Request_Apply{
 		Materialization: &pf.MaterializationSpec{
-			Materialization:  pf.Materialization(collectionName),
-			EndpointSpecJson: endpointSpecJson,
-			Bindings:         bindings,
+			Name:       pf.Materialization(collectionName),
+			ConfigJson: endpointSpecJson,
+			Bindings:   bindings,
 		},
 		Version: "1",
 		DryRun:  false,
@@ -194,7 +191,7 @@ func TestRocksetDriverApply(t *testing.T) {
 
 	defer cleanup(config, workspaceName, collectionName)
 
-	response, err := driver.ApplyUpsert(context.Background(), &applyReq)
+	response, err := driver.Apply(context.Background(), &applyReq)
 
 	require.NoError(t, err)
 	require.Contains(t, response.ActionDescription, fmt.Sprintf("created %s collection", collectionName))
