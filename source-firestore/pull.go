@@ -40,32 +40,25 @@ const retryInterval = 300 * time.Second
 // Log progress messages after every N documents on a particular stream
 const progressLogInterval = 10000
 
-func (driver) Pull(stream pc.Driver_PullServer) error {
+func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
 
-	var open, err = stream.Recv()
-	if err != nil {
-		return fmt.Errorf("error reading PullRequest: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected PullRequest.Open, got %#v", open)
-	}
-
 	var cfg config
-	if err := pf.UnmarshalStrict(open.Open.Capture.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	var prevState captureState
-	if open.Open.DriverCheckpointJson != nil {
-		if err := pf.UnmarshalStrict(open.Open.DriverCheckpointJson, &prevState); err != nil {
+	if open.StateJson != nil {
+		if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
 			return fmt.Errorf("parsing state checkpoint: %w", err)
 		}
 	}
 
 	var resourceBindings []resource
-	for _, binding := range open.Open.Capture.Bindings {
+	for _, binding := range open.Capture.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 		resourceBindings = append(resourceBindings, res)
@@ -81,7 +74,7 @@ func (driver) Pull(stream pc.Driver_PullServer) error {
 		State: &captureState{
 			Resources: updatedResourceStates,
 		},
-		Output: &boilerplate.PullOutput{Stream: stream},
+		Output: stream,
 	}
 	return capture.Run(stream.Context())
 }
@@ -100,7 +93,7 @@ type captureState struct {
 type resourceState struct {
 	ReadTime     time.Time
 	Backfill     *backfillState
-	bindingIndex uint32
+	bindingIndex int
 }
 
 type backfillState struct {
@@ -128,7 +121,7 @@ func initResourceStates(prevStates map[string]*resourceState, resourceBindings [
 	var now = time.Now()
 	var states = make(map[string]*resourceState)
 	for idx, resource := range resourceBindings {
-		var state = &resourceState{bindingIndex: uint32(idx)}
+		var state = &resourceState{bindingIndex: idx}
 		if prevState, ok := prevStates[resource.Path]; ok {
 			state.ReadTime = prevState.ReadTime
 			state.Backfill = prevState.Backfill
@@ -163,14 +156,14 @@ func (s *captureState) Validate() error {
 	return nil
 }
 
-func (s *captureState) BindingIndex(resourcePath string) (uint32, bool) {
+func (s *captureState) BindingIndex(resourcePath string) (int, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	if state := s.Resources[resourcePath]; state != nil {
 		return state.bindingIndex, true
 	}
-	// Return UINT32_MAX just to be extra clear that we're not capturing this resource
-	return ^uint32(0), false
+	// Return MaxInt just to be extra clear that we're not capturing this resource
+	return math.MaxInt, false
 }
 
 func (s *captureState) ReadTime(resourcePath string) (time.Time, bool) {

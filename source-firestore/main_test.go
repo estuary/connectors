@@ -24,12 +24,12 @@ import (
 
 var testCredentialsPath = flag.String(
 	"creds_path",
-	"~/.config/gcloud/application_default_credentials.json",
+	"/Users/wbaker/Downloads/estuary-sandbox-c68fbf0575e2.json",
 	"Path to the credentials JSON to use for test authentication",
 )
 var testProjectID = flag.String(
 	"project_id",
-	"helpful-kingdom-273219",
+	"estuary-sandbox",
 	"The project ID to interact with during automated tests",
 )
 var testDatabaseName = flag.String(
@@ -68,7 +68,7 @@ func TestMain(m *testing.M) {
 
 func TestSpec(t *testing.T) {
 	driver := driver{}
-	response, err := driver.Spec(context.Background(), &pc.SpecRequest{})
+	response, err := driver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -263,9 +263,8 @@ func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
 	for _, name := range names {
 		var path = "flow_source_tests/*/" + name
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
-			Collection:       flow.CollectionSpec{Collection: flow.Collection("acmeCo/test/" + name)},
-			ResourceSpecJson: json.RawMessage(fmt.Sprintf(`{"path": %q, "backfillMode": "async"}`, path)),
-			ResourcePath:     []string{path},
+			ResourceConfigJson: json.RawMessage(fmt.Sprintf(`{"path": %q, "backfillMode": "async"}`, path)),
+			ResourcePath:       []string{path},
 		})
 	}
 	return bindings
