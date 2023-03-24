@@ -10,6 +10,7 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -256,10 +257,10 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		return nil, err
 	}
 
-	return func(_ context.Context, _ []byte, _ <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
-		return &pf.DriverCheckpoint{
-			DriverCheckpointJson: json.RawMessage(fmt.Sprintf("{\"round\":%v}", d.round)),
-			Rfc7396MergePatch:    false,
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		return &pf.ConnectorState{
+			UpdatedJson: json.RawMessage(fmt.Sprintf("{\"round\":%v}", d.round)),
+			MergePatch:  false,
 		}, nil
 	}, nil
 }

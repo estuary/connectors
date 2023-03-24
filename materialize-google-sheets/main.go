@@ -95,7 +95,7 @@ func (c driverCheckpoint) Validate() error {
 	return nil
 }
 
-func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -111,17 +111,17 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/materialize-google-sheets",
-		Oauth2Spec:             google_auth.Spec(scopes...),
+	return &pm.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/materialize-google-sheets",
+		Oauth2:                   google_auth.Spec(scopes...),
 	}, nil
 }
 
-func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
+func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, err
 	}
 
@@ -132,58 +132,50 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		return nil, fmt.Errorf("verifying credentials: %w", err)
 	}
 
-	var out []*pm.ValidateResponse_Binding
+	var out []*pm.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		var constraints = make(map[string]*pm.Constraint)
+		var constraints = make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range binding.Collection.Projections {
-			var constraint = new(pm.Constraint)
+			var constraint = new(pm.Response_Validated_Constraint)
 			switch {
 			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Constraint_LOCATION_REQUIRED
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = "The root document must be materialized"
 			case projection.IsPrimaryKey:
-				constraint.Type = pm.Constraint_LOCATION_REQUIRED
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = "Components of the collection key must be materialized"
 			case strings.HasPrefix(projection.Field, "_meta"):
-				constraint.Type = pm.Constraint_FIELD_OPTIONAL
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 				constraint.Reason = "Metadata fields are optional"
 			case projection.Inference.IsSingleScalarType():
-				constraint.Type = pm.Constraint_LOCATION_RECOMMENDED
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 				constraint.Reason = "Scalar types are recommended for materialization"
 			default:
-				constraint.Type = pm.Constraint_FIELD_OPTIONAL
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 				constraint.Reason = "Field is optional"
 			}
 			constraints[projection.Field] = constraint
 		}
 
-		out = append(out, &pm.ValidateResponse_Binding{
+		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: false,
 			ResourcePath: []string{res.Sheet},
 		})
 	}
 
-	return &pm.ValidateResponse{Bindings: out}, nil
+	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	return d.apply(ctx, req, false)
-}
-
-func (d driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	return d.apply(ctx, req, true)
-}
-
-func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*pm.ApplyResponse, error) {
+func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.Materialization.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, err
 	}
 
@@ -202,12 +194,12 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 		var _, exists = sheetIDs[res.Sheet]
 
-		if !exists && !isDelete {
+		if !exists {
 			description += fmt.Sprintf("Created sheet %q.\n", res.Sheet)
 
 			// Create a new sheet.
@@ -220,14 +212,6 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 					},
 				},
 			})
-		} else if exists && isDelete {
-			description += fmt.Sprintf("Deleted sheet %q.\n", res.Sheet)
-
-			actions = append(actions, &sheets.Request{
-				DeleteSheet: &sheets.DeleteSheetRequest{
-					SheetId: sheetIDs[res.Sheet],
-				},
-			})
 		}
 	}
 
@@ -237,61 +221,58 @@ func (driver) apply(ctx context.Context, req *pm.ApplyRequest, isDelete bool) (*
 		return nil, fmt.Errorf("while updated sheets: %w", err)
 	}
 
-	return &pm.ApplyResponse{ActionDescription: description}, nil
+	return &pm.Response_Applied{ActionDescription: description}, nil
 }
 
-// Transactions implements the DriverServer interface.
-func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
-		var cfg config
-		if err := pf.UnmarshalStrict(open.Materialization.EndpointSpecJson, &cfg); err != nil {
-			return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
-		}
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+	var cfg config
+	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
+		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
 
-		var checkpoint driverCheckpoint
-		if err := pf.UnmarshalStrict(open.DriverCheckpointJson, &checkpoint); err != nil {
-			return nil, nil, fmt.Errorf("parsing driver checkpoint: %w", err)
-		}
+	var checkpoint driverCheckpoint
+	if err := pf.UnmarshalStrict(open.StateJson, &checkpoint); err != nil {
+		return nil, nil, fmt.Errorf("parsing driver checkpoint: %w", err)
+	}
 
-		svc, err := cfg.buildService(stream.Context())
-		if err != nil {
-			return nil, nil, err
-		}
+	svc, err := cfg.buildService(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
 
-		states, err := loadSheetStates(
-			open.Materialization.Bindings,
-			svc,
-			cfg.spreadsheetID(),
-		)
-		if err != nil {
-			return nil, nil, fmt.Errorf("recovering sheet states: %w", err)
-		}
+	states, err := loadSheetStates(
+		open.Materialization.Bindings,
+		svc,
+		cfg.spreadsheetID(),
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("recovering sheet states: %w", err)
+	}
 
-		if err := writeSheetSentinels(stream.Context(), svc, cfg.spreadsheetID(), states); err != nil {
-			return nil, nil, fmt.Errorf("writing sheet sentinels: %w", err)
-		}
+	if err := writeSheetSentinels(ctx, svc, cfg.spreadsheetID(), states); err != nil {
+		return nil, nil, fmt.Errorf("writing sheet sentinels: %w", err)
+	}
 
-		bindings, err := buildTransactorBindings(
-			open.Materialization.Bindings,
-			checkpoint.Round,
-			states,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
+	bindings, err := buildTransactorBindings(
+		open.Materialization.Bindings,
+		checkpoint.Round,
+		states,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
 
-		if err := writeSheetHeaders(stream.Context(), svc, cfg.spreadsheetID(), bindings); err != nil {
-			return nil, nil, fmt.Errorf("writing sheet headers: %w", err)
-		}
+	if err := writeSheetHeaders(ctx, svc, cfg.spreadsheetID(), bindings); err != nil {
+		return nil, nil, fmt.Errorf("writing sheet headers: %w", err)
+	}
 
-		var transactor = &transactor{
-			bindings:      bindings,
-			client:        svc,
-			round:         checkpoint.Round,
-			spreadsheetId: cfg.spreadsheetID(),
-		}
-		return transactor, &pm.TransactionResponse_Opened{}, nil
-	})
+	var transactor = &transactor{
+		bindings:      bindings,
+		client:        svc,
+		round:         checkpoint.Round,
+		spreadsheetId: cfg.spreadsheetID(),
+	}
+	return transactor, &pm.Response_Opened{}, nil
 }
 
 func main() { boilerplate.RunMain(new(driver)) }
