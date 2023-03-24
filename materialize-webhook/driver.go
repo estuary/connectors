@@ -53,7 +53,7 @@ func (r resource) URL() *url.URL {
 	return u
 }
 
-func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	endpointSchema, err := schemagen.GenerateSchema("Webhook", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
@@ -64,27 +64,27 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/materialize-webhook",
+	return &pm.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/materialize-webhook",
 	}, nil
 }
 
 // Validate validates the Webhook configuration and constrains projections
 // to the document root (only).
-func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
+func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var out []*pm.ValidateResponse_Binding
+	var out []*pm.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 
 		// Verify that the resource parses, and joins into an absolute URL.
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 		var resolved = cfg.Address.URL().ResolveReference(res.URL())
@@ -92,21 +92,21 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 			return nil, fmt.Errorf("resolved webhook address %s is not absolute", resolved)
 		}
 
-		var constraints = make(map[string]*pm.Constraint)
+		var constraints = make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range binding.Collection.Projections {
-			var constraint = new(pm.Constraint)
+			var constraint = new(pm.Response_Validated_Constraint)
 			switch {
 			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Constraint_LOCATION_REQUIRED
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = "The root document must be materialized"
 			default:
-				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 				constraint.Reason = "Webhooks only materialize the full document"
 			}
 			constraints[projection.Field] = constraint
 		}
 
-		out = append(out, &pm.ValidateResponse_Binding{
+		out = append(out, &pm.Response_Validated_Binding{
 			Constraints: constraints,
 			// Only delta updates are supported by webhooks.
 			DeltaUpdates: true,
@@ -114,43 +114,35 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		})
 	}
 
-	return &pm.ValidateResponse{Bindings: out}, nil
+	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-// ApplyUpsert is a no-op.
-func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	return &pm.ApplyResponse{}, nil
+// Apply is a no-op.
+func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	return &pm.Response_Applied{}, nil
 }
 
-// ApplyDelete is a no-op.
-func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	return &pm.ApplyResponse{}, nil
-}
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+	var cfg config
+	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
+		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
 
-// Transactions implements the DriverServer interface.
-func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
-		var cfg config
-		if err := pf.UnmarshalStrict(open.Materialization.EndpointSpecJson, &cfg); err != nil {
-			return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+	var addresses []*url.URL
+
+	for _, binding := range open.Materialization.Bindings {
+		// Join paths of each binding with the base URL.
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
 		}
+		addresses = append(addresses, cfg.Address.URL().ResolveReference(res.URL()))
+	}
 
-		var addresses []*url.URL
-
-		for _, binding := range open.Materialization.Bindings {
-			// Join paths of each binding with the base URL.
-			var res resource
-			if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
-				return nil, nil, fmt.Errorf("parsing resource config: %w", err)
-			}
-			addresses = append(addresses, cfg.Address.URL().ResolveReference(res.URL()))
-		}
-
-		var transactor = &transactor{
-			addresses: addresses,
-		}
-		return transactor, &pm.TransactionResponse_Opened{}, nil
-	})
+	var transactor = &transactor{
+		addresses: addresses,
+	}
+	return transactor, &pm.Response_Opened{}, nil
 }
 
 type transactor struct {
