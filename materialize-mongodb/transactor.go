@@ -1,42 +1,42 @@
 package main
 
 import (
-	"encoding/json"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
+	"go.gazette.dev/core/consumer/protocol"
 
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type transactor struct {
 	materialization string
 	fenceCollection *mongo.Collection
-	fence *fenceRecord
+	fence           *fenceRecord
 
-	client *mongo.Client
+	client   *mongo.Client
 	bindings []*binding
 }
 
 type binding struct {
 	collection *mongo.Collection
-	res resource
+	res        resource
 }
 
 type fenceRecord struct {
-	Checkpoint []byte `bson:"checkpoint"`
+	Checkpoint      []byte `bson:"checkpoint"`
 	Materialization string `bson:"materialization"`
-	Fence int `bson:"fence"`
+	Fence           int    `bson:"fence"`
 }
 
 var idField = "_id"
 var fenceCollectionName = "flow_checkpoints"
-
 
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
@@ -120,9 +120,14 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		return nil, fmt.Errorf("finding fence: %w", err)
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint []byte, runtimeAckCh <-chan struct{}) (*pf.DriverCheckpoint, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		checkpointBytes, err := runtimeCheckpoint.Marshal()
+		if err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
+
 		return nil, pf.RunAsyncOperation(func() error {
-			var bump = bson.D{{"$set", bson.D{{"checkpoint", runtimeCheckpoint}}}}
+			var bump = bson.D{{"$set", bson.D{{"checkpoint", checkpointBytes}}}}
 			var updateOpts = options.Update()
 			if _, err = t.fenceCollection.UpdateOne(ctx, filter, bump, updateOpts); err != nil {
 				return fmt.Errorf("updating checkpoint: %w", err)
@@ -136,7 +141,6 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 func (t *transactor) Destroy() {
 }
-
 
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
