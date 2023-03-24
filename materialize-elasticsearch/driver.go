@@ -71,7 +71,7 @@ func (resource) GetFieldDocString(fieldName string) string {
 // driver implements the DriverServer interface.
 type driver struct{}
 
-func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	endpointSchema, err := schemagen.GenerateSchema("Elasticsearch Connection", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
@@ -82,16 +82,16 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/materialize-elasticsearch",
+	return &pm.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/materialize-elasticsearch",
 	}, nil
 }
 
-func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
+func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
@@ -100,10 +100,10 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		return nil, fmt.Errorf("creating elasticSearch: %w", err)
 	}
 
-	var out []*pm.ValidateResponse_Binding
+	var out []*pm.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
@@ -118,39 +118,39 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 			return nil, fmt.Errorf("validate elastic search index: %w", err)
 		}
 
-		var constraints = make(map[string]*pm.Constraint)
+		var constraints = make(map[string]*pm.Response_Validated_Constraint)
 
 		for _, projection := range binding.Collection.Projections {
-			var constraint = &pm.Constraint{}
+			var constraint = &pm.Response_Validated_Constraint{}
 			switch {
 			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Constraint_LOCATION_REQUIRED
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = "The root document is required."
 			case projection.IsPrimaryKey:
-				constraint.Type = pm.Constraint_LOCATION_REQUIRED
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = "Primary key locations are required."
 			default:
-				constraint.Type = pm.Constraint_FIELD_FORBIDDEN
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 				constraint.Reason = "Non-root document fields and non-primary key locations cannot be used."
 			}
 			constraints[projection.Field] = constraint
 		}
-		out = append(out, &pm.ValidateResponse_Binding{
+		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: res.DeltaUpdates,
 			ResourcePath: []string{res.Index},
 		})
 	}
 
-	return &pm.ValidateResponse{Bindings: out}, nil
+	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
+func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 	var cfg config
-	if err := pf.UnmarshalStrict(req.Materialization.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
@@ -162,7 +162,7 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 	var indices []string
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
@@ -178,75 +178,38 @@ func (driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyR
 		indices = append(indices, res.Index)
 	}
 
-	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("created indices: ", strings.Join(indices, ","))}, nil
+	return &pm.Response_Applied{ActionDescription: fmt.Sprint("created indices: ", strings.Join(indices, ","))}, nil
 }
 
-func (driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	}
-
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
 	var cfg config
-	if err := pf.UnmarshalStrict(req.Materialization.EndpointSpecJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
+		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
 	if err != nil {
-		return nil, fmt.Errorf("creating elasticSearch: %w", err)
+		return nil, nil, fmt.Errorf("creating elastic search client: %w", err)
 	}
 
-	var indices []string
-	for _, binding := range req.Materialization.Bindings {
+	var bindings []*binding
+	for _, b := range open.Materialization.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
+		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
+			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
 		}
-		indices = append(indices, res.Index)
+		bindings = append(bindings,
+			&binding{
+				index:        res.Index,
+				deltaUpdates: res.DeltaUpdates,
+			})
 	}
 
-	if req.DryRun {
-		return &pm.ApplyResponse{ActionDescription: fmt.Sprint("to delete indices: ", strings.Join(indices, ","))}, nil
+	var transactor = &transactor{
+		elasticSearch: elasticSearch,
+		bindings:      bindings,
 	}
-
-	if err = elasticSearch.DeleteIndices(indices); err != nil {
-		return nil, fmt.Errorf("deleting elastic search index: %w", err)
-	}
-	return &pm.ApplyResponse{ActionDescription: fmt.Sprint("deleted indices: ", strings.Join(indices, ","))}, nil
-}
-
-// Transactions implements the DriverServer interface.
-func (d driver) Transactions(stream pm.Driver_TransactionsServer) error {
-	return pm.RunTransactions(stream, func(ctx context.Context, open pm.TransactionRequest_Open) (pm.Transactor, *pm.TransactionResponse_Opened, error) {
-		var cfg config
-		if err := pf.UnmarshalStrict(open.Materialization.EndpointSpecJson, &cfg); err != nil {
-			return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
-		}
-
-		var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
-		if err != nil {
-			return nil, nil, fmt.Errorf("creating elastic search client: %w", err)
-		}
-
-		var bindings []*binding
-		for _, b := range open.Materialization.Bindings {
-			var res resource
-			if err := pf.UnmarshalStrict(b.ResourceSpecJson, &res); err != nil {
-				return nil, nil, fmt.Errorf("parsing resource config: %w", err)
-			}
-			bindings = append(bindings,
-				&binding{
-					index:        res.Index,
-					deltaUpdates: res.DeltaUpdates,
-				})
-		}
-
-		var transactor = &transactor{
-			elasticSearch: elasticSearch,
-			bindings:      bindings,
-		}
-		return transactor, &pm.TransactionResponse_Opened{}, nil
-	})
+	return transactor, &pm.Response_Opened{}, nil
 
 }
 
