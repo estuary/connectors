@@ -173,7 +173,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.App
 				var previousProjection = loadedBinding.Collection.GetProjection(field)
 
 				// Make sure new columns are added to the table
-				if previousProjection == nil {
+				if !SliceContains(field, loadedBinding.FieldSelection.Values) {
 					var table, err = ResolveTable(tableShape, endpoint.Dialect)
 					if err != nil {
 						return nil, err
