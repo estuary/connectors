@@ -138,7 +138,7 @@ type MappedType struct {
 	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct inclusion in raw SQL.
 	DDL string
 	// Converter of tuple elements for this mapping, into SQL runtime values.
-	Converter ElementConverter
+	Converter ElementConverter `json:"-"`
 	// ParsedFieldConfig is a Dialect-defined parsed implementation of the (optional)
 	// additional field configuration supplied within the field selection.
 	ParsedFieldConfig interface{}
