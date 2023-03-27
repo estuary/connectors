@@ -86,23 +86,3 @@ func WriteSpec(cfg config, materialization *pf.MaterializationSpec, version stri
 
 	return nil
 }
-
-func CleanSpec(cfg config, materialization string) error {
-	awsConfig := aws.Config{
-		Credentials: credentials.NewStaticCredentials(cfg.AWSKeyId, cfg.AWSSecretKey, ""),
-		Region:      &cfg.AWSRegion,
-	}
-	sess := session.Must(session.NewSession(&awsConfig))
-	svc := s3.New(sess)
-	specKey := fmt.Sprintf("%s/%s.flow.materialization_spec", CleanPrefix(cfg.S3Prefix), materialization)
-	_, err := svc.DeleteObject(&s3.DeleteObjectInput{
-		Bucket: &cfg.S3Bucket,
-		Key:    &specKey,
-	})
-
-	if err != nil {
-		return fmt.Errorf("deleting materialization spec %s: %w", specKey, err)
-	}
-
-	return nil
-}
