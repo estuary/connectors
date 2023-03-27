@@ -24,7 +24,7 @@ import (
 
 var testCredentialsPath = flag.String(
 	"creds_path",
-	"/Users/wbaker/Downloads/estuary-sandbox-c68fbf0575e2.json",
+	"~/.config/gcloud/application_default_credentials.json",
 	"Path to the credentials JSON to use for test authentication",
 )
 var testProjectID = flag.String(
