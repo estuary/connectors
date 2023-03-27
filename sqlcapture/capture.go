@@ -613,7 +613,7 @@ func (c *Capture) emitMessage(out *boilerplate.PullOutput, msg interface{}) erro
 		if !ok {
 			return fmt.Errorf("capture output to invalid stream %q", streamID)
 		}
-		return out.Documents(binding.Index, bs)
+		return out.Documents(int(binding.Index), bs)
 	case *PersistentState:
 		var bs, err = json.Marshal(msg)
 		if err != nil {
