@@ -88,21 +88,21 @@ func docsUrlFromEnv(providedURL string) string {
 
 // Spec returns the specification definition of this driver.
 // Notably this includes its endpoint and resource configuration JSON schema.
-func (d *Driver) Spec(ctx context.Context, req *pc.SpecRequest) (*pc.SpecResponse, error) {
+func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
 	var resourceSchema, err = schemagen.GenerateSchema("SQL Database Resource Spec", &Resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
-	return &pc.SpecResponse{
-		EndpointSpecSchemaJson: d.ConfigSchema,
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
+	return &pc.Response_Spec{
+		ConfigSchemaJson: d.ConfigSchema,
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
 		DocumentationUrl:       docsUrlFromEnv(d.DocumentationURL),
 	}, nil
 }
 
 // ApplyUpsert applies a new or updated capture to the store.
-func (d *Driver) ApplyUpsert(ctx context.Context, req *pc.ApplyRequest) (*pc.ApplyResponse, error) {
-	var db, err = d.Connect(ctx, string(req.Capture.Capture), req.Capture.EndpointSpecJson)
+func (d *Driver) ApplyUpsert(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
+	var db, err = d.Connect(ctx, string(req.Capture.Name), req.Capture.ConfigJson)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -115,7 +115,7 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pc.ApplyRequest) (*pc.App
 
 	for _, binding := range req.Capture.Bindings {
 		var res Resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 
@@ -125,17 +125,17 @@ func (d *Driver) ApplyUpsert(ctx context.Context, req *pc.ApplyRequest) (*pc.App
 			return nil, fmt.Errorf("could not find or access table %s", res.Stream)
 		}
 	}
-	return &pc.ApplyResponse{ActionDescription: ""}, nil
+	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
 // ApplyDelete deletes an existing capture from the store.
-func (d *Driver) ApplyDelete(ctx context.Context, req *pc.ApplyRequest) (*pc.ApplyResponse, error) {
-	return &pc.ApplyResponse{ActionDescription: ""}, nil
+func (d *Driver) ApplyDelete(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
+	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
 // Validate that store resources and proposed collection bindings are compatible.
-func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.ValidateResponse, error) {
-	var db, err = d.Connect(ctx, string(req.Capture), req.EndpointSpecJson)
+func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
+	var db, err = d.Connect(ctx, string(req.Name), req.ConfigJson)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -146,10 +146,10 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 	}
 
 	var errs = db.SetupPrerequisites(ctx)
-	var out []*pc.ValidateResponse_Binding
+	var out []*pc.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 		var res Resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 
@@ -158,19 +158,19 @@ func (d *Driver) Validate(ctx context.Context, req *pc.ValidateRequest) (*pc.Val
 			continue
 		}
 
-		out = append(out, &pc.ValidateResponse_Binding{
+		out = append(out, &pc.Response_Validated_Binding{
 			ResourcePath: []string{res.Namespace, res.Stream},
 		})
 	}
 	if len(errs) > 0 {
 		return nil, &prerequisitesError{errs}
 	}
-	return &pc.ValidateResponse{Bindings: out}, nil
+	return &pc.Response_Validated{Bindings: out}, nil
 }
 
 // Discover returns the set of resources available from this Driver.
-func (d *Driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.DiscoverResponse, error) {
-	var db, err = d.Connect(ctx, "Flow Discovery", req.EndpointSpecJson)
+func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
+	var db, err = d.Connect(ctx, "Flow Discovery", req.ConfigJson)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -184,10 +184,10 @@ func (d *Driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Dis
 	// Filter the watermarks table out of the discovered catalog before output
 	// It's basically never useful to capture so we shouldn't suggest it.
 	var watermarkStreamID = db.WatermarksTable()
-	var filteredBindings = []*pc.DiscoverResponse_Binding{} // Empty discovery must result in `[]` rather than `null`
+	var filteredBindings = []*pc.Response_Discovered_Binding{} // Empty discovery must result in `[]` rather than `null`
 	for _, binding := range discoveredBindings {
 		var res Resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
@@ -201,29 +201,23 @@ func (d *Driver) Discover(ctx context.Context, req *pc.DiscoverRequest) (*pc.Dis
 		}
 	}
 
-	return &pc.DiscoverResponse{Bindings: filteredBindings}, nil
+	return &pc.Response_Discovered{Bindings: filteredBindings}, nil
 }
 
 // Pull is a very long lived RPC through which the Flow runtime and a
 // Driver cooperatively execute an unbounded number of transactions.
-func (d *Driver) Pull(stream pc.Driver_PullServer) error {
+func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
-	var open, err = stream.Recv()
-	if err != nil {
-		return fmt.Errorf("error reading PullRequest: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected PullRequest.Open, got %#v", open)
-	}
 
 	var state = &PersistentState{Streams: make(map[string]TableState)}
-	if open.Open.DriverCheckpointJson != nil {
-		if err := pf.UnmarshalStrict(open.Open.DriverCheckpointJson, state); err != nil {
+	if open.StateJson != nil {
+		if err := pf.UnmarshalStrict(open.StateJson, state); err != nil {
 			return fmt.Errorf("unable to parse state checkpoint: %w", err)
 		}
 	}
 
 	var ctx = stream.Context()
-	db, err := d.Connect(ctx, string(open.Open.Capture.Capture), open.Open.Capture.EndpointSpecJson)
+	db, err := d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
 	if err != nil {
 		return fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -233,9 +227,9 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 
 	// Build a mapping from stream IDs to capture binding information
 	var bindings = make(map[string]*Binding)
-	for idx, binding := range open.Open.Capture.Bindings {
+	for idx, binding := range open.Capture.Bindings {
 		var res Resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("error parsing resource config: %w", err)
 		}
 		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
@@ -246,7 +240,7 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 		bindings[streamID] = &Binding{
 			Index:         uint32(idx),
 			Resource:      res,
-			CollectionKey: binding.Collection.KeyPtrs,
+			CollectionKey: binding.Collection.Key,
 		}
 	}
 
@@ -257,7 +251,7 @@ func (d *Driver) Pull(stream pc.Driver_PullServer) error {
 	var c = Capture{
 		Bindings: bindings,
 		State:    state,
-		Output:   &boilerplate.PullOutput{Stream: stream},
+		Output:   stream,
 		Database: db,
 	}
 	return c.Run(ctx)
