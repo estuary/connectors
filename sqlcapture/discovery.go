@@ -146,9 +146,9 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 
 		catalog = append(catalog, &pc.Response_Discovered_Binding{
 			RecommendedName:    pf.Collection(recommendedStreamName(table.Schema, table.Name)),
-			ResourceConfigJson:   resourceSpecJSON,
+			ResourceConfigJson: resourceSpecJSON,
 			DocumentSchemaJson: rawSchema,
-			Key:            keyPointers,
+			Key:                keyPointers,
 		})
 
 	}

@@ -134,10 +134,10 @@ func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamI
 
 	// Perform discovery and build a map from streamID to discovery binding response
 	var discoveredBindings = cs.Discover(ctx, t, regexp.MustCompile(`.*`))
-	var discovery = make(map[string]*capture.DiscoverResponse_Binding)
+	var discovery = make(map[string]*capture.Response_Discovered_Binding)
 	for _, d := range discoveredBindings {
 		var res sqlcapture.Resource
-		require.NoError(t, json.Unmarshal(d.ResourceSpecJson, &res))
+		require.NoError(t, json.Unmarshal(d.ResourceConfigJson, &res))
 		var streamID = sqlcapture.JoinStreamID(res.Namespace, res.Stream)
 		discovery[strings.ToLower(streamID)] = d
 	}
@@ -151,13 +151,13 @@ func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamI
 			t.Fatalf("stream %q not found in discovery", streamID)
 		}
 		var res sqlcapture.Resource
-		require.NoError(t, json.Unmarshal(b.ResourceSpecJson, &res))
+		require.NoError(t, json.Unmarshal(b.ResourceConfigJson, &res))
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
-			ResourceSpecJson: b.ResourceSpecJson,
+			ResourceConfigJson: b.ResourceConfigJson,
 			Collection: flow.CollectionSpec{
-				Collection:     "acmeCo/test/" + b.RecommendedName,
+				Name:           "acmeCo/test/" + b.RecommendedName,
 				ReadSchemaJson: b.DocumentSchemaJson,
-				KeyPtrs:        b.KeyPtrs,
+				Key:            b.Key,
 			},
 			ResourcePath: []string{res.Namespace, res.Stream},
 		})
@@ -172,8 +172,8 @@ func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamI
 // a binding for table `foobar_bbb` which doesn't actually exist.
 func BindingReplace(b *flow.CaptureSpec_Binding, old, new string) *flow.CaptureSpec_Binding {
 	var x = *b
-	x.Collection.Collection = flow.Collection(strings.ReplaceAll(string(x.Collection.Collection), old, new))
-	x.ResourceSpecJson = json.RawMessage(strings.ReplaceAll(string(x.ResourceSpecJson), old, new))
+	x.Collection.Name = flow.Collection(strings.ReplaceAll(string(x.Collection.Name), old, new))
+	x.ResourceConfigJson = json.RawMessage(strings.ReplaceAll(string(x.ResourceConfigJson), old, new))
 	for idx := range x.ResourcePath {
 		x.ResourcePath[idx] = strings.ReplaceAll(x.ResourcePath[idx], old, new)
 	}
