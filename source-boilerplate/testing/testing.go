@@ -273,7 +273,7 @@ func (a *pullAdapter) Send(m *pc.Response) error {
 		for _, doc := range a.transaction {
 			var binding string
 			if idx := doc.Binding; int(idx) < len(a.bindings) {
-				binding = strings.Join(a.bindings[idx].ResourcePath, ".")
+				binding = string(a.bindings[idx].Collection.Name)
 			} else {
 				binding = fmt.Sprintf("Invalid Binding %d", idx)
 			}

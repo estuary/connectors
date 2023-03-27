@@ -1,7 +1,7 @@
 Binding 0:
 {
     "recommended_name": "usertypes_domain_bandoleer",
-    "resource_spec_json": {
+    "resource_config_json": {
       "namespace": "test",
       "stream": "usertypes_domain_bandoleer"
     },
@@ -105,7 +105,7 @@ Binding 0:
         }
       ]
     },
-    "key_ptrs": [
+    "key": [
       "/id"
     ]
   }

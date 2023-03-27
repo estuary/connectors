@@ -1,7 +1,7 @@
 Binding 0:
 {
     "recommended_name": "users",
-    "resource_spec_json": {
+    "resource_config_json": {
       "namespace": "test",
       "stream": "USERS"
     },
@@ -102,7 +102,7 @@ Binding 0:
         }
       ]
     },
-    "key_ptrs": [
+    "key": [
       "/id"
     ]
   }

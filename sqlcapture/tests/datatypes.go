@@ -36,7 +36,7 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 		t.Run(fmt.Sprintf("%d_%s", idx, testName), func(t *testing.T) {
 			var uniqueSuffix = fmt.Sprintf("scrabbled_%d_quinine", idx)
 			var tableName = tb.CreateTable(ctx, t, uniqueSuffix, fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
-			var stream *capture.DiscoverResponse_Binding
+			var stream *capture.Response_Discovered_Binding
 
 			// Perform discovery and verify that the generated JSON schema looks correct
 			t.Run("discovery", func(t *testing.T) {

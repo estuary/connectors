@@ -1,7 +1,7 @@
 Binding 0:
 {
     "recommended_name": "generic_simplediscovery_magnanimous_outshine",
-    "resource_spec_json": {
+    "resource_config_json": {
       "namespace": "test",
       "stream": "Generic_SimpleDiscovery_magnanimous_outshine"
     },
@@ -109,7 +109,7 @@ Binding 0:
         }
       ]
     },
-    "key_ptrs": [
+    "key": [
       "/a"
     ]
   }
