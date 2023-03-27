@@ -41,7 +41,7 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 // testConfigSchema serializes the response to a SpecRequest RPC and verifies it
 // against a snapshot.
 func testConfigSchema(ctx context.Context, t *testing.T, tb TestBackend) {
-	response, err := tb.CaptureSpec(ctx, t).Driver.Spec(ctx, &pc.SpecRequest{})
+	response, err := tb.CaptureSpec(ctx, t).Driver.Spec(ctx, &pc.Request_Spec{})
 	require.NoError(t, err)
 	formatted, err := json.MarshalIndent(response, "", "  ")
 	require.NoError(t, err)
@@ -179,10 +179,10 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 	require.NoError(t, err)
 	cs.Bindings = append(cs.Bindings, &flow.CaptureSpec_Binding{
 		Collection: flow.CollectionSpec{
-			Collection: flow.Collection("acmeCo/test/" + strings.ToLower(nameParts[1])),
+			Name: flow.Collection("acmeCo/test/" + strings.ToLower(nameParts[1])),
 		},
-		ResourceSpecJson: specJSON,
-		ResourcePath:     nameParts,
+		ResourceConfigJson: specJSON,
+		ResourcePath:       nameParts,
 	})
 
 	t.Run("capture1", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
@@ -210,10 +210,10 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 	require.NoError(t, err)
 	cs.Bindings = append(cs.Bindings, &flow.CaptureSpec_Binding{
 		Collection: flow.CollectionSpec{
-			Collection: flow.Collection("acmeCo/test/" + strings.ToLower(nameParts[1])),
+			Name: flow.Collection("acmeCo/test/" + strings.ToLower(nameParts[1])),
 		},
-		ResourceSpecJson: specJSON,
-		ResourcePath:     nameParts,
+		ResourceConfigJson: specJSON,
+		ResourcePath:       nameParts,
 	})
 
 	t.Run("capture1", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })

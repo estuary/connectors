@@ -86,7 +86,7 @@ func docsUrlFromEnv(providedURL string) string {
 	return providedURL
 }
 
-// Spec returns the specification definition of this driver.
+// spec returns the specification definition of this driver.
 // Notably this includes its endpoint and resource configuration JSON schema.
 func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
 	var resourceSchema, err = schemagen.GenerateSchema("SQL Database Resource Spec", &Resource{}).MarshalJSON()
@@ -94,42 +94,42 @@ func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_S
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 	return &pc.Response_Spec{
-		ConfigSchemaJson: d.ConfigSchema,
+		Protocol:                 3032023,
+		ConfigSchemaJson:         d.ConfigSchema,
 		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       docsUrlFromEnv(d.DocumentationURL),
+		DocumentationUrl:         docsUrlFromEnv(d.DocumentationURL),
 	}, nil
 }
 
-// ApplyUpsert applies a new or updated capture to the store.
-func (d *Driver) ApplyUpsert(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
-	var db, err = d.Connect(ctx, string(req.Capture.Name), req.Capture.ConfigJson)
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to database: %w", err)
-	}
-	defer db.Close(ctx)
+// Apply applies a new or updated capture to the store.
+func (d *Driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
+	// If there are no bindings in the request, then it may represent the deletion of the capture,
+	// or it may also be that the all of the bindings were deleted but the capture remains.
+	if len(req.Capture.Bindings) > 0 {
+		var db, err = d.Connect(ctx, string(req.Capture.Name), req.Capture.ConfigJson)
+		if err != nil {
+			return nil, fmt.Errorf("error connecting to database: %w", err)
+		}
+		defer db.Close(ctx)
 
-	discoveredTables, err := db.DiscoverTables(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, binding := range req.Capture.Bindings {
-		var res Resource
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return nil, fmt.Errorf("error parsing resource config: %w", err)
+		discoveredTables, err := db.DiscoverTables(ctx)
+		if err != nil {
+			return nil, err
 		}
 
-		var streamID = JoinStreamID(res.Namespace, res.Stream)
+		for _, binding := range req.Capture.Bindings {
+			var res Resource
+			if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+				return nil, fmt.Errorf("error parsing resource config: %w", err)
+			}
 
-		if _, ok := discoveredTables[streamID]; !ok {
-			return nil, fmt.Errorf("could not find or access table %s", res.Stream)
+			var streamID = JoinStreamID(res.Namespace, res.Stream)
+
+			if _, ok := discoveredTables[streamID]; !ok {
+				return nil, fmt.Errorf("could not find or access table %s", res.Stream)
+			}
 		}
 	}
-	return &pc.Response_Applied{ActionDescription: ""}, nil
-}
-
-// ApplyDelete deletes an existing capture from the store.
-func (d *Driver) ApplyDelete(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
 	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
@@ -210,7 +210,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	log.Debug("connector started")
 
 	var state = &PersistentState{Streams: make(map[string]TableState)}
-	if open.StateJson != nil {
+	if len(open.StateJson) > 0 {
 		if err := pf.UnmarshalStrict(open.StateJson, state); err != nil {
 			return fmt.Errorf("unable to parse state checkpoint: %w", err)
 		}
@@ -251,7 +251,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	var c = Capture{
 		Bindings: bindings,
 		State:    state,
-		Output:   stream,
+		Output:   &boilerplate.PullOutput{Connector_CaptureServer: stream},
 		Database: db,
 	}
 	return c.Run(ctx)
