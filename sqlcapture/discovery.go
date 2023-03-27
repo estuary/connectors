@@ -14,7 +14,7 @@ import (
 
 // DiscoverCatalog queries the database and generates an Airbyte Catalog
 // describing the available tables and their columns.
-func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.DiscoverResponse_Binding, error) {
+func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovered_Binding, error) {
 	tables, err := db.DiscoverTables(ctx)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.DiscoverResponse_B
 	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
 
-	var catalog []*pc.DiscoverResponse_Binding
+	var catalog []*pc.Response_Discovered_Binding
 	for _, table := range tables {
 		logrus.WithFields(logrus.Fields{
 			"table":      table.Name,
@@ -144,11 +144,11 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.DiscoverResponse_B
 			return nil, fmt.Errorf("error serializing resource spec: %w", err)
 		}
 
-		catalog = append(catalog, &pc.DiscoverResponse_Binding{
+		catalog = append(catalog, &pc.Response_Discovered_Binding{
 			RecommendedName:    pf.Collection(recommendedStreamName(table.Schema, table.Name)),
-			ResourceSpecJson:   resourceSpecJSON,
+			ResourceConfigJson:   resourceSpecJSON,
 			DocumentSchemaJson: rawSchema,
-			KeyPtrs:            keyPointers,
+			Key:            keyPointers,
 		})
 
 	}
