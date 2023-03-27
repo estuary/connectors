@@ -366,7 +366,7 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tr
 		return nil, nil, fmt.Errorf("building transactor: %w", err)
 	}
 
-	var cp *protocol.Checkpoint
+	var cp = new(protocol.Checkpoint)
 	if err := cp.Unmarshal(fence.Checkpoint); err != nil {
 		return nil, nil, fmt.Errorf("unmarshalling fence.Checkpoint, %w", err)
 	}
