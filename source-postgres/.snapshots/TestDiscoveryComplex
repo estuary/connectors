@@ -1,7 +1,7 @@
 Binding 0:
 {
     "recommended_name": "discoverycomplex_cheap_oxygenation",
-    "resource_spec_json": {
+    "resource_config_json": {
       "namespace": "test",
       "stream": "discoverycomplex_cheap_oxygenation"
     },
@@ -122,7 +122,7 @@ Binding 0:
         }
       ]
     },
-    "key_ptrs": [
+    "key": [
       "/k2",
       "/k1"
     ]

@@ -1,7 +1,7 @@
 Binding 0:
 {
     "recommended_name": "trickycolumnnames_fizzed_cupcake_a",
-    "resource_spec_json": {
+    "resource_config_json": {
       "namespace": "test",
       "stream": "trickycolumnnames_fizzed_cupcake_a"
     },
@@ -105,14 +105,14 @@ Binding 0:
         }
       ]
     },
-    "key_ptrs": [
+    "key": [
       "/Meta/\"wtf\"/ID"
     ]
   }
 Binding 1:
 {
     "recommended_name": "trickycolumnnames_fizzed_cupcake_b",
-    "resource_spec_json": {
+    "resource_config_json": {
       "namespace": "test",
       "stream": "trickycolumnnames_fizzed_cupcake_b"
     },
@@ -216,7 +216,7 @@ Binding 1:
         }
       ]
     },
-    "key_ptrs": [
+    "key": [
       "/table"
     ]
   }
