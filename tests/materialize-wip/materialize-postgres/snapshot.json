@@ -204,3 +204,18 @@
 {"table":"Multiple Types","row":{"id":10,"array_int":[1,2],"bool_field":true,"float_field":10.1,"nested":{"id":"i10"},"nullable_int":10,"str_field":"str10"}}
 {"table":"Formatted Strings","row":{"id":3,"int_and_str":3,"int_str":30,"num_and_str":3.1,"num_str":30.1}}
 {"table":"Formatted Strings","row":{"id":4,"int_and_str":4,"int_str":40,"num_and_str":4.1,"num_str":40.1}}
+{
+  "applied": {}
+}
+{
+  "opened": {
+    "runtimeCheckpoint": {
+      "sources": {
+        "a/read/journal;suffix": {}
+      }
+    }
+  }
+}
+{
+  "acknowledged": {}
+}

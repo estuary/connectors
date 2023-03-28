@@ -352,3 +352,14 @@
     }
   ]
 }
+{
+  "applied": {
+    "actionDescription": "created indices: "
+  }
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
