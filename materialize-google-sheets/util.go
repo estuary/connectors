@@ -172,6 +172,10 @@ func loadSheetStates(
 	client *sheets.Service,
 	spreadsheetID string,
 ) ([]SheetState, error) {
+	if len(bindings) == 0 {
+		// Bail out because an empty Ranges() constraint below will return *all* sheets.
+		return nil, nil
+	}
 
 	var sheetNames, sheetRanges []string
 	for _, binding := range bindings {
@@ -293,6 +297,10 @@ func batchRequestWithRetry(
 	spreadsheetID string,
 	requests []*sheets.Request,
 ) error {
+	if len(requests) == 0 {
+		return nil // Nothing to do, and an attempted actual request will fail.
+	}
+
 	for attempt := 1; true; attempt++ {
 		var _, err = client.Spreadsheets.BatchUpdate(spreadsheetID,
 			&sheets.BatchUpdateSpreadsheetRequest{Requests: requests}).

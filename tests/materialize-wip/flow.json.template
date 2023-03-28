@@ -59,7 +59,7 @@
   "materializations": {
     "tests/${CONNECTOR}/materialize": {
       "endpoint": {
-        "flowSink": {
+        "connector": {
           "image": "${CONNECTOR_IMAGE}",
           "config": ${CONNECTOR_CONFIG}
         }

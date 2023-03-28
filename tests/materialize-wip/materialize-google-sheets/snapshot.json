@@ -181,9 +181,6 @@
     }
   }
 }
-{
-  "acknowledged": {}
-}
 {"values":[{"userEnteredValue":{"stringValue":"id"}},{"userEnteredValue":{"stringValue":"canary"}}]}
 {"values":[{"userEnteredValue":{"numberValue":1}},{"userEnteredValue":{"stringValue":"amputation's"}}]}
 {"values":[{"userEnteredValue":{"numberValue":2}},{"userEnteredValue":{"stringValue":"armament's"}}]}
@@ -212,3 +209,12 @@
 {"values":[{"userEnteredValue":{"numberValue":8}},{"userEnteredValue":{"boolValue":true}},{"userEnteredValue":{"numberValue":8.8}},{"userEnteredValue":{"stringValue":"i8"}},{"userEnteredValue":{"numberValue":8}},{"userEnteredValue":{"stringValue":"str8"}}]}
 {"values":[{"userEnteredValue":{"numberValue":9}},{"userEnteredValue":{"boolValue":false}},{"userEnteredValue":{"numberValue":9.9}},{"userEnteredValue":{"stringValue":"i9"}},{},{"userEnteredValue":{"stringValue":"str9"}}]}
 {"values":[{"userEnteredValue":{"numberValue":10}},{"userEnteredValue":{"boolValue":true}},{"userEnteredValue":{"numberValue":10.1}},{"userEnteredValue":{"stringValue":"i10"}},{"userEnteredValue":{"numberValue":10}},{"userEnteredValue":{"stringValue":"str10"}}]}
+{
+  "applied": {}
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
