@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/elastic/go-elasticsearch/v7/esutil"
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -283,14 +284,25 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		return nil, err
 	}
 
+	// Refresh to make segments available for search, and flush to disk.
+
+	var refreshes []func(*esapi.IndicesRefreshRequest)
+	var flushes []func(*esapi.IndicesFlushRequest)
 	for _, b := range t.bindings {
-		// Using Flush instead of Refresh to make sure the data are persisted.
-		// Although both operations ensure the data in ElasticSearch available for search,
-		// Flush guarantees the data are persisted to disk. For details see
-		// https://qbox.io/blog/refresh-flush-operations-elasticsearch-guide/)
-		if err := t.elasticSearch.Flush(b.index); err != nil {
-			return nil, err
-		}
+		refreshes = append(refreshes, t.elasticSearch.client.Indices.Refresh.WithIndex(b.index))
+		flushes = append(flushes, t.elasticSearch.client.Indices.Flush.WithIndex(b.index))
+	}
+
+	refreshResp, err := t.elasticSearch.client.Indices.Refresh(refreshes...)
+	defer closeResponse(refreshResp)
+	if err = t.elasticSearch.parseErrorResp(err, refreshResp); err != nil {
+		return nil, fmt.Errorf("failed to refresh: %w", err)
+	}
+
+	flushResp, err := t.elasticSearch.client.Indices.Flush(flushes...)
+	defer closeResponse(flushResp)
+	if err = t.elasticSearch.parseErrorResp(err, flushResp); err != nil {
+		return nil, fmt.Errorf("failed to flush: %w", err)
 	}
 
 	return nil, nil

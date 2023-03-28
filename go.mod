@@ -19,7 +19,7 @@ require (
 	github.com/benbjohnson/clock v1.3.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/elastic/go-elasticsearch/v7 v7.17.1
-	github.com/estuary/flow v0.1.9-0.20230327223815-afe6d29a1203
+	github.com/estuary/flow v0.1.9-0.20230328162226-717f771893a4
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/gogo/protobuf v1.3.2
@@ -31,7 +31,6 @@ require (
 	github.com/jackc/pgproto3/v2 v2.3.0
 	github.com/jackc/pgtype v1.11.0
 	github.com/jackc/pgx/v4 v4.16.1
-	github.com/jessevdk/go-flags v1.5.0
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/microsoft/go-mssqldb v0.19.0
 	github.com/mitchellh/mapstructure v1.4.1
@@ -100,6 +99,7 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/jackc/puddle v1.2.1 // indirect
+	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.15.5 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
