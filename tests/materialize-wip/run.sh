@@ -14,8 +14,7 @@ cd "$ROOT_DIR"
 export CONNECTOR_IMAGE="ghcr.io/estuary/${CONNECTOR}:${VERSION}"
 
 function bail() {
-    echo "$@" 1>&2
-    echo "test failed..."
+    echo -e "$@"
     exit 1
 }
 export -f bail
@@ -56,10 +55,12 @@ fi
 
 envsubst < ${TEST_DIR}/flow.json.template > ${TEMP_DIR}/flow.json \
     || bail "generating catalog failed"
+envsubst < ${TEST_DIR}/empty.flow.json.template > ${TEMP_DIR}/empty.flow.json \
+    || bail "generating empty catalog failed"
 
 # File into which we'll write a snapshot of the connector output.
-SNAPSHOT_ACTUAL=${TEST_DIR}/${CONNECTOR}/snapshot.actual
-rm ${SNAPSHOT_ACTUAL} || true
+SNAPSHOT=${TEST_DIR}/${CONNECTOR}/snapshot.json
+rm ${SNAPSHOT} || true
 
 function drive_connector {
     local source=$1;
@@ -81,7 +82,7 @@ function drive_connector {
     # Drive the connector, writing its output into the snapshot.
     ~/flowctl raw materialize-fixture --source ${TEMP_DIR}/spec.proto --fixture ${fixture} | \
         docker run --rm -i -e FLOW_RUNTIME_CODEC=json --network flow-test ${CONNECTOR_IMAGE} | \
-        jq 'if .applied.actionDescription != null then .applied.actionDescription |= sub("[A-Za-z0-9+/=]{100,}"; "(a-base64-encoded-value)") else . end' >> ${SNAPSHOT_ACTUAL} \
+        jq 'if .applied.actionDescription != null then .applied.actionDescription |= sub("[A-Za-z0-9+/=]{100,}"; "(a-base64-encoded-value)") else . end' >> ${SNAPSHOT} \
         || bail "connector invocation failed"
 }
 
@@ -89,17 +90,15 @@ function drive_connector {
 drive_connector ${TEMP_DIR}/flow.json ${TEST_DIR}/fixture.yaml
 
 # Extend the snapshot with additional fetched content for this connector.
-source ${TEST_DIR}/${CONNECTOR}/fetch.sh >> ${SNAPSHOT_ACTUAL} || bail "fetching results failed"
+source ${TEST_DIR}/${CONNECTOR}/fetch.sh >> ${SNAPSHOT} || bail "fetching results failed"
+
+# Drive it again to excercise any cleanup behavior when bindings are removed.
+drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.yaml
 
 # Compare actual and expected snapshots.
-diff \
-    --suppress-common-lines \
-    --side-by-side \
-    ${SNAPSHOT_ACTUAL} ${TEST_DIR}/${CONNECTOR}/snapshot.expected \
-    || bail "Test Failed because snapshot is different"
-
-# Only remove the actual snapshot if we passed.
-rm ${SNAPSHOT_ACTUAL}
+# Produce patch output, so that differences in CI can be reviewed and manually
+# patched into the expectation without having to run the test locally via:
+git diff --exit-code ${SNAPSHOT} || bail "Test Failed because snapshot is different"
 
 TEST_STATUS="Test Passed"
 

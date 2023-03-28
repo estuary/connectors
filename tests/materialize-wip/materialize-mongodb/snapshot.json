@@ -2,7 +2,9 @@
   "applied": {}
 }
 {
-  "opened": {}
+  "opened": {
+    "runtimeCheckpoint": {}
+  }
 }
 {
   "acknowledged": {}
@@ -304,4 +306,23 @@
       "str": "str 10"
     }
   ]
+}
+{
+  "applied": {
+    "actionDescription": "drop collection Simple\ndrop collection duplicate_keys_standard\ndrop collection duplicate_keys_delta"
+  }
+}
+{
+  "opened": {
+    "runtimeCheckpoint": {
+      "sources": {
+        "a/read/journal;suffix": {
+          "readThrough": "1"
+        }
+      }
+    }
+  }
+}
+{
+  "acknowledged": {}
 }

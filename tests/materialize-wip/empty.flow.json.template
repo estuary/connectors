@@ -1,0 +1,21 @@
+{
+  "materializations": {
+    "tests/${CONNECTOR}/materialize": {
+      "endpoint": {
+        "connector": {
+          "image": "${CONNECTOR_IMAGE}",
+          "config": ${CONNECTOR_CONFIG}
+        }
+      },
+      "bindings": []
+    }
+  },
+
+  "storageMappings": {
+    "": {
+      "stores": [
+        { "provider": "S3", "bucket": "a-bucket" }
+      ]
+    }
+  }
+}
