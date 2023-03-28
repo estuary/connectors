@@ -1,15 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	proto "github.com/gogo/protobuf/proto"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const specCollection = "flow_materializations"
@@ -60,7 +60,7 @@ func (d driver) WriteSpec(ctx context.Context, cfg config, materialization *pf.M
 	}
 
 	opts := options.Replace().SetUpsert(true)
-	_, err = collection.ReplaceOne(ctx, bson.D{{idField, string(materialization.Materialization)}}, bson.D{{"spec", bs}}, opts)
+	_, err = collection.ReplaceOne(ctx, bson.D{{idField, string(materialization.Name)}}, bson.D{{"spec", bs}}, opts)
 	if err != nil {
 		return fmt.Errorf("upserting spec: %w", err)
 	}
