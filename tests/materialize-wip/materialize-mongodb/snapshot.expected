@@ -1,0 +1,307 @@
+{
+  "applied": {}
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_id": "1501",
+      "id": 1,
+      "int": 1,
+      "str": "str 1"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_id": "1502",
+      "id": 2,
+      "int": 2,
+      "str": "str 2"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_id": "1503",
+      "id": 3,
+      "int": 3,
+      "str": "str 3"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_id": "1504",
+      "id": 4,
+      "int": 4,
+      "str": "str 4"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_id": "1505",
+      "id": 5,
+      "int": 5,
+      "str": "str 5"
+    }
+  }
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "index": "$1",
+  "rows": [
+    {
+      "_id": "1501",
+      "canary": "amputation's",
+      "id": {
+        "$numberInt": "1"
+      }
+    },
+    {
+      "_id": "1502",
+      "canary": "armament's",
+      "id": {
+        "$numberInt": "2"
+      }
+    },
+    {
+      "_id": "1503",
+      "canary": "splatters",
+      "id": {
+        "$numberInt": "3"
+      }
+    },
+    {
+      "_id": "1504",
+      "canary": "strengthen",
+      "id": {
+        "$numberInt": "4"
+      }
+    },
+    {
+      "_id": "1505",
+      "canary": "Kringle's",
+      "id": {
+        "$numberInt": "5"
+      }
+    },
+    {
+      "_id": "1506",
+      "canary": "grosbeak's",
+      "id": {
+        "$numberInt": "6"
+      }
+    },
+    {
+      "_id": "1507",
+      "canary": "pieced",
+      "id": {
+        "$numberInt": "7"
+      }
+    },
+    {
+      "_id": "1508",
+      "canary": "roaches",
+      "id": {
+        "$numberInt": "8"
+      }
+    },
+    {
+      "_id": "1509",
+      "canary": "devilish",
+      "id": {
+        "$numberInt": "9"
+      }
+    },
+    {
+      "_id": "150a",
+      "canary": "glucose's",
+      "id": {
+        "$numberInt": "10"
+      }
+    }
+  ]
+}
+{
+  "index": "$1",
+  "rows": [
+    {
+      "_id": "1501",
+      "id": {
+        "$numberInt": "1"
+      },
+      "int": {
+        "$numberInt": "6"
+      },
+      "str": "str 6"
+    },
+    {
+      "_id": "1502",
+      "id": {
+        "$numberInt": "2"
+      },
+      "int": {
+        "$numberInt": "7"
+      },
+      "str": "str 7"
+    },
+    {
+      "_id": "1503",
+      "id": {
+        "$numberInt": "3"
+      },
+      "int": {
+        "$numberInt": "8"
+      },
+      "str": "str 8"
+    },
+    {
+      "_id": "1504",
+      "id": {
+        "$numberInt": "4"
+      },
+      "int": {
+        "$numberInt": "9"
+      },
+      "str": "str 9"
+    },
+    {
+      "_id": "1505",
+      "id": {
+        "$numberInt": "5"
+      },
+      "int": {
+        "$numberInt": "10"
+      },
+      "str": "str 10"
+    }
+  ]
+}
+{
+  "index": "$1",
+  "rows": [
+    {
+      "id": {
+        "$numberInt": "1"
+      },
+      "int": {
+        "$numberInt": "1"
+      },
+      "str": "str 1"
+    },
+    {
+      "id": {
+        "$numberInt": "2"
+      },
+      "int": {
+        "$numberInt": "2"
+      },
+      "str": "str 2"
+    },
+    {
+      "id": {
+        "$numberInt": "3"
+      },
+      "int": {
+        "$numberInt": "3"
+      },
+      "str": "str 3"
+    },
+    {
+      "id": {
+        "$numberInt": "4"
+      },
+      "int": {
+        "$numberInt": "4"
+      },
+      "str": "str 4"
+    },
+    {
+      "id": {
+        "$numberInt": "5"
+      },
+      "int": {
+        "$numberInt": "5"
+      },
+      "str": "str 5"
+    },
+    {
+      "id": {
+        "$numberInt": "1"
+      },
+      "int": {
+        "$numberInt": "6"
+      },
+      "str": "str 6"
+    },
+    {
+      "id": {
+        "$numberInt": "2"
+      },
+      "int": {
+        "$numberInt": "7"
+      },
+      "str": "str 7"
+    },
+    {
+      "id": {
+        "$numberInt": "3"
+      },
+      "int": {
+        "$numberInt": "8"
+      },
+      "str": "str 8"
+    },
+    {
+      "id": {
+        "$numberInt": "4"
+      },
+      "int": {
+        "$numberInt": "9"
+      },
+      "str": "str 9"
+    },
+    {
+      "id": {
+        "$numberInt": "5"
+      },
+      "int": {
+        "$numberInt": "10"
+      },
+      "str": "str 10"
+    }
+  ]
+}
