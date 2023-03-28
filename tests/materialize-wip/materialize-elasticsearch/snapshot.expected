@@ -1,0 +1,354 @@
+{
+  "applied": {
+    "actionDescription": "created indices: index-duplicated-keys-delta,index-duplicated-keys-non-delta,index-multiple-data-types"
+  }
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
+        61,
+        62
+      ],
+      "bool_field": true,
+      "float_field": 6.6,
+      "id": 6,
+      "nested": {
+        "id": "i6"
+      },
+      "nullable_int": 6,
+      "str_field": "str6"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
+        71,
+        72
+      ],
+      "bool_field": false,
+      "float_field": 7.7,
+      "id": 7,
+      "nested": {
+        "id": "i7"
+      },
+      "nullable_int": null,
+      "str_field": "str7"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
+        81,
+        82
+      ],
+      "bool_field": true,
+      "float_field": 8.8,
+      "id": 8,
+      "nested": {
+        "id": "i8"
+      },
+      "nullable_int": 8,
+      "str_field": "str8"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
+        91,
+        92
+      ],
+      "bool_field": false,
+      "float_field": 9.9,
+      "id": 9,
+      "nested": {
+        "id": "i9"
+      },
+      "nullable_int": null,
+      "str_field": "str9"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
+        1,
+        2
+      ],
+      "bool_field": true,
+      "float_field": 10.1,
+      "id": 10,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10"
+    }
+  }
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "index": "index-duplicated-keys-delta",
+  "rows": [
+    {
+      "id": 1,
+      "int": 1,
+      "str": "str 1"
+    },
+    {
+      "id": 1,
+      "int": 6,
+      "str": "str 6"
+    },
+    {
+      "id": 2,
+      "int": 2,
+      "str": "str 2"
+    },
+    {
+      "id": 2,
+      "int": 7,
+      "str": "str 7"
+    },
+    {
+      "id": 3,
+      "int": 3,
+      "str": "str 3"
+    },
+    {
+      "id": 3,
+      "int": 8,
+      "str": "str 8"
+    },
+    {
+      "id": 4,
+      "int": 4,
+      "str": "str 4"
+    },
+    {
+      "id": 4,
+      "int": 9,
+      "str": "str 9"
+    },
+    {
+      "id": 5,
+      "int": 5,
+      "str": "str 5"
+    },
+    {
+      "id": 5,
+      "int": 10,
+      "str": "str 10"
+    }
+  ]
+}
+{
+  "index": "index-duplicated-keys-non-delta",
+  "rows": [
+    {
+      "id": 1,
+      "int": 6,
+      "str": "str 6"
+    },
+    {
+      "id": 2,
+      "int": 7,
+      "str": "str 7"
+    },
+    {
+      "id": 3,
+      "int": 8,
+      "str": "str 8"
+    },
+    {
+      "id": 4,
+      "int": 9,
+      "str": "str 9"
+    },
+    {
+      "id": 5,
+      "int": 10,
+      "str": "str 10"
+    }
+  ]
+}
+{
+  "index": "index-multiple-data-types",
+  "rows": [
+    {
+      "array_int": [
+        11,
+        12
+      ],
+      "bool_field": false,
+      "float_field": 1.1,
+      "id": 1,
+      "nested": {
+        "id": "i1"
+      },
+      "nullable_int": null,
+      "str_field": "str1"
+    },
+    {
+      "array_int": [
+        21,
+        22
+      ],
+      "bool_field": true,
+      "float_field": 2.2,
+      "id": 2,
+      "nested": {
+        "id": "i2"
+      },
+      "nullable_int": 2,
+      "str_field": "str2"
+    },
+    {
+      "array_int": [
+        31,
+        32
+      ],
+      "bool_field": false,
+      "float_field": 3.3,
+      "id": 3,
+      "nested": {
+        "id": "i3"
+      },
+      "nullable_int": null,
+      "str_field": "str3"
+    },
+    {
+      "array_int": [
+        41,
+        42
+      ],
+      "bool_field": true,
+      "float_field": 4.4,
+      "id": 4,
+      "nested": {
+        "id": "i4"
+      },
+      "nullable_int": 4,
+      "str_field": "str4"
+    },
+    {
+      "array_int": [
+        51,
+        52
+      ],
+      "bool_field": false,
+      "float_field": 5.5,
+      "id": 5,
+      "nested": {
+        "id": "i5"
+      },
+      "nullable_int": null,
+      "str_field": "str5"
+    },
+    {
+      "array_int": [
+        61,
+        62
+      ],
+      "bool_field": true,
+      "float_field": 6.6,
+      "id": 6,
+      "nested": {
+        "id": "i6"
+      },
+      "nullable_int": 6,
+      "str_field": "str6"
+    },
+    {
+      "array_int": [
+        71,
+        72
+      ],
+      "bool_field": false,
+      "float_field": 7.7,
+      "id": 7,
+      "nested": {
+        "id": "i7"
+      },
+      "nullable_int": null,
+      "str_field": "str7"
+    },
+    {
+      "array_int": [
+        81,
+        82
+      ],
+      "bool_field": true,
+      "float_field": 8.8,
+      "id": 8,
+      "nested": {
+        "id": "i8"
+      },
+      "nullable_int": 8,
+      "str_field": "str8"
+    },
+    {
+      "array_int": [
+        91,
+        92
+      ],
+      "bool_field": false,
+      "float_field": 9.9,
+      "id": 9,
+      "nested": {
+        "id": "i9"
+      },
+      "nullable_int": null,
+      "str_field": "str9"
+    },
+    {
+      "array_int": [
+        1,
+        2
+      ],
+      "bool_field": true,
+      "float_field": 10.1,
+      "id": 10,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10"
+    }
+  ]
+}

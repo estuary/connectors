@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -62,10 +63,10 @@ func (es *ElasticSearch) DeleteIndices(indices []string) error {
 
 // CreateIndex creates a new es index and sets its mappings to be schemaJSON,
 // if the index does not exist. Otherwise,
-// 1. if the new index has a different mapping (or num_of_shards spec) from the existing index,
-//    the API stops with an error, because the mapping and num_of_shards cannot be changed after creation.
-// 2. if the new index has a different num_of_replica spec from the existing index,
-//    the API resets the setting to match the new.
+//  1. if the new index has a different mapping (or num_of_shards spec) from the existing index,
+//     the API stops with an error, because the mapping and num_of_shards cannot be changed after creation.
+//  2. if the new index has a different num_of_replica spec from the existing index,
+//     the API resets the setting to match the new.
 func (es *ElasticSearch) CreateIndex(index string, numOfShards int, numOfReplicas int, schemaJSON json.RawMessage, dryRun bool) error {
 	var schema = make(map[string]interface{})
 	var err = json.Unmarshal(schemaJSON, &schema)
@@ -228,23 +229,15 @@ func (es *ElasticSearch) SearchByIds(index string, ids []string) ([]json.RawMess
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
+	// Return document chunks in a stable order.
+	// This facilitates testing.
+	sort.Slice(r.Hits.Hits, func(i, j int) bool { return r.Hits.Hits[i].ID < r.Hits.Hits[j].ID })
+
 	var results = make([]json.RawMessage, 0, len(r.Hits.Hits))
 	for _, hit := range r.Hits.Hits {
 		results = append(results, hit.Source)
 	}
 	return results, nil
-}
-
-func (es *ElasticSearch) Flush(index string) error {
-	var resp, err = es.client.Indices.Flush(
-		es.client.Indices.Flush.WithIndex(index),
-	)
-	defer closeResponse(resp)
-	if err = es.parseErrorResp(err, resp); err != nil {
-		return fmt.Errorf("flush: %w", err)
-	}
-
-	return nil
 }
 
 func (es *ElasticSearch) checkIndexMapping(index string, schema map[string]interface{}) error {
