@@ -214,7 +214,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		return nil, nil, fmt.Errorf("bumping fence: %w", err)
 	}
 
-	var cp *protocol.Checkpoint
+	var cp = new(protocol.Checkpoint)
 	if err := cp.Unmarshal(fence.Checkpoint); err != nil {
 		return nil, nil, fmt.Errorf("unmarshalling checkpoint, %w", err)
 	}
