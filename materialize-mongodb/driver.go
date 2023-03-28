@@ -87,6 +87,9 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			case projection.IsRootDocumentProjection():
 				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = "The root document must be materialized"
+			case projection.IsPrimaryKey:
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+				constraint.Reason = "Document keys must be included"
 			default:
 				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 				constraint.Reason = "MongoDB only materializes the full document"
