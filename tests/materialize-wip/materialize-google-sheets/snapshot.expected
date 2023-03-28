@@ -1,0 +1,214 @@
+{
+  "applied": {
+    "actionDescription": "Created sheet \"Simple\".\nCreated sheet \"duplicate_keys\".\nCreated sheet \"Multiple Types\".\n"
+  }
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {
+    "state": {
+      "updated": {
+        "round": 1
+      }
+    }
+  }
+}
+{
+  "acknowledged": {}
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "id": 1,
+      "int": 1,
+      "str": "str 1"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "id": 2,
+      "int": 2,
+      "str": "str 2"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "id": 3,
+      "int": 3,
+      "str": "str 3"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "id": 4,
+      "int": 4,
+      "str": "str 4"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "id": 5,
+      "int": 5,
+      "str": "str 5"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
+        61,
+        62
+      ],
+      "bool_field": true,
+      "float_field": 6.6,
+      "id": 6,
+      "nested": {
+        "id": "i6"
+      },
+      "nullable_int": 6,
+      "str_field": "str6"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
+        71,
+        72
+      ],
+      "bool_field": false,
+      "float_field": 7.7,
+      "id": 7,
+      "nested": {
+        "id": "i7"
+      },
+      "nullable_int": null,
+      "str_field": "str7"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
+        81,
+        82
+      ],
+      "bool_field": true,
+      "float_field": 8.8,
+      "id": 8,
+      "nested": {
+        "id": "i8"
+      },
+      "nullable_int": 8,
+      "str_field": "str8"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
+        91,
+        92
+      ],
+      "bool_field": false,
+      "float_field": 9.9,
+      "id": 9,
+      "nested": {
+        "id": "i9"
+      },
+      "nullable_int": null,
+      "str_field": "str9"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
+        1,
+        2
+      ],
+      "bool_field": true,
+      "float_field": 10.1,
+      "id": 10,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10"
+    }
+  }
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {
+    "state": {
+      "updated": {
+        "round": 2
+      }
+    }
+  }
+}
+{
+  "acknowledged": {}
+}
+{"values":[{"userEnteredValue":{"stringValue":"id"}},{"userEnteredValue":{"stringValue":"canary"}}]}
+{"values":[{"userEnteredValue":{"numberValue":1}},{"userEnteredValue":{"stringValue":"amputation's"}}]}
+{"values":[{"userEnteredValue":{"numberValue":2}},{"userEnteredValue":{"stringValue":"armament's"}}]}
+{"values":[{"userEnteredValue":{"numberValue":3}},{"userEnteredValue":{"stringValue":"splatters"}}]}
+{"values":[{"userEnteredValue":{"numberValue":4}},{"userEnteredValue":{"stringValue":"strengthen"}}]}
+{"values":[{"userEnteredValue":{"numberValue":5}},{"userEnteredValue":{"stringValue":"Kringle's"}}]}
+{"values":[{"userEnteredValue":{"numberValue":6}},{"userEnteredValue":{"stringValue":"grosbeak's"}}]}
+{"values":[{"userEnteredValue":{"numberValue":7}},{"userEnteredValue":{"stringValue":"pieced"}}]}
+{"values":[{"userEnteredValue":{"numberValue":8}},{"userEnteredValue":{"stringValue":"roaches"}}]}
+{"values":[{"userEnteredValue":{"numberValue":9}},{"userEnteredValue":{"stringValue":"devilish"}}]}
+{"values":[{"userEnteredValue":{"numberValue":10}},{"userEnteredValue":{"stringValue":"glucose's"}}]}
+{"values":[{"userEnteredValue":{"stringValue":"id"}},{"userEnteredValue":{"stringValue":"int"}},{"userEnteredValue":{"stringValue":"str"}}]}
+{"values":[{"userEnteredValue":{"numberValue":1}},{"userEnteredValue":{"numberValue":6}},{"userEnteredValue":{"stringValue":"str 6"}}]}
+{"values":[{"userEnteredValue":{"numberValue":2}},{"userEnteredValue":{"numberValue":7}},{"userEnteredValue":{"stringValue":"str 7"}}]}
+{"values":[{"userEnteredValue":{"numberValue":3}},{"userEnteredValue":{"numberValue":8}},{"userEnteredValue":{"stringValue":"str 8"}}]}
+{"values":[{"userEnteredValue":{"numberValue":4}},{"userEnteredValue":{"numberValue":9}},{"userEnteredValue":{"stringValue":"str 9"}}]}
+{"values":[{"userEnteredValue":{"numberValue":5}},{"userEnteredValue":{"numberValue":10}},{"userEnteredValue":{"stringValue":"str 10"}}]}
+{"values":[{"userEnteredValue":{"stringValue":"id"}},{"userEnteredValue":{"stringValue":"bool_field"}},{"userEnteredValue":{"stringValue":"float_field"}},{"userEnteredValue":{"stringValue":"nested/id"}},{"userEnteredValue":{"stringValue":"nullable_int"}},{"userEnteredValue":{"stringValue":"str_field"}}]}
+{"values":[{"userEnteredValue":{"numberValue":1}},{"userEnteredValue":{"boolValue":false}},{"userEnteredValue":{"numberValue":1.1}},{"userEnteredValue":{"stringValue":"i1"}},{},{"userEnteredValue":{"stringValue":"str1"}}]}
+{"values":[{"userEnteredValue":{"numberValue":2}},{"userEnteredValue":{"boolValue":true}},{"userEnteredValue":{"numberValue":2.2}},{"userEnteredValue":{"stringValue":"i2"}},{"userEnteredValue":{"numberValue":2}},{"userEnteredValue":{"stringValue":"str2"}}]}
+{"values":[{"userEnteredValue":{"numberValue":3}},{"userEnteredValue":{"boolValue":false}},{"userEnteredValue":{"numberValue":3.3}},{"userEnteredValue":{"stringValue":"i3"}},{},{"userEnteredValue":{"stringValue":"str3"}}]}
+{"values":[{"userEnteredValue":{"numberValue":4}},{"userEnteredValue":{"boolValue":true}},{"userEnteredValue":{"numberValue":4.4}},{"userEnteredValue":{"stringValue":"i4"}},{"userEnteredValue":{"numberValue":4}},{"userEnteredValue":{"stringValue":"str4"}}]}
+{"values":[{"userEnteredValue":{"numberValue":5}},{"userEnteredValue":{"boolValue":false}},{"userEnteredValue":{"numberValue":5.5}},{"userEnteredValue":{"stringValue":"i5"}},{},{"userEnteredValue":{"stringValue":"str5"}}]}
+{"values":[{"userEnteredValue":{"numberValue":6}},{"userEnteredValue":{"boolValue":true}},{"userEnteredValue":{"numberValue":6.6}},{"userEnteredValue":{"stringValue":"i6"}},{"userEnteredValue":{"numberValue":6}},{"userEnteredValue":{"stringValue":"str6"}}]}
+{"values":[{"userEnteredValue":{"numberValue":7}},{"userEnteredValue":{"boolValue":false}},{"userEnteredValue":{"numberValue":7.7}},{"userEnteredValue":{"stringValue":"i7"}},{},{"userEnteredValue":{"stringValue":"str7"}}]}
+{"values":[{"userEnteredValue":{"numberValue":8}},{"userEnteredValue":{"boolValue":true}},{"userEnteredValue":{"numberValue":8.8}},{"userEnteredValue":{"stringValue":"i8"}},{"userEnteredValue":{"numberValue":8}},{"userEnteredValue":{"stringValue":"str8"}}]}
+{"values":[{"userEnteredValue":{"numberValue":9}},{"userEnteredValue":{"boolValue":false}},{"userEnteredValue":{"numberValue":9.9}},{"userEnteredValue":{"stringValue":"i9"}},{},{"userEnteredValue":{"stringValue":"str9"}}]}
+{"values":[{"userEnteredValue":{"numberValue":10}},{"userEnteredValue":{"boolValue":true}},{"userEnteredValue":{"numberValue":10.1}},{"userEnteredValue":{"stringValue":"i10"}},{"userEnteredValue":{"numberValue":10}},{"userEnteredValue":{"stringValue":"str10"}}]}
