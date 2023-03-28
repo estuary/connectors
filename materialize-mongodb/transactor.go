@@ -40,7 +40,7 @@ var fenceCollectionName = "flow_checkpoints"
 
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
-		var key = string(it.Key.Pack())
+		var key = fmt.Sprintf("%x", it.PackedKey) // Hex-encode.
 		var collection = t.bindings[it.Binding].collection
 
 		var ctx = context.Background()
@@ -88,6 +88,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}
 
 	for it.Next() {
+		var key = fmt.Sprintf("%x", it.PackedKey) // Hex-encode.
 		binding := t.bindings[it.Binding]
 
 		var doc bson.M
@@ -97,12 +98,12 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		// In case of delta updates, we don't want to set the _id. We want
 		// MongoDB to generate a new _id for each record we insert
 		if !binding.res.DeltaUpdates {
-			doc[idField] = it.Key.String()
+			doc[idField] = key
 		}
 
 		if it.Exists {
 			var opts = options.Replace()
-			_, err := binding.collection.ReplaceOne(tx, bson.D{{idField, bson.D{{"$eq", it.Key.String()}}}}, doc, opts)
+			_, err := binding.collection.ReplaceOne(tx, bson.D{{idField, bson.D{{"$eq", key}}}}, doc, opts)
 			if err != nil {
 				return nil, fmt.Errorf("upserting document into collection %s: %w", binding.collection.Name(), err)
 			}
@@ -126,7 +127,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error {
+		var op = pf.RunAsyncOperation(func() error {
 			var bump = bson.D{{"$set", bson.D{{"checkpoint", checkpointBytes}}}}
 			var updateOpts = options.Update()
 			if _, err = t.fenceCollection.UpdateOne(ctx, filter, bump, updateOpts); err != nil {
@@ -136,6 +137,11 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			defer sess.EndSession(ctx)
 			return sess.CommitTransaction(context.Background())
 		})
+
+		// TODO - this should be async, but we need Load to await it before it may perform point-lookups.
+		<-op.Done()
+
+		return nil, op
 	}, nil
 }
 
