@@ -277,6 +277,7 @@ func (c *jsonCodec) SendMsg(m interface{}) error {
 	return err
 }
 func (c *jsonCodec) RecvMsg(m interface{}) error {
+	m.(proto.Message).Reset()
 	return c.unmarshaler.UnmarshalNext(c.decoder, m.(proto.Message))
 }
 func (c *jsonCodec) SendHeader(metadata.MD) error {
