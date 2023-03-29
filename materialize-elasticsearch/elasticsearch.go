@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -228,10 +227,6 @@ func (es *ElasticSearch) SearchByIds(index string, ids []string) ([]json.RawMess
 	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
-
-	// Return document chunks in a stable order.
-	// This facilitates testing.
-	sort.Slice(r.Hits.Hits, func(i, j int) bool { return r.Hits.Hits[i].ID < r.Hits.Hits[j].ID })
 
 	var results = make([]json.RawMessage, 0, len(r.Hits.Hits))
 	for _, hit := range r.Hits.Hits {
