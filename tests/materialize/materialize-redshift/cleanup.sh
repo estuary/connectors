@@ -1,5 +1,8 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o pipefail
+set -o nounset
 
-# Nothing to do because deleting the materialization also cleans up its tables.
+# TODO(johnny): This mostly works because deleting bindings also drops the tables.
+# But, this script should nuke it from orbit and ensure we get back to a clean state.

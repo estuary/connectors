@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o pipefail
+set -o nounset
 
 # This spreadsheet lives under the Estuary org and is shared with our CI service account
 # and engineering@. If you're an engineer, feel free to add additional service accounts
