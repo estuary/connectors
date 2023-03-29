@@ -23,6 +23,25 @@
     "binding": 2,
     "doc": {
       "array_int": [
+        1,
+        2
+      ],
+      "bool_field": true,
+      "float_field": 10.1,
+      "id": 10,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "array_int": [
         61,
         62
       ],
@@ -91,25 +110,6 @@
       },
       "nullable_int": null,
       "str_field": "str9"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
-      "array_int": [
-        1,
-        2
-      ],
-      "bool_field": true,
-      "float_field": 10.1,
-      "id": 10,
-      "nested": {
-        "id": "i10"
-      },
-      "nullable_int": 10,
-      "str_field": "str10"
     }
   }
 }

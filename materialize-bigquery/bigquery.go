@@ -213,8 +213,10 @@ func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
 			// contains the differentiation between "was it the project or dataset" as unstructured
 			// text and we can remove some of the error wrapping to make the message returned to the
 			// user more clear.
-			if googleErr.Code == http.StatusNotFound || googleErr.Code == http.StatusForbidden {
-				err = fmt.Errorf(googleErr.Message)
+			if googleErr.Message != "" {
+				err = fmt.Errorf("%s (code %v)", googleErr.Message, googleErr.Code)
+			} else if googleErr.Code == http.StatusNotFound {
+				err = fmt.Errorf("the ProjectID or BigQuery Dataset could not be found")
 			}
 		}
 		errs.Err(err)
@@ -236,7 +238,7 @@ func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
 		// connector code.
 		errs.Err(err)
 	} else if err := writer.Close(); err != nil {
-		// Handling for the two most comman cases: The bucket doesn't exist, or the bucket does
+		// Handling for the two most common cases: The bucket doesn't exist, or the bucket does
 		// exist but the configured credentials aren't authorized to write to it.
 		if errors.As(err, &googleErr) {
 			if googleErr.Code == http.StatusNotFound {
