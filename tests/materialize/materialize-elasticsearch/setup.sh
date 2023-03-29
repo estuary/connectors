@@ -1,5 +1,8 @@
 #!/bin/bash
-set -e
+
+set -o errexit
+set -o pipefail
+set -o nounset
 
 # Elastic index names.
 export TEST_ES_INDEX_DUPLICATED_KEYS_DELTA="index-duplicated-keys-delta"

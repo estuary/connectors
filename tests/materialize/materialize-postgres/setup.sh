@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o pipefail
+set -o nounset
 
 # Ensure canonical Postgres environment variables are set.
 export PGHOST="${PGHOST:=materialize-postgres-postgres-1.flow-test}"
@@ -10,6 +12,8 @@ export PGPASSWORD="${PGPASSWORD:=flow}"
 export PGUSER="${PGUSER:=flow}"
 
 docker compose -f materialize-postgres/docker-compose.yaml up --detach
+# Give it time to start.
+sleep 5
 
 config_json_template='{
    "address":  "$PGHOST:$PGPORT",
@@ -84,7 +88,4 @@ resources_json_template='[
 ]'
 
 export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
-echo "Connector configuration is: ${CONNECTOR_CONFIG}".
-
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
-echo "Resources configuration is: ${RESOURCES_CONFIG}".

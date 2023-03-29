@@ -1,5 +1,8 @@
 #!/bin/bash
-set -e
+
+set -o errexit
+set -o pipefail
+set -o nounset
 
 export LOCALSTACK_CONTAINER_NAME=localstack
 export LOCALSTACK_S3_ENDPOINT=http://${LOCALSTACK_CONTAINER_NAME}.flow-test:4566
@@ -74,8 +77,5 @@ resources_json_template='[
   }
 ]'
 
-CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
-export CONNECTOR_CONFIG
-
-RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
-export RESOURCES_CONFIG
+export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
+export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
