@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o pipefail
+set -o nounset
 
 export PROJECT_ID="${GCP_BQ_PROJECT_ID}"
 export DATASET="${GCP_BQ_DATASET}"
@@ -61,7 +63,4 @@ resources_json_template='[
 ]'
 
 export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
-echo "Connector configuration is: ${CONNECTOR_CONFIG}".
-
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
-echo "Resources configuration is: ${RESOURCES_CONFIG}".
