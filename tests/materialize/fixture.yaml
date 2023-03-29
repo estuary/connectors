@@ -44,8 +44,8 @@ transactions:
       - [false, { "id":2, "int_and_str":2, "num_and_str":2.1, "int_str": "20", "num_str":"20.1" }]
       - [false, { "id":5, "int_and_str":"5", "num_and_str":"5.1", "int_str": "50", "num_str":"50.1" }]
     tests/multiple-data-types:
-      - [false, { "id": 6, "str_field": "str6", "float_field": 6.6, "bool_field": true , "nullable_int": 6   , "array_int":[61, 62], "nested": {"id": "i6"}}]
-      - [false, { "id": 7, "str_field": "str7", "float_field": 7.7, "bool_field": false, "nullable_int": null, "array_int":[71, 72], "nested": {"id": "i7"}}]
-      - [false, { "id": 8, "str_field": "str8", "float_field": 8.8, "bool_field": true , "nullable_int": 8   , "array_int":[81, 82], "nested": {"id": "i8"}}]
-      - [false, { "id": 9, "str_field": "str9", "float_field": 9.9, "bool_field": false, "nullable_int": null, "array_int":[91, 92], "nested": {"id": "i9"}}]
-      - [false, { "id": 10, "str_field": "str10", "float_field": 10.1, "bool_field": true , "nullable_int": 10   , "array_int":[1,   2], "nested": {"id": "i10"}}]
+      - [true, { "id": 6, "str_field": "str6 v2", "float_field": 66.66, "bool_field": true , "nullable_int": 6   , "array_int":[61, 62], "nested": {"id": "i6"}}]
+      - [true, { "id": 7, "str_field": "str7 v2", "float_field": 77.77, "bool_field": false, "nullable_int": null, "array_int":[71, 72], "nested": {"id": "i7"}}]
+      - [true, { "id": 8, "str_field": "str8 v2", "float_field": 88.88, "bool_field": true , "nullable_int": 8   , "array_int":[81, 82], "nested": {"id": "i8"}}]
+      - [true, { "id": 9, "str_field": "str9 v2", "float_field": 99.99, "bool_field": false, "nullable_int": null, "array_int":[91, 92], "nested": {"id": "i9"}}]
+      - [true, { "id": 10, "str_field": "str10 v2", "float_field": 1010.101, "bool_field": true , "nullable_int": 10, "array_int":[1, 2], "nested": {"id": "i10"}}]

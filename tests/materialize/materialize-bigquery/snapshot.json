@@ -175,6 +175,9 @@
 {
   "startedCommit": {}
 }
+{
+  "acknowledged": {}
+}
 [
   1,
   "amputation's",
@@ -206,34 +209,54 @@
   "{\"canary\":\"grosbeak's\",\"id\":6}"
 ]
 [
+  7,
+  "pieced",
+  "{\"canary\":\"pieced\",\"id\":7}"
+]
+[
+  8,
+  "roaches",
+  "{\"canary\":\"roaches\",\"id\":8}"
+]
+[
+  9,
+  "devilish",
+  "{\"canary\":\"devilish\",\"id\":9}"
+]
+[
+  10,
+  "glucose's",
+  "{\"canary\":\"glucose's\",\"id\":10}"
+]
+[
   1,
-  1,
-  "str 1",
-  "{\"id\":1,\"int\":1,\"str\":\"str 1\"}"
+  6,
+  "str 6",
+  "{\"id\":1,\"int\":6,\"str\":\"str 6\"}"
 ]
 [
   2,
-  2,
-  "str 2",
-  "{\"id\":2,\"int\":2,\"str\":\"str 2\"}"
+  7,
+  "str 7",
+  "{\"id\":2,\"int\":7,\"str\":\"str 7\"}"
 ]
 [
   3,
-  3,
-  "str 3",
-  "{\"id\":3,\"int\":3,\"str\":\"str 3\"}"
+  8,
+  "str 8",
+  "{\"id\":3,\"int\":8,\"str\":\"str 8\"}"
 ]
 [
   4,
-  4,
-  "str 4",
-  "{\"id\":4,\"int\":4,\"str\":\"str 4\"}"
+  9,
+  "str 9",
+  "{\"id\":4,\"int\":9,\"str\":\"str 9\"}"
 ]
 [
   5,
-  5,
-  "str 5",
-  "{\"id\":5,\"int\":5,\"str\":\"str 5\"}"
+  10,
+  "str 10",
+  "{\"id\":5,\"int\":10,\"str\":\"str 10\"}"
 ]
 [
   1,
@@ -289,51 +312,67 @@
   6,
   "[61,62]",
   true,
-  "33/5",
+  "3333/50",
   "{\"id\":\"i6\"}",
   6,
-  "str6",
-  "{\"array_int\":[61,62],\"bool_field\":true,\"float_field\":6.6,\"id\":6,\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6\"}"
+  "str6 v2",
+  "{\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}"
 ]
 [
   7,
   "[71,72]",
   false,
-  "77/10",
+  "7777/100",
   "{\"id\":\"i7\"}",
   null,
-  "str7",
-  "{\"array_int\":[71,72],\"bool_field\":false,\"float_field\":7.7,\"id\":7,\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7\"}"
+  "str7 v2",
+  "{\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}"
 ]
 [
   8,
   "[81,82]",
   true,
-  "44/5",
+  "2222/25",
   "{\"id\":\"i8\"}",
   8,
-  "str8",
-  "{\"array_int\":[81,82],\"bool_field\":true,\"float_field\":8.8,\"id\":8,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8\"}"
+  "str8 v2",
+  "{\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}"
 ]
 [
   9,
   "[91,92]",
   false,
-  "99/10",
+  "9999/100",
   "{\"id\":\"i9\"}",
   null,
-  "str9",
-  "{\"array_int\":[91,92],\"bool_field\":false,\"float_field\":9.9,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9\"}"
+  "str9 v2",
+  "{\"array_int\":[91,92],\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}"
 ]
 [
   10,
   "[1,2]",
   true,
-  "101/10",
+  "1010101/1000",
   "{\"id\":\"i10\"}",
   10,
-  "str10",
-  "{\"array_int\":[1,2],\"bool_field\":true,\"float_field\":10.1,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10\"}"
+  "str10 v2",
+  "{\"array_int\":[1,2],\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}"
+]
+[
+  1,
+  1,
+  10,
+  "11/10",
+  "101/10",
+  "{\"id\":1,\"int_and_str\":1,\"int_str\":\"10\",\"num_and_str\":1.1,\"num_str\":\"10.1\"}"
+]
+[
+  2,
+  2,
+  20,
+  "21/10",
+  "201/10",
+  "{\"id\":2,\"int_and_str\":2,\"int_str\":\"20\",\"num_and_str\":2.1,\"num_str\":\"20.1\"}"
 ]
 [
   3,
@@ -351,6 +390,14 @@
   "401/10",
   "{\"id\":4,\"int_and_str\":\"4\",\"int_str\":\"40\",\"num_and_str\":\"4.1\",\"num_str\":\"40.1\"}"
 ]
+[
+  5,
+  5,
+  50,
+  "51/10",
+  "501/10",
+  "{\"id\":5,\"int_and_str\":\"5\",\"int_str\":\"50\",\"num_and_str\":\"5.1\",\"num_str\":\"50.1\"}"
+]
 {
   "applied": {
     "actionDescription": "DROP TABLE IF EXISTS `estuary-sandbox`.whb_other_region.simple;\nDROP TABLE IF EXISTS `estuary-sandbox`.whb_other_region.duplicate_keys;\nDROP TABLE IF EXISTS `estuary-sandbox`.whb_other_region.multiple_types;\nDROP TABLE IF EXISTS `estuary-sandbox`.whb_other_region.formatted_strings;\nCREATE TABLE IF NOT EXISTS `estuary-sandbox`.whb_other_region.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-sandbox`.whb_other_region.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nUPDATE `estuary-sandbox`.whb_other_region.flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-bigquery/materialize';"
@@ -360,7 +407,9 @@
   "opened": {
     "runtimeCheckpoint": {
       "sources": {
-        "a/read/journal;suffix": {}
+        "a/read/journal;suffix": {
+          "readThrough": "1"
+        }
       }
     }
   }

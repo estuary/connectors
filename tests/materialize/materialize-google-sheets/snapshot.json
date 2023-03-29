@@ -658,7 +658,7 @@
     },
     {
       "userEnteredValue": {
-        "numberValue": 6.6
+        "numberValue": 66.66
       }
     },
     {
@@ -673,7 +673,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "str6"
+        "stringValue": "str6 v2"
       }
     }
   ]
@@ -692,7 +692,7 @@
     },
     {
       "userEnteredValue": {
-        "numberValue": 7.7
+        "numberValue": 77.77
       }
     },
     {
@@ -703,7 +703,7 @@
     {},
     {
       "userEnteredValue": {
-        "stringValue": "str7"
+        "stringValue": "str7 v2"
       }
     }
   ]
@@ -722,7 +722,7 @@
     },
     {
       "userEnteredValue": {
-        "numberValue": 8.8
+        "numberValue": 88.88
       }
     },
     {
@@ -737,7 +737,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "str8"
+        "stringValue": "str8 v2"
       }
     }
   ]
@@ -756,7 +756,7 @@
     },
     {
       "userEnteredValue": {
-        "numberValue": 9.9
+        "numberValue": 99.99
       }
     },
     {
@@ -767,7 +767,7 @@
     {},
     {
       "userEnteredValue": {
-        "stringValue": "str9"
+        "stringValue": "str9 v2"
       }
     }
   ]
@@ -786,7 +786,7 @@
     },
     {
       "userEnteredValue": {
-        "numberValue": 10.1
+        "numberValue": 1010.101
       }
     },
     {
@@ -801,7 +801,7 @@
     },
     {
       "userEnteredValue": {
-        "stringValue": "str10"
+        "stringValue": "str10 v2"
       }
     }
   ]

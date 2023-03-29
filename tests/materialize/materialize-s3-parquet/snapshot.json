@@ -167,50 +167,50 @@
 {
   "array_int": "[61,62]",
   "bool_field": true,
-  "float_field": 6.6,
+  "float_field": 66.66,
   "id": 6,
   "nested": "{\"id\":\"i6\"}",
   "nested/id": "i6",
   "nullable_int": 6,
-  "str_field": "str6"
+  "str_field": "str6 v2"
 }
 {
   "array_int": "[71,72]",
   "bool_field": false,
-  "float_field": 7.7,
+  "float_field": 77.77,
   "id": 7,
   "nested": "{\"id\":\"i7\"}",
   "nested/id": "i7",
-  "str_field": "str7"
+  "str_field": "str7 v2"
 }
 {
   "array_int": "[81,82]",
   "bool_field": true,
-  "float_field": 8.8,
+  "float_field": 88.88,
   "id": 8,
   "nested": "{\"id\":\"i8\"}",
   "nested/id": "i8",
   "nullable_int": 8,
-  "str_field": "str8"
+  "str_field": "str8 v2"
 }
 {
   "array_int": "[91,92]",
   "bool_field": false,
-  "float_field": 9.9,
+  "float_field": 99.99,
   "id": 9,
   "nested": "{\"id\":\"i9\"}",
   "nested/id": "i9",
-  "str_field": "str9"
+  "str_field": "str9 v2"
 }
 {
   "array_int": "[1,2]",
   "bool_field": true,
-  "float_field": 10.1,
+  "float_field": 1010.101,
   "id": 10,
   "nested": "{\"id\":\"i10\"}",
   "nested/id": "i10",
   "nullable_int": 10,
-  "str_field": "str10"
+  "str_field": "str10 v2"
 }
 {
   "applied": {}
