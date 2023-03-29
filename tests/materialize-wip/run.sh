@@ -14,7 +14,7 @@ cd "$ROOT_DIR"
 export CONNECTOR_IMAGE="ghcr.io/estuary/${CONNECTOR}:${VERSION}"
 
 function bail() {
-    echo -e "$@"
+    >&2 echo "$@"
     exit 1
 }
 export -f bail
@@ -32,7 +32,7 @@ TEST_STATUS="Test Failed"
 function test_shutdown() {
     source ${TEST_DIR}/${CONNECTOR}/cleanup.sh || true
     rm -r ${TEMP_DIR}
-    echo -e "===========\n${TEST_STATUS}\n==========="
+    >&2 echo -e "===========\n${TEST_STATUS}\n==========="
 }
 trap test_shutdown EXIT
 
