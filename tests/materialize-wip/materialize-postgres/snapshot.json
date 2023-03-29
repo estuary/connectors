@@ -75,6 +75,25 @@
     "binding": 4,
     "doc": {
       "array_int": [
+        1,
+        2
+      ],
+      "bool_field": true,
+      "float_field": 10.1,
+      "id": 10,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "array_int": [
         61,
         62
       ],
@@ -147,65 +166,367 @@
   }
 }
 {
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "array_int": [
-        1,
-        2
-      ],
-      "bool_field": true,
-      "float_field": 10.1,
-      "id": 10,
-      "nested": {
-        "id": "i10"
-      },
-      "nullable_int": 10,
-      "str_field": "str10"
-    }
-  }
-}
-{
   "flushed": {}
 }
 {
   "startedCommit": {}
 }
-{"table":"Simple","row":{"id":1,"canary":"amputation's"}}
-{"table":"Simple","row":{"id":2,"canary":"armament's"}}
-{"table":"Simple","row":{"id":3,"canary":"splatters"}}
-{"table":"Simple","row":{"id":4,"canary":"strengthen"}}
-{"table":"Simple","row":{"id":5,"canary":"Kringle's"}}
-{"table":"Simple","row":{"id":6,"canary":"grosbeak's"}}
-{"table":"duplicate_keys_standard","row":{"id":1,"int":1,"str":"str 1"}}
-{"table":"duplicate_keys_standard","row":{"id":2,"int":2,"str":"str 2"}}
-{"table":"duplicate_keys_standard","row":{"id":3,"int":3,"str":"str 3"}}
-{"table":"duplicate_keys_standard","row":{"id":4,"int":4,"str":"str 4"}}
-{"table":"duplicate_keys_standard","row":{"id":5,"int":5,"str":"str 5"}}
-{"table":"duplicate_keys_delta","row":{"id":1,"int":1,"str":"str 1"}}
-{"table":"duplicate_keys_delta","row":{"id":2,"int":2,"str":"str 2"}}
-{"table":"duplicate_keys_delta","row":{"id":3,"int":3,"str":"str 3"}}
-{"table":"duplicate_keys_delta","row":{"id":4,"int":4,"str":"str 4"}}
-{"table":"duplicate_keys_delta","row":{"id":5,"int":5,"str":"str 5"}}
-{"table":"duplicate_keys_delta_exclude_flow_doc","row":{"id":1,"int":1,"str":"str 1"}}
-{"table":"duplicate_keys_delta_exclude_flow_doc","row":{"id":2,"int":2,"str":"str 2"}}
-{"table":"duplicate_keys_delta_exclude_flow_doc","row":{"id":3,"int":3,"str":"str 3"}}
-{"table":"duplicate_keys_delta_exclude_flow_doc","row":{"id":4,"int":4,"str":"str 4"}}
-{"table":"duplicate_keys_delta_exclude_flow_doc","row":{"id":5,"int":5,"str":"str 5"}}
-{"table":"Multiple Types","row":{"id":1,"array_int":[11,12],"bool_field":false,"float_field":1.1,"nested":{"id":"i1"},"nullable_int":null,"str_field":"str1"}}
-{"table":"Multiple Types","row":{"id":2,"array_int":[21,22],"bool_field":true,"float_field":2.2,"nested":{"id":"i2"},"nullable_int":2,"str_field":"str2"}}
-{"table":"Multiple Types","row":{"id":3,"array_int":[31,32],"bool_field":false,"float_field":3.3,"nested":{"id":"i3"},"nullable_int":null,"str_field":"str3"}}
-{"table":"Multiple Types","row":{"id":4,"array_int":[41,42],"bool_field":true,"float_field":4.4,"nested":{"id":"i4"},"nullable_int":4,"str_field":"str4"}}
-{"table":"Multiple Types","row":{"id":5,"array_int":[51,52],"bool_field":false,"float_field":5.5,"nested":{"id":"i5"},"nullable_int":null,"str_field":"str5"}}
-{"table":"Multiple Types","row":{"id":6,"array_int":[61,62],"bool_field":true,"float_field":6.6,"nested":{"id":"i6"},"nullable_int":6,"str_field":"str6"}}
-{"table":"Multiple Types","row":{"id":7,"array_int":[71,72],"bool_field":false,"float_field":7.7,"nested":{"id":"i7"},"nullable_int":null,"str_field":"str7"}}
-{"table":"Multiple Types","row":{"id":8,"array_int":[81,82],"bool_field":true,"float_field":8.8,"nested":{"id":"i8"},"nullable_int":8,"str_field":"str8"}}
-{"table":"Multiple Types","row":{"id":9,"array_int":[91,92],"bool_field":false,"float_field":9.9,"nested":{"id":"i9"},"nullable_int":null,"str_field":"str9"}}
-{"table":"Multiple Types","row":{"id":10,"array_int":[1,2],"bool_field":true,"float_field":10.1,"nested":{"id":"i10"},"nullable_int":10,"str_field":"str10"}}
-{"table":"Formatted Strings","row":{"id":3,"int_and_str":3,"int_str":30,"num_and_str":3.1,"num_str":30.1}}
-{"table":"Formatted Strings","row":{"id":4,"int_and_str":4,"int_str":40,"num_and_str":4.1,"num_str":40.1}}
 {
-  "applied": {}
+  "row": {
+    "canary": "amputation's",
+    "id": 1
+  },
+  "table": "Simple"
+}
+{
+  "row": {
+    "canary": "armament's",
+    "id": 2
+  },
+  "table": "Simple"
+}
+{
+  "row": {
+    "canary": "splatters",
+    "id": 3
+  },
+  "table": "Simple"
+}
+{
+  "row": {
+    "canary": "strengthen",
+    "id": 4
+  },
+  "table": "Simple"
+}
+{
+  "row": {
+    "canary": "Kringle's",
+    "id": 5
+  },
+  "table": "Simple"
+}
+{
+  "row": {
+    "canary": "grosbeak's",
+    "id": 6
+  },
+  "table": "Simple"
+}
+{
+  "row": {
+    "id": 1,
+    "int": 1,
+    "str": "str 1"
+  },
+  "table": "duplicate_keys_standard"
+}
+{
+  "row": {
+    "id": 2,
+    "int": 2,
+    "str": "str 2"
+  },
+  "table": "duplicate_keys_standard"
+}
+{
+  "row": {
+    "id": 3,
+    "int": 3,
+    "str": "str 3"
+  },
+  "table": "duplicate_keys_standard"
+}
+{
+  "row": {
+    "id": 4,
+    "int": 4,
+    "str": "str 4"
+  },
+  "table": "duplicate_keys_standard"
+}
+{
+  "row": {
+    "id": 5,
+    "int": 5,
+    "str": "str 5"
+  },
+  "table": "duplicate_keys_standard"
+}
+{
+  "row": {
+    "id": 1,
+    "int": 1,
+    "str": "str 1"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 2,
+    "int": 2,
+    "str": "str 2"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 3,
+    "int": 3,
+    "str": "str 3"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 4,
+    "int": 4,
+    "str": "str 4"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 5,
+    "int": 5,
+    "str": "str 5"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 1,
+    "int": 1,
+    "str": "str 1"
+  },
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "id": 2,
+    "int": 2,
+    "str": "str 2"
+  },
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "id": 3,
+    "int": 3,
+    "str": "str 3"
+  },
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "id": 4,
+    "int": 4,
+    "str": "str 4"
+  },
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "id": 5,
+    "int": 5,
+    "str": "str 5"
+  },
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "array_int": [
+      11,
+      12
+    ],
+    "bool_field": false,
+    "float_field": 1.1,
+    "id": 1,
+    "nested": {
+      "id": "i1"
+    },
+    "nullable_int": null,
+    "str_field": "str1"
+  },
+  "table": "Multiple Types"
+}
+{
+  "row": {
+    "array_int": [
+      21,
+      22
+    ],
+    "bool_field": true,
+    "float_field": 2.2,
+    "id": 2,
+    "nested": {
+      "id": "i2"
+    },
+    "nullable_int": 2,
+    "str_field": "str2"
+  },
+  "table": "Multiple Types"
+}
+{
+  "row": {
+    "array_int": [
+      31,
+      32
+    ],
+    "bool_field": false,
+    "float_field": 3.3,
+    "id": 3,
+    "nested": {
+      "id": "i3"
+    },
+    "nullable_int": null,
+    "str_field": "str3"
+  },
+  "table": "Multiple Types"
+}
+{
+  "row": {
+    "array_int": [
+      41,
+      42
+    ],
+    "bool_field": true,
+    "float_field": 4.4,
+    "id": 4,
+    "nested": {
+      "id": "i4"
+    },
+    "nullable_int": 4,
+    "str_field": "str4"
+  },
+  "table": "Multiple Types"
+}
+{
+  "row": {
+    "array_int": [
+      51,
+      52
+    ],
+    "bool_field": false,
+    "float_field": 5.5,
+    "id": 5,
+    "nested": {
+      "id": "i5"
+    },
+    "nullable_int": null,
+    "str_field": "str5"
+  },
+  "table": "Multiple Types"
+}
+{
+  "row": {
+    "array_int": [
+      61,
+      62
+    ],
+    "bool_field": true,
+    "float_field": 6.6,
+    "id": 6,
+    "nested": {
+      "id": "i6"
+    },
+    "nullable_int": 6,
+    "str_field": "str6"
+  },
+  "table": "Multiple Types"
+}
+{
+  "row": {
+    "array_int": [
+      71,
+      72
+    ],
+    "bool_field": false,
+    "float_field": 7.7,
+    "id": 7,
+    "nested": {
+      "id": "i7"
+    },
+    "nullable_int": null,
+    "str_field": "str7"
+  },
+  "table": "Multiple Types"
+}
+{
+  "row": {
+    "array_int": [
+      81,
+      82
+    ],
+    "bool_field": true,
+    "float_field": 8.8,
+    "id": 8,
+    "nested": {
+      "id": "i8"
+    },
+    "nullable_int": 8,
+    "str_field": "str8"
+  },
+  "table": "Multiple Types"
+}
+{
+  "row": {
+    "array_int": [
+      91,
+      92
+    ],
+    "bool_field": false,
+    "float_field": 9.9,
+    "id": 9,
+    "nested": {
+      "id": "i9"
+    },
+    "nullable_int": null,
+    "str_field": "str9"
+  },
+  "table": "Multiple Types"
+}
+{
+  "row": {
+    "array_int": [
+      1,
+      2
+    ],
+    "bool_field": true,
+    "float_field": 10.1,
+    "id": 10,
+    "nested": {
+      "id": "i10"
+    },
+    "nullable_int": 10,
+    "str_field": "str10"
+  },
+  "table": "Multiple Types"
+}
+{
+  "row": {
+    "id": 3,
+    "int_and_str": 3,
+    "int_str": 30,
+    "num_and_str": 3.1,
+    "num_str": 30.1
+  },
+  "table": "Formatted Strings"
+}
+{
+  "row": {
+    "id": 4,
+    "int_and_str": 4,
+    "int_str": 40,
+    "num_and_str": 4.1,
+    "num_str": 40.1
+  },
+  "table": "Formatted Strings"
+}
+{
+  "applied": {
+    "actionDescription": "DROP TABLE IF EXISTS \"public\".\"Simple\";\nDROP TABLE IF EXISTS \"public\".duplicate_keys_standard;\nDROP TABLE IF EXISTS \"public\".duplicate_keys_delta;\nDROP TABLE IF EXISTS \"public\".duplicate_keys_delta_exclude_flow_doc;\nDROP TABLE IF EXISTS \"public\".\"Multiple Types\";\nDROP TABLE IF EXISTS \"public\".\"Formatted Strings\";\n\nCREATE TABLE IF NOT EXISTS \"public\".flow_materializations_v2 (\n\t\tmaterialization TEXT NOT NULL,\n\t\tversion TEXT NOT NULL,\n\t\tspec TEXT NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\n\nCOMMENT ON TABLE \"public\".flow_materializations_v2 IS 'This table is the source of truth for all materializations into this system.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.materialization IS 'The name of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.version IS 'Version of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.spec IS 'Specification of the materialization, encoded as base64 protobuf.';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".flow_checkpoints_v1 (\n\t\tmaterialization TEXT NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\tcheckpoint TEXT NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\n\nCOMMENT ON TABLE \"public\".flow_checkpoints_v1 IS 'This table holds Flow processing checkpoints used for exactly-once processing of materializations';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.materialization IS 'The name of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.key_begin IS 'The inclusive lower-bound key hash covered by this checkpoint.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.key_end IS 'The inclusive upper-bound key hash covered by this checkpoint.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.fence IS 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.checkpoint IS 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.';\n\nUPDATE \"public\".flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-postgres/materialize';"
+  }
 }
 {
   "opened": {
