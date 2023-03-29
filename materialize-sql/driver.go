@@ -103,26 +103,20 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 // ApplyUpsert implements the DriverServer interface.
 func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	var (
-		endpoint      *Endpoint
-		loadedSpec    *pf.MaterializationSpec
-		loadedVersion string
-		specBytes     []byte
-		err           error
+		endpoint   *Endpoint
+		loadedSpec *pf.MaterializationSpec
+		specBytes  []byte
+		err        error
 	)
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if loadedSpec, loadedVersion, err = loadSpec(ctx, endpoint, req.Materialization.Name); err != nil {
+	} else if loadedSpec, _, err = loadSpec(ctx, endpoint, req.Materialization.Name); err != nil {
 		return nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
 	} else if specBytes, err = req.Materialization.Marshal(); err != nil {
 		panic(err) // Cannot fail to marshal.
-	}
-
-	if loadedVersion == req.Version {
-		// A re-application of the current version is a no-op.
-		return new(pm.Response_Applied), nil
 	}
 
 	// The Materialization specifications meta table is almost always requied.

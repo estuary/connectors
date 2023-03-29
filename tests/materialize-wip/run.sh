@@ -80,9 +80,17 @@ function drive_connector {
     sqlite3 ${TEMP_DIR}/build.db "select writefile('${TEMP_DIR}/spec.proto', spec) from built_materializations;"
 
     # Drive the connector, writing its output into the snapshot.
+    # The first jq command orders all object keys and sanitizes base64-encoded
+    # checkpoints and specifications, having one line per message output.
+    # We sort all Response.Loaded responses in ascending lexicographic order,
+    # and then snapshot the pretty-printed result. This allows connectors to
+    # output loads in any overall order and with any inter-document structure,
+    # while still having a stable snapshot result.
     ~/flowctl raw materialize-fixture --source ${TEMP_DIR}/spec.proto --fixture ${fixture} | \
         docker run --rm -i -e FLOW_RUNTIME_CODEC=json --network flow-test ${CONNECTOR_IMAGE} | \
-        jq 'if .applied.actionDescription != null then .applied.actionDescription |= sub("[A-Za-z0-9+/=]{100,}"; "(a-base64-encoded-value)") else . end' >> ${SNAPSHOT} \
+        jq -Sc 'if .applied.actionDescription != null then .applied.actionDescription |= sub("[A-Za-z0-9+/=]{100,}"; "(a-base64-encoded-value)") else . end' | \
+        go run ${TEST_DIR}/sort-loaded.go | \
+        jq '.' >> ${SNAPSHOT} \
         || bail "connector invocation failed"
 }
 
@@ -90,7 +98,7 @@ function drive_connector {
 drive_connector ${TEMP_DIR}/flow.json ${TEST_DIR}/fixture.yaml
 
 # Extend the snapshot with additional fetched content for this connector.
-source ${TEST_DIR}/${CONNECTOR}/fetch.sh >> ${SNAPSHOT} || bail "fetching results failed"
+source ${TEST_DIR}/${CONNECTOR}/fetch.sh | jq -S '.' >> ${SNAPSHOT} || bail "fetching results failed"
 
 # Drive it again to excercise any cleanup behavior when bindings are removed.
 drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.yaml
