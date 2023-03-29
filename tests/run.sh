@@ -6,9 +6,11 @@
 # The tests will execute a connector-specific setup script, then run a flow data plane with a
 # generated catalog that uses the connector to capture some data.
 
-# -e causes the script to exit on encountering an error
 # -m turns on job management, required for our use of `fg` below.
-set -em
+set -m
+set -o errexit
+set -o pipefail
+set -o nounset
 
 command -v flowctl-go >/dev/null 2>&1 || { echo >&2 "flowctl-go must be available via PATH, aborting."; exit 1; }
 
@@ -104,7 +106,12 @@ fi
 cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
 
 # Build the catalog.
-flowctl-go api build --directory ${TESTDIR}/builds --build-id test-build-id --source ${CATALOG_SOURCE} --network "flow-test" --ts-package || bail "Build failed."
+flowctl-go api build \
+  --build-id test-build-id  \
+  --build-db ${TESTDIR}/builds/test-build-id \
+  --source ${CATALOG_SOURCE} \
+  --network "flow-test" \
+  || bail "Build failed."
 
 # Activate the catalog.
 flowctl-go api activate --build-id test-build-id --all --network "flow-test" --log.level info || bail "Activate failed."

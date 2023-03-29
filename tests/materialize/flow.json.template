@@ -1,6 +1,6 @@
 {
   "collections": {
-    "${TEST_COLLECTION_SIMPLE}": {
+    "tests/simple": {
        "schema": {
           "properties": {
            "id": { "type": "integer" },
@@ -11,7 +11,7 @@
        },
        "key": ["/id"]
     },
-    "${TEST_COLLECTION_DUPLICATED_KEYS}": {
+    "tests/duplicated-keys": {
        "schema": {
           "properties": {
            "id": { "type": "integer" },
@@ -24,8 +24,7 @@
        },
        "key": ["/id"]
     },
-
-    "${TEST_COLLECTION_MULTIPLE_DATATYPES}": {
+    "tests/multiple-data-types": {
        "schema": {
        "properties": {
            "id": { "type": "integer" },
@@ -41,8 +40,7 @@
        },
        "key": ["/id"]
     },
-
-    "${TEST_COLLECTION_FORMATTED_STRINGS}": {
+    "tests/formatted-strings": {
        "schema": {
        "properties": {
            "id": { "type": "integer" },
@@ -58,22 +56,10 @@
     }
   },
 
-  "captures": {
-    "${PUSH_CAPTURE_NAME}" : {
-      "endpoint": { "ingest": {} },
-      "bindings": [
-        { "target": "${TEST_COLLECTION_SIMPLE}", "resource": { "name": "${TEST_COLLECTION_SIMPLE}" } },
-        { "target": "${TEST_COLLECTION_DUPLICATED_KEYS}", "resource": { "name": "${TEST_COLLECTION_DUPLICATED_KEYS}" } },
-        { "target": "${TEST_COLLECTION_MULTIPLE_DATATYPES}", "resource": { "name": "${TEST_COLLECTION_MULTIPLE_DATATYPES}" } },
-        { "target": "${TEST_COLLECTION_FORMATTED_STRINGS}", "resource": { "name": "${TEST_COLLECTION_FORMATTED_STRINGS}" } },
-      ]
-    },
-  },
-
   "materializations": {
     "tests/${CONNECTOR}/materialize": {
       "endpoint": {
-        "flowSink": {
+        "connector": {
           "image": "${CONNECTOR_IMAGE}",
           "config": ${CONNECTOR_CONFIG}
         }

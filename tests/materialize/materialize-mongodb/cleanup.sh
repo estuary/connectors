@@ -1,8 +1,7 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o pipefail
+set -o nounset
 
-docker exec materialize-mongodb-mongo-1 mongosh test --username flow --password flow --eval="db.Simple.drop()"
-docker exec materialize-mongodb-mongo-1 mongosh test --username flow --password flow --eval="db.duplicate_keys_standard.drop()"
-docker exec materialize-mongodb-mongo-1 mongosh test --username flow --password flow --eval="db.duplicate_keys_delta.drop()"
-docker exec materialize-mongodb-mongo-1 mongosh test --username flow --password flow --eval="db.flow_checkpoints.drop()"
+docker compose --file  ./materialize-mongodb/docker-compose.yaml down || true

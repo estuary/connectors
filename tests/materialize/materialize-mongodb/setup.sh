@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o pipefail
+set -o nounset
 
 chmod 400 materialize-mongodb/sample.key
 docker compose -f materialize-mongodb/docker-compose.yaml up --detach
@@ -57,7 +59,4 @@ resources_json_template='[
 ]'
 
 export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
-echo "Connector configuration is: ${CONNECTOR_CONFIG}".
-
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
-echo "Resources configuration is: ${RESOURCES_CONFIG}".

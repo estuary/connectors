@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o pipefail
+set -o nounset
 
 command -v flowctl-go >/dev/null 2>&1 || { echo >&2 "flowctl-go must be available via PATH, aborting."; exit 1; }
 
@@ -12,8 +14,7 @@ cd "$ROOT_DIR"
 export CONNECTOR_IMAGE="ghcr.io/estuary/${CONNECTOR}:${VERSION}"
 
 function bail() {
-    echo "$@" 1>&2
-    echo "test failed..."
+    >&2 echo "$@"
     exit 1
 }
 export -f bail
@@ -21,142 +22,94 @@ export -f bail
 test -n "${CONNECTOR}" || bail "must specify CONNECTOR env variable"
 test -n "${VERSION}" || bail "must specify VERSION env variable"
 
-# The dir of materialize tests.
-TEST_BASE_DIR="${ROOT_DIR}/tests/materialize"
+# The base test directory containing test scripts of the connector.
+TEST_DIR="${ROOT_DIR}/tests/materialize"
+# Temporary directory into which we'll write files.
+TEMP_DIR=$(mktemp -d /tmp/${CONNECTOR}-XXXXXX)
 
-# The dir containing various helper scripts.
-TEST_SCRIPT_DIR="${ROOT_DIR}/tests/materialize/flowctl-go"
+# Arrange to clean up on exit.
+TEST_STATUS="Test Failed"
+function test_shutdown() {
+    source ${TEST_DIR}/${CONNECTOR}/cleanup.sh || true
+    rm -r ${TEMP_DIR}
+    >&2 echo -e "===========\n${TEST_STATUS}\n==========="
+}
+trap test_shutdown EXIT
 
-# The dir containing test scripts of the connector.
-CONNECTOR_TEST_SCRIPTS_DIR="${TEST_BASE_DIR}/${CONNECTOR}"
 
-# Export envvars to be shared by all scripts.
+# TODO(johnny): These no longer need to be enviornment variables.
+# I'm leaving them as such to avoid churning tests more than is needed.
+export TEST_COLLECTION_SIMPLE="tests/simple"
+export TEST_COLLECTION_DUPLICATED_KEYS="tests/duplicated-keys"
+export TEST_COLLECTION_MULTIPLE_DATATYPES="tests/multiple-data-types"
+export TEST_COLLECTION_FORMATTED_STRINGS="tests/formatted-strings"
 
-# Build ID to use for tests.
-export BUILD_ID=run-test-"${CONNECTOR}"
-
-# A directory for hosting temp files generated during the test executions.
-export TEST_DIR="$(mktemp -d /tmp/"${CONNECTOR}"-XXXXXX)"
-
-# `flowctl-go` commands which interact with the data plane look for *_ADDRESS
-# variables, which are created by the temp-data-plane we're about to start.
-export BROKER_ADDRESS=unix://localhost${TEST_DIR}/gazette.sock
-export CONSUMER_ADDRESS=unix://localhost${TEST_DIR}/consumer.sock
-
-# Used for the ingestion client to build a unix socket dialer.
-export INGEST_SOCKET_PATH=${TEST_DIR}/consumer.sock
-
-# The path to the data ingestion go script.
-export DATA_INGEST_SCRIPT_PATH="${TEST_BASE_DIR}/datasets/ingest.go"
-
-# The file name of catalog specification.
-# The file is located in ${TEST_DIR}
-export CATALOG="materialize-test.flow.yaml"
-
-# The name of the test capture for pushing data into collections.
-export PUSH_CAPTURE_NAME=test/ingest
-
-# A few envvars related to test data and collections.
-# They are used by the connector-specific script of `ingest-data.sh`.
-# 1. the names of prepared flow collections.
-export TEST_COLLECTION_SIMPLE="tests/${CONNECTOR}/simple"
-export TEST_COLLECTION_DUPLICATED_KEYS="tests/${CONNECTOR}/duplicated-keys"
-export TEST_COLLECTION_MULTIPLE_DATATYPES="tests/${CONNECTOR}/multiple-datatypes"
-export TEST_COLLECTION_FORMATTED_STRINGS="tests/${CONNECTOR}/formatted-strings"
-
-# 2. the paths of test datasets that matches the test collections.
-# - a dataset that matches the schema of TEST_COLLECTION_SIMPLE.
-export DATASET_SIMPLE="${ROOT_DIR}/tests/materialize/datasets/simple.jsonl"
-# - a dataset that matches the schema of TEST_COLLECTION_DUPLICATED_KEYS.
-export DATASET_DUPLICATED_KEYS="${ROOT_DIR}/tests/materialize/datasets/duplicated-keys.jsonl"
-# - a dataset that matches the schema of TEST_COLLECTION_MULTIPLE_DATATYPES.
-export DATASET_MULTIPLE_DATATYPES="${ROOT_DIR}/tests/materialize/datasets/multiple-datatypes.jsonl"
-# - a dataset that matches the schema of TEST_COLLECTION_FORMATTED_STRINGS.
-export DATASET_FORMATTED_STRINGS="${ROOT_DIR}/tests/materialize/datasets/formatted-strings.jsonl"
-
-# 3. the binding number of datasets in the push capture.
-export BINDING_NUM_SIMPLE=0
-export BINDING_NUM_DUPLICATED_KEYS=1
-export BINDING_NUM_MULTIPLE_DATATYPES=2
-export BINDING_NUM_FORMATTED_STRINGS=3
-
-echo -e "\nexecuting setup"
-source "${CONNECTOR_TEST_SCRIPTS_DIR}/setup.sh" || bail "setup failed"
+source ${TEST_DIR}/${CONNECTOR}/setup.sh || bail "setup failed"
 
 if [[ -z "${CONNECTOR_CONFIG}" ]]; then
     bail "setup did not set CONNECTOR_CONFIG"
 fi
-
 if [[ -z "${RESOURCES_CONFIG}" ]]; then
     bail "setup did not set RESOURCES_CONFIG"
 fi
 
-echo -e "\ngenerating catalog"
-envsubst < ${ROOT_DIR}/tests/materialize/flow.json.template > "${TEST_DIR}/${CATALOG}" \
-    || bail "generating ${CATALOG} failed."
+envsubst < ${TEST_DIR}/flow.json.template > ${TEMP_DIR}/flow.json \
+    || bail "generating catalog failed"
+envsubst < ${TEST_DIR}/empty.flow.json.template > ${TEMP_DIR}/empty.flow.json \
+    || bail "generating empty catalog failed"
 
-echo -e "\nstarting temp data plane"
-# Start an empty local data plane within our TESTDIR as a background job.
-# --tempdir to use our known TESTDIR rather than creating a new temporary directory.
-# --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
-flowctl-go temp-data-plane \
-    --log.level info \
-    --network "flow-test" \
-    --tempdir ${TEST_DIR} \
-    --unix-sockets \
-    &
-DATA_PLANE_PID=$!
+# File into which we'll write a snapshot of the connector output.
+SNAPSHOT=${TEST_DIR}/${CONNECTOR}/snapshot.json
+rm ${SNAPSHOT} || true
 
-# Arrange to stop the data plane on exit.
-TEST_STATUS="Test Failed"
-function test_shutdown() {
-    echo -e "\nexecuting cleanup"
+function drive_connector {
+    local source=$1;
+    local fixture=$2;
 
-    source "${TEST_SCRIPT_DIR}/delete.sh" || true
-    source "${CONNECTOR_TEST_SCRIPTS_DIR}/cleanup.sh" || true
-    kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} || true
-    echo -e "===========\n${TEST_STATUS}\n==========="
+    # Build source into a build DB. We must go through flowctl-go because flowctl
+    # hasn't implemented validation of connector images yet.
+    flowctl-go api build \
+        --build-id build-id \
+        --build-db ${TEMP_DIR}/build.db \
+        --network flow-test \
+        --source ${source} \
+        --log.level info \
+        || bail "building catalog failed"
+
+    # Pluck out the protobuf-encoded materialization.
+    sqlite3 ${TEMP_DIR}/build.db "select writefile('${TEMP_DIR}/spec.proto', spec) from built_materializations;"
+
+    # Drive the connector, writing its output into the snapshot.
+    # The first jq command orders all object keys and sanitizes base64-encoded
+    # checkpoints and specifications, having one line per message output.
+    # We sort all Response.Loaded responses in ascending lexicographic order,
+    # and then snapshot the pretty-printed result. This allows connectors to
+    # output loads in any overall order and with any inter-document structure,
+    # while still having a stable snapshot result.
+    ~/flowctl raw materialize-fixture --source ${TEMP_DIR}/spec.proto --fixture ${fixture} | \
+        docker run --rm -i -e FLOW_RUNTIME_CODEC=json --network flow-test ${CONNECTOR_IMAGE} | \
+        jq -Sc 'if .applied.actionDescription != null then .applied.actionDescription |= sub("[A-Za-z0-9+/=]{100,}"; "(a-base64-encoded-value)") else . end' | \
+        go run ${TEST_DIR}/sort-loaded.go | \
+        jq '.' >> ${SNAPSHOT} \
+        || bail "connector invocation failed"
 }
-trap test_shutdown EXIT
 
-echo -e "\nbuilding and activating test catalog"
-source "${TEST_SCRIPT_DIR}/build-and-activate.sh" false || bail "building and activating test catalog failed."
+# Drive the connector with the fixture.
+drive_connector ${TEMP_DIR}/flow.json ${TEST_DIR}/fixture.yaml
 
-echo -e "\nexecuting ingest-data"
-source "${CONNECTOR_TEST_SCRIPTS_DIR}/ingest-data.sh" || bail "ingest data failed."
+# Extend the snapshot with additional fetched content for this connector.
+source ${TEST_DIR}/${CONNECTOR}/fetch.sh | jq -S '.' >> ${SNAPSHOT} || bail "fetching results failed"
 
-# The relative path to ${TEST_DIR} for storing result files.
-result_dir=result_jsonl
-mkdir -p "$(realpath "${TEST_DIR}"/"${result_dir}")"
+# Drive it again to excercise any cleanup behavior when bindings are removed.
+drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.yaml
 
-echo -e "\nexecuting fetch-materialize-results"
-source "${CONNECTOR_TEST_SCRIPTS_DIR}/fetch-materialize-results.sh" ${result_dir}\
-    || bail "fetching test results failed."
+# Compare actual and expected snapshots.
+# Produce patch output, so that differences in CI can be reviewed and manually
+# patched into the expectation without having to run the test locally via:
+git diff --exit-code ${SNAPSHOT} || bail "Test Failed because snapshot is different"
 
-echo -e "\ncomparing actual v.s. expected"
-# The dir that contains all the files expected from the output.
-EXPECTED_DIR="${CONNECTOR_TEST_SCRIPTS_DIR}/expected/"
-
-# Make sure all expected files has their corresponding files in the actual output directory.
-for f in "${EXPECTED_DIR}"/*; do
-    filename="$(basename "${f}")"
-    if [[ ! -f "${TEST_DIR}/${result_dir}/${filename}" ]]; then
-        bail "expected file ${result_dir}/${filename} is missing in the actual output."
-    fi
-done
-
-# Make sure all files in the actual output directory are same as expected.
-for f in "${TEST_DIR}/${result_dir}"/*; do
-    expected="${EXPECTED_DIR}/$(basename "${f}")"
-    if [[ ! -f ${expected} ]]; then
-        bail "${f} in the actual output is not expected."
-    fi
-
-    jq --sort-keys -c <"${f}" >"${f}.normalized" || bail "Failed to normalize ${f}."
-
-    diff --suppress-common-lines --side-by-side "${f}.normalized" "${expected}" \
-    || bail "Test Failed because ${expected} is different"
-done
-
-# Will be printed by the shutdown trap *after* any shutdown logging from flowctl
 TEST_STATUS="Test Passed"
+
+
+
+
