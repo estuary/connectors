@@ -39,6 +39,8 @@ var idField = "_id"
 var fenceCollectionName = "flow_checkpoints"
 
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+	it.WaitForAcknowledged()
+
 	for it.Next() {
 		var key = fmt.Sprintf("%x", it.PackedKey) // Hex-encode.
 		var collection = t.bindings[it.Binding].collection
@@ -127,7 +129,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		var op = pf.RunAsyncOperation(func() error {
+		return nil, pf.RunAsyncOperation(func() error {
 			var bump = bson.D{{"$set", bson.D{{"checkpoint", checkpointBytes}}}}
 			var updateOpts = options.Update()
 			if _, err = t.fenceCollection.UpdateOne(ctx, filter, bump, updateOpts); err != nil {
@@ -137,11 +139,6 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			defer sess.EndSession(ctx)
 			return sess.CommitTransaction(context.Background())
 		})
-
-		// TODO - this should be async, but we need Load to await it before it may perform point-lookups.
-		<-op.Done()
-
-		return nil, op
 	}, nil
 }
 

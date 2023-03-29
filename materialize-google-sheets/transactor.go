@@ -65,6 +65,8 @@ func (b transactorBinding) columnCount() int {
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+	it.WaitForAcknowledged()
+
 	for it.Next() {
 		var needle = string(it.Key.Pack())
 		var rows = d.bindings[it.Binding].rows
