@@ -172,6 +172,9 @@
   "startedCommit": {}
 }
 {
+  "acknowledged": {}
+}
+{
   "row": {
     "canary": "amputation's",
     "id": 1
@@ -215,83 +218,71 @@
 }
 {
   "row": {
+    "canary": "pieced",
+    "id": 7
+  },
+  "table": "Simple"
+}
+{
+  "row": {
+    "canary": "roaches",
+    "id": 8
+  },
+  "table": "Simple"
+}
+{
+  "row": {
+    "canary": "devilish",
+    "id": 9
+  },
+  "table": "Simple"
+}
+{
+  "row": {
+    "canary": "glucose's",
+    "id": 10
+  },
+  "table": "Simple"
+}
+{
+  "row": {
     "id": 1,
-    "int": 1,
-    "str": "str 1"
+    "int": 6,
+    "str": "str 6"
   },
   "table": "duplicate_keys_standard"
 }
 {
   "row": {
     "id": 2,
-    "int": 2,
-    "str": "str 2"
+    "int": 7,
+    "str": "str 7"
   },
   "table": "duplicate_keys_standard"
 }
 {
   "row": {
     "id": 3,
-    "int": 3,
-    "str": "str 3"
+    "int": 8,
+    "str": "str 8"
   },
   "table": "duplicate_keys_standard"
 }
 {
   "row": {
     "id": 4,
-    "int": 4,
-    "str": "str 4"
+    "int": 9,
+    "str": "str 9"
   },
   "table": "duplicate_keys_standard"
 }
 {
   "row": {
     "id": 5,
-    "int": 5,
-    "str": "str 5"
+    "int": 10,
+    "str": "str 10"
   },
   "table": "duplicate_keys_standard"
-}
-{
-  "row": {
-    "id": 1,
-    "int": 1,
-    "str": "str 1"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "id": 2,
-    "int": 2,
-    "str": "str 2"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "id": 3,
-    "int": 3,
-    "str": "str 3"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "id": 4,
-    "int": 4,
-    "str": "str 4"
-  },
-  "table": "duplicate_keys_delta"
-}
-{
-  "row": {
-    "id": 5,
-    "int": 5,
-    "str": "str 5"
-  },
-  "table": "duplicate_keys_delta"
 }
 {
   "row": {
@@ -299,6 +290,86 @@
     "int": 1,
     "str": "str 1"
   },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 2,
+    "int": 2,
+    "str": "str 2"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 3,
+    "int": 3,
+    "str": "str 3"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 4,
+    "int": 4,
+    "str": "str 4"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 5,
+    "int": 5,
+    "str": "str 5"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 1,
+    "int": 6,
+    "str": "str 6"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 2,
+    "int": 7,
+    "str": "str 7"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 3,
+    "int": 8,
+    "str": "str 8"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 4,
+    "int": 9,
+    "str": "str 9"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 5,
+    "int": 10,
+    "str": "str 10"
+  },
+  "table": "duplicate_keys_delta"
+}
+{
+  "row": {
+    "id": 1,
+    "int": 1,
+    "str": "str 1"
+  },
   "table": "duplicate_keys_delta_exclude_flow_doc"
 }
 {
@@ -330,6 +401,46 @@
     "id": 5,
     "int": 5,
     "str": "str 5"
+  },
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "id": 1,
+    "int": 6,
+    "str": "str 6"
+  },
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "id": 2,
+    "int": 7,
+    "str": "str 7"
+  },
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "id": 3,
+    "int": 8,
+    "str": "str 8"
+  },
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "id": 4,
+    "int": 9,
+    "str": "str 9"
+  },
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "id": 5,
+    "int": 10,
+    "str": "str 10"
   },
   "table": "duplicate_keys_delta_exclude_flow_doc"
 }
@@ -425,13 +536,13 @@
       62
     ],
     "bool_field": true,
-    "float_field": 6.6,
+    "float_field": 66.66,
     "id": 6,
     "nested": {
       "id": "i6"
     },
     "nullable_int": 6,
-    "str_field": "str6"
+    "str_field": "str6 v2"
   },
   "table": "Multiple Types"
 }
@@ -442,13 +553,13 @@
       72
     ],
     "bool_field": false,
-    "float_field": 7.7,
+    "float_field": 77.77,
     "id": 7,
     "nested": {
       "id": "i7"
     },
     "nullable_int": null,
-    "str_field": "str7"
+    "str_field": "str7 v2"
   },
   "table": "Multiple Types"
 }
@@ -459,13 +570,13 @@
       82
     ],
     "bool_field": true,
-    "float_field": 8.8,
+    "float_field": 88.88,
     "id": 8,
     "nested": {
       "id": "i8"
     },
     "nullable_int": 8,
-    "str_field": "str8"
+    "str_field": "str8 v2"
   },
   "table": "Multiple Types"
 }
@@ -476,13 +587,13 @@
       92
     ],
     "bool_field": false,
-    "float_field": 9.9,
+    "float_field": 99.99,
     "id": 9,
     "nested": {
       "id": "i9"
     },
     "nullable_int": null,
-    "str_field": "str9"
+    "str_field": "str9 v2"
   },
   "table": "Multiple Types"
 }
@@ -493,13 +604,13 @@
       2
     ],
     "bool_field": true,
-    "float_field": 10.1,
+    "float_field": 1010.101,
     "id": 10,
     "nested": {
       "id": "i10"
     },
     "nullable_int": 10,
-    "str_field": "str10"
+    "str_field": "str10 v2"
   },
   "table": "Multiple Types"
 }
@@ -524,6 +635,36 @@
   "table": "Formatted Strings"
 }
 {
+  "row": {
+    "id": 1,
+    "int_and_str": 1,
+    "int_str": 10,
+    "num_and_str": 1.1,
+    "num_str": 10.1
+  },
+  "table": "Formatted Strings"
+}
+{
+  "row": {
+    "id": 2,
+    "int_and_str": 2,
+    "int_str": 20,
+    "num_and_str": 2.1,
+    "num_str": 20.1
+  },
+  "table": "Formatted Strings"
+}
+{
+  "row": {
+    "id": 5,
+    "int_and_str": 5,
+    "int_str": 50,
+    "num_and_str": 5.1,
+    "num_str": 50.1
+  },
+  "table": "Formatted Strings"
+}
+{
   "applied": {
     "actionDescription": "DROP TABLE IF EXISTS \"public\".\"Simple\";\nDROP TABLE IF EXISTS \"public\".duplicate_keys_standard;\nDROP TABLE IF EXISTS \"public\".duplicate_keys_delta;\nDROP TABLE IF EXISTS \"public\".duplicate_keys_delta_exclude_flow_doc;\nDROP TABLE IF EXISTS \"public\".\"Multiple Types\";\nDROP TABLE IF EXISTS \"public\".\"Formatted Strings\";\n\nCREATE TABLE IF NOT EXISTS \"public\".flow_materializations_v2 (\n\t\tmaterialization TEXT NOT NULL,\n\t\tversion TEXT NOT NULL,\n\t\tspec TEXT NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\n\nCOMMENT ON TABLE \"public\".flow_materializations_v2 IS 'This table is the source of truth for all materializations into this system.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.materialization IS 'The name of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.version IS 'Version of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_materializations_v2.spec IS 'Specification of the materialization, encoded as base64 protobuf.';\n\n\nCREATE TABLE IF NOT EXISTS \"public\".flow_checkpoints_v1 (\n\t\tmaterialization TEXT NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\tcheckpoint TEXT NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\n\nCOMMENT ON TABLE \"public\".flow_checkpoints_v1 IS 'This table holds Flow processing checkpoints used for exactly-once processing of materializations';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.materialization IS 'The name of the materialization.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.key_begin IS 'The inclusive lower-bound key hash covered by this checkpoint.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.key_end IS 'The inclusive upper-bound key hash covered by this checkpoint.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.fence IS 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.';\nCOMMENT ON COLUMN \"public\".flow_checkpoints_v1.checkpoint IS 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.';\n\nUPDATE \"public\".flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-postgres/materialize';"
   }
@@ -532,7 +673,9 @@
   "opened": {
     "runtimeCheckpoint": {
       "sources": {
-        "a/read/journal;suffix": {}
+        "a/read/journal;suffix": {
+          "readThrough": "1"
+        }
       }
     }
   }
