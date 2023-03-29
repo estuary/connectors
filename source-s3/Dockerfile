@@ -46,3 +46,4 @@ ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture
+LABEL FLOW_RUNTIME_CODEC=json
