@@ -2,6 +2,7 @@ package sql
 
 import (
 	"fmt"
+	"strings"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -145,6 +146,7 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.CollectionSpec) string {
 	var existingProjection = existing.GetProjection(field)
 	var proposedProjection = proposed.GetProjection(field)
+	var existingEffectiveType = effectiveJsonTypes(existingProjection)
 
 	// Ensure that the possible types of the proposed are compatible with the possible types of the
 	// existing. The new projection is always allowed to contain fewer types than the original since
@@ -152,8 +154,8 @@ func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.Coll
 	// compatible if they do not alter the effective FlatType, such as adding a string formatted as
 	// an integer to an existing integer type.
 	for _, pt := range effectiveJsonTypes(proposedProjection) {
-		if !SliceContains(pt, effectiveJsonTypes(existingProjection)) && pt != "null" {
-			return fmt.Sprintf("The proposed projection may contain the type '%s', which is not part of the original projection", pt)
+		if !SliceContains(pt, existingEffectiveType) && pt != "null" {
+			return fmt.Sprintf("The existing materialization for field %q of collection %q has type %q, but the proposed update requires the field type to be %q which is not compatible. Please consider materializing to a new table.", field, existing.Collection, strings.Join(existingEffectiveType, ","), pt)
 		}
 	}
 
