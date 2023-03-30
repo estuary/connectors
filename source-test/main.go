@@ -199,6 +199,10 @@ func (connector) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	var bindings = open.Capture.Bindings
 
+	// Notify Flow that we're starting.
+	if err := stream.Ready(); err != nil {
+		return err
+	}
 	for {
 		if config.FailAfter != 0 && state.Cursor >= config.FailAfter {
 			return fmt.Errorf("a horrible, no good error!")
