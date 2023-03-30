@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -24,11 +25,11 @@ func CatalogExtract(t *testing.T, sourcePath string, fn func(*sql.DB) error) err
 		"api",
 		"build",
 		"--build-id", "catalog",
-		"--directory", tempdir,
+		"--build-db", path.Join(tempdir, "build.db"),
 		"--source", sourcePath,
 	)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	require.NoError(t, cmd.Run())
 
-	return catalog.Extract(filepath.Join(tempdir, "catalog"), fn)
+	return catalog.Extract(filepath.Join(tempdir, "build.db"), fn)
 }
