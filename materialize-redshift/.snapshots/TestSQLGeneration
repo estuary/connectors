@@ -23,7 +23,7 @@ COMMENT ON COLUMN "a-schema".target_table."array" IS 'This is an array!
 auto-generated projection of JSON at: /array with inferred types: [array]';
 COMMENT ON COLUMN "a-schema".target_table.lower_case IS 'auto-generated projection of JSON at: /lower_case with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".target_table.value IS 'auto-generated projection of JSON at: /value with inferred types: [string]';
-COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'user-provided projection of JSON at:  with inferred types: [object]';
+COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
 --- End "a-schema".target_table createTargetTable ---
 
 --- Begin "Delta Updates" createTargetTable ---

@@ -11,7 +11,7 @@ collections:
 captures:
   tests/${CONNECTOR}/from-source:
     endpoint:
-      airbyteSource:
+      connector:
         image: "${CONNECTOR_IMAGE}"
         config: ${CONNECTOR_CONFIG}
     bindings:

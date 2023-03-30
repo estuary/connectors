@@ -18,7 +18,7 @@
   COMMENT ON COLUMN target_table.integer IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
   COMMENT ON COLUMN target_table.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
   COMMENT ON COLUMN target_table.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
-  COMMENT ON COLUMN target_table.flow_document IS 'user-provided projection of JSON at:  with inferred types: [object]';
+  COMMENT ON COLUMN target_table.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
   --- End target_table createTargetTable ---
 
 --- Begin target_table loadQuery ---

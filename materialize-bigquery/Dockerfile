@@ -11,8 +11,8 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Download recent flow binaries for usage by tests.
-RUN curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" | tar -zx -C /usr/local/bin/
+# Copy in the latest flowctl-go for usage by tests.
+COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go
 
 # Build the connector projects we depend on.
 COPY go-schema-gen           ./go-schema-gen
