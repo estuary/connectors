@@ -187,6 +187,7 @@ func TestSpecification(t *testing.T) {
 		Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
+	// Note that this diverges from canonical protobuf field names.
 	formatted, err := json.MarshalIndent(resp, "", "  ")
 	require.NoError(t, err)
 

@@ -114,7 +114,8 @@ jobs:
 
       - name: Download latest Flow release binaries and add them to $PATH
         run: |
-          ./fetch-flow.sh
+          # TODO(johnny): remove FLOW_RELEASE once sql branch is merged.
+          FLOW_RELEASE=dev-sql ./fetch-flow.sh
           echo "${PWD}/flow-bin" >> $GITHUB_PATH
 
       - name: Install kafkactl

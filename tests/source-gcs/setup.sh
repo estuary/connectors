@@ -15,7 +15,7 @@ config_json_template='{
 
 export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
 
-gsutil mb -p "$GCP_PROJECT_ID" "gs://${TEST_STREAM}"
+gsutil mb "gs://${TEST_STREAM}"
 
 root_dir="$(git rev-parse --show-toplevel)"
 

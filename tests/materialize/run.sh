@@ -86,7 +86,7 @@ function drive_connector {
     # and then snapshot the pretty-printed result. This allows connectors to
     # output loads in any overall order and with any inter-document structure,
     # while still having a stable snapshot result.
-    ~/flowctl raw materialize-fixture --source ${TEMP_DIR}/spec.proto --fixture ${fixture} | \
+    flowctl raw materialize-fixture --source ${TEMP_DIR}/spec.proto --fixture ${fixture} | \
         docker run --rm -i -e FLOW_RUNTIME_CODEC=json --network flow-test ${CONNECTOR_IMAGE} | \
         jq -Sc 'if .applied.actionDescription != null then .applied.actionDescription |= sub("[A-Za-z0-9+/=]{100,}"; "(a-base64-encoded-value)") else . end' | \
         go run ${TEST_DIR}/sort-loaded.go | \
