@@ -91,7 +91,7 @@ func (c *Config) SetDefaults() {
 		c.Advanced.WatermarksTable = "dbo.flow_watermarks"
 	}
 	if c.Advanced.BackfillChunkSize <= 0 {
-		c.Advanced.BackfillChunkSize = 4096
+		c.Advanced.BackfillChunkSize = 32768
 	}
 
 	// The address config property should accept a host or host:port
