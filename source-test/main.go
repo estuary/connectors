@@ -193,7 +193,7 @@ func (connector) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("parsing config: %w", err)
 	}
 	var state State
-	if err := flow.UnmarshalStrict(open.StateJson, &config); err != nil {
+	if err := flow.UnmarshalStrict(open.StateJson, &state); err != nil {
 		return fmt.Errorf("parsing state: %w", err)
 	}
 
