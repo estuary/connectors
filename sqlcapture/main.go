@@ -3,6 +3,7 @@ package sqlcapture
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -51,6 +52,30 @@ type Driver struct {
 
 type prerequisitesError struct {
 	errs []error
+}
+
+type formattedError interface{ MarkdownError() string }
+
+func (e *prerequisitesError) MarkdownError() string {
+	var b = new(strings.Builder)
+	fmt.Fprintf(b, "# Prerequisites Not Met\n\n")
+	fmt.Fprintf(b, "The capture cannot run due to the following error(s).\n\n")
+	var unformatted []error
+	for _, err := range e.errs {
+		var msg formattedError
+		if errors.As(err, &msg) {
+			fmt.Fprintf(b, "%s\n\n", msg.MarkdownError())
+		} else {
+			unformatted = append(unformatted, err)
+		}
+	}
+	if len(unformatted) > 0 {
+		fmt.Fprintf(b, "## Other Errors\n\n")
+		for _, err := range unformatted {
+			fmt.Fprintf(b, "* `%s`\n", err.Error())
+		}
+	}
+	return b.String()
 }
 
 func (e *prerequisitesError) Error() string {

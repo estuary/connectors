@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"net"
 	"net/url"
 	"strings"
@@ -21,6 +23,41 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
+
+// errorTemplates is a collection of templates used for formatted error reporting.
+var errorTemplates *template.Template
+
+//go:embed templates/*
+var errorTemplatesFS embed.FS
+
+func init() {
+	tmpl, err := template.ParseFS(errorTemplatesFS, "templates/*.md")
+	if err != nil {
+		panic(err)
+	}
+	errorTemplates = tmpl
+}
+
+type formattedError struct {
+	Name string
+	Data map[string]any
+}
+
+func (err *formattedError) MarkdownError() string {
+	var out = new(strings.Builder)
+	if err := errorTemplates.ExecuteTemplate(out, err.Name, err.Data); err != nil {
+		panic(err)
+	}
+	return out.String()
+}
+
+func (err *formattedError) Error() string {
+	var out = new(strings.Builder)
+	if err := errorTemplates.ExecuteTemplate(out, err.Name+"_short", err.Data); err != nil {
+		panic(err)
+	}
+	return out.String()
+}
 
 type sshForwarding struct {
 	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`

@@ -185,6 +185,8 @@ func (cs *CaptureSpec) Reset() {
 	cs.Errors = nil
 }
 
+type formattedError interface{ MarkdownError() string }
+
 // Summary returns a human-readable summary of the capture output, current state checkpoint,
 // and any errors encountered along the way.
 func (cs *CaptureSpec) Summary() string {
@@ -210,7 +212,12 @@ func (cs *CaptureSpec) Summary() string {
 		fmt.Fprintf(w, "# Captures Terminated With Errors\n")
 		fmt.Fprintf(w, "# ================================\n")
 		for _, err := range cs.Errors {
-			fmt.Fprintf(w, "%v\n", err)
+			var msg formattedError
+			if errors.As(err, &msg) {
+				fmt.Fprintf(w, "%s\n\n", msg.MarkdownError())
+			} else {
+				fmt.Fprintf(w, "%v\n", err)
+			}
 		}
 	}
 	return w.String()

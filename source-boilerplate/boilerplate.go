@@ -155,6 +155,8 @@ type applyUpsertCmd struct{ cmdCommon }
 type applyDeleteCmd struct{ cmdCommon }
 type pullCmd struct{ cmdCommon }
 
+type formattedError interface{ MarkdownError() string }
+
 func (c specCmd) Execute(args []string) error {
 	c.cmdCommon.logging.Configure()
 
@@ -164,6 +166,10 @@ func (c specCmd) Execute(args []string) error {
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
 	} else if resp, err := c.srv.Spec(c.ctx, &req); err != nil {
+		var msg formattedError
+		if errors.As(err, &msg) {
+			log.WithField("formatted", msg.MarkdownError()).Info("formatted error information")
+		}
 		return err
 	} else if err = c.w.WriteMsg(resp); err != nil {
 		return fmt.Errorf("writing response: %w", err)
@@ -180,6 +186,10 @@ func (c validateCmd) Execute(args []string) error {
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
 	} else if resp, err := c.srv.Validate(c.ctx, &req); err != nil {
+		var msg formattedError
+		if errors.As(err, &msg) {
+			log.WithField("formatted", msg.MarkdownError()).Info("formatted error information")
+		}
 		return err
 	} else if err = c.w.WriteMsg(resp); err != nil {
 		return fmt.Errorf("writing response: %w", err)
@@ -196,6 +206,10 @@ func (c discoverCmd) Execute(args []string) error {
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
 	} else if resp, err := c.srv.Discover(c.ctx, &req); err != nil {
+		var msg formattedError
+		if errors.As(err, &msg) {
+			log.WithField("formatted", msg.MarkdownError()).Info("formatted error information")
+		}
 		return err
 	} else if err = c.w.WriteMsg(resp); err != nil {
 		return fmt.Errorf("writing response: %w", err)
@@ -212,6 +226,10 @@ func (c applyUpsertCmd) Execute(args []string) error {
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
 	} else if resp, err := c.srv.ApplyUpsert(c.ctx, &req); err != nil {
+		var msg formattedError
+		if errors.As(err, &msg) {
+			log.WithField("formatted", msg.MarkdownError()).Info("formatted error information")
+		}
 		return err
 	} else if err = c.w.WriteMsg(resp); err != nil {
 		return fmt.Errorf("writing response: %w", err)
@@ -229,6 +247,10 @@ func (c applyDeleteCmd) Execute(args []string) error {
 	if err := c.readMsg(&req); err != nil {
 		return fmt.Errorf("reading request: %w", err)
 	} else if resp, err := c.srv.ApplyDelete(c.ctx, &req); err != nil {
+		var msg formattedError
+		if errors.As(err, &msg) {
+			log.WithField("formatted", msg.MarkdownError()).Info("formatted error information")
+		}
 		// Translate delete errors into a successful response so that task
 		// deletion cannot fail.
 		resp = &pc.ApplyResponse{ActionDescription: err.Error()}
@@ -245,7 +267,15 @@ func (c pullCmd) Execute(args []string) error {
 	c.cmdCommon.logging.Configure()
 
 	log.Debug("executing Pull subcommand")
-	return c.srv.Pull(&pullAdapter{cmdCommon: c.cmdCommon})
+	if err := c.srv.Pull(&pullAdapter{cmdCommon: c.cmdCommon}); err != nil {
+		log.Info("checking for formatted error")
+		var msg formattedError
+		if errors.As(err, &msg) {
+			log.WithField("formatted", msg.MarkdownError()).Info("formatted error information")
+		}
+		return err
+	}
+	return nil
 }
 
 // pullAdapter is a pc.Driver_PullServer built from

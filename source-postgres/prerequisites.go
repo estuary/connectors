@@ -30,7 +30,7 @@ func (db *postgresDatabase) prerequisiteLogicalReplication(ctx context.Context) 
 	if err := db.conn.QueryRow(ctx, `SHOW wal_level;`).Scan(&level); err != nil {
 		return fmt.Errorf("unable to query 'wal_level' system variable: %w", err)
 	} else if level != "logical" {
-		return fmt.Errorf("logical replication isn't enabled: current wal_level = %q", level)
+		return &formattedError{"prereq_logical_replication", map[string]any{"wal_level": level}}
 	}
 	return nil
 }
@@ -126,7 +126,7 @@ func (db *postgresDatabase) SetupTablePrerequisites(ctx context.Context, schema,
 	rows.Close()
 	if err != nil {
 		var streamID = sqlcapture.JoinStreamID(schema, table)
-		return fmt.Errorf("user %q cannot read from table %q", db.config.User, streamID)
+		return &formattedError{"prereq_table_select", map[string]any{"user": db.config.User, "table": streamID}}
 	}
 	return nil
 }
