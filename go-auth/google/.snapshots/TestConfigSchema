@@ -17,10 +17,6 @@
           "type": "string",
           "secret": true
         },
-        "access_token": {
-          "type": "string",
-          "secret": true
-        },
         "refresh_token": {
           "type": "string",
           "secret": true
