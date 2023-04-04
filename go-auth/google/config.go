@@ -20,6 +20,7 @@ type CredentialConfig struct {
 	AuthType        string `json:"auth_type"`
 	ClientID        string `json:"client_id,omitempty"`
 	ClientSecret    string `json:"client_secret,omitempty"`
+	AccessToken     string `json:"access_token,omitempty"`
 	RefreshToken    string `json:"refresh_token,omitempty"`
 	CredentialsJSON string `json:"credentials_json,omitempty"`
 }
@@ -118,6 +119,12 @@ func (CredentialConfig) JSONSchema() *jsonschema.Schema {
 		},
 	})
 	oauthProps.Set("client_secret", &jsonschema.Schema{
+		Type: "string",
+		Extras: map[string]interface{}{
+			"secret": true,
+		},
+	})
+	oauthProps.Set("access_token", &jsonschema.Schema{
 		Type: "string",
 		Extras: map[string]interface{}{
 			"secret": true,
