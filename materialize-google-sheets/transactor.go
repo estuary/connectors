@@ -68,7 +68,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	it.WaitForAcknowledged()
 
 	for it.Next() {
-		var needle = string(it.Key.Pack())
+		var needle = string(it.PackedKey)
 		var rows = d.bindings[it.Binding].rows
 
 		var ind = sort.Search(len(rows), func(i int) bool {
@@ -120,7 +120,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		stores[it.Binding] = append(stores[it.Binding], storedRow{
 			RowState: RowState{
-				PackedKey: it.Key.Pack(),
+				PackedKey: it.PackedKey,
 				NextRound: d.round,
 				NextDoc:   it.RawJSON,
 			},
