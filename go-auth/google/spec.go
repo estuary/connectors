@@ -17,7 +17,6 @@ func Spec(scopes ...string) *pf.OAuth2 {
 		AccessTokenUrlTemplate: "https://oauth2.googleapis.com/token",
 		AccessTokenBody:        "{\"grant_type\": \"authorization_code\", \"client_id\": \"{{{ client_id }}}\", \"client_secret\": \"{{{ client_secret }}}\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"code\": \"{{{ code }}}\"}",
 		AccessTokenResponseJsonMap: map[string]json.RawMessage{
-			"access_token":  json.RawMessage(`"/access_token"`),
 			"refresh_token": json.RawMessage(`"/refresh_token"`),
 		},
 	}
