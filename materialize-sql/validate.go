@@ -155,7 +155,7 @@ func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.Coll
 	// an integer to an existing integer type.
 	for _, pt := range effectiveJsonTypes(proposedProjection) {
 		if !SliceContains(pt, existingEffectiveType) && pt != "null" {
-			return fmt.Sprintf("The existing materialization for field %q of collection %q has type %q, but the proposed update requires the field type to be %q which is not compatible. Please consider materializing to a new table.", field, existing.Collection, strings.Join(existingEffectiveType, ","), pt)
+			return fmt.Sprintf("The existing materialization for field %q of collection %q has type %q, but the proposed update requires the field type to be %q which is not compatible. Please consider materializing to a new table.", field, existing.Name, strings.Join(existingEffectiveType, ","), pt)
 		}
 	}
 
