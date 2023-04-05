@@ -7,8 +7,8 @@ FROM rust:1.54-slim-buster as builder
 RUN rustup component add clippy
 
 RUN apt-get update \
- && apt-get install -y ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev \
- && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /connector
 
@@ -17,20 +17,20 @@ COPY source-kafka/Cargo.* /connector/
 # Avoid having to install/build all dependencies by copying the Cargo files and
 # making a dummy src/main.rs and empty lib.rs files.
 RUN mkdir src \
- && echo "fn main() {}" > src/main.rs \
- && touch src/lib.rs \
- && cargo test --locked \
- && cargo build --release --locked \
- && rm -r src
+    && echo "fn main() {}" > src/main.rs \
+    && touch src/lib.rs \
+    && cargo test --locked \
+    && cargo build --release --locked \
+    && rm -r src
 
 COPY source-kafka/src ./src
 
 # This touch prevents Docker from using a cached empty main.rs file.
 RUN touch src/main.rs \
- && touch src/lib.rs \
- && cargo test --locked --offline \
- && cargo clippy --locked --offline \
- && cargo install --path . --locked --offline
+    && touch src/lib.rs \
+    && cargo test --locked --offline \
+    && cargo clippy --locked --offline \
+    && cargo install --path . --locked --offline
 
 
 # Runtime Stage
@@ -53,7 +53,7 @@ COPY --from=builder /usr/local/cargo/bin/source-kafka ./source-kafka
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-COPY --from=ghcr.io/estuary/airbyte-to-flow:50cc7fa /airbyte-to-flow ./
+COPY --from=ghcr.io/estuary/airbyte-to-flow:eb2f96a /airbyte-to-flow ./
 ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/source-kafka"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
