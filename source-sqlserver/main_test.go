@@ -213,3 +213,10 @@ func TestGeneric(t *testing.T) {
 	var tb = sqlserverTestBackend(t)
 	tests.Run(context.Background(), t, tb)
 }
+
+func TestColumnNameQuoting(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var tableName = tb.CreateTable(ctx, t, "", "([id] INTEGER, [data] INTEGER, [CAPITALIZED] INTEGER, [unique] INTEGER, [type] INTEGER, PRIMARY KEY ([id], [data], [capitalized], [unique], [type]))")
+	tb.Insert(ctx, t, tableName, [][]any{{0, 0, 0, 0, 0}, {1, 1, 1, 1, 1}, {2, 2, 2, 2, 2}})
+	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, tableName))
+}

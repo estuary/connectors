@@ -114,7 +114,7 @@ func (db *sqlserverDatabase) buildScanQuery(start bool, keyColumns []string, col
 	var pkey []string
 	var args []string
 	for idx, colName := range keyColumns {
-		pkey = append(pkey, colName)
+		pkey = append(pkey, quoteColumnName(colName))
 		args = append(args, fmt.Sprintf("@p%d", idx+1))
 	}
 
@@ -138,4 +138,15 @@ func (db *sqlserverDatabase) buildScanQuery(start bool, keyColumns []string, col
 	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " OFFSET 0 ROWS FETCH FIRST %d ROWS ONLY;", db.config.Advanced.BackfillChunkSize)
 	return query.String()
+}
+
+func quoteColumnName(name string) string {
+	// From https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers
+	// it appears to always be valid to take an identifier for which quoting is optional and enclose
+	// it in brackets.
+	//
+	// It is not immediately clear whether there are any special characters which need further
+	// escaping in a bracket delimited identifier, but for now adding brackets is strictly better
+	// than not adding brackets.
+	return `[` + name + `]`
 }
