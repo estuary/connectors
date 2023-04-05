@@ -9,12 +9,25 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// The standard library `time.RFC3339Nano` is wrong for historical reasons, this
+// format string is better because it always uses 9-digit fractional seconds, and
+// thus it can be sorted lexicographically as bytes.
+const sortableRFC3339Nano = "2006-01-02T15:04:05.000000000Z07:00"
+
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
-	return key, nil
+	switch key := key.(type) {
+	case time.Time:
+		return key.Format(sortableRFC3339Nano), nil
+	default:
+		return key, nil
+	}
 }
 
 func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
-	return t, nil
+	switch t := t.(type) {
+	default:
+		return t, nil
+	}
 }
 
 func (db *sqlserverDatabase) translateRecordFields(columnTypes map[string]interface{}, f map[string]interface{}) error {

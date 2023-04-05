@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
+	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/sqlcapture/tests"
 )
 
@@ -54,4 +56,30 @@ func TestDatatypes(t *testing.T) {
 
 		{ColumnType: `xml`, ExpectType: `{"type":["string","null"]}`, InputValue: `<hello>world</hello>`, ExpectValue: `"\u003chello\u003eworld\u003c/hello\u003e"`},
 	})
+}
+
+func TestScanKeyTypes(t *testing.T) {
+	var ctx, tb = context.Background(), sqlserverTestBackend(t)
+	for _, tc := range []struct {
+		Name       string
+		ColumnType string
+		Values     []interface{}
+	}{
+		{"Integer", "INTEGER", []any{0, -3, 2, 1723}},
+		{"DateTimeOffset", "DATETIMEOFFSET", []any{"1991-08-31T12:34:54.125-06:00", "1991-08-31T12:34:54.126-06:00", "2000-01-01T01:01:01Z"}},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			var tableName = tb.CreateTable(ctx, t, "", fmt.Sprintf("(k %s PRIMARY KEY, v TEXT)", tc.ColumnType))
+			var rows [][]interface{}
+			for idx, val := range tc.Values {
+				rows = append(rows, []interface{}{val, fmt.Sprintf("Data %d", idx)})
+			}
+			tb.Insert(ctx, t, tableName, rows)
+
+			var cs = tb.CaptureSpec(ctx, t, tableName)
+			cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
+			var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
+			cupaloy.SnapshotT(t, summary)
+		})
+	}
 }
