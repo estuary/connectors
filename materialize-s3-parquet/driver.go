@@ -281,8 +281,11 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 	}
 
 	var cp *protocol.Checkpoint
-	if err := cp.Unmarshal(runtimeCheckpoint); err != nil {
-		return nil, nil, fmt.Errorf("unmarshalling runtimeCheckpoint, %w", err)
+	if len(runtimeCheckpoint) > 0 {
+		cp = new(protocol.Checkpoint)
+		if err := cp.Unmarshal(runtimeCheckpoint); err != nil {
+			return nil, nil, fmt.Errorf("unmarshalling runtimeCheckpoint, %w", err)
+		}
 	}
 
 	return transactor, &pm.Response_Opened{RuntimeCheckpoint: cp}, nil
