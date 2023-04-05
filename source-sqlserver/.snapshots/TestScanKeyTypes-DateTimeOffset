@@ -1,0 +1,49 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_datetimeoffset": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset"}},"k":"<TIMESTAMP>","v":"Data 0"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI1MDAwMDAwLTA2OjAwAA=="}}}
+
+
+####################################
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI1MDAwMDAwLTA2OjAwAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_datetimeoffset": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset"}},"k":"<TIMESTAMP>","v":"Data 1"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI2MDAwMDAwLTA2OjAwAA=="}}}
+
+
+####################################
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI2MDAwMDAwLTA2OjAwAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_datetimeoffset": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset"}},"k":"<TIMESTAMP>","v":"Data 2"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"key_columns":["k"],"mode":"Backfill","scanned":"AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwMDAwMDAwWgA="}}}
+
+
+####################################
+### Capture from Key "AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwMDAwMDAwWgA="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"key_columns":["k"],"mode":"Active"}}}
+
+
+
