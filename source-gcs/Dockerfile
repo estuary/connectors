@@ -38,7 +38,7 @@ COPY --from=builder /builder/connector ./source-gcs
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-COPY --from=ghcr.io/estuary/airbyte-to-flow:50cc7fa /airbyte-to-flow ./
+COPY --from=ghcr.io/estuary/airbyte-to-flow:eb2f96a /airbyte-to-flow ./
 ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/source-gcs"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
