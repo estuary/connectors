@@ -174,11 +174,11 @@ func (c *protoCodec) RecvMsg(m interface{}) error {
 		return fmt.Errorf("reading message length: %w", err)
 	}
 
-	var len = int(binary.LittleEndian.Uint32(lengthBytes[:]))
+	var size = int(binary.LittleEndian.Uint32(lengthBytes[:]))
 
-	var b, err = c.peekMessage(len)
-	if err != nil {
-		return err
+	var b = make([]byte, size)
+	if _, err := io.ReadFull(c.r, b); err != nil {
+		return fmt.Errorf("reading message: %w", err)
 	}
 
 	if err := proto.Unmarshal(b, m.(proto.Message)); err != nil {
