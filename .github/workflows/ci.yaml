@@ -114,6 +114,7 @@ jobs:
 
       - name: Download latest Flow release binaries and add them to $PATH
         run: |
+          ./fetch-flow.sh
           echo "${PWD}/flow-bin" >> $GITHUB_PATH
 
       - name: Install kafkactl
