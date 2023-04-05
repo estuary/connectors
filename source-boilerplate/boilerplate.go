@@ -271,6 +271,13 @@ func (c *protoCodec) SetTrailer(metadata.MD) {
 }
 
 func (c *protoCodec) peekMessage(size int) ([]byte, error) {
+	// TODO(johnny): Remove me when we resolve the json.RawMessage casting issue.
+	var buf = make([]byte, size)
+	if _, err := io.ReadFull(c.r, buf); err != nil {
+		return nil, fmt.Errorf("reading message (directly): %w", err)
+	}
+	return buf, nil
+
 	// Fetch next length-delimited message into a buffer.
 	// In the garden-path case, we decode directly from the
 	// bufio.Reader internal buffer without copying
