@@ -5,9 +5,9 @@ edition = "2021"
 
 
 [dependencies]
-doc = { git = "https://github.com/estuary/flow", branch = "johnny/more-sql" }
-json = { git = "https://github.com/estuary/flow", branch = "johnny/more-sql" }
-proto-flow = { git = "https://github.com/estuary/flow", branch = "johnny/more-sql" }
+doc = { git = "https://github.com/estuary/flow" }
+json = { git = "https://github.com/estuary/flow" }
+proto-flow = { git = "https://github.com/estuary/flow" }
 
 anyhow = "1.0.69"
 async-trait = "0.1.64"
