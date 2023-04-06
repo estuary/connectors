@@ -108,7 +108,6 @@ type changeEvent struct {
 	FullDocument  bson.M `bson:"fullDocument"`
 }
 
-const changeStreamFatalErrorCode = 280
 const resumePointGoneErrorMessage = "the resume point may no longer be in the oplog"
 
 func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding int, res resource, backfillFinishedAt *primitive.Timestamp, resumeToken bson.Raw) error {
@@ -116,7 +115,12 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 
 	var collection = db.Collection(res.Collection)
 
-	log.Debug("listening on changes on collection ", res.Collection)
+	log.WithFields(log.Fields{
+		"database":           res.Database,
+		"collection":         res.Collection,
+		"resumeToken":        resumeToken,
+		"backfillFinishedAt": backfillFinishedAt,
+	}).Info("listening on changes on collection")
 	var eventFilter = bson.D{{"$match", bson.D{{"$or",
 		bson.A{
 			bson.D{{"operationType", "delete"}},
@@ -140,20 +144,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 		// of the collection which can't resume instead of resetting the whole
 		// connector's checkpoint and backfilling everything
 		if e, ok := err.(mongo.ServerError); ok {
-			if e.HasErrorCode(changeStreamFatalErrorCode) && e.HasErrorMessage(resumePointGoneErrorMessage) {
+			if e.HasErrorMessage(resumePointGoneErrorMessage) {
 				if err = c.Output.Checkpoint([]byte("{}"), false); err != nil {
 					return fmt.Errorf("output checkpoint failed: %w", err)
 				}
-
 				return fmt.Errorf("change stream on collection %s cannot resume capture, the connector will restart and run a backfill: %w", res.Collection, err)
-			} else {
-				log.WithFields(log.Fields{
-					"database":                 res.Database,
-					"collection":               res.Collection,
-					"isChangeStreamFatalError": e.HasErrorCode(changeStreamFatalErrorCode),
-					"isResumePointGone":        e.HasErrorMessage(resumePointGoneErrorMessage),
-					"resumeToken":              resumeToken,
-				}).Errorf("mongo server error: %+v", e)
 			}
 		}
 
