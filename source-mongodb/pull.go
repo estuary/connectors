@@ -146,6 +146,14 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 				}
 
 				return fmt.Errorf("change stream on collection %s cannot resume capture, the connector will restart and run a backfill: %w", res.Collection, err)
+			} else {
+				log.WithFields(log.Fields{
+					"database":                 res.Database,
+					"collection":               res.Collection,
+					"isChangeStreamFatalError": e.HasErrorCode(changeStreamFatalErrorCode),
+					"isResumePointGone":        e.HasErrorMessage(resumePointGoneErrorMessage),
+					"resumeToken":              resumeToken,
+				}).Errorf("mongo server error: %+v", e)
 			}
 		}
 
