@@ -135,7 +135,8 @@ func (db *sqlserverDatabase) buildScanQuery(start bool, keyColumns []string, col
 		}
 		fmt.Fprintf(query, ")")
 	}
-	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
+	// TODO(phil): just testing collation here. Add a comment if it works.
+	fmt.Fprintf(query, " ORDER BY %s COLLATE Latin1_General_100_CS_AS_KS_WS_UTF8", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " OFFSET 0 ROWS FETCH FIRST %d ROWS ONLY;", db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
