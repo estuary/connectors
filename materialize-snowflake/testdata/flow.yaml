@@ -36,8 +36,9 @@ collections:
 materializations:
   test/sqlite:
     endpoint:
-      sqlite:
-        path: ":memory:"
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
     bindings:
       - source: key/value
         resource: { table: key_value }

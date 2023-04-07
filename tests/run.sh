@@ -34,7 +34,7 @@ TESTDIR=".build/tests/${CONNECTOR}"
 # Post-templating catalog source processed by the test.
 CATALOG_SOURCE="${TESTDIR}/test.flow.yaml"
 # SQLite database into which the test is expected to materialize.
-OUTPUT_DB="${TESTDIR}/materialization.db"
+OUTPUT_DB="/tmp/sqlite.db"
 # Actual materialization output scraped from ${OUTPUT_DB}.
 ACTUAL="${TESTDIR}/actual_test_results.txt"
 
@@ -122,7 +122,8 @@ retry_counter=0
 while true
 do
   # Read out materialization results.
-  sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
+  container_id=$(docker ps | grep materialize-sqlite | awk '{ print $1 }')
+  docker exec $connector_id sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
   if [[ "$(cat tests/${CONNECTOR}/expected.txt | wc -l )" -eq "$(cat ${ACTUAL} | wc -l)" ]]; then
     # Verify actual vs expected results. `diff` will exit 1 if files are different
     echo "-- RUNNING DIFF"
