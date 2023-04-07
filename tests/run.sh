@@ -128,11 +128,13 @@ do
     # Verify actual vs expected results. `diff` will exit 1 if files are different
     echo "-- RUNNING DIFF"
     diff --suppress-common-lines --side-by-side "${ACTUAL}" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"
+    docker stop $container_id
     break
   fi
   # after 30 retries (30 seconds) we timeout
   retry_counter=$((retry_counter + 1))
   if [[ "$retry_counter" -eq "30" ]]; then
+    docker stop $container_id
     bail "Timeout reached while checking for expected output"
   fi
   sleep 1
