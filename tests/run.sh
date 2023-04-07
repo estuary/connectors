@@ -123,7 +123,7 @@ while true
 do
   # Read out materialization results.
   container_id=$(docker ps | grep materialize-sqlite | awk '{ print $1 }')
-  docker exec $connector_id sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
+  docker exec $container_id sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
   if [[ "$(cat tests/${CONNECTOR}/expected.txt | wc -l )" -eq "$(cat ${ACTUAL} | wc -l)" ]]; then
     # Verify actual vs expected results. `diff` will exit 1 if files are different
     echo "-- RUNNING DIFF"
