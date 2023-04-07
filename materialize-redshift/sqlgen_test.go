@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+	"fmt"
+	"encoding/json"
 
 	"github.com/bradleyjkemp/cupaloy"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"

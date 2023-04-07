@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+	"fmt"
+	"encoding/json"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
