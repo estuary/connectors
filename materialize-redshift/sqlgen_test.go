@@ -22,6 +22,11 @@ func TestSQLGeneration(t *testing.T) {
 			spec, err = catalog.LoadMaterialization(db, "test/sqlite")
 			return err
 		}))
+	var jsonSpec, err = json.Marshal(spec)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%s", string(jsonSpec))	
 
 	// TODO(whb): These keys are manually set as "nullable" for now to test the query generation
 	// with nullable keys. Once flow supports nullable keys natively, this should be cleaned up.

@@ -22,6 +22,11 @@ func TestSQLGeneration(t *testing.T) {
 			spec, err = catalog.LoadMaterialization(db, "test/sqlite")
 			return err
 		}))
+	var jsonSpec, err = json.Marshal(spec)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%s", string(jsonSpec))	
 
 	var shape = sqlDriver.BuildTableShape(spec, 0, tableConfig{
 		Table:     "target_table",
