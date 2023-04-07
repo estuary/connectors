@@ -1,34 +1,27 @@
 package connector
 
 import (
-	"database/sql"
 	"strings"
 	"testing"
-	"fmt"
+	"os"
 	"encoding/json"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
-	"github.com/estuary/connectors/testsupport"
-	"github.com/estuary/flow/go/protocols/catalog"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
-	require.NoError(t, testsupport.CatalogExtract(t, "testdata/flow.yaml",
-		func(db *sql.DB) error {
-			var err error
-			spec, err = catalog.LoadMaterialization(db, "test/sqlite")
-			return err
-		}))
-	var jsonSpec, err = json.Marshal(spec)
+	var specJson, err = os.ReadFile("testdata/spec.json")
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("%s", string(jsonSpec))	
+	if err := json.Unmarshal(specJson, &spec); err != nil {
+		panic(err)
+	}
 
 	var shape = sqlDriver.BuildTableShape(spec, 0, tableConfig{
 		Table:     "target_table",
