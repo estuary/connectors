@@ -22,8 +22,9 @@ captures:
 materializations:
   tests/${CONNECTOR}/to-sqlite:
     endpoint:
-      sqlite:
-        path: materialization.db
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
     bindings:
       - resource:
           table: test_results
