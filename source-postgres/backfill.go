@@ -139,7 +139,7 @@ func (db *postgresDatabase) buildScanQuery(start bool, keyColumns []string, colu
 	if !start {
 		fmt.Fprintf(query, ` WHERE (%s) > (%s)`, strings.Join(pkey, ", "), strings.Join(args, ", "))
 	}
-	fmt.Fprintf(query, ` ORDER BY (%s)`, strings.Join(pkey, ", "))
+	fmt.Fprintf(query, ` ORDER BY %s`, strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " LIMIT %d;", db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
