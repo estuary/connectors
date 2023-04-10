@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sort"
 	"strings"
 	"time"
@@ -493,9 +494,12 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 	// in the database matches the one we previously wrote? Maybe that's more effort
 	// than it's worth until we have other evidence of correctness violations though.
 
-	// TODO(wgd): We can dispatch these table reads concurrently with a WaitGroup
-	// for synchronization.
-	for _, streamID := range streams {
+	// Select one stream at random to backfill at a time. On average this works
+	// as well as any other policy, and just doing one at a time means that we
+	// can size the relevant constants without worrying about how many tables
+	// might be concurrently backfilling.
+	if len(streams) != 0 {
+		var streamID = streams[rand.Intn(len(streams))]
 		var streamState = c.State.Streams[streamID]
 
 		discoveryInfo, ok := c.discovery[streamID]
