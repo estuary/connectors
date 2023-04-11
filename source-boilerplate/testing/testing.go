@@ -358,6 +358,44 @@ func (v *SortedCaptureValidator) Reset() {
 	v.documents = nil
 }
 
+// OrderedCaptureValidator maintains a list of every document emitted to each output
+// collection in the order they were emitted.
+type OrderedCaptureValidator struct {
+	documents map[string][]json.RawMessage // Map from collection name to list of documents
+}
+
+// Output feeds a new document into the CaptureValidator.
+func (v *OrderedCaptureValidator) Output(collection string, data json.RawMessage) {
+	if v.documents == nil {
+		v.documents = make(map[string][]json.RawMessage)
+	}
+	v.documents[collection] = append(v.documents[collection], data)
+}
+
+// Summarize writes a human-readable / snapshottable summary of the documents observed by the CaptureValidator.
+func (v *OrderedCaptureValidator) Summarize(w io.Writer) error {
+	var collections []string
+	for collection := range v.documents {
+		collections = append(collections, collection)
+	}
+	sort.Strings(collections)
+
+	for _, collection := range collections {
+		fmt.Fprintf(w, "# ================================\n")
+		fmt.Fprintf(w, "# Collection %q: %d Documents\n", collection, len(v.documents[collection]))
+		fmt.Fprintf(w, "# ================================\n")
+		for _, doc := range v.documents[collection] {
+			fmt.Fprintf(w, "%s\n", doc)
+		}
+	}
+	return nil
+}
+
+// Reset clears the internal state of the CaptureValidator.
+func (v *OrderedCaptureValidator) Reset() {
+	v.documents = nil
+}
+
 // ChecksumValidator receives documents and reduces them into a final checksum. Useful for
 // snapshotting large collections where a human-readable output is not feasible.
 type ChecksumValidator struct {

@@ -220,3 +220,12 @@ func TestColumnNameQuoting(t *testing.T) {
 	tb.Insert(ctx, t, tableName, [][]any{{0, 0, 0, 0, 0}, {1, 1, 1, 1, 1}, {2, 2, 2, 2, 2}})
 	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, tableName))
 }
+
+func TestTextCollation(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var tableName = tb.CreateTable(ctx, t, "", "(id VARCHAR(8) PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, tableName, [][]any{{"AAA", "1"}, {"BBB", "2"}, {"-J C", "3"}, {"H R", "4"}})
+	var cs = tb.CaptureSpec(ctx, t, tableName)
+	cs.Validator = &st.OrderedCaptureValidator{}
+	tests.VerifiedCapture(ctx, t, cs)
+}
