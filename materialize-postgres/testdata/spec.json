@@ -1,1 +1,595 @@
-{"name":"test/sqlite","connector_type":2,"config_json":{"path":":memory:"},"bindings":[{"resource_config_json":{"table":"key_value"},"resource_path":["key_value"],"collection":{"name":"key/value","write_schema_json":{"$id":"file:///builder/materialize-***/testdata/flow.yaml?ptr=/collections/key~1value/schema","properties":{"Camel_Case":{"type":"integer"},"a Time":{"format":"date-time","type":"string"},"array":{"title":"This is an array!","type":"array"},"key!2":{"type":"boolean"},"key1":{"description":"Key One Description","title":"Key One Title","type":"integer"},"lower_case":{"type":"integer"},"nullableKey":{"type":"string"},"value":{"type":"string"}},"required":["key1","key!2","nullableKey"],"type":"object"},"key":["/key1","/key!2","/nullableKey"],"uuid_ptr":"/_meta/uuid","projections":[{"ptr":"/Camel_Case","field":"Camel_Case","inference":{"types":["integer"],"exists":2}},{"ptr":"/a Time","field":"a Time","inference":{"types":["string"],"string":{"format":"date-time"},"exists":2}},{"ptr":"/array","field":"array","inference":{"types":["array"],"title":"This is an array!","exists":2}},{"field":"flow_document","inference":{"types":["object"],"exists":1}},{"ptr":"/key!2","field":"key!2","is_primary_key":true,"inference":{"types":["boolean"],"exists":1}},{"ptr":"/key1","field":"key1","is_primary_key":true,"inference":{"types":["integer"],"title":"Key One Title","description":"Key One Description","exists":1}},{"ptr":"/lower_case","field":"lower_case","inference":{"types":["integer"],"exists":2}},{"ptr":"/nullableKey","field":"nullableKey","is_primary_key":true,"inference":{"types":["string"],"string":{},"exists":1}},{"ptr":"/value","field":"value","inference":{"types":["string"],"string":{},"exists":2}}],"ack_template_json":{"_meta":{"ack":true,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"}},"partition_template":{"name":"key/value","replication":3,"labels":{"labels":[{"name":"app.gazette.dev/managed-by","value":"estuary.dev/flow"},{"name":"content-type","value":"application/x-ndjson"},{"name":"estuary.dev/build","value":"catalog"},{"name":"estuary.dev/collection","value":"key/value"}]},"fragment":{"length":536870912,"compression_codec":2,"stores":["s3://a-bucket/"],"refresh_interval":300000000000,"retention":0,"flush_interval":0,"path_postfix_template":"utc_date={{.Spool.FirstAppendTime.Format \"2006-01-02\"}}/utc_hour={{.Spool.FirstAppendTime.Format \"15\"}}"},"flags":4,"max_append_rate":4194304}},"partition_selector":{"include":{"labels":[{"name":"estuary.dev/collection","value":"key/value"}]},"exclude":{"labels":null}},"field_selection":{"keys":["key1","key!2","nullableKey"],"values":["Camel_Case","a Time","array","lower_case","value"],"document":"flow_document","field_config_json_map":{"array":{}}},"journal_read_suffix":"materialize/test/sqlite/key_value"},{"resource_config_json":{"table":"Delta Updates"},"resource_path":["Delta Updates"],"collection":{"name":"delta/updates","write_schema_json":{"$id":"file:///builder/materialize-***/testdata/flow.yaml?ptr=/collections/delta~1updates/schema","properties":{"aValue":{"description":"A super-awesome value.","type":"integer"},"nullableKey":{"type":"string"},"theKey":{"type":"string"}},"required":["theKey","nullableKey"],"type":"object"},"key":["/theKey","/nullableKey"],"uuid_ptr":"/_meta/uuid","projections":[{"ptr":"/aValue","field":"aValue","inference":{"types":["integer"],"description":"A super-awesome value.","exists":2}},{"field":"flow_document","inference":{"types":["object"],"exists":1}},{"ptr":"/nullableKey","field":"nullableKey","is_primary_key":true,"inference":{"types":["string"],"string":{},"exists":1}},{"ptr":"/theKey","field":"theKey","is_primary_key":true,"inference":{"types":["string"],"string":{},"exists":1}}],"ack_template_json":{"_meta":{"ack":true,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"}},"partition_template":{"name":"delta/updates","replication":3,"labels":{"labels":[{"name":"app.gazette.dev/managed-by","value":"estuary.dev/flow"},{"name":"content-type","value":"application/x-ndjson"},{"name":"estuary.dev/build","value":"catalog"},{"name":"estuary.dev/collection","value":"delta/updates"}]},"fragment":{"length":536870912,"compression_codec":2,"stores":["s3://a-bucket/"],"refresh_interval":300000000000,"retention":0,"flush_interval":0,"path_postfix_template":"utc_date={{.Spool.FirstAppendTime.Format \"2006-01-02\"}}/utc_hour={{.Spool.FirstAppendTime.Format \"15\"}}"},"flags":4,"max_append_rate":4194304}},"partition_selector":{"include":{"labels":[{"name":"estuary.dev/collection","value":"delta/updates"}]},"exclude":{"labels":null}},"field_selection":{"keys":["theKey","nullableKey"],"values":["aValue"],"document":"flow_document"},"journal_read_suffix":"materialize/test/sqlite/Delta%20Updates"},{"resource_config_json":{"table":"No Values"},"resource_path":["No Values"],"collection":{"name":"no_values","write_schema_json":{"$id":"file:///builder/materialize-***/testdata/flow.yaml?ptr=/collections/no_values/schema","properties":{"key1":{"type":"integer"},"key2":{"type":"boolean"}},"required":["key1","key2"],"type":"object"},"key":["/key1","/key2"],"uuid_ptr":"/_meta/uuid","projections":[{"field":"flow_document","inference":{"types":["object"],"exists":1}},{"ptr":"/key1","field":"key1","is_primary_key":true,"inference":{"types":["integer"],"exists":1}},{"ptr":"/key2","field":"key2","is_primary_key":true,"inference":{"types":["boolean"],"exists":1}}],"ack_template_json":{"_meta":{"ack":true,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"}},"partition_template":{"name":"no_values","replication":3,"labels":{"labels":[{"name":"app.gazette.dev/managed-by","value":"estuary.dev/flow"},{"name":"content-type","value":"application/x-ndjson"},{"name":"estuary.dev/build","value":"catalog"},{"name":"estuary.dev/collection","value":"no_values"}]},"fragment":{"length":536870912,"compression_codec":2,"stores":["s3://a-bucket/"],"refresh_interval":300000000000,"retention":0,"flush_interval":0,"path_postfix_template":"utc_date={{.Spool.FirstAppendTime.Format \"2006-01-02\"}}/utc_hour={{.Spool.FirstAppendTime.Format \"15\"}}"},"flags":4,"max_append_rate":4194304}},"partition_selector":{"include":{"labels":[{"name":"estuary.dev/collection","value":"no_values"}]},"exclude":{"labels":null}},"field_selection":{"keys":["key1","key2"],"document":"flow_document"},"journal_read_suffix":"materialize/test/sqlite/No%20Values"}],"shard_template":{"id":"materialize/test/sqlite","sources":null,"recovery_log_prefix":"recovery","hint_prefix":"/estuary/flow/hints","hint_backups":2,"max_txn_duration":1000000000,"min_txn_duration":0,"labels":{"labels":[{"name":"app.gazette.dev/managed-by","value":"estuary.dev/flow"},{"name":"estuary.dev/build","value":"catalog"},{"name":"estuary.dev/log-level","value":"info"},{"name":"estuary.dev/task-name","value":"test/sqlite"},{"name":"estuary.dev/task-type","value":"materialization"}]},"ring_buffer_size":65536,"read_channel_size":131072},"recovery_log_template":{"name":"recovery/materialize/test/sqlite","replication":3,"labels":{"labels":[{"name":"app.gazette.dev/managed-by","value":"estuary.dev/flow"},{"name":"content-type","value":"application/x-gazette-recoverylog"},{"name":"estuary.dev/build","value":"catalog"},{"name":"estuary.dev/task-name","value":"test/sqlite"},{"name":"estuary.dev/task-type","value":"materialization"}]},"fragment":{"length":268435456,"compression_codec":4,"stores":["s3://a-bucket/"],"refresh_interval":300000000000,"retention":0,"flush_interval":0},"flags":4,"max_append_rate":4194304}}
+{
+  "name": "test/sqlite",
+  "connector_type": 2,
+  "config_json": {
+    "path": ":memory:"
+  },
+  "bindings": [
+    {
+      "resource_config_json": {
+        "table": "key_value"
+      },
+      "resource_path": [
+        "key_value"
+      ],
+      "collection": {
+        "name": "key/value",
+        "write_schema_json": {
+          "$id": "file:///builder/materialize-***/testdata/flow.yaml?ptr=/collections/key~1value/schema",
+          "properties": {
+            "Camel_Case": {
+              "type": "integer"
+            },
+            "a Time": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "array": {
+              "title": "This is an array!",
+              "type": "array"
+            },
+            "key!2": {
+              "type": "boolean"
+            },
+            "key1": {
+              "description": "Key One Description",
+              "title": "Key One Title",
+              "type": "integer"
+            },
+            "lower_case": {
+              "type": "integer"
+            },
+            "nullableKey": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "key1",
+            "key!2",
+            "nullableKey"
+          ],
+          "type": "object"
+        },
+        "key": [
+          "/key1",
+          "/key!2",
+          "/nullableKey"
+        ],
+        "uuid_ptr": "/_meta/uuid",
+        "projections": [
+          {
+            "ptr": "/Camel_Case",
+            "field": "Camel_Case",
+            "inference": {
+              "types": [
+                "integer"
+              ],
+              "exists": 2
+            }
+          },
+          {
+            "ptr": "/a Time",
+            "field": "a Time",
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {
+                "format": "date-time"
+              },
+              "exists": 2
+            }
+          },
+          {
+            "ptr": "/array",
+            "field": "array",
+            "inference": {
+              "types": [
+                "array"
+              ],
+              "title": "This is an array!",
+              "exists": 2
+            }
+          },
+          {
+            "field": "flow_document",
+            "inference": {
+              "types": [
+                "object"
+              ],
+              "exists": 1
+            }
+          },
+          {
+            "ptr": "/key!2",
+            "field": "key!2",
+            "is_primary_key": true,
+            "inference": {
+              "types": [
+                "boolean"
+              ],
+              "exists": 1
+            }
+          },
+          {
+            "ptr": "/key1",
+            "field": "key1",
+            "is_primary_key": true,
+            "inference": {
+              "types": [
+                "integer"
+              ],
+              "title": "Key One Title",
+              "description": "Key One Description",
+              "exists": 1
+            }
+          },
+          {
+            "ptr": "/lower_case",
+            "field": "lower_case",
+            "inference": {
+              "types": [
+                "integer"
+              ],
+              "exists": 2
+            }
+          },
+          {
+            "ptr": "/nullableKey",
+            "field": "nullableKey",
+            "is_primary_key": true,
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {},
+              "exists": 1
+            }
+          },
+          {
+            "ptr": "/value",
+            "field": "value",
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {},
+              "exists": 2
+            }
+          }
+        ],
+        "ack_template_json": {
+          "_meta": {
+            "ack": true,
+            "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+          }
+        },
+        "partition_template": {
+          "name": "key/value",
+          "replication": 3,
+          "labels": {
+            "labels": [
+              {
+                "name": "app.gazette.dev/managed-by",
+                "value": "estuary.dev/flow"
+              },
+              {
+                "name": "content-type",
+                "value": "application/x-ndjson"
+              },
+              {
+                "name": "estuary.dev/build",
+                "value": "catalog"
+              },
+              {
+                "name": "estuary.dev/collection",
+                "value": "key/value"
+              }
+            ]
+          },
+          "fragment": {
+            "length": 536870912,
+            "compression_codec": 2,
+            "stores": [
+              "s3://a-bucket/"
+            ],
+            "refresh_interval": 300000000000,
+            "retention": 0,
+            "flush_interval": 0,
+            "path_postfix_template": "utc_date={{.Spool.FirstAppendTime.Format \"2006-01-02\"}}/utc_hour={{.Spool.FirstAppendTime.Format \"15\"}}"
+          },
+          "flags": 4,
+          "max_append_rate": 4194304
+        }
+      },
+      "partition_selector": {
+        "include": {
+          "labels": [
+            {
+              "name": "estuary.dev/collection",
+              "value": "key/value"
+            }
+          ]
+        },
+        "exclude": {
+          "labels": null
+        }
+      },
+      "field_selection": {
+        "keys": [
+          "key1",
+          "key!2",
+          "nullableKey"
+        ],
+        "values": [
+          "Camel_Case",
+          "a Time",
+          "array",
+          "lower_case",
+          "value"
+        ],
+        "document": "flow_document",
+        "field_config_json_map": {
+          "array": {}
+        }
+      },
+      "journal_read_suffix": "materialize/test/sqlite/key_value"
+    },
+    {
+      "resource_config_json": {
+        "table": "Delta Updates"
+      },
+      "resource_path": [
+        "Delta Updates"
+      ],
+      "collection": {
+        "name": "delta/updates",
+        "write_schema_json": {
+          "$id": "file:///builder/materialize-***/testdata/flow.yaml?ptr=/collections/delta~1updates/schema",
+          "properties": {
+            "aValue": {
+              "description": "A super-awesome value.",
+              "type": "integer"
+            },
+            "nullableKey": {
+              "type": "string"
+            },
+            "theKey": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "theKey",
+            "nullableKey"
+          ],
+          "type": "object"
+        },
+        "key": [
+          "/theKey",
+          "/nullableKey"
+        ],
+        "uuid_ptr": "/_meta/uuid",
+        "projections": [
+          {
+            "ptr": "/aValue",
+            "field": "aValue",
+            "inference": {
+              "types": [
+                "integer"
+              ],
+              "description": "A super-awesome value.",
+              "exists": 2
+            }
+          },
+          {
+            "field": "flow_document",
+            "inference": {
+              "types": [
+                "object"
+              ],
+              "exists": 1
+            }
+          },
+          {
+            "ptr": "/nullableKey",
+            "field": "nullableKey",
+            "is_primary_key": true,
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {},
+              "exists": 1
+            }
+          },
+          {
+            "ptr": "/theKey",
+            "field": "theKey",
+            "is_primary_key": true,
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {},
+              "exists": 1
+            }
+          }
+        ],
+        "ack_template_json": {
+          "_meta": {
+            "ack": true,
+            "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+          }
+        },
+        "partition_template": {
+          "name": "delta/updates",
+          "replication": 3,
+          "labels": {
+            "labels": [
+              {
+                "name": "app.gazette.dev/managed-by",
+                "value": "estuary.dev/flow"
+              },
+              {
+                "name": "content-type",
+                "value": "application/x-ndjson"
+              },
+              {
+                "name": "estuary.dev/build",
+                "value": "catalog"
+              },
+              {
+                "name": "estuary.dev/collection",
+                "value": "delta/updates"
+              }
+            ]
+          },
+          "fragment": {
+            "length": 536870912,
+            "compression_codec": 2,
+            "stores": [
+              "s3://a-bucket/"
+            ],
+            "refresh_interval": 300000000000,
+            "retention": 0,
+            "flush_interval": 0,
+            "path_postfix_template": "utc_date={{.Spool.FirstAppendTime.Format \"2006-01-02\"}}/utc_hour={{.Spool.FirstAppendTime.Format \"15\"}}"
+          },
+          "flags": 4,
+          "max_append_rate": 4194304
+        }
+      },
+      "partition_selector": {
+        "include": {
+          "labels": [
+            {
+              "name": "estuary.dev/collection",
+              "value": "delta/updates"
+            }
+          ]
+        },
+        "exclude": {
+          "labels": null
+        }
+      },
+      "field_selection": {
+        "keys": [
+          "theKey",
+          "nullableKey"
+        ],
+        "values": [
+          "aValue"
+        ],
+        "document": "flow_document"
+      },
+      "journal_read_suffix": "materialize/test/sqlite/Delta%20Updates"
+    },
+    {
+      "resource_config_json": {
+        "table": "No Values"
+      },
+      "resource_path": [
+        "No Values"
+      ],
+      "collection": {
+        "name": "no_values",
+        "write_schema_json": {
+          "$id": "file:///builder/materialize-***/testdata/flow.yaml?ptr=/collections/no_values/schema",
+          "properties": {
+            "key1": {
+              "type": "integer"
+            },
+            "key2": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "key1",
+            "key2"
+          ],
+          "type": "object"
+        },
+        "key": [
+          "/key1",
+          "/key2"
+        ],
+        "uuid_ptr": "/_meta/uuid",
+        "projections": [
+          {
+            "field": "flow_document",
+            "inference": {
+              "types": [
+                "object"
+              ],
+              "exists": 1
+            }
+          },
+          {
+            "ptr": "/key1",
+            "field": "key1",
+            "is_primary_key": true,
+            "inference": {
+              "types": [
+                "integer"
+              ],
+              "exists": 1
+            }
+          },
+          {
+            "ptr": "/key2",
+            "field": "key2",
+            "is_primary_key": true,
+            "inference": {
+              "types": [
+                "boolean"
+              ],
+              "exists": 1
+            }
+          }
+        ],
+        "ack_template_json": {
+          "_meta": {
+            "ack": true,
+            "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+          }
+        },
+        "partition_template": {
+          "name": "no_values",
+          "replication": 3,
+          "labels": {
+            "labels": [
+              {
+                "name": "app.gazette.dev/managed-by",
+                "value": "estuary.dev/flow"
+              },
+              {
+                "name": "content-type",
+                "value": "application/x-ndjson"
+              },
+              {
+                "name": "estuary.dev/build",
+                "value": "catalog"
+              },
+              {
+                "name": "estuary.dev/collection",
+                "value": "no_values"
+              }
+            ]
+          },
+          "fragment": {
+            "length": 536870912,
+            "compression_codec": 2,
+            "stores": [
+              "s3://a-bucket/"
+            ],
+            "refresh_interval": 300000000000,
+            "retention": 0,
+            "flush_interval": 0,
+            "path_postfix_template": "utc_date={{.Spool.FirstAppendTime.Format \"2006-01-02\"}}/utc_hour={{.Spool.FirstAppendTime.Format \"15\"}}"
+          },
+          "flags": 4,
+          "max_append_rate": 4194304
+        }
+      },
+      "partition_selector": {
+        "include": {
+          "labels": [
+            {
+              "name": "estuary.dev/collection",
+              "value": "no_values"
+            }
+          ]
+        },
+        "exclude": {
+          "labels": null
+        }
+      },
+      "field_selection": {
+        "keys": [
+          "key1",
+          "key2"
+        ],
+        "document": "flow_document"
+      },
+      "journal_read_suffix": "materialize/test/sqlite/No%20Values"
+    }
+  ],
+  "shard_template": {
+    "id": "materialize/test/sqlite",
+    "sources": null,
+    "recovery_log_prefix": "recovery",
+    "hint_prefix": "/estuary/flow/hints",
+    "hint_backups": 2,
+    "max_txn_duration": 1000000000,
+    "min_txn_duration": 0,
+    "labels": {
+      "labels": [
+        {
+          "name": "app.gazette.dev/managed-by",
+          "value": "estuary.dev/flow"
+        },
+        {
+          "name": "estuary.dev/build",
+          "value": "catalog"
+        },
+        {
+          "name": "estuary.dev/log-level",
+          "value": "info"
+        },
+        {
+          "name": "estuary.dev/task-name",
+          "value": "test/sqlite"
+        },
+        {
+          "name": "estuary.dev/task-type",
+          "value": "materialization"
+        }
+      ]
+    },
+    "ring_buffer_size": 65536,
+    "read_channel_size": 131072
+  },
+  "recovery_log_template": {
+    "name": "recovery/materialize/test/sqlite",
+    "replication": 3,
+    "labels": {
+      "labels": [
+        {
+          "name": "app.gazette.dev/managed-by",
+          "value": "estuary.dev/flow"
+        },
+        {
+          "name": "content-type",
+          "value": "application/x-gazette-recoverylog"
+        },
+        {
+          "name": "estuary.dev/build",
+          "value": "catalog"
+        },
+        {
+          "name": "estuary.dev/task-name",
+          "value": "test/sqlite"
+        },
+        {
+          "name": "estuary.dev/task-type",
+          "value": "materialization"
+        }
+      ]
+    },
+    "fragment": {
+      "length": 268435456,
+      "compression_codec": 4,
+      "stores": [
+        "s3://a-bucket/"
+      ],
+      "refresh_interval": 300000000000,
+      "retention": 0,
+      "flush_interval": 0
+    },
+    "flags": 4,
+    "max_append_rate": 4194304
+  }
+}
