@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.generic_duplicatedscankey":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"varchar"}}},"mode":"Backfill"}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+error performing backfill: error buffering scan results for "test.generic_duplicatedscankey": primary key ordering failure: prev="\x01BBB\x00", next="\x01BBB\x00"
+
