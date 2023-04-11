@@ -8,9 +8,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_textcollation":{"key_columns":["id"],"mode":"Backfill","scanned":"AkggUgA="}}}
-# ================================
-# Captures Terminated With Errors
-# ================================
-error performing backfill: scan key ordering failure: last="\x02H R\x00", next="\x02-J C\x00"
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_textcollation":{"key_columns":["id"],"mode":"Active"}}}
 
