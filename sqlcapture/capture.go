@@ -510,7 +510,7 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 		if err != nil {
 			return nil, fmt.Errorf("error scanning table %q: %w", streamID, err)
 		}
-		if len(events) > 0 && compareTuples(streamState.Scanned, events[0].RowKey) >= 0 {
+		if len(events) > 0 && compareTuples(streamState.Scanned, events[0].RowKey) > 0 {
 			// Sanity check that the DB must always return rows whose serialized
 			// key value is greater than the previous cursor value. This together
 			// with the check in resultset.go ensures that the scan key always
