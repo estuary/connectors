@@ -35,6 +35,7 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 	t.Run("CatalogPrimaryKeyOverride", func(t *testing.T) { testCatalogPrimaryKeyOverride(ctx, t, tb) })
 	t.Run("MissingTable", func(t *testing.T) { testMissingTable(ctx, t, tb) })
 	t.Run("StressCorrectness", func(t *testing.T) { testStressCorrectness(ctx, t, tb) })
+	t.Run("DuplicatedScanKey", func(t *testing.T) { testDuplicatedScanKey(ctx, t, tb) })
 	//t.Run("ComplexDataset", func(t *testing.T) { testComplexDataset(ctx, t, tb) })
 }
 
@@ -233,6 +234,14 @@ func testMissingTable(ctx context.Context, t *testing.T, tb TestBackend) {
 	var binding2 = BindingReplace(binding1, "one", "two")
 	var cs = tb.CaptureSpec(ctx, t)
 	cs.Bindings = []*flow.CaptureSpec_Binding{binding1, binding2}
+	VerifiedCapture(ctx, t, cs)
+}
+
+func testDuplicatedScanKey(ctx context.Context, t *testing.T, tb TestBackend) {
+	var tableName = tb.CreateTable(ctx, t, "", "(id VARCHAR(8), data TEXT)")
+	tb.Insert(ctx, t, tableName, [][]any{{"AAA", "1"}, {"BBB", "2"}, {"BBB", "3"}, {"CCC", "4"}})
+	var cs = tb.CaptureSpec(ctx, t, tableName)
+	cs.Bindings[0].Collection.Key = []string{"id"}
 	VerifiedCapture(ctx, t, cs)
 }
 
