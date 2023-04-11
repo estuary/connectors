@@ -17,12 +17,8 @@ import (
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
 	var specJson, err = os.ReadFile("testdata/spec.json")
-	if err != nil {
-		panic(err)
-	}
-	if err := json.Unmarshal(specJson, &spec); err != nil {
-		panic(err)
-	}
+  require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(specJson, &spec))
 
 	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
 		Table: "target_table",
