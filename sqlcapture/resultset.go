@@ -50,7 +50,7 @@ func (r *resultSet) Buffer(streamID string, events []*ChangeEvent) error {
 	}).Debug("buffering chunk of backfill data")
 	for _, event := range events {
 		var bs = event.RowKey
-		if chunk.scanned != nil && compareTuples(chunk.scanned, bs) >= 0 {
+		if chunk.scanned != nil && compareTuples(chunk.scanned, bs) > 0 {
 			// It's important for correctness that the ordering of serialized primary keys matches
 			// the ordering that PostgreSQL uses. Since we're already serializing every result row's
 			// key this is a good place to opportunistically check that invariant.
