@@ -23,7 +23,6 @@ COPY testsupport             ./testsupport
 COPY go-network-tunnel       ./go-network-tunnel
 
 # Test and build the connector.
-COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
 RUN go test  -tags nozstd,nodb -v ./materialize-redshift/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-redshift/...
 

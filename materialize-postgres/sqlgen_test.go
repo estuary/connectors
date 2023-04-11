@@ -16,12 +16,8 @@ import (
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
 	var specJson, err = os.ReadFile("testdata/spec.json")
-	if err != nil {
-		panic(err)
-	}
-	if err := json.Unmarshal(specJson, &spec); err != nil {
-		panic(err)
-	}
+  require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(specJson, &spec))
 
 	// TODO(whb): These keys are manually set as "nullable" for now to test the query generation
 	// with nullable keys. Once flow supports nullable keys natively, this should be cleaned up.
