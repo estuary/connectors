@@ -308,9 +308,7 @@
   ]
 }
 {
-  "applied": {
-    "actionDescription": "drop collection Simple\ndrop collection duplicate_keys_standard\ndrop collection duplicate_keys_delta"
-  }
+  "applied": {}
 }
 {
   "opened": {
