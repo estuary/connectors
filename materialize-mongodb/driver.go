@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -121,48 +120,13 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		return nil, err
 	}
 
-	client, err := d.connect(ctx, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("connecting to database: %w", err)
-	}
-
-	var db = client.Database(cfg.Database)
-
-	var newCollections []string
-	for _, binding := range req.Materialization.Bindings {
-		newCollections = append(newCollections, binding.ResourcePath[1])
-	}
-
-	existing, err := d.LoadSpec(ctx, cfg, string(req.Materialization.Name))
-	if err != nil {
-		return nil, fmt.Errorf("loading spec: %w", err)
-	}
-
-	var actions []string
-	if existing != nil {
-		for _, binding := range existing.Bindings {
-			var collection = binding.ResourcePath[1]
-			// A binding that has been removed
-			if !SliceContains(collection, newCollections) {
-				if !req.DryRun {
-					var col = db.Collection(collection)
-					if err := col.Drop(ctx); err != nil {
-						return nil, fmt.Errorf("dropping collection %s: %w", collection, err)
-					}
-				}
-
-				actions = append(actions, fmt.Sprintf("drop collection %s", collection))
-			}
-		}
-	}
-
 	err = d.WriteSpec(ctx, cfg, req.Materialization, req.Version)
 	if err != nil {
 		return nil, fmt.Errorf("writing spec: %w", err)
 	}
 
 	return &pm.Response_Applied{
-		ActionDescription: strings.Join(actions, "\n"),
+		ActionDescription: "",
 	}, nil
 }
 
