@@ -149,7 +149,7 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 	JOIN {{ template "tempTableName" . }} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
-		l.{{ $key.Identifier }} is not distinct from r.{{ $key.Identifier }}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{ else }}
 SELECT -1, NULL LIMIT 0

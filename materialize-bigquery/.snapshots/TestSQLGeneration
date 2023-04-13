@@ -22,11 +22,11 @@ CLUSTER BY key1, key2, boolean, integer;
 SELECT 0, l.flow_document
 	FROM projectID.dataset.target_table AS l
 	JOIN flow_temp_table_0 AS r
-		 ON l.key1 is not distinct from r.key1
-		 AND l.key2 is not distinct from r.key2
-		 AND l.boolean is not distinct from r.boolean
-		 AND l.integer is not distinct from r.integer
-		 AND l.string is not distinct from r.string
+		 ON l.key1 = r.key1
+		 AND l.key2 = r.key2
+		 AND l.boolean = r.boolean
+		 AND l.integer = r.integer
+		 AND l.string = r.string
 
 --- End projectID.dataset.target_table loadQuery ---
 
