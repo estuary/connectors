@@ -27,6 +27,12 @@ func TestPostgresConfig(t *testing.T) {
 	uri = minimal.ToURI()
 	require.Equal(t, "postgres://youser:shmassword@post.toast:1234?statement_cache_mode=describe", uri)
 
+	var noPort = validConfig
+	noPort.Address = "post.toast"
+	require.NoError(t, noPort.Validate())
+	uri = noPort.ToURI()
+	require.Equal(t, "postgres://youser:shmassword@post.toast:5432/namegame?statement_cache_mode=describe", uri)
+
 	var noAddress = validConfig
 	noAddress.Address = ""
 	require.Error(t, noAddress.Validate(), "expected validation error")

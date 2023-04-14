@@ -6,7 +6,7 @@
       "address": {
         "type": "string",
         "title": "Address",
-        "description": "Host and port of the database.",
+        "description": "Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided.",
         "order": 0
       },
       "user": {

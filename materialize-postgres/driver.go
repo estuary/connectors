@@ -36,7 +36,7 @@ type tunnelConfig struct {
 
 // config represents the endpoint configuration for postgres.
 type config struct {
-	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database." jsonschema_extras:"order=0"`
+	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
 	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
@@ -68,6 +68,14 @@ func (c *config) ToURI() string {
 	if c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "" {
 		address = "localhost:5432"
 	}
+
+	// If the user did not specify a port (or no network tunnel is being used), default to port
+	// 5432. pgx ends up doing this anyway, but we do it here to make it more explicit and stable in
+	// case that underlying behavior changes in the future.
+	if !strings.Contains(address, ":") {
+		address = address + ":5432"
+	}
+
 	var uri = url.URL{
 		Scheme: "postgres",
 		Host:   address,
