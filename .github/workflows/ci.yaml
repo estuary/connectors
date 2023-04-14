@@ -137,7 +137,7 @@ jobs:
           export_default_credentials: true
 
       - name: Configure AWS credentials from Test account
-        if: matrix.connector == 'source-kinesis' || matrix.connector == 'source-s3'
+        if: matrix.connector == 'source-kinesis'
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
