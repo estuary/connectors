@@ -84,7 +84,7 @@ func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
 		c = c.WithRegion(cfg.Region)
 	}
 	if cfg.Advanced.Endpoint != "" {
-		c = c.WithEndpoint(cfg.Advanced.Endpoint)
+		c = c.WithEndpoint(cfg.Advanced.Endpoint).WithS3ForcePathStyle(true)
 	}
 
 	awsSession, err := session.NewSession(c)
@@ -325,7 +325,7 @@ func main() {
 		DocumentationURL: "https://go.estuary.dev/source-s3",
 		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
 		// timestamp that's equal to the `MinBound` in the state.
-		TimeHorizonDelta:    time.Second * -30,
+		TimeHorizonDelta: time.Second * -30,
 	}
 
 	src.Main()
