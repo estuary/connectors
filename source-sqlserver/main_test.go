@@ -135,11 +135,8 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 
 	log.WithFields(log.Fields{"table": fullTableName, "cols": tableDef}).Debug("creating test table")
 
-	var _, err = tb.control.ExecContext(ctx, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
-	require.NoError(t, err)
-
-	_, err = tb.control.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s%s;", fullTableName, tableDef))
-	require.NoError(t, err)
+	tb.Query(ctx, t, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
+	tb.Query(ctx, t, fmt.Sprintf("CREATE TABLE %s%s;", fullTableName, tableDef))
 
 	if *enableCDCWhenCreatingTables {
 		var instanceName = "dbo_" + strings.ToLower(tableName)
@@ -148,14 +145,12 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 			*dbCaptureUser,
 			instanceName,
 		)
-		_, err = tb.control.ExecContext(ctx, query)
-		require.NoError(t, err)
+		tb.Query(ctx, t, query)
 	}
 
 	t.Cleanup(func() {
 		log.WithField("table", fullTableName).Debug("destroying test table")
-		_, err = tb.control.ExecContext(ctx, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
-		require.NoError(t, err)
+		tb.Query(ctx, t, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
 	})
 
 	return fullTableName
@@ -195,8 +190,7 @@ func (tb *testBackend) Update(ctx context.Context, t testing.TB, table string, w
 	t.Helper()
 	var query = fmt.Sprintf(`UPDATE %s SET %s = @p1 WHERE %s = @p2;`, table, setCol, whereCol)
 	log.WithField("query", query).Debug("updating rows")
-	var _, err = tb.control.ExecContext(ctx, query, setVal, whereVal)
-	require.NoError(t, err, "update rows")
+	tb.Query(ctx, t, query, setVal, whereVal)
 }
 
 // Delete removes preexisting rows.
@@ -204,8 +198,13 @@ func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, w
 	t.Helper()
 	var query = fmt.Sprintf(`DELETE FROM %s WHERE %s = @p1;`, table, whereCol)
 	log.WithField("query", query).Debug("deleting rows")
-	var _, err = tb.control.ExecContext(ctx, query, whereVal)
-	require.NoError(t, err, "delete rows")
+	tb.Query(ctx, t, query, whereVal)
+}
+
+func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, args ...any) {
+	t.Helper()
+	var _, err = tb.control.ExecContext(ctx, query)
+	require.NoError(t, err)
 }
 
 // TestGeneric runs the generic sqlcapture test suite.

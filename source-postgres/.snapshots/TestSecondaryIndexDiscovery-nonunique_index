@@ -1,0 +1,115 @@
+Binding 0:
+{
+    "recommended_name": "secondaryindexdiscovery_nonunique_index_g22906",
+    "resource_config_json": {
+      "namespace": "test",
+      "stream": "secondaryindexdiscovery_nonunique_index_g22906"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "TestSecondaryindexdiscovery_nonunique_index_g22906": {
+          "type": "object",
+          "$anchor": "TestSecondaryindexdiscovery_nonunique_index_g22906",
+          "properties": {
+            "data": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "k1": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "k2": {
+              "type": "integer"
+            },
+            "k3": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op",
+                "source"
+              ],
+              "properties": {
+                "before": {
+                  "$ref": "#TestSecondaryindexdiscovery_nonunique_index_g22906",
+                  "description": "Record state immediately before this change was applied.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "source": {
+                  "$id": "https://github.com/estuary/connectors/source-postgres/postgres-source",
+                  "properties": {
+                    "ts_ms": {
+                      "type": "integer",
+                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                    },
+                    "schema": {
+                      "type": "string",
+                      "description": "Database schema (namespace) of the event."
+                    },
+                    "snapshot": {
+                      "type": "boolean",
+                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                    },
+                    "table": {
+                      "type": "string",
+                      "description": "Database table of the event."
+                    },
+                    "loc": {
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array",
+                      "maxItems": 3,
+                      "minItems": 3,
+                      "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "schema",
+                    "table"
+                  ]
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          },
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        {
+          "$ref": "#TestSecondaryindexdiscovery_nonunique_index_g22906"
+        }
+      ]
+    }
+  }
+
