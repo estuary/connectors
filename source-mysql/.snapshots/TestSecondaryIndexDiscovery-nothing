@@ -1,0 +1,110 @@
+Binding 0:
+{
+    "recommended_name": "secondaryindexdiscovery_nothing_g14307",
+    "resource_config_json": {
+      "namespace": "test",
+      "stream": "SecondaryIndexDiscovery_nothing_g14307"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "TestSecondaryIndexDiscovery_nothing_g14307": {
+          "type": "object",
+          "$anchor": "TestSecondaryIndexDiscovery_nothing_g14307",
+          "properties": {
+            "data": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "k1": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "k2": {
+              "type": "integer"
+            },
+            "k3": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op",
+                "source"
+              ],
+              "properties": {
+                "before": {
+                  "$ref": "#TestSecondaryIndexDiscovery_nothing_g14307",
+                  "description": "Record state immediately before this change was applied.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "source": {
+                  "$id": "https://github.com/estuary/connectors/source-mysql/mysql-source-info",
+                  "properties": {
+                    "ts_ms": {
+                      "type": "integer",
+                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                    },
+                    "schema": {
+                      "type": "string",
+                      "description": "Database schema (namespace) of the event."
+                    },
+                    "snapshot": {
+                      "type": "boolean",
+                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                    },
+                    "table": {
+                      "type": "string",
+                      "description": "Database table of the event."
+                    },
+                    "cursor": {
+                      "type": "string",
+                      "description": "Cursor value representing the current position in the binlog."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "schema",
+                    "table"
+                  ]
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          },
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        {
+          "$ref": "#TestSecondaryIndexDiscovery_nothing_g14307"
+        }
+      ]
+    }
+  }
+
