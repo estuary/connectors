@@ -9,6 +9,10 @@ Binding 0:
       "$defs": {
         "TestSecondaryindexdiscovery_index_only_g26313": {
           "type": "object",
+          "required": [
+            "k2",
+            "k3"
+          ],
           "$anchor": "TestSecondaryindexdiscovery_index_only_g26313",
           "properties": {
             "data": {
@@ -110,6 +114,10 @@ Binding 0:
           "$ref": "#TestSecondaryindexdiscovery_index_only_g26313"
         }
       ]
-    }
+    },
+    "key": [
+      "/k2",
+      "/k3"
+    ]
   }
 

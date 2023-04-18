@@ -26,6 +26,10 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
 	}
+	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
+	}
 
 	// Column descriptions just add a bit of user-friendliness. They're so unimportant
 	// that failure to list them shouldn't even be a fatal error.
@@ -68,6 +72,7 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 			tableMap[streamID] = info
 		}
 	}
+
 	for streamID, key := range primaryKeys {
 		// The `getColumns()` query implements the "exclude system schemas" logic,
 		// so here we ignore primary key information for tables we don't care about.
@@ -75,11 +80,48 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 		if !ok {
 			continue
 		}
-		logrus.WithFields(logrus.Fields{"table": streamID, "key": key}).Trace("queried primary key")
+		logrus.WithFields(logrus.Fields{
+			"table": streamID,
+			"key":   key,
+		}).Trace("queried primary key")
 		info.PrimaryKey = key
 		tableMap[streamID] = info
 	}
+
+	// For tables which have no primary key but have a valid secondary index,
+	// fill in that secondary index as the 'primary key' for our purposes.
+	for streamID, indexColumns := range secondaryIndexes {
+		var info, ok = tableMap[streamID]
+		if !ok || info.PrimaryKey != nil {
+			continue
+		}
+		for _, columns := range indexColumns {
+			// Test that for each column the value is non-nullable
+			if columnsNonNullable(info.Columns, columns) {
+				logrus.WithFields(logrus.Fields{
+					"table": streamID,
+					"index": columns,
+				}).Trace("using unique secondary index as primary key")
+				info.PrimaryKey = columns
+				break
+			} else {
+				logrus.WithFields(logrus.Fields{
+					"table": streamID,
+					"index": columns,
+				}).Trace("cannot use secondary index because some of its columns are nullable")
+			}
+		}
+	}
 	return tableMap, nil
+}
+
+func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnNames []string) bool {
+	for _, columnName := range columnNames {
+		if columnsInfo[columnName].IsNullable {
+			return false
+		}
+	}
+	return true
 }
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
@@ -387,6 +429,54 @@ func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, e
 			return nil
 		})
 	return keys, err
+}
+
+const queryDiscoverSecondaryIndices = `
+SELECT r.table_schema, r.table_name, r.index_name, (r.index_keys).n, r.column_name
+FROM (
+  SELECT tn.nspname AS table_schema,
+         tc.relname AS table_name,
+	     ic.relname AS index_name,
+	     information_schema._pg_expandarray(ix.indkey) AS index_keys,
+		 a.attnum AS column_number,
+		 a.attname AS column_name
+  FROM pg_index ix
+       JOIN pg_class ic ON (ic.oid = ix.indexrelid)
+	   JOIN pg_class tc ON (tc.oid = ix.indrelid)
+	   JOIN pg_namespace tn ON (tn.oid = tc.relnamespace)
+	   JOIN pg_attribute a ON (a.attrelid = tc.oid)
+  WHERE ix.indisunique AND ix.indexprs IS NULL AND tc.relkind = 'r'
+    AND NOT ix.indisprimary
+  ORDER BY tc.relname, ic.relname
+) r
+WHERE r.column_number = (r.index_keys).x
+ORDER BY r.table_schema, r.table_name, r.index_name, (r.index_keys).n
+`
+
+func getSecondaryIndexes(ctx context.Context, conn *pgx.Conn) (map[string]map[string][]string, error) {
+	logrus.Debug("listing secondary indexes")
+
+	// Run the 'list secondary indexes' query and aggregate results into
+	// a `map[StreamID]map[IndexName][]ColumnName`
+	var streamIndexColumns = make(map[string]map[string][]string)
+	var tableSchema, tableName, indexName, columnName string
+	var keySequence int
+	var _, err = conn.QueryFunc(ctx, queryDiscoverSecondaryIndices, nil,
+		[]interface{}{&tableSchema, &tableName, &indexName, &keySequence, &columnName},
+		func(r pgx.QueryFuncRow) error {
+			var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
+			var indexColumns = streamIndexColumns[streamID]
+			if indexColumns == nil {
+				indexColumns = make(map[string][]string)
+				streamIndexColumns[streamID] = indexColumns
+			}
+			indexColumns[indexName] = append(indexColumns[indexName], columnName)
+			if len(indexColumns[indexName]) != keySequence {
+				return fmt.Errorf("internal error: secondary index key ordering failure: index %q on stream %q: column %q appears out of order", indexName, streamID, columnName)
+			}
+			return nil
+		})
+	return streamIndexColumns, err
 }
 
 const queryColumnDescriptions = `
