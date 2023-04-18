@@ -21,6 +21,10 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[string]*sq
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
 	}
+	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
+	}
 
 	// Aggregate column information into DiscoveryInfo structs using a map
 	// from fully-qualified table names to the corresponding info.
@@ -59,6 +63,31 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[string]*sq
 		tableMap[id] = info
 	}
 
+	// For tables which have no primary key but have a valid secondary index,
+	// fill in that secondary index as the 'primary key' for our purposes.
+	for streamID, indexColumns := range secondaryIndexes {
+		var info, ok = tableMap[streamID]
+		if !ok || info.PrimaryKey != nil {
+			continue
+		}
+		for _, columns := range indexColumns {
+			// Test that for each column the value is non-nullable
+			if columnsNonNullable(info.Columns, columns) {
+				log.WithFields(log.Fields{
+					"table": streamID,
+					"index": columns,
+				}).Trace("using unique secondary index as primary key")
+				info.PrimaryKey = columns
+				break
+			} else {
+				log.WithFields(log.Fields{
+					"table": streamID,
+					"index": columns,
+				}).Trace("cannot use secondary index because some of its columns are nullable")
+			}
+		}
+	}
+
 	if log.IsLevelEnabled(log.DebugLevel) {
 		for id, info := range tableMap {
 			log.WithFields(log.Fields{
@@ -69,6 +98,15 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[string]*sq
 	}
 
 	return tableMap, nil
+}
+
+func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnNames []string) bool {
+	for _, columnName := range columnNames {
+		if columnsInfo[columnName].IsNullable {
+			return false
+		}
+	}
+	return true
 }
 
 const queryDiscoverColumns = `
@@ -127,6 +165,46 @@ func getPrimaryKeys(ctx context.Context, conn *sql.DB) (map[string][]string, err
 		}
 	}
 	return keys, nil
+}
+
+const queryDiscoverSecondaryIndices = `
+SELECT sch.name, tbl.name, COALESCE(idx.name, 'null'), COL_NAME(ic.object_id,ic.column_id), ic.key_ordinal
+FROM sys.indexes idx
+     JOIN sys.tables tbl ON tbl.object_id = idx.object_id
+	 JOIN sys.schemas sch ON sch.schema_id = tbl.schema_id
+	 JOIN sys.index_columns ic ON ic.index_id = idx.index_id AND ic.object_id = tbl.object_id
+WHERE idx.is_unique = 1 AND sch.name NOT IN ('cdc')
+ORDER BY sch.name, tbl.name, idx.name, ic.key_ordinal
+`
+
+func getSecondaryIndexes(ctx context.Context, conn *sql.DB) (map[string]map[string][]string, error) {
+	var rows, err = conn.QueryContext(ctx, queryDiscoverSecondaryIndices)
+	if err != nil {
+		return nil, fmt.Errorf("error querying secondary indexes: %w", err)
+	}
+	defer rows.Close()
+
+	// Run the 'list secondary indexes' query and aggregate results into
+	// a `map[StreamID]map[IndexName][]ColumnName`
+	var streamIndexColumns = make(map[string]map[string][]string)
+	for rows.Next() {
+		var tableSchema, tableName, indexName, columnName string
+		var keySequence int
+		if err := rows.Scan(&tableSchema, &tableName, &indexName, &columnName, &keySequence); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+		var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
+		var indexColumns = streamIndexColumns[streamID]
+		if indexColumns == nil {
+			indexColumns = make(map[string][]string)
+			streamIndexColumns[streamID] = indexColumns
+		}
+		indexColumns[indexName] = append(indexColumns[indexName], columnName)
+		if len(indexColumns[indexName]) != keySequence {
+			return nil, fmt.Errorf("internal error: secondary index key ordering failure: index %q on stream %q: column %q appears out of order", indexName, streamID, columnName)
+		}
+	}
+	return streamIndexColumns, err
 }
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
