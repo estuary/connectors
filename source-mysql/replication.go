@@ -480,13 +480,17 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 }
 
 func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, query string, streamID string) error {
+	// This lock and assignment to `meta` isn't actually needed unless we are able to handle the
+	// alteration. But if we can't handle the alteration the connector is probably going to crash,
+	// so any performance implication is negligible at that point and it makes things a little
+	// easier to get the lock here.
+	rs.tables.Lock()
+	defer rs.tables.Unlock()
+	meta := rs.tables.metadata[streamID]
+
 	for _, alterOpt := range stmt.AlterOptions {
 		switch alter := alterOpt.(type) {
 		case *sqlparser.AddColumns:
-			rs.tables.Lock()
-			defer rs.tables.Unlock()
-			meta := rs.tables.metadata[streamID]
-
 			insertAt := len(meta.Schema.Columns)
 			if alter.First {
 				insertAt = 0
@@ -499,7 +503,6 @@ func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, q
 			}
 
 			newCols := []string{}
-
 			for _, col := range alter.Columns {
 				newCols = append(newCols, col.Name.String())
 
@@ -523,11 +526,6 @@ func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, q
 		case *sqlparser.DropColumn:
 			dropped := alter.Name.Name.String()
 
-			rs.tables.Lock()
-			defer rs.tables.Unlock()
-
-			meta := rs.tables.metadata[streamID]
-
 			idx := findStr(dropped, meta.Schema.Columns)
 			if idx == -1 {
 				return fmt.Errorf("column %q not tracked in replication stream state for query %q", dropped, query)
@@ -540,7 +538,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, q
 		}
 	}
 
-	var bs, err = json.Marshal(rs.tables.metadata[streamID])
+	var bs, err = json.Marshal(meta)
 	if err != nil {
 		return fmt.Errorf("error serializing metadata JSON for %q: %w", streamID, err)
 	}
