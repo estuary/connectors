@@ -433,7 +433,7 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 			}).Info("parsed components of ALTER TABLE statement")
 
 			if stmt.PartitionSpec == nil || len(stmt.AlterOptions) != 0 {
-				return fmt.Errorf("unsupported operation (go.estuary.dev/eVVwet): %s", query)
+				return rs.handleAlterTable(stmt, query, streamID)
 			}
 		}
 	case *sqlparser.DropTable:
@@ -477,6 +477,88 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	}
 
 	return nil
+}
+
+func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, query string, streamID string) error {
+	for _, alterOpt := range stmt.AlterOptions {
+		switch alter := alterOpt.(type) {
+		case *sqlparser.AddColumns:
+			rs.tables.Lock()
+			defer rs.tables.Unlock()
+			meta := rs.tables.metadata[streamID]
+
+			insertAt := len(meta.Schema.Columns)
+			if alter.First {
+				insertAt = 0
+			} else if after := alter.After; after != nil {
+				insertAt = findStr(after.Name.String(), meta.Schema.Columns)
+				if insertAt == -1 {
+					return fmt.Errorf("column %q not tracked in replication stream state for query %q", after.Name.String(), query)
+				}
+				insertAt++ // Insert after the found column
+			}
+
+			newCols := []string{}
+
+			for _, col := range alter.Columns {
+				newCols = append(newCols, col.Name.String())
+
+				typeName := strings.ToLower(col.Type.Type)
+				var dataType interface{}
+				if typeName == "enum" {
+					dataType = &mysqlColumnType{Type: "enum", EnumValues: col.Type.EnumValues}
+				} else if typeName == "set" {
+					dataType = &mysqlColumnType{Type: "set", EnumValues: col.Type.EnumValues}
+				} else {
+					dataType = typeName
+				}
+
+				meta.Schema.ColumnTypes[col.Name.String()] = dataType
+			}
+
+			meta.Schema.Columns = append(
+				meta.Schema.Columns[:insertAt],
+				append(newCols, meta.Schema.Columns[insertAt:]...)...,
+			)
+		case *sqlparser.DropColumn:
+			dropped := alter.Name.Name.String()
+
+			rs.tables.Lock()
+			defer rs.tables.Unlock()
+
+			meta := rs.tables.metadata[streamID]
+
+			idx := findStr(dropped, meta.Schema.Columns)
+			if idx == -1 {
+				return fmt.Errorf("column %q not tracked in replication stream state for query %q", dropped, query)
+			}
+
+			meta.Schema.Columns = append(meta.Schema.Columns[:idx], meta.Schema.Columns[idx+1:]...)
+			meta.Schema.ColumnTypes[dropped] = nil
+		default:
+			return fmt.Errorf("unsupported operation (go.estuary.dev/eVVwet): %s", query)
+		}
+	}
+
+	var bs, err = json.Marshal(rs.tables.metadata[streamID])
+	if err != nil {
+		return fmt.Errorf("error serializing metadata JSON for %q: %w", streamID, err)
+	}
+	rs.events <- &sqlcapture.MetadataEvent{
+		StreamID: streamID,
+		Metadata: json.RawMessage(bs),
+	}
+
+	return nil
+}
+
+func findStr(needle string, cols []string) int {
+	for idx, val := range cols {
+		if val == needle {
+			return idx
+		}
+	}
+	return -1
 }
 
 func resolveTableName(defaultSchema string, name sqlparser.TableName) string {
