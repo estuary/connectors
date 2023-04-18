@@ -9,6 +9,10 @@ Binding 0:
       "$defs": {
         "DboTest_SecondaryIndexDiscovery_index_only_g26313": {
           "type": "object",
+          "required": [
+            "k2",
+            "k3"
+          ],
           "$anchor": "DboTest_SecondaryIndexDiscovery_index_only_g26313",
           "properties": {
             "data": {
@@ -112,6 +116,10 @@ Binding 0:
           "$ref": "#DboTest_SecondaryIndexDiscovery_index_only_g26313"
         }
       ]
-    }
+    },
+    "key": [
+      "/k2",
+      "/k3"
+    ]
   }
 
