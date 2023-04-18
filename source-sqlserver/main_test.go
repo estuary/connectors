@@ -203,7 +203,7 @@ func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, w
 
 func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, args ...any) {
 	t.Helper()
-	var _, err = tb.control.ExecContext(ctx, query)
+	var _, err = tb.control.ExecContext(ctx, query, args...)
 	require.NoError(t, err)
 }
 
