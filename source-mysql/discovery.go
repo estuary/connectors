@@ -66,6 +66,35 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcap
 		tableMap[id] = info
 	}
 
+	// Enumerate secondary indexes and use those as a fallback where present
+	// for tables whose primary key is unset.
+	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
+	}
+	for streamID, indexColumns := range secondaryIndexes {
+		var info, ok = tableMap[streamID]
+		if !ok || info.PrimaryKey != nil {
+			continue
+		}
+		for _, columns := range indexColumns {
+			// Test that for each column the value is non-nullable
+			if columnsNonNullable(info.Columns, columns) {
+				logrus.WithFields(logrus.Fields{
+					"table": streamID,
+					"index": columns,
+				}).Trace("using unique secondary index as primary key")
+				info.PrimaryKey = columns
+				break
+			} else {
+				logrus.WithFields(logrus.Fields{
+					"table": streamID,
+					"index": columns,
+				}).Trace("cannot use secondary index because some of its columns are nullable")
+			}
+		}
+	}
+
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {
 		for id, info := range tableMap {
 			logrus.WithFields(logrus.Fields{
@@ -76,6 +105,15 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcap
 	}
 
 	return tableMap, nil
+}
+
+func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnNames []string) bool {
+	for _, columnName := range columnNames {
+		if columnsInfo[columnName].IsNullable {
+			return false
+		}
+	}
+	return true
 }
 
 func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
@@ -355,6 +393,50 @@ func getPrimaryKeys(ctx context.Context, conn *client.Conn) (map[string][]string
 		}
 	}
 	return keys, nil
+}
+
+const queryDiscoverSecondaryIndices = `
+SELECT stat.table_schema,
+       stat.table_name,
+       stat.index_name,
+	   stat.column_name,
+	   stat.seq_in_index
+FROM information_schema.statistics stat
+     JOIN information_schema.table_constraints tco
+          ON stat.table_schema = tco.table_schema
+          AND stat.table_name = tco.table_name
+          AND stat.index_name = tco.constraint_name
+WHERE stat.non_unique = 0
+      AND stat.table_schema NOT IN ('information_schema', 'sys', 'performance_schema', 'mysql')
+      AND tco.constraint_type != 'PRIMARY KEY'
+ORDER BY stat.table_schema, stat.table_name, stat.index_name, stat.seq_in_index
+`
+
+func getSecondaryIndexes(ctx context.Context, conn *client.Conn) (map[string]map[string][]string, error) {
+	var results, err = conn.Execute(queryDiscoverSecondaryIndices)
+	if err != nil {
+		return nil, fmt.Errorf("error querying secondary indexes: %w", err)
+	}
+	defer results.Close()
+
+	// Run the 'list secondary indexes' query and aggregate results into
+	// a `map[StreamID]map[IndexName][]ColumnName`
+	var streamIndexColumns = make(map[string]map[string][]string)
+	for _, row := range results.Values {
+		var streamID = sqlcapture.JoinStreamID(string(row[0].AsString()), string(row[1].AsString()))
+		var indexName, columnName = string(row[2].AsString()), string(row[3].AsString())
+		var keySequence = int(row[4].AsInt64())
+		var indexColumns = streamIndexColumns[streamID]
+		if indexColumns == nil {
+			indexColumns = make(map[string][]string)
+			streamIndexColumns[streamID] = indexColumns
+		}
+		indexColumns[indexName] = append(indexColumns[indexName], columnName)
+		if len(indexColumns[indexName]) != keySequence {
+			return nil, fmt.Errorf("internal error: secondary index key ordering failure: index %q on stream %q: column %q appears out of order", indexName, streamID, columnName)
+		}
+	}
+	return streamIndexColumns, err
 }
 
 type columnSchema struct {
