@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/altertable_addcolumnsetenum_set_aaa": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddColumnSetEnum_set_aaa"}},"data":"aaa","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddColumnSetEnum_set_aaa"}},"data":"bbb","id":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_addcolumnsetenum_set_aaa":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
+

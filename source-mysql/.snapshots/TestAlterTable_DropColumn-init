@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/altertable_dropcolumn_aaa": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_DropColumn_aaa"}},"data":"abc","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_DropColumn_aaa"}},"data":"def","id":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_dropcolumn_aaa":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
+

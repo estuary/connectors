@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_unsupported_aaa":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.altertable_unsupported_bbb":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+error processing query event: unsupported operation (go.estuary.dev/eVVwet): ALTER TABLE test.AlterTable_Unsupported_bbb MODIFY COLUMN data INTEGER
+
