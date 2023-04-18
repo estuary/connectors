@@ -166,7 +166,7 @@ func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, r
 func argsTuple(argc int) string {
 	var tuple = "(?"
 	for idx := 1; idx < argc; idx++ {
-		tuple += fmt.Sprintf(",?")
+		tuple += ",?"
 	}
 	return tuple + ")"
 }
@@ -198,24 +198,23 @@ func TestGeneric(t *testing.T) {
 	tests.Run(context.Background(), t, tb)
 }
 
-func TestAlterTable(t *testing.T) {
+func TestAlterTable_Unsupported(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
 	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "abc"}, {2, "def"}})
-	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ghi"}, {4, "jkl"}})
-	tb.Insert(ctx, t, tableC, [][]interface{}{{5, "mno"}, {6, "pqr"}})
 
 	var cs = tb.CaptureSpec(ctx, t, tableA, tableB)
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Altering tableC, which is not being captured, should be fine
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableC))
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN data INTEGER;", tableC))
 	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Altering tableB, which is being captured, should result in an error
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableB))
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN data INTEGER;", tableB))
+	tb.Insert(ctx, t, tableB, [][]interface{}{{3, 30}, {4, 40}})
 	t.Run("capture2-fails", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Restarting the capture won't fix this
@@ -233,9 +232,139 @@ func TestAlterTable(t *testing.T) {
 	// is added to the capture *when it was also altered after the last state
 	// checkpoint*. This should still work, because tables only become active
 	// after the first stream-to-watermark operation.
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN evenmore TEXT;", tableC))
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN data BOOL;", tableC))
+	tb.Insert(ctx, t, tableC, [][]interface{}{{5, true}, {6, false}})
 	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, tableA, tableB, tableC)
 	t.Run("capture6", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestAlterTable_AddColumnBasic(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var table = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{1, "aaa"},
+		{2, "bbb"},
+	})
+
+	var cs = tb.CaptureSpec(ctx, t, table)
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Can add a column at the end of the table.
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra_end TEXT;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{3, "eee", "extra_end_3"},
+		{4, "fff", "extra_end_4"},
+	})
+	t.Run("at_end", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{5, "ggg", "extra_end_5"},
+		{6, "hhh", "extra_end_6"},
+	})
+	t.Run("at_end_restart", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Can add a column at the beginning of the table.
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra_start TEXT FIRST;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{"extra_start_7", 7, "iii", "extra_end_7"},
+		{"extra_start_8", 8, "jjj", "extra_end_8"},
+	})
+	t.Run("at_first", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{"extra_start_9", 9, "kkk", "extra_end_9"},
+		{"extra_start_10", 10, "lll", "extra_end_10"},
+	})
+	t.Run("at_first_restart", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Can add a column in the middle of the table.
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra_middle TEXT AFTER id;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{"extra_start_11", 11, "extra_middle_1", "mmm", "extra_end_11"},
+		{"extra_start_12", 12, "extra_middle_2", "nnn", "extra_end_12"},
+	})
+	t.Run("at_middle", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{"extra_start_13", 13, "extra_middle_13", "ooo", "extra_end_13"},
+		{"extra_start_14", 14, "extra_middle_14", "ppp", "extra_end_14"},
+	})
+	t.Run("at_middle_restart", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestAlterTable_AddColumnSetEnum(t *testing.T) {
+	t.Run("enum", func(t *testing.T) {
+		var tb, ctx = mysqlTestBackend(t), context.Background()
+		var table = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+		tb.Insert(ctx, t, table, [][]interface{}{
+			{1, "aaa"},
+			{2, "bbb"},
+		})
+
+		var cs = tb.CaptureSpec(ctx, t, table)
+		t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+		tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD enumCol ENUM('someValue','anotherValue');;", table))
+		tb.Insert(ctx, t, table, [][]interface{}{
+			{3, "ccc", "anotherValue"},
+			{4, "ddd", "someValue"},
+		})
+		t.Run("stream", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+		tb.Insert(ctx, t, table, [][]interface{}{
+			{5, "eee", "someValue"},
+			{6, "fff", "someValue"},
+		})
+		t.Run("restart", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	})
+
+	t.Run("set", func(t *testing.T) {
+		var tb, ctx = mysqlTestBackend(t), context.Background()
+		var table = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+		tb.Insert(ctx, t, table, [][]interface{}{
+			{1, "aaa"},
+			{2, "bbb"},
+		})
+
+		var cs = tb.CaptureSpec(ctx, t, table)
+		t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+		tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD setCol SET('a','b','c');;", table))
+		tb.Insert(ctx, t, table, [][]interface{}{
+			{3, "ccc", "a,b"},
+			{4, "ddd", "b,c"},
+		})
+		t.Run("stream", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+		tb.Insert(ctx, t, table, [][]interface{}{
+			{5, "eee", "a,c"},
+			{6, "fff", "b,c"},
+		})
+		t.Run("restart", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	})
+}
+
+func TestAlterTable_DropColumn(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var table = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, table, [][]interface{}{{1, "abc"}, {2, "def"}})
+
+	var cs = tb.CaptureSpec(ctx, t, table)
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s DROP COLUMN data;", table))
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD other_data TEXT;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{3, "ghi"}, {4, "jkl"}})
+	t.Run("stream", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+	tb.Insert(ctx, t, table, [][]interface{}{{5, "mno"}, {6, "pqr"}})
+	t.Run("restart", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
 // TestBinlogExpirySanityCheck verifies that the "dangerously short binlog expiry"

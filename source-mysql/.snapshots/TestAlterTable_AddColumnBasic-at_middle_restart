@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/altertable_addcolumnbasic_aaa": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_aaa"}},"data":"ooo","extra_end":"extra_end_13","extra_middle":"extra_middle_13","extra_start":"extra_start_13","id":13}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_aaa"}},"data":"ppp","extra_end":"extra_end_14","extra_middle":"extra_middle_14","extra_start":"extra_start_14","id":14}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_addcolumnbasic_aaa":{"key_columns":["id"],"metadata":{"schema":{"columns":["extra_start","id","extra_middle","data","extra_end"],"types":{"data":"text","extra_end":"text","extra_middle":"text","extra_start":"text","id":"int"}}},"mode":"Active"}}}
+

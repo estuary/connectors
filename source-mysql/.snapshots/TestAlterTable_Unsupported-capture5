@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/altertable_unsupported_bbb": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_Unsupported_bbb"}},"data":30,"id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_Unsupported_bbb"}},"data":40,"id":4}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_unsupported_aaa":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.altertable_unsupported_bbb":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"int","id":"int"}}},"mode":"Active"}}}
+
