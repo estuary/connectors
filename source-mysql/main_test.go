@@ -295,6 +295,33 @@ func TestAlterTable_AddColumnBasic(t *testing.T) {
 	t.Run("at_middle_restart", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
+func TestAlterTable_MultipleAlterations(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var table = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{1, "aaa"},
+		{2, "bbb"},
+	})
+
+	var cs = tb.CaptureSpec(ctx, t, table)
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, fmt.Sprintf(`
+		ALTER TABLE %s 
+		ADD COLUMN extra_after_id TEXT AFTER id,
+		ADD COLUMN extra_first TEXT FIRST,
+		DROP COLUMN data,
+		ADD COLUMN extra_end TEXT;`,
+		table,
+	))
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{"extra_first_3", 3, "extra_after_id_3", "extra_end_3"},
+		{"extra_first_4", 4, "extra_after_id_4", "extra_end_4"},
+	})
+
+	t.Run("altered", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
 func TestAlterTable_AddColumnSetEnum(t *testing.T) {
 	t.Run("enum", func(t *testing.T) {
 		var tb, ctx = mysqlTestBackend(t), context.Background()
