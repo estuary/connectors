@@ -112,12 +112,38 @@ func (db *mysqlDatabase) prerequisiteUserPermissions(ctx context.Context) error 
 }
 
 func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, schema, table string) error {
+	var streamID = sqlcapture.JoinStreamID(schema, table)
+
 	results, err := db.conn.Execute(fmt.Sprintf(`SELECT * FROM %s.%s LIMIT 0;`, schema, table))
 	if err != nil {
-		var streamID = sqlcapture.JoinStreamID(schema, table)
 		return fmt.Errorf("user %q cannot read from table %q", db.config.User, streamID)
 	}
 	results.Close()
+
+	// If this table contains any DATETIME columns, fail validation if the database timezone
+	// couldn't be determined.
+	// Requirement: (*db).connect has already been called to initialize the datetimeLocation field.
+	if db.datetimeLocation == nil {
+		results, err := db.conn.Execute(fmt.Sprintf(`
+			SELECT column_name
+			FROM information_schema.columns
+			WHERE data_type='datetime' AND table_schema='%s' AND table_name='%s';
+		`, schema, table))
+		if err != nil {
+			return fmt.Errorf("time_zone system variable not set and could not validate that table %q does not contain DATETIME columns: %w", streamID, err)
+		}
+
+		var datetimeCols []string
+		for _, row := range results.Values {
+			datetimeCols = append(datetimeCols, string(row[0].AsString()))
+		}
+		results.Close()
+
+		if len(datetimeCols) > 0 {
+			return fmt.Errorf("system variable 'time_zone' must be set to capture datetime columns [%s] from table %q", strings.Join(datetimeCols, ", "), streamID)
+		}
+	}
+
 	return nil
 }
 
