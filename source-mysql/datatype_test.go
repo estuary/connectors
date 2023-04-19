@@ -19,6 +19,10 @@ func TestDatatypes(t *testing.T) {
 	tb.Query(ctx, t, "SET GLOBAL time_zone = 'America/Chicago';")
 	tb.Query(ctx, t, "SET SESSION time_zone = 'America/Chicago';")
 
+	// For testing inputs of "zero" value datetime and timestamp 'NO_ZERO_DATE' must be disabled for
+	// the "zero" values to be inserted into the test database tables.
+	tb.Query(ctx, t, "SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'NO_ZERO_DATE',''));")
+
 	tests.TestDatatypes(ctx, t, tb, []tests.DatatypeTestCase{
 		{ColumnType: "integer", ExpectType: `{"type":["integer","null"]}`, InputValue: 123, ExpectValue: `123`},
 		{ColumnType: "integer", ExpectType: `{"type":["integer","null"]}`, InputValue: nil, ExpectValue: `null`},
@@ -95,6 +99,8 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T17:34:57Z"`},
 		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56", ExpectValue: `"1991-08-31T17:34:56Z"`},
 		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T18:34:56Z"`},
+		// Handle the special "zero" value datetime by converting it to a valid sentinel RFC3339 datetime.
+		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "0000-00-00 00:00:00", ExpectValue: `"0001-01-01T00:00:00Z"`},
 
 		// The TIMESTAMP column type will be converted by MySQL from the local time zone (which as mentioned
 		// above was set to 'America/Chicago' and acts as UTC-5 or UTC-6 depending on the date) to UTC for
@@ -104,6 +110,8 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T17:34:57Z"`},
 		{ColumnType: "timestamp(4)", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1991-08-31 12:34:56.987654", ExpectValue: `"1991-08-31T17:34:56.9877Z"`},
 		{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T18:34:56Z"`},
+		// Handle the special "zero" value timestamp by converting it to a valid sentinel RFC3339 timestamp.
+		{ColumnType: "timestamp", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "0000-00-00 00:00:00", ExpectValue: `"0001-01-01T00:00:00Z"`},
 
 		// This test fails on MariaDB, because the 'JSON' column type is just an alias for LONGTEXT
 		// and will result in the original input JSON being captured as a string. See also:
