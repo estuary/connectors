@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
@@ -72,8 +73,15 @@ func (db *mysqlDatabase) prerequisiteWatermarksTable(ctx context.Context) error 
 
 	// If we can create the watermarks table and then write a watermark, that also works
 	logEntry.Info("watermarks table doesn't exist, attempting to create it")
-	// TODO(wgd): Try executing a `CREATE DATABASE IF NOT EXISTS %s;` when necessary?
-	if _, err := db.conn.Execute(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot INTEGER PRIMARY KEY, watermark TEXT);", table)); err != nil {
+
+	// Try to create the watermarks database if it doesn't already exist. WatermarksTable from the
+	// configuration has already been validated as being in the fully-qualified form of
+	// <database>.<table>.
+	if _, err := db.conn.Execute(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", strings.Split(table, ".")[0])); err != nil {
+		// It is entirely possible that the watermarks database already exists but we don't have
+		// permission to create databases. In this case we will get an "Access Denied" error here.
+		logEntry.WithField("err", err).Debug("failed to create watermarks database")
+	} else if _, err := db.conn.Execute(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot INTEGER PRIMARY KEY, watermark TEXT);", table)); err != nil {
 		logEntry.WithField("err", err).Error("failed to create watermarks table")
 	} else if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
 		logEntry.Info("successfully created watermarks table")
