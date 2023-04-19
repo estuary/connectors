@@ -164,12 +164,6 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 			case "json":
 				return json.RawMessage(val), nil
 			case "timestamp":
-				t, err := time.Parse(mysqlTimestampLayout, string(val))
-				if err != nil {
-					return nil, fmt.Errorf("error parsing timestamp %q: %w", string(val), err)
-				}
-				return t.Format(time.RFC3339Nano), nil
-			case "datetime":
 				// Per the MySQL docs:
 				//
 				//  > Invalid DATE, DATETIME, or TIMESTAMP values are converted to the “zero” value
@@ -179,6 +173,19 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 				// it could it wouldn't be a valid RFC3339 timestamp. Since this is the
 				// "your data is junk" sentinel value we replace it with a similar one
 				// that actually is a valid RFC3339 timestamp.
+				if string(val) == "0000-00-00 00:00:00" {
+					return "0001-01-01T00:00:00Z", nil
+				}
+
+				t, err := time.Parse(mysqlTimestampLayout, string(val))
+				if err != nil {
+					return nil, fmt.Errorf("error parsing timestamp %q: %w", string(val), err)
+				}
+				return t.Format(time.RFC3339Nano), nil
+			case "datetime":
+				// See note above in the "timestamp" case about replacing this default sentinel
+				// value with a valid RFC3339 timestamp sentinel value. The same reasoning applies
+				// here for "datetime".
 				if string(val) == "0000-00-00 00:00:00" {
 					return "0001-01-01T00:00:00Z", nil
 				}
