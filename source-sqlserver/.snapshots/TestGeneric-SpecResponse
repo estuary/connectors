@@ -99,7 +99,7 @@
     "properties": {
       "namespace": {
         "type": "string",
-        "title": "Namespace",
+        "title": "Schema",
         "description": "The schema (namespace) in which the table resides."
       },
       "stream": {
