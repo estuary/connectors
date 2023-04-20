@@ -129,7 +129,7 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 	// If the column type looks like `_foo` then it's an array of elements of type `foo`.
 	var columnType, ok = column.DataType.(string)
 	if !ok {
-		return nil, fmt.Errorf("unhandled PostgreSQL type %q", columnType)
+		return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", columnType)
 	}
 	var arrayColumn = false
 	if strings.HasPrefix(columnType, "_") {
@@ -140,7 +140,7 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 	// Translate the basic value/element type into a JSON Schema type
 	colSchema, ok := postgresTypeToJSON[columnType]
 	if !ok {
-		return nil, fmt.Errorf("unhandled PostgreSQL type %q", columnType)
+		return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", columnType)
 	}
 	colSchema.nullable = column.IsNullable
 	var jsonType = colSchema.toType()

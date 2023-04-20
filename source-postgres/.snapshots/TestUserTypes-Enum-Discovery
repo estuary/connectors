@@ -18,7 +18,7 @@ Binding 0:
               "type": "integer"
             },
             "value": {
-              "description": "ERROR: could not translate column type \"userenum\" to JSON schema: unhandled PostgreSQL type \"userenum\""
+              "description": "using catch-all schema: unable to translate PostgreSQL type \"userenum\" into JSON schema"
             }
           }
         }
