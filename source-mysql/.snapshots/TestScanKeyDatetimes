@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeydatetimes": 1 Documents
+# Collection "acmeCo/test/test.scankeydatetimes": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"aood","ts":"<TIMESTAMP>"}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeydatetimes": 1 Documents
+# Collection "acmeCo/test/test.scankeydatetimes": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"xwxt","ts":"<TIMESTAMP>"}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMTExMDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeydatetimes": 1 Documents
+# Collection "acmeCo/test/test.scankeydatetimes": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"tpxi","ts":"<TIMESTAMP>"}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMjIyMDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeydatetimes": 1 Documents
+# Collection "acmeCo/test/test.scankeydatetimes": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"jvqz","ts":"<TIMESTAMP>"}
 # ================================
@@ -54,7 +54,7 @@
 ### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMzMzMDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeydatetimes": 1 Documents
+# Collection "acmeCo/test/test.scankeydatetimes": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"juwf","ts":"<TIMESTAMP>"}
 # ================================
@@ -67,7 +67,7 @@
 ### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNDQ0MDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeydatetimes": 1 Documents
+# Collection "acmeCo/test/test.scankeydatetimes": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"znzn","ts":"<TIMESTAMP>"}
 # ================================
@@ -80,7 +80,7 @@
 ### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNTU1MDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeydatetimes": 1 Documents
+# Collection "acmeCo/test/test.scankeydatetimes": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"zocp","ts":"<TIMESTAMP>"}
 # ================================
@@ -93,7 +93,7 @@
 ### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNjY2MDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeydatetimes": 1 Documents
+# Collection "acmeCo/test/test.scankeydatetimes": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"pxoi","ts":"<TIMESTAMP>"}
 # ================================
@@ -106,7 +106,7 @@
 ### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNzc3MDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeydatetimes": 1 Documents
+# Collection "acmeCo/test/test.scankeydatetimes": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"vdug","ts":"<TIMESTAMP>"}
 # ================================
@@ -119,7 +119,7 @@
 ### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuODg4MDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeydatetimes": 1 Documents
+# Collection "acmeCo/test/test.scankeydatetimes": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"xerk","ts":"<TIMESTAMP>"}
 # ================================

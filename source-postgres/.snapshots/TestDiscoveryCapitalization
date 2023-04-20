@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "discoverycapitalization_aaaaa",
+    "recommended_name": "test.discoverycapitalization_aaaaa",
     "resource_config_json": {
       "namespace": "test",
       "stream": "DiscoveryCapitalization_AaAaA"
@@ -111,7 +111,7 @@ Binding 0:
   }
 Binding 1:
 {
-    "recommended_name": "discoverycapitalization_bbbbb",
+    "recommended_name": "test.discoverycapitalization_bbbbb",
     "resource_config_json": {
       "namespace": "test",
       "stream": "discoverycapitalization_bbbbb"
@@ -222,7 +222,7 @@ Binding 1:
   }
 Binding 2:
 {
-    "recommended_name": "discoverycapitalization_ccccc",
+    "recommended_name": "test.discoverycapitalization_ccccc",
     "resource_config_json": {
       "namespace": "test",
       "stream": "discoverycapitalization_ccccc"

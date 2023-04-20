@@ -156,5 +156,5 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 }
 
 func recommendedStreamName(schema, table string) string {
-	return strings.ToLower(table)
+	return JoinStreamID(schema, table)
 }

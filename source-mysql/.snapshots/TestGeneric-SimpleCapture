@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/generic_simplecapture": 5 Documents
+# Collection "acmeCo/test/test.generic_simplecapture": 5 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_SimpleCapture"}},"data":"5","id":4}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_SimpleCapture"}},"data":"A","id":0}

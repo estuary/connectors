@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "secondaryindexdiscovery_index_only_g26313",
+    "recommended_name": "test.secondaryindexdiscovery_index_only_g26313",
     "resource_config_json": {
       "namespace": "test",
       "stream": "secondaryindexdiscovery_index_only_g26313"

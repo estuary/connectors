@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/generic_duplicatedscankey": 3 Documents
+# Collection "acmeCo/test/test.generic_duplicatedscankey": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_duplicatedscankey","loc":[11111111,11111111,11111111]}},"data":"1","id":"AAA"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_duplicatedscankey","loc":[11111111,11111111,11111111]}},"data":"3","id":"BBB"}
