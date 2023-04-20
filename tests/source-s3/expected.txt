@@ -1,14 +1,6 @@
 id|canary
 1|misidentifying
 10|inmates
-2|sourness's
-3|Sims's
-4|withhold
-5|rectangle's
-6|invertebrates
-7|antibiotics
-8|nursery's
-9|Tabitha's
 11|amputation's
 12|armament's
 13|splatters
@@ -18,6 +10,7 @@ id|canary
 17|pieced
 18|roaches
 19|devilish
+2|sourness's
 20|glucose's
 211|everybody
 212|Vietcong
@@ -29,3 +22,10 @@ id|canary
 218|testamentary
 219|northbound
 220|horrible
+3|Sims's
+4|withhold
+5|rectangle's
+6|invertebrates
+7|antibiotics
+8|nursery's
+9|Tabitha's
