@@ -1,9 +1,9 @@
 # ================================
-# Collection "acmeCo/test/generic_multiplestreams_one": 1 Documents
+# Collection "acmeCo/test/test.generic_multiplestreams_one": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_one"}},"data":"nine","id":9}
 # ================================
-# Collection "acmeCo/test/generic_multiplestreams_three": 1 Documents
+# Collection "acmeCo/test/test.generic_multiplestreams_three": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_three"}},"data":"eleven","id":11}
 # ================================

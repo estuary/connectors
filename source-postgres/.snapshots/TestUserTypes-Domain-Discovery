@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "usertypes_domain_bandoleer",
+    "recommended_name": "test.usertypes_domain_bandoleer",
     "resource_config_json": {
       "namespace": "test",
       "stream": "usertypes_domain_bandoleer"

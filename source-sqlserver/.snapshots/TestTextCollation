@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test_textcollation": 4 Documents
+# Collection "acmeCo/test/dbo.test_textcollation": 4 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation"}},"data":"3","id":"-J C"}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation"}},"data":"1","id":"AAA"}

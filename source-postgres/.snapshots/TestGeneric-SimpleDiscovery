@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "generic_simplediscovery_magnanimous_outshine",
+    "recommended_name": "test.generic_simplediscovery_magnanimous_outshine",
     "resource_config_json": {
       "namespace": "test",
       "stream": "generic_simplediscovery_magnanimous_outshine"
