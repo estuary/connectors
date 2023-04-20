@@ -57,7 +57,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 				// Logging an error from the connector is nice, but can be swallowed by `flowctl-go`.
 				// Putting an error in the generated schema is ugly, but makes the failure visible.
 				properties[column.Name] = &jsonschema.Schema{
-					Description: fmt.Sprintf("ERROR: could not translate column type %q to JSON schema: %v", column.DataType, err),
+					Description: fmt.Sprintf("using catch-all schema: %v", err),
 				}
 			} else {
 				properties[column.Name] = jsonType

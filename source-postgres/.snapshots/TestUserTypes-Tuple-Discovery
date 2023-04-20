@@ -18,7 +18,7 @@ Binding 0:
               "type": "integer"
             },
             "value": {
-              "description": "ERROR: could not translate column type \"usertuple\" to JSON schema: unhandled PostgreSQL type \"usertuple\""
+              "description": "using catch-all schema: unable to translate PostgreSQL type \"usertuple\" into JSON schema"
             }
           }
         }
