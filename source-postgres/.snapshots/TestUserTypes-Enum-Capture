@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/usertypes_enum_terror": 3 Documents
+# Collection "acmeCo/test/test.usertypes_enum_terror": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"usertypes_enum_terror","loc":[11111111,11111111,11111111]}},"id":1,"value":"red"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"usertypes_enum_terror","loc":[11111111,11111111,11111111]}},"id":2,"value":"green"}

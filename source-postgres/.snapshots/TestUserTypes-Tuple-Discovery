@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "usertypes_tuple_byways",
+    "recommended_name": "test.usertypes_tuple_byways",
     "resource_config_json": {
       "namespace": "test",
       "stream": "usertypes_tuple_byways"

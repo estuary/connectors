@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test_generic_multiplestreams_two": 4 Documents
+# Collection "acmeCo/test/dbo.test_generic_multiplestreams_two": 4 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_two"}},"data":"five","id":5}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_two"}},"data":"four","id":4}

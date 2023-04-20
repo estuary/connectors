@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeytypes_smallint": 1 Documents
+# Collection "acmeCo/test/test.scankeytypes_smallint": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallint","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":-3}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "E/w="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeytypes_smallint": 1 Documents
+# Collection "acmeCo/test/test.scankeytypes_smallint": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallint","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":0}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "FA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeytypes_smallint": 1 Documents
+# Collection "acmeCo/test/test.scankeytypes_smallint": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallint","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":2}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "FQI="
 ####################################
 # ================================
-# Collection "acmeCo/test/scankeytypes_smallint": 1 Documents
+# Collection "acmeCo/test/test.scankeytypes_smallint": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallint","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":1723}
 # ================================
