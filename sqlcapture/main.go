@@ -16,7 +16,7 @@ import (
 
 // Resource represents the capture configuration of a single table.
 type Resource struct {
-	Namespace string `json:"namespace" jsonschema:"title=Namespace,description=The schema (namespace) in which the table resides."`
+	Namespace string `json:"namespace" jsonschema:"title=Schema,description=The schema (namespace) in which the table resides."`
 	Stream    string `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured."`
 
 	// PrimaryKey allows the user to override the "scan key" columns which will be used
