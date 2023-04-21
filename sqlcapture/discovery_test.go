@@ -73,3 +73,31 @@ func TestRecommendedCatalogName(t *testing.T) {
 		})
 	}
 }
+
+func TestKeyRoundTrip(t *testing.T) {
+	for _, pk := range []string{
+		"standard",
+		"with/slash",
+		"with~tilde",
+		"/start",
+		"~start",
+		"end/",
+		"end~",
+		"has~0escape~1already",
+		"~/",
+		"~0~1",
+		"~1~0",
+		"~~01",
+		"~~10",
+		"~01~",
+		"~0",
+		"~1",
+		"~",
+		"/",
+		"",
+	} {
+		t.Run(pk, func(t *testing.T) {
+			require.Equal(t, pk, collectionKeyToPrimaryKey(primaryKeyToCollectionKey(pk)))
+		})
+	}
+}

@@ -133,7 +133,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 
 		var keyPointers []string
 		for _, colName := range table.PrimaryKey {
-			keyPointers = append(keyPointers, "/"+colName)
+			keyPointers = append(keyPointers, primaryKeyToCollectionKey(colName))
 		}
 
 		var res = Resource{
@@ -166,4 +166,27 @@ var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
 
 func recommendedCatalogName(schema, table string) string {
 	return catalogNameSanitizerRe.ReplaceAllString(JoinStreamID(schema, table), "_")
+}
+
+// primaryKeyToCollectionKey converts a database primary key column name into a Flow collection key
+// JSON pointer with escaping for '~' and '/' applied per RFC6901.
+func primaryKeyToCollectionKey(key string) string {
+	// Any encoded '~' must be escaped first to prevent a second escape on escaped '/' values as
+	// '~1'.
+	key = strings.ReplaceAll(key, "~", "~0")
+	key = strings.ReplaceAll(key, "/", "~1")
+	return "/" + key
+}
+
+// collectionKeyToPrimaryKey is the inverse of primaryKeyToCollectionKey: It converts a Flow
+// collection key JSON pointer back to the original database primary key column name by unescaping
+// the encoded '~0' and '~1' values back into '~' and '/', respecively.
+func collectionKeyToPrimaryKey(ptr string) string {
+	ptr = strings.TrimPrefix(ptr, "/")
+	// Any encoded '/' must be unescaped first. An escaped database column name containing a literal
+	// '~1' results in an escaped JSON pointer like '/~01'. If encoded '~' were escaped first, this
+	// would result in a conversion like '~01' -> '~1' -> '/' rather than '~01' -> '~01' -> '~1'.
+	ptr = strings.ReplaceAll(ptr, "~1", "/")
+	ptr = strings.ReplaceAll(ptr, "~0", "~")
+	return ptr
 }
