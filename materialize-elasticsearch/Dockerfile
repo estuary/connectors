@@ -16,10 +16,6 @@ COPY materialize-boilerplate ./materialize-boilerplate
 COPY go-schema-gen           ./go-schema-gen
 COPY materialize-elasticsearch ./materialize-elasticsearch
 
-# TODO: copy flow bins
-# Copy schema-builder binary.
-COPY flow-bin/flow-schemalate ./
-
 ENV PATH="/builder:$PATH"
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-elasticsearch/...
@@ -34,7 +30,6 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector /connector/materialize-elasticsearch
-COPY --from=builder /builder/flow-schemalate /connector/
 COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
 # Avoid running the connector as root.
