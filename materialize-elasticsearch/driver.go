@@ -12,10 +12,10 @@ import (
 	"github.com/elastic/go-elasticsearch/v7/esutil"
 	schemagen "github.com/estuary/connectors/go-schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	"github.com/estuary/connectors/materialize-elasticsearch/schemabuilder"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 )
 
 type config struct {
@@ -32,12 +32,10 @@ func (c config) Validate() error {
 }
 
 type resource struct {
-	Index         string                        `json:"index" jsonschema_extras:"x-collection-name=true"`
-	DeltaUpdates  bool                          `json:"delta_updates" jsonschema:"default=false"`
-	FieldOverides []schemabuilder.FieldOverride `json:"field_overrides,omitempty"`
-
-	NumOfShards   int `json:"number_of_shards,omitempty" jsonschema:"default=1"`
-	NumOfReplicas int `json:"number_of_replicas,omitempty"`
+	Index         string `json:"index" jsonschema_extras:"x-collection-name=true"`
+	DeltaUpdates  bool   `json:"delta_updates" jsonschema:"default=false"`
+	NumOfShards   int    `json:"number_of_shards,omitempty" jsonschema:"default=1"`
+	NumOfReplicas int    `json:"number_of_replicas,omitempty" jsonschema:"default=0"`
 }
 
 func (r resource) Validate() error {
@@ -59,11 +57,10 @@ func (resource) GetFieldDocString(fieldName string) string {
 	case "DeltaUpdates":
 		return "Should updates to this table be done via delta updates. Default is false."
 	case "NumOfShards":
-		return "The number of shards in ElasticSearch index. Must set to be greater than 0."
+		return "The number of shards in ElasticSearch index. Must be greater than 0."
 	case "NumOfReplicas":
 		return "The number of replicas in ElasticSearch index. If not set, default to be 0. " +
-			"For single-node clusters, make sure this field is 0, because the " +
-			"Elastic search needs to allocate replicas on different nodes."
+			"For single-node clusters, this must be 0. For production systems, a value of 1 or more is recommended"
 	default:
 		return ""
 	}
@@ -102,21 +99,21 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	}
 
 	var out []*pm.Response_Validated_Binding
-	for _, binding := range req.Bindings {
+	for i, binding := range req.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
 		// Make sure the specified resource is valid to build
-		if schema, err := schemabuilder.RunSchemaBuilder(
-			binding.Collection.GetReadSchemaJson(),
-			res.FieldOverides,
-		); err != nil {
-			return nil, fmt.Errorf("building elastic search schema: %w", err)
-		} else if err = elasticSearch.CreateIndex(res.Index, res.NumOfShards, res.NumOfReplicas, schema, true); err != nil {
+		if desc, err := elasticSearch.ApplyIndex(res.Index, res.NumOfShards, res.NumOfReplicas, true); err != nil {
 			// Dry run the index creation to make sure the specifications of the index are consistent with the existing one, if any.
 			return nil, fmt.Errorf("validate elastic search index: %w", err)
+		} else {
+			log.WithFields(log.Fields{
+				"binding":    i,
+				"collection": binding.Collection,
+			}).Info(desc)
 		}
 
 		var constraints = make(map[string]*pm.Response_Validated_Constraint)
@@ -160,6 +157,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		return nil, fmt.Errorf("creating elasticSearch: %w", err)
 	}
 
+	var actionDesc = strings.Builder{}
 	var indices []string
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
@@ -167,19 +165,17 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		if elasticSearchSchema, err := schemabuilder.RunSchemaBuilder(
-			binding.Collection.GetReadSchemaJson(),
-			res.FieldOverides,
-		); err != nil {
-			return nil, fmt.Errorf("building elastic search schema: %w", err)
-		} else if err = elasticSearch.CreateIndex(res.Index, res.NumOfShards, res.NumOfReplicas, elasticSearchSchema, false); err != nil {
+		if desc, err := elasticSearch.ApplyIndex(res.Index, res.NumOfShards, res.NumOfReplicas, false); err != nil {
 			return nil, fmt.Errorf("creating elastic search index: %w", err)
+		} else {
+			actionDesc.WriteString(desc)
+			actionDesc.WriteRune('\n')
 		}
 
 		indices = append(indices, res.Index)
 	}
 
-	return &pm.Response_Applied{ActionDescription: fmt.Sprint("created indices: ", strings.Join(indices, ","))}, nil
+	return &pm.Response_Applied{ActionDescription: actionDesc.String()}, nil
 }
 
 func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {

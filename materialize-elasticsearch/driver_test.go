@@ -30,13 +30,7 @@ func TestResource(t *testing.T) {
 	pf.UnmarshalStrict(json.RawMessage(`{
 		"index":        "testIndex",
 		"delta_updates": true,
-		"number_of_shards": 1,
-		"field_overides": [
-			{
-				"pointer": "/test_pointer",
-				"esType":  {"field_type": "test_field_type"}
-			}
-		]
+		"number_of_shards": 1
 	}`), &validResourceA)
 	require.NoError(t, validResourceA.Validate())
 	require.Equal(t, 1, validResourceA.NumOfShards)
