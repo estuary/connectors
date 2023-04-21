@@ -114,7 +114,7 @@ func (db *mysqlDatabase) prerequisiteUserPermissions(ctx context.Context) error 
 func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, schema, table string) error {
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 
-	results, err := db.conn.Execute(fmt.Sprintf(`SELECT * FROM %s.%s LIMIT 0;`, schema, table))
+	results, err := db.conn.Execute(fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 0;", schema, table))
 	if err != nil {
 		return fmt.Errorf("user %q cannot read from table %q", db.config.User, streamID)
 	}

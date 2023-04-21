@@ -139,7 +139,7 @@ func (db *mysqlDatabase) buildScanQuery(start bool, keyColumns []string, columnT
 
 	// Construct the query itself.
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM %s.%s", schemaName, tableName)
+	fmt.Fprintf(query, "SELECT * FROM `%s`.`%s`", schemaName, tableName)
 
 	if !start {
 		for i := 0; i != len(pkey); i++ {
