@@ -272,10 +272,8 @@ func (c *Capture) updateState(ctx context.Context) error {
 			primaryKey = binding.Resource.PrimaryKey
 			logrus.WithFields(logrus.Fields{"stream": streamID, "key": primaryKey}).Debug("using resource primary key")
 		} else if len(binding.CollectionKey) > 0 {
-			// TODO(wgd): This logic isn't correct for all possible column names, but
-			// I need to implement a unit test demonstrating that issue first.
 			for _, ptr := range binding.CollectionKey {
-				primaryKey = append(primaryKey, strings.TrimPrefix(ptr, "/"))
+				primaryKey = append(primaryKey, collectionKeyToPrimaryKey(ptr))
 			}
 			logrus.WithFields(logrus.Fields{"stream": streamID, "key": primaryKey}).Debug("using collection primary key")
 		} else if len(discoveryInfo.PrimaryKey) > 0 {
