@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -145,7 +146,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		}
 
 		catalog = append(catalog, &pc.Response_Discovered_Binding{
-			RecommendedName:    pf.Collection(recommendedStreamName(table.Schema, table.Name)),
+			RecommendedName:    pf.Collection(recommendedCatalogName(table.Schema, table.Name)),
 			ResourceConfigJson: resourceSpecJSON,
 			DocumentSchemaJson: rawSchema,
 			Key:                keyPointers,
@@ -155,6 +156,14 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 	return catalog, err
 }
 
-func recommendedStreamName(schema, table string) string {
-	return JoinStreamID(schema, table)
+// Per the flow JSON schema: Collection names are paths of Unicode letters, numbers, '-', '_', or
+// '.'. Each path component is separated by a slash '/', and a name may not begin or end in a '/'.
+
+// There is also a requirement for gazette journals that they must be a "clean" path. As a
+// simplification to ensure that recommended collection names meet this requirement we will replace
+// any occurences of '/' with '_' as well.
+var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
+
+func recommendedCatalogName(schema, table string) string {
+	return catalogNameSanitizerRe.ReplaceAllString(JoinStreamID(schema, table), "_")
 }
