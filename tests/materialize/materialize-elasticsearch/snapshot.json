@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "created indices: index-duplicated-keys-delta,index-duplicated-keys-non-delta,index-multiple-data-types"
+    "actionDescription": "create Elasticsearch index 'index-duplicated-keys-delta'\ncreate Elasticsearch index 'index-duplicated-keys-non-delta'\ncreate Elasticsearch index 'index-multiple-data-types'\n"
   }
 }
 {
@@ -353,9 +353,7 @@
   ]
 }
 {
-  "applied": {
-    "actionDescription": "created indices: "
-  }
+  "applied": {}
 }
 {
   "opened": {}
