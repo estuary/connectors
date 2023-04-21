@@ -10,11 +10,11 @@ Binding 0:
         "TestTrickycolumnnames_fizzed_cupcake_a": {
           "type": "object",
           "required": [
-            "Meta/\"wtf\"/ID"
+            "Meta/\"wtf\"~ID"
           ],
           "$anchor": "TestTrickycolumnnames_fizzed_cupcake_a",
           "properties": {
-            "Meta/\"wtf\"/ID": {
+            "Meta/\"wtf\"~ID": {
               "type": "integer"
             },
             "data": {
@@ -106,7 +106,7 @@ Binding 0:
       ]
     },
     "key": [
-      "/Meta/\"wtf\"/ID"
+      "/Meta~1\"wtf\"~0ID"
     ]
   }
 Binding 1:

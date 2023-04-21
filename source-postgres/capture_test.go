@@ -211,7 +211,7 @@ func TestTrickyColumnNames(t *testing.T) {
 	// name, and one containing special characters which also happens to be the primary key).
 	var tb, ctx = postgresTestBackend(t), context.Background()
 	const uniqueString = "fizzed_cupcake"
-	var tableA = tb.CreateTable(ctx, t, uniqueString+"_a", `("Meta/""wtf""/ID" INTEGER PRIMARY KEY, data TEXT)`)
+	var tableA = tb.CreateTable(ctx, t, uniqueString+"_a", `("Meta/""wtf""~ID" INTEGER PRIMARY KEY, data TEXT)`)
 	var tableB = tb.CreateTable(ctx, t, uniqueString+"_b", `("table" INTEGER PRIMARY KEY, data TEXT)`)
 	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "aaa"}, {2, "bbb"}})
 	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ccc"}, {4, "ddd"}})
