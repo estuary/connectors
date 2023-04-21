@@ -1,0 +1,15 @@
+# ================================
+# Collection "acmeCo/test/test.trickycolumnnames_fizzed_cupcake_a": 2 Documents
+# ================================
+{"Meta/`wtf`~ID":1,"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"TrickyColumnNames_fizzed_cupcake_a"}},"data":"aaa"}
+{"Meta/`wtf`~ID":2,"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"TrickyColumnNames_fizzed_cupcake_a"}},"data":"bbb"}
+# ================================
+# Collection "acmeCo/test/test.trickycolumnnames_fizzed_cupcake_b": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"TrickyColumnNames_fizzed_cupcake_b"}},"data":"ccc","table":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"TrickyColumnNames_fizzed_cupcake_b"}},"data":"ddd","table":4}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.trickycolumnnames_fizzed_cupcake_a":{"key_columns":["Meta/`wtf`~ID"],"metadata":{"schema":{"columns":["Meta/`wtf`~ID","data"],"types":{"Meta/`wtf`~ID":"int","data":"text"}}},"mode":"Active"},"test.trickycolumnnames_fizzed_cupcake_b":{"key_columns":["table"],"metadata":{"schema":{"columns":["table","data"],"types":{"data":"text","table":"int"}}},"mode":"Active"}}}
+

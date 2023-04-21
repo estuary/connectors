@@ -129,10 +129,11 @@ func (db *mysqlDatabase) buildScanQuery(start bool, keyColumns []string, columnT
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
 	for _, colName := range keyColumns {
+		var quotedName = quoteColumnName(colName)
 		if colType, ok := columnTypes[colName].(string); ok && columnBinaryKeyComparison[colType] {
-			pkey = append(pkey, "BINARY "+colName)
+			pkey = append(pkey, "BINARY "+quotedName)
 		} else {
-			pkey = append(pkey, colName)
+			pkey = append(pkey, quotedName)
 		}
 	}
 
@@ -158,6 +159,12 @@ func (db *mysqlDatabase) buildScanQuery(start bool, keyColumns []string, columnT
 	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " LIMIT %d;", db.config.Advanced.BackfillChunkSize)
 	return query.String()
+}
+
+func quoteColumnName(name string) string {
+	// Per https://dev.mysql.com/doc/refman/8.0/en/identifiers.html, the identifier quote character
+	// is the backtick (`). If the identifier itself contains a backtick, it must be doubled.
+	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }
 
 func (db *mysqlDatabase) explainQuery(streamID, query string, args []interface{}) {
