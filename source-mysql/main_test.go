@@ -279,8 +279,8 @@ func TestAlterTable_AddColumnBasic(t *testing.T) {
 	})
 	t.Run("at_first_restart", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	// Can add a column in the middle of the table.
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra_middle TEXT AFTER id;", table))
+	// Can add a column in the middle of the table, and case sensitivity is not a problem.
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN Extra_MIDDLE TEXT AFTER id;", table))
 	tb.Insert(ctx, t, table, [][]interface{}{
 		{"extra_start_11", 11, "extra_middle_1", "mmm", "extra_end_11"},
 		{"extra_start_12", 12, "extra_middle_2", "nnn", "extra_end_12"},
