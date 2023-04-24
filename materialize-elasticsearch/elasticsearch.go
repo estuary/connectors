@@ -16,6 +16,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// tOken: Qzl1S3BZY0I4T3RSRm93NE1lWTA6dnlxOFByNmJSdU94dWMyam9qSmx4QQ==
+
 // ElasticSearch provides APIs for interacting with ElasticSearch service.
 type ElasticSearch struct {
 	client *elasticsearch.Client
@@ -30,12 +32,13 @@ type IndexSettings struct {
 	} `json:"index"`
 }
 
-func newElasticSearch(endpoint string, username string, password string) (*ElasticSearch, error) {
+func newElasticsearchClient(cfg config) (*ElasticSearch, error) {
 	var client, err = elasticsearch.NewClient(
 		elasticsearch.Config{
-			Addresses: []string{endpoint},
-			Username:  username,
-			Password:  password,
+			Addresses: []string{cfg.Endpoint},
+			Username:  cfg.Credentials.Username,
+			Password:  cfg.Credentials.Password,
+			APIKey:    cfg.Credentials.ApiKey,
 		},
 	)
 	if err != nil {
@@ -68,6 +71,10 @@ func (es *ElasticSearch) indexExists(index string) (bool, error) {
 	switch resp.StatusCode {
 	case 200:
 		return true, nil
+	case 401:
+		return false, fmt.Errorf("the credential you provided is invalid (likely has missing or extra characters)")
+	case 403:
+		return false, fmt.Errorf("the user does not have permission to access the Elasticsearch index %q", index)
 	case 404:
 		return false, nil
 	default:
