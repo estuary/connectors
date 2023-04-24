@@ -126,22 +126,27 @@ func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnName
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
 func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
-	// If the column type looks like `_foo` then it's an array of elements of type `foo`.
-	var columnType, ok = column.DataType.(string)
-	if !ok {
-		return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", columnType)
-	}
 	var arrayColumn = false
-	if strings.HasPrefix(columnType, "_") {
-		columnType = strings.TrimPrefix(columnType, "_")
-		arrayColumn = true
+	var colSchema columnSchema
+
+	if columnType, ok := column.DataType.(string); ok {
+		// If the column type looks like `_foo` then it's an array of elements of type `foo`.
+		if strings.HasPrefix(columnType, "_") {
+			columnType = strings.TrimPrefix(columnType, "_")
+			arrayColumn = true
+		}
+
+		// Translate the basic value/element type into a JSON Schema type
+		colSchema, ok = postgresTypeToJSON[columnType]
+		if !ok {
+			return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", columnType)
+		}
+	} else if colSchema, ok = column.DataType.(columnSchema); ok {
+		// Nothing else to do since the columnSchema was already determined.
+	} else {
+		return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", column.DataType)
 	}
 
-	// Translate the basic value/element type into a JSON Schema type
-	colSchema, ok := postgresTypeToJSON[columnType]
-	if !ok {
-		return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", columnType)
-	}
 	colSchema.nullable = column.IsNullable
 	var jsonType = colSchema.toType()
 
@@ -358,9 +363,11 @@ const queryDiscoverColumns = `
 		c.ordinal_position,
 		c.column_name,
 		c.is_nullable::boolean,
-		c.udt_name
+		c.udt_name,
+		p.typtype::text
   FROM information_schema.columns c
   JOIN information_schema.tables t ON (c.table_schema = t.table_schema AND c.table_name = t.table_name)
+  JOIN pg_type p ON (c.udt_name = p.typname)
   WHERE
 		c.table_schema != 'pg_catalog' AND
 		c.table_schema != 'information_schema' AND
@@ -378,9 +385,29 @@ func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, e
 	logrus.Debug("listing all tables/columns in the database")
 	var columns []sqlcapture.ColumnInfo
 	var sc sqlcapture.ColumnInfo
+	var typtype string
 	var _, err = conn.QueryFunc(ctx, queryDiscoverColumns, nil,
-		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType},
+		[]interface{}{&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &sc.IsNullable, &sc.DataType, &typtype},
 		func(r pgx.QueryFuncRow) error {
+			// Special cases for user-defined types where we must resolve the columnSchema directly.
+			switch typtype {
+			case "c": // composite
+				// TODO(whb): We don't currently do any kind of special handling for composite
+				// (tuple) types and just output whatever we get from from pgx's GenericText
+				// decoder. The generated text for these isn't very usable and we may be able to
+				// improve this by discovering composite types, building decoders for them, and
+				// registering the decoders with the pgx connection. pgx v5 has new utility methods
+				// specifically for doing this.
+			case "e": // enum
+				// Enum values are always strings corresponding to an enum label.
+				sc.DataType = columnSchema{jsonType: "string"}
+			case "r", "m": // range, multirange
+				// Capture ranges in their text form to retain inclusive (like `[`) & exclusive
+				// (like `(`) bounds information. For example, the text form of a range representing
+				// "integers greater than or equal to 1 but less than 5" is '[1,5)'
+				sc.DataType = columnSchema{jsonType: "string"}
+			}
+
 			columns = append(columns, sc)
 			return nil
 		})

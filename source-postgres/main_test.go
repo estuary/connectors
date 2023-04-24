@@ -16,7 +16,6 @@ import (
 	"github.com/estuary/flow/go/protocols/flow"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -59,7 +58,7 @@ func postgresTestBackend(t testing.TB) *testBackend {
 	// Open control connection
 	var ctx = context.Background()
 	var controlURI = fmt.Sprintf(`postgres://%s:%s@%s/%s`, *dbControlUser, *dbControlPass, *dbAddress, *dbName)
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(log.Fields{
 		"user": *dbControlUser,
 		"addr": *dbAddress,
 	}).Info("opening control connection")

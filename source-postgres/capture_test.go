@@ -382,6 +382,36 @@ func TestUserTypes(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("Range", func(t *testing.T) {
+		tb.Query(ctx, t, `DROP TYPE IF EXISTS UserRange CASCADE`)
+		tb.Query(ctx, t, `CREATE TYPE UserRange AS RANGE (subtype = int4)`)
+		t.Cleanup(func() { tb.Query(ctx, t, `DROP TYPE UserRange CASCADE`) })
+
+		var uniqueString = "morsel"
+		var tableName = tb.CreateTable(ctx, t, uniqueString, "(id INTEGER PRIMARY KEY, value UserRange)")
+
+		t.Run("Discovery", func(t *testing.T) {
+			var cs = tb.CaptureSpec(ctx, t)
+			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueString))
+		})
+
+		t.Run("Capture", func(t *testing.T) {
+			tb.Insert(ctx, t, tableName, [][]any{
+				{1, "(1, 2]"},
+				{2, "[3,)"},
+			})
+			var cs = tb.CaptureSpec(ctx, t, tableName)
+			tests.VerifiedCapture(ctx, t, cs)
+			t.Run("Replication", func(t *testing.T) {
+				tb.Insert(ctx, t, tableName, [][]any{
+					{3, "(,4]"},
+					{4, "[5,6)"},
+				})
+				tests.VerifiedCapture(ctx, t, cs)
+			})
+		})
+	})
 }
 
 func TestCaptureCapitalization(t *testing.T) {

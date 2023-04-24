@@ -118,7 +118,13 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `text ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: []interface{}{`Hello, world!`, `asdf`}, ExpectValue: `{"dimensions":[2],"elements":["Hello, world!","asdf"]}`},
 		{ColumnType: `uuid ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"uuid"}`), InputValue: []interface{}{`a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11`}, ExpectValue: `{"dimensions":[1],"elements":["a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"]}`},
 
-		// TODO(wgd): Add enumeration test case?
+		// Built-in range types.
+		{ColumnType: `int4range`, ExpectType: `{"type":["string","null"]}`, InputValue: `[1,5)`, ExpectValue: `"[1,5)"`},
+		{ColumnType: `int8range`, ExpectType: `{"type":["string","null"]}`, InputValue: `[,]`, ExpectValue: `"(,)"`},
+		{ColumnType: `numrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `(1.1,5.5]`, ExpectValue: `"(11e-1,55e-1]"`},
+		{ColumnType: `tsrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `[2010-01-01 11:30,2010-01-01 15:00)`, ExpectValue: `"[2010-01-01 11:30:00,2010-01-01 15:00:00)"`},
+		{ColumnType: `tstzrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `[2010-01-01 11:30,2010-01-01 15:00)`, ExpectValue: `"[2010-01-01 11:30:00Z,2010-01-01 15:00:00Z)"`},
+		{ColumnType: `daterange`, ExpectType: `{"type":["string","null"]}`, InputValue: `(2010-01-01,2010-01-02]`, ExpectValue: `"[2010-01-02,2010-01-03)"`},
 	})
 }
 
