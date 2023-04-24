@@ -18,17 +18,97 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// credentials is a union representing either an api key or a username/password.
+// It's allowed for all credentials to be missing, which is used for connecting to servers
+// without authentication enabled.
+type credentials struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	ApiKey   string `json:"apiKey,omitempty"`
+}
+
 type config struct {
-	Endpoint string `json:"endpoint" jsonschema:"title=Endpoint,description=Endpoint host or URL. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT" jsonschema_extras:"order=0"`
-	Username string `json:"username,omitempty" jsonschema:"title=Username,description=User to connect to the endpoint." jsonschema_extras:"order=1"`
-	Password string `json:"password,omitempty" jsonschema:"title=Password,description=Password to connect to the endpoint." jsonschema_extras:"secret=true,order=2"`
+	Credentials credentials `json:"credentials"`
+	Endpoint    string      `json:"endpoint"`
+}
+
+// The `go-schema-gen` package doesn't have a good way of dealing with oneOf, and I couldn't get it
+// to output a schema that works with Flow's UI. So the endpoint config schema is written out manually
+// instead of being generated from the structs.
+func configSchema() json.RawMessage {
+	var schemaStr = `{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/estuary/connectors/materialize-elasticsearch/config",
+  "properties": {
+    "endpoint": {
+      "type": "string",
+      "title": "Endpoint",
+      "description": "Endpoint host or URL. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
+      "order": 0
+    },
+    "credentials": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "title": "Username and Password",
+          "properties": {
+            "username": {
+              "type": "string",
+              "title": "Username",
+              "description": "Username to use with the elasticsearch API"
+            },
+            "password": {
+              "type": "string",
+              "secret": true,
+              "title": "Password",
+              "description": "Password for the user"
+            }
+          },
+          "required": [
+            "username",
+            "password"
+          ]
+        },
+        {
+          "type": "object",
+          "title": "API Key",
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "secret": true,
+              "title": "API key",
+              "description": "API key for authenticating with the elasticsearch API"
+            }
+          },
+          "required": [
+            "apiKey"
+          ]
+        }
+      ]
+    }
+  },
+  "type": "object",
+  "required": [
+    "endpoint"
+  ],
+  "title": "Elasticsearch Connection"
+}`
+	return json.RawMessage([]byte(schemaStr))
+}
+
+func (c *credentials) Validate() error {
+	if (c.Username == "") != (c.Password == "") {
+		return fmt.Errorf("username and password must both be present if one of them is")
+	}
+	return nil
 }
 
 func (c config) Validate() error {
 	if c.Endpoint == "" {
 		return fmt.Errorf("missing Endpoint")
 	}
-	return nil
+	return c.Credentials.Validate()
 }
 
 type resource struct {
@@ -70,10 +150,7 @@ func (resource) GetFieldDocString(fieldName string) string {
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := schemagen.GenerateSchema("Elasticsearch Connection", &config{}).MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("generating endpoint schema: %w", err)
-	}
+	var endpointSchema = configSchema()
 
 	resourceSchema, err := schemagen.GenerateSchema("Elasticsearch Index", &resource{}).MarshalJSON()
 	if err != nil {
@@ -81,7 +158,7 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 	}
 
 	return &pm.Response_Spec{
-		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ConfigSchemaJson:         endpointSchema,
 		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
 		DocumentationUrl:         "https://go.estuary.dev/materialize-elasticsearch",
 	}, nil
@@ -93,7 +170,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
+	var elasticSearch, err = newElasticsearchClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("creating elasticSearch: %w", err)
 	}
@@ -152,7 +229,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
+	var elasticSearch, err = newElasticsearchClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("creating elasticSearch: %w", err)
 	}
@@ -184,7 +261,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = newElasticSearch(cfg.Endpoint, cfg.Username, cfg.Password)
+	var elasticSearch, err = newElasticsearchClient(cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating elastic search client: %w", err)
 	}
