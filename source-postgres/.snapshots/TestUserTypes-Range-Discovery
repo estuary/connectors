@@ -1,18 +1,18 @@
 Binding 0:
 {
-    "recommended_name": "test.usertypes_enum_terror",
+    "recommended_name": "test.usertypes_range_morsel",
     "resource_config_json": {
       "namespace": "test",
-      "stream": "usertypes_enum_terror"
+      "stream": "usertypes_range_morsel"
     },
     "document_schema_json": {
       "$defs": {
-        "TestUsertypes_enum_terror": {
+        "TestUsertypes_range_morsel": {
           "type": "object",
           "required": [
             "id"
           ],
-          "$anchor": "TestUsertypes_enum_terror",
+          "$anchor": "TestUsertypes_range_morsel",
           "properties": {
             "id": {
               "type": "integer"
@@ -40,7 +40,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#TestUsertypes_enum_terror",
+                  "$ref": "#TestUsertypes_range_morsel",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -101,7 +101,7 @@ Binding 0:
           }
         },
         {
-          "$ref": "#TestUsertypes_enum_terror"
+          "$ref": "#TestUsertypes_range_morsel"
         }
       ]
     },
