@@ -11,11 +11,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfig(t *testing.T) {
+func TestConfigUnmarshalling(t *testing.T) {
+	var input = `{
+		"endpoint": "http://foo.test", 
+		"credentials": {
+			"username": "user",
+			"password": "pass"
+		}
+	}`
+	var out config
+	require.NoError(t, pf.UnmarshalStrict(json.RawMessage([]byte(input)), &out))
+	require.Equal(t, "http://foo.test", out.Endpoint)
+	require.Equal(t, "user", out.Credentials.Username)
+	require.Equal(t, "pass", out.Credentials.Password)
+
+	//
+	input = `{"endpoint": "http://foo.test"}`
+	out = config{}
+	require.NoError(t, pf.UnmarshalStrict(json.RawMessage([]byte(input)), &out))
+	require.Equal(t, "http://foo.test", out.Endpoint)
+}
+
+func TestConfigValidation(t *testing.T) {
 	var validConfig = config{
 		Endpoint: "testEndpoint",
-		Username: "testUsername",
-		Password: "testPassword",
+		Credentials: credentials{
+			Username: "testUsername",
+			Password: "testPassword",
+		},
 	}
 
 	require.NoError(t, validConfig.Validate())
@@ -23,6 +46,11 @@ func TestConfig(t *testing.T) {
 	var missingEndpoint = validConfig
 	missingEndpoint.Endpoint = ""
 	require.Error(t, missingEndpoint.Validate(), "expected validation error")
+
+	var userWithoutPassword = validConfig
+	userWithoutPassword.Credentials.Password = ""
+
+	require.Error(t, userWithoutPassword.Validate(), "expected validation error")
 }
 
 func TestResource(t *testing.T) {

@@ -9,18 +9,46 @@
         "description": "Endpoint host or URL. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
         "order": 0
       },
-      "username": {
-        "type": "string",
-        "title": "Username",
-        "description": "User to connect to the endpoint.",
-        "order": 1
-      },
-      "password": {
-        "type": "string",
-        "title": "Password",
-        "description": "Password to connect to the endpoint.",
-        "order": 2,
-        "secret": true
+      "credentials": {
+        "type": "object",
+        "oneOf": [
+          {
+            "type": "object",
+            "title": "Username and Password",
+            "properties": {
+              "username": {
+                "type": "string",
+                "title": "Username",
+                "description": "Username to use with the elasticsearch API"
+              },
+              "password": {
+                "type": "string",
+                "secret": true,
+                "title": "Password",
+                "description": "Password for the user"
+              }
+            },
+            "required": [
+              "username",
+              "password"
+            ]
+          },
+          {
+            "type": "object",
+            "title": "API Key",
+            "properties": {
+              "apiKey": {
+                "type": "string",
+                "secret": true,
+                "title": "API key",
+                "description": "API key for authenticating with the elasticsearch API"
+              }
+            },
+            "required": [
+              "apiKey"
+            ]
+          }
+        ]
       }
     },
     "type": "object",
