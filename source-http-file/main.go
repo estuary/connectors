@@ -37,20 +37,41 @@ type config struct {
 	Headers     headers        `json:"headers"`
 }
 
-func (c *config) Validate() error {
+func (c *config) parsedURL() (*url.URL, string, error) {
 	if c.URL == "" {
-		return fmt.Errorf("url is required")
+		return nil, "", fmt.Errorf("url is required")
+	}
+
+	var p, err = url.Parse(c.URL)
+	if err != nil {
+		return nil, "", fmt.Errorf("URL is invalid: %w", err)
+	} else if !p.IsAbs() {
+		return nil, "", fmt.Errorf(
+			"URL %q is not valid (it must be a complete URL with an HTTP scheme and domain)", c.URL)
+	}
+
+	var pathPieces = strings.Split(strings.TrimRight(p.Path, "/"), "/")
+	var name = pathPieces[len(pathPieces)-1]
+
+	if name == "" {
+		return p, p.Hostname(), nil
+	}
+	return p, name, nil
+}
+
+func (c *config) Validate() error {
+	if _, _, err := c.parsedURL(); err != nil {
+		return err
 	}
 	return nil
 }
 
 func (c *config) DiscoverRoot() string {
-	var parsedURL, err = url.Parse(c.URL)
+	var _, name, err = c.parsedURL()
 	if err != nil {
-		return c.URL
+		panic(fmt.Sprintf("invalid URL: %s", err))
 	}
-	var pathPieces = strings.Split(parsedURL.Path, "/")
-	return pathPieces[len(pathPieces)-1]
+	return name
 }
 
 func (c *config) FilesAreMonotonic() bool {
@@ -185,7 +206,7 @@ func main() {
 			"url": {
 			"type":        "string",
 			"title":       "HTTP File URL",
-			"description": "A valid HTTP url for downloading the source file."
+			"description": "The HTTP URL of the source file to capture."
 			},
 			"credentials": {
 			"title": "Credentials",
