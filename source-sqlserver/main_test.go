@@ -79,6 +79,10 @@ func sqlserverTestBackend(t *testing.T) *testBackend {
 		Password: *dbCapturePass,
 		Database: *dbName,
 	}
+	// Other connectors use 16 in tests, but going below 128 here
+	// appears to change database backfill row ordering in the
+	// 'DuplicatedScanKey' test.
+	captureConfig.Advanced.BackfillChunkSize = 128
 	if err := captureConfig.Validate(); err != nil {
 		t.Fatalf("error validating capture config: %v", err)
 	}

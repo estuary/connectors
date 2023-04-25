@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+
+# ================================
+# Captures Terminated With Errors
+# ================================
+error updating capture state: stream "test.generic_keylesscapture": primary key must be specified
+

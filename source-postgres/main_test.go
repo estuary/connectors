@@ -73,6 +73,7 @@ func postgresTestBackend(t testing.TB) *testBackend {
 		Password: *dbCapturePass,
 		Database: *dbName,
 	}
+	captureConfig.Advanced.BackfillChunkSize = 16
 	if err := captureConfig.Validate(); err != nil {
 		t.Fatalf("error validating capture config: %v", err)
 	}
@@ -88,12 +89,6 @@ type testBackend struct {
 
 func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 	t.Helper()
-
-	// Within the scope of a single test, adjust some tuning parameters so that it's
-	// easier to exercise backfill chunking and replication buffering behavior.
-	var prevChunkSize = tb.config.Advanced.BackfillChunkSize
-	t.Cleanup(func() { tb.config.Advanced.BackfillChunkSize = prevChunkSize })
-	tb.config.Advanced.BackfillChunkSize = 16
 
 	var prevBufferSize = replicationBufferSize
 	t.Cleanup(func() { replicationBufferSize = prevBufferSize })
