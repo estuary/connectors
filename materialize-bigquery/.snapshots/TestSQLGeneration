@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS projectID.dataset.target_table (
 		person_place_ STRING,
 		source_name STRING,
 		`with-dash` STRING,
-		flow_document STRING NOT NULL
+		flow_document JSON NOT NULL
 )
 CLUSTER BY key1, key2, boolean, integer;
 --- End projectID.dataset.target_table createTargetTable ---

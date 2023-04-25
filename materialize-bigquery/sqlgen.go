@@ -63,7 +63,7 @@ var bqTypeMapper = sql.ProjectionTypeMapper{
 	sql.BOOLEAN: sql.NewStaticMapper("BOOL"),
 	sql.INTEGER: sql.NewStaticMapper("INT64", sql.WithElementConverter(sql.StdStrToInt())),
 	sql.NUMBER:  sql.NewStaticMapper("BIGNUMERIC", sql.WithElementConverter(sql.StdStrToFloat())),
-	sql.OBJECT:  sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
+	sql.OBJECT:  sql.NewStaticMapper("JSON", sql.WithElementConverter(jsonConverter)),
 	sql.STRING: sql.StringTypeMapper{
 		Fallback: sql.NewStaticMapper("STRING"),
 		WithFormat: map[string]sql.TypeMapper{
