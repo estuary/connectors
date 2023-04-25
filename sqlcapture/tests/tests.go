@@ -36,6 +36,8 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 	t.Run("MissingTable", func(t *testing.T) { testMissingTable(ctx, t, tb) })
 	t.Run("StressCorrectness", func(t *testing.T) { testStressCorrectness(ctx, t, tb) })
 	t.Run("DuplicatedScanKey", func(t *testing.T) { testDuplicatedScanKey(ctx, t, tb) })
+	t.Run("KeylessDiscovery", func(t *testing.T) { testKeylessDiscovery(ctx, t, tb) })
+	t.Run("KeylessCapture", func(t *testing.T) { testKeylessCapture(ctx, t, tb) })
 	//t.Run("ComplexDataset", func(t *testing.T) { testComplexDataset(ctx, t, tb) })
 }
 
@@ -430,4 +432,22 @@ func (v *correctnessInvariantsCaptureValidator) Summarize(w io.Writer) error {
 		fmt.Fprintf(w, "%s\n", str)
 	}
 	return nil
+}
+
+func testKeylessDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
+	const uniqueString = "t32386"
+	tb.CreateTable(ctx, t, uniqueString, "(a INTEGER, b TEXT, c REAL NOT NULL, d VARCHAR(255))")
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+}
+
+func testKeylessCapture(ctx context.Context, t *testing.T, tb TestBackend) {
+	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER, data TEXT)")
+	for i := 0; i < 32; i++ {
+		var batch [][]any
+		for j := 0; j < 256; j++ {
+			batch = append(batch, []any{i*1000000 + j, fmt.Sprintf("Batch %d Value %d", i, j)})
+		}
+		tb.Insert(ctx, t, tableName, batch)
+	}
+	VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, tableName))
 }
