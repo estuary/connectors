@@ -2,7 +2,7 @@ version: "3"
 services:
   # Secured Kafka with SCRAM enabled
   kafka:
-    image: 'bitnami/kafka:latest'
+    image: 'bitnami/kafka:3.3'
     container_name: infra-kafka-1
     networks:
       - flow-test
@@ -19,6 +19,8 @@ services:
     depends_on:
       - zookeeper
     environment:
+      - KAFKA_ENABLE_KRAFT=no
+
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_ZOOKEEPER_PROTOCOL=SASL
       - KAFKA_ZOOKEEPER_USER=zoo
@@ -42,14 +44,8 @@ services:
       - KAFKA_CLIENT_USERS=alice,bob
       - KAFKA_CLIENT_PASSWORDS=alice-pass,bob-pass
 
-    healthcheck:
-      test: ["CMD-SHELL", "kafka-topics.sh --zookeeper zookeeper:2181 --list"]
-      interval: 2s
-      timeout: 2s
-      retries: 15
-
   zookeeper:
-    image: 'bitnami/zookeeper:latest'
+    image: 'bitnami/zookeeper:3.7'
     networks:
       - flow-test
     volumes:
