@@ -24,11 +24,6 @@ function kctl() {
   docker run -i --network flow-test --mount "type=bind,src=$kafkactl_config,target=/kafkactl.yaml" deviceinsight/kafkactl --config-file=/kafkactl.yaml $@
 }
 
-if [ -z $(which kafkactl) ]; then
-  echo "kafkactl is required"
-  exit 1
-fi
-
 # Ensure we can connect to a broker.
 for i in $(seq 1 10); do
   if [ -n "$(kctl get topics)" ]; then
@@ -48,7 +43,7 @@ kctl create topic $TEST_STREAM --partitions $TOTAL_PARTITIONS
 
 # Seed the topic with documents
 for i in $(seq 1 $TOTAL_PARTITIONS); do
-  cat $root_dir/tests/files/d.jsonl \
-  | jq -cs "map(select(.id % $TOTAL_PARTITIONS == $i - 1)) | .[]" \
-  | kctl produce $TEST_STREAM
+  cat $root_dir/tests/files/d.jsonl |
+    jq -cs "map(select(.id % $TOTAL_PARTITIONS == $i - 1)) | .[]" |
+    kctl produce $TEST_STREAM
 done

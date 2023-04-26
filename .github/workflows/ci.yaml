@@ -117,17 +117,6 @@ jobs:
           ./fetch-flow.sh
           echo "${PWD}/flow-bin" >> $GITHUB_PATH
 
-      - name: Install kafkactl
-        if: matrix.connector == 'source-kafka'
-        env:
-          version: 1.20.0
-          checksum: ff285ce7eefa956234e65f9ff98160c2c365973ca598187cee81da1377b139d1
-        run: |
-          curl -L -o "kafkactl_${version}_linux_amd64.deb" "https://github.com/deviceinsight/kafkactl/releases/download/v${version}/kafkactl_${version}_linux_amd64.deb" && \
-          echo "$checksum kafkactl_${version}_linux_amd64.deb" | sha256sum --check && \
-          sudo dpkg -i "kafkactl_${version}_linux_amd64.deb" && \
-          rm "kafkactl_${version}_linux_amd64.deb"
-
       - name: Set up Cloud SDK
         if: matrix.connector == 'source-gcs'
         uses: google-github-actions/setup-gcloud@v0
@@ -183,8 +172,7 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: matrix.connector == 'source-kafka'
         run: |
-          docker compose --file infra/docker-compose.yaml up --detach zookeeper
-          docker compose --file infra/docker-compose.yaml up --detach kafka
+          docker compose --file infra/docker-compose.yaml up --detach
 
       - name: Source connector ${{ matrix.connector }} integration tests
         if: |
