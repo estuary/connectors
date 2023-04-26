@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test.altertable_addcolumnbasic_aaa": 2 Documents
+# Collection "acmeCo/test/test_altertable_addcolumnbasic_aaa": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_aaa"}},"data":"kkk","extra_end":"extra_end_9","extra_start":"extra_start_9","id":9}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_aaa"}},"data":"lll","extra_end":"extra_end_10","extra_start":"extra_start_10","id":10}

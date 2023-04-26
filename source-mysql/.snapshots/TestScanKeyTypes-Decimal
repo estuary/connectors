@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 2","k":"-1.100"}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "IUAOZmZmZmZl"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 1","k":"-1.000"}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "IUAP////////"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 0","k":"-0.900"}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "IUATMzMzMzMy"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 3","k":"0.000"}
 # ================================
@@ -54,7 +54,7 @@
 ### Capture from Key "IYAAAAAAAAAA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 4","k":"0.900"}
 # ================================
@@ -67,7 +67,7 @@
 ### Capture from Key "Ib/szMzMzMzN"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 5","k":"1.000"}
 # ================================
@@ -80,7 +80,7 @@
 ### Capture from Key "Ib/wAAAAAAAA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 6","k":"1.111"}
 # ================================
@@ -93,7 +93,7 @@
 ### Capture from Key "Ib/xxqfvnbIt"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 7","k":"1.222"}
 # ================================
@@ -106,7 +106,7 @@
 ### Capture from Key "Ib/zjU/fO2Ra"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 8","k":"1.333"}
 # ================================
@@ -119,7 +119,7 @@
 ### Capture from Key "Ib/1U/fO2RaH"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 9","k":"1.444"}
 # ================================
@@ -132,7 +132,7 @@
 ### Capture from Key "Ib/3Gp++dsi0"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 10","k":"1.555"}
 # ================================
@@ -145,7 +145,7 @@
 ### Capture from Key "Ib/44UeuFHrh"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 11","k":"1.666"}
 # ================================
@@ -158,7 +158,7 @@
 ### Capture from Key "Ib/6p++dsi0O"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 12","k":"1.777"}
 # ================================
@@ -171,7 +171,7 @@
 ### Capture from Key "Ib/8bpeNT987"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 13","k":"1.888"}
 # ================================
@@ -184,7 +184,7 @@
 ### Capture from Key "Ib/+NT987ZFo"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 14","k":"1.999"}
 # ================================
@@ -197,7 +197,7 @@
 ### Capture from Key "Ib//++dsi0OW"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_decimal": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_decimal": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Decimal"}},"data":"Data 15","k":"2.000"}
 # ================================

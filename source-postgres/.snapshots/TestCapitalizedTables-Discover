@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test.users",
+    "recommended_name": "test_users",
     "resource_config_json": {
       "namespace": "test",
       "stream": "USERS"

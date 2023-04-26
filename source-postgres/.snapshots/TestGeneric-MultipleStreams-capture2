@@ -1,11 +1,11 @@
 # ================================
-# Collection "acmeCo/test/test.generic_multiplestreams_three": 3 Documents
+# Collection "acmeCo/test/test_generic_multiplestreams_three": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_three","loc":[11111111,11111111,11111111]}},"data":"eight","id":8}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_three","loc":[11111111,11111111,11111111]}},"data":"seven","id":7}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_three","loc":[11111111,11111111,11111111]}},"data":"six","id":6}
 # ================================
-# Collection "acmeCo/test/test.generic_multiplestreams_two": 3 Documents
+# Collection "acmeCo/test/test_generic_multiplestreams_two": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_two","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_two","loc":[11111111,11111111,11111111]}},"data":"four","id":4}

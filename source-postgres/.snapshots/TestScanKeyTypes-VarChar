@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":""}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "AgA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":"   "}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "AiAgIAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 5","key":"A"}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "AkEA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 6","key":"B"}
 # ================================
@@ -54,7 +54,7 @@
 ### Capture from Key "AkIA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 7","key":"C"}
 # ================================
@@ -67,7 +67,7 @@
 ### Capture from Key "AkMA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 8","key":"_a"}
 # ================================
@@ -80,7 +80,7 @@
 ### Capture from Key "Al9hAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 9","key":"_b"}
 # ================================
@@ -93,7 +93,7 @@
 ### Capture from Key "Al9iAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 10","key":"_c"}
 # ================================
@@ -106,7 +106,7 @@
 ### Capture from Key "Al9jAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":"a"}
 # ================================
@@ -119,7 +119,7 @@
 ### Capture from Key "AmEA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":"b"}
 # ================================
@@ -132,7 +132,7 @@
 ### Capture from Key "AmIA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.scankeytypes_varchar": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_varchar": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_varchar","loc":[11111111,11111111,11111111]}},"data":"Data 4","key":"c"}
 # ================================

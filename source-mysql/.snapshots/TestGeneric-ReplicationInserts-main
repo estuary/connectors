@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test.generic_replicationinserts": 3 Documents
+# Collection "acmeCo/test/test_generic_replicationinserts": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationInserts"}},"data":"more","id":1000}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationInserts"}},"data":"rows","id":1001}

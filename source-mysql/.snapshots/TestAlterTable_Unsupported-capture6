@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test.altertable_unsupported_ccc": 2 Documents
+# Collection "acmeCo/test/test_altertable_unsupported_ccc": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_Unsupported_ccc"}},"data":0,"id":6}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_Unsupported_ccc"}},"data":1,"id":5}

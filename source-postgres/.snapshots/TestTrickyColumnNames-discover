@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test.trickycolumnnames_fizzed_cupcake_a",
+    "recommended_name": "test_trickycolumnnames_fizzed_cupcake_a",
     "resource_config_json": {
       "namespace": "test",
       "stream": "trickycolumnnames_fizzed_cupcake_a"
@@ -111,7 +111,7 @@ Binding 0:
   }
 Binding 1:
 {
-    "recommended_name": "test.trickycolumnnames_fizzed_cupcake_b",
+    "recommended_name": "test_trickycolumnnames_fizzed_cupcake_b",
     "resource_config_json": {
       "namespace": "test",
       "stream": "trickycolumnnames_fizzed_cupcake_b"

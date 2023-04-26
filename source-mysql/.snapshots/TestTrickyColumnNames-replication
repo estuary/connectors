@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/test.trickycolumnnames_fizzed_cupcake_a": 2 Documents
+# Collection "acmeCo/test/test_trickycolumnnames_fizzed_cupcake_a": 2 Documents
 # ================================
 {"Meta/`wtf`~ID":5,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"TrickyColumnNames_fizzed_cupcake_a"}},"data":"eee"}
 {"Meta/`wtf`~ID":6,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"TrickyColumnNames_fizzed_cupcake_a"}},"data":"fff"}
 # ================================
-# Collection "acmeCo/test/test.trickycolumnnames_fizzed_cupcake_b": 2 Documents
+# Collection "acmeCo/test/test_trickycolumnnames_fizzed_cupcake_b": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"TrickyColumnNames_fizzed_cupcake_b"}},"data":"ggg","table":7}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"TrickyColumnNames_fizzed_cupcake_b"}},"data":"hhh","table":8}

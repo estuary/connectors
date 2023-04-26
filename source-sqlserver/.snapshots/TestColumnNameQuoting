@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo.test_columnnamequoting": 3 Documents
+# Collection "acmeCo/test/test_columnnamequoting": 3 Documents
 # ================================
 {"CAPITALIZED":0,"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ColumnNameQuoting"}},"data":0,"id":0,"type":0,"unique":0}
 {"CAPITALIZED":1,"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ColumnNameQuoting"}},"data":1,"id":1,"type":1,"unique":1}

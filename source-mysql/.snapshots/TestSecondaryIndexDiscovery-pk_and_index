@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test.secondaryindexdiscovery_pk_and_index_g14228",
+    "recommended_name": "test_secondaryindexdiscovery_pk_and_index_g14228",
     "resource_config_json": {
       "namespace": "test",
       "stream": "SecondaryIndexDiscovery_pk_and_index_g14228"

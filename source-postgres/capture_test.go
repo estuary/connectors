@@ -133,7 +133,7 @@ func TestViewDiscovery(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, grp INTEGER, data TEXT)")
 
-	var view = tableName + "_view"
+	var view = tableName + "_simpleview"
 	tb.Query(ctx, t, fmt.Sprintf(`CREATE VIEW %s AS SELECT id, data FROM %s WHERE grp = 1;`, view, tableName))
 	t.Cleanup(func() {
 		logrus.WithField("view", view).Debug("dropping view")
@@ -150,7 +150,7 @@ func TestViewDiscovery(t *testing.T) {
 	var bindings = tb.CaptureSpec(ctx, t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(strings.TrimPrefix(tableName, "test."))))
 	for _, binding := range bindings {
 		logrus.WithField("name", binding.RecommendedName).Debug("discovered stream")
-		if strings.Contains(string(binding.RecommendedName), "_view") {
+		if strings.Contains(string(binding.RecommendedName), "_simpleview") {
 			t.Errorf("view returned by catalog discovery")
 		}
 		if strings.Contains(string(binding.RecommendedName), "_matview") {
