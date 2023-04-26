@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test.usertypes_enum_terror",
+    "recommended_name": "test_usertypes_enum_terror",
     "resource_config_json": {
       "namespace": "test",
       "stream": "usertypes_enum_terror"

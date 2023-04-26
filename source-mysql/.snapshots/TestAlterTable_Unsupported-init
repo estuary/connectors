@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test.altertable_unsupported_aaa": 2 Documents
+# Collection "acmeCo/test/test_altertable_unsupported_aaa": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_Unsupported_aaa"}},"data":"abc","id":1}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_Unsupported_aaa"}},"data":"def","id":2}

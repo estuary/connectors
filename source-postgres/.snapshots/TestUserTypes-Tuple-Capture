@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test.usertypes_tuple_byways": 2 Documents
+# Collection "acmeCo/test/test_usertypes_tuple_byways": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"usertypes_tuple_byways","loc":[11111111,11111111,11111111]}},"id":1,"value":"(1234,5678,\" 'hello'\")"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"usertypes_tuple_byways","loc":[11111111,11111111,11111111]}},"id":2,"value":"(3456,9876,\" 'world'\")"}

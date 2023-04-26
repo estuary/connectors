@@ -165,7 +165,15 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
 
 func recommendedCatalogName(schema, table string) string {
-	return catalogNameSanitizerRe.ReplaceAllString(JoinStreamID(schema, table), "_")
+	var catalogName string
+	// Omit 'default schema' names for Postgres and SQL Server. There is
+	// no default schema for MySQL databases.
+	if schema == "public" || schema == "dbo" {
+		catalogName = table
+	} else {
+		catalogName = schema + "_" + table
+	}
+	return catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(catalogName), "_")
 }
 
 // primaryKeyToCollectionKey converts a database primary key column name into a Flow collection key

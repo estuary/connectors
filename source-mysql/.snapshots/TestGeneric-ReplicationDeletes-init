@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test.generic_replicationdeletes": 5 Documents
+# Collection "acmeCo/test/test_generic_replicationdeletes": 5 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes"}},"data":"5","id":4}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes"}},"data":"A","id":0}

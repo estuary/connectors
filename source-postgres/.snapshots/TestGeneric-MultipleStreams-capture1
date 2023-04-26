@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test.generic_multiplestreams_one": 3 Documents
+# Collection "acmeCo/test/test_generic_multiplestreams_one": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_one","loc":[11111111,11111111,11111111]}},"data":"one","id":1}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_one","loc":[11111111,11111111,11111111]}},"data":"two","id":2}

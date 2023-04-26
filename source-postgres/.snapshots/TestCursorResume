@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":-1,"data":"kvxr","epoch":""}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "AgAT/g=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":0,"data":"xakg","epoch":""}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "AgAU"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":3,"data":"gboj","epoch":"   "}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "AiAgIAAVAw=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":1,"data":"bvzf","epoch":"aaa"}
 # ================================
@@ -54,7 +54,7 @@
 ### Capture from Key "AmFhYQAVAQ=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":2,"data":"ukwh","epoch":"aaa"}
 # ================================
@@ -67,7 +67,7 @@
 ### Capture from Key "AmFhYQAVAg=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":3,"data":"lntg","epoch":"aaa"}
 # ================================
@@ -80,7 +80,7 @@
 ### Capture from Key "AmFhYQAVAw=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":-100,"data":"bycz","epoch":"bbb"}
 # ================================
@@ -93,7 +93,7 @@
 ### Capture from Key "AmJiYgATmw=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":2,"data":"ajgp","epoch":"bbb"}
 # ================================
@@ -106,7 +106,7 @@
 ### Capture from Key "AmJiYgAVAg=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":333,"data":"zljj","epoch":"bbb"}
 # ================================
@@ -119,7 +119,7 @@
 ### Capture from Key "AmJiYgAWAU0="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":4096,"data":"lhnw","epoch":"bbb"}
 # ================================
@@ -132,7 +132,7 @@
 ### Capture from Key "AmJiYgAWEAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":800000,"data":"iask","epoch":"bbb"}
 # ================================
@@ -145,7 +145,7 @@
 ### Capture from Key "AmJiYgAXDDUA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":1234,"data":"bikh","epoch":"ccc"}
 # ================================
@@ -158,7 +158,7 @@
 ### Capture from Key "AmNjYwAWBNI="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":-10000,"data":"dhqc","epoch":"ddd"}
 # ================================
@@ -171,7 +171,7 @@
 ### Capture from Key "AmRkZAAS2O8="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":1,"data":"djsf","epoch":"x"}
 # ================================
@@ -184,7 +184,7 @@
 ### Capture from Key "AngAFQE="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":1,"data":"iwnx","epoch":"y"}
 # ================================
@@ -197,7 +197,7 @@
 ### Capture from Key "AnkAFQE="
 ####################################
 # ================================
-# Collection "acmeCo/test/test.cursorresume": 1 Documents
+# Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"cursorresume","loc":[11111111,11111111,11111111]}},"count":1,"data":"qmjp","epoch":"z"}
 # ================================

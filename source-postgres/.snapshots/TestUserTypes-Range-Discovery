@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test.usertypes_range_morsel",
+    "recommended_name": "test_usertypes_range_morsel",
     "resource_config_json": {
       "namespace": "test",
       "stream": "usertypes_range_morsel"
