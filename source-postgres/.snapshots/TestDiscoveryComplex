@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test.discoverycomplex_cheap_oxygenation",
+    "recommended_name": "test_discoverycomplex_cheap_oxygenation",
     "resource_config_json": {
       "namespace": "test",
       "stream": "discoverycomplex_cheap_oxygenation"

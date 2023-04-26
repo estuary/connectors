@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo.test_prerequisites_aaa": 2 Documents
+# Collection "acmeCo/test/test_prerequisites_aaa": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Prerequisites_aaa"}},"data":"hello","id":0}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Prerequisites_aaa"}},"data":"world","id":1}

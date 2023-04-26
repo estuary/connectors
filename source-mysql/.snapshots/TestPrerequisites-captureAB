@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test.prerequisites_aaa": 2 Documents
+# Collection "acmeCo/test/test_prerequisites_aaa": 2 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Prerequisites_aaa"}},"data":"hello","id":0}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Prerequisites_aaa"}},"data":"world","id":1}

@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "dbo.test_secondaryindexdiscovery_pk_and_index_g14228",
+    "recommended_name": "test_secondaryindexdiscovery_pk_and_index_g14228",
     "resource_config_json": {
       "namespace": "dbo",
       "stream": "test_SecondaryIndexDiscovery_pk_and_index_g14228"

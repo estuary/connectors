@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo.test_generic_replicationupdates": 5 Documents
+# Collection "acmeCo/test/test_generic_replicationupdates": 5 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_replicationupdates","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"more","id":1000}
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_replicationupdates","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"rows","id":1001}
