@@ -339,6 +339,7 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 				Location: [3]pglogrepl.LSN{s.lastTxnEndLSN, lsn, 0},
 			},
 		}
+		logrus.WithField("lsn", s.lastTxnEndLSN).Debug("commit event")
 		return event, nil
 	case *pglogrepl.TruncateMessage:
 		for _, relID := range msg.RelationIDs {
@@ -603,6 +604,7 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 // advance the "Restart LSN" to the same point, but so long as you ignore the details
 // things will work out in the end.
 func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
+	logrus.WithField("cursor", cursor).Debug("advancing acknowledged LSN")
 	var lsn, err = pglogrepl.ParseLSN(cursor)
 	if err != nil {
 		return fmt.Errorf("error parsing acknowledge cursor: %w", err)
