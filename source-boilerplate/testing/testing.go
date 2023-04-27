@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -159,7 +160,6 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 
 	var adapter = &pullAdapter{
 		ctx:        ctx,
-		openReq:    open,
 		checkpoint: cs.Checkpoint,
 		bindings:   cs.Bindings,
 		validator:  cs.Validator,
@@ -220,22 +220,31 @@ func (cs *CaptureSpec) Summary() string {
 
 type pullAdapter struct {
 	ctx         context.Context
-	openReq     *pc.Request
 	checkpoint  []byte
 	bindings    []*flow.CaptureSpec_Binding
 	validator   CaptureValidator
 	callback    func(data json.RawMessage)
 	sanitizers  map[string]*regexp.Regexp
 	transaction []*pc.Response_Captured
+
+	// pendingCheckpoints is a counter of checkpoints emitted by the capture,
+	// used to produce valid Acknowledge messages upon request.
+	pendingCheckpoints atomic.Int64
 }
 
 func (a *pullAdapter) Recv() (*pc.Request, error) {
-	if msg := a.openReq; msg != nil {
-		a.openReq = nil
-		return msg, nil
+	// Since Recv() is blocking it must either be running in a separate thread
+	// from the one Send()ing checkpoints, or it must be called at a time when
+	// there are already pending checkpoints.
+	for {
+		var count = a.pendingCheckpoints.Load()
+		if count > 0 && a.pendingCheckpoints.CompareAndSwap(count, 0) {
+			return &pc.Request{Acknowledge: &pc.Request_Acknowledge{
+				Checkpoints: uint32(count),
+			}}, nil
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	time.Sleep(10 * time.Millisecond)
-	return &pc.Request{Acknowledge: &pc.Request_Acknowledge{}}, nil
 }
 
 func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {
@@ -269,6 +278,7 @@ func (a *pullAdapter) Send(m *pc.Response) error {
 				}).Log(logLevel, "checkpoint")
 			}
 		}
+		a.pendingCheckpoints.Add(1)
 
 		for _, doc := range a.transaction {
 			var binding string

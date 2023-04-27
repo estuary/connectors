@@ -76,7 +76,7 @@ func TestToastColumns(t *testing.T) {
 }
 
 // TestSlotLSNAdvances checks that the `restart_lsn` of a replication slot
-// eventually advances in response to connector restarts.
+// advances during normal connector operation.
 func TestSlotLSNAdvances(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
@@ -89,44 +89,51 @@ func TestSlotLSNAdvances(t *testing.T) {
 	var lsnQuery = `SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = $1;`
 	var slotName = tb.config.Advanced.SlotName
 
-	// Capture the current `restart_lsn` of the replication slot prior to our test
-	var beforeLSN pglogrepl.LSN
-	if err := tb.control.QueryRow(ctx, lsnQuery, slotName).Scan(&beforeLSN); err != nil {
+	// Start a "traffic generator" which will generate 2 QPS of inserts
+	var trafficCtx, cancelTraffic = context.WithCancel(ctx)
+	defer cancelTraffic()
+	go func(ctx context.Context) {
+		for i := 0; ctx.Err() == nil; i++ {
+			tb.Insert(ctx, t, tableName, [][]any{{i, fmt.Sprintf("Row %d", i)}})
+			time.Sleep(500 * time.Millisecond)
+		}
+	}(trafficCtx)
+	time.Sleep(1 * time.Second)
+
+	// Start the capture running in a separate thread as well
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+	defer cancelCapture()
+	go cs.Capture(captureCtx, t, nil)
+	time.Sleep(1 * time.Second)
+
+	// Capture the current `restart_lsn` of the replication slot. At this point any
+	// startup-related behavior should have stabilized, so if the slot LSN changes
+	// again this will demonstrate that we're advancing it reliably.
+	var initialLSN pglogrepl.LSN
+	if err := tb.control.QueryRow(ctx, lsnQuery, slotName).Scan(&initialLSN); err != nil {
 		logrus.WithFields(logrus.Fields{"slot": slotName, "err": err}).Error("failed to query restart_lsn")
 	}
 
-	// Insert some data, get the initial table scan out of the way, and wait long enough
-	// that the database must have written a new snapshot.
-	//
-	// PostgreSQL `BackgroundWriterMain()` will trigger `LogStandbySnapshot()` whenever
-	// "important records" have been inserted in the WAL and >15s have elapsed since
-	// the last such snapshot. We need this to happen because these snapshots include
-	// an `XLOG_RUNNING_XACTS` record, which is the trigger for the mechanism allowing
-	// a replication slot's `restart_lsn` to advance in response to StandbyStatusUpdate
-	// messages.
-	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
-	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-	logrus.Info("waiting so a standby snapshot can occur")
-	time.Sleep(20 * time.Second)
-
-	// Perform a capture and then check if `restart_lsn` has advanced. If not,
-	// keep trying until it does or the retry count is hit.
-	const retryCount = 50
-	for iter := 0; iter < retryCount; iter++ {
-		t.Run("captureN", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-
-		var afterLSN pglogrepl.LSN
-		if err := tb.control.QueryRow(ctx, lsnQuery, slotName).Scan(&afterLSN); err != nil {
+	// Periodically check whether the slot's `restart_lsn` has updated. Since we're
+	// sending 'Standby Status Update' messages every 10 seconds we'll check every
+	// 2s but give it up to a minute to succeed (note that this is worst-case time,
+	// the test will end as soon as the LSN advances -- typically after 12-22s)
+	const (
+		passDeadline = 60 * time.Second
+		pollInterval = 2 * time.Second
+	)
+	for i := 0; i < int(passDeadline/pollInterval); i++ {
+		var currentLSN pglogrepl.LSN
+		if err := tb.control.QueryRow(ctx, lsnQuery, slotName).Scan(&currentLSN); err != nil {
 			logrus.WithFields(logrus.Fields{"slot": slotName, "err": err}).Error("failed to query restart_lsn")
 		}
-		logrus.WithFields(logrus.Fields{"iter": iter, "before": beforeLSN, "after": afterLSN}).Debug("checking slot LSN")
-		if afterLSN > beforeLSN {
+		logrus.WithFields(logrus.Fields{"initial": initialLSN, "current": currentLSN}).Info("checking slot LSN")
+		if currentLSN > initialLSN {
 			return
 		}
-
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(pollInterval)
 	}
-	t.Errorf("slot %q restart LSN failed to advance after %d retries", slotName, retryCount)
+	t.Errorf("slot %q restart LSN failed to advance after %s", slotName, passDeadline.String())
 }
 
 func TestViewDiscovery(t *testing.T) {

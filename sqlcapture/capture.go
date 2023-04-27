@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
@@ -88,6 +90,14 @@ type Capture struct {
 
 	emitQueue chan interface{} // A large buffered channel containing messages to be serialized and emitted
 	emitError chan error       // A unit-buffered channel which contains the emitter goroutine's exit status after it terminates
+
+	// A mutex-guarded list of checkpoint cursor values. Values are appended by the
+	// emitter goroutine whenever it outputs a checkpoint and removed whenever the
+	// acknowledgement-relaying goroutine receives an Acknowledge message.
+	pending struct {
+		sync.Mutex
+		cursors []string
+	}
 }
 
 const (
@@ -118,8 +128,8 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	// Notify Flow that we're starting.
-	if err := c.Output.Ready(); err != nil {
+	// Notify Flow that we're ready and would like to receive acknowledgements.
+	if err := c.Output.Ready(true); err != nil {
 		return err
 	}
 
@@ -161,6 +171,14 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	defer func() {
 		if streamErr := replStream.Close(ctx); streamErr != nil {
 			err = streamErr
+		}
+	}()
+
+	// Start a goroutine which will read acknowledgement messages from stdin
+	// and relay them to the replication stream acknowledgement.
+	go func() {
+		if err := c.acknowledgeWorker(ctx, c.Output, replStream); err != nil {
+			logrus.WithField("err", err).Fatal("error relaying acknowledgements from stdin")
 		}
 	}()
 
@@ -617,6 +635,10 @@ func (c *Capture) emitMessage(out *boilerplate.PullOutput, msg interface{}) erro
 		}
 		return out.Documents(int(binding.Index), bs)
 	case *PersistentState:
+		c.pending.Lock()
+		defer c.pending.Unlock()
+		c.pending.cursors = append(c.pending.cursors, msg.Cursor)
+
 		var bs, err = json.Marshal(msg)
 		if err != nil {
 			return fmt.Errorf("error serializing state checkpoint: %w", err)
@@ -626,6 +648,45 @@ func (c *Capture) emitMessage(out *boilerplate.PullOutput, msg interface{}) erro
 	default:
 		return fmt.Errorf("invalid message to emit: %#v", msg)
 	}
+}
+
+func (c *Capture) acknowledgeWorker(ctx context.Context, stream *boilerplate.PullOutput, replStream ReplicationStream) error {
+	for {
+		var request, err = stream.Recv()
+		if err == io.EOF {
+			return nil
+		} else if err != nil {
+			return err
+		} else if err = request.Validate_(); err != nil {
+			return fmt.Errorf("validating request: %w", err)
+		}
+
+		switch {
+		case request.Acknowledge != nil:
+			if err := c.handleAcknowledgement(ctx, int(request.Acknowledge.Checkpoints), replStream); err != nil {
+				return fmt.Errorf("error handling acknowledgement: %w", err)
+			}
+		default:
+			return fmt.Errorf("unexpected message %#v", request)
+		}
+	}
+}
+
+func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStream ReplicationStream) error {
+	c.pending.Lock()
+	defer c.pending.Unlock()
+	if count == 0 {
+		return nil // Zero count isn't permitted in the protocol, but has a sensible meaning of 'ignore it' so let's do that
+	}
+	if count > len(c.pending.cursors) {
+		return fmt.Errorf("invalid acknowledgement count %d, only %d pending checkpoints", count, len(c.pending.cursors))
+	}
+
+	var cursor = c.pending.cursors[count-1]
+	c.pending.cursors = c.pending.cursors[count:]
+	logrus.WithField("cursor", cursor).Trace("acknowledged up to cursor")
+	replStream.Acknowledge(ctx, cursor)
+	return nil
 }
 
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".

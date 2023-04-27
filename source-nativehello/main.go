@@ -158,7 +158,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 }
 
 func (c *capture) Run() error {
-	if err := c.Stream.Ready(); err != nil {
+	if err := c.Stream.Ready(false); err != nil {
 		return err
 	}
 

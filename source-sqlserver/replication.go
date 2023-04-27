@@ -163,7 +163,7 @@ func (rs *sqlserverReplicationStream) Events() <-chan sqlcapture.DatabaseEvent {
 }
 
 func (rs *sqlserverReplicationStream) Acknowledge(ctx context.Context, cursor string) error {
-	panic("NOT YET IMPLEMENTED: Acknowledge")
+	return nil // Nothing to do here, SQL Server CDC retention is primarily time-based
 }
 
 func (rs *sqlserverReplicationStream) Close(ctx context.Context) error {

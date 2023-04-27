@@ -56,7 +56,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	if err := c.Output.Ready(); err != nil {
+	if err := c.Output.Ready(false); err != nil {
 		return err
 	}
 
