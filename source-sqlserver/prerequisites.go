@@ -13,6 +13,13 @@ import (
 func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 	var errs []error
 
+	if err := db.prerequisiteVersion(ctx); err != nil {
+		// Return early if the database version is incompatible with the connector since additional
+		// errors will be of minimal use.
+		errs = append(errs, err)
+		return errs
+	}
+
 	for _, prereq := range []func(ctx context.Context) error{
 		db.prerequisiteCDCEnabled,
 		db.prerequisiteWatermarksTable,
@@ -24,6 +31,58 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 		}
 	}
 	return errs
+}
+
+// Per https://learn.microsoft.com/en-us/sql/t-sql/functions/version-transact-sql-configuration-functions,
+// the product version reported by @@VERSION is incorrect for Azure SQL Database, Azure SQL Managed
+// Instance and Azure Synapse Analytics. These are managed services and are always up-to-date, so we
+// will not bother checking them. They have EngineEdition's of '5' for Azure SQL Database, '8' for
+// Azure SQL Managed Instance, and '6' or '11' for Azure Synapse.
+var managedEditions = map[int]bool{
+	5:  true,
+	6:  true,
+	8:  true,
+	11: true,
+}
+
+func (db *sqlserverDatabase) prerequisiteVersion(ctx context.Context) error {
+	var engineEdition int
+	var version string
+
+	if err := db.conn.QueryRowContext(ctx, `SELECT SERVERPROPERTY('EngineEdition');`).Scan(&engineEdition); err != nil {
+		log.Warn(fmt.Errorf("unable to query 'EngineEdition' server property: %w", err))
+	} else if managedEditions[engineEdition] {
+		log.WithFields(log.Fields{
+			"engineEdition": engineEdition,
+		}).Info("skipping database version check for Azure managed database")
+		return nil
+	} else if err := db.conn.QueryRowContext(ctx, `SELECT SERVERPROPERTY('productversion');`).Scan(&version); err != nil {
+		log.Warn(fmt.Errorf("unable to query 'productversion' server property: %w", err))
+	} else if len(version) == 0 {
+		log.Warn("'productversion' server property query result was empty")
+	} else if major, minor, err := sqlcapture.ParseVersion(version); err != nil {
+		log.Warn(fmt.Errorf("unable to parse server version from '%s': %w", version, err))
+	} else if !sqlcapture.ValidVersion(major, minor, 14, 0) {
+		// Return an error only if the actual version could be definitively determined to be less
+		// than required.
+		return fmt.Errorf(
+			"minimum supported SQL Server version is 14.0 (SQL Server 2017): attempted to capture from database version %d.%d",
+			major,
+			minor,
+		)
+	} else {
+		log.WithFields(log.Fields{
+			"version": version,
+			"major":   major,
+			"minor":   minor,
+		}).Info("queried database version")
+		return nil
+	}
+
+	// Catch-all trailing log message for cases where the server version could not be determined.
+	log.Warn("attempting to capture from unknown database version: minimum supported SQL Server version is 14.0 (SQL Server 2017)")
+
+	return nil
 }
 
 func (db *sqlserverDatabase) prerequisiteCDCEnabled(ctx context.Context) error {
