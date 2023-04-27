@@ -16,6 +16,13 @@ import (
 func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 	var errs []error
 
+	if err := db.prerequisiteVersion(ctx); err != nil {
+		// Return early if the database version is incompatible with the connector since additional
+		// errors will be of minimal use.
+		errs = append(errs, err)
+		return errs
+	}
+
 	for _, prereq := range []func(ctx context.Context) error{
 		db.prerequisiteBinlogFormat,
 		db.prerequisiteBinlogExpiry,
@@ -27,6 +34,62 @@ func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 		}
 	}
 	return errs
+}
+
+func (db *mysqlDatabase) prerequisiteVersion(ctx context.Context) error {
+	// This connector works for both MySQL and MariaDB. If the queried version indicates that we're
+	// connecting to a MariaDB instance, the version requirements will be set accordingly further
+	// down.
+	database := "MySQL"
+	// TODO(whb): MySQL 5.7 current does not appear to work with our connector, see
+	// https://github.com/estuary/connectors/issues/682.
+	minMajor := 8
+	minMinor := 0
+
+	var version string
+	results, err := db.conn.Execute(`SELECT @@GLOBAL.version;`)
+	if err != nil {
+		logrus.Warn(fmt.Errorf("unable to query 'version' system variable: %w", err))
+	} else if len(results.Values) != 1 || len(results.Values[0]) != 1 {
+		logrus.Warn(fmt.Errorf("unable to query 'version' system variable: malformed response"))
+	} else {
+		version = string(results.Values[0][0].AsString())
+		// This check may not be perfect, but it should be conservative: Since MariaDB has a higher
+		// minimum version requirement, only increase the version requirements corresponding to
+		// MariaDB if we can conclusively prove that this is a MariaDB instance.
+		if strings.Contains(strings.ToLower(version), "mariadb") {
+			database = "MariaDB"
+			minMajor = 10
+			minMinor = 3
+		}
+
+		if major, minor, err := sqlcapture.ParseVersion(version); err != nil {
+			logrus.Warn(fmt.Errorf("unable to parse server version from '%s': %w", version, err))
+		} else if !sqlcapture.ValidVersion(major, minor, minMajor, minMinor) {
+			// Return an error only if the actual version could be definitively determined to be
+			// less than required.
+			return fmt.Errorf(
+				"minimum supported %s version is %d.%d: attempted to capture from database version %d.%d",
+				database,
+				minMajor,
+				minMinor,
+				major,
+				minor,
+			)
+		} else {
+			logrus.WithFields(logrus.Fields{
+				"version": version,
+				"major":   major,
+				"minor":   minor,
+			}).Info("queried database version")
+			return nil
+		}
+	}
+
+	// Catch-all trailing log message for cases where the server version could not be determined.
+	logrus.Warn(fmt.Sprintf("attempting to capture from unknown database version: minimum supported %s version is %d.%d", database, minMajor, minMinor))
+
+	return nil
 }
 
 func (db *mysqlDatabase) prerequisiteBinlogFormat(ctx context.Context) error {
