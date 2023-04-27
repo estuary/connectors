@@ -284,7 +284,7 @@ func (c *capture) Run(ctx context.Context) error {
 	ctx = metadata.AppendToOutgoingContext(ctx, "google-cloud-resource-prefix", c.Config.DatabasePath)
 
 	// Notify Flow that we're starting.
-	if err := c.Output.Ready(); err != nil {
+	if err := c.Output.Ready(false); err != nil {
 		return err
 	}
 

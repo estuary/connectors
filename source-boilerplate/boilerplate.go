@@ -147,11 +147,15 @@ type PullOutput struct {
 }
 
 // Ready sends a PullResponse_Opened message to indicate that the capture has started.
-func (out *PullOutput) Ready() error {
+func (out *PullOutput) Ready(explicitAcknowledgements bool) error {
 	log.Debug("sending PullResponse.Opened")
 	out.Lock()
 	defer out.Unlock()
-	if err := out.Send(&pc.Response{Opened: &pc.Response_Opened{}}); err != nil {
+	if err := out.Send(&pc.Response{
+		Opened: &pc.Response_Opened{
+			ExplicitAcknowledgements: explicitAcknowledgements,
+		},
+	}); err != nil {
 		return fmt.Errorf("error sending PullResponse.Opened: %w", err)
 	}
 	return nil

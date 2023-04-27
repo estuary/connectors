@@ -200,7 +200,7 @@ func (connector) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	var bindings = open.Capture.Bindings
 
 	// Notify Flow that we're starting.
-	if err := stream.Ready(); err != nil {
+	if err := stream.Ready(false); err != nil {
 		return err
 	}
 	for {

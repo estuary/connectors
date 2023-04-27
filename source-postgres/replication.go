@@ -586,20 +586,11 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 	return nil
 }
 
-// AcknowledgeLSN informs the ReplicationStream that all messages up to the specified
+// Acknowledge informs the ReplicationStream that all messages up to the specified
 // LSN [1] have been persisted, and that a future restart will never need to return
 // to older portions of the transaction log. This fact will be communicated to the
 // database in a periodic status update, whereupon the replication slot's "Restart
 // LSN" may be advanced accordingly.
-//
-// TODO(wgd): At present this function is never called. That's because there is no
-// way for Flow to tell us that our output has been durably committed downstream,
-// and no reliable heuristic we could use either. For now the committed LSN only
-// "advances" by being set at startup. Due to how connector restarts work this
-// will actually kind of work, but at the cost of retaining more WAL data than
-// we actually need (until the connector restarts), and causing a "hiccup" of
-// replication latency when the restarted connector makes PostgreSQL go back
-// through all that extra buffered data before reaching new changes.
 //
 // [1] The handling of LSNs and replication slot advancement is complicated, but
 // luckily most of the complexity is handled within PostgreSQL. Just be aware that

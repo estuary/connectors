@@ -83,7 +83,7 @@ type capture struct {
 
 func (c *capture) Run() error {
 	// Notify Flow that we're starting.
-	if err := c.stream.Ready(); err != nil {
+	if err := c.stream.Ready(false); err != nil {
 		return err
 	}
 
