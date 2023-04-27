@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -197,4 +198,35 @@ func collectionKeyToPrimaryKey(ptr string) string {
 	ptr = strings.ReplaceAll(ptr, "~1", "/")
 	ptr = strings.ReplaceAll(ptr, "~0", "~")
 	return ptr
+}
+
+var versionRe = regexp.MustCompile(`(?i)^v?(\d+)\.(\d+)`)
+
+// ParseVersion attempts to parse the major and minor version from a database version string. The
+// version string can be optionally prefixed with a "v" which must be followed by one or more digits
+// for the major version, a period, and one or more digits for the minor version. Characters
+// following the minor version digit(s) are allowed but have no impact on the parsed result.
+func ParseVersion(versionStr string) (major, minor int, err error) {
+	if matches := versionRe.FindAllStringSubmatch(versionStr, -1); len(matches) != 1 {
+		return 0, 0, fmt.Errorf("could not extract major and minor version")
+	} else if parts := matches[0]; len(parts) != 3 { // Index 0 is the entire matched string; 1 and 2 are the capture groups
+		return 0, 0, fmt.Errorf("could not extract major and minor version")
+	} else if major, err = strconv.Atoi(parts[1]); err != nil {
+		return 0, 0, err
+	} else if minor, err = strconv.Atoi(parts[2]); err != nil {
+		return 0, 0, err
+	}
+
+	return major, minor, nil
+}
+
+// ValidVersion compares a given major and minor version with a required major and minor version.
+func ValidVersion(major, minor, reqMajor, reqMinor int) bool {
+	if major > reqMajor {
+		return true
+	} else if major < reqMajor || minor < reqMinor {
+		return false
+	}
+
+	return true
 }
