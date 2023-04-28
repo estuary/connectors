@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/sirupsen/logrus"
@@ -24,6 +25,7 @@ func (db *postgresDatabase) SetupPrerequisites(ctx context.Context) []error {
 		db.prerequisiteReplicationSlot,
 		db.prerequisitePublication,
 		db.prerequisiteWatermarksTable,
+		db.prerequisiteWatermarksInPublication,
 	} {
 		if err := prereq(ctx); err != nil {
 			errs = append(errs, err)
@@ -133,11 +135,7 @@ func (db *postgresDatabase) prerequisitePublication(ctx context.Context) error {
 	}
 
 	logEntry.Info("attempting to create publication")
-	// TODO(wgd): We would like to stop using 'FOR ALL TABLES' at some point in the future
-	// (see https://github.com/estuary/connectors/issues/460), but this whole prerequisite-
-	// checking branch has gotten complicated enough already, so for now we'll keep doing
-	// this the same as before.
-	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`CREATE PUBLICATION %s FOR ALL TABLES;`, pubName)); err != nil {
+	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`CREATE PUBLICATION "%s";`, pubName)); err != nil {
 		return fmt.Errorf("publication %q doesn't exist and couldn't be created", pubName)
 	}
 
@@ -170,6 +168,22 @@ func (db *postgresDatabase) prerequisiteWatermarksTable(ctx context.Context) err
 	return fmt.Errorf("user %q cannot write to the watermarks table %q", db.config.User, table)
 }
 
+func (db *postgresDatabase) prerequisiteWatermarksInPublication(ctx context.Context) error {
+	// The watermarks table must be present in the publication. This assumes that the watermarks
+	// table and publication have already attempted to be created if they don't exist. If either the
+	// watermarks table or publication doesn't exist another error will be generated here which is a
+	// bit redundant.
+
+	var pubName = db.config.Advanced.PublicationName
+	var watermarks = db.config.Advanced.WatermarksTable
+
+	// (*Config).Validate() has previously verified that this value contains a period. The first
+	// part is the schema and the second part is the table.
+	tableParts := strings.Split(watermarks, ".")
+
+	return db.addTableToPublication(ctx, pubName, tableParts[0], tableParts[1])
+}
+
 func (db *postgresDatabase) SetupTablePrerequisites(ctx context.Context, schema, table string) error {
 	var rows, err = db.conn.Query(ctx, fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 0;`, schema, table))
 	rows.Close()
@@ -177,5 +191,47 @@ func (db *postgresDatabase) SetupTablePrerequisites(ctx context.Context, schema,
 		var streamID = sqlcapture.JoinStreamID(schema, table)
 		return fmt.Errorf("user %q cannot read from table %q", db.config.User, streamID)
 	}
+
+	return db.addTableToPublication(ctx, db.config.Advanced.PublicationName, schema, table)
+}
+
+// addTableToPublication adds a table to a publication if it isn't already part of that publication.
+func (db *postgresDatabase) addTableToPublication(ctx context.Context, pubName string, schema string, table string) error {
+	var logEntry = logrus.WithFields(logrus.Fields{
+		"publication": pubName,
+		"schema":      schema,
+		"table":       table,
+	})
+
+	// The table may have already been added to the publication by a previous invocation, or the
+	// publication was created as FOR ALL TABLES. In either case it will show up in this query, and
+	// we won't try to add it to the publication again.
+	var count int
+	if err := db.conn.QueryRow(ctx, fmt.Sprintf(`
+		SELECT COUNT(*) FROM pg_catalog.pg_publication_tables 
+		WHERE
+			pubname = '%s' AND
+			schemaname = '%s' AND
+			tablename = '%s';
+		`,
+		pubName,
+		schema,
+		table,
+	)).Scan(&count); err != nil {
+		return fmt.Errorf("error querying publications: %w", err)
+	}
+	if count == 1 {
+		logEntry.Debug("table is already part of publication")
+		return nil
+	}
+
+	logEntry.Info("attempting to add table to publication")
+
+	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`ALTER PUBLICATION "%s" ADD TABLE "%s"."%s";`, pubName, schema, table)); err != nil {
+		return fmt.Errorf("could not add table %s.%s to publication %s", schema, table, pubName)
+	}
+
+	logEntry.Info("added table to publication")
+
 	return nil
 }
