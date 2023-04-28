@@ -33,6 +33,12 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 	return errs
 }
 
+const (
+	reqMajorVersion = 14
+	reqMinorVersion = 0
+	reqRelease      = "SQL Server 2017" // Used for error messaging only; not part of version checks
+)
+
 // Per https://learn.microsoft.com/en-us/sql/t-sql/functions/version-transact-sql-configuration-functions,
 // the product version reported by @@VERSION is incorrect for Azure SQL Database, Azure SQL Managed
 // Instance and Azure Synapse Analytics. These are managed services and are always up-to-date, so we
@@ -62,11 +68,14 @@ func (db *sqlserverDatabase) prerequisiteVersion(ctx context.Context) error {
 		log.Warn("'productversion' server property query result was empty")
 	} else if major, minor, err := sqlcapture.ParseVersion(version); err != nil {
 		log.Warn(fmt.Errorf("unable to parse server version from '%s': %w", version, err))
-	} else if !sqlcapture.ValidVersion(major, minor, 14, 0) {
+	} else if !sqlcapture.ValidVersion(major, minor, reqMajorVersion, reqMinorVersion) {
 		// Return an error only if the actual version could be definitively determined to be less
 		// than required.
 		return fmt.Errorf(
-			"minimum supported SQL Server version is 14.0 (SQL Server 2017): attempted to capture from database version %d.%d",
+			"minimum supported SQL Server version is %d.%d (%s): attempted to capture from database version %d.%d",
+			reqMajorVersion,
+			reqMinorVersion,
+			reqRelease,
 			major,
 			minor,
 		)
@@ -80,7 +89,12 @@ func (db *sqlserverDatabase) prerequisiteVersion(ctx context.Context) error {
 	}
 
 	// Catch-all trailing log message for cases where the server version could not be determined.
-	log.Warn("attempting to capture from unknown database version: minimum supported SQL Server version is 14.0 (SQL Server 2017)")
+	log.Warn(fmt.Sprintf(
+		"attempting to capture from unknown database version: minimum supported SQL Server version is %d.%d (%s)",
+		reqMajorVersion,
+		reqMinorVersion,
+		reqRelease,
+	))
 
 	return nil
 }
