@@ -36,15 +36,23 @@ func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 	return errs
 }
 
+const (
+	// TODO(whb): MySQL 5.7 current does not appear to work with our connector, see
+	// https://github.com/estuary/connectors/issues/682.
+	mysqlReqMajorVersion = 8
+	mysqlReqMinorVersion = 0
+
+	mariadbReqMajorVersion = 10
+	mariadbReqMinorVersion = 3
+)
+
 func (db *mysqlDatabase) prerequisiteVersion(ctx context.Context) error {
 	// This connector works for both MySQL and MariaDB. If the queried version indicates that we're
 	// connecting to a MariaDB instance, the version requirements will be set accordingly further
 	// down.
 	database := "MySQL"
-	// TODO(whb): MySQL 5.7 current does not appear to work with our connector, see
-	// https://github.com/estuary/connectors/issues/682.
-	minMajor := 8
-	minMinor := 0
+	minMajor := mysqlReqMajorVersion
+	minMinor := mysqlReqMinorVersion
 
 	var version string
 	results, err := db.conn.Execute(`SELECT @@GLOBAL.version;`)
@@ -59,8 +67,8 @@ func (db *mysqlDatabase) prerequisiteVersion(ctx context.Context) error {
 		// MariaDB if we can conclusively prove that this is a MariaDB instance.
 		if strings.Contains(strings.ToLower(version), "mariadb") {
 			database = "MariaDB"
-			minMajor = 10
-			minMinor = 3
+			minMajor = mariadbReqMajorVersion
+			minMinor = mariadbReqMinorVersion
 		}
 
 		if major, minor, err := sqlcapture.ParseVersion(version); err != nil {
@@ -87,7 +95,12 @@ func (db *mysqlDatabase) prerequisiteVersion(ctx context.Context) error {
 	}
 
 	// Catch-all trailing log message for cases where the server version could not be determined.
-	logrus.Warn(fmt.Sprintf("attempting to capture from unknown database version: minimum supported %s version is %d.%d", database, minMajor, minMinor))
+	logrus.Warn(fmt.Sprintf(
+		"attempting to capture from unknown database version: minimum supported %s version is %d.%d",
+		database,
+		minMajor,
+		minMinor,
+	))
 
 	return nil
 }
