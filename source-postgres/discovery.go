@@ -147,12 +147,14 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 		return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", column.DataType)
 	}
 
-	colSchema.nullable = column.IsNullable
-	var jsonType = colSchema.toType()
-
-	// If the column is an array, wrap the element type in a multidimensional
-	// array structure.
+	var jsonType *jsonschema.Schema
+	// If the column is an array, wrap the element type in a multidimensional array structure.
 	if arrayColumn {
+		// Nullability applies to the array itself, not the items. Items are always allowed to be
+		// null unless additional checks are imposed on the column which we currently can't look
+		// for.
+		colSchema.nullable = true
+
 		jsonType = &jsonschema.Schema{
 			Type: "object",
 			Extras: map[string]interface{}{
@@ -163,12 +165,20 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 					},
 					"elements": {
 						Type:  "array",
-						Items: jsonType,
+						Items: colSchema.toType(),
 					},
 				},
 			},
 			Required: []string{"dimensions", "elements"},
 		}
+
+		// The column value itself may be null if the column is nullable.
+		if column.IsNullable {
+			jsonType.Extras["type"] = []string{"object", "null"}
+		}
+	} else {
+		colSchema.nullable = column.IsNullable
+		jsonType = colSchema.toType()
 	}
 
 	// Pass-through a postgres column description.
