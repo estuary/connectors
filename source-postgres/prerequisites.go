@@ -32,6 +32,11 @@ func (db *postgresDatabase) SetupPrerequisites(ctx context.Context) []error {
 	return errs
 }
 
+const (
+	reqMajorVersion = 10
+	reqMinorVersion = 0
+)
+
 func (db *postgresDatabase) prerequisiteVersion(ctx context.Context) error {
 	var version string
 	if err := db.conn.QueryRow(ctx, `SHOW server_version`).Scan(&version); err != nil {
@@ -40,11 +45,13 @@ func (db *postgresDatabase) prerequisiteVersion(ctx context.Context) error {
 		logrus.Warn("'server_version' system variable query result was empty")
 	} else if major, minor, err := sqlcapture.ParseVersion(version); err != nil {
 		logrus.Warn(fmt.Errorf("unable to parse server version from '%s': %w", version, err))
-	} else if !sqlcapture.ValidVersion(major, minor, 10, 0) {
+	} else if !sqlcapture.ValidVersion(major, minor, reqMajorVersion, reqMinorVersion) {
 		// Return an error only if the actual version could be definitively determined to be less
 		// than required.
 		return fmt.Errorf(
-			"minimum supported Postgres version is 10.0: attempted to capture from database version %d.%d",
+			"minimum supported Postgres version is %d.%d: attempted to capture from database version %d.%d",
+			reqMajorVersion,
+			reqMinorVersion,
 			major,
 			minor,
 		)
@@ -58,7 +65,11 @@ func (db *postgresDatabase) prerequisiteVersion(ctx context.Context) error {
 	}
 
 	// Catch-all trailing log message for cases where the server version could not be determined.
-	logrus.Warn("attempting to capture from unknown database version: minimum supported Postgres version is 10.0")
+	logrus.Warn(fmt.Sprintf(
+		"attempting to capture from unknown database version: minimum supported Postgres version is %d.%d",
+		reqMajorVersion,
+		reqMinorVersion,
+	))
 
 	return nil
 }
