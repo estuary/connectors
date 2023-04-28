@@ -10,7 +10,8 @@ import (
 	"github.com/estuary/connectors/sqlcapture/tests"
 )
 
-const arraySchemaPattern = `{"required":["dimensions","elements"],"type":"object","properties":{"dimensions":{"type":"array","items":{"type":"integer"}},"elements":{"type":"array","items":%s}}}`
+const arraySchemaPatternNotNullable = `{"required":["dimensions","elements"],"type":"object","properties":{"dimensions":{"type":"array","items":{"type":"integer"}},"elements":{"type":"array","items":%s}}}`
+const arraySchemaPattern = `{"required":["dimensions","elements"],"type":["object","null"],"properties":{"dimensions":{"type":"array","items":{"type":"integer"}},"elements":{"type":"array","items":%s}}}`
 
 // TestDatatypes runs the generic datatype discovery and round-tripping test on various datatypes.
 func TestDatatypes(t *testing.T) {
@@ -102,7 +103,9 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `integer[3][3]`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: `{{1,2,3},{4,5,6},{7,8,9}}`, ExpectValue: `{"dimensions":[3,3],"elements":[1,2,3,4,5,6,7,8,9]}`},
 
 		// Sanity-check various types of array for discovery and round-tripping
+		{ColumnType: `bigint ARRAY NOT NULL`, ExpectType: fmt.Sprintf(arraySchemaPatternNotNullable, `{"type":["integer","null"]}`), InputValue: `{1,2,null,4}`, ExpectValue: `{"dimensions":[4],"elements":[1,2,null,4]}`},
 		{ColumnType: `bigint ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: `{1,2,null,4}`, ExpectValue: `{"dimensions":[4],"elements":[1,2,null,4]}`},
+		{ColumnType: `bigint ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: nil, ExpectValue: `null`},
 		{ColumnType: `boolean ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["boolean","null"]}`), InputValue: `{true, false, null, true}`, ExpectValue: `{"dimensions":[4],"elements":[true,false,null,true]}`},
 		{ColumnType: `bytea ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"contentEncoding":"base64"}`), InputValue: `{abcd, efgh}`, ExpectValue: `{"dimensions":[2],"elements":["YWJjZA==","ZWZnaA=="]}`},
 		{ColumnType: `varchar(12) ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: `{foo, bar}`, ExpectValue: `{"dimensions":[2],"elements":["foo","bar"]}`},
