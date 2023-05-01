@@ -2,6 +2,7 @@ Binding 0:
 {
     "recommended_name": "test.generic_keylessdiscovery_t32386",
     "resource_config_json": {
+      "mode": "Without Primary Key",
       "namespace": "test",
       "stream": "generic_keylessdiscovery_t32386"
     },

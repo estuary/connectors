@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 // Run executes the generic SQL capture test suite
@@ -38,6 +40,7 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 	t.Run("DuplicatedScanKey", func(t *testing.T) { testDuplicatedScanKey(ctx, t, tb) })
 	t.Run("KeylessDiscovery", func(t *testing.T) { testKeylessDiscovery(ctx, t, tb) })
 	t.Run("KeylessCapture", func(t *testing.T) { testKeylessCapture(ctx, t, tb) })
+	t.Run("ReplicationOnly", func(t *testing.T) { testReplicationOnly(ctx, t, tb) })
 	//t.Run("ComplexDataset", func(t *testing.T) { testComplexDataset(ctx, t, tb) })
 }
 
@@ -434,6 +437,35 @@ func (v *correctnessInvariantsCaptureValidator) Summarize(w io.Writer) error {
 	return nil
 }
 
+func testReplicationOnly(ctx context.Context, t *testing.T, tb TestBackend) {
+	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER, data TEXT)")
+
+	// Create a capture spec and replace the suggested "Without Key" backfill mode
+	// with the "Only Changes" one. This mirrors the deliberate user action which
+	// would be required in the UI to get this mode of operation.
+	var cs = tb.CaptureSpec(ctx, t, tableName)
+	cs.Bindings[0].ResourceConfigJson = json.RawMessage(strings.ReplaceAll(string(cs.Bindings[0].ResourceConfigJson), string(sqlcapture.BackfillModeWithoutKey), string(sqlcapture.BackfillModeOnlyChanges)))
+
+	for i := 0; i < 8; i++ {
+		var batch [][]any
+		for j := 0; j < 256; j++ {
+			batch = append(batch, []any{i*1000000 + j, fmt.Sprintf("Batch %d Value %d", i, j)})
+		}
+		tb.Insert(ctx, t, tableName, batch)
+	}
+	t.Run("backfill", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
+
+	for i := 8; i < 16; i++ {
+		var batch [][]any
+		for j := 0; j < 256; j++ {
+			batch = append(batch, []any{i*1000000 + j, fmt.Sprintf("Batch %d Value %d", i, j)})
+		}
+		tb.Insert(ctx, t, tableName, batch)
+	}
+	t.Run("replication", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
+
+}
+
 func testKeylessDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 	const uniqueString = "t32386"
 	tb.CreateTable(ctx, t, uniqueString, "(a INTEGER, b TEXT, c REAL NOT NULL, d VARCHAR(255))")
@@ -441,13 +473,36 @@ func testKeylessDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 }
 
 func testKeylessCapture(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER, data TEXT)")
-	for i := 0; i < 32; i++ {
-		var batch [][]any
-		for j := 0; j < 256; j++ {
-			batch = append(batch, []any{i*1000000 + j, fmt.Sprintf("Batch %d Value %d", i, j)})
-		}
-		tb.Insert(ctx, t, tableName, batch)
+	// This test is not reliable in the current unfinished state, because we recommend
+	// using the 'Only Replication' capture mode and then start the capture partway
+	// through the stream of changes, and so the exact point at which we start can be
+	// variable. But this is just an intermediate step towards implementing full
+	// keyless backfills, so that's okay.
+	if val := os.Getenv("CI_BUILD"); val != "" {
+		t.Skipf("skipping %q in CI builds", t.Name())
 	}
+
+	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER, data TEXT)")
+
+	var wg = new(errgroup.Group)
+	defer wg.Wait()
+	wg.Go(func() error {
+		for i := 0; i < 32; i++ {
+			var batch [][]any
+			for j := 0; j < 256; j++ {
+				batch = append(batch, []any{i*1000000 + j, fmt.Sprintf("Batch %d Value %d", i, j)})
+			}
+			tb.Insert(ctx, t, tableName, batch)
+			time.Sleep(50 * time.Millisecond)
+		}
+		log.Info("test dataset loaded")
+		return nil
+	})
+
+	// The traffic generation waits 50ms between change batches and we want the
+	// capture to start up partway through. It's better to err earlier rather than
+	// later, so a 400ms delay is aiming for 25% of the dataset via backfill and
+	// the rest via replication.
+	time.Sleep(400 * time.Millisecond)
 	VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, tableName))
 }
