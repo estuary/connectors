@@ -1,0 +1,5 @@
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"binlog.000123:56789","streams":{"test.generic_replicationonly":{"mode":"Active"}}}
+

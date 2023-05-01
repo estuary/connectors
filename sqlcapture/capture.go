@@ -69,12 +69,14 @@ type TableState struct {
 //	Ignore: The table is being deliberately ignored.
 //	Pending: The table is new, and will start being backfilled soon.
 //	Backfill: The table's rows are being backfilled and replication events will only be emitted for the already-backfilled portion.
+//	KeylessBackfill: The table's rows are being backfilled with a non-primary-key based strategy and all replication events will be emitted.
 //	Active: The table finished backfilling and replication events are emitted for the entire table.
 const (
-	TableModeIgnore   = "Ignore"
-	TableModePending  = "Pending"
-	TableModeBackfill = "Backfill"
-	TableModeActive   = "Active"
+	TableModeIgnore          = "Ignore"
+	TableModePending         = "Pending"
+	TableModeBackfill        = "Backfill"
+	TableModeKeylessBackfill = "KeylessBackfill"
+	TableModeActive          = "Active"
 )
 
 // Capture encapsulates the generic process of capturing data from a SQL database
@@ -194,11 +196,27 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error streaming until watermark: %w", err)
 	}
 	for _, streamID := range c.State.StreamsInState(TableModePending) {
-		logrus.WithField("stream", streamID).Info("activating replication for stream")
+		var binding = c.Bindings[streamID]
+		if binding == nil {
+			return fmt.Errorf("internal error: no binding information for stream %q", streamID)
+		}
+
+		logrus.WithFields(logrus.Fields{"stream": streamID, "mode": binding.Resource.Mode}).Info("activating replication for stream")
+
 		var state = c.State.Streams[streamID]
-		state.Mode = TableModeBackfill
+		switch binding.Resource.Mode {
+		case BackfillModeNormal:
+			state.Mode = TableModeBackfill
+		case BackfillModeOnlyChanges:
+			state.Mode = TableModeActive
+		case BackfillModeWithoutKey:
+			state.Mode = TableModeKeylessBackfill
+		default:
+			return fmt.Errorf("invalid backfill mode %q for stream %q", binding.Resource.Mode, streamID)
+		}
 		state.dirty = true
 		c.State.Streams[streamID] = state
+
 		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
 			return fmt.Errorf("error activating %q for replication: %w", streamID, err)
 		}
@@ -213,6 +231,11 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// This means that a backfill can still be terminated/skipped, even after the
 	// user starts their capture and only then realizes that it's going to take days
 	// to backfill their multiple-terabyte table.
+	//
+	// TODO(wgd): In theory this logic could have been merged with the new 'Backfill Mode'
+	// configuration logic, but that would make that logic more complex and I would like
+	// to deprecate the whole 'SkipBackfills' configuration property in the near future
+	// so I have left this little blob of logic nicely self-contained here.
 	for _, streamID := range c.State.StreamsInState(TableModeBackfill) {
 		if !c.Database.ShouldBackfill(streamID) {
 			var state = c.State.Streams[streamID]
@@ -248,7 +271,15 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			return fmt.Errorf("error performing backfill: %w", err)
 		}
 	}
-	logrus.Debug("finished backfilling tables")
+
+	// Once all backfills are complete, make sure an up-to-date state checkpoint
+	// gets emitted. This ensures that streams reliably transition into the Active
+	// state on the first connector run even if there are no replication events
+	// occurring.
+	logrus.Debug("no tables currently require backfilling")
+	if err := c.emitState(); err != nil {
+		return err
+	}
 
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
@@ -286,7 +317,9 @@ func (c *Capture) updateState(ctx context.Context) error {
 			"discovery":  discoveryInfo.PrimaryKey,
 		}).Debug("selecting primary key")
 		var primaryKey []string
-		if len(binding.Resource.PrimaryKey) > 0 {
+		if binding.Resource.Mode == BackfillModeOnlyChanges || binding.Resource.Mode == BackfillModeWithoutKey {
+			logrus.WithFields(logrus.Fields{"stream": streamID}).Debug("initializing stream state without primary key")
+		} else if len(binding.Resource.PrimaryKey) > 0 {
 			primaryKey = binding.Resource.PrimaryKey
 			logrus.WithFields(logrus.Fields{"stream": streamID, "key": primaryKey}).Debug("using resource primary key")
 		} else if len(binding.CollectionKey) > 0 {

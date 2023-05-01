@@ -17,6 +17,8 @@ import (
 
 // Resource represents the capture configuration of a single table.
 type Resource struct {
+	Mode BackfillMode `json:"mode" jsonschema:"title=Backfill Mode,description=How the preexisting contents of the table should be backfilled. This should generally not be changed.,enum=Normal,enum=Only Changes,enum=Without Primary Key,default=Normal"`
+
 	Namespace string `json:"namespace" jsonschema:"title=Schema,description=The schema (namespace) in which the table resides."`
 	Stream    string `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured."`
 
@@ -29,6 +31,25 @@ type Resource struct {
 
 	DeprecatedSyncMode string `json:"syncMode,omitempty" jsonschema:"-"` // Unused, only supported to avoid breaking existing captures
 }
+
+// BackfillMode represents different ways we might want to backfill the preexisting contents of a table.
+type BackfillMode string
+
+const (
+	// BackfillModeNormal backfills chunks of the table and merges them by
+	// primary key with the replication stream in a way that produces exactly
+	// correct data.
+	BackfillModeNormal = BackfillMode("Normal")
+
+	// BackfillModeOnlyChanges skips backfilling the table entirely and jumps
+	// directly to replication streaming for the entire dataset.
+	BackfillModeOnlyChanges = BackfillMode("Only Changes")
+
+	// BackfillModeWithoutKey can be used to capture tables without any form
+	// of unique primary key, but lacks the exact correctness properties of
+	// the normal backfill mode.
+	BackfillModeWithoutKey = BackfillMode("Without Primary Key")
+)
 
 // Validate checks to make sure a resource appears usable.
 func (r Resource) Validate() error {

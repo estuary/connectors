@@ -1,9 +1,9 @@
 # ================================
 # Final State Checkpoint
 # ================================
-
+{"cursor":"binlog.000123:56789","streams":{"test.generic_keylesscapture":{"mode":"KeylessBackfill"}}}
 # ================================
 # Captures Terminated With Errors
 # ================================
-error updating capture state: stream "test.generic_keylesscapture": primary key must be specified
+table "test.generic_keylesscapture" in invalid mode "KeylessBackfill"
 
