@@ -6,7 +6,7 @@
       "address": {
         "type": "string",
         "title": "Address",
-        "description": "Host and port of the database. Optionally can specify scheme for the URL such as mongodb+srv://host.",
+        "description": "The connection URI for your database without the username and password. For example mongodb://my-mongo.test?authSource=admin.",
         "order": 0
       },
       "user": {
