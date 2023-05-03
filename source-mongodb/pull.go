@@ -8,7 +8,6 @@ import (
 	"io"
 	"math"
 	"time"
-	"reflect"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -81,7 +80,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		eg.Go(func() error {
 			var e = c.ChangeStream(ctx, client, idx, res, backfillFinishedAt, resState)
 			if e != nil {
-				log.WithField("error", e).WithField("collection", res.Collection).Error("ChangeStream error")
+				log.WithField("error", e).WithField("collection", res.Collection).WithField("database", res.Database).Error("ChangeStream error")
 			}
 			return e
 		})
@@ -281,22 +280,16 @@ func resourceId(res resource) string {
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		// Make sure `_id` is always captured as string
-		var t = "nil"
-		if value != nil {
-			t = reflect.TypeOf(value).String()
-		}
-
-		log.WithField("key", key).WithField("value", value).WithField("type", t).Debug("sanitizing document")
 		if key == "_id" {
 			doc[key] = idToString(value)
 		} else {
 			switch v := value.(type) {
 			case float64:
-				log.WithField("key", key).WithField("value", value).WithField("IsNaN", math.IsNaN(v)).Debug("sanitizing document")
 				if math.IsNaN(v) {
 					doc[key] = "NaN"
 				}
 			case map[string]interface{}:
+			case primitive.M:
 				doc[key] = sanitizeDocument(v)
 			}
 		}
