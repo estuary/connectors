@@ -54,7 +54,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		Output: stream,
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, egCtx := errgroup.WithContext(ctx)
 
 	if err := c.Output.Ready(false); err != nil {
 		return err
@@ -78,11 +78,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 
 		eg.Go(func() error {
-			var e = c.ChangeStream(ctx, client, idx, res, backfillFinishedAt, resState)
-			if e != nil {
-				log.WithField("error", e).WithField("collection", res.Collection).WithField("database", res.Database).Error("ChangeStream error")
-			}
-			return e
+			return c.ChangeStream(egCtx, client, idx, res, backfillFinishedAt, resState)
 		})
 	}
 
