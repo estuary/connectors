@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"time"
+	"reflect"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -77,7 +78,13 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			}
 		}
 
-		eg.Go(func() error { return c.ChangeStream(ctx, client, idx, res, backfillFinishedAt, resState) })
+		eg.Go(func() error {
+			var e = c.ChangeStream(ctx, client, idx, res, backfillFinishedAt, resState)
+			if e != nil {
+				log.WithField("error", e).WithField("collection", res.Collection).Error("ChangeStream error")
+			}
+			return e
+		})
 	}
 
 	if err := eg.Wait(); err != nil && !errors.Is(err, io.EOF) {
@@ -274,6 +281,7 @@ func resourceId(res resource) string {
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		// Make sure `_id` is always captured as string
+		log.WithField("key", key).WithField("value", value).WithField("type", reflect.TypeOf(value)).Debug("sanitizing document")
 		if key == "_id" {
 			doc[key] = idToString(value)
 		} else {
