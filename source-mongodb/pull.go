@@ -178,7 +178,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 
 			js, err := json.Marshal(doc)
 			if err != nil {
-				return fmt.Errorf("encoding document in collection %s as json: %w", res.Collection, err)
+				return fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
 			}
 
 			if err = c.Output.Documents(binding, js); err != nil {
@@ -189,7 +189,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 
 			js, err := json.Marshal(doc)
 			if err != nil {
-				return fmt.Errorf("encoding document in collection %s as json: %w", res.Collection, err)
+				return fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
 			}
 
 			if err = c.Output.Documents(binding, js); err != nil {
@@ -248,7 +248,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 
 		js, err := json.Marshal(doc)
 		if err != nil {
-			return nil, fmt.Errorf("encoding document in collection %s as json: %w", res.Collection, err)
+			return nil, fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
 		}
 
 		if err = c.Output.Documents(binding, js); err != nil {
@@ -281,12 +281,18 @@ func resourceId(res resource) string {
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		// Make sure `_id` is always captured as string
-		log.WithField("key", key).WithField("value", value).WithField("type", reflect.TypeOf(value)).Debug("sanitizing document")
+		var t = "nil"
+		if value != nil {
+			t = reflect.TypeOf(value).String()
+		}
+
+		log.WithField("key", key).WithField("value", value).WithField("type", t).Debug("sanitizing document")
 		if key == "_id" {
 			doc[key] = idToString(value)
 		} else {
 			switch v := value.(type) {
 			case float64:
+				log.WithField("key", key).WithField("value", value).WithField("IsNaN", math.IsNaN(v)).Debug("sanitizing document")
 				if math.IsNaN(v) {
 					doc[key] = "NaN"
 				}

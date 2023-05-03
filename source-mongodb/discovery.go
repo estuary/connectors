@@ -98,6 +98,11 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 
 	var bindings = []*pc.Response_Discovered_Binding{}
 	for _, collection := range collections {
+		// Views cannot be used with change streams, so we don't support them for
+		// capturing at the moment
+		if collection.Type == "view" {
+			continue
+		}
 		resourceJSON, err := json.Marshal(resource{Database: db.Name(), Collection: collection.Name})
 		if err != nil {
 			return nil, fmt.Errorf("serializing resource json: %w", err)
