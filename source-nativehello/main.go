@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"

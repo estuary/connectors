@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.19-bullseye as builder
+FROM golang:1.20-bullseye as builder
 
 WORKDIR /builder
 
@@ -11,9 +11,8 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Build the connector projects we depend on.
+COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
-COPY go-schema-gen           ./go-schema-gen
 COPY materialize-s3-parquet  ./materialize-s3-parquet
 
 # Test and build the connector.

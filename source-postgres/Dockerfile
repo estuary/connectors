@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.19-buster as builder
+FROM golang:1.20-buster as builder
 
 WORKDIR /builder
 
@@ -11,16 +11,10 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Copy the helper packages we depend on and fetch dependencies.
-COPY go-network-tunnel  ./go-network-tunnel
-COPY go-schema-gen      ./go-schema-gen
-COPY source-boilerplate ./source-boilerplate
-COPY sqlcapture         ./sqlcapture
-RUN go get -v ./go-network-tunnel ./go-schema-gen ./source-boilerplate ./sqlcapture
-
-# Copy the connector code and fetch dependencies.
+COPY go                  ./go
+COPY source-boilerplate  ./source-boilerplate
+COPY sqlcapture          ./sqlcapture
 COPY source-postgres ./source-postgres
-RUN go get -v ./source-postgres
 
 ENV PATH="/builder/bin:$PATH"
 
