@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
+	"time"
 
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -15,6 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
+	mongoDriver "go.mongodb.org/mongo-driver/x/mongo/driver"
 )
 
 type resource struct {
@@ -88,8 +92,32 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		return nil, err
 	}
 
+	// Any error other than an authentication error will result in the call to Ping hanging until it
+	// times out due to the way the mongo client handles retries. The flow control plane will cancel
+	// any RPC after ~30 seconds, so we'll timeout ahead of that in order to produce a more useful
+	// error message.
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
 	// Ping the primary
 	if err := client.Ping(ctx, readpref.Primary()); err != nil {
+		var mongoErr mongoDriver.Error
+
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, cerrors.NewUserError(fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", cfg.Address), err)
+		} else if errors.As(err, &mongoErr) {
+			if mongoErr.Code == 18 {
+				// See https://github.com/mongodb/mongo-go-driver/blob/master/docs/common-issues.md#authentication-failed
+				// An auth error can occur for any of these reasons, and the mongo driver gives us no way to tell them apart:
+				//   - Wrong username
+				//   - Wrong password
+				//   - Wrong authentication database, which is specified by the query parameter `authSource`
+				//   - User doesn't have access to the requested database
+				//   - The requested database doesn't exist
+				return nil, cerrors.NewUserError("authentication failed: you may have entered an incorrect username or password, the database may not exist, the user may not have access to the database, or the authSource query parameter may be incorrect", err)
+			}
+		}
+
 		return nil, err
 	}
 
