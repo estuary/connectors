@@ -4,19 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
 
-	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 
-	_ "github.com/microsoft/go-mssqldb"
+	mssqldb "github.com/microsoft/go-mssqldb"
 )
 
 func main() {
@@ -186,6 +188,22 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
+
+	if err := conn.PingContext(ctx); err != nil {
+		var mssqlErr mssqldb.Error
+
+		if errors.As(err, &mssqlErr) {
+			switch mssqlErr.Number {
+			case 18456:
+				return cerrors.NewUserError("incorrect username or password", err)
+			case 4063:
+				return cerrors.NewUserError(fmt.Sprintf("cannot open database %q: database does not exist or user %q does not have access", db.config.Database, db.config.User), err)
+			}
+		}
+
+		return fmt.Errorf("unable to connect to database: %w", err)
+	}
+
 	db.conn = conn
 	return nil
 }
