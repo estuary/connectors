@@ -14,14 +14,16 @@ import (
 	"strings"
 	"time"
 
-	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
+	perrors "github.com/pingcap/errors"
 	"github.com/sirupsen/logrus"
 
 	mysqlLog "github.com/siddontang/go-log/log"
@@ -230,6 +232,12 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		logrus.WithField("addr", address).Warn("connected without TLS")
 		db.conn = conn
 	} else {
+		if err, ok := perrors.Cause(err).(*mysql.MyError); ok {
+			if err.Code == mysql.ER_ACCESS_DENIED_ERROR {
+				return cerrors.NewUserError("incorrect username or password", err)
+			}
+		}
+
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 
