@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/estuary/connectors/go-schema-gen/test-config",
+  "$id": "https://github.com/estuary/connectors/go/schema-gen/test-config",
   "properties": {
     "password": {
       "type": "string",

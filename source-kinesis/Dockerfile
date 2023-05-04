@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.19-buster as builder
+FROM golang:1.20-buster as builder
 
 WORKDIR /builder
 
@@ -11,7 +11,7 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Build the connector projects we depend on.
+COPY go             ./go
 COPY source-kinesis ./source-kinesis
 
 # Run the unit tests.

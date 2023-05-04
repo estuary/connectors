@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	protoio "github.com/gogo/protobuf/io"
 	"github.com/gogo/protobuf/jsonpb"
@@ -69,9 +70,7 @@ func RunMain(connector Connector) {
 	var server = ConnectorServer{connector}
 
 	if err := server.Materialize(stream); err != nil {
-		_, _ = os.Stderr.WriteString(err.Error())
-		_, _ = os.Stderr.Write([]byte("\n"))
-		os.Exit(1)
+		cerrors.LogFinalError(err)
 	}
 	os.Exit(0)
 }

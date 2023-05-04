@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/estuary/connectors/go-auth/google/credential-config",
+  "$id": "https://github.com/estuary/connectors/go/auth/google/credential-config",
   "oneOf": [
     {
       "properties": {
