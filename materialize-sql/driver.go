@@ -8,7 +8,8 @@ import (
 	"os"
 	"strings"
 
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -73,7 +74,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	} else if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
 	} else if prereqErrs := endpoint.CheckPrerequisites(ctx, req.ConfigJson); prereqErrs.Len() != 0 {
-		return nil, prereqErrs
+		return nil, cerrors.NewUserError(prereqErrs.Error(), nil)
 	} else if loadedSpec, _, err = loadSpec(ctx, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
