@@ -1,0 +1,62 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-mongodb/config",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Address",
+        "description": "The connection URI for your database without the username and password. For example mongodb://my-mongo.test?authSource=admin.",
+        "order": 0
+      },
+      "user": {
+        "type": "string",
+        "title": "User",
+        "description": "Database user to connect as.",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "description": "Password for the specified database user.",
+        "order": 2,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Name of the database to capture from.",
+        "order": 3
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "user",
+      "password",
+      "database"
+    ],
+    "title": "MongoDB"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-mongodb/resource",
+    "properties": {
+      "database": {
+        "type": "string",
+        "title": "Database name"
+      },
+      "collection": {
+        "type": "string",
+        "title": "Collection name"
+      }
+    },
+    "type": "object",
+    "required": [
+      "database",
+      "collection"
+    ],
+    "title": "MongoDB Resource Spec"
+  },
+  "documentation_url": "https://go.estuary.dev/source-mongodb"
+}
