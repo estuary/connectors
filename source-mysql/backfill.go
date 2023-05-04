@@ -25,43 +25,62 @@ func (db *mysqlDatabase) WatermarksTable() string {
 	return db.config.Advanced.WatermarksTable
 }
 
-func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, keyColumns []string, resumeAfter []byte) ([]*sqlcapture.ChangeEvent, error) {
+func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState) ([]*sqlcapture.ChangeEvent, error) {
+	var keyColumns = state.KeyColumns
+	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
-
-	// Decode the resumeAfter key if non-nil
-	var err error
-	var resumeKey []interface{}
-	if resumeAfter != nil {
-		resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
-		if err != nil {
-			return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
-		}
-		if len(resumeKey) != len(keyColumns) {
-			return nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
-		}
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"stream":     streamID,
-		"keyColumns": keyColumns,
-		"resumeKey":  resumeKey,
-	}).Debug("scanning table chunk")
 
 	var columnTypes = make(map[string]interface{})
 	for name, column := range info.Columns {
 		columnTypes[name] = column.DataType
 	}
 
-	// Build a query to fetch the next `backfillChunkSize` rows from the database.
-	var query = db.buildScanQuery(resumeKey == nil, keyColumns, columnTypes, schema, table)
-	// Splat the resume key into runs of arguments matching the predicate built by buildScanQuery.
-	// This is super gross, and is a work-around for lack of indexed positional argument support,
-	// AND lack of implementation for named arguments in our MySQL client.
-	// See: https://github.com/go-sql-driver/mysql/issues/561
-	var args []interface{}
-	for i := range resumeKey {
-		args = append(args, resumeKey[:i+1]...)
+	// Compute backfill query and arguments list
+	var query string
+	var args []any
+
+	switch state.Mode {
+	case sqlcapture.TableModeKeylessBackfill:
+		logrus.WithFields(logrus.Fields{
+			"stream": streamID,
+			"offset": state.BackfilledCount,
+		}).Debug("scanning keyless table chunk")
+		query = db.keylessScanQuery(info, schema, table)
+		args = []any{state.BackfilledCount}
+	case sqlcapture.TableModeBackfill:
+		if resumeAfter != nil {
+			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
+			if err != nil {
+				return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+			}
+			if len(resumeKey) != len(keyColumns) {
+				return nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+			}
+
+			logrus.WithFields(logrus.Fields{
+				"stream":     streamID,
+				"keyColumns": keyColumns,
+				"resumeKey":  resumeKey,
+			}).Debug("scanning subsequent table chunk")
+
+			// Splat the resume key into runs of arguments matching the predicate built by buildScanQuery.
+			// This is super gross, and is a work-around for lack of indexed positional argument support,
+			// AND lack of implementation for named arguments in our MySQL client.
+			// See: https://github.com/go-sql-driver/mysql/issues/561
+			for i := range resumeKey {
+				args = append(args, resumeKey[:i+1]...)
+			}
+			query = db.buildScanQuery(false, keyColumns, columnTypes, schema, table)
+		} else {
+			logrus.WithFields(logrus.Fields{
+				"stream":     streamID,
+				"keyColumns": keyColumns,
+			}).Debug("scanning initial table chunk")
+			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
+		}
+	default:
+		return nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
@@ -77,6 +96,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 
 	// Process the results into `changeEvent` structs and return them
 	var events []*sqlcapture.ChangeEvent
+	var rowOffset = state.BackfilledCount
 	logrus.WithFields(logrus.Fields{
 		"stream": streamID,
 		"rows":   len(results.Values),
@@ -86,9 +106,14 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		for idx, val := range row {
 			fields[string(results.Fields[idx].Name)] = val.Value()
 		}
-		var rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
-		if err != nil {
-			return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+		var rowKey []byte
+		if state.Mode == sqlcapture.TableModeKeylessBackfill {
+			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset)) // A 19 digit decimal number is sufficient to hold any 63-bit integer
+		} else {
+			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
+			if err != nil {
+				return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+			}
 		}
 		if err := db.translateRecordFields(columnTypes, fields); err != nil {
 			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
@@ -109,6 +134,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			Before: nil,
 			After:  fields,
 		})
+		rowOffset++
 	}
 	return events, nil
 }
@@ -123,6 +149,20 @@ var columnBinaryKeyComparison = map[string]bool{
 	"text":       true,
 	"mediumtext": true,
 	"longtext":   true,
+}
+
+func (db *mysqlDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
+	var orderColumns []string
+	for _, name := range info.ColumnNames {
+		orderColumns = append(orderColumns, quoteColumnName(name))
+	}
+
+	var query = new(strings.Builder)
+	fmt.Fprintf(query, "SELECT * FROM `%s`.`%s`", schemaName, tableName)
+	fmt.Fprintf(query, " ORDER BY %s", strings.Join(orderColumns, ", "))
+	fmt.Fprintf(query, " LIMIT %d", db.config.Advanced.BackfillChunkSize)
+	fmt.Fprintf(query, " OFFSET ?;")
+	return query.String()
 }
 
 func (db *mysqlDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {

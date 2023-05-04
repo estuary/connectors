@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.generic_multiplestreams_one":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_three":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_two":{"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Ignore"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.generic_multiplestreams_one":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_three":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_two":{"backfilled":3,"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Ignore"}}}
 

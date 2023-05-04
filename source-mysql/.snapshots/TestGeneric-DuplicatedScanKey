@@ -1,11 +1,12 @@
 # ================================
-# Collection "acmeCo/test/test_generic_duplicatedscankey": 3 Documents
+# Collection "acmeCo/test/test_generic_duplicatedscankey": 4 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_DuplicatedScanKey"}},"data":"1","id":"AAA"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_DuplicatedScanKey"}},"data":"2","id":"BBB"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_DuplicatedScanKey"}},"data":"3","id":"BBB"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_DuplicatedScanKey"}},"data":"4","id":"CCC"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.generic_duplicatedscankey":{"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"varchar"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.generic_duplicatedscankey":{"backfilled":4,"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"varchar"}}},"mode":"Active"}}}
 

@@ -6,19 +6,18 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"os"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
 )
 
 // Run executes the generic SQL capture test suite
@@ -178,6 +177,7 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 
 	var nameParts = strings.SplitN(tableName, ".", 2)
 	var specJSON, err = json.Marshal(sqlcapture.Resource{
+		Mode:       sqlcapture.BackfillModeNormal,
 		Namespace:  nameParts[0],
 		Stream:     nameParts[1],
 		PrimaryKey: []string{"fullname", "year"},
@@ -286,6 +286,7 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 	cs.Validator = &correctnessInvariantsCaptureValidator{
 		NumExpectedIDs: numTotalIDs,
 	}
+	cs.Sanitizers[`"backfilled":999`] = regexp.MustCompile(`"backfilled":[0-9]+`)
 	cs.Validator.Reset()
 
 	// Run the load generator for at most 60s
@@ -473,36 +474,20 @@ func testKeylessDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 }
 
 func testKeylessCapture(ctx context.Context, t *testing.T, tb TestBackend) {
-	// This test is not reliable in the current unfinished state, because we recommend
-	// using the 'Only Replication' capture mode and then start the capture partway
-	// through the stream of changes, and so the exact point at which we start can be
-	// variable. But this is just an intermediate step towards implementing full
-	// keyless backfills, so that's okay.
-	if val := os.Getenv("CI_BUILD"); val != "" {
-		t.Skipf("skipping %q in CI builds", t.Name())
+	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER, data TEXT)")
+	var generate = func(n, m int) [][]any {
+		var rows [][]any
+		for i := n; i < m; i++ {
+			rows = append(rows, []any{i, fmt.Sprintf("Row Number %d", i)})
+		}
+		return rows
 	}
 
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, tableName)
+	cs.Validator = &st.OrderedCaptureValidator{}
 
-	var wg = new(errgroup.Group)
-	defer wg.Wait()
-	wg.Go(func() error {
-		for i := 0; i < 32; i++ {
-			var batch [][]any
-			for j := 0; j < 256; j++ {
-				batch = append(batch, []any{i*1000000 + j, fmt.Sprintf("Batch %d Value %d", i, j)})
-			}
-			tb.Insert(ctx, t, tableName, batch)
-			time.Sleep(50 * time.Millisecond)
-		}
-		log.Info("test dataset loaded")
-		return nil
-	})
-
-	// The traffic generation waits 50ms between change batches and we want the
-	// capture to start up partway through. It's better to err earlier rather than
-	// later, so a 400ms delay is aiming for 25% of the dataset via backfill and
-	// the rest via replication.
-	time.Sleep(400 * time.Millisecond)
-	VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, tableName))
+	tb.Insert(ctx, t, tableName, generate(0, 500))
+	t.Run("Backfill", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
+	tb.Insert(ctx, t, tableName, generate(500, 1000))
+	t.Run("Replication", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
 }
