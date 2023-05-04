@@ -1,6 +1,6 @@
 module github.com/estuary/connectors
 
-go 1.19
+go 1.20
 
 require (
 	cloud.google.com/go/bigquery v1.32.0
@@ -34,6 +34,7 @@ require (
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/microsoft/go-mssqldb v0.19.0
 	github.com/mitchellh/mapstructure v1.4.1
+	github.com/pingcap/errors v0.11.5-0.20201126102027-b0a155152ca3
 	github.com/rockset/rockset-go-client v0.15.4
 	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed
 	github.com/sirupsen/logrus v1.9.0
@@ -128,7 +129,6 @@ require (
 	github.com/opentracing/opentracing-go v1.1.0 // indirect
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.16 // indirect
-	github.com/pingcap/errors v0.11.5-0.20201126102027-b0a155152ca3 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

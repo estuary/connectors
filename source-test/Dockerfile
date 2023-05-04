@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.19-buster as builder
+FROM golang:1.20-buster as builder
 
 WORKDIR /builder
 
@@ -11,10 +11,9 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Build the connector projects we depend on.
-COPY go-schema-gen ./go-schema-gen
+COPY go                 ./go
 COPY source-boilerplate ./source-boilerplate
-COPY source-test ./source-test
+COPY source-test        ./source-test
 
 # Run the unit tests.
 RUN go test -v ./source-test/...

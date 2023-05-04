@@ -14,6 +14,7 @@ import (
 	"sync"
 	"syscall"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	protoio "github.com/gogo/protobuf/io"
@@ -72,9 +73,7 @@ func RunMain(connector Connector) {
 	var server = ConnectorServer{connector}
 
 	if err := server.Capture(stream); err != nil {
-		_, _ = os.Stderr.WriteString(err.Error())
-		_, _ = os.Stderr.Write([]byte("\n"))
-		os.Exit(1)
+		cerrors.LogFinalError(err)
 	}
 	os.Exit(0)
 }

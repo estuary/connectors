@@ -21,7 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
-	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"

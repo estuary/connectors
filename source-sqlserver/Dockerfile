@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.19-buster as builder
+FROM golang:1.20-buster as builder
 
 WORKDIR /builder
 
@@ -11,18 +11,10 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Copy the helper packages we depend on and fetch dependencies.
-COPY go-network-tunnel  ./go-network-tunnel
-COPY go-schema-gen      ./go-schema-gen
-COPY source-boilerplate ./source-boilerplate
-COPY sqlcapture         ./sqlcapture
-RUN go get -v ./go-network-tunnel ./go-schema-gen ./source-boilerplate ./sqlcapture
-
-# Copy the connector code and fetch dependencies.
-COPY source-sqlserver ./source-sqlserver
-RUN go get -v ./source-sqlserver
-
-ENV PATH="/builder/bin:$PATH"
+COPY go                  ./go
+COPY source-boilerplate  ./source-boilerplate
+COPY sqlcapture          ./sqlcapture
+COPY source-sqlserver    ./source-sqlserver
 
 # Run the unit tests. To skip tests which access a test database, specify `--build-arg TEST_DATABASE=no` in the Docker command line.
 ARG TEST_DATABASE=yes

@@ -1,4 +1,4 @@
-package google_auth
+package google
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/stretchr/testify/require"
 )
 
