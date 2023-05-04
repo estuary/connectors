@@ -3,16 +3,20 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
-	google_auth "github.com/estuary/connectors/go-auth/google"
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	google_auth "github.com/estuary/connectors/go/auth/google"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 )
@@ -60,7 +64,7 @@ func (c config) buildService(ctx context.Context) (*sheets.Service, error) {
 		return nil, fmt.Errorf("building sheets service: %w", err)
 	}
 
-	client, err := sheets.NewService(context.Background(), option.WithCredentials(creds))
+	client, err := sheets.NewService(ctx, option.WithCredentials(creds))
 	if err != nil {
 		return nil, fmt.Errorf("building sheets service: %w", err)
 	}
@@ -129,6 +133,15 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	if err != nil {
 		return nil, err
 	} else if _, err = loadSheetIDMapping(svc, cfg.spreadsheetID()); err != nil {
+		var googleErr *googleapi.Error
+		if errors.As(err, &googleErr) {
+			if googleErr.Code == http.StatusNotFound {
+				return nil, cerrors.NewUserError("configured sheet doesn't exist", err)
+			} else if googleErr.Code == http.StatusForbidden {
+				return nil, cerrors.NewUserError("not authorized to view configured sheet", err)
+			}
+		}
+
 		return nil, fmt.Errorf("verifying credentials: %w", err)
 	}
 
