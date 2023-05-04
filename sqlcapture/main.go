@@ -7,7 +7,8 @@ import (
 	"os"
 	"strings"
 
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -163,7 +164,8 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		})
 	}
 	if len(errs) > 0 {
-		return nil, &prerequisitesError{errs}
+		e := &prerequisitesError{errs}
+		return nil, cerrors.NewUserError(e.Error(), nil)
 	}
 	return &pc.Response_Validated{Bindings: out}, nil
 }
@@ -250,7 +252,8 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	if len(errs) > 0 {
-		return &prerequisitesError{errs}
+		e := &prerequisitesError{errs}
+		return cerrors.NewUserError(e.Error(), nil)
 	}
 
 	var c = Capture{
