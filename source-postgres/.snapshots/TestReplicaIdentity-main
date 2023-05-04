@@ -8,5 +8,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.replicaidentity":{"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.replicaidentity":{"backfilled":5,"key_columns":["id"],"mode":"Active"}}}
 

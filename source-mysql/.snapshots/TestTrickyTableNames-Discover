@@ -2,6 +2,7 @@ Binding 0:
 {
     "recommended_name": "test_users____",
     "resource_config_json": {
+      "mode": "Normal",
       "namespace": "test",
       "stream": "UsErS!@#$"
     },

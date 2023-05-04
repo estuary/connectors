@@ -104,5 +104,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_catalogprimarykeyoverride":{"key_columns":["fullname","year"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.generic_catalogprimarykeyoverride":{"backfilled":100,"key_columns":["fullname","year"],"mode":"Active"}}}
 

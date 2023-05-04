@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_multiplestreams_one":{"key_columns":["id"],"mode":"Active"},"test.generic_multiplestreams_three":{"key_columns":["id"],"mode":"Active"},"test.generic_multiplestreams_two":{"mode":"Ignore"}}}
+{"cursor":"0/1111111","streams":{"test.generic_multiplestreams_one":{"backfilled":3,"key_columns":["id"],"mode":"Active"},"test.generic_multiplestreams_three":{"backfilled":3,"key_columns":["id"],"mode":"Active"},"test.generic_multiplestreams_two":{"backfilled":0,"mode":"Ignore"}}}
 

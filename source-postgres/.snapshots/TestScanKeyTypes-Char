@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Backfill","scanned":"AiAgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"AiAgIAA="}}}
 
 
 ####################################
@@ -21,7 +21,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Backfill","scanned":"AkEgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"AkEgIAA="}}}
 
 
 ####################################
@@ -34,7 +34,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Backfill","scanned":"AkIgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":3,"key_columns":["key"],"mode":"Backfill","scanned":"AkIgIAA="}}}
 
 
 ####################################
@@ -47,7 +47,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Backfill","scanned":"AkMgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":4,"key_columns":["key"],"mode":"Backfill","scanned":"AkMgIAA="}}}
 
 
 ####################################
@@ -60,7 +60,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Backfill","scanned":"Al9hIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":5,"key_columns":["key"],"mode":"Backfill","scanned":"Al9hIAA="}}}
 
 
 ####################################
@@ -73,7 +73,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Backfill","scanned":"Al9iIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":6,"key_columns":["key"],"mode":"Backfill","scanned":"Al9iIAA="}}}
 
 
 ####################################
@@ -86,7 +86,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Backfill","scanned":"Al9jIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":7,"key_columns":["key"],"mode":"Backfill","scanned":"Al9jIAA="}}}
 
 
 ####################################
@@ -99,7 +99,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Backfill","scanned":"AmEgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":8,"key_columns":["key"],"mode":"Backfill","scanned":"AmEgIAA="}}}
 
 
 ####################################
@@ -112,7 +112,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Backfill","scanned":"AmIgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":9,"key_columns":["key"],"mode":"Backfill","scanned":"AmIgIAA="}}}
 
 
 ####################################
@@ -125,7 +125,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Backfill","scanned":"AmMgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":10,"key_columns":["key"],"mode":"Backfill","scanned":"AmMgIAA="}}}
 
 
 ####################################
@@ -134,7 +134,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"key_columns":["key"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":10,"key_columns":["key"],"mode":"Active"}}}
 
 
 

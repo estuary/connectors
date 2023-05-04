@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"key_columns":["key"],"mode":"Backfill","scanned":"E/w="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"E/w="}}}
 
 
 ####################################
@@ -21,7 +21,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"key_columns":["key"],"mode":"Backfill","scanned":"FA=="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"FA=="}}}
 
 
 ####################################
@@ -34,7 +34,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"key_columns":["key"],"mode":"Backfill","scanned":"FQI="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"backfilled":3,"key_columns":["key"],"mode":"Backfill","scanned":"FQI="}}}
 
 
 ####################################
@@ -47,7 +47,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"key_columns":["key"],"mode":"Backfill","scanned":"Fga7"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"backfilled":4,"key_columns":["key"],"mode":"Backfill","scanned":"Fga7"}}}
 
 
 ####################################
@@ -56,7 +56,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"key_columns":["key"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"backfilled":4,"key_columns":["key"],"mode":"Active"}}}
 
 
 
