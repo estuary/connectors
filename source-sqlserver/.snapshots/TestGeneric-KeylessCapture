@@ -1,5 +1,0 @@
-# ================================
-# Final State Checkpoint
-# ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_keylesscapture":{"mode":"KeylessBackfill"}}}
-

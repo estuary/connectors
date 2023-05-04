@@ -97,28 +97,25 @@ type testBackend struct {
 }
 
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs ...string) *st.CaptureSpec {
+	var sanitizers = make(map[string]*regexp.Regexp)
+	for k, v := range st.DefaultSanitizers {
+		sanitizers[k] = v
+	}
+	sanitizers[`"cursor":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"cursor":"[0-9A-Za-z+/=]+"`)
+	sanitizers[`"lsn":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"lsn":"[0-9A-Za-z+/=]+"`)
+	sanitizers[`"seqval":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"seqval":"[0-9A-Za-z+/=]+"`)
+
 	var cfg = tb.config
 	var cs = &st.CaptureSpec{
 		Driver:       sqlserverDriver,
 		EndpointSpec: &cfg,
 		Validator:    &st.SortedCaptureValidator{},
-		Sanitizers:   CaptureSanitizers,
+		Sanitizers:   sanitizers,
 	}
 	if len(streamIDs) > 0 {
 		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamIDs...)
 	}
 	return cs
-}
-
-var CaptureSanitizers = make(map[string]*regexp.Regexp)
-
-func init() {
-	for k, v := range st.DefaultSanitizers {
-		CaptureSanitizers[k] = v
-	}
-	CaptureSanitizers[`"cursor":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"cursor":"[0-9A-Za-z+/=]+"`)
-	CaptureSanitizers[`"lsn":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"lsn":"[0-9A-Za-z+/=]+"`)
-	CaptureSanitizers[`"seqval":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"seqval":"[0-9A-Za-z+/=]+"`)
 }
 
 // CreateTable creates a new database table whose name is based on the current test

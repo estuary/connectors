@@ -11,42 +11,61 @@ import (
 )
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, keyColumns []string, resumeAfter []byte) ([]*sqlcapture.ChangeEvent, error) {
+func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState) ([]*sqlcapture.ChangeEvent, error) {
+	var keyColumns = state.KeyColumns
+	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
-
-	// Decode the resumeAfter key if non-nil
-	var err error
-	var resumeKey []interface{}
-	if resumeAfter != nil {
-		resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
-		if err != nil {
-			return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
-		}
-		if len(resumeKey) != len(keyColumns) {
-			return nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
-		}
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"stream":     streamID,
-		"keyColumns": keyColumns,
-		"resumeKey":  resumeKey,
-	}).Debug("scanning table chunk")
 
 	var columnTypes = make(map[string]interface{})
 	for name, column := range info.Columns {
 		columnTypes[name] = column.DataType
 	}
 
-	// Build a query to fetch the next `backfillChunkSize` rows from the database.
+	// Compute backfill query and arguments list
+	var query string
+	var args []any
+	switch state.Mode {
+	case sqlcapture.TableModeKeylessBackfill:
+		logrus.WithFields(logrus.Fields{
+			"stream": streamID,
+			"offset": state.BackfilledCount,
+		}).Debug("scanning keyless table chunk")
+		query = db.keylessScanQuery(info, schema, table)
+		args = []any{state.BackfilledCount}
+	case sqlcapture.TableModeBackfill:
+		if resumeAfter != nil {
+			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
+			if err != nil {
+				return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+			}
+			if len(resumeKey) != len(keyColumns) {
+				return nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+			}
+			logrus.WithFields(logrus.Fields{
+				"stream":     streamID,
+				"keyColumns": keyColumns,
+				"resumeKey":  resumeKey,
+			}).Debug("scanning subsequent table chunk")
+			query = db.buildScanQuery(false, keyColumns, columnTypes, schema, table)
+			args = resumeKey
+		} else {
+			logrus.WithFields(logrus.Fields{
+				"stream":     streamID,
+				"keyColumns": keyColumns,
+			}).Debug("scanning initial table chunk")
+			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
+		}
+	default:
+		return nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
+	}
+
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
-	var query = db.buildScanQuery(resumeKey == nil, keyColumns, columnTypes, schema, table)
-	db.explainQuery(ctx, streamID, query, resumeKey)
+	db.explainQuery(ctx, streamID, query, args)
 
 	// Execute the backfill query to fetch rows from the database
-	logrus.WithFields(logrus.Fields{"query": query, "args": resumeKey}).Debug("executing query")
-	rows, err := db.conn.Query(ctx, query, resumeKey...)
+	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
+	rows, err := db.conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
@@ -55,6 +74,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	// Process the results into `changeEvent` structs and return them
 	var cols = rows.FieldDescriptions()
 	var events []*sqlcapture.ChangeEvent
+	var rowOffset = state.BackfilledCount
 	logrus.WithField("stream", streamID).Debug("translating query rows to change events")
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
@@ -66,9 +86,14 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		for idx := range cols {
 			fields[string(cols[idx].Name)] = vals[idx]
 		}
-		rowKey, err := sqlcapture.EncodeRowKey(keyColumns, fields, nil, encodeKeyFDB)
-		if err != nil {
-			return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+		var rowKey []byte
+		if state.Mode == sqlcapture.TableModeKeylessBackfill {
+			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset)) // A 19 digit decimal number is sufficient to hold any 63-bit integer
+		} else {
+			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
+			if err != nil {
+				return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+			}
 		}
 		if err := translateRecordFields(info, fields); err != nil {
 			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
@@ -84,11 +109,12 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 					Snapshot: true,
 					Table:    table,
 				},
-				Location: [3]pglogrepl.LSN{},
+				Location: [3]pglogrepl.LSN{}, // TODO(wgd): Synthesize fake LSN from row offset?
 			},
 			Before: nil,
 			After:  fields,
 		})
+		rowOffset++
 	}
 	return events, nil
 }
@@ -117,6 +143,15 @@ var columnBinaryKeyComparison = map[string]bool{
 	"varchar": true,
 	"bpchar":  true,
 	"text":    true,
+}
+
+func (db *postgresDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
+	var query = new(strings.Builder)
+	fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
+	fmt.Fprintf(query, ` ORDER BY ctid`)
+	fmt.Fprintf(query, ` LIMIT %d`, db.config.Advanced.BackfillChunkSize)
+	fmt.Fprintf(query, ` OFFSET $1;`)
+	return query.String()
 }
 
 func (db *postgresDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {

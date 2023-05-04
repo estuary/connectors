@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test.generic_replicationonly": 2048 Documents
+# Collection "acmeCo/test/test_generic_replicationonly": 2048 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationOnly"}},"data":"Batch 10 Value 0","id":10000000}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationOnly"}},"data":"Batch 10 Value 1","id":10000001}

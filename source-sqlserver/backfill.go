@@ -25,38 +25,57 @@ func (db *sqlserverDatabase) ShouldBackfill(streamID string) bool {
 }
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
-func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, keyColumns []string, resumeAfter []byte) ([]*sqlcapture.ChangeEvent, error) {
+func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState) ([]*sqlcapture.ChangeEvent, error) {
+	var keyColumns = state.KeyColumns
+	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
-
-	// Decode the resumeAfter key if non-nil
-	var err error
-	var resumeKey []interface{}
-	if resumeAfter != nil {
-		resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
-		if err != nil {
-			return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
-		}
-		if len(resumeKey) != len(keyColumns) {
-			return nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
-		}
-	}
-
-	log.WithFields(log.Fields{
-		"stream":     streamID,
-		"keyColumns": keyColumns,
-		"resumeKey":  resumeKey,
-	}).Debug("scanning table chunk")
 
 	var columnTypes = make(map[string]interface{})
 	for name, column := range info.Columns {
 		columnTypes[name] = column.DataType
 	}
 
-	var query = db.buildScanQuery(resumeKey == nil, keyColumns, columnTypes, schema, table)
+	// Compute backfill query and arguments list
+	var query string
+	var args []any
+	switch state.Mode {
+	case sqlcapture.TableModeKeylessBackfill:
+		log.WithFields(log.Fields{
+			"stream": streamID,
+			"offset": state.BackfilledCount,
+		}).Debug("scanning keyless table chunk")
+		query = db.keylessScanQuery(info, schema, table)
+		args = []any{state.BackfilledCount}
+	case sqlcapture.TableModeBackfill:
+		if resumeAfter != nil {
+			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
+			if err != nil {
+				return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+			}
+			if len(resumeKey) != len(keyColumns) {
+				return nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+			}
+			log.WithFields(log.Fields{
+				"stream":     streamID,
+				"keyColumns": keyColumns,
+				"resumeKey":  resumeKey,
+			}).Debug("scanning subsequent table chunk")
+			query = db.buildScanQuery(false, keyColumns, columnTypes, schema, table)
+			args = resumeKey
+		} else {
+			log.WithFields(log.Fields{
+				"stream":     streamID,
+				"keyColumns": keyColumns,
+			}).Debug("scanning initial table chunk")
+			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
+		}
+	default:
+		return nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
+	}
 
-	log.WithFields(log.Fields{"query": query, "args": resumeKey}).Debug("executing query")
-	rows, err := db.conn.QueryContext(ctx, query, resumeKey...)
+	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
+	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
@@ -75,6 +94,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 
 	// Iterate over the result set appending change events to the list
 	var events []*sqlcapture.ChangeEvent
+	var rowOffset = state.BackfilledCount
 	for rows.Next() {
 		if err := rows.Scan(vptrs...); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
@@ -84,9 +104,14 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			fields[name] = vals[idx]
 		}
 
-		var rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
-		if err != nil {
-			return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+		var rowKey []byte
+		if state.Mode == sqlcapture.TableModeKeylessBackfill {
+			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset)) // A 19 digit decimal number is sufficient to hold any 63-bit integer
+		} else {
+			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
+			if err != nil {
+				return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+			}
 		}
 		if err := db.translateRecordFields(columnTypes, fields); err != nil {
 			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
@@ -106,6 +131,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			Before: nil,
 			After:  fields,
 		})
+		rowOffset++
 	}
 	return events, nil
 }
@@ -119,6 +145,19 @@ var columnTypeCollatedText = map[string]bool{
 	"varchar":  true,
 	"nchar":    true,
 	"nvarchar": true,
+}
+
+func (db *sqlserverDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
+	var orderColumns []string
+	for _, name := range info.ColumnNames {
+		orderColumns = append(orderColumns, quoteColumnName(name))
+	}
+
+	var query = new(strings.Builder)
+	fmt.Fprintf(query, "SELECT * FROM %s.%s", schemaName, tableName)
+	fmt.Fprintf(query, " ORDER BY %%%%physloc%%%%")
+	fmt.Fprintf(query, " OFFSET @p1 ROWS FETCH FIRST %d ROWS ONLY;", db.config.Advanced.BackfillChunkSize)
+	return query.String()
 }
 
 func (db *sqlserverDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {

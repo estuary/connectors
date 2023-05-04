@@ -96,28 +96,25 @@ func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 }
 
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs ...string) *st.CaptureSpec {
+	var sanitizers = make(map[string]*regexp.Regexp)
+	for k, v := range st.DefaultSanitizers {
+		sanitizers[k] = v
+	}
+	sanitizers[`"loc":[11111111,11111111,11111111]`] = regexp.MustCompile(`"loc":\[[0-9]+,[0-9]+,[0-9]+\]`)
+	sanitizers[`"cursor":"0/1111111"`] = regexp.MustCompile(`"cursor":"0/[0-9A-F]+"`)
+	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
+
 	var cfg = tb.config
 	var cs = &st.CaptureSpec{
 		Driver:       postgresDriver,
 		EndpointSpec: &cfg,
 		Validator:    &st.SortedCaptureValidator{},
-		Sanitizers:   CaptureSanitizers,
+		Sanitizers:   sanitizers,
 	}
 	if len(streamIDs) > 0 {
 		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamIDs...)
 	}
 	return cs
-}
-
-var CaptureSanitizers = make(map[string]*regexp.Regexp)
-
-func init() {
-	for k, v := range st.DefaultSanitizers {
-		CaptureSanitizers[k] = v
-	}
-	CaptureSanitizers[`"loc":[11111111,11111111,11111111]`] = regexp.MustCompile(`"loc":\[[0-9]+,[0-9]+,[0-9]+\]`)
-	CaptureSanitizers[`"cursor":"0/1111111"`] = regexp.MustCompile(`"cursor":"0/[0-9A-F]+"`)
-	CaptureSanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 }
 
 // CreateTable is a test helper for creating a new database table and returning the
