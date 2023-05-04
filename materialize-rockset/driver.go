@@ -11,7 +11,7 @@ import (
 	// without requiring timezone packages to be installed on the system.
 	_ "time/tzdata"
 
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	rockset "github.com/rockset/rockset-go-client"

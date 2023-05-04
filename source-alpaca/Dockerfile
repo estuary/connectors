@@ -1,6 +1,6 @@
 # Build Stage
 ################################################################################
-FROM golang:1.19-buster as builder
+FROM golang:1.20-buster as builder
 
 WORKDIR /builder
 
@@ -9,12 +9,9 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Build the connector projects we depend on.
+COPY go                 ./go
 COPY source-boilerplate ./source-boilerplate
-COPY go-schema-gen  ./go-schema-gen
-RUN go get -v ./source-boilerplate ./go-schema-gen
-
-COPY source-alpaca ./source-alpaca
+COPY source-alpaca      ./source-alpaca
 
 # Run the unit tests.
 RUN go test -v ./source-alpaca/...

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-s3-parquet/checkpoint"
 	pf "github.com/estuary/flow/go/protocols/flow"

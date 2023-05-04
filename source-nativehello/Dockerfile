@@ -1,6 +1,6 @@
 # Build Stage
 ################################################################################
-FROM golang:1.19-buster as builder
+FROM golang:1.20-buster as builder
 
 WORKDIR /builder
 
@@ -9,16 +9,15 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Copy over helper packages that the connector uses and then build them and
-# their transitive dependencies to aid in layer caching.
-COPY go-schema-gen      ./go-schema-gen
+COPY go                 ./go
 COPY source-boilerplate ./source-boilerplate
-RUN go get -v ./go-schema-gen ./source-boilerplate
-
-# Copy and build and test the connector (there are currently no tests)
 COPY source-nativehello ./source-nativehello
+
+# Run the unit tests.
+RUN go test -v ./source-nativehello/...
+
+# Build the connector.
 RUN go build -o ./connector -v ./source-nativehello
-# RUN go test -v ./source-nativehello/...
 
 
 # Runtime Stage

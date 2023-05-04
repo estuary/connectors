@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-firebolt/firebolt"
 	"github.com/estuary/connectors/materialize-firebolt/schemalate"

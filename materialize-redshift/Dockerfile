@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.19-bullseye as builder
+FROM --platform=linux/amd64 golang:1.20-bullseye as builder
 
 WORKDIR /builder
 
@@ -14,13 +14,11 @@ RUN go mod download
 # Copy in the latest flowctl-go for usage by tests.
 COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go
 
-# Build the connector projects we depend on.
-COPY go-schema-gen           ./go-schema-gen
+COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-redshift    ./materialize-redshift
 COPY materialize-sql         ./materialize-sql
 COPY testsupport             ./testsupport
-COPY go-network-tunnel       ./go-network-tunnel
 
 # Test and build the connector.
 RUN go test  -tags nozstd,nodb -v ./materialize-redshift/...
