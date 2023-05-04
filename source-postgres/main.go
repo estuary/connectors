@@ -10,13 +10,15 @@ import (
 	"strings"
 	"time"
 
-	networkTunnel "github.com/estuary/connectors/go-network-tunnel"
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
@@ -202,10 +204,23 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("error parsing database uri: %w", err)
 	}
 	if config.ConnectTimeout == 0 {
-		config.ConnectTimeout = 30 * time.Second
+		config.ConnectTimeout = 10 * time.Second
 	}
 	conn, err := pgx.ConnectConfig(ctx, config)
 	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) {
+			switch pgErr.Code {
+			case "28P01":
+				return cerrors.NewUserError("incorrect username or password", err)
+			case "3D000":
+				return cerrors.NewUserError(fmt.Sprintf("database %q does not exist", db.config.Database), err)
+			case "42501":
+				return cerrors.NewUserError(fmt.Sprintf("user %q does not have CONNECT privilege to database %q", db.config.User, db.config.Database), err)
+			}
+		}
+
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 	db.conn = conn
