@@ -17,7 +17,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgdsAkdBAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":10,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgdsAkdBAA=="}}}
 
 
 ####################################
@@ -39,7 +39,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgdsAk1FAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":20,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgdsAk1FAA=="}}}
 
 
 ####################################
@@ -61,7 +61,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgdsAk5KAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":30,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgdsAk5KAA=="}}}
 
 
 ####################################
@@ -83,7 +83,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgdsAlNEAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":40,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgdsAlNEAA=="}}}
 
 
 ####################################
@@ -105,7 +105,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeAAkFMAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":50,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeAAkFMAA=="}}}
 
 
 ####################################
@@ -127,7 +127,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeAAklBAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":60,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeAAklBAA=="}}}
 
 
 ####################################
@@ -149,7 +149,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeAAk1JAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":70,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeAAk1JAA=="}}}
 
 
 ####################################
@@ -171,7 +171,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeAAk5NAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":80,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeAAk5NAA=="}}}
 
 
 ####################################
@@ -193,7 +193,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeAAlROAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":90,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeAAlROAA=="}}}
 
 
 ####################################
@@ -215,7 +215,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAkFSAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":100,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAkFSAA=="}}}
 
 
 ####################################
@@ -237,7 +237,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAklEAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":110,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAklEAA=="}}}
 
 
 ####################################
@@ -259,7 +259,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAk1OAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":120,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAk1OAA=="}}}
 
 
 ####################################
@@ -281,7 +281,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAk5WAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":130,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAk5WAA=="}}}
 
 
 ####################################
@@ -303,7 +303,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAlRYAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":140,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeUAlRYAA=="}}}
 
 
 ####################################
@@ -325,7 +325,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAkFSAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":150,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAkFSAA=="}}}
 
 
 ####################################
@@ -347,7 +347,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAklBAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":160,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAklBAA=="}}}
 
 
 ####################################
@@ -369,7 +369,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAk1JAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":170,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAk1JAA=="}}}
 
 
 ####################################
@@ -391,7 +391,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAk5NAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":180,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAk5NAA=="}}}
 
 
 ####################################
@@ -413,7 +413,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAlROAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":190,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgeoAlROAA=="}}}
 
 
 ####################################
@@ -435,7 +435,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8AkFMAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":200,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8AkFMAA=="}}}
 
 
 ####################################
@@ -457,7 +457,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8AkhJAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":210,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8AkhJAA=="}}}
 
 
 ####################################
@@ -479,7 +479,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8Ak1FAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":220,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8Ak1FAA=="}}}
 
 
 ####################################
@@ -501,7 +501,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8Ak5KAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":230,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8Ak5KAA=="}}}
 
 
 ####################################
@@ -523,7 +523,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8AlNEAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":240,"key_columns":["year","state"],"mode":"Backfill","scanned":"Fge8AlNEAA=="}}}
 
 
 ####################################
@@ -545,7 +545,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAkFLAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":250,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAkFLAA=="}}}
 
 
 ####################################
@@ -567,7 +567,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAkdBAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":260,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAkdBAA=="}}}
 
 
 ####################################
@@ -589,7 +589,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAk1EAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":270,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAk1EAA=="}}}
 
 
 ####################################
@@ -611,7 +611,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAk5IAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":280,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAk5IAA=="}}}
 
 
 ####################################
@@ -633,7 +633,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAlNDAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":290,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAlNDAA=="}}}
 
 
 ####################################
@@ -655,7 +655,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAldZAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":300,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfQAldZAA=="}}}
 
 
 ####################################
@@ -677,7 +677,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAkZMAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":310,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAkZMAA=="}}}
 
 
 ####################################
@@ -699,7 +699,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAk1BAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":320,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAk1BAA=="}}}
 
 
 ####################################
@@ -721,7 +721,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAk5FAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":330,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAk5FAA=="}}}
 
 
 ####################################
@@ -743,7 +743,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAlJJAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":340,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAlJJAA=="}}}
 
 
 ####################################
@@ -765,7 +765,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAldWAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":350,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAldWAA=="}}}
 
 
 ####################################
@@ -778,7 +778,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAldZAA=="}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":351,"key_columns":["year","state"],"mode":"Backfill","scanned":"FgfkAldZAA=="}}}
 
 
 ####################################
@@ -787,7 +787,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.complexdataset":{"key_columns":["year","state"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.complexdataset":{"backfilled":351,"key_columns":["year","state"],"mode":"Active"}}}
 
 
 

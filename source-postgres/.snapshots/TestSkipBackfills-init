@@ -7,5 +7,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.skipbackfills_aaa":{"key_columns":["id"],"mode":"Active"},"test.skipbackfills_bbb":{"key_columns":["id"],"mode":"Active"},"test.skipbackfills_ccc":{"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.skipbackfills_aaa":{"backfilled":0,"key_columns":["id"],"mode":"Active"},"test.skipbackfills_bbb":{"backfilled":3,"key_columns":["id"],"mode":"Active"},"test.skipbackfills_ccc":{"backfilled":0,"key_columns":["id"],"mode":"Active"}}}
 

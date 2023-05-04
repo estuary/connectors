@@ -104,5 +104,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_catalogprimarykey":{"key_columns":["fullname","year"],"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_catalogprimarykey":{"backfilled":100,"key_columns":["fullname","year"],"mode":"Active"}}}
 

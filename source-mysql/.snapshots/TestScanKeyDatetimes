@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":1,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMDAwAA=="}}}
 
 
 ####################################
@@ -21,7 +21,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMTExMDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":2,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMTExMDAwAA=="}}}
 
 
 ####################################
@@ -34,7 +34,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMjIyMDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":3,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMjIyMDAwAA=="}}}
 
 
 ####################################
@@ -47,7 +47,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMzMzMDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":4,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMzMzMDAwAA=="}}}
 
 
 ####################################
@@ -60,7 +60,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNDQ0MDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":5,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNDQ0MDAwAA=="}}}
 
 
 ####################################
@@ -73,7 +73,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNTU1MDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":6,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNTU1MDAwAA=="}}}
 
 
 ####################################
@@ -86,7 +86,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNjY2MDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":7,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNjY2MDAwAA=="}}}
 
 
 ####################################
@@ -99,7 +99,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNzc3MDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":8,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuNzc3MDAwAA=="}}}
 
 
 ####################################
@@ -112,7 +112,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuODg4MDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":9,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuODg4MDAwAA=="}}}
 
 
 ####################################
@@ -125,7 +125,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuOTk5MDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":10,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuOTk5MDAwAA=="}}}
 
 
 ####################################
@@ -134,7 +134,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes":{"backfilled":10,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Active"}}}
 
 
 

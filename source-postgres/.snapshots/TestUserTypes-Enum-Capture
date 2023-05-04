@@ -7,5 +7,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.usertypes_enum_terror":{"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.usertypes_enum_terror":{"backfilled":3,"key_columns":["id"],"mode":"Active"}}}
 

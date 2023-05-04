@@ -11,5 +11,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.capturecapitalization_aaaaa":{"key_columns":["id"],"mode":"Active"},"test.capturecapitalization_bbbbb":{"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.capturecapitalization_aaaaa":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"test.capturecapitalization_bbbbb":{"backfilled":2,"key_columns":["id"],"mode":"Active"}}}
 

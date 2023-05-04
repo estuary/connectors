@@ -2,6 +2,7 @@ Binding 0:
 {
     "recommended_name": "test_secondaryindexdiscovery_pk_and_index_g14228",
     "resource_config_json": {
+      "mode": "Normal",
       "namespace": "test",
       "stream": "secondaryindexdiscovery_pk_and_index_g14228"
     },

@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer":{"key_columns":["k"],"mode":"Backfill","scanned":"E/w="}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"E/w="}}}
 
 
 ####################################
@@ -21,7 +21,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer":{"key_columns":["k"],"mode":"Backfill","scanned":"FA=="}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"FA=="}}}
 
 
 ####################################
@@ -34,7 +34,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer":{"key_columns":["k"],"mode":"Backfill","scanned":"FQI="}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"FQI="}}}
 
 
 ####################################
@@ -47,7 +47,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer":{"key_columns":["k"],"mode":"Backfill","scanned":"Fga7"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer":{"backfilled":4,"key_columns":["k"],"mode":"Backfill","scanned":"Fga7"}}}
 
 
 ####################################
@@ -56,7 +56,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer":{"key_columns":["k"],"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_integer":{"backfilled":4,"key_columns":["k"],"mode":"Active"}}}
 
 
 

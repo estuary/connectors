@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI1MDAwMDAwLTA2OjAwAA=="}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI1MDAwMDAwLTA2OjAwAA=="}}}
 
 
 ####################################
@@ -21,7 +21,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI2MDAwMDAwLTA2OjAwAA=="}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI2MDAwMDAwLTA2OjAwAA=="}}}
 
 
 ####################################
@@ -34,7 +34,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"key_columns":["k"],"mode":"Backfill","scanned":"AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwMDAwMDAwWgA="}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwMDAwMDAwWgA="}}}
 
 
 ####################################
@@ -43,7 +43,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"key_columns":["k"],"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"backfilled":3,"key_columns":["k"],"mode":"Active"}}}
 
 
 

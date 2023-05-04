@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_replicationupdates":{"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.generic_replicationupdates":{"backfilled":3,"key_columns":["id"],"mode":"Active"}}}
 

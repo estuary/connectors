@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo.test_generic_keylesscapture": 500 Documents
+# Collection "acmeCo/test/test_generic_keylesscapture": 500 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_keylesscapture","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"Row Number 500","id":500}
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_keylesscapture","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"Row Number 501","id":501}
