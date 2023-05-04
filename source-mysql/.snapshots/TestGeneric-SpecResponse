@@ -111,6 +111,17 @@
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/sqlcapture/resource",
     "properties": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "Normal",
+          "Only Changes",
+          "Without Primary Key"
+        ],
+        "title": "Backfill Mode",
+        "description": "How the preexisting contents of the table should be backfilled. This should generally not be changed.",
+        "default": "Normal"
+      },
       "namespace": {
         "type": "string",
         "title": "Schema",
@@ -124,6 +135,7 @@
     },
     "type": "object",
     "required": [
+      "mode",
       "namespace",
       "stream"
     ],

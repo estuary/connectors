@@ -235,7 +235,7 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
 
-	var state = &PersistentState{Streams: make(map[string]TableState)}
+	var state = &PersistentState{Streams: make(map[string]*TableState)}
 	if len(open.StateJson) > 0 {
 		if err := pf.UnmarshalStrict(open.StateJson, state); err != nil {
 			return fmt.Errorf("unable to parse state checkpoint: %w", err)

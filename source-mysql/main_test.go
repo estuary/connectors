@@ -93,27 +93,24 @@ func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 }
 
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs ...string) *st.CaptureSpec {
+	var sanitizers = make(map[string]*regexp.Regexp)
+	for k, v := range st.DefaultSanitizers {
+		sanitizers[k] = v
+	}
+	sanitizers[`"binlog.000123:56789"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+"`)
+	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
+
 	var cfg = tb.config
 	var cs = &st.CaptureSpec{
 		Driver:       mysqlDriver,
 		EndpointSpec: &cfg,
 		Validator:    &st.SortedCaptureValidator{},
-		Sanitizers:   CaptureSanitizers,
+		Sanitizers:   sanitizers,
 	}
 	if len(streamIDs) > 0 {
 		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamIDs...)
 	}
 	return cs
-}
-
-var CaptureSanitizers = make(map[string]*regexp.Regexp)
-
-func init() {
-	for k, v := range st.DefaultSanitizers {
-		CaptureSanitizers[k] = v
-	}
-	CaptureSanitizers[`"binlog.000123:56789"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+"`)
-	CaptureSanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 }
 
 func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {

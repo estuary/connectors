@@ -6,5 +6,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.altertable_multiplealterations_aaa":{"key_columns":["id"],"metadata":{"schema":{"columns":["extra_first","id","extra_after_id","extra_end"],"types":{"extra_after_id":"text","extra_end":"text","extra_first":"text","id":"int"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_multiplealterations_aaa":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["extra_first","id","extra_after_id","extra_end"],"types":{"extra_after_id":"text","extra_end":"text","extra_first":"text","id":"int"}}},"mode":"Active"}}}
 

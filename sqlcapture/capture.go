@@ -19,8 +19,8 @@ import (
 // PersistentState represents the part of a connector's state which can be serialized
 // and emitted in a state checkpoint, and resumed from after a restart.
 type PersistentState struct {
-	Cursor  string                `json:"cursor"`            // The replication cursor of the most recent 'Commit' event
-	Streams map[string]TableState `json:"streams,omitempty"` // A mapping from table IDs (<namespace>.<table>) to table-specific state.
+	Cursor  string                 `json:"cursor"`            // The replication cursor of the most recent 'Commit' event
+	Streams map[string]*TableState `json:"streams,omitempty"` // A mapping from table IDs (<namespace>.<table>) to table-specific state.
 }
 
 // Validate performs basic sanity-checking after a state has been parsed from JSON. More
@@ -31,11 +31,14 @@ func (ps *PersistentState) Validate() error {
 
 // StreamsInState returns the IDs of all streams in a particular
 // state, in sorted order for reproducibility.
-func (ps *PersistentState) StreamsInState(mode string) []string {
+func (ps *PersistentState) StreamsInState(modes ...string) []string {
 	var streams []string
 	for id, tableState := range ps.Streams {
-		if tableState.Mode == mode {
-			streams = append(streams, id)
+		for _, mode := range modes {
+			if tableState.Mode == mode {
+				streams = append(streams, id)
+				break
+			}
 		}
 	}
 	sort.Strings(streams)
@@ -59,6 +62,8 @@ type TableState struct {
 	// which needs to be tracked persistently on a per-table basis. The
 	// original purpose is/was for tracking table schema information.
 	Metadata json.RawMessage `json:"metadata,omitempty"`
+	// BackfilledCount is a counter of the number of rows backfilled.
+	BackfilledCount int `json:"backfilled"`
 	// dirty is set whenever the table state changes, and cleared whenever
 	// a state update is emitted. It should never be serialized itself.
 	dirty bool
@@ -205,7 +210,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 
 		var state = c.State.Streams[streamID]
 		switch binding.Resource.Mode {
-		case BackfillModeNormal:
+		case BackfillModeNormal, "":
 			state.Mode = TableModeBackfill
 		case BackfillModeOnlyChanges:
 			state.Mode = TableModeActive
@@ -256,7 +261,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 
 	// Backfill any tables which require it
 	var results *resultSet
-	for c.State.StreamsInState(TableModeBackfill) != nil {
+	for c.State.StreamsInState(TableModeBackfill, TableModeKeylessBackfill) != nil {
 		var watermark = uuid.New().String()
 		if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
 			return fmt.Errorf("error writing next watermark: %w", err)
@@ -266,7 +271,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		} else if err := c.emitBuffered(results); err != nil {
 			return fmt.Errorf("error emitting buffered results: %w", err)
 		}
-		results, err = c.backfillStreams(ctx, c.State.StreamsInState(TableModeBackfill))
+		results, err = c.backfillStreams(ctx, c.State.StreamsInState(TableModeBackfill, TableModeKeylessBackfill))
 		if err != nil {
 			return fmt.Errorf("error performing backfill: %w", err)
 		}
@@ -293,7 +298,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 func (c *Capture) updateState(ctx context.Context) error {
 	// Create the Streams map if nil
 	if c.State.Streams == nil {
-		c.State.Streams = make(map[string]TableState)
+		c.State.Streams = make(map[string]*TableState)
 	}
 
 	// Streams may be added to the catalog at various times. We need to
@@ -346,7 +351,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 		// See if the stream is already initialized. If it's not, then create it.
 		var streamState, ok = c.State.Streams[streamID]
 		if !ok || streamState.Mode == TableModeIgnore {
-			c.State.Streams[streamID] = TableState{Mode: TableModePending, KeyColumns: primaryKey, dirty: true}
+			c.State.Streams[streamID] = &TableState{Mode: TableModePending, KeyColumns: primaryKey, dirty: true}
 			continue
 		}
 
@@ -362,7 +367,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 		var _, streamExistsInCatalog = c.Bindings[streamID]
 		if !streamExistsInCatalog {
 			logrus.WithField("stream", streamID).Info("stream removed from catalog")
-			c.State.Streams[streamID] = TableState{Mode: TableModeIgnore, dirty: true}
+			c.State.Streams[streamID] = &TableState{Mode: TableModeIgnore, dirty: true}
 		}
 	}
 
@@ -469,14 +474,14 @@ func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationS
 
 		// Handle the easy cases: Events on ignored or fully-active tables.
 		var tableState = c.State.Streams[streamID]
-		if tableState.Mode == "" || tableState.Mode == TableModeIgnore {
+		if tableState == nil || tableState.Mode == "" || tableState.Mode == TableModeIgnore {
 			logrus.WithFields(logrus.Fields{
 				"stream": streamID,
 				"op":     event.Operation,
 			}).Debug("ignoring stream")
 			continue
 		}
-		if tableState.Mode == TableModeActive {
+		if tableState.Mode == TableModeActive || tableState.Mode == TableModeKeylessBackfill {
 			if err := c.handleChangeEvent(streamID, event); err != nil {
 				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 			}
@@ -522,6 +527,7 @@ func (c *Capture) emitBuffered(results *resultSet) error {
 			state.Scanned = nil
 		} else {
 			state.Scanned = results.Scanned(streamID)
+			state.BackfilledCount += len(events)
 		}
 
 		logrus.WithField("stream", streamID).Trace("stream mode/cursor changed")
@@ -555,7 +561,8 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 		if !ok {
 			return nil, fmt.Errorf("unknown table %q", streamID)
 		}
-		events, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState.KeyColumns, streamState.Scanned)
+
+		var events, err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning table %q: %w", streamID, err)
 		}
@@ -583,11 +590,10 @@ func (c *Capture) emitState() error {
 	// Put together an update which includes only those streams which have changed
 	// since the last state output. At the same time, clear the dirty flags on all
 	// those tables.
-	var streams = make(map[string]TableState)
+	var streams = make(map[string]*TableState)
 	for streamID, state := range c.State.Streams {
 		if state.dirty {
 			state.dirty = false
-			c.State.Streams[streamID] = state
 			streams[streamID] = state
 		}
 	}
