@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo.test_generic_replicationonly": 2048 Documents
+# Collection "acmeCo/test/test_generic_replicationonly": 2048 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_replicationonly","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"Batch 10 Value 0","id":10000000}
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_replicationonly","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"Batch 10 Value 1","id":10000001}
@@ -2052,5 +2052,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationonly":{"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationonly":{"backfilled":0,"mode":"Active"}}}
 

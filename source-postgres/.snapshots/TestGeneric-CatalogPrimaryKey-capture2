@@ -7,5 +7,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_catalogprimarykey":{"key_columns":["fullname","year"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.generic_catalogprimarykey":{"backfilled":100,"key_columns":["fullname","year"],"mode":"Active"}}}
 

@@ -7,5 +7,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_columnnamequoting":{"key_columns":["id","data","CAPITALIZED","unique","type"],"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_columnnamequoting":{"backfilled":3,"key_columns":["id","data","CAPITALIZED","unique","type"],"mode":"Active"}}}
 

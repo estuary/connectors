@@ -8,7 +8,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"key_columns":["key"],"mode":"Backfill","scanned":"Jg=="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"Jg=="}}}
 
 
 ####################################
@@ -21,7 +21,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"key_columns":["key"],"mode":"Backfill","scanned":"Jw=="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"Jw=="}}}
 
 
 ####################################
@@ -30,7 +30,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"key_columns":["key"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"backfilled":2,"key_columns":["key"],"mode":"Active"}}}
 
 
 

@@ -1,5 +1,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_replicationonly":{"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.generic_replicationonly":{"backfilled":0,"mode":"Active"}}}
 

@@ -2,6 +2,7 @@ Binding 0:
 {
     "recommended_name": "test_secondaryindexdiscovery_nonunique_index_g22906",
     "resource_config_json": {
+      "mode": "Without Primary Key",
       "namespace": "test",
       "stream": "secondaryindexdiscovery_nonunique_index_g22906"
     },
