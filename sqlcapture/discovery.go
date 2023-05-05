@@ -139,6 +139,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 
 		var suggestedMode = BackfillModeNormal
 		if len(keyPointers) == 0 {
+			keyPointers = db.FallbackCollectionKey()
 			suggestedMode = BackfillModeWithoutKey
 		}
 		var res = Resource{
