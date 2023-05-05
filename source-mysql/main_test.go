@@ -97,6 +97,7 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs 
 	for k, v := range st.DefaultSanitizers {
 		sanitizers[k] = v
 	}
+	sanitizers[`"binlog.000123:56789:123"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+:[0-9]+"`)
 	sanitizers[`"binlog.000123:56789"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+"`)
 	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 

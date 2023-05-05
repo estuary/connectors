@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -118,6 +119,8 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		}
 
 		log.WithField("fields", fields).Trace("got row")
+		var seqval = make([]byte, 10)
+		binary.BigEndian.PutUint64(seqval[2:], uint64(rowOffset))
 		events = append(events, &sqlcapture.ChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			RowKey:    rowKey,
@@ -127,6 +130,8 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 					Snapshot: true,
 					Table:    table,
 				},
+				LSN:    nil,
+				SeqVal: seqval,
 			},
 			Before: nil,
 			After:  fields,
