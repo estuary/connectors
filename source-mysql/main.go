@@ -309,6 +309,10 @@ func (db *mysqlDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &mysqlSourceInfo{}
 }
 
+func (db *mysqlDatabase) FallbackCollectionKey() []string {
+	return []string{"/_meta/source/cursor"}
+}
+
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 	switch val := key.(type) {
 	case []byte:

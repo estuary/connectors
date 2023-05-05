@@ -114,6 +114,11 @@ Binding 0:
           "$ref": "#TestGeneric_keylessdiscovery_t32386"
         }
       ]
-    }
+    },
+    "key": [
+      "/_meta/source/loc/0",
+      "/_meta/source/loc/1",
+      "/_meta/source/loc/2"
+    ]
   }
 

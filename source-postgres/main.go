@@ -223,6 +223,10 @@ func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &postgresSource{}
 }
 
+func (db *postgresDatabase) FallbackCollectionKey() []string {
+	return []string{"/_meta/source/loc/0", "/_meta/source/loc/1", "/_meta/source/loc/2"}
+}
+
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 	switch key := key.(type) {
 	case [16]uint8:

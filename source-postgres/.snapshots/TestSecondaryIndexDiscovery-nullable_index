@@ -117,6 +117,11 @@ Binding 0:
           "$ref": "#TestSecondaryindexdiscovery_nullable_index_g31990"
         }
       ]
-    }
+    },
+    "key": [
+      "/_meta/source/loc/0",
+      "/_meta/source/loc/1",
+      "/_meta/source/loc/2"
+    ]
   }
 

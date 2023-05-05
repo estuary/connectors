@@ -109,6 +109,9 @@ Binding 0:
           "$ref": "#TestGeneric_KeylessDiscovery_t32386"
         }
       ]
-    }
+    },
+    "key": [
+      "/_meta/source/cursor"
+    ]
   }
 
