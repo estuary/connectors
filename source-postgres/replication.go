@@ -130,10 +130,6 @@ func (s *postgresSource) Common() sqlcapture.SourceCommon {
 	return s.SourceCommon
 }
 
-func (s *postgresSource) Cursor() string {
-	return s.Location[pgLocLastCommitEndLSN].String()
-}
-
 // A replicationStream represents the process of receiving PostgreSQL
 // Logical Replication events, managing keepalives and status updates,
 // and translating changes into a more friendly representation. There
@@ -333,11 +329,8 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		s.nextTxnFinalLSN = 0
 		s.nextTxnMillis = 0
 		s.lastTxnEndLSN = msg.TransactionEndLSN
-
 		var event = &sqlcapture.FlushEvent{
-			Source: &postgresSource{
-				Location: [3]pglogrepl.LSN{s.lastTxnEndLSN, lsn, 0},
-			},
+			Cursor: s.lastTxnEndLSN.String(),
 		}
 		logrus.WithField("lsn", s.lastTxnEndLSN).Debug("commit event")
 		return event, nil
