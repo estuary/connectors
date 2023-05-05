@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/jackc/pglogrepl"
 	"github.com/sirupsen/logrus"
 )
 
@@ -109,7 +108,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 					Snapshot: true,
 					Table:    table,
 				},
-				Location: [3]pglogrepl.LSN{0, pglogrepl.LSN(rowOffset), 0},
+				Location: [3]int{-1, rowOffset, 0},
 			},
 			Before: nil,
 			After:  fields,

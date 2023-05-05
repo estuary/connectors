@@ -228,14 +228,12 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				continue
 			}
 
-			var sourceMeta = &mysqlSourceInfo{
-				SourceCommon: sqlcapture.SourceCommon{
-					Schema: schema,
-					Table:  table,
-				},
+			var sourceCommon = sqlcapture.SourceCommon{
+				Schema: schema,
+				Table:  table,
 			}
 			if !rs.gtidTimestamp.IsZero() {
-				sourceMeta.SourceCommon.Millis = rs.gtidTimestamp.UnixMilli()
+				sourceCommon.Millis = rs.gtidTimestamp.UnixMilli()
 			}
 
 			// Get column names and types from persistent metadata. If available, allow
@@ -257,7 +255,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 
 			switch event.Header.EventType {
 			case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
-				for _, row := range data.Rows {
+				for rowIdx, row := range data.Rows {
 					var after, err = decodeRow(streamID, columnNames, row)
 					if err != nil {
 						return fmt.Errorf("error decoding row values: %w", err)
@@ -272,8 +270,14 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					rs.events <- &sqlcapture.ChangeEvent{
 						Operation: sqlcapture.InsertOp,
 						RowKey:    rowKey,
-						Source:    sourceMeta,
 						After:     after,
+						Source: &mysqlSourceInfo{
+							SourceCommon: sourceCommon,
+							// TODO(wgd): At some point in the future we'd like to make a breaking
+							// connector change so that instead of a single `cursor` property we have
+							// separate fields for filename, position, and row index within the event.
+							EventCursor: fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx),
+						},
 					}
 				}
 			case replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
@@ -301,14 +305,17 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						rs.events <- &sqlcapture.ChangeEvent{
 							Operation: sqlcapture.UpdateOp,
 							RowKey:    rowKey,
-							Source:    sourceMeta,
 							Before:    before,
 							After:     after,
+							Source: &mysqlSourceInfo{
+								SourceCommon: sourceCommon,
+								EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx/2),
+							},
 						}
 					}
 				}
 			case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
-				for _, row := range data.Rows {
+				for rowIdx, row := range data.Rows {
 					var before, err = decodeRow(streamID, columnNames, row)
 					if err != nil {
 						return fmt.Errorf("error decoding row values: %w", err)
@@ -323,8 +330,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					rs.events <- &sqlcapture.ChangeEvent{
 						Operation: sqlcapture.DeleteOp,
 						RowKey:    rowKey,
-						Source:    sourceMeta,
 						Before:    before,
+						Source: &mysqlSourceInfo{
+							SourceCommon: sourceCommon,
+							EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx),
+						},
 					}
 				}
 			default:
