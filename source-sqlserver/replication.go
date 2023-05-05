@@ -34,10 +34,6 @@ func (si *sqlserverSourceInfo) Common() sqlcapture.SourceCommon {
 	return si.SourceCommon
 }
 
-func (si *sqlserverSourceInfo) Cursor() string {
-	return base64.StdEncoding.EncodeToString(si.LSN)
-}
-
 // ReplicationStream constructs a new ReplicationStream object, from which
 // a neverending sequence of change events can be read.
 func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
@@ -240,9 +236,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 
 	log.WithField("lsn", toLSN).Trace("flushed up to LSN")
 	rs.events <- &sqlcapture.FlushEvent{
-		Source: &sqlserverSourceInfo{
-			LSN: toLSN,
-		},
+		Cursor: base64.StdEncoding.EncodeToString(toLSN),
 	}
 	rs.fromLSN = toLSN
 

@@ -352,13 +352,9 @@ func (db *mysqlDatabase) ShouldBackfill(streamID string) bool {
 // mysqlSourceInfo is source metadata for data capture events.
 type mysqlSourceInfo struct {
 	sqlcapture.SourceCommon
-	FlushCursor string `json:"cursor,omitempty" jsonschema:"description=Cursor value representing the current position in the binlog."`
+	EventCursor string `json:"cursor,omitempty" jsonschema:"description=Cursor value representing the current position in the binlog."`
 }
 
 func (s *mysqlSourceInfo) Common() sqlcapture.SourceCommon {
 	return s.SourceCommon
-}
-
-func (s *mysqlSourceInfo) Cursor() string {
-	return s.FlushCursor
 }
