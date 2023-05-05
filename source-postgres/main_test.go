@@ -100,7 +100,7 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs 
 	for k, v := range st.DefaultSanitizers {
 		sanitizers[k] = v
 	}
-	sanitizers[`"loc":[11111111,11111111,11111111]`] = regexp.MustCompile(`"loc":\[[0-9]+,[0-9]+,[0-9]+\]`)
+	sanitizers[`"loc":[11111111,11111111,11111111]`] = regexp.MustCompile(`"loc":\[(-1|[0-9]+),[0-9]+,[0-9]+\]`)
 	sanitizers[`"cursor":"0/1111111"`] = regexp.MustCompile(`"cursor":"0/[0-9A-F]+"`)
 	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 
