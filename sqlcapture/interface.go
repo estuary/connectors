@@ -57,7 +57,6 @@ type SourceCommon struct {
 // SourceMetadata is source-specific metadata about data capture events.
 type SourceMetadata interface {
 	Common() SourceCommon
-	Cursor() string // TODO(wgd): Maybe json.RawMessage?
 }
 
 // ChangeEvent represents an Insert/Update/Delete operation on a specific
@@ -73,7 +72,7 @@ type ChangeEvent struct {
 // FlushEvent informs the generic sqlcapture logic about transaction
 // boundaries.
 type FlushEvent struct {
-	Source SourceMetadata
+	Cursor string // TODO(wgd): Maybe json.RawMessage?
 }
 
 // MetadataEvent informs the generic sqlcapture logic about changes to

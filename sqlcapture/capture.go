@@ -428,7 +428,7 @@ func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationS
 		// Flush events update the checkpointed LSN and trigger a state update.
 		// If this is the commit after the target watermark, it also ends the loop.
 		if event, ok := event.(*FlushEvent); ok {
-			c.State.Cursor = event.Source.Cursor()
+			c.State.Cursor = event.Cursor
 			if err := c.emitState(); err != nil {
 				return fmt.Errorf("error emitting state update: %w", err)
 			}

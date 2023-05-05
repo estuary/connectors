@@ -346,9 +346,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				"cursor": rs.cursor,
 			}).Trace("XID Event")
 			rs.events <- &sqlcapture.FlushEvent{
-				Source: &mysqlSourceInfo{
-					FlushCursor: fmt.Sprintf("%s:%d", rs.cursor.Name, rs.cursor.Pos),
-				},
+				Cursor: fmt.Sprintf("%s:%d", rs.cursor.Name, rs.cursor.Pos),
 			}
 		case *replication.TableMapEvent:
 			logrus.WithField("data", data).Trace("Table Map Event")

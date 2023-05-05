@@ -109,7 +109,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 					Snapshot: true,
 					Table:    table,
 				},
-				Location: [3]pglogrepl.LSN{}, // TODO(wgd): Synthesize fake LSN from row offset?
+				Location: [3]pglogrepl.LSN{0, pglogrepl.LSN(rowOffset), 0},
 			},
 			Before: nil,
 			After:  fields,
