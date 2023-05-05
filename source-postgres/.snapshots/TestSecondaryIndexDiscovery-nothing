@@ -111,6 +111,11 @@ Binding 0:
           "$ref": "#TestSecondaryindexdiscovery_nothing_g14307"
         }
       ]
-    }
+    },
+    "key": [
+      "/_meta/source/loc/0",
+      "/_meta/source/loc/1",
+      "/_meta/source/loc/2"
+    ]
   }
 

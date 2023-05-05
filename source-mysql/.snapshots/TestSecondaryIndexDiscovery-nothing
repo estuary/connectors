@@ -106,6 +106,9 @@ Binding 0:
           "$ref": "#TestSecondaryIndexDiscovery_nothing_g14307"
         }
       ]
-    }
+    },
+    "key": [
+      "/_meta/source/cursor"
+    ]
   }
 

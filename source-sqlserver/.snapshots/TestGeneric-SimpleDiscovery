@@ -89,6 +89,8 @@ Binding 0:
                       "description": "The LSN at which a CDC event occurred. Only set for CDC events"
                     },
                     "seqval": {
+                      "type": "string",
+                      "contentEncoding": "base64",
                       "description": "Sequence value used to order changes to a row within a transaction. Only set for CDC events"
                     },
                     "updateMask": {

@@ -220,3 +220,7 @@ func (db *sqlserverDatabase) Close(ctx context.Context) error {
 func (db *sqlserverDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 	return &sqlserverSourceInfo{}
 }
+
+func (db *sqlserverDatabase) FallbackCollectionKey() []string {
+	return []string{"/_meta/source/lsn", "/_meta/source/seqval"}
+}

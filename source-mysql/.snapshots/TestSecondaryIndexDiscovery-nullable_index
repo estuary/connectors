@@ -112,6 +112,9 @@ Binding 0:
           "$ref": "#TestSecondaryIndexDiscovery_nullable_index_g31990"
         }
       ]
-    }
+    },
+    "key": [
+      "/_meta/source/cursor"
+    ]
   }
 

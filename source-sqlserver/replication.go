@@ -26,7 +26,7 @@ type sqlserverSourceInfo struct {
 	sqlcapture.SourceCommon
 
 	LSN        []byte `json:"lsn,omitempty" jsonschema:"description=The LSN at which a CDC event occurred. Only set for CDC events, not backfills."`
-	SeqVal     any    `json:"seqval,omitempty" jsonschema:"description=Sequence value used to order changes to a row within a transaction. Only set for CDC events, not backfills."`
+	SeqVal     []byte `json:"seqval,omitempty" jsonschema:"description=Sequence value used to order changes to a row within a transaction. Only set for CDC events, not backfills."`
 	UpdateMask any    `json:"updateMask,omitempty" jsonschema:"description=A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events, not backfills."`
 }
 
@@ -334,9 +334,13 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, fromLSN, to
 		delete(fields, "__$operation")
 
 		// Move the '__$seqval' and '__$update_mask' columns into metadata as well.
-		var seqval = fields["__$seqval"]
-		var updateMask = fields["__$update_mask"]
+		seqval, ok := fields["__$seqval"].([]byte)
+		if !ok || seqval == nil {
+			return fmt.Errorf("invalid '__$seqval' value: %v", seqval)
+		}
 		delete(fields, "__$seqval")
+
+		var updateMask = fields["__$update_mask"]
 		delete(fields, "__$update_mask")
 
 		var rowKey, err = sqlcapture.EncodeRowKey(info.KeyColumns, fields, info.ColumnTypes, encodeKeyFDB)

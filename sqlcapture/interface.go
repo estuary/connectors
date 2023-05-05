@@ -129,6 +129,11 @@ type Database interface {
 	// ShouldBackfill returns true if a given table's contents should be backfilled.
 	ShouldBackfill(streamID string) bool
 
+	// The collection key which should be suggested if discovery fails to find suitable
+	// primary key. This should be some property or combination of properties in the
+	// source metadata which encodes the database change sequence.
+	FallbackCollectionKey() []string
+
 	// SetupPrerequisites verifies that various database requirements (things like
 	// "Is CDC enabled on this DB?" and "Does the user have replication access?")
 	// are met, and possibly attempts to perform some setup. It may return multiple
