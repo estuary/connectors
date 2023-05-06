@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/test_prerequisites_aaa": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Prerequisites_aaa"}},"data":"hello","id":0}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Prerequisites_aaa"}},"data":"world","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Prerequisites_aaa","cursor":"backfill:0"}},"data":"hello","id":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Prerequisites_aaa","cursor":"backfill:1"}},"data":"world","id":1}
 # ================================
 # Final State Checkpoint
 # ================================

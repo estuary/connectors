@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/test_altertable_addcolumnbasic_aaa": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_aaa"}},"data":"ggg","extra_end":"extra_end_5","id":5}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_aaa"}},"data":"hhh","extra_end":"extra_end_6","id":6}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_aaa","cursor":"binlog.000123:56789:123"}},"data":"ggg","extra_end":"extra_end_5","id":5}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_aaa","cursor":"binlog.000123:56789:123"}},"data":"hhh","extra_end":"extra_end_6","id":6}
 # ================================
 # Final State Checkpoint
 # ================================

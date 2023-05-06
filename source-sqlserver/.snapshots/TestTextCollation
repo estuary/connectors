@@ -1,10 +1,10 @@
 # ================================
 # Collection "acmeCo/test/test_textcollation": 4 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation"}},"data":"3","id":"-J C"}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation"}},"data":"1","id":"AAA"}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation"}},"data":"2","id":"BBB"}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation"}},"data":"4","id":"H R"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation","seqval":"AAAAAAAAAAAAAA=="}},"data":"3","id":"-J C"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation","seqval":"AAAAAAAAAAAAAA=="}},"data":"1","id":"AAA"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation","seqval":"AAAAAAAAAAAAAA=="}},"data":"2","id":"BBB"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation","seqval":"AAAAAAAAAAAAAA=="}},"data":"4","id":"H R"}
 # ================================
 # Final State Checkpoint
 # ================================

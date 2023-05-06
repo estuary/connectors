@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/users____": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UsErS!@#$"}},"data":"Carol","id":3}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UsErS!@#$"}},"data":"Dave","id":4}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UsErS!@#$","cursor":"binlog.000123:56789:123"}},"data":"Carol","id":3}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UsErS!@#$","cursor":"binlog.000123:56789:123"}},"data":"Dave","id":4}
 # ================================
 # Final State Checkpoint
 # ================================

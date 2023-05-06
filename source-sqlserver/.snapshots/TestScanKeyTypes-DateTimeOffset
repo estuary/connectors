@@ -4,7 +4,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_datetimeoffset": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset"}},"k":"<TIMESTAMP>","v":"Data 0"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 0"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -17,7 +17,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_datetimeoffset": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset"}},"k":"<TIMESTAMP>","v":"Data 1"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 1"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -30,7 +30,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_datetimeoffset": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset"}},"k":"<TIMESTAMP>","v":"Data 2"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 2"}
 # ================================
 # Final State Checkpoint
 # ================================

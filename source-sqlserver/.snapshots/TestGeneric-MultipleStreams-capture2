@@ -1,15 +1,15 @@
 # ================================
 # Collection "acmeCo/test/test_generic_multiplestreams_three": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_three"}},"data":"eight","id":8}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_three"}},"data":"seven","id":7}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_three"}},"data":"six","id":6}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_three","seqval":"AAAAAAAAAAAAAA=="}},"data":"eight","id":8}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_three","seqval":"AAAAAAAAAAAAAA=="}},"data":"seven","id":7}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_three","seqval":"AAAAAAAAAAAAAA=="}},"data":"six","id":6}
 # ================================
 # Collection "acmeCo/test/test_generic_multiplestreams_two": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_two"}},"data":"five","id":5}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_two"}},"data":"four","id":4}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_two"}},"data":"three","id":3}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_two","seqval":"AAAAAAAAAAAAAA=="}},"data":"five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_two","seqval":"AAAAAAAAAAAAAA=="}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_two","seqval":"AAAAAAAAAAAAAA=="}},"data":"three","id":3}
 # ================================
 # Final State Checkpoint
 # ================================

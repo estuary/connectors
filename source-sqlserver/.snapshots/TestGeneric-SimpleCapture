@@ -1,11 +1,11 @@
 # ================================
 # Collection "acmeCo/test/test_generic_simplecapture": 5 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_SimpleCapture"}},"data":"5","id":4}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_SimpleCapture"}},"data":"A","id":0}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_SimpleCapture"}},"data":"CDEFGHIJKLMNOP","id":2}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_SimpleCapture"}},"data":"Four","id":3}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_SimpleCapture"}},"data":"bbb","id":1}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_SimpleCapture","seqval":"AAAAAAAAAAAAAA=="}},"data":"5","id":4}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_SimpleCapture","seqval":"AAAAAAAAAAAAAA=="}},"data":"A","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_SimpleCapture","seqval":"AAAAAAAAAAAAAA=="}},"data":"CDEFGHIJKLMNOP","id":2}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_SimpleCapture","seqval":"AAAAAAAAAAAAAA=="}},"data":"Four","id":3}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_SimpleCapture","seqval":"AAAAAAAAAAAAAA=="}},"data":"bbb","id":1}
 # ================================
 # Final State Checkpoint
 # ================================
