@@ -4,7 +4,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"aood","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes","cursor":"backfill:0"}},"data":"aood","ts":"<TIMESTAMP>"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -17,7 +17,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"xwxt","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes","cursor":"backfill:1"}},"data":"xwxt","ts":"<TIMESTAMP>"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -30,7 +30,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"tpxi","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes","cursor":"backfill:2"}},"data":"tpxi","ts":"<TIMESTAMP>"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -43,7 +43,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"jvqz","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes","cursor":"backfill:3"}},"data":"jvqz","ts":"<TIMESTAMP>"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -56,7 +56,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"juwf","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes","cursor":"backfill:4"}},"data":"juwf","ts":"<TIMESTAMP>"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -69,7 +69,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"znzn","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes","cursor":"backfill:5"}},"data":"znzn","ts":"<TIMESTAMP>"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -82,7 +82,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"zocp","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes","cursor":"backfill:6"}},"data":"zocp","ts":"<TIMESTAMP>"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -95,7 +95,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"pxoi","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes","cursor":"backfill:7"}},"data":"pxoi","ts":"<TIMESTAMP>"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -108,7 +108,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"vdug","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes","cursor":"backfill:8"}},"data":"vdug","ts":"<TIMESTAMP>"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -121,7 +121,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes"}},"data":"xerk","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyDatetimes","cursor":"backfill:9"}},"data":"xerk","ts":"<TIMESTAMP>"}
 # ================================
 # Final State Checkpoint
 # ================================

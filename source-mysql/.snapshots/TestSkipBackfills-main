@@ -1,21 +1,21 @@
 # ================================
 # Collection "acmeCo/test/test_skipbackfills_aaa": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_aaa"}},"data":"eleven","id":11}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_aaa"}},"data":"ten","id":10}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_aaa"}},"data":"twelve","id":12}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_aaa","cursor":"binlog.000123:56789:123"}},"data":"eleven","id":11}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_aaa","cursor":"binlog.000123:56789:123"}},"data":"ten","id":10}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_aaa","cursor":"binlog.000123:56789:123"}},"data":"twelve","id":12}
 # ================================
 # Collection "acmeCo/test/test_skipbackfills_bbb": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_bbb"}},"data":"fifteen","id":15}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_bbb"}},"data":"fourteen","id":14}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_bbb"}},"data":"thirteen","id":13}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_bbb","cursor":"binlog.000123:56789:123"}},"data":"fifteen","id":15}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_bbb","cursor":"binlog.000123:56789:123"}},"data":"fourteen","id":14}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_bbb","cursor":"binlog.000123:56789:123"}},"data":"thirteen","id":13}
 # ================================
 # Collection "acmeCo/test/test_skipbackfills_ccc": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_ccc"}},"data":"eighteen","id":18}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_ccc"}},"data":"seventeen","id":17}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_ccc"}},"data":"sixteen","id":16}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_ccc","cursor":"binlog.000123:56789:123"}},"data":"eighteen","id":18}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_ccc","cursor":"binlog.000123:56789:123"}},"data":"seventeen","id":17}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SkipBackfills_ccc","cursor":"binlog.000123:56789:123"}},"data":"sixteen","id":16}
 # ================================
 # Final State Checkpoint
 # ================================

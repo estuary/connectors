@@ -4,7 +4,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 2","k":-1.1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:0"}},"data":"Data 2","k":-1.1}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -17,7 +17,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 1","k":-1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:1"}},"data":"Data 1","k":-1}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -30,7 +30,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 0","k":-0.9}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:2"}},"data":"Data 0","k":-0.9}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -43,7 +43,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 3","k":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:3"}},"data":"Data 3","k":0}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -56,7 +56,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 4","k":0.9}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:4"}},"data":"Data 4","k":0.9}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -69,7 +69,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 5","k":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:5"}},"data":"Data 5","k":1}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -82,7 +82,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 6","k":1.111}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:6"}},"data":"Data 6","k":1.111}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -95,7 +95,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 7","k":1.222}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:7"}},"data":"Data 7","k":1.222}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -108,7 +108,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 8","k":1.333}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:8"}},"data":"Data 8","k":1.333}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -121,7 +121,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 9","k":1.444}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:9"}},"data":"Data 9","k":1.444}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -134,7 +134,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 10","k":1.555}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:10"}},"data":"Data 10","k":1.555}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -147,7 +147,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 11","k":1.666}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:11"}},"data":"Data 11","k":1.666}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -160,7 +160,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 12","k":1.777}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:12"}},"data":"Data 12","k":1.777}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -173,7 +173,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 13","k":1.888}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:13"}},"data":"Data 13","k":1.888}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -186,7 +186,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 14","k":1.999}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:14"}},"data":"Data 14","k":1.999}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -199,7 +199,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_real": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real"}},"data":"Data 15","k":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Real","cursor":"backfill:15"}},"data":"Data 15","k":2}
 # ================================
 # Final State Checkpoint
 # ================================
