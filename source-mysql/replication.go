@@ -72,6 +72,8 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
 		// Request that timestamp values coming via replication be interpreted as UTC.
 		TimestampStringLocation: time.UTC,
+		// Limit connection retries so unreachability eventually bubbles up into task failure.
+		MaxReconnectAttempts: 10,
 	}
 
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
