@@ -4,7 +4,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_bool": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool"}},"data":"Data 1","k":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool","cursor":"backfill:0"}},"data":"Data 1","k":0}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -17,7 +17,7 @@
 # ================================
 # Collection "acmeCo/test/test_scankeytypes_bool": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool"}},"data":"Data 0","k":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool","cursor":"backfill:1"}},"data":"Data 0","k":1}
 # ================================
 # Final State Checkpoint
 # ================================

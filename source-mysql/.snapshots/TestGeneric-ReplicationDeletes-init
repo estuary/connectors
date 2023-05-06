@@ -1,11 +1,11 @@
 # ================================
 # Collection "acmeCo/test/test_generic_replicationdeletes": 5 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes"}},"data":"5","id":4}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes"}},"data":"A","id":0}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes"}},"data":"CDEFGHIJKLMNOP","id":2}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes"}},"data":"Four","id":3}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes"}},"data":"bbb","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes","cursor":"backfill:0"}},"data":"A","id":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes","cursor":"backfill:1"}},"data":"bbb","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes","cursor":"backfill:2"}},"data":"CDEFGHIJKLMNOP","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes","cursor":"backfill:3"}},"data":"Four","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes","cursor":"backfill:4"}},"data":"5","id":4}
 # ================================
 # Final State Checkpoint
 # ================================

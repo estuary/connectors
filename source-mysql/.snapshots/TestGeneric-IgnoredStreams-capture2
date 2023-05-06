@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/test_generic_ignoredstreams_one": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_IgnoredStreams_one"}},"data":"eight","id":8}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_IgnoredStreams_one"}},"data":"six","id":6}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_IgnoredStreams_one","cursor":"binlog.000123:56789:123"}},"data":"eight","id":8}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_IgnoredStreams_one","cursor":"binlog.000123:56789:123"}},"data":"six","id":6}
 # ================================
 # Final State Checkpoint
 # ================================

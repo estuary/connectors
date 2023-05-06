@@ -1,9 +1,9 @@
 # ================================
 # Collection "acmeCo/test/test_skipbackfills_bbb": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_bbb"}},"data":"five","id":5}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_bbb"}},"data":"four","id":4}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_bbb"}},"data":"six","id":6}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_bbb","cursor":"backfill:0"}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_bbb","cursor":"backfill:1"}},"data":"five","id":5}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_bbb","cursor":"backfill:2"}},"data":"six","id":6}
 # ================================
 # Final State Checkpoint
 # ================================

@@ -4,7 +4,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":-1,"data":"kvxr","epoch":""}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:0"}},"count":-1,"data":"kvxr","epoch":""}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -17,7 +17,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":0,"data":"xakg","epoch":""}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:1"}},"count":0,"data":"xakg","epoch":""}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -30,7 +30,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":3,"data":"gboj","epoch":"   "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:2"}},"count":3,"data":"gboj","epoch":"   "}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -43,7 +43,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":1,"data":"bvzf","epoch":"aaa"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:3"}},"count":1,"data":"bvzf","epoch":"aaa"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -56,7 +56,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":2,"data":"ukwh","epoch":"aaa"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:4"}},"count":2,"data":"ukwh","epoch":"aaa"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -69,7 +69,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":3,"data":"lntg","epoch":"aaa"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:5"}},"count":3,"data":"lntg","epoch":"aaa"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -82,7 +82,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":-100,"data":"bycz","epoch":"bbb"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:6"}},"count":-100,"data":"bycz","epoch":"bbb"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -95,7 +95,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":2,"data":"ajgp","epoch":"bbb"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:7"}},"count":2,"data":"ajgp","epoch":"bbb"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -108,7 +108,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":333,"data":"zljj","epoch":"bbb"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:8"}},"count":333,"data":"zljj","epoch":"bbb"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -121,7 +121,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":4096,"data":"lhnw","epoch":"bbb"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:9"}},"count":4096,"data":"lhnw","epoch":"bbb"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -134,7 +134,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":800000,"data":"iask","epoch":"bbb"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:10"}},"count":800000,"data":"iask","epoch":"bbb"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -147,7 +147,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":1234,"data":"bikh","epoch":"ccc"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:11"}},"count":1234,"data":"bikh","epoch":"ccc"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -160,7 +160,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":-10000,"data":"dhqc","epoch":"ddd"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:12"}},"count":-10000,"data":"dhqc","epoch":"ddd"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -173,7 +173,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":1,"data":"djsf","epoch":"x"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:13"}},"count":1,"data":"djsf","epoch":"x"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -186,7 +186,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":1,"data":"iwnx","epoch":"y"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:14"}},"count":1,"data":"iwnx","epoch":"y"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -199,7 +199,7 @@
 # ================================
 # Collection "acmeCo/test/test_cursorresume": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume"}},"count":1,"data":"qmjp","epoch":"z"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CursorResume","cursor":"backfill:15"}},"count":1,"data":"qmjp","epoch":"z"}
 # ================================
 # Final State Checkpoint
 # ================================

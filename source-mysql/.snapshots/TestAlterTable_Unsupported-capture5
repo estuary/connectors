@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/test_altertable_unsupported_bbb": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_Unsupported_bbb"}},"data":30,"id":3}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_Unsupported_bbb"}},"data":40,"id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_Unsupported_bbb","cursor":"backfill:0"}},"data":30,"id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_Unsupported_bbb","cursor":"backfill:1"}},"data":40,"id":4}
 # ================================
 # Final State Checkpoint
 # ================================
