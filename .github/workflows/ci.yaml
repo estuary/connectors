@@ -284,6 +284,12 @@ jobs:
           - tag: materialize-amazon-aurora-postgres
             base: materialize-postgres
             docsURL: "https://go.estuary.dev/materialize-amazon-aurora-postgres"
+          - tag: source-cosmosdb-mongodb
+            base: source-mongodb
+            docsURL: "https://go.estuary.dev/source-mongodb"
+          - tag: materialize-cosmosdb-mongodb
+            base: materialize-mongodb
+            docsURL: "https://go.estuary.dev/source-mongodb"
 
     steps:
       - uses: actions/checkout@v2
