@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	stdsql "database/sql"
 	"encoding/base64"
@@ -10,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -18,7 +16,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake"
 	"go.gazette.dev/core/consumer/protocol"
@@ -319,22 +316,20 @@ type binding struct {
 	// Variables exclusively used by Load.
 	load struct {
 		loadQuery string
-		stage     *scratchFile
-		hasKeys   bool
+		stage     *stagedFile
 	}
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
-		stage     *scratchFile
+		stage     *stagedFile
 		mergeInto string
 		copyInto  string
 		mustMerge bool
-		hasDocs   bool
 	}
 }
 
 type TableWithUUID struct {
 	Table      *sql.Table
-	RandomUUID uuid.UUID
+	RandomUUID string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
@@ -342,13 +337,8 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	var err error
 	d.target = target
 
-	// Create local scratch files used for loads and stores.
-	if d.load.stage, err = newScratchFile(os.TempDir()); err != nil {
-		return fmt.Errorf("newScratchFile: %w", err)
-	}
-	if d.store.stage, err = newScratchFile(os.TempDir()); err != nil {
-		return fmt.Errorf("newScratchFile: %w", err)
-	}
+	d.load.stage = newStagedFile(os.TempDir())
+	d.store.stage = newStagedFile(os.TempDir())
 
 	if d.load.loadQuery, err = RenderTableWithRandomUUIDTemplate(target, d.load.stage.uuid, tplLoadQuery); err != nil {
 		return fmt.Errorf("loadQuery template: %w", err)
@@ -370,27 +360,26 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if converted, err := b.target.ConvertKey(it.Key); err != nil {
+		if err := b.load.stage.start(ctx, d.load.conn); err != nil {
+			return err
+		} else if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
-		} else if err = b.load.stage.Encode(converted); err != nil {
+		} else if err = b.load.stage.encodeRow(converted); err != nil {
 			return fmt.Errorf("encoding Load key to scratch file: %w", err)
 		}
-		b.load.hasKeys = true
 	}
 	if it.Err() != nil {
 		return it.Err()
 	}
 
 	var subqueries []string
-	// PUT staged keys to Snowflake in preparation for querying.
 	for _, b := range d.bindings {
-		if !b.load.hasKeys {
+		if !b.load.stage.started {
 			// Pass.
-		} else if err := b.load.stage.put(ctx, d.load.conn, d.cfg); err != nil {
+		} else if err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
 			subqueries = append(subqueries, b.load.loadQuery)
-			b.load.hasKeys = false // Reset for next transaction.
 		}
 	}
 
@@ -428,24 +417,16 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+		if err := b.store.stage.start(it.Context(), d.store.conn); err != nil {
+			return nil, err
+		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
-		} else if err = b.store.stage.Encode(converted); err != nil {
+		} else if err = b.store.stage.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
 
 		if it.Exists {
 			b.store.mustMerge = true
-		}
-		b.store.hasDocs = true
-	}
-
-	for _, b := range d.bindings {
-		if b.store.hasDocs {
-			// PUT staged rows to Snowflake in preparation for commit.
-			if err := b.store.stage.put(it.Context(), d.store.conn, d.cfg); err != nil {
-				return nil, fmt.Errorf("store.stage(): %w", err)
-			}
 		}
 	}
 
@@ -482,8 +463,10 @@ func (d *transactor) commit(ctx context.Context) error {
 	}
 
 	for _, b := range d.bindings {
-		if !b.store.hasDocs {
+		if !b.store.stage.started {
 			// No table update required
+		} else if err := b.store.stage.flush(); err != nil {
+			return err
 		} else if !b.store.mustMerge {
 			// We can issue a faster COPY INTO the target table.
 			if _, err = d.store.conn.ExecContext(ctx, b.store.copyInto); err != nil {
@@ -497,7 +480,6 @@ func (d *transactor) commit(ctx context.Context) error {
 		}
 
 		// Reset for next transaction.
-		b.store.hasDocs = false
 		b.store.mustMerge = false
 	}
 
@@ -511,73 +493,6 @@ func (d *transactor) commit(ctx context.Context) error {
 func (d *transactor) Destroy() {
 	d.load.conn.Close()
 	d.store.conn.Close()
-
-	for _, b := range d.bindings {
-		b.load.stage.destroy()
-		b.store.stage.destroy()
-	}
-}
-
-type scratchFile struct {
-	uuid uuid.UUID
-	file *os.File
-	bw   *bufio.Writer
-	*json.Encoder
-}
-
-func (f *scratchFile) destroy() {
-	// TODO remove from Snowflake.
-	os.Remove(f.file.Name())
-	f.file.Close()
-}
-
-func newScratchFile(tempdir string) (*scratchFile, error) {
-	var uuid, err = uuid.NewRandom()
-	if err != nil {
-		panic(err)
-	}
-
-	var path = filepath.Join(tempdir, uuid.String())
-	file, err := os.Create(path)
-	if err != nil {
-		return nil, fmt.Errorf("creating scratch %q: %w", path, err)
-	}
-	var bw = bufio.NewWriter(file)
-	var enc = json.NewEncoder(bw)
-
-	return &scratchFile{
-		uuid:    uuid,
-		file:    file,
-		bw:      bw,
-		Encoder: enc,
-	}, nil
-}
-
-func (f *scratchFile) put(ctx context.Context, conn *stdsql.Conn, cfg *config) error {
-	if err := f.bw.Flush(); err != nil {
-		return fmt.Errorf("scratch.Flush: %w", err)
-	}
-
-	var query = fmt.Sprintf(
-		`PUT file://%s @flow_v1 AUTO_COMPRESS=FALSE SOURCE_COMPRESSION=NONE OVERWRITE=TRUE ;`,
-		f.file.Name(),
-	)
-
-	var rows, err = conn.QueryContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("PUT to stage: %w", err)
-	} else {
-		rows.Close()
-	}
-
-	if err := f.file.Truncate(0); err != nil {
-		return fmt.Errorf("truncate after stage: %w", err)
-	} else if _, err = f.file.Seek(0, 0); err != nil {
-		return fmt.Errorf("seek after truncate: %w", err)
-	}
-	f.bw.Reset(f.file)
-
-	return nil
 }
 
 func main() {
