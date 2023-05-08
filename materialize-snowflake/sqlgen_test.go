@@ -1,10 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
-	"os"
-	"encoding/json"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -17,7 +17,7 @@ import (
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
 	var specJson, err = os.ReadFile("testdata/spec.json")
-  require.NoError(t, err)
+	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(specJson, &spec))
 
 	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
@@ -40,7 +40,7 @@ func TestSQLGeneration(t *testing.T) {
 	for _, tbl := range []sqlDriver.Table{table1, table2} {
 		withUUID := TableWithUUID{
 			Table:      &tbl,
-			RandomUUID: uuid.UUID{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+			RandomUUID: uuid.UUID{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}.String(),
 		}
 
 		for _, tpl := range []*template.Template{
@@ -75,7 +75,7 @@ func TestSQLGeneration(t *testing.T) {
 
 	tableNoValuesWithUUID := TableWithUUID{
 		Table:      &tableNoValues,
-		RandomUUID: uuid.UUID{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+		RandomUUID: uuid.UUID{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}.String(),
 	}
 
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized mergeInto" + " ---")
