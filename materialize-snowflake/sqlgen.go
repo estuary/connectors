@@ -11,7 +11,6 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	"github.com/google/uuid"
 )
 
 // For historical reasons, we do not quote identifiers starting with an underscore or any letter,
@@ -251,7 +250,7 @@ FILE_FORMAT = (
 COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored documents'
 ;`
 
-func RenderTableWithRandomUUIDTemplate(table sql.Table, randomUUID uuid.UUID, tpl *template.Template) (string, error) {
+func RenderTableWithRandomUUIDTemplate(table sql.Table, randomUUID string, tpl *template.Template) (string, error) {
 	var w strings.Builder
 	if err := tpl.Execute(&w, &TableWithUUID{Table: &table, RandomUUID: randomUUID}); err != nil {
 		return "", err
