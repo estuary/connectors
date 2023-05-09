@@ -237,7 +237,7 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	} else {
 		if err, ok := perrors.Cause(err).(*mysql.MyError); ok {
 			if err.Code == mysql.ER_ACCESS_DENIED_ERROR {
-				return cerrors.NewUserError("incorrect username or password", err)
+				return cerrors.NewUserError(err, "incorrect username or password")
 			}
 		}
 

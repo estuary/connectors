@@ -136,9 +136,9 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		var googleErr *googleapi.Error
 		if errors.As(err, &googleErr) {
 			if googleErr.Code == http.StatusNotFound {
-				return nil, cerrors.NewUserError("configured sheet doesn't exist", err)
+				return nil, cerrors.NewUserError(err, "configured sheet doesn't exist")
 			} else if googleErr.Code == http.StatusForbidden {
-				return nil, cerrors.NewUserError("not authorized to view configured sheet", err)
+				return nil, cerrors.NewUserError(err, "not authorized to view configured sheet")
 			}
 		}
 
