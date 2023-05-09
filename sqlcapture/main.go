@@ -165,7 +165,7 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 	}
 	if len(errs) > 0 {
 		e := &prerequisitesError{errs}
-		return nil, cerrors.NewUserError(e.Error(), nil)
+		return nil, cerrors.NewUserError(nil, e.Error())
 	}
 	return &pc.Response_Validated{Bindings: out}, nil
 }
@@ -253,7 +253,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	if len(errs) > 0 {
 		e := &prerequisitesError{errs}
-		return cerrors.NewUserError(e.Error(), nil)
+		return cerrors.NewUserError(nil, e.Error())
 	}
 
 	var c = Capture{

@@ -195,9 +195,9 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 		if errors.As(err, &mssqlErr) {
 			switch mssqlErr.Number {
 			case 18456:
-				return cerrors.NewUserError("incorrect username or password", err)
+				return cerrors.NewUserError(err, "incorrect username or password")
 			case 4063:
-				return cerrors.NewUserError(fmt.Sprintf("cannot open database %q: database does not exist or user %q does not have access", db.config.Database, db.config.User), err)
+				return cerrors.NewUserError(err, fmt.Sprintf("cannot open database %q: database does not exist or user %q does not have access", db.config.Database, db.config.User))
 			}
 		}
 
