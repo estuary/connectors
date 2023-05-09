@@ -109,7 +109,7 @@ type postgresSource struct {
 
 	// This is a compact array to reduce noise in generated JSON outputs,
 	// and because a lexicographic ordering is also a correct event ordering.
-	Location [3]int `json:"loc,omitempty" jsonschema:"description=Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"`
+	Location [3]int `json:"loc" jsonschema:"description=Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"`
 
 	// Fields which are part of the Debezium Postgres representation but are not included here:
 	// * `lsn` is the log sequence number of this event. It's equal to loc[1].

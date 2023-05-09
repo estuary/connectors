@@ -102,7 +102,9 @@ Binding 0:
                   "type": "object",
                   "required": [
                     "schema",
-                    "table"
+                    "table",
+                    "lsn",
+                    "seqval"
                   ]
                 }
               },
