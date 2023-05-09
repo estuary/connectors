@@ -213,11 +213,11 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		if errors.As(err, &pgErr) {
 			switch pgErr.Code {
 			case "28P01":
-				return cerrors.NewUserError("incorrect username or password", err)
+				return cerrors.NewUserError(err, "incorrect username or password")
 			case "3D000":
-				return cerrors.NewUserError(fmt.Sprintf("database %q does not exist", db.config.Database), err)
+				return cerrors.NewUserError(err, fmt.Sprintf("database %q does not exist", db.config.Database))
 			case "42501":
-				return cerrors.NewUserError(fmt.Sprintf("user %q does not have CONNECT privilege to database %q", db.config.User, db.config.Database), err)
+				return cerrors.NewUserError(err, fmt.Sprintf("user %q does not have CONNECT privilege to database %q", db.config.User, db.config.Database))
 			}
 		}
 

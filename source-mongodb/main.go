@@ -104,7 +104,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		var mongoErr mongoDriver.Error
 
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, cerrors.NewUserError(fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", cfg.Address), err)
+			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", cfg.Address))
 		} else if errors.As(err, &mongoErr) {
 			if mongoErr.Code == 18 {
 				// See https://github.com/mongodb/mongo-go-driver/blob/master/docs/common-issues.md#authentication-failed
@@ -114,7 +114,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 				//   - Wrong authentication database, which is specified by the query parameter `authSource`
 				//   - User doesn't have access to the requested database
 				//   - The requested database doesn't exist
-				return nil, cerrors.NewUserError("authentication failed: you may have entered an incorrect username or password, the database may not exist, the user may not have access to the database, or the authSource query parameter may be incorrect", err)
+				return nil, cerrors.NewUserError(err, "authentication failed: you may have entered an incorrect username or password, the database may not exist, the user may not have access to the database, or the authSource query parameter may be incorrect")
 			}
 		}
 

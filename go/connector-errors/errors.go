@@ -16,7 +16,7 @@ type UserError struct {
 }
 
 // NewUserError creates a UserError that will output message as the error string.
-func NewUserError(message string, source error) *UserError {
+func NewUserError(source error, message string) *UserError {
 	return &UserError{
 		message: message,
 		source:  source,
