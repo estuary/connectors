@@ -130,7 +130,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 					Snapshot: true,
 					Table:    table,
 				},
-				LSN:    nil,
+				LSN:    []byte{},
 				SeqVal: seqval,
 			},
 			Before: nil,

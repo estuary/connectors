@@ -83,7 +83,8 @@ Binding 0:
                   "type": "object",
                   "required": [
                     "schema",
-                    "table"
+                    "table",
+                    "cursor"
                   ]
                 }
               },
@@ -190,7 +191,8 @@ Binding 1:
                   "type": "object",
                   "required": [
                     "schema",
-                    "table"
+                    "table",
+                    "cursor"
                   ]
                 }
               },

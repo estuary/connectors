@@ -25,8 +25,8 @@ var replicationBufferSize = 4 * 1024 // Assuming change events average ~2kB then
 type sqlserverSourceInfo struct {
 	sqlcapture.SourceCommon
 
-	LSN        []byte `json:"lsn,omitempty" jsonschema:"description=The LSN at which a CDC event occurred. Only set for CDC events, not backfills."`
-	SeqVal     []byte `json:"seqval,omitempty" jsonschema:"description=Sequence value used to order changes to a row within a transaction. Only set for CDC events, not backfills."`
+	LSN        []byte `json:"lsn" jsonschema:"description=The LSN at which a CDC event occurred. Only set for CDC events, not backfills."`
+	SeqVal     []byte `json:"seqval" jsonschema:"description=Sequence value used to order changes to a row within a transaction. Only set for CDC events, not backfills."`
 	UpdateMask any    `json:"updateMask,omitempty" jsonschema:"description=A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events, not backfills."`
 }
 
