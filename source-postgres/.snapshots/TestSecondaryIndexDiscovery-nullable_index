@@ -100,7 +100,8 @@ Binding 0:
                   "type": "object",
                   "required": [
                     "schema",
-                    "table"
+                    "table",
+                    "loc"
                   ]
                 }
               },
