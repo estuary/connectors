@@ -12,14 +12,17 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-command -v flowctl-go >/dev/null 2>&1 || { echo >&2 "flowctl-go must be available via PATH, aborting."; exit 1; }
+command -v flowctl-go >/dev/null 2>&1 || {
+  echo >&2 "flowctl-go must be available via PATH, aborting."
+  exit 1
+}
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
 function bail() {
-    echo "$@" 1>&2
-    exit 1
+  echo "$@" 1>&2
+  exit 1
 }
 
 test -n "$CONNECTOR" || bail "must specify CONNECTOR env variable"
@@ -41,7 +44,7 @@ ACTUAL="${TESTDIR}/actual_test_results.txt"
 # Ensure we start with an empty dir, since temporary data plane files will go here.
 # Remove it, if it exists already.
 if [[ -d "${TESTDIR}" ]]; then
-    rm -r ${TESTDIR}
+  rm -r ${TESTDIR}
 fi
 mkdir -p "${TESTDIR}"
 
@@ -58,12 +61,12 @@ export CONSUMER_ADDRESS=unix://localhost${TESTDIR}/consumer.sock
 # --tempdir to use our known TESTDIR rather than creating a new temporary directory.
 # --unix-sockets to create UDS socket files in TESTDIR in well-known locations.
 flowctl-go temp-data-plane \
-    --log.level info \
-    --sigterm \
-    --network "flow-test" \
-    --tempdir ${TESTDIR} \
-    --unix-sockets \
-    &
+  --log.level info \
+  --sigterm \
+  --network "flow-test" \
+  --tempdir ${TESTDIR} \
+  --unix-sockets \
+  &
 DATA_PLANE_PID=$!
 # Arrange to stop the data plane on exit.
 trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID}" EXIT
@@ -75,16 +78,16 @@ flowctl-go api spec --image "${CONNECTOR_IMAGE}" | jq -cM || bail "failed to val
 echo -e "\nexecuting setup"
 source "tests/${CONNECTOR}/setup.sh" || bail "${CONNECTOR}/setup.sh failed"
 if [[ -z "$RESOURCE" ]]; then
-    bail "setup did not set RESOURCE"
+  bail "setup did not set RESOURCE"
 fi
 
 if [[ -z "$CONNECTOR_CONFIG" ]]; then
-    bail "setup did not set CONNECTOR_CONFIG"
+  bail "setup did not set CONNECTOR_CONFIG"
 fi
 TEST_STATUS="Test Failed"
 function test_shutdown() {
-    kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${CONNECTOR}/cleanup.sh
-    echo -e "===========\n${TEST_STATUS}\n==========="
+  kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${CONNECTOR}/cleanup.sh
+  echo -e "===========\n${TEST_STATUS}\n==========="
 }
 trap "test_shutdown" EXIT
 
@@ -95,23 +98,23 @@ trap "test_shutdown" EXIT
 export ID_TYPE="${ID_TYPE:-integer}"
 
 # Verify discover works
-flowctl-go api discover --image="${CONNECTOR_IMAGE}" --network "flow-test" --log.level=debug --config=<(echo ${CONNECTOR_CONFIG}) > ${TESTDIR}/discover_output.json || bail "Discover failed."
-cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" > ${TESTDIR}/bindings.json
+flowctl-go api discover --image="${CONNECTOR_IMAGE}" --network "flow-test" --log.level=debug --config=<(echo ${CONNECTOR_CONFIG}) >${TESTDIR}/discover_output.json || bail "Discover failed."
+cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" >${TESTDIR}/bindings.json
 
 if [[ -f "tests/${CONNECTOR}/bindings.json" ]]; then
   diff --side-by-side ${TESTDIR}/bindings.json "tests/${CONNECTOR}/bindings.json" || bail "Discovered bindings are wrong"
 fi
 
 # Generate the test-specific catalog source.
-cat tests/template.flow.yaml | envsubst > "${CATALOG_SOURCE}"
+cat tests/template.flow.yaml | envsubst >"${CATALOG_SOURCE}"
 
 # Build the catalog.
 flowctl-go api build \
-  --build-id test-build-id  \
+  --build-id test-build-id \
   --build-db ${TESTDIR}/builds/test-build-id \
   --source ${CATALOG_SOURCE} \
-  --network "flow-test" \
-  || bail "Build failed."
+  --network "flow-test" ||
+  bail "Build failed."
 
 # Activate the catalog.
 flowctl-go api activate --build-id test-build-id --all --network "flow-test" --log.level info || bail "Activate failed."
@@ -119,12 +122,11 @@ flowctl-go api activate --build-id test-build-id --all --network "flow-test" --l
 # Periodically check expected vs actual lines of output, once we reach the same
 # number of lines, we stop the plane and then compare the output
 retry_counter=0
-while true
-do
+while true; do
   # Read out materialization results.
   container_id=$(docker ps | grep materialize-sqlite | awk '{ print $1 }')
-  docker exec $container_id sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results;" > "${ACTUAL}"
-  if [[ "$(cat tests/${CONNECTOR}/expected.txt | wc -l )" -eq "$(cat ${ACTUAL} | wc -l)" ]]; then
+  docker exec $container_id sqlite3 -header "${OUTPUT_DB}" "select id, canary from test_results order by id, canary;" >"${ACTUAL}"
+  if [[ "$(cat tests/${CONNECTOR}/expected.txt | wc -l)" -eq "$(cat ${ACTUAL} | wc -l)" ]]; then
     # Verify actual vs expected results. `diff` will exit 1 if files are different
     echo "-- RUNNING DIFF"
     diff --suppress-common-lines --side-by-side "${ACTUAL}" "tests/${CONNECTOR}/expected.txt" || bail "Test Failed"
