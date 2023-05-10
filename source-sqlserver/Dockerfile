@@ -43,10 +43,6 @@ COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flo
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-# Ask the Go runtime to keep heap size below 900MiB. Our real memory limit is
-# 1GiB so this is 10% headroom as recommended in https://go.dev/doc/gc-guide
-ENV GOMEMLIMIT=900MiB
-
 ENTRYPOINT ["/connector/source-sqlserver"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
