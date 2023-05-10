@@ -72,8 +72,16 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
 		// Request that timestamp values coming via replication be interpreted as UTC.
 		TimestampStringLocation: time.UTC,
+
 		// Limit connection retries so unreachability eventually bubbles up into task failure.
 		MaxReconnectAttempts: 10,
+
+		// Request heartbeat events from the server every 30s and time out waiting after 5m.
+		// The heartbeats ensure that the TCP connection remains alive when no changes are
+		// occurring and the read timeout ensures that we will detect silent link failures
+		// and fail+restart the capture within a few minutes at worst.
+		HeartbeatPeriod: 30 * time.Second,
+		ReadTimeout:     5 * time.Minute,
 	}
 
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
@@ -363,7 +371,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		case *replication.FormatDescriptionEvent:
 			logrus.WithField("data", data).Trace("Format Description Event")
 		case *replication.GenericEvent:
-			logrus.WithField("event", event.Header.EventType.String()).Debug("Generic Event")
+			if event.Header.EventType == replication.HEARTBEAT_EVENT {
+				logrus.Debug("received server heartbeat")
+			} else {
+				logrus.WithField("event", event.Header.EventType.String()).Debug("Generic Event")
+			}
 		default:
 			return fmt.Errorf("unhandled event type: %q", event.Header.EventType)
 		}
