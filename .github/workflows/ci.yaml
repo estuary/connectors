@@ -84,6 +84,7 @@ jobs:
           - source-mysql
           - source-postgres
           - source-s3
+          - source-sftp
           - source-sqlserver
           - materialize-bigquery
           - materialize-redshift
@@ -152,6 +153,7 @@ jobs:
           contains(fromJson('[
             "source-mysql",
             "source-postgres",
+            "source-sftp",
             "source-sqlserver"
             ]'), matrix.connector)
         run: |
@@ -183,6 +185,7 @@ jobs:
             "source-mysql",
             "source-postgres",
             "source-s3",
+            "source-sftp",
             "source-sqlserver"
             ]'), matrix.connector)
         env:
