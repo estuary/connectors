@@ -1,4 +1,4 @@
-use std::{fmt::Display, io::Read};
+use std::fmt::Display;
 
 use schemars::JsonSchema;
 use serde::{de::Visitor, Deserialize, Serialize};
@@ -18,7 +18,7 @@ pub enum Error {
 }
 
 /// # Kafka Source Configuration
-#[derive(Deserialize, Default, Serialize)]
+#[derive(Deserialize, Default, Debug, Serialize)]
 pub struct Configuration {
     /// # Bootstrap Servers
     ///
@@ -159,8 +159,8 @@ impl JsonSchema for Configuration {
 impl connector::ConnectorConfig for Configuration {
     type Error = Error;
 
-    fn parse(reader: impl Read) -> Result<Self, Self::Error> {
-        let configuration: Configuration = serde_json::from_reader(reader)?;
+    fn parse(reader: &str) -> Result<Self, Self::Error> {
+        let configuration: Configuration = serde_json::from_str(reader)?;
 
         if configuration.bootstrap_servers.is_empty() {
             return Err(Error::NoBootstrapServersGiven);
@@ -174,6 +174,7 @@ impl connector::ConnectorConfig for Configuration {
 // Kafka doesn't specify a scheme for the `bootstrap_servers` values, so
 // expecting anyone to add one is really odd. Thus, we parse these values
 // ourselves.
+#[derive(Debug)]
 pub struct BootstrapServer {
     host: String,
     port: u16,
@@ -292,18 +293,16 @@ pub struct Authentication {
 /// Controls how should TLS certificates be found or used.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum TlsSettings {
     /// Use the TLS certificates bundled with openssl.
+    #[default]
     SystemCertificates,
     // TODO: allow the user to specify custom TLS certs, authorities, etc.
     // CustomCertificates(CustomTlsSettings),
 }
 
-impl Default for TlsSettings {
-    fn default() -> Self {
-        TlsSettings::SystemCertificates
-    }
-}
+
 
 #[cfg(test)]
 mod test {
@@ -338,19 +337,16 @@ mod test {
     fn parse_config_file_test() {
         use connector::ConnectorConfig;
 
-        let input = std::io::Cursor::new(
-            r#"
+        let input = r#"
         {
             "bootstrap_servers": ["localhost:9093"],
             "tls": "system_certificates"
         }
-        "#,
-        );
+        "#;
 
         Configuration::parse(input).expect("to parse");
 
-        let input = std::io::Cursor::new(
-            r#"
+        let input = r#"
         {
             "bootstrap_servers": ["localhost:9093"],
             "authentication": {
@@ -360,8 +356,7 @@ mod test {
             },
             "tls": null
         }
-        "#,
-        );
+        "#;
 
         Configuration::parse(input).expect("to parse");
     }

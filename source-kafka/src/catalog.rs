@@ -1,12 +1,6 @@
-use std::io::Read;
-use std::ops::RangeInclusive;
-
 use highway::{HighwayHash, HighwayHasher};
-use serde::Deserialize;
-use serde_with::serde_as;
-use serde_with::FromInto;
-
-use crate::connector;
+use proto_flow::flow::RangeSpec;
+use serde::{Deserialize, Serialize};
 
 mod shard_range;
 
@@ -22,73 +16,14 @@ pub enum Error {
     MissingStream(String),
 }
 
-#[serde_as]
-#[derive(Deserialize)]
-pub struct ConfiguredCatalog {
-    /// A list of streams to read from.
-    pub streams: Vec<ConfiguredStream>,
-
-    /// When tailing, the connector will never exit. When not tailing, the
-    /// connector will exit once it has consumed messages emitted before the
-    /// connector process was launched.
-    ///
-    /// "estuary.dev/tail": true,
-    #[serde(rename = "estuary.dev/tail", default = "tail_default")]
-    pub tail: bool,
-
-    /// This instance is only responsible for a subset of the data.
-    ///
-    ///  "estuary.dev/range": {
-    ///    "begin": "00000000",
-    ///    "end": "ffffffff"
-    ///  }
-    #[serde(rename = "estuary.dev/range", default = "range_default")]
-    #[serde_as(as = "FromInto<shard_range::ShardRangeDefinition>")]
-    pub range: RangeInclusive<u32>,
+pub fn responsible_for_shard(range: &RangeSpec, key: impl Into<ShardKey>) -> bool {
+    let hash = key.into().hash();
+    range.key_begin <= hash && range.key_end >= hash
 }
 
-impl ConfiguredCatalog {
-    pub fn responsible_for_shard(&self, key: impl Into<ShardKey>) -> bool {
-        self.range.contains(&key.into().hash())
-    }
-}
-
-impl Default for ConfiguredCatalog {
-    fn default() -> Self {
-        Self {
-            streams: vec![],
-            tail: tail_default(),
-            range: range_default(),
-        }
-    }
-}
-
-impl connector::ConnectorConfig for ConfiguredCatalog {
-    type Error = Error;
-
-    fn parse(reader: impl Read) -> Result<Self, Self::Error> {
-        let catalog = serde_json::from_reader(reader)?;
-
-        Ok(catalog)
-    }
-}
-
-#[derive(Deserialize)]
-pub struct ConfiguredStream {
-    pub stream: Stream,
-}
-
-#[derive(Deserialize)]
-pub struct Stream {
-    pub name: String,
-}
-
-fn tail_default() -> bool {
-    false
-}
-
-fn range_default() -> RangeInclusive<u32> {
-    0..=u32::MAX
+#[derive(Serialize, Deserialize)]
+pub struct Resource {
+    pub stream: String,
 }
 
 #[derive(Default)]
@@ -113,64 +48,14 @@ impl ShardKey {
 #[cfg(test)]
 mod test {
     use super::*;
-    use serde_json::{from_value, json};
-
-    #[test]
-    fn stream_parsing_test() {
-        let input = json!({
-            "streams": [
-                {"stream": {"name": "test"} },
-            ],
-            "estuary.dev/tail": false,
-            "estuary.dev/range": {
-                "begin": "00010000",
-                "end": "ffffffff",
-            },
-        });
-
-        let parsed: ConfiguredCatalog = from_value(input).expect("to parse configured catalog");
-
-        assert_eq!("test", parsed.streams[0].stream.name);
-        assert_eq!(false, parsed.tail);
-        assert_eq!(65_536..=u32::MAX, parsed.range);
-    }
-
-    #[test]
-    fn parse_catalog_file_test() {
-        use connector::ConnectorConfig;
-
-        let input = std::io::Cursor::new(
-            r#"
-        {
-            "streams": [
-                {
-                    "stream": {
-                        "name": "test"
-                    },
-                    "estuary.dev/range": {
-                        "begin": "00010000",
-                        "end": "ffffffff"
-                    }
-                }
-            ],
-            "estuary.dev/tail": false
-        }
-        "#,
-        );
-
-        ConfiguredCatalog::parse(input).expect("to parse");
-    }
 
     #[test]
     fn shard_assignment_test() {
-        let stream = Stream {
-            name: "test".to_owned(),
-        };
-        let streams = vec![ConfiguredStream { stream: stream }];
-        let catalog = ConfiguredCatalog {
-            streams,
-            tail: false,
-            range: 0..=0x7fffffff,
+        let range = RangeSpec {
+            key_begin: 0,
+            key_end: 0x7fffffff,
+            r_clock_begin: 0,
+            r_clock_end: 0xffffffff,
         };
 
         let shards = (0..10).map(|n| ShardKey::default().add_int(n));
@@ -179,7 +64,7 @@ mod test {
         assert_eq!(
             shards_covered,
             shards
-                .map(|n| catalog.responsible_for_shard(n))
+                .map(|n| responsible_for_shard(&range, n))
                 .filter(|b| *b)
                 .count()
         );

@@ -1,14 +1,17 @@
 use std::time::Duration;
 
-use chrono::{DateTime, NaiveDateTime, Utc};
+use proto_flow::capture::{Response, response, request};
+use proto_flow::flow::capture_spec::Binding;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::error::KafkaError;
 use rdkafka::message::BorrowedMessage;
 use rdkafka::metadata::{Metadata, MetadataPartition, MetadataTopic};
-use rdkafka::{ClientConfig, Message, Timestamp, TopicPartitionList};
+use rdkafka::{ClientConfig, Message, TopicPartitionList};
+use serde_json::json;
 
+use crate::catalog::Resource;
 use crate::configuration::Configuration;
-use crate::{airbyte, catalog, state};
+use crate::{catalog, state};
 
 const KAFKA_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -53,16 +56,23 @@ pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsume
     config.create().map_err(Error::Config)
 }
 
-pub fn test_connection<C: Consumer>(consumer: &C) -> airbyte::ConnectionStatus {
-    match fetch_metadata(consumer) {
-        Ok(metadata) => airbyte::ConnectionStatus::new(
-            "SUCCEEDED".to_owned(),
-            format!("{} topics found", metadata.topics().len()),
-        ),
-        Err(e) => {
-            airbyte::ConnectionStatus::new("FAILED".to_owned(), format!("{:#} -- {:?}", &e, &e))
-        }
-    }
+pub fn test_connection<C: Consumer>(consumer: &C, bindings: Vec<request::validate::Binding>) -> Result<Response, Error> {
+    let metadata = fetch_metadata(consumer)?;
+    Ok(Response {
+        validated: Some(response::Validated {
+            bindings: metadata.topics().iter().filter(|topic| {
+                bindings.iter().any(|binding| {
+                    let res: Resource = serde_json::from_str(&binding.resource_config_json).expect("parse resource config");
+                    res.stream == topic.name()
+                })
+            }).map(|topic| {
+                response::validated::Binding {
+                    resource_path: vec![topic.name().to_string()],
+                }
+            }).collect()
+        }),
+        ..Default::default()
+    })
 }
 
 pub fn fetch_metadata<C: Consumer>(consumer: &C) -> Result<Metadata, Error> {
@@ -71,13 +81,43 @@ pub fn fetch_metadata<C: Consumer>(consumer: &C) -> Result<Metadata, Error> {
         .map_err(Error::Metadata)
 }
 
-pub fn available_streams(metadata: &Metadata) -> Vec<airbyte::Stream> {
+pub fn available_streams(metadata: &Metadata) -> Vec<response::discovered::Binding> {
     metadata
         .topics()
         .iter()
         .filter(reject_internal_topics)
         .map(MetadataTopic::name)
-        .map(|s| airbyte::Stream::new(s.to_owned()))
+        .map(|s| response::discovered::Binding {
+            recommended_name: s.to_owned(),
+            resource_config_json: serde_json::to_string(&json!({
+                "stream": s.to_owned(),
+            })).expect("resource config"),
+            document_schema_json: serde_json::to_string(&json!({
+                "x-infer-schema": true,
+                "type": "object",
+                "properties": {
+                    "_meta": {
+                        "type": "object",
+                        "properties": {
+                            "partition": {
+                                "description": "The partition the message was read from",
+                                "type": "integer",
+                            },
+                            "offset": {
+                                "description": "The offset of the message within the partition",
+                                "type": "integer",
+                            }
+                        },
+                        "required": ["partition", "offset"]
+                    },
+                    "message": {
+                        "type": "object"
+                    }
+                },
+                "required": ["_meta"]
+            })).expect("document schema"),
+            key: vec!["/_meta/partition".to_string(), "/_meta/offset".to_string()],
+        })
         .collect()
 }
 
@@ -161,18 +201,36 @@ pub enum ProcessingError {
     #[error("failed to parse message `{0}`")]
     Parsing(String, #[source] serde_json::Error),
 
+    #[error("failed to encode message: `{0}`")]
+    Encoding(#[source] serde_json::Error),
+
     #[error("message contained no payload")]
     EmptyMessage,
 }
 
 pub fn process_message<'m>(
     msg: &'m BorrowedMessage<'m>,
-) -> Result<(airbyte::Record, state::Checkpoint), ProcessingError> {
-    let payload = parse_message(msg)?;
-    let emitted_at = timestamp_to_datetime(msg.timestamp());
-    let namespace = format!("Partition {}", msg.partition());
+    bindings: &Vec<Binding>,
+) -> Result<(response::Captured, state::Checkpoint), ProcessingError> {
+    let mut payload = parse_message(msg)?;
 
-    let message = airbyte::Record::new(msg.topic().to_owned(), payload, emitted_at, namespace);
+    let binding_index = bindings.iter().position(|s| {
+        let res = serde_json::from_str::<Resource>(&s.resource_config_json).expect("to parse resource config");
+        res.stream == msg.topic()
+    }).expect("got message for unknown binding");
+
+    let meta = json!({
+        "partition": msg.partition(),
+        "offset": msg.offset()
+    });
+
+    payload.as_object_mut().unwrap()
+        .insert("_meta".to_string(), meta);
+
+    let message = response::Captured {
+        binding: binding_index as u32,
+        doc_json: serde_json::to_string(&payload).map_err(ProcessingError::Encoding)?,
+    };
     let checkpoint = state::Checkpoint::new(msg.topic(), msg.partition(), state::Offset::from(msg));
     Ok((message, checkpoint))
 }
@@ -192,18 +250,6 @@ static KAFKA_INTERNAL_TOPICS: [&str; 1] = ["__consumer_offsets"];
 
 fn reject_internal_topics(topic: &&MetadataTopic) -> bool {
     !KAFKA_INTERNAL_TOPICS.contains(&topic.name())
-}
-
-fn timestamp_to_datetime(timestamp: Timestamp) -> DateTime<Utc> {
-    // Kafka Timestamps are rather complicated. They can be broker-centric,
-    // producer-centric, or missing entirely based upon Topic configuration.
-    // This should be uniform for all the Partitions in a Topic though. We
-    // ultimately don't care much which variety they're using, as we're letting
-    // Kafka enforce the ordering of the Messages.
-    timestamp
-        .to_millis()
-        .map(|ms| DateTime::from_utc(NaiveDateTime::from_timestamp(ms / 1000, 0), Utc))
-        .unwrap_or_else(Utc::now)
 }
 
 pub fn build_shard_key(topic: &MetadataTopic, partition: &MetadataPartition) -> catalog::ShardKey {
