@@ -1,0 +1,37 @@
+{
+	"Path": "root/b.csv.gz",
+	"IsPrefix": false,
+	"ContentSum": "",
+	"Size": 12,
+	"ContentType": "",
+	"ContentEncoding": "",
+	"ModTime": "2033-05-18T03:33:20Z"
+}
+{
+	"Path": "root/emptyDir1",
+	"IsPrefix": true,
+	"ContentSum": "",
+	"Size": 0,
+	"ContentType": "",
+	"ContentEncoding": "",
+	"ModTime": "0001-01-01T00:00:00Z"
+}
+{
+	"Path": "root/emptyDir2",
+	"IsPrefix": true,
+	"ContentSum": "",
+	"Size": 0,
+	"ContentType": "",
+	"ContentEncoding": "",
+	"ModTime": "0001-01-01T00:00:00Z"
+}
+{
+	"Path": "root/sub",
+	"IsPrefix": true,
+	"ContentSum": "",
+	"Size": 0,
+	"ContentType": "",
+	"ContentEncoding": "",
+	"ModTime": "0001-01-01T00:00:00Z"
+}
+
