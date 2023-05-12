@@ -172,25 +172,25 @@ func (src Source) Check(args airbyte.CheckCmd) error {
 }
 
 func (src Source) Discover(args airbyte.DiscoverCmd) error {
-  var conn, err = newConnector(src, args.ConfigFile)
-  if err != nil {
-    return err
-  }
+	var conn, err = newConnector(src, args.ConfigFile)
+	if err != nil {
+		return err
+	}
 
-  return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
-    Type: airbyte.MessageTypeCatalog,
-    Catalog: &airbyte.Catalog{
-      Streams: []airbyte.Stream{{
-        Name:               conn.config.DiscoverRoot(),
-        JSONSchema:         json.RawMessage(minimalDocumentSchema),
-        SupportedSyncModes: airbyte.AllSyncModes,
-        SourceDefinedPrimaryKey: [][]string{
-          {"_meta", "file"},
-          {"_meta", "offset"},
-        },
-      }},
-    },
-  })
+	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
+		Type: airbyte.MessageTypeCatalog,
+		Catalog: &airbyte.Catalog{
+			Streams: []airbyte.Stream{{
+				Name:               conn.config.DiscoverRoot(),
+				JSONSchema:         json.RawMessage(minimalDocumentSchema),
+				SupportedSyncModes: airbyte.AllSyncModes,
+				SourceDefinedPrimaryKey: [][]string{
+					{"_meta", "file"},
+					{"_meta", "offset"},
+				},
+			}},
+		},
+	})
 }
 
 func (src Source) Read(args airbyte.ReadCmd) error {
@@ -349,7 +349,13 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 	if err != nil {
 		return err
 	}
-	defer rr.Close()
+	// Report errors from deferred closing of the reader.
+	defer func() {
+		closeErr := rr.Close()
+		if err == nil {
+			err = fmt.Errorf("processObject closing file: %w", closeErr)
+		}
+	}()
 
 	if ok := r.state.startPath(obj.Path, obj.ModTime); !ok {
 		log.WithField("path", obj.Path).Debug("skipping path (after Read)")
