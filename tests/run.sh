@@ -102,6 +102,8 @@ flowctl-go api discover --image="${CONNECTOR_IMAGE}" --network "flow-test" --log
 cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" >${TESTDIR}/bindings.json
 
 if [[ -f "tests/${CONNECTOR}/bindings.json" ]]; then
+  cat ${TESTDIR}/bindings.json
+  cat tests/${CONNECTOR}/bindings.json
   diff --side-by-side ${TESTDIR}/bindings.json "tests/${CONNECTOR}/bindings.json" || bail "Discovered bindings are wrong"
 fi
 

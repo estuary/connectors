@@ -4,7 +4,7 @@ expression: parse_from_output(&stdout)
 
 ---
 spec:
-  connectionSpecification:
+  configSchema:
     $schema: "http://json-schema.org/draft-07/schema#"
     definitions:
       Authentication:
@@ -80,7 +80,12 @@ spec:
       - bootstrap_servers
     title: Kafka Source Configuration
     type: object
-  supported_destination_sync_modes: []
-  supportsIncremental: true
-type: SPEC
+  documentationUrl: "https://go.estuary.dev/source-kafka"
+  protocol: 3032023
+  resourceConfigSchema:
+    properties:
+      stream:
+        type: string
+        x-collection-name: true
+    type: object
 

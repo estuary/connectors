@@ -95,6 +95,34 @@ make start_local_infra
 
 This will launch a dockerized Kafka + Zookeeper instance and expose a client listener on port 9092.
 
+#### Mac M1
+
+In order to build this connector on an M1 Mac, you will need to install the
+following packages and make sure their libraries are linked:
+
+```
+brew install openssl
+brew link openssl --force
+brew install librdkafka
+```
+
+You will then need to change the `Cargo.toml` file to use `dynamic-linking` for
+`rdkafka` instead of `cmake-build`:
+
+```
+#rdkafka = { version = "0.26", features = ["cmake-build", "gssapi", "libz", "sasl", "ssl"], default-features = false }
+rdkafka = { version = "0.29", features = ["dynamic-linking", "gssapi", "libz", "sasl", "ssl"], default-features = false }
+```
+
+Moreover, you need to switch to a `vendored` installation of `sasl2-sys`, so add
+the following to `Cargo.toml`:
+
+```
+sasl2-sys = { version = "0.1.14", features = ["vendored" ] }
+```
+
+You should now be able to build this connector locally. Note that you should not
+commit these changes to your pull-request.
 
 #### Install `kafkactl`
 
