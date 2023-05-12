@@ -1,0 +1,28 @@
+{
+	"Path": "root/b.csv.gz",
+	"IsPrefix": false,
+	"ContentSum": "",
+	"Size": 12,
+	"ContentType": "",
+	"ContentEncoding": "",
+	"ModTime": "2033-05-18T03:33:20Z"
+}
+{
+	"Path": "root/sub/nested/a.jsonl",
+	"IsPrefix": false,
+	"ContentSum": "",
+	"Size": 17,
+	"ContentType": "",
+	"ContentEncoding": "",
+	"ModTime": "2001-09-09T01:46:40Z"
+}
+{
+	"Path": "root/sub/z.csv",
+	"IsPrefix": false,
+	"ContentSum": "",
+	"Size": 18,
+	"ContentType": "",
+	"ContentEncoding": "",
+	"ModTime": "2017-07-14T02:40:00Z"
+}
+
