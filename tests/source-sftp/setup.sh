@@ -14,7 +14,7 @@ export RESOURCE="{ \"stream\": \"${TEST_STREAM}\", \"syncMode\": \"incremental\"
 docker compose -f source-sftp/docker-compose.yaml up --detach
 
 # Wait for the sftp server to be ready.
-go run tests/source-sftp/wait_for_server.go
+go run wait_for_server.go --username test --password test --address localhost:2222
 
 # The config excludes JSON files by only including CSV files, since the JSON data has the "id"
 # property as an integer.
