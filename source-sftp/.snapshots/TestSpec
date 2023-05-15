@@ -24,7 +24,7 @@
     "directory": {
       "type": "string",
       "title": "Directory",
-      "description": "Directory to parse files from. All files in this directory and any subdirectories will be included.",
+      "description": "Directory to capture files from. All files in this directory and any subdirectories will be included.",
       "order": 3
     },
     "matchFiles": {
