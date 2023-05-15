@@ -104,7 +104,7 @@ func fixMysqlLogging() {
 	}
 
 	mysqlLog.SetDefaultLogger(mysqlLog.NewDefault(handler))
-	// Looking at the source code, it seems that the level names pretty muc" match those used by logrus.
+	// Looking at the source code, it seems that the level names pretty much match those used by logrus.
 	// In the event that anything doesn't match, it'll fall back to info level.
 	// Source: https://github.com/siddontang/go-log/blob/1e957dd83bed/log/logger.go#L116
 	mysqlLog.SetLevelByName(logrus.GetLevel().String())
@@ -116,6 +116,7 @@ type Config struct {
 	Address  string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
 	User     string         `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
 	Password string         `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Timezone string         `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be set and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX)." jsonschema_extras:"order=3"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
@@ -145,6 +146,12 @@ func (c *Config) Validate() error {
 	if len(c.Password) > 32 {
 		return fmt.Errorf("passwords used as part of replication cannot exceed 32 characters in length due to an internal limitation in MySQL: password length of %d characters is too long, please use a shorter password", len(c.Password))
 	}
+	if c.Timezone != "" {
+		if _, err := parseTimeZone(c.Timezone); err != nil {
+			return fmt.Errorf("unknown or invalid timezone %q: must be a valid IANA time zone name or +HH:MM offset", c.Timezone)
+		}
+	}
+
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
 		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
 	}
@@ -244,12 +251,37 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 
-	// Infer the location in which captured DATETIME values will be interpreted.
-	if loc, err := queryTimeZone(conn); err == nil {
+	if db.config.Timezone != "" {
+		// The user-entered timezone value is verified to parse without error in (*Config).Validate,
+		// so this parsing is not expected to fail.
+		loc, err := parseTimeZone(db.config.Timezone)
+		if err != nil {
+			return fmt.Errorf("parsing timezone from config: %w", err)
+		}
+		logrus.WithFields(logrus.Fields{
+			"tzName": db.config.Timezone,
+			"loc":    loc.String(),
+		}).Debug("using datetime location from config")
 		db.datetimeLocation = loc
 	} else {
-		logrus.WithField("err", err).Warn("unable to determine database timezone")
-		logrus.Warn("capturing DATETIME values will not be permitted")
+		// Infer the location in which captured DATETIME values will be interpreted from the system
+		// variable 'time_zone' if it is set on the database.
+		var tzName string
+		if tzName, err = queryTimeZone(conn); err == nil {
+			var loc *time.Location
+			if loc, err = parseTimeZone(tzName); err == nil {
+				logrus.WithFields(logrus.Fields{
+					"tzName": tzName,
+					"loc":    loc.String(),
+				}).Debug("using datetime location queried from database")
+				db.datetimeLocation = loc
+			}
+		}
+
+		if db.datetimeLocation == nil {
+			logrus.WithField("err", err).Warn("unable to determine database timezone and no timezone in capture configuration")
+			logrus.Warn("capturing DATETIME values will not be permitted")
+		}
 	}
 
 	// Set our desired timezone (specifically for the backfill connection, this has
@@ -264,20 +296,23 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 
 var timeZoneOffsetRegex = regexp.MustCompile(`^[-+][0-9]{1,2}:[0-9]{2}$`)
 
-func queryTimeZone(conn *client.Conn) (*time.Location, error) {
+func queryTimeZone(conn *client.Conn) (string, error) {
 	var tzName, err = queryStringVariable(conn, `SELECT @@GLOBAL.time_zone;`)
 	if err != nil {
-		return nil, fmt.Errorf("error querying 'time_zone' system variable: %w", err)
+		return "", fmt.Errorf("error querying 'time_zone' system variable: %w", err)
 	}
 	logrus.WithField("time_zone", tzName).Debug("queried time_zone system variable")
 	if tzName == "SYSTEM" {
-		return nil, errDatabaseTimezoneUnknown
+		return "", errDatabaseTimezoneUnknown
 	}
 
+	return tzName, nil
+}
+
+func parseTimeZone(tzName string) (*time.Location, error) {
 	// If the time zone setting is a valid IANA zone name then return that.
 	loc, err := time.LoadLocation(tzName)
 	if err == nil {
-		logrus.WithField("name", loc.String()).Debug("using named datetime location")
 		return loc, nil
 	}
 
@@ -287,7 +322,6 @@ func queryTimeZone(conn *client.Conn) (*time.Location, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %q: %w", tzName, err)
 		}
-		logrus.WithField("offset", tzName).Debug("using fixed datetime offset")
 		return t.Location(), nil
 	}
 
