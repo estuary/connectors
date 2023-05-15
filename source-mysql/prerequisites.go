@@ -206,7 +206,7 @@ func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, schema, ta
 			WHERE data_type='datetime' AND table_schema='%s' AND table_name='%s';
 		`, schema, table))
 		if err != nil {
-			return fmt.Errorf("time_zone system variable not set and could not validate that table %q does not contain DATETIME columns: %w", streamID, err)
+			return fmt.Errorf("db.datetimeLocation not set and could not validate that table %q does not contain DATETIME columns: %w", streamID, err)
 		}
 
 		var datetimeCols []string
@@ -216,7 +216,7 @@ func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, schema, ta
 		results.Close()
 
 		if len(datetimeCols) > 0 {
-			return fmt.Errorf("system variable 'time_zone' must be set to capture datetime columns [%s] from table %q", strings.Join(datetimeCols, ", "), streamID)
+			return fmt.Errorf("system variable 'time_zone' must be set or capture configured with a valid timezone to capture datetime columns [%s] from table %q", strings.Join(datetimeCols, ", "), streamID)
 		}
 	}
 

@@ -173,7 +173,7 @@ func (db *mysqlDatabase) translateRecordFields(columnTypes map[string]interface{
 
 const mysqlTimestampLayout = "2006-01-02 15:04:05"
 
-var errDatabaseTimezoneUnknown = errors.New("system variable 'time_zone' must contain a valid IANA time zone name or +HH:MM offset (go.estuary.dev/80J6rX)")
+var errDatabaseTimezoneUnknown = errors.New("system variable 'time_zone' or timezone from capture configuration must contain a valid IANA time zone name or +HH:MM offset (go.estuary.dev/80J6rX)")
 
 func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interface{}) (interface{}, error) {
 	if columnType == nil {
