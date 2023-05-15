@@ -72,7 +72,7 @@ type ChangeEvent struct {
 // FlushEvent informs the generic sqlcapture logic about transaction
 // boundaries.
 type FlushEvent struct {
-	Cursor string // TODO(wgd): Maybe json.RawMessage?
+	Cursor string
 }
 
 // MetadataEvent informs the generic sqlcapture logic about changes to

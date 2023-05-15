@@ -53,6 +53,9 @@ const (
 
 // Validate checks to make sure a resource appears usable.
 func (r Resource) Validate() error {
+	if r.Mode != "" && r.Mode != BackfillModeNormal && r.Mode != BackfillModeOnlyChanges && r.Mode != BackfillModeWithoutKey {
+		return fmt.Errorf("invalid backfill mode %q", r.Mode)
+	}
 	if r.Namespace == "" {
 		return fmt.Errorf("table namespace unspecified")
 	}
@@ -60,6 +63,13 @@ func (r Resource) Validate() error {
 		return fmt.Errorf("table name unspecified")
 	}
 	return nil
+}
+
+// SetDefaults fills in the default values for unset optional parameters.
+func (r *Resource) SetDefaults() {
+	if r.Mode == "" {
+		r.Mode = BackfillModeNormal
+	}
 }
 
 // Binding represents a capture binding, and includes a Resource config and a binding index.
@@ -144,6 +154,7 @@ func (d *Driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response
 			if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 				return nil, fmt.Errorf("error parsing resource config: %w", err)
 			}
+			res.SetDefaults()
 
 			var streamID = JoinStreamID(res.Namespace, res.Stream)
 
@@ -174,6 +185,7 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
+		res.SetDefaults()
 
 		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
 			errs = append(errs, err)
@@ -219,6 +231,7 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
+		res.SetDefaults()
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
 		if streamID != watermarkStreamID && res.Stream != "flow_materializations_v2" && res.Stream != "flow_checkpoints_v1" {
 			filteredBindings = append(filteredBindings, binding)
@@ -260,6 +273,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("error parsing resource config: %w", err)
 		}
+		res.SetDefaults()
 		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
 			errs = append(errs, err)
 			continue
