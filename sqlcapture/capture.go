@@ -210,7 +210,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 
 		var state = c.State.Streams[streamID]
 		switch binding.Resource.Mode {
-		case BackfillModeNormal, "":
+		case BackfillModeNormal:
 			state.Mode = TableModeBackfill
 		case BackfillModeOnlyChanges:
 			state.Mode = TableModeActive
