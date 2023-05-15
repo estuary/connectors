@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	"path"
 	"regexp"
@@ -18,7 +17,7 @@ import (
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/estuary/flow/go/parser"
 	"github.com/pkg/sftp"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
 )
@@ -42,7 +41,7 @@ func (config) GetFieldDocString(fieldName string) string {
 	case "Password":
 		return "Password for authentication."
 	case "Directory":
-		return "Directory to parse files from. All files in this directory and any subdirectories will be included."
+		return "Directory to capture files from. All files in this directory and any subdirectories will be included."
 	case "MatchFiles":
 		return "Filter applied to all file names in the directory. If provided, only files whose path (relative to the directory) matches this regex will be read."
 	case "Advanced":
@@ -147,7 +146,7 @@ func newSftpSource(ctx context.Context, cfg *config) (filesource.Store, error) {
 	}
 
 	if !info.IsDir() {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"Name":    info.Name(),
 			"IsDir":   info.IsDir(),
 			"ModTime": info.ModTime().UTC(),
@@ -232,7 +231,7 @@ func (l *sftpListing) Next() (filesource.ObjectInfo, error) {
 				return filesource.ObjectInfo{}, fmt.Errorf("stat'ing symbolic link: %w", err)
 			}
 			if info.IsDir() {
-				logrus.WithFields(logrus.Fields{
+				log.WithFields(log.Fields{
 					"Name": info.Name(),
 					"Mode": info.Mode().String(),
 				}).Info("skipping symbolic link to directory in listing output")
@@ -384,8 +383,6 @@ func main() {
 func configSchema(parserSchema json.RawMessage) json.RawMessage {
 	schema := schemagen.GenerateSchema("SFTP Source", &config{})
 
-	// TODO(whb): This is a little gross but I don't have a better idea for how to embed the parser
-	// schema in the overall schema, and this works.
 	schema.Properties.Set("parser", parserSchema)
 
 	out, err := schema.MarshalJSON()
