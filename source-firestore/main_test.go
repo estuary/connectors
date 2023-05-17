@@ -218,9 +218,13 @@ func TestDiscovery(t *testing.T) {
 	var ctx = testContext(t, 300*time.Second)
 	var client = testFirestoreClient(ctx, t)
 	client.Upsert(ctx, t, "users/1", `{"name": "Will"}`)
-	client.Upsert(ctx, t, "users/1/docs/2", `{"foo": "bar", "asdf": 123}`)
+	client.Upsert(ctx, t, "users/2", `{"name": "Alice"}`)
+	client.Upsert(ctx, t, "users/1/docs/1", `{"foo": "bar", "asdf": 123}`)
+	client.Upsert(ctx, t, "users/1/docs/2", `{"foo": "bar", "asdf": 456}`)
+	client.Upsert(ctx, t, "users/2/docs/3", `{"foo": "baz", "asdf": 789}`)
+	client.Upsert(ctx, t, "users/2/docs/4", `{"foo": "baz", "asdf": 1000}`)
 	time.Sleep(1 * time.Second)
-	simpleCapture(t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta("flow_source_tests")))
+	simpleCapture(t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta("flow_source_tests")))
 }
 
 func testContext(t testing.TB, duration time.Duration) context.Context {
