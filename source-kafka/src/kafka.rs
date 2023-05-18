@@ -109,9 +109,6 @@ pub fn available_streams(metadata: &Metadata) -> Vec<response::discovered::Bindi
                             }
                         },
                         "required": ["partition", "offset"]
-                    },
-                    "message": {
-                        "type": "object"
                     }
                 },
                 "required": ["_meta"]
