@@ -75,11 +75,11 @@ func validateNewProjection(resource Resource, projection *pf.Projection) *pm.Res
 	case projection.IsRootDocumentProjection():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "The root document must be materialized"
-	case projection.Inference.IsSingleScalarType():
+	case projection.Inference.IsSingleScalarType() || len(effectiveJsonTypes(projection)) == 1:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
 
-	case projection.Inference.IsSingleType() || len(effectiveJsonTypes(projection)) == 1:
+	case projection.Inference.IsSingleType():
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "This field is able to be materialized"
 	default:
