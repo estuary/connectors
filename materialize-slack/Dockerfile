@@ -14,7 +14,8 @@ RUN go mod download
 # Build the connector projects we depend on.
 COPY materialize-boilerplate   ./materialize-boilerplate
 COPY materialize-slack         ./materialize-slack
-COPY go-schema-gen             ./go-schema-gen
+COPY go/schema-gen             ./go/schema-gen
+COPY go/connector-errors       ./go/connector-errors
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-slack/...
