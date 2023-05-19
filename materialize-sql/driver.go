@@ -110,6 +110,13 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		err        error
 	)
 
+	if len(req.Materialization.Bindings) == 0 {
+		// Empty bindings means we are deleting the materialization, in this case we
+		// don't have anything to do, so return early
+		return &pm.Response_Applied{ActionDescription: ""}, nil
+	}
+
+
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson); err != nil {
