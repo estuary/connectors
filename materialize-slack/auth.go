@@ -6,15 +6,16 @@ import (
 	"strings"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/slack-go/slack"
 )
 
 type CredentialConfig struct {
 	// Provided by runtime
-	ClientID     string `json:"client_id,omitempty"`
-	ClientSecret string `json:"client_secret,omitempty"`
+	ClientID     string `json:"client_id,omitempty" jsonschema_extras:"secret=true"`
+	ClientSecret string `json:"client_secret,omitempty" jsonschema_extras:"secret=true"`
 
 	// Extracted by us in AccessTokenResponseJsonMap
-	AccessToken string `json:"access_token,omitempty"`
+	AccessToken string `json:"access_token,omitempty" jsonschema_extras:"secret=true"`
 }
 
 func (c *CredentialConfig) validateClientCreds() error {
@@ -31,7 +32,7 @@ func (c *CredentialConfig) validateClientCreds() error {
 
 func (c *CredentialConfig) SlackAPI(config SlackSenderConfig) *SlackAPI {
 	return &SlackAPI{
-		Token:        c.AccessToken,
+		Client:       *slack.New(c.AccessToken),
 		SenderConfig: config,
 	}
 }
