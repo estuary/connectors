@@ -6,31 +6,33 @@ import (
 	"fmt"
 	"time"
 
-	schemagen "github.com/estuary/connectors/go-schema-gen"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
+	"go.gazette.dev/core/consumer/protocol"
 )
 
 // driver implements the pm.DriverServer interface.
 type driver struct{}
 
 type config struct {
-	BearerToken string `json:"token" jsonschema:"title=Bearer Token,description=The Slack API authentication token."`
+	SenderConfig SlackSenderConfig `json:"sender_config" jsonschema:"title=Slack Config"`
+	Credentials  CredentialConfig  `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-oauth2-provider=slack"`
 }
 
 // Validate returns an error if the config is not well-formed.
 func (c config) Validate() error {
-	if c.BearerToken == "" {
-		return fmt.Errorf("missing required Slack API authentication token")
+	if err := c.Credentials.validateClientCreds(); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (c config) buildAPI() (*slackAPI, error) {
-	var api = &slackAPI{Token: c.BearerToken}
+func (c config) buildAPI() (*SlackAPI, error) {
+	var api = c.Credentials.SlackAPI(c.SenderConfig)
 	if err := api.AuthTest(); err != nil {
 		return nil, fmt.Errorf("error verifying authentication: %w", err)
 	}
@@ -56,7 +58,7 @@ func (c driverCheckpoint) Validate() error {
 	return nil
 }
 
-func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, error) {
+func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	log.Debug("handling Spec request")
 
 	endpointSchema, err := schemagen.GenerateSchema("Slack Connection", &config{}).MarshalJSON()
@@ -69,18 +71,20 @@ func (driver) Spec(ctx context.Context, req *pm.SpecRequest) (*pm.SpecResponse, 
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.SpecResponse{
-		EndpointSpecSchemaJson: json.RawMessage(endpointSchema),
-		ResourceSpecSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:       "https://go.estuary.dev/materialize-slack",
+	return &pm.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/materialize-slack",
+		Oauth2:                   Spec("channels:read", "groups:read", "im:read", "channels:join", "chat:write", "chat:write.customize"),
+		//	                      Spec("channels:history", "channels:join", "channels:read", "files:read", "groups:read", "links:read", "reactions:read", "remote_files:read", "team:read", "usergroups:read", "users.profile:read", "users:read"),
 	}, nil
 }
 
-func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.ValidateResponse, error) {
+func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	log.Debug("handling Validate request")
 
 	var cfg config
-	if err := pf.UnmarshalStrict(req.EndpointSpecJson, &cfg); err != nil {
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, err
 	}
 
@@ -89,71 +93,69 @@ func (driver) Validate(ctx context.Context, req *pm.ValidateRequest) (*pm.Valida
 		return nil, err
 	}
 
-	var out []*pm.ValidateResponse_Binding
+	var out []*pm.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceSpecJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
-		if _, err := api.GetChannelID(res.Channel); err != nil {
-			return nil, fmt.Errorf("")
+		var channelInfo, err = api.ConversationInfo(res.Channel)
+		if err != nil {
+			return nil, fmt.Errorf("error getting channel: %s, %w", res.Channel, err)
 		}
 
-		var constraints = make(map[string]*pm.Constraint)
+		if !channelInfo.Channel.IsMember {
+			if err := api.JoinChannel(res.Channel); err != nil {
+				return nil, fmt.Errorf("error joining channel: %s, %w", res.Channel, err)
+			}
+		}
+
+		var constraints = make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range binding.Collection.Projections {
-			constraints[projection.Field] = &pm.Constraint{
-				Type:   pm.Constraint_FIELD_OPTIONAL,
+			constraints[projection.Field] = &pm.Response_Validated_Constraint{
+				Type:   pm.Response_Validated_Constraint_FIELD_OPTIONAL,
 				Reason: "All fields other than 'ts' and 'message' will be ignored",
 			}
 		}
-		constraints["ts"] = &pm.Constraint{
-			Type:   pm.Constraint_LOCATION_REQUIRED,
+		constraints["ts"] = &pm.Response_Validated_Constraint{
+			Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
 			Reason: "The Slack materialization requires a message timestamp",
 		}
-		constraints["message"] = &pm.Constraint{
-			Type:   pm.Constraint_LOCATION_REQUIRED,
-			Reason: "The Slack materialization requires message text",
+		constraints["text"] = &pm.Response_Validated_Constraint{
+			Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+			Reason: "The Slack materialization requires either text or blocks",
 		}
-
-		out = append(out, &pm.ValidateResponse_Binding{
+		constraints["blocks"] = &pm.Response_Validated_Constraint{
+			Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+			Reason: "The Slack materialization requires either text or blocks",
+		}
+		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: true,
 			ResourcePath: []string{res.Channel},
 		})
 	}
 
-	return &pm.ValidateResponse{Bindings: out}, nil
+	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-func (d driver) ApplyUpsert(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	log.Debug("handling ApplyUpsert request")
-	return &pm.ApplyResponse{ActionDescription: "materialize-slack does not create channels"}, nil
-}
-
-func (d driver) ApplyDelete(ctx context.Context, req *pm.ApplyRequest) (*pm.ApplyResponse, error) {
-	log.Debug("handling ApplyDelete request")
-	return &pm.ApplyResponse{ActionDescription: "materialize-slack does not delete channels"}, nil
+func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	log.Debug("handling Apply request")
+	return &pm.Response_Applied{ActionDescription: "materialize-slack does not modify channels"}, nil
 }
 
 // Transactions implements the DriverServer interface.
-func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
 	log.Debug("handling Transactions request")
 
-	var open, err = stream.Recv()
-	if err != nil {
-		return fmt.Errorf("read Open: %w", err)
-	} else if open.Open == nil {
-		return fmt.Errorf("expected Open, got %#v", open)
-	}
-
 	var cfg config
-	if err = pf.UnmarshalStrict(open.Open.Materialization.EndpointSpecJson, &cfg); err != nil {
-		return fmt.Errorf("parsing endpoint config: %w", err)
+	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
+		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	var checkpoint driverCheckpoint
-	if err = pf.UnmarshalStrict(open.Open.DriverCheckpointJson, &checkpoint); err != nil {
-		return fmt.Errorf("parsing driver checkpoint: %w", err)
+	if err := pf.UnmarshalStrict(open.StateJson, &checkpoint); err != nil {
+		return nil, nil, fmt.Errorf("parsing driver checkpoint: %w", err)
 	}
 	if checkpoint.LastMessage.IsZero() {
 		checkpoint.LastMessage = time.Now()
@@ -161,11 +163,11 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 
 	api, err := cfg.buildAPI()
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	var bindings []*binding
-	for _, b := range open.Open.Materialization.Bindings {
+	for _, b := range open.Materialization.Bindings {
 		var fields = append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
 		var fieldIndices = make(map[string]int)
 		for idx, field := range fields {
@@ -174,16 +176,18 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 
 		tsIndex, ok := fieldIndices["ts"]
 		if !ok {
-			return fmt.Errorf("no index found for field 'ts' in %q binding", b.ResourcePath[0])
+			return nil, nil, fmt.Errorf("no index found for field 'ts' in %q binding", b.ResourcePath[0])
 		}
-		msgIndex, ok := fieldIndices["message"]
-		if !ok {
-			return fmt.Errorf("no index found for field 'message' in %q binding", b.ResourcePath[0])
+		var textIndex, textOk = fieldIndices["text"]
+		var blocksIndex, blocksOk = fieldIndices["blocks"]
+		if !(textOk || blocksOk) {
+			return nil, nil, fmt.Errorf("no index found for fields 'text' or 'blocks' in %q binding", b.ResourcePath[0])
 		}
 		bindings = append(bindings, &binding{
-			channel:  b.ResourcePath[0],
-			tsIndex:  tsIndex,
-			msgIndex: msgIndex,
+			channel:     b.ResourcePath[0],
+			tsIndex:     tsIndex,
+			textIndex:   textIndex,
+			blocksIndex: blocksIndex,
 		})
 	}
 
@@ -193,48 +197,28 @@ func (driver) Transactions(stream pm.Driver_TransactionsServer) error {
 		bindings:    bindings,
 	}
 
-	if err = stream.Send(&pm.TransactionResponse{
-		Opened: &pm.TransactionResponse_Opened{FlowCheckpoint: nil},
-	}); err != nil {
-		return fmt.Errorf("sending Opened: %w", err)
-	}
-
-	var logEntry = log.WithField("materialization", "slack")
-	logEntry.Debug("running transactions")
-	return pm.RunTransactions(stream, transactor, logEntry)
+	return transactor, &pm.Response_Opened{}, nil
 }
 
 type transactor struct {
-	api         *slackAPI
+	api         *SlackAPI
 	bindings    []*binding
 	lastMessage time.Time
 }
 
 type binding struct {
-	channel  string
-	tsIndex  int
-	msgIndex int
+	channel     string
+	tsIndex     int
+	textIndex   int
+	blocksIndex int
 }
 
-func (transactor) Load(it *pm.LoadIterator, priorCommittedCh <-chan struct{}, priorAcknowledgedCh <-chan struct{}, loaded func(binding int, doc json.RawMessage) error) error {
+func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	log.Debug("handling Load operation")
 	return fmt.Errorf("this materialization only supports delta-updates")
 }
 
-func (t *transactor) Prepare(context.Context, pm.TransactionRequest_Prepare) (pf.DriverCheckpoint, error) {
-	log.Debug("handling Prepare operation")
-	var checkpoint = driverCheckpoint{LastMessage: t.lastMessage}
-	var bs, err = json.Marshal(&checkpoint)
-	if err != nil {
-		return pf.DriverCheckpoint{}, fmt.Errorf("error marshalling driver checkpoint: %w", err)
-	}
-	return pf.DriverCheckpoint{
-		DriverCheckpointJson: json.RawMessage(bs),
-		Rfc7396MergePatch:    true,
-	}, nil
-}
-
-func (t *transactor) Store(it *pm.StoreIterator) error {
+func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	log.Debug("handling Store operation")
 
 	var vals []tuple.TupleElement
@@ -249,27 +233,50 @@ func (t *transactor) Store(it *pm.StoreIterator) error {
 		// Extract timestamp and message fields from the document
 		tsStr, ok := vals[b.tsIndex].(string)
 		if !ok {
-			return fmt.Errorf("timestamp field is not a string, instead got %#v", vals[b.tsIndex])
+			return nil, fmt.Errorf("timestamp field is not a string, instead got %#v", vals[b.tsIndex])
 		}
-		msg, ok := vals[b.msgIndex].(string)
-		if !ok {
-			return fmt.Errorf("message field is not a string, instead got %#v", vals[b.msgIndex])
+		var text, textExists = vals[b.textIndex].(string)
+		var blocks, blocksExists = vals[b.blocksIndex].(string)
+		if !(textExists || blocksExists) {
+			return nil, fmt.Errorf("text or blocks fields missing, instead got text:%#v, blocks:%#v", vals[b.textIndex], vals[b.blocksIndex])
 		}
 
 		// Parse the timstamp as a time.Time
 		ts, err := time.Parse(time.RFC3339Nano, tsStr)
 		if err != nil {
-			return fmt.Errorf("invalid timestamp %q", tsStr)
+			return nil, fmt.Errorf("invalid timestamp %q", tsStr)
+		}
+
+		var blocksParsed json.RawMessage
+		if blocksExists {
+			err = blocksParsed.UnmarshalJSON([]byte(blocks))
+
+			if err != nil {
+				return nil, fmt.Errorf("invalid blocks value %q", tsStr)
+			}
 		}
 
 		if ts.After(t.lastMessage) {
-			if err := t.api.PostMessage(b.channel, msg); err != nil {
-				return fmt.Errorf("error sending message: %w", err)
+			if err := t.api.PostMessage(b.channel, text, blocksParsed); err != nil {
+				return nil, fmt.Errorf("error sending message: %w", err)
 			}
 			t.lastMessage = ts
 		}
 	}
-	return nil
+
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		log.Debug("handling Prepare operation")
+		var checkpoint = driverCheckpoint{LastMessage: t.lastMessage}
+		var bs, err = json.Marshal(&checkpoint)
+		if err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("error marshalling driver checkpoint: %w", err))
+		}
+
+		return &pf.ConnectorState{
+			UpdatedJson: json.RawMessage(bs),
+			MergePatch:  true,
+		}, nil
+	}, nil
 }
 
 func (transactor) Commit(context.Context) error {
