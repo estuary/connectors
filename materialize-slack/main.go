@@ -12,6 +12,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 	"go.gazette.dev/core/consumer/protocol"
 )
 
@@ -104,7 +105,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			return nil, fmt.Errorf("error getting channel: %s, %w", res.Channel, err)
 		}
 
-		if !channelInfo.Channel.IsMember {
+		if !channelInfo.IsMember {
 			if err := api.JoinChannel(res.Channel); err != nil {
 				return nil, fmt.Errorf("error joining channel: %s, %w", res.Channel, err)
 			}
@@ -214,8 +215,10 @@ type binding struct {
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	log.Debug("handling Load operation")
-	return fmt.Errorf("this materialization only supports delta-updates")
+	for it.Next() {
+		panic("Load should never be called for materialize-slack")
+	}
+	return nil
 }
 
 func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
@@ -247,7 +250,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, fmt.Errorf("invalid timestamp %q", tsStr)
 		}
 
-		var blocksParsed json.RawMessage
+		var blocksParsed slack.Blocks
 		if blocksExists {
 			err = blocksParsed.UnmarshalJSON([]byte(blocks))
 
@@ -257,7 +260,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 
 		if ts.After(t.lastMessage) {
-			if err := t.api.PostMessage(b.channel, text, blocksParsed); err != nil {
+			if err := t.api.PostMessage(b.channel, text, blocksParsed.BlockSet); err != nil {
 				return nil, fmt.Errorf("error sending message: %w", err)
 			}
 			t.lastMessage = ts
