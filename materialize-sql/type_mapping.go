@@ -112,16 +112,24 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 }
 
 // effectiveJsonTypes potentially maps the provided JSON types into alternate types for
-// materialization. It currently supports strings formatted as numeric values, either as stand-alone
-// string types or as a string type formatted as numeric + that numeric type. It does not apply to
-// keyed fields.
+// materialization. It currently supports potentially nullable strings formatted as numeric values,
+// either as stand-alone string types or as a string type formatted as numeric + that numeric type.
+// It does not apply to keyed fields.
 func effectiveJsonTypes(projection *pf.Projection) []string {
 	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
 		switch {
+		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"integer", "null", "string"}):
+			return []string{"integer", "null"}
+		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"null", "number", "string"}):
+			return []string{"null", "number"}
 		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"integer", "string"}):
 			return []string{"integer"}
 		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"number", "string"}):
 			return []string{"number"}
+		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"null", "string"}):
+			return []string{"integer", "null"}
+		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"null", "string"}):
+			return []string{"null", "number"}
 		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
 			return []string{"integer"}
 		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
