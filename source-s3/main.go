@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -36,7 +37,7 @@ type advancedConfig struct {
 	Endpoint      string `json:"endpoint"`
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	if c.Region == "" {
 		return fmt.Errorf("missing region")
 	}
@@ -49,19 +50,19 @@ func (c *config) Validate() error {
 	return nil
 }
 
-func (c *config) DiscoverRoot() string {
+func (c config) DiscoverRoot() string {
 	return filesource.PartsToPath(c.Bucket, c.Prefix)
 }
 
-func (c *config) FilesAreMonotonic() bool {
+func (c config) FilesAreMonotonic() bool {
 	return c.Advanced.AscendingKeys
 }
 
-func (c *config) ParserConfig() *parser.Config {
+func (c config) ParserConfig() *parser.Config {
 	return c.Parser
 }
 
-func (c *config) PathRegex() string {
+func (c config) PathRegex() string {
 	return c.MatchKeys
 }
 
@@ -69,7 +70,7 @@ type s3Store struct {
 	s3 *s3.S3
 }
 
-func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
+func newS3Store(ctx context.Context, cfg config) (*s3Store, error) {
 	var c = aws.NewConfig()
 
 	if cfg.AWSSecretAccessKey != "" {
@@ -103,7 +104,7 @@ func newS3Store(ctx context.Context, cfg *config) (*s3Store, error) {
 // validateBucket verifies that we can list objects in the bucket and potentially read an object in
 // the bucket. This is done in a way that requires only s3:ListBucket and s3:GetObject permissions,
 // since these are the permissions required by the connector.
-func validateBucket(ctx context.Context, cfg *config, s3Sess *s3.S3) error {
+func validateBucket(ctx context.Context, cfg config, s3Sess *s3.S3) error {
 	// All we care about is a succesful listing rather than iterating on all objects, so MaxKeys = 1
 	// in this query.
 	_, err := s3Sess.ListObjectsV2WithContext(ctx, &s3.ListObjectsV2Input{
@@ -247,9 +248,15 @@ func (l *s3Listing) poll() error {
 func main() {
 
 	var src = filesource.Source{
-		NewConfig: func() filesource.Config { return new(config) },
+    NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
+      var cfg config
+      if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
+        return nil, fmt.Errorf("parsing config json: %w", err)
+      }
+      return cfg, nil
+    },
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
-			return newS3Store(ctx, cfg.(*config))
+			return newS3Store(ctx, cfg.(config))
 		},
 		ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
 			return json.RawMessage(`{
