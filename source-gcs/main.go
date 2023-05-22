@@ -11,6 +11,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/estuary/connectors/filesource"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/estuary/flow/go/parser"
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
@@ -30,7 +31,7 @@ type advancedConfig struct {
 	AscendingKeys bool `json:"ascendingKeys"`
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	if c.Bucket == "" {
 		return fmt.Errorf("missing bucket")
 	}
@@ -38,19 +39,19 @@ func (c *config) Validate() error {
 	return nil
 }
 
-func (c *config) DiscoverRoot() string {
+func (c config) DiscoverRoot() string {
 	return filesource.PartsToPath(c.Bucket, c.Prefix)
 }
 
-func (c *config) FilesAreMonotonic() bool {
+func (c config) FilesAreMonotonic() bool {
 	return c.Advanced.AscendingKeys
 }
 
-func (c *config) ParserConfig() *parser.Config {
+func (c config) ParserConfig() *parser.Config {
 	return c.Parser
 }
 
-func (c *config) PathRegex() string {
+func (c config) PathRegex() string {
 	return c.MatchKeys
 }
 
@@ -173,7 +174,13 @@ func (s *gcStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadC
 func main() {
 
 	var src = filesource.Source{
-		NewConfig: func() filesource.Config { return new(config) },
+    NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
+      var cfg config
+      if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
+        return nil, fmt.Errorf("parsing config json: %w", err)
+      }
+      return cfg, nil
+    },
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
 			return newGCStore(ctx, cfg.(*config))
 		},

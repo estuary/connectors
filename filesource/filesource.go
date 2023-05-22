@@ -12,9 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/estuary/flow/go/parser"
-	"github.com/estuary/flow/go/protocols/airbyte"
 	log "github.com/sirupsen/logrus"
+	pc "github.com/estuary/flow/go/protocols/capture"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
+	"github.com/estuary/flow/go/parser"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -41,7 +44,7 @@ type Source struct {
 	// given a parser JSON schema it may wish to embed.
 	ConfigSchema func(parserSchema json.RawMessage) json.RawMessage
 	// NewConfig returns a zero-valued Config which may be decoded into.
-	NewConfig func() Config
+	NewConfig func(raw json.RawMessage) (Config, error)
 	// Connect using to the Source's Store using the decoded and validated Config.
 	Connect func(context.Context, Config) (Store, error)
 	// DocumentationURL links to the Source's extended user documentation.
@@ -125,92 +128,107 @@ type connector struct {
 	store  Store
 }
 
-func newConnector(src Source, args airbyte.ConfigFile) (*connector, error) {
-	var cfg = src.NewConfig()
-
-	if err := args.ConfigFile.Parse(cfg); err != nil {
-		return nil, fmt.Errorf("parsing configuration: %w", err)
-	}
-
-	var store, err = src.Connect(context.Background(), cfg)
-	if err != nil {
-		return nil, fmt.Errorf("connecting to store: %w", err)
-	}
-
-	return &connector{config: cfg, store: store}, nil
+type resource struct {
+	Stream   string `json:"stream" jsonschema:"title=Stream to capture from"`
 }
 
-func (src Source) Main() {
+func (r resource) Validate() error {
+	if r.Stream == "" {
+		return fmt.Errorf("stream is required")
+	}
+	return nil
+}
+
+func (src Source) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
 	var parserSpec, err = parser.GetSpec()
 	if err != nil {
 		panic(err)
 	}
-	var spec = airbyte.Spec{
-		SupportsIncremental:           true,
-		SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
-		ConnectionSpecification:       src.ConfigSchema(parserSpec),
-		DocumentationURL:              src.DocumentationURL,
+
+	var endpointSchema = src.ConfigSchema(parserSpec)
+	if err != nil {
+		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
 	}
-	airbyte.RunMain(spec, src.Check, src.Discover, src.Read)
+	resourceSchema, err := schemagen.GenerateSchema("MongoDB Resource Spec", &resource{}).MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("generating resource schema: %w", err)
+	}
+
+	return &pc.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         src.DocumentationURL,
+	}, nil
 }
 
-func (src Source) Check(args airbyte.CheckCmd) error {
-	var result = &airbyte.ConnectionStatus{
-		Status: airbyte.StatusSucceeded,
-	}
-
-	var _, err = newConnector(src, args.ConfigFile)
+func (src *Source) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
+	/*var cfg, err = src.NewConfig(req.ConfigJson)
 	if err != nil {
-		result.Status = airbyte.StatusFailed
-		result.Message = err.Error()
+		return nil, fmt.Errorf("parsing config json: %w", err)
+	}*/
+
+	var bindings = []*pc.Response_Validated_Binding{}
+
+	for _, binding := range req.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return nil, fmt.Errorf("error parsing resource config: %w", err)
+		}
+
+		bindings = append(bindings, &pc.Response_Validated_Binding{
+			ResourcePath: []string{res.Stream},
+		})
 	}
 
-	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
-		Type:             airbyte.MessageTypeConnectionStatus,
-		ConnectionStatus: result,
-	})
+	return &pc.Response_Validated{Bindings: bindings}, nil
 }
 
-func (src Source) Discover(args airbyte.DiscoverCmd) error {
-	var conn, err = newConnector(src, args.ConfigFile)
+// Discover returns the set of resources available from this Driver.
+func (src *Source) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
+	var cfg, err = src.NewConfig(req.ConfigJson)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("parsing config json: %w", err)
 	}
 
-	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
-		Type: airbyte.MessageTypeCatalog,
-		Catalog: &airbyte.Catalog{
-			Streams: []airbyte.Stream{{
-				Name:               conn.config.DiscoverRoot(),
-				JSONSchema:         json.RawMessage(minimalDocumentSchema),
-				SupportedSyncModes: airbyte.AllSyncModes,
-				SourceDefinedPrimaryKey: [][]string{
-					{"_meta", "file"},
-					{"_meta", "offset"},
-				},
-			}},
-		},
-	})
+  store, err := src.Connect(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to store: %w", err)
+	}
+
+	var conn = connector{config: cfg, store: store}
+
+  var root = conn.config.DiscoverRoot()
+  resourceJSON, err := json.Marshal(resource{Stream: root})
+
+	return &pc.Response_Discovered{Bindings: []*pc.Response_Discovered_Binding{{
+			RecommendedName:    pf.Collection(root),
+			ResourceConfigJson: resourceJSON,
+			DocumentSchemaJson: json.RawMessage(minimalDocumentSchema),
+			Key:                []string{"/_meta/file", "/_meta/offset"},
+  }}}, nil
 }
 
-func (src Source) Read(args airbyte.ReadCmd) error {
-	var conn, err = newConnector(src, args.ConfigFile)
+// Pull is a very long lived RPC through which the Flow runtime and a
+// Driver cooperatively execute an unbounded number of transactions.
+func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
+	var cfg, err = src.NewConfig(open.Capture.ConfigJson)
 	if err != nil {
-		return err
-	}
-	var catalog = airbyte.ConfiguredCatalog{}
-	if err = args.CatalogFile.Parse(&catalog); err != nil {
-		return fmt.Errorf("parsing configured catalog: %w", err)
-	}
-	if catalog.Range.IsZero() {
-		// Process all files, unless the parsed catalog says otherwise.
-		catalog.Range = airbyte.NewFullRange()
+		return fmt.Errorf("parsing config json: %w", err)
 	}
 
-	var states = make(States)
-	if args.StateFile != "" {
-		if err = args.StateFile.Parse(&states); err != nil {
-			return fmt.Errorf("parsing state: %w", err)
+	var ctx = stream.Context()
+
+  store, err := src.Connect(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("connecting to store: %w", err)
+	}
+
+	var conn = connector{config: cfg, store: store}
+
+	var states States
+	if open.StateJson != nil {
+		if err := pf.UnmarshalStrict(open.StateJson, &states); err != nil {
+			return fmt.Errorf("parsing state checkpoint: %w", err)
 		}
 	}
 
@@ -218,7 +236,6 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 	var horizon = time.Now().Add(src.TimeHorizonDelta).Round(time.Second).UTC()
 
 	var sharedMu = new(sync.Mutex)
-	var enc = airbyte.NewStdoutEncoder()
 
 	var pathRe *regexp.Regexp
 	if r := conn.config.PathRegex(); r != "" {
@@ -227,26 +244,30 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 		}
 	}
 
-	var grp, ctx = errgroup.WithContext(context.Background())
-	for _, stream := range catalog.Streams {
+  grp, ctx := errgroup.WithContext(ctx)
+	for i, binding := range open.Capture.Bindings {
 		// Stream names represent an absolute path prefix to capture.
-		var prefix = stream.Stream.Name
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return fmt.Errorf("error parsing resource config: %w", err)
+		}
+		var prefix = res.Stream
 		var state = states[prefix]
 
 		state.startSweep(horizon)
 
 		var r = &reader{
-			connector: conn,
+			connector: &conn,
+      binding:   i,
+      stream:    stream,
 			pathRe:    pathRe,
 			prefix:    prefix,
-			range_:    catalog.Range,
-			schema:    stream.Stream.JSONSchema,
+			schema:    binding.Collection.WriteSchemaJson,
 			state:     state,
 		}
 
 		r.shared.mu = sharedMu
 		r.shared.states = states
-		r.shared.enc = enc
 
 		grp.Go(func() error {
 			if err := r.sweep(ctx); err != nil {
@@ -259,25 +280,33 @@ func (src Source) Read(args airbyte.ReadCmd) error {
 	return grp.Wait()
 }
 
+func (src *Source) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
+	return &pc.Response_Applied{ActionDescription: ""}, nil
+}
+
+func (src *Source) Main() {
+	boilerplate.RunMain(src)
+}
+
 type reader struct {
 	*connector
 
 	pathRe *regexp.Regexp
 	prefix string
-	range_ airbyte.Range
 	schema json.RawMessage
 	state  State
+  binding int
+  stream *boilerplate.PullOutput
 
 	shared struct {
 		mu     *sync.Mutex
 		states States
-		enc    *json.Encoder
 	}
 }
 
 func (r *reader) sweep(ctx context.Context) error {
-	r.log("sweeping %s starting at %q, from %s through %s",
-		r.prefix, r.state.Path, r.state.MinBound, r.state.MaxBound)
+	log.Info(fmt.Sprintf("sweeping %s starting at %q, from %s through %s",
+		r.prefix, r.state.Path, r.state.MinBound, r.state.MaxBound))
 
 	var listing, err = r.store.List(ctx, Query{
 		Prefix:    r.prefix,
@@ -305,8 +334,8 @@ func (r *reader) sweep(ctx context.Context) error {
 		}
 	}
 
-	r.log("completed sweep of %s from %s through %s",
-		r.prefix, r.state.MinBound, r.state.MaxBound)
+	log.Info(fmt.Sprintf("completed sweep of %s from %s through %s",
+		r.prefix, r.state.MinBound, r.state.MaxBound))
 	r.state.finishSweep(r.config.FilesAreMonotonic())
 
 	// Write a final checkpoint to mark the completion of the sweep.
@@ -315,12 +344,6 @@ func (r *reader) sweep(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (r *reader) log(msg string, args ...interface{}) {
-	r.shared.mu.Lock()
-	defer r.shared.mu.Unlock()
-	_ = r.shared.enc.Encode(airbyte.NewLogMessage(airbyte.LogLevelInfo, msg, args...))
 }
 
 func (r *reader) shouldSkip(obj ObjectInfo) (_ bool, reason string) {
@@ -337,9 +360,9 @@ func (r *reader) shouldSkip(obj ObjectInfo) (_ bool, reason string) {
 		return true, "regex not matched"
 	}
 	// Is it outside of our responsible key range?
-	if !r.range_.IncludesHwHash([]byte(obj.Path)) {
+	/*if !r.range_.IncludesHwHash([]byte(obj.Path)) {
 		return true, "path not in range"
-	}
+	}*/
 
 	return false, ""
 }
@@ -361,7 +384,7 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 		log.WithField("path", obj.Path).Debug("skipping path (after Read)")
 		return nil
 	}
-	r.log("processing file %q modified at %s", obj.Path, obj.ModTime)
+	log.Info(fmt.Sprintf("processing file %q modified at %s", obj.Path, obj.ModTime))
 
 	tmp, err := ioutil.TempFile("", "parser-config-*.json")
 	if err != nil {
@@ -402,42 +425,16 @@ func (r *reader) makeParseConfig(obj ObjectInfo) *parser.Config {
 }
 
 func (r *reader) emit(lines []json.RawMessage) error {
-	// Message which wraps Records we'll generate.
-	var wrapper = &airbyte.Message{
-		Type: airbyte.MessageTypeRecord,
-		Record: &airbyte.Record{
-			Stream:    r.prefix,
-			EmittedAt: time.Now().UTC().UnixNano() / int64(time.Millisecond),
-		},
-	}
-	// Message which wraps State checkpoints we'll generate.
-	// Use a custom struct that matches the shape of airbyte.Message,
-	// but specializes State.Data to our type and avoids a double-encoding.
-	var stateWrapper = &struct {
-		Type  airbyte.MessageType `json:"type"`
-		State struct {
-			Data States `json:"data"`
-		} `json:"state,omitempty"`
-	}{
-		Type: airbyte.MessageTypeState,
-	}
-
-	r.shared.mu.Lock()
-	defer r.shared.mu.Unlock()
-
 	// Write out all records, wrapped in |wrapper|.
 	for _, line := range lines {
-		wrapper.Record.Data = line
-		if err := r.shared.enc.Encode(wrapper); err != nil {
+		if err := r.stream.Documents(r.binding, line); err != nil {
 			return err
 		}
 	}
 
-	// Update and write out state.
-	r.shared.states[r.prefix] = r.state
-	stateWrapper.State.Data = r.shared.states
-
-	if err := r.shared.enc.Encode(stateWrapper); err != nil {
+  if encodedCheckpoint, err := json.Marshal(r.shared.states); err != nil {
+    return err
+  } else if err := r.stream.Checkpoint(encodedCheckpoint, true); err != nil {
 		return err
 	}
 
