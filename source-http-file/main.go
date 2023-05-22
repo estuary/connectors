@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/estuary/connectors/filesource"
 	"github.com/estuary/flow/go/parser"
 )
@@ -59,14 +60,14 @@ func (c *config) parsedURL() (*url.URL, string, error) {
 	return p, name, nil
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	if _, _, err := c.parsedURL(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *config) DiscoverRoot() string {
+func (c config) DiscoverRoot() string {
 	var _, name, err = c.parsedURL()
 	if err != nil {
 		panic(fmt.Sprintf("invalid URL: %s", err))
@@ -74,17 +75,17 @@ func (c *config) DiscoverRoot() string {
 	return name
 }
 
-func (c *config) FilesAreMonotonic() bool {
+func (c config) FilesAreMonotonic() bool {
 	// Conceptually, if the source files are monotonic, the same file will not be visited again, and only
 	// ascending file names are visited, so we set this to false.
 	return false
 }
 
-func (c *config) ParserConfig() *parser.Config {
+func (c config) ParserConfig() *parser.Config {
 	return c.Parser
 }
 
-func (c *config) PathRegex() string {
+func (c config) PathRegex() string {
 	return ""
 }
 
@@ -95,7 +96,7 @@ type httpSource struct {
 	fileName string
 }
 
-func newHttpSource(ctx context.Context, cfg *config) (*httpSource, error) {
+func newHttpSource(ctx context.Context, cfg config) (*httpSource, error) {
 	var parsedURL, err = url.Parse(cfg.URL)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse URL %s: %w", cfg.URL, err)
@@ -123,7 +124,7 @@ func newHttpSource(ctx context.Context, cfg *config) (*httpSource, error) {
 	}
 
 	return &httpSource{
-		cfg:      cfg,
+		cfg:      &cfg,
 		req:      req,
 		resp:     resp,
 		fileName: pathPieces[len(pathPieces)-1],
@@ -192,9 +193,15 @@ func (r *ctxReader) Read(p []byte) (n int, err error) {
 
 func main() {
 	var src = filesource.Source{
-		NewConfig: func() filesource.Config { return new(config) },
+    NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
+      var cfg config
+      if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
+        return nil, fmt.Errorf("parsing config json: %w", err)
+      }
+      return cfg, nil
+    },
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
-			return newHttpSource(ctx, cfg.(*config))
+			return newHttpSource(ctx, cfg.(config))
 		},
 		ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
 			return json.RawMessage(`{

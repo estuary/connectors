@@ -13,6 +13,7 @@ RUN go mod download
 
 COPY go           ./go
 COPY filesource   ./filesource
+COPY source-boilerplate ./source-boilerplate
 COPY source-sftp  ./source-sftp
 
 RUN go test -v ./filesource/...
@@ -39,9 +40,7 @@ COPY --from=builder /builder/connector ./source-sftp
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-COPY --from=ghcr.io/estuary/airbyte-to-flow:dev /airbyte-to-flow ./
-ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/source-sftp"]
+ENTRYPOINT ["/connector/source-sftp"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture
-LABEL FLOW_RUNTIME_CODEC=json

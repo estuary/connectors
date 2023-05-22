@@ -13,6 +13,7 @@ RUN go mod download
 
 COPY go         ./go
 COPY filesource ./filesource
+COPY source-boilerplate ./source-boilerplate
 COPY source-s3  ./source-s3
 
 # Run the unit tests.
@@ -41,9 +42,7 @@ COPY --from=builder /builder/connector ./source-s3
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-COPY --from=ghcr.io/estuary/airbyte-to-flow:dev /airbyte-to-flow ./
-ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/source-s3"]
+ENTRYPOINT ["/connector/source-s3"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture
-LABEL FLOW_RUNTIME_CODEC=json
