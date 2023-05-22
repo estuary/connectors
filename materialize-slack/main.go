@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -52,7 +53,8 @@ func (r resource) Validate() error {
 }
 
 type driverCheckpoint struct {
-	LastMessage time.Time `json:"last_message"`
+	LastMessage        map[string]time.Time `json:"last_message"`
+	BindingCollections []string             `json:"binding_collections"`
 }
 
 func (c driverCheckpoint) Validate() error {
@@ -158,8 +160,8 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 	if err := pf.UnmarshalStrict(open.StateJson, &checkpoint); err != nil {
 		return nil, nil, fmt.Errorf("parsing driver checkpoint: %w", err)
 	}
-	if checkpoint.LastMessage.IsZero() {
-		checkpoint.LastMessage = time.Now()
+	if checkpoint.LastMessage == nil {
+		checkpoint.LastMessage = make(map[string]time.Time)
 	}
 
 	api, err := cfg.buildAPI()
@@ -169,7 +171,13 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 
 	var bindings []*binding
 	for _, b := range open.Materialization.Bindings {
+		//Keys/Values are the NAMES
 		var fields = append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
+
+		if checkpoint.LastMessage[string(b.Collection.Name)+b.ResourcePath[0]].IsZero() {
+			checkpoint.LastMessage[string(b.Collection.Name)+b.ResourcePath[0]] = time.Now()
+		}
+
 		var fieldIndices = make(map[string]int)
 		for idx, field := range fields {
 			fieldIndices[field] = idx
@@ -186,6 +194,7 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 		}
 		bindings = append(bindings, &binding{
 			channel:     b.ResourcePath[0],
+			collection:  string(b.Collection.Name),
 			tsIndex:     tsIndex,
 			textIndex:   textIndex,
 			blocksIndex: blocksIndex,
@@ -204,10 +213,11 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 type transactor struct {
 	api         *SlackAPI
 	bindings    []*binding
-	lastMessage time.Time
+	lastMessage map[string]time.Time
 }
 
 type binding struct {
+	collection  string
 	channel     string
 	tsIndex     int
 	textIndex   int
@@ -226,7 +236,8 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 	var vals []tuple.TupleElement
 	for it.Next() {
-		// Concatenate key and non-key fields because we don't care
+		// Key and Values are the resolved values of the pointers defined by projections
+		// Theoretically in the same order as FieldSelection.Keys and .Values
 		vals = append(append(vals[:0], it.Key...), it.Values...)
 
 		var b = t.bindings[it.Binding]
@@ -239,9 +250,9 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, fmt.Errorf("timestamp field is not a string, instead got %#v", vals[b.tsIndex])
 		}
 		var text, textExists = vals[b.textIndex].(string)
-		var blocks, blocksExists = vals[b.blocksIndex].(string)
+		var blocks, blocksExists = vals[b.blocksIndex].([]byte)
 		if !(textExists || blocksExists) {
-			return nil, fmt.Errorf("text or blocks fields missing, instead got text:%#v, blocks:%#v", vals[b.textIndex], vals[b.blocksIndex])
+			return nil, fmt.Errorf("text and blocks fields missing, instead got text:%#v, blocks:%#v", vals[b.textIndex], vals[b.blocksIndex])
 		}
 
 		// Parse the timstamp as a time.Time
@@ -252,18 +263,38 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		var blocksParsed slack.Blocks
 		if blocksExists {
-			err = blocksParsed.UnmarshalJSON([]byte(blocks))
+			// Is this jank? This should really be taken care of by the
+			// serialization logic in slack.Block, but it can't be _that_
+			// bad to do it here... right? see below:
+			// https://api.slack.com/reference/surfaces/formatting#escaping
+			var escaped_blocks = string(blocks)
+			escaped_blocks = strings.ReplaceAll(escaped_blocks, "&", "&amp;")
+			escaped_blocks = strings.ReplaceAll(escaped_blocks, "<", "&lt;")
+			escaped_blocks = strings.ReplaceAll(escaped_blocks, ">", "&gt;")
+
+			err = json.Unmarshal([]byte(escaped_blocks), &blocksParsed)
 
 			if err != nil {
-				return nil, fmt.Errorf("invalid blocks value %q", tsStr)
+				log.Warn(fmt.Sprintf("Here is the field ordering: %#v", vals))
+				return nil, fmt.Errorf("invalid blocks value %q: %w", string(blocks), err)
 			}
+
 		}
 
-		if ts.After(t.lastMessage) {
+		if ts.After(t.lastMessage[b.collection+b.channel]) {
 			if err := t.api.PostMessage(b.channel, text, blocksParsed.BlockSet); err != nil {
+				serializedBlocks, marshal_err := json.Marshal(blocksParsed)
+				if marshal_err == nil {
+					log.Warn(fmt.Sprintf("Parse Blocks: %+v", string(serializedBlocks)))
+				}
 				return nil, fmt.Errorf("error sending message: %w", err)
 			}
-			t.lastMessage = ts
+			t.lastMessage[b.collection+b.channel] = ts
+			// Mom can we get rate limiting?
+			// we have rate limiting at home
+			time.Sleep(time.Second)
+		} else {
+			log.Warn(fmt.Sprintf("Ignoring message from the past: %q", ts))
 		}
 	}
 
