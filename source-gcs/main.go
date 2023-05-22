@@ -59,7 +59,7 @@ type gcStore struct {
 	gcs *storage.Client
 }
 
-func newGCStore(ctx context.Context, cfg *config) (*gcStore, error) {
+func newGCStore(ctx context.Context, cfg config) (*gcStore, error) {
 
 	var opt option.ClientOption
 	if cfg.GoogleCredentials != "" {
@@ -83,7 +83,7 @@ func newGCStore(ctx context.Context, cfg *config) (*gcStore, error) {
 // validateBucket verifies that we can list objects in the bucket and read an object in the bucket.
 // This is done in a way that requires only storage.objects.list and storage.objects.get since these
 // are the permissions required by the connector.
-func validateBucket(ctx context.Context, cfg *config, client *storage.Client) error {
+func validateBucket(ctx context.Context, cfg config, client *storage.Client) error {
 	iter := client.Bucket(cfg.Bucket).Objects(ctx, &storage.Query{
 		Prefix: cfg.Prefix,
 	})
@@ -172,7 +172,6 @@ func (s *gcStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadC
 }
 
 func main() {
-
 	var src = filesource.Source{
     NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
       var cfg config
@@ -182,7 +181,7 @@ func main() {
       return cfg, nil
     },
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
-			return newGCStore(ctx, cfg.(*config))
+			return newGCStore(ctx, cfg.(config))
 		},
 		ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
 			return json.RawMessage(`{
