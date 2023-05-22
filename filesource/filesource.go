@@ -130,6 +130,7 @@ type connector struct {
 
 type resource struct {
 	Stream   string `json:"stream" jsonschema:"title=Stream to capture from"`
+  SyncMode string `json:"syncMode"`
 }
 
 func (r resource) Validate() error {
@@ -242,6 +243,10 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 		if pathRe, err = regexp.Compile(r); err != nil {
 			return fmt.Errorf("building regex: %w", err)
 		}
+	}
+
+	if err := stream.Ready(false); err != nil {
+		return err
 	}
 
   grp, ctx := errgroup.WithContext(ctx)
