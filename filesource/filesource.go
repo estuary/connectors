@@ -129,7 +129,7 @@ type connector struct {
 }
 
 type resource struct {
-	Stream   string `json:"stream" jsonschema:"title=Stream to capture from"`
+	Stream   string `json:"stream" jsonschema:"title=Stream to capture from" jsonschema_extras="x-collection-name=true"`
   SyncMode string `json:"syncMode"`
 }
 
