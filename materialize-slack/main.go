@@ -113,17 +113,35 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			}
 		}
 
+		/*
+			projections:
+				blocks: /slack_blocks
+
+			`blocks` is a FIELD
+			`/slack_blocks` is a LOCATION
+		*/
+
 		var constraints = make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range binding.Collection.Projections {
 			constraints[projection.Field] = &pm.Response_Validated_Constraint{
 				Type:   pm.Response_Validated_Constraint_FIELD_OPTIONAL,
-				Reason: "All fields other than 'ts' and 'message' will be ignored",
+				Reason: "All fields other than 'ts', 'text', and 'blocks' will be ignored",
 			}
 		}
 		constraints["ts"] = &pm.Response_Validated_Constraint{
-			Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+			Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 			Reason: "The Slack materialization requires a message timestamp",
 		}
+
+		for _, v := range binding.Collection.Key {
+			if v != "ts" {
+				constraints[v] = &pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+					Reason: "All fields other than 'ts', 'text', and 'blocks' will be ignored",
+				}
+			}
+		}
+
 		constraints["text"] = &pm.Response_Validated_Constraint{
 			Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
 			Reason: "The Slack materialization requires either text or blocks",
