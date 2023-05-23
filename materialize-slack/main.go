@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -21,7 +22,7 @@ import (
 type driver struct{}
 
 type config struct {
-	Credentials CredentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-oauth2-provider=slack"`
+	Credentials CredentialConfig `json:"credentials" jsonschema:"required,title=Authentication" jsonschema_extras:"x-oauth2-provider=slack"`
 }
 
 // Validate returns an error if the config is not well-formed.
@@ -53,8 +54,7 @@ func (r resource) Validate() error {
 }
 
 type driverCheckpoint struct {
-	LastMessage        map[string]time.Time `json:"last_message"`
-	BindingCollections []string             `json:"binding_collections"`
+	BindingCollections []string `json:"binding_collections"`
 }
 
 func (c driverCheckpoint) Validate() error {
@@ -129,17 +129,8 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			}
 		}
 		constraints["ts"] = &pm.Response_Validated_Constraint{
-			Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
+			Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
 			Reason: "The Slack materialization requires a message timestamp",
-		}
-
-		for _, v := range binding.Collection.Key {
-			if v != "ts" {
-				constraints[v] = &pm.Response_Validated_Constraint{
-					Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
-					Reason: "All fields other than 'ts', 'text', and 'blocks' will be ignored",
-				}
-			}
 		}
 
 		constraints["text"] = &pm.Response_Validated_Constraint{
@@ -178,9 +169,6 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 	if err := pf.UnmarshalStrict(open.StateJson, &checkpoint); err != nil {
 		return nil, nil, fmt.Errorf("parsing driver checkpoint: %w", err)
 	}
-	if checkpoint.LastMessage == nil {
-		checkpoint.LastMessage = make(map[string]time.Time)
-	}
 
 	api, err := cfg.buildAPI()
 	if err != nil {
@@ -189,62 +177,60 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 
 	var bindings []*binding
 	for _, b := range open.Materialization.Bindings {
-		//Keys/Values are the NAMES
-		var fields = append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
-
-		if checkpoint.LastMessage[string(b.Collection.Name)+b.ResourcePath[0]].IsZero() {
-			checkpoint.LastMessage[string(b.Collection.Name)+b.ResourcePath[0]] = time.Now()
-		}
-
-		var fieldIndices = make(map[string]int)
-		for idx, field := range fields {
-			fieldIndices[field] = idx
-		}
-
-		tsIndex, ok := fieldIndices["ts"]
-		if !ok {
-			return nil, nil, fmt.Errorf("no index found for field 'ts' in %q binding", b.ResourcePath[0])
-		}
-		var textIndex, textOk = fieldIndices["text"]
-		var blocksIndex, blocksOk = fieldIndices["blocks"]
-		if !(textOk || blocksOk) {
-			return nil, nil, fmt.Errorf("no index found for fields 'text' or 'blocks' in %q binding", b.ResourcePath[0])
-		}
 		var res resource
 		err = json.Unmarshal(b.ResourceConfigJson, &res)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to parse resource config: %w", err)
 		}
 		bindings = append(bindings, &binding{
-			resource:    res,
-			collection:  string(b.Collection.Name),
-			tsIndex:     tsIndex,
-			textIndex:   textIndex,
-			blocksIndex: blocksIndex,
+			resource:   res,
+			collection: string(b.Collection.Name),
+			spec:       b,
 		})
 	}
 
 	var transactor = &transactor{
-		api:         api,
-		lastMessage: checkpoint.LastMessage,
-		bindings:    bindings,
+		api:      api,
+		bindings: bindings,
 	}
 
 	return transactor, &pm.Response_Opened{}, nil
 }
 
 type transactor struct {
-	api         *SlackAPI
-	bindings    []*binding
-	lastMessage map[string]time.Time
+	api      *SlackAPI
+	bindings []*binding
 }
 
 type binding struct {
-	resource    resource
-	collection  string
-	tsIndex     int
-	textIndex   int
-	blocksIndex int
+	spec       *pf.MaterializationSpec_Binding
+	resource   resource
+	collection string
+}
+
+func buildDocument(b *binding, keys, values tuple.Tuple) map[string]interface{} {
+	var document = make(map[string]interface{})
+
+	// Add the `_id` field to the document. This is required by Rockset.
+	document["_id"] = base64.RawStdEncoding.EncodeToString(keys.Pack())
+
+	// Add the keys to the document.
+	for i, value := range keys {
+		var propName = b.spec.FieldSelection.Keys[i]
+		document[propName] = value
+	}
+
+	// Add the non-keys to the document.
+	for i, value := range values {
+		var propName = b.spec.FieldSelection.Values[i]
+
+		if raw, ok := value.([]byte); ok {
+			document[propName] = json.RawMessage(raw)
+		} else {
+			document[propName] = value
+		}
+	}
+	return document
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
@@ -259,23 +245,18 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 	var vals []tuple.TupleElement
 	for it.Next() {
-		// Key and Values are the resolved values of the pointers defined by projections
-		// Theoretically in the same order as FieldSelection.Keys and .Values
-		vals = append(append(vals[:0], it.Key...), it.Values...)
-
 		var b = t.bindings[it.Binding]
+		var parsed = buildDocument(b, it.Key, it.Values)
+		var tsStr, tsOk = parsed["ts"].(string)
+		var text, textOk = parsed["text"].(string)
+		var blocks, blocksOk = parsed["blocks"].([]byte)
 
-		log.WithField("binding", fmt.Sprintf("%#v", b)).WithField("vals", fmt.Sprintf("%#v", vals)).Debug("storing document")
-
-		// Extract timestamp and message fields from the document
-		tsStr, ok := vals[b.tsIndex].(string)
-		if !ok {
-			return nil, fmt.Errorf("timestamp field is not a string, instead got %#v", vals[b.tsIndex])
+		if !tsOk {
+			return nil, fmt.Errorf("missing timestamp")
 		}
-		var text, textExists = vals[b.textIndex].(string)
-		var blocks, blocksExists = vals[b.blocksIndex].([]byte)
-		if !(textExists || blocksExists) {
-			return nil, fmt.Errorf("text and blocks fields missing, instead got text:%#v, blocks:%#v", vals[b.textIndex], vals[b.blocksIndex])
+
+		if !textOk {
+			return nil, fmt.Errorf("missing text")
 		}
 
 		// Parse the timstamp as a time.Time
@@ -285,7 +266,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 
 		var blocksParsed slack.Blocks
-		if blocksExists {
+		if blocksOk {
 			// Is this jank? This should really be taken care of by the
 			// serialization logic in slack.Block, but it can't be _that_
 			// bad to do it here... right? see below:
@@ -304,22 +285,27 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		}
 
-		if err := t.api.PostMessage(b.resource.Channel, text, blocksParsed.BlockSet, b.resource.SenderConfig); err != nil {
-			serializedBlocks, marshal_err := json.Marshal(blocksParsed)
-			if marshal_err == nil {
-				log.Warn(fmt.Sprintf("Parse Blocks: %+v", string(serializedBlocks)))
+		// Accept messages from at most 30 minutes in the past
+		if time.Since(ts).Minutes() < 30 {
+			if err := t.api.PostMessage(b.resource.Channel, text, blocksParsed.BlockSet, b.resource.SenderConfig); err != nil {
+				serializedBlocks, marshal_err := json.Marshal(blocksParsed)
+				if marshal_err == nil {
+					log.Warn(fmt.Sprintf("Parse Blocks: %+v", string(serializedBlocks)))
+				}
+				log.Warn(fmt.Errorf("error sending message: %w", err))
 			}
-			log.Warn(fmt.Errorf("error sending message: %w", err))
+			// Mom can we get rate limiting?
+			// we have rate limiting at home
+			// rate limiting at home:
+			time.Sleep(time.Second * 10)
+		} else {
+			log.Warn(fmt.Sprintf("Ignoring message from the past: %q", ts))
 		}
-		t.lastMessage[b.collection+b.resource.Channel] = ts
-		// Mom can we get rate limiting?
-		// we have rate limiting at home
-		time.Sleep(time.Second)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
 		log.Debug("handling Prepare operation")
-		var checkpoint = driverCheckpoint{LastMessage: t.lastMessage}
+		var checkpoint = driverCheckpoint{}
 		var bs, err = json.Marshal(&checkpoint)
 		if err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("error marshalling driver checkpoint: %w", err))
