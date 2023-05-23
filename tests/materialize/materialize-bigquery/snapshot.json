@@ -1,15 +1,11 @@
 {
   "applied": {
-    "actionDescription": "CREATE TABLE IF NOT EXISTS `estuary-sandbox`.whb_other_region.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-sandbox`.whb_other_region.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nCREATE TABLE IF NOT EXISTS `estuary-sandbox`.whb_other_region.simple (\n\t\tid INT64 NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-sandbox`.whb_other_region.duplicate_keys (\n\t\tid INT64 NOT NULL,\n\t\tint INT64,\n\t\tstr STRING,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-sandbox`.whb_other_region.multiple_types (\n\t\tid INT64 NOT NULL,\n\t\tarray_int STRING,\n\t\tbool_field BOOL,\n\t\tfloat_field BIGNUMERIC,\n\t\tnested STRING,\n\t\tnullable_int INT64,\n\t\tstr_field STRING,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-sandbox`.whb_other_region.formatted_strings (\n\t\tid INT64 NOT NULL,\n\t\tint_and_str INT64,\n\t\tint_str INT64,\n\t\tnum_and_str BIGNUMERIC,\n\t\tnum_str BIGNUMERIC,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nUPDATE `estuary-sandbox`.whb_other_region.flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-bigquery/materialize';"
+    "actionDescription": "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INT64 NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INT64 NOT NULL,\n\t\tint INT64,\n\t\tstr STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INT64 NOT NULL,\n\t\tarray_int STRING,\n\t\tbool_field BOOL,\n\t\tfloat_field BIGNUMERIC,\n\t\tnested STRING,\n\t\tnullable_int INT64,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INT64 NOT NULL,\n\t\tint_and_str INT64,\n\t\tint_str INT64,\n\t\tnum_and_str BIGNUMERIC,\n\t\tnum_str BIGNUMERIC,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nINSERT INTO `estuary-theatre`.testing.flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-bigquery/materialize');"
   }
 }
 {
   "opened": {
-    "runtimeCheckpoint": {
-      "sources": {
-        "a/read/journal;suffix": {}
-      }
-    }
+    "runtimeCheckpoint": {}
   }
 }
 {
@@ -400,7 +396,7 @@
 ]
 {
   "applied": {
-    "actionDescription": "\nCREATE TABLE IF NOT EXISTS `estuary-sandbox`.whb_other_region.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-sandbox`.whb_other_region.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nUPDATE `estuary-sandbox`.whb_other_region.flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-bigquery/materialize';"
+    "actionDescription": "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nUPDATE `estuary-theatre`.testing.flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-bigquery/materialize';"
   }
 }
 {
