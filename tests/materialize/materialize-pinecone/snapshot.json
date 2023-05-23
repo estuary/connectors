@@ -1,0 +1,319 @@
+{
+  "applied": {}
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "matches": [
+    {
+      "id": "FQE",
+      "metadata": {
+        "canary": "amputation's",
+        "id": 1
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQI",
+      "metadata": {
+        "canary": "armament's",
+        "id": 2
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQM",
+      "metadata": {
+        "canary": "splatters",
+        "id": 3
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQQ",
+      "metadata": {
+        "canary": "strengthen",
+        "id": 4
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQU",
+      "metadata": {
+        "canary": "Kringle's",
+        "id": 5
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQY",
+      "metadata": {
+        "canary": "grosbeak's",
+        "id": 6
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQc",
+      "metadata": {
+        "canary": "pieced",
+        "id": 7
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQg",
+      "metadata": {
+        "canary": "roaches",
+        "id": 8
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQk",
+      "metadata": {
+        "canary": "devilish",
+        "id": 9
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQo",
+      "metadata": {
+        "canary": "glucose's",
+        "id": 10
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    }
+  ],
+  "namespace": "simple",
+  "results": []
+}
+{
+  "matches": [
+    {
+      "id": "FQE",
+      "metadata": {
+        "id": 1,
+        "int": 6,
+        "str": "str 6"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQI",
+      "metadata": {
+        "id": 2,
+        "int": 7,
+        "str": "str 7"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQM",
+      "metadata": {
+        "id": 3,
+        "int": 8,
+        "str": "str 8"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQQ",
+      "metadata": {
+        "id": 4,
+        "int": 9,
+        "str": "str 9"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQU",
+      "metadata": {
+        "id": 5,
+        "int": 10,
+        "str": "str 10"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    }
+  ],
+  "namespace": "duplicated-keys",
+  "results": []
+}
+{
+  "matches": [
+    {
+      "id": "FQE",
+      "metadata": {
+        "bool_field": false,
+        "float_field": 1.1,
+        "id": 1,
+        "nested/id": "i1",
+        "str_field": "str1"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQI",
+      "metadata": {
+        "bool_field": true,
+        "float_field": 2.2,
+        "id": 2,
+        "nested/id": "i2",
+        "nullable_int": 2,
+        "str_field": "str2"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQM",
+      "metadata": {
+        "bool_field": false,
+        "float_field": 3.3,
+        "id": 3,
+        "nested/id": "i3",
+        "str_field": "str3"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQQ",
+      "metadata": {
+        "bool_field": true,
+        "float_field": 4.4,
+        "id": 4,
+        "nested/id": "i4",
+        "nullable_int": 4,
+        "str_field": "str4"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQU",
+      "metadata": {
+        "bool_field": false,
+        "float_field": 5.5,
+        "id": 5,
+        "nested/id": "i5",
+        "str_field": "str5"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQY",
+      "metadata": {
+        "bool_field": true,
+        "float_field": 66.66,
+        "id": 6,
+        "nested/id": "i6",
+        "nullable_int": 6,
+        "str_field": "str6 v2"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQc",
+      "metadata": {
+        "bool_field": false,
+        "float_field": 77.77,
+        "id": 7,
+        "nested/id": "i7",
+        "str_field": "str7 v2"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQg",
+      "metadata": {
+        "bool_field": true,
+        "float_field": 88.88,
+        "id": 8,
+        "nested/id": "i8",
+        "nullable_int": 8,
+        "str_field": "str8 v2"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQk",
+      "metadata": {
+        "bool_field": false,
+        "float_field": 99.99,
+        "id": 9,
+        "nested/id": "i9",
+        "str_field": "str9 v2"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    },
+    {
+      "id": "FQo",
+      "metadata": {
+        "bool_field": true,
+        "float_field": 1010.101,
+        "id": 10,
+        "nested/id": "i10",
+        "nullable_int": 10,
+        "str_field": "str10 v2"
+      },
+      "score": 0,
+      "values": "<VECTOR>"
+    }
+  ],
+  "namespace": "multiple-types",
+  "results": []
+}
+{
+  "applied": {}
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
