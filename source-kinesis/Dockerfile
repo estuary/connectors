@@ -11,8 +11,9 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-COPY go             ./go
-COPY source-kinesis ./source-kinesis
+COPY go                 ./go
+COPY source-boilerplate ./source-boilerplate
+COPY source-kinesis     ./source-kinesis
 
 # Run the unit tests.
 RUN go test -v ./source-kinesis/...
@@ -36,9 +37,7 @@ COPY --from=builder /builder/connector ./source-kinesis
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-COPY --from=ghcr.io/estuary/airbyte-to-flow:dev /airbyte-to-flow ./
-ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/source-kinesis"]
+ENTRYPOINT ["/connector/source-kinesis"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture
-LABEL FLOW_RUNTIME_CODEC=json
