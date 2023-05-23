@@ -29,6 +29,9 @@ func TestCapture(t *testing.T) {
 			{
 				ResourceConfigJson: resourceBytes,
 				ResourcePath:       []string{"hellCollection"},
+				Collection: flow.CollectionSpec{
+					Name: "hellCollection",
+				},
 			},
 		},
 		Validator:  &st.SortedCaptureValidator{},
