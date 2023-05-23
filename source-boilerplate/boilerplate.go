@@ -384,7 +384,52 @@ func hwHashPartition(partitionId []byte) uint32 {
 	return uint32(highwayhash.Sum64(partitionId, highwayHashKey) >> 32)
 }
 
-func IncludesHwHash(range_ *pf.RangeSpec, partitionID []byte) bool {
+func RangeIncludesHwHash(range_ *pf.RangeSpec, partitionID []byte) bool {
 	var hashed = hwHashPartition(partitionID)
 	return hashed >= range_.KeyBegin && hashed <= range_.KeyEnd
+}
+
+func RangeIncludes(r *pf.RangeSpec, hash uint32) bool {
+	return hash >= r.KeyBegin && hash <= r.KeyEnd
+}
+
+// RangeOverlap is the result of checking whether one Range overlaps another.
+type RangeOverlap int
+
+const (
+	NoRangeOverlap      RangeOverlap = 0
+	PartialRangeOverlap RangeOverlap = 1
+	FullRangeOverlap    RangeOverlap = 2
+)
+
+func RangesOverlap(rangeOne *pf.RangeSpec, rangeTwo *pf.RangeSpec) RangeOverlap {
+	var includesBegin = RangeIncludes(rangeOne, rangeTwo.KeyBegin)
+	var includesEnd = RangeIncludes(rangeOne, rangeTwo.KeyEnd)
+
+	if includesBegin && includesEnd {
+		return FullRangeOverlap
+	} else if includesBegin != includesEnd {
+		return PartialRangeOverlap
+	} else {
+		return NoRangeOverlap
+	}
+}
+
+// Intersection returns the intersection of two overlapping Ranges. If the ranges do not
+// overlap, this function will panic.
+func RangeIntersection(rangeOne *pf.RangeSpec, rangeTwo *pf.RangeSpec) pf.RangeSpec {
+	var result = pf.RangeSpec{}
+	result.KeyBegin = rangeOne.KeyBegin
+	result.KeyEnd = rangeOne.KeyEnd
+
+	if rangeTwo.KeyBegin > rangeOne.KeyBegin {
+		result.KeyBegin = rangeTwo.KeyBegin
+	}
+	if rangeTwo.KeyEnd < rangeOne.KeyEnd {
+		result.KeyEnd = rangeTwo.KeyEnd
+	}
+	if result.KeyBegin > result.KeyEnd {
+		panic("intersected partition ranges that do not overlap")
+	}
+	return result
 }

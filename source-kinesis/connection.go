@@ -14,10 +14,10 @@ import (
 // Config represents the fully merged endpoint configuration for Kinesis.
 // It matches the `KinesisConfig` struct in `crates/sources/src/specs.rs`
 type Config struct {
-	Endpoint           string `json:"endpoint"`
-	Region             string `json:"region"`
-	AWSAccessKeyID     string `json:"awsAccessKeyId"`
-	AWSSecretAccessKey string `json:"awsSecretAccessKey"`
+	Endpoint           string `json:"endpoint,omitempty" jsonschema:"title=AWS Endpoint" jsonschema_description="The AWS endpoint URI to connect to, useful if you're capturing from a kinesis-compatible API that isn't provided by AWS"`
+	Region             string `json:"region" jsonschema:"title=AWS Region,description=The name of the AWS region where the Kinesis stream is located"`
+	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=AWS Access Key ID,description=Part of the AWS credentials that will be used to connect to Kinesis"`
+	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=AWS Secret Access Key,description=Part of the AWS credentials that will be used to connect to Kinesis"`
 }
 
 func (c *Config) Validate() error {
@@ -32,45 +32,6 @@ func (c *Config) Validate() error {
 	}
 	return nil
 }
-
-var configJSONSchema = `{
-	"$schema": "http://json-schema.org/draft-07/schema#",
-	"title":   "Kinesis Source Spec",
-	"type":    "object",
-	"required": [
-		"region",
-		"awsAccessKeyId",
-		"awsSecretAccessKey"
-	],
-	"properties": {
-		"awsAccessKeyId": {
-			"type":        "string",
-			"title":       "AWS Access Key ID",
-			"description": "Part of the AWS credentials that will be used to connect to Kinesis",
-			"order": 0
-
-		},
-		"awsSecretAccessKey": {
-			"type":        "string",
-			"title":       "AWS Secret Access Key",
-			"description": "Part of the AWS credentials that will be used to connect to Kinesis",
-			"secret":      true,
-			"order":       1
-		},
-		"region": {
-			"type":        "string",
-			"title":       "AWS Region",
-			"description": "The name of the AWS region where the Kinesis stream is located",
-			"order":       2
-		},
-		"endpoint": {
-			"type":        "string",
-			"title":       "AWS Endpoint",
-			"description": "The AWS endpoint URI to connect to, useful if you're capturing from a kinesis-compatible API that isn't provided by AWS",
-			"order":       3
-		}
-	}
-}`
 
 func connect(config *Config) (*kinesis.Kinesis, error) {
 	var err = config.Validate()

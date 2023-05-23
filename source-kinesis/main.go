@@ -4,79 +4,197 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"os"
+	"math"
 	"sync"
-	"time"
 
-	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/flow/go/protocols/airbyte"
 	log "github.com/sirupsen/logrus"
+	pc "github.com/estuary/flow/go/protocols/capture"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 )
 
-func main() {
-	airbyte.RunMain(spec, doCheck, doDiscover, doRead)
+type driver struct{}
+
+type resource struct {
+	Stream   string `json:"stream" jsonschema:"title=Stream Name"`
+	SyncMode string `json:"syncMode" jsonschema:"-"`
 }
 
-var spec = airbyte.Spec{
-	SupportsIncremental:           true,
-	SupportedDestinationSyncModes: airbyte.AllDestinationSyncModes,
-	ConnectionSpecification:       json.RawMessage(configJSONSchema),
-	DocumentationURL:              "https://go.estuary.dev/source-kinesis",
-}
-
-func doCheck(args airbyte.CheckCmd) error {
-	var result = &airbyte.ConnectionStatus{
-		Status: airbyte.StatusSucceeded,
+func (r resource) Validate() error {
+	if r.Stream == "" {
+		return fmt.Errorf("stream is required")
 	}
-	var _, err = tryListingStreams(args.ConfigFile)
-	if err != nil {
-		result.Status = airbyte.StatusFailed
-		result.Message = err.Error()
-	}
-	return airbyte.NewStdoutEncoder().Encode(airbyte.Message{
-		Type:             airbyte.MessageTypeConnectionStatus,
-		ConnectionStatus: result,
-	})
+	return nil
 }
 
-func tryListingStreams(configFile airbyte.ConfigFile) ([]string, error) {
-	var _, client, err = parseConfigAndConnect(configFile)
+func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
+	var endpointSchema, err = schemagen.GenerateSchema("Kinesis", &Config{}).MarshalJSON()
 	if err != nil {
-		return nil, err
+		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
 	}
-	var ctx = context.Background()
-	return listAllStreams(ctx, client)
+	resourceSchema, err := schemagen.GenerateSchema("Kinesis Resource Spec", &resource{}).MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("generating resource schema: %w", err)
+	}
+
+	return &pc.Response_Spec{
+		ConfigSchemaJson:         json.RawMessage(endpointSchema),
+		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		DocumentationUrl:         "https://go.estuary.dev/source-kinesis",
+	}, nil
 }
 
-func doDiscover(args airbyte.DiscoverCmd) error {
-	var catalog, err = discoverCatalog(args.ConfigFile)
+// Validate that store resources and proposed collection bindings are compatible.
+func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
+	var config Config
+	if err := pf.UnmarshalStrict(req.ConfigJson, &config); err != nil {
+		return nil, fmt.Errorf("parsing config json: %w", err)
+	}
+
+	client, err := connect(&config);
 	if err != nil {
+		err = fmt.Errorf("failed to connect: %w", err)
+	}
+
+	streamNames, err := listAllStreams(ctx, client);
+	if err != nil {
+		return nil, fmt.Errorf("listing streams: %w", err)
+	}
+
+	var bindings = []*pc.Response_Validated_Binding{}
+
+	for _, binding := range req.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return nil, fmt.Errorf("error parsing resource config: %w", err)
+		}
+
+		if !SliceContains(res.Stream, streamNames) {
+			return nil, fmt.Errorf("stream %s does not exist", res.Stream)
+		}
+
+		bindings = append(bindings, &pc.Response_Validated_Binding{
+			ResourcePath: []string{res.Stream},
+		})
+	}
+
+	return &pc.Response_Validated{Bindings: bindings}, nil
+}
+
+// Discover returns the set of resources available from this Driver.
+func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
+	var config Config
+	if err := pf.UnmarshalStrict(req.ConfigJson, &config); err != nil {
+		return nil, fmt.Errorf("parsing config json: %w", err)
+	}
+
+	client, err := connect(&config);
+	if err != nil {
+		err = fmt.Errorf("failed to connect: %w", err)
+	}
+
+	streamNames, err := listAllStreams(ctx, client);
+	if err != nil {
+		return nil, fmt.Errorf("listing streams: %w", err)
+	}
+
+	bindings := discoverStreams(ctx, client, streamNames)
+
+	return &pc.Response_Discovered{Bindings: bindings}, nil
+}
+
+// Pull is a very long lived RPC through which the Flow runtime and a
+// Driver cooperatively execute an unbounded number of transactions.
+func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
+	var config Config
+	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &config); err != nil {
+		return fmt.Errorf("parsing config json: %w", err)
+	}
+
+	var stateMap = make(stateMap)
+	if open.StateJson != nil {
+		if err := pf.UnmarshalStrict(open.StateJson, &stateMap); err != nil {
+			return fmt.Errorf("parsing state file: %w", err)
+		}
+	}
+
+	client, err := connect(&config);
+	if err != nil {
+		err = fmt.Errorf("failed to connect: %w", err)
+	}
+
+	var dataCh = make(chan readResult, 8)
+	var ctx = stream.Context()
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	log.WithField("bindings count", open.Capture.Bindings).Info("Starting to read stream(s)")
+
+	var shardRange = open.Range
+	if shardRange.KeyBegin == 0 && shardRange.KeyEnd == 0 {
+		log.Info("using full shard range since no range was given in the catalog")
+		shardRange.KeyEnd = math.MaxUint32
+	}
+
+	var waitGroup = new(sync.WaitGroup)
+	for i, binding := range open.Capture.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return fmt.Errorf("error parsing resource config: %w", err)
+		}
+		streamState, err := copyStreamState(stateMap, res.Stream)
+		if err != nil {
+			cancelFunc()
+			return fmt.Errorf("invalid state for stream %s: %w", res.Stream, err)
+		}
+		waitGroup.Add(1)
+		go readStream(ctx, shardRange, client, i, res.Stream, streamState, dataCh, waitGroup)
+	}
+
+	go closeChannelWhenDone(dataCh, waitGroup)
+
+	if err := stream.Ready(false); err != nil {
 		return err
 	}
-	log.Infof("Discover completed with %d streams", len(catalog.Streams))
-	var encoder = airbyte.NewStdoutEncoder()
-	return encoder.Encode(airbyte.Message{
-		Type:    airbyte.MessageTypeCatalog,
-		Catalog: catalog,
-	})
+
+	// We're all set to start printing data to stdout
+	for next := range dataCh {
+		if next.err != nil {
+			// time to bail
+			log.WithField("error", next.err).Error("read failed due to error")
+			err = next.err
+			break
+		}
+		for _, record := range next.records {
+			if err = stream.Documents(next.source.idx, record); err != nil {
+				break
+			}
+		}
+		updateState(stateMap, next.source, next.sequenceNumber)
+
+		stateRaw, err := json.Marshal(stateMap)
+		if err != nil {
+			break
+		}
+		if err = stream.Checkpoint(json.RawMessage(stateRaw), false); err != nil {
+			break
+		}
+
+		if err != nil {
+			break
+		}
+	}
+	cancelFunc()
+	return err
 }
 
-func discoverCatalog(config airbyte.ConfigFile) (*airbyte.Catalog, error) {
-	var _, client, err = parseConfigAndConnect(config)
-	if err != nil {
-		return nil, err
-	}
+// ApplyUpsert applies a new or updated capture to the store.
+func (d *driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
+	return &pc.Response_Applied{ActionDescription: ""}, nil
+}
 
-	var ctx = context.Background()
-	streamNames, err := listAllStreams(ctx, client)
-	if err != nil {
-		return nil, err
-	}
-
-	streams := discoverStreams(ctx, client, streamNames)
-
-	return &airbyte.Catalog{Streams: streams}, nil
+func main() {
+	boilerplate.RunMain(new(driver))
 }
 
 func updateState(state map[string]map[string]string, source *recordSource, sequenceNumber string) {
@@ -99,115 +217,23 @@ func copyStreamState(state map[string]map[string]string, stream string) (map[str
 	return dest, nil
 }
 
-func doRead(args airbyte.ReadCmd) error {
-	return readStreamsTo(context.Background(), args, os.Stdout)
-}
-
-func readStreamsTo(ctx context.Context, args airbyte.ReadCmd, output io.Writer) error {
-	var _, client, err = parseConfigAndConnect(args.ConfigFile)
-	if err != nil {
-		return err
-	}
-	var catalog airbyte.ConfiguredCatalog
-	if err = args.CatalogFile.Parse(&catalog); err != nil {
-		return fmt.Errorf("parsing configured catalog: %w", err)
-	}
-
-	var stateMap = make(stateMap)
-	if len(args.StateFile) > 0 {
-		if err = args.StateFile.Parse(&stateMap); err != nil {
-			return fmt.Errorf("parsing state file: %w", err)
-		}
-	}
-
-	var dataCh = make(chan readResult, 8)
-	ctx, cancelFunc := context.WithCancel(ctx)
-
-	log.WithField("streamCount", len(catalog.Streams)).Info("Starting to read stream(s)")
-
-	var shardRange = catalog.Range
-	if shardRange.IsZero() {
-		log.Info("using full shard range since no range was given in the catalog")
-		shardRange = airbyte.NewFullRange()
-	}
-
-	var waitGroup = new(sync.WaitGroup)
-	for _, stream := range catalog.Streams {
-		streamState, err := copyStreamState(stateMap, stream.Stream.Name)
-		if err != nil {
-			cancelFunc()
-			return fmt.Errorf("invalid state for stream %s: %w", stream.Stream.Name, err)
-		}
-		waitGroup.Add(1)
-		go readStream(ctx, shardRange, client, stream.Stream.Name, streamState, dataCh, waitGroup)
-	}
-
-	go closeChannelWhenDone(dataCh, waitGroup)
-
-	// We'll re-use this same message instance for all records we print
-	var recordMessage = airbyte.Message{
-		Type:   airbyte.MessageTypeRecord,
-		Record: &airbyte.Record{},
-	}
-	// We're all set to start printing data to stdout
-	var encoder = json.NewEncoder(output)
-	for next := range dataCh {
-		if next.err != nil {
-			// time to bail
-			var errMessage = airbyte.NewLogMessage(airbyte.LogLevelFatal, "read failed due to error: %v", next.err)
-			// Printing the error may fail, but we'll ignore that error and return the original
-			_ = encoder.Encode(errMessage)
-			err = next.err
-			break
-		}
-		recordMessage.Record.Stream = next.source.stream
-		for _, record := range next.records {
-			recordMessage.Record.Data = record
-			recordMessage.Record.EmittedAt = time.Now().UTC().UnixNano() / int64(time.Millisecond)
-			if err = encoder.Encode(recordMessage); err != nil {
-				break
-			}
-		}
-		updateState(stateMap, next.source, next.sequenceNumber)
-
-		stateRaw, err := json.Marshal(stateMap)
-		if err != nil {
-			break
-		}
-		if err = encoder.Encode(airbyte.Message{
-			Type:  airbyte.MessageTypeState,
-			State: &airbyte.State{Data: json.RawMessage(stateRaw)},
-		}); err != nil {
-			break
-		}
-
-		if err != nil {
-			break
-		}
-	}
-	cancelFunc()
-	return err
-}
-
 func closeChannelWhenDone(dataCh chan readResult, waitGroup *sync.WaitGroup) {
 	waitGroup.Wait()
 	log.Info("All reads have completed")
 	close(dataCh)
 }
 
-func parseConfigAndConnect(configFile airbyte.ConfigFile) (config Config, client *kinesis.Kinesis, err error) {
-	if err = configFile.ConfigFile.Parse(&config); err != nil {
-		err = fmt.Errorf("parsing config file: %w", err)
-		return
-	}
-	if client, err = connect(&config); err != nil {
-		err = fmt.Errorf("failed to connect: %w", err)
-	}
-	return
-}
-
 type stateMap map[string]map[string]string
 
 func (s stateMap) Validate() error {
 	return nil // No-op.
+}
+
+func SliceContains(expected string, actual []string) bool {
+	for _, ty := range actual {
+		if ty == expected {
+			return true
+		}
+	}
+	return false
 }
