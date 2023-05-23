@@ -4,8 +4,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/stretchr/testify/require"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 )
 
 // max u128
@@ -48,44 +49,44 @@ func TestHashPartitionKeyMatchesKinesisHashing(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		var keyHash = hashPartitionKey(tc.partitionKey)
-		require.Equalf(t, tc.included, shard0Range.Includes(keyHash), "TC: %#v", tc)
+		require.Equalf(t, tc.included, boilerplate.RangeIncludes(&shard0Range, keyHash), "TC: %#v", tc)
 	}
 }
 
 func TestShardRangeTranslation(t *testing.T) {
 	var result, err = parseKinesisShardRange("0", maxKinesisHash)
 	require.NoError(t, err)
-	require.Equal(t, uint32(math.MaxUint32), result.End)
-	require.Equal(t, uint32(0), result.Begin)
+	require.Equal(t, uint32(math.MaxUint32), result.KeyEnd)
+	require.Equal(t, uint32(0), result.KeyBegin)
 
 	result, err = parseKinesisShardRange("65536", "1584563250654221633430969384980")
 	require.NoError(t, err)
-	require.Equal(t, uint32(0), result.Begin)
-	require.Equal(t, uint32(20), result.End)
+	require.Equal(t, uint32(0), result.KeyBegin)
+	require.Equal(t, uint32(20), result.KeyEnd)
 }
 
 func TestShardRangeOverlaps(t *testing.T) {
-	testRangeOverlap(t, airbyte.FullRangeOverlap, 0, math.MaxUint32, "0", maxKinesisHash)
-	testRangeOverlap(t, airbyte.FullRangeOverlap, 0, math.MaxUint32, "1", maxKinesisHash)
-	testRangeOverlap(t, airbyte.PartialRangeOverlap, 1, math.MaxUint32, "0", maxKinesisHash)
+	testRangeOverlap(t, boilerplate.FullRangeOverlap, 0, math.MaxUint32, "0", maxKinesisHash)
+	testRangeOverlap(t, boilerplate.FullRangeOverlap, 0, math.MaxUint32, "1", maxKinesisHash)
+	testRangeOverlap(t, boilerplate.PartialRangeOverlap, 1, math.MaxUint32, "0", maxKinesisHash)
 	// This huge number is equivalent to 5 << 96, so this case is testing the boundary where the
 	// kinesis range begin is the same as the flow range exclusive end.
-	testRangeOverlap(t, airbyte.PartialRangeOverlap, 0, 5, "396140812571321687967719751680", maxKinesisHash)
-	testRangeOverlap(t, airbyte.NoRangeOverlap, 0, 5, "475368975085586025561263702016", maxKinesisHash)
+	testRangeOverlap(t, boilerplate.PartialRangeOverlap, 0, 5, "396140812571321687967719751680", maxKinesisHash)
+	testRangeOverlap(t, boilerplate.NoRangeOverlap, 0, 5, "475368975085586025561263702016", maxKinesisHash)
 
 	// This huge number is equivalent to 20 << 96, so should partially overlap
-	testRangeOverlap(t, airbyte.PartialRangeOverlap, 10, 20, "1584563250285286751870879006720", maxKinesisHash)
-	testRangeOverlap(t, airbyte.FullRangeOverlap, 20, 20, "1584563250285286751870879006720", "1584563250285286751870879006721")
+	testRangeOverlap(t, boilerplate.PartialRangeOverlap, 10, 20, "1584563250285286751870879006720", maxKinesisHash)
+	testRangeOverlap(t, boilerplate.FullRangeOverlap, 20, 20, "1584563250285286751870879006720", "1584563250285286751870879006721")
 }
 
-func testRangeOverlap(t *testing.T, expected airbyte.RangeOverlap, flowBegin, flowEnd uint32, kinesisBegin, kinesisEnd string) {
-	var flowRange = &airbyte.Range{
-		Begin: flowBegin,
-		End:   flowEnd,
+func testRangeOverlap(t *testing.T, expected boilerplate.RangeOverlap, flowBegin, flowEnd uint32, kinesisBegin, kinesisEnd string) {
+	var flowRange = &pf.RangeSpec{
+		KeyBegin: flowBegin,
+		KeyEnd:   flowEnd,
 	}
 	var kinesisRange, err = parseKinesisShardRange(kinesisBegin, kinesisEnd)
 	require.NoError(t, err, "failed to convert kinesis hash key range")
-	var result = flowRange.Overlaps(kinesisRange)
+	var result = boilerplate.RangesOverlap(flowRange, &kinesisRange)
 
 	require.Equalf(t, expected, result, "flowRange: %#v, kinesisRange: %s-%s, translatedKinesisRange: %#v", flowRange, kinesisBegin, kinesisEnd, kinesisRange)
 }
