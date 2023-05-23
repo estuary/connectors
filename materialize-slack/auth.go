@@ -11,11 +11,11 @@ import (
 
 type CredentialConfig struct {
 	// Provided by runtime
-	ClientID     string `json:"client_id,omitempty" jsonschema_extras:"secret=true"`
-	ClientSecret string `json:"client_secret,omitempty" jsonschema_extras:"secret=true"`
+	ClientID     string `json:"client_id" jsonschema_extras:"required,secret=true"`
+	ClientSecret string `json:"client_secret" jsonschema_extras:"required,secret=true"`
 
 	// Extracted by us in AccessTokenResponseJsonMap
-	AccessToken string `json:"access_token,omitempty" jsonschema_extras:"secret=true"`
+	AccessToken string `json:"access_token" jsonschema_extras:"required,secret=true"`
 }
 
 func (c *CredentialConfig) validateClientCreds() error {
