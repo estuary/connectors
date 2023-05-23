@@ -17,8 +17,6 @@ type SlackSenderConfig struct {
 type SlackAPI struct {
 	Client slack.Client // Bearer token for authentication
 
-	SenderConfig SlackSenderConfig
-
 	channelIDs map[string]string // Cache for channel Name->ID mappings
 }
 
@@ -33,7 +31,7 @@ func (api *SlackAPI) AuthTest() error {
 
 // PostMessage sends a simple message to the specified channel name or ID.
 // If the channel is specified by ID it should be prefixed like `id:C1234`.
-func (api *SlackAPI) PostMessage(channel, text string, blocks []slack.Block) error {
+func (api *SlackAPI) PostMessage(channel, text string, blocks []slack.Block, config SlackSenderConfig) error {
 	var channelID, err = api.GetChannelID(channel)
 	if err != nil {
 		return fmt.Errorf("error getting channel id: %w", err)
@@ -43,9 +41,9 @@ func (api *SlackAPI) PostMessage(channel, text string, blocks []slack.Block) err
 		channelID,
 		slack.MsgOptionText(text, false),
 		slack.MsgOptionBlocks(blocks...),
-		slack.MsgOptionUsername(api.SenderConfig.DisplayName),
-		slack.MsgOptionIconEmoji(api.SenderConfig.LogoEmoji),
-		slack.MsgOptionIconURL(api.SenderConfig.LogoPicture),
+		slack.MsgOptionUsername(config.DisplayName),
+		slack.MsgOptionIconEmoji(config.LogoEmoji),
+		slack.MsgOptionIconURL(config.LogoPicture),
 	)
 	if err != nil {
 		return err
