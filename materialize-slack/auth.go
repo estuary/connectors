@@ -30,10 +30,9 @@ func (c *CredentialConfig) validateClientCreds() error {
 	return nil
 }
 
-func (c *CredentialConfig) SlackAPI(config SlackSenderConfig) *SlackAPI {
+func (c *CredentialConfig) SlackAPI() *SlackAPI {
 	return &SlackAPI{
-		Client:       *slack.New(c.AccessToken),
-		SenderConfig: config,
+		Client: *slack.New(c.AccessToken),
 	}
 }
 
