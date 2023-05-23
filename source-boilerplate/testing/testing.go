@@ -284,6 +284,9 @@ func (a *pullAdapter) Send(m *pc.Response) error {
 			var binding string
 			if idx := doc.Binding; int(idx) < len(a.bindings) {
 				binding = string(a.bindings[idx].Collection.Name)
+				if len(binding) == 0 {
+					binding = strings.Join(a.bindings[idx].ResourcePath,"/")
+				}
 			} else {
 				binding = fmt.Sprintf("Invalid Binding %d", idx)
 			}
