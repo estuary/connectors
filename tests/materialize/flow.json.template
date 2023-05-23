@@ -18,7 +18,7 @@
            "int": { "type": "integer", "reduce": {"strategy": "sum"} },
            "str": { "type": "string" }
           },
-          "required": ["id"],
+          "required": ["id", "str"],
           "type": "object",
           "reduce": { "strategy": "merge" }
        },
@@ -35,7 +35,7 @@
            "array_int": {"type": "array", "items": {"type": "integer"}},
            "nested": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}}
           },
-          "required": ["id"],
+          "required": ["id", "str_field"],
           "type": "object"
        },
        "key": ["/id"]
