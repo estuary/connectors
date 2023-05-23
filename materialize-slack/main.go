@@ -21,8 +21,7 @@ import (
 type driver struct{}
 
 type config struct {
-	SenderConfig SlackSenderConfig `json:"sender_config" jsonschema:"title=Slack Config"`
-	Credentials  CredentialConfig  `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-oauth2-provider=slack"`
+	Credentials CredentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-oauth2-provider=slack"`
 }
 
 // Validate returns an error if the config is not well-formed.
@@ -34,7 +33,7 @@ func (c config) Validate() error {
 }
 
 func (c config) buildAPI() (*SlackAPI, error) {
-	var api = c.Credentials.SlackAPI(c.SenderConfig)
+	var api = c.Credentials.SlackAPI()
 	if err := api.AuthTest(); err != nil {
 		return nil, fmt.Errorf("error verifying authentication: %w", err)
 	}
@@ -42,7 +41,8 @@ func (c config) buildAPI() (*SlackAPI, error) {
 }
 
 type resource struct {
-	Channel string `json:"channel" jsonschema:"title=Channel,description=The name of the channel to post messages to (or a raw channel ID like \"id:C123456\")"`
+	Channel      string            `json:"channel" jsonschema:"title=Channel,description=The name of the channel to post messages to (or a raw channel ID like \"id:C123456\")"`
+	SenderConfig SlackSenderConfig `json:"sender_config" jsonschema:"title=Configure Appearance"`
 }
 
 func (r resource) Validate() error {
@@ -192,8 +192,13 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 		if !(textOk || blocksOk) {
 			return nil, nil, fmt.Errorf("no index found for fields 'text' or 'blocks' in %q binding", b.ResourcePath[0])
 		}
+		var res resource
+		err = json.Unmarshal(b.ResourceConfigJson, &res)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to parse resource config: %w", err)
+		}
 		bindings = append(bindings, &binding{
-			channel:     b.ResourcePath[0],
+			resource:    res,
 			collection:  string(b.Collection.Name),
 			tsIndex:     tsIndex,
 			textIndex:   textIndex,
@@ -217,8 +222,8 @@ type transactor struct {
 }
 
 type binding struct {
+	resource    resource
 	collection  string
-	channel     string
 	tsIndex     int
 	textIndex   int
 	blocksIndex int
@@ -281,21 +286,17 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		}
 
-		if ts.After(t.lastMessage[b.collection+b.channel]) {
-			if err := t.api.PostMessage(b.channel, text, blocksParsed.BlockSet); err != nil {
-				serializedBlocks, marshal_err := json.Marshal(blocksParsed)
-				if marshal_err == nil {
-					log.Warn(fmt.Sprintf("Parse Blocks: %+v", string(serializedBlocks)))
-				}
-				return nil, fmt.Errorf("error sending message: %w", err)
+		if err := t.api.PostMessage(b.resource.Channel, text, blocksParsed.BlockSet, b.resource.SenderConfig); err != nil {
+			serializedBlocks, marshal_err := json.Marshal(blocksParsed)
+			if marshal_err == nil {
+				log.Warn(fmt.Sprintf("Parse Blocks: %+v", string(serializedBlocks)))
 			}
-			t.lastMessage[b.collection+b.channel] = ts
-			// Mom can we get rate limiting?
-			// we have rate limiting at home
-			time.Sleep(time.Second)
-		} else {
-			log.Warn(fmt.Sprintf("Ignoring message from the past: %q", ts))
+			log.Warn(fmt.Errorf("error sending message: %w", err))
 		}
+		t.lastMessage[b.collection+b.resource.Channel] = ts
+		// Mom can we get rate limiting?
+		// we have rate limiting at home
+		time.Sleep(time.Second)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
