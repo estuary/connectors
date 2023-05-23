@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	pc "github.com/estuary/flow/go/protocols/capture"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/flow/go/protocols/airbyte"
 )
 
 const (
@@ -43,8 +44,8 @@ var minimalSchema = &jsonschema.Schema{
 		},
 }
 
-func discoverStreams(ctx context.Context, client *kinesis.Kinesis, streamNames []string) []airbyte.Stream {
-	var streams = make([]airbyte.Stream, len(streamNames))
+func discoverStreams(ctx context.Context, client *kinesis.Kinesis, streamNames []string) []*pc.Response_Discovered_Binding {
+	var streams = make([]*pc.Response_Discovered_Binding, len(streamNames))
 
 	// Marshal schema to JSON
 	bs, err := json.Marshal(minimalSchema)
@@ -53,12 +54,15 @@ func discoverStreams(ctx context.Context, client *kinesis.Kinesis, streamNames [
 	}
 
 	for i, name := range streamNames {
-		streams[i] = airbyte.Stream{
-			Name:                name,
-			JSONSchema:          json.RawMessage(bs),
-			SupportedSyncModes:  []airbyte.SyncMode{airbyte.SyncModeIncremental},
-			SourceDefinedPrimaryKey: [][]string{{metaProperty, sequenceNumber}, {metaProperty, partitionKey}},
-			SourceDefinedCursor: true,
+		resourceJSON, err := json.Marshal(resource{Stream: name})
+		if err != nil {
+			panic(fmt.Errorf("serializing resource json: %w", err))
+		}
+		streams[i] = &pc.Response_Discovered_Binding{
+			RecommendedName:     pf.Collection(name),
+			DocumentSchemaJson:  json.RawMessage(bs),
+			ResourceConfigJson:  resourceJSON,
+			Key: []string{fmt.Sprintf("/%s/%s", metaProperty, sequenceNumber), fmt.Sprintf("/%s/%s", metaProperty, partitionKey)},
 		}
 	}
 
