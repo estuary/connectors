@@ -1,0 +1,79 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-pinecone/config",
+    "properties": {
+      "index": {
+        "type": "string",
+        "title": "Pinecone Index",
+        "description": "Pinecone index for this materialization. Must already exist and have appropriate dimensions for the embedding model used.",
+        "order": 0
+      },
+      "environment": {
+        "type": "string",
+        "title": "Pinecone Environment",
+        "description": "Cloud region for your Pinecone project. Example: us-central1-gcp",
+        "order": 1
+      },
+      "pineconeApiKey": {
+        "type": "string",
+        "title": "Pinecone API Key",
+        "description": "Pinecone API key used for authentication.",
+        "order": 2,
+        "secret": true
+      },
+      "openAiApiKey": {
+        "type": "string",
+        "title": "OpenAI API Key",
+        "description": "OpenAI API key used for authentication.",
+        "order": 3,
+        "secret": true
+      },
+      "embeddingModel": {
+        "type": "string",
+        "title": "Embedding Model ID",
+        "description": "Embedding model ID for generating OpenAI bindings. The default text-embedding-ada-002 is recommended.",
+        "default": "text-embedding-ada-002",
+        "order": 4
+      },
+      "openAiOrg": {
+        "type": "string",
+        "title": "OpenAI Organization",
+        "description": "Optional organization name for OpenAI requests. Use this if you belong to multiple organizations to specify which organization is used for API requests.",
+        "order": 5
+      }
+    },
+    "type": "object",
+    "required": [
+      "index",
+      "environment",
+      "pineconeApiKey",
+      "openAiApiKey"
+    ],
+    "title": "Materialize Pinecone Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-pinecone/resource",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "title": "Pinecone Namespace",
+        "description": "Name of the Pinecone namespace that this collection will materialize vectors into.",
+        "x-collection-name": true
+      },
+      "inputProjection": {
+        "type": "string",
+        "title": "Input Projection Name",
+        "description": "Alternate name of the collection projection to use as input for creating the vector embedding. Defaults to 'input'.",
+        "default": "input"
+      }
+    },
+    "type": "object",
+    "required": [
+      "namespace"
+    ],
+    "title": "Pinecone Collection"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-pinecone"
+}
