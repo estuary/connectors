@@ -7,10 +7,6 @@ services:
     command: ["--replSet", "rs0", "--keyFile", "/etc/ssl/sample.key"]
     networks:
       - flow-test
-    volumes:
-      - type: bind
-        source: ./sample.key
-        target: /etc/ssl/sample.key
 
 networks:
   flow-test:
