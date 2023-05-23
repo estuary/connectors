@@ -93,6 +93,7 @@ jobs:
           - materialize-google-pubsub
           - materialize-google-sheets
           - materialize-mongodb
+          - materialize-pinecone
           - materialize-postgres
           - materialize-rockset
           - materialize-s3-parquet
@@ -206,12 +207,18 @@ jobs:
           contains(fromJson('[
               "materialize-elasticsearch",
               "materialize-google-sheets",
+              "materialize-pinecone",
               "materialize-postgres",
               "materialize-s3-parquet",
               "materialize-mongodb"
             ]'), matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PINECONE_INDEX: ${{ vars.PINECONE_INDEX }}
+          PINECONE_PROJECT_ID: ${{ vars.PINECONE_PROJECT_ID }}
+          PINECONE_ENVIRONMENT: ${{ vars.PINECONE_ENVIRONMENT }}
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
