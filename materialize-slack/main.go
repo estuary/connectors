@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -211,23 +210,24 @@ type binding struct {
 func buildDocument(b *binding, keys, values tuple.Tuple) map[string]interface{} {
 	var document = make(map[string]interface{})
 
-	// Add the `_id` field to the document. This is required by Rockset.
-	document["_id"] = base64.RawStdEncoding.EncodeToString(keys.Pack())
-
 	// Add the keys to the document.
 	for i, value := range keys {
-		var propName = b.spec.FieldSelection.Keys[i]
-		document[propName] = value
+		if i < len(b.spec.FieldSelection.Keys) {
+			var propName = b.spec.FieldSelection.Keys[i]
+			document[propName] = value
+		}
 	}
 
 	// Add the non-keys to the document.
 	for i, value := range values {
-		var propName = b.spec.FieldSelection.Values[i]
+		if i < len(b.spec.FieldSelection.Values) {
+			var propName = b.spec.FieldSelection.Values[i]
 
-		if raw, ok := value.([]byte); ok {
-			document[propName] = json.RawMessage(raw)
-		} else {
-			document[propName] = value
+			if raw, ok := value.([]byte); ok {
+				document[propName] = json.RawMessage(raw)
+			} else {
+				document[propName] = value
+			}
 		}
 	}
 	return document
