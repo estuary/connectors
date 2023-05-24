@@ -232,7 +232,8 @@ jobs:
           for VARIANT in ${{ steps.prep.outputs.variants }}; do
             docker image tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} ghcr.io/estuary/${VARIANT}:dev;
             docker image tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.version }};
-            docker image push ghcr.io/estuary/${VARIANT}:dev ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.version }};
+            docker image push ghcr.io/estuary/${VARIANT}:dev;
+            docker image push ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.version }};
           done
 
       - name: Install psql
