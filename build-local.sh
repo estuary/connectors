@@ -9,6 +9,6 @@ docker buildx build \
   --cache-from=type=local,src=.docker-cache \
   --platform linux/amd64 \
   --load \
-  -t $1:local \
+  -t ghcr.io/estuary/$1:local \
   -f $1/Dockerfile \
   .
