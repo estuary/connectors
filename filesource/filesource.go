@@ -197,7 +197,7 @@ func (src *Source) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.
 	resourceJSON, err := json.Marshal(resource{Stream: root})
 
 	return &pc.Response_Discovered{Bindings: []*pc.Response_Discovered_Binding{{
-		RecommendedName:    pf.Collection(root),
+		RecommendedName:    pf.Collection(strings.Trim(root, "/")),
 		ResourceConfigJson: resourceJSON,
 		DocumentSchemaJson: json.RawMessage(minimalDocumentSchema),
 		Key:                []string{"/_meta/file", "/_meta/offset"},
