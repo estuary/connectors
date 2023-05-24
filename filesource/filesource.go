@@ -43,7 +43,7 @@ type Source struct {
 	// ConfigSchema returns the JSON schema of the source's configuration,
 	// given a parser JSON schema it may wish to embed.
 	ConfigSchema func(parserSchema json.RawMessage) json.RawMessage
-	// NewConfig returns a zero-valued Config which may be decoded into.
+	// NewConfig decodes the input raw json into Config
 	NewConfig func(raw json.RawMessage) (Config, error)
 	// Connect using to the Source's Store using the decoded and validated Config.
 	Connect func(context.Context, Config) (Store, error)
@@ -130,7 +130,7 @@ type connector struct {
 
 type resource struct {
 	Stream   string `json:"stream" jsonschema:"title=Stream to capture from" jsonschema_extras="x-collection-name=true"`
-  SyncMode string `json:"syncMode"`
+	SyncMode string `json:"syncMode,omitempty" jsonschema:"-"`
 }
 
 func (r resource) Validate() error {
@@ -150,7 +150,7 @@ func (src Source) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_
 	if err != nil {
 		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
 	}
-	resourceSchema, err := schemagen.GenerateSchema("MongoDB Resource Spec", &resource{}).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("Resource Spec", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -163,11 +163,6 @@ func (src Source) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_
 }
 
 func (src *Source) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
-	/*var cfg, err = src.NewConfig(req.ConfigJson)
-	if err != nil {
-		return nil, fmt.Errorf("parsing config json: %w", err)
-	}*/
-
 	var bindings = []*pc.Response_Validated_Binding{}
 
 	for _, binding := range req.Bindings {
@@ -226,7 +221,7 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 
 	var conn = connector{config: cfg, store: store}
 
-	var states States
+	var states = make(States)
 	if open.StateJson != nil {
 		if err := pf.UnmarshalStrict(open.StateJson, &states); err != nil {
 			return fmt.Errorf("parsing state checkpoint: %w", err)
@@ -269,6 +264,7 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 			prefix:    prefix,
 			schema:    binding.Collection.WriteSchemaJson,
 			state:     state,
+			range_:    open.Range,
 		}
 
 		r.shared.mu = sharedMu
@@ -302,6 +298,7 @@ type reader struct {
 	state  State
   binding int
   stream *boilerplate.PullOutput
+	range_ *pf.RangeSpec
 
 	shared struct {
 		mu     *sync.Mutex
@@ -365,9 +362,9 @@ func (r *reader) shouldSkip(obj ObjectInfo) (_ bool, reason string) {
 		return true, "regex not matched"
 	}
 	// Is it outside of our responsible key range?
-	/*if !r.range_.IncludesHwHash([]byte(obj.Path)) {
+	if !boilerplate.IncludesHwHash(r.range_, []byte(obj.Path)) {
 		return true, "path not in range"
-	}*/
+	}
 
 	return false, ""
 }
@@ -430,12 +427,15 @@ func (r *reader) makeParseConfig(obj ObjectInfo) *parser.Config {
 }
 
 func (r *reader) emit(lines []json.RawMessage) error {
-	// Write out all records, wrapped in |wrapper|.
 	for _, line := range lines {
 		if err := r.stream.Documents(r.binding, line); err != nil {
 			return err
 		}
 	}
+
+	r.shared.mu.Lock()
+	defer r.shared.mu.Unlock()
+	r.shared.states[r.prefix] = r.state
 
   if encodedCheckpoint, err := json.Marshal(r.shared.states); err != nil {
     return err
