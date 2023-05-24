@@ -13,7 +13,9 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"encoding/hex"
 
+	"github.com/minio/highwayhash"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -372,4 +374,17 @@ func (c *jsonCodec) SetHeader(metadata.MD) error {
 }
 func (c *jsonCodec) SetTrailer(metadata.MD) {
 	panic("SetTrailer is not supported")
+}
+
+// highwayHashKey is a fixed 32 bytes (as required by HighwayHash) read from /dev/random.
+// DO NOT MODIFY this value, as it is required to have consistent hash results.
+var highwayHashKey, _ = hex.DecodeString("332757d16f0fb1cf2d4f676f85e34c6a8b85aa58f42bb081449d8eb2e4ed529f")
+
+func hwHashPartition(partitionId []byte) uint32 {
+	return uint32(highwayhash.Sum64(partitionId, highwayHashKey) >> 32)
+}
+
+func IncludesHwHash(range_ *pf.RangeSpec, partitionID []byte) bool {
+	var hashed = hwHashPartition(partitionID)
+	return hashed >= range_.KeyBegin && hashed <= range_.KeyEnd
 }
