@@ -186,22 +186,22 @@ func (src *Source) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.
 		return nil, fmt.Errorf("parsing config json: %w", err)
 	}
 
-  store, err := src.Connect(ctx, cfg)
+	store, err := src.Connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to store: %w", err)
 	}
 
 	var conn = connector{config: cfg, store: store}
 
-  var root = conn.config.DiscoverRoot()
-  resourceJSON, err := json.Marshal(resource{Stream: root})
+	var root = conn.config.DiscoverRoot()
+	resourceJSON, err := json.Marshal(resource{Stream: root})
 
 	return &pc.Response_Discovered{Bindings: []*pc.Response_Discovered_Binding{{
-			RecommendedName:    pf.Collection(root),
-			ResourceConfigJson: resourceJSON,
-			DocumentSchemaJson: json.RawMessage(minimalDocumentSchema),
-			Key:                []string{"/_meta/file", "/_meta/offset"},
-  }}}, nil
+		RecommendedName:    pf.Collection(root),
+		ResourceConfigJson: resourceJSON,
+		DocumentSchemaJson: json.RawMessage(minimalDocumentSchema),
+		Key:                []string{"/_meta/file", "/_meta/offset"},
+	}}}, nil
 }
 
 // Pull is a very long lived RPC through which the Flow runtime and a
@@ -214,7 +214,7 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 
 	var ctx = stream.Context()
 
-  store, err := src.Connect(ctx, cfg)
+	store, err := src.Connect(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("connecting to store: %w", err)
 	}
@@ -244,7 +244,7 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 		return err
 	}
 
-  grp, ctx := errgroup.WithContext(ctx)
+	grp, ctx := errgroup.WithContext(ctx)
 	for i, binding := range open.Capture.Bindings {
 		// Stream names represent an absolute path prefix to capture.
 		var res resource
@@ -258,8 +258,8 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 
 		var r = &reader{
 			connector: &conn,
-      binding:   i,
-      stream:    stream,
+			binding:   i,
+			stream:    stream,
 			pathRe:    pathRe,
 			prefix:    prefix,
 			schema:    binding.Collection.WriteSchemaJson,
@@ -296,8 +296,8 @@ type reader struct {
 	prefix string
 	schema json.RawMessage
 	state  State
-  binding int
-  stream *boilerplate.PullOutput
+	binding int
+	stream *boilerplate.PullOutput
 	range_ *pf.RangeSpec
 
 	shared struct {
@@ -308,7 +308,7 @@ type reader struct {
 
 func (r *reader) sweep(ctx context.Context) error {
 	log.Info(fmt.Sprintf("sweeping %s starting at %q, from %s through %s",
-		r.prefix, r.state.Path, r.state.MinBound, r.state.MaxBound))
+	r.prefix, r.state.Path, r.state.MinBound, r.state.MaxBound))
 
 	var listing, err = r.store.List(ctx, Query{
 		Prefix:    r.prefix,
@@ -337,7 +337,7 @@ func (r *reader) sweep(ctx context.Context) error {
 	}
 
 	log.Info(fmt.Sprintf("completed sweep of %s from %s through %s",
-		r.prefix, r.state.MinBound, r.state.MaxBound))
+	r.prefix, r.state.MinBound, r.state.MaxBound))
 	r.state.finishSweep(r.config.FilesAreMonotonic())
 
 	// Write a final checkpoint to mark the completion of the sweep.
@@ -437,9 +437,9 @@ func (r *reader) emit(lines []json.RawMessage) error {
 	defer r.shared.mu.Unlock()
 	r.shared.states[r.prefix] = r.state
 
-  if encodedCheckpoint, err := json.Marshal(r.shared.states); err != nil {
-    return err
-  } else if err := r.stream.Checkpoint(encodedCheckpoint, true); err != nil {
+	if encodedCheckpoint, err := json.Marshal(r.shared.states); err != nil {
+		return err
+	} else if err := r.stream.Checkpoint(encodedCheckpoint, true); err != nil {
 		return err
 	}
 
