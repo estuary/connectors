@@ -351,7 +351,7 @@ func (r *reader) shouldSkip(obj ObjectInfo) (_ bool, reason string) {
 		return true, "regex not matched"
 	}
 	// Is it outside of our responsible key range?
-	if !boilerplate.IncludesHwHash(r.range_, []byte(obj.Path)) {
+	if !boilerplate.RangeIncludesHwHash(r.range_, []byte(obj.Path)) {
 		return true, "path not in range"
 	}
 
