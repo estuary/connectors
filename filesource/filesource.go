@@ -9,7 +9,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -231,8 +230,6 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 	// Time horizon used for identifying files which fall within a modification time window.
 	var horizon = time.Now().Add(src.TimeHorizonDelta).Round(time.Second).UTC()
 
-	var sharedMu = new(sync.Mutex)
-
 	var pathRe *regexp.Regexp
 	if r := conn.config.PathRegex(); r != "" {
 		if pathRe, err = regexp.Compile(r); err != nil {
@@ -267,7 +264,6 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 			range_:    open.Range,
 		}
 
-		r.shared.mu = sharedMu
 		r.shared.states = states
 
 		grp.Go(func() error {
@@ -301,7 +297,6 @@ type reader struct {
 	range_ *pf.RangeSpec
 
 	shared struct {
-		mu     *sync.Mutex
 		states States
 	}
 }
@@ -433,13 +428,11 @@ func (r *reader) emit(lines []json.RawMessage) error {
 		}
 	}
 
-	r.shared.mu.Lock()
-	defer r.shared.mu.Unlock()
 	r.shared.states[r.prefix] = r.state
 
 	if encodedCheckpoint, err := json.Marshal(r.shared.states); err != nil {
 		return err
-	} else if err := r.stream.Checkpoint(encodedCheckpoint, true); err != nil {
+	} else if err := r.stream.Checkpoint(encodedCheckpoint, false); err != nil {
 		return err
 	}
 
