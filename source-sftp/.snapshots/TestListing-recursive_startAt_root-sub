@@ -8,6 +8,15 @@
 	"ModTime": "2001-09-09T01:46:40Z"
 }
 {
+	"Path": "root/sub/y.csv",
+	"IsPrefix": false,
+	"ContentSum": "",
+	"Size": 18,
+	"ContentType": "",
+	"ContentEncoding": "",
+	"ModTime": "2017-07-14T02:40:00Z"
+}
+{
 	"Path": "root/sub/z.csv",
 	"IsPrefix": false,
 	"ContentSum": "",
