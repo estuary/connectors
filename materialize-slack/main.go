@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -122,24 +123,42 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 
 		var constraints = make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range binding.Collection.Projections {
-			constraints[projection.Field] = &pm.Response_Validated_Constraint{
-				Type:   pm.Response_Validated_Constraint_FIELD_OPTIONAL,
-				Reason: "All fields other than 'ts', 'text', and 'blocks' will be ignored",
+			var constraint pm.Response_Validated_Constraint
+
+			switch {
+			case projection.Field == "ts":
+				constraint = pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
+					Reason: "The Slack materialization requires a message timestamp",
+				}
+			case projection.Field == "text":
+				constraint = pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
+					Reason: "The Slack materialization requires 'text'",
+				}
+			case projection.Field == "blocks":
+				constraint = pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
+					Reason: "The Slack materialization would like 'blocks'",
+				}
+			case projection.IsPrimaryKey:
+				constraint = pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+					Reason: "Keys are all required",
+				}
+			default:
+				constraint = pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_FIELD_OPTIONAL,
+					Reason: "All fields other than 'ts', 'text', and 'blocks' will be ignored",
+				}
 			}
-		}
-		constraints["ts"] = &pm.Response_Validated_Constraint{
-			Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
-			Reason: "The Slack materialization requires a message timestamp",
+			constraints[projection.Field] = &constraint
 		}
 
-		constraints["text"] = &pm.Response_Validated_Constraint{
-			Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
-			Reason: "The Slack materialization requires either text or blocks",
+		if constraints["text"] == nil {
+			return nil, fmt.Errorf("'text' field required")
 		}
-		constraints["blocks"] = &pm.Response_Validated_Constraint{
-			Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
-			Reason: "The Slack materialization requires either text or blocks",
-		}
+
 		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: true,
@@ -243,13 +262,12 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	log.Debug("handling Store operation")
 
-	var vals []tuple.TupleElement
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 		var parsed = buildDocument(b, it.Key, it.Values)
 		var tsStr, tsOk = parsed["ts"].(string)
 		var text, textOk = parsed["text"].(string)
-		var blocks, blocksOk = parsed["blocks"].([]byte)
+		var blocks, blocksOk = parsed["blocks"].(json.RawMessage)
 
 		if !tsOk {
 			return nil, fmt.Errorf("missing timestamp")
@@ -279,14 +297,14 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			err = json.Unmarshal([]byte(escaped_blocks), &blocksParsed)
 
 			if err != nil {
-				log.Warn(fmt.Sprintf("Here is the field ordering: %#v", vals))
-				return nil, fmt.Errorf("invalid blocks value %q: %w", string(blocks), err)
+				return nil, fmt.Errorf("invalid blocks value %q, %q: %w", reflect.TypeOf(blocks), string(blocks), err)
 			}
-
+		} else {
+			log.Warn(fmt.Sprintf("Blocks apparently NOT okay: %+v", reflect.TypeOf(parsed["blocks"])))
 		}
 
 		// Accept messages from at most 30 minutes in the past
-		if time.Since(ts).Minutes() < 30 {
+		if time.Since(ts).Minutes() < 10 {
 			if err := t.api.PostMessage(b.resource.Channel, text, blocksParsed.BlockSet, b.resource.SenderConfig); err != nil {
 				serializedBlocks, marshal_err := json.Marshal(blocksParsed)
 				if marshal_err == nil {

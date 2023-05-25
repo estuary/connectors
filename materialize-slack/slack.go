@@ -79,7 +79,7 @@ func (api *SlackAPI) GetChannelID(name string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			if len(found_channels) > 0 {
+			if nextCursor != "" {
 				channels = append(channels, found_channels...)
 				cursor = nextCursor
 			} else {
