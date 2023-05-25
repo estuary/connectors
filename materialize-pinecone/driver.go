@@ -203,6 +203,13 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = fmt.Sprintf("The %q projection must be materialized", inputProjectionName)
 
+			// We require collection keys be materialized because it seems pretty reasonable to
+			// require they be included as metadata since the composite key is used as the basis for
+			// the vector ID, and also to avoid complications from
+			// https://github.com/estuary/flow/issues/1057.
+			case projection.IsPrimaryKey:
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+				constraint.Reason = "Components of the collection key must be materialized"
 			case isPossibleMetadata(&projection):
 				constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 				constraint.Reason = "The projection can be materialized as metadata"
