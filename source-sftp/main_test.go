@@ -54,6 +54,10 @@ var testFs = fstest.MapFS{
 		Data:    []byte(`{"some": "value"}`),
 		ModTime: time.UnixMilli(1000000000000).UTC(),
 	},
+	"root/sub/y.csv": &fstest.MapFile{
+		Data:    []byte(`first,second,third`),
+		ModTime: time.UnixMilli(1500000000000).UTC(),
+	},
 	"root/sub/z.csv": &fstest.MapFile{
 		Data:    []byte(`first,second,third`),
 		ModTime: time.UnixMilli(1500000000000).UTC(),
@@ -107,6 +111,12 @@ func TestListing(t *testing.T) {
 			root:      "root",
 			recursive: true,
 			startAt:   "z",
+		},
+		{
+			name:      "recursive startAt root/sub/y.csv",
+			root:      "root",
+			recursive: true,
+			startAt:   "root/sub/y.csv",
 		},
 		{
 			name:      "recursive otherDir",
