@@ -60,6 +60,7 @@ var snowflakeDialect = func() sql.Dialect {
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("STRING"),
 			WithFormat: map[string]sql.TypeMapper{
+				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMP"),
 			},
 		},
