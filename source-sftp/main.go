@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -277,8 +278,21 @@ func (l *sftpListing) pushDir(dir string) error {
 	// Filter out file names < query.StartAt and map to visits.
 	visits := []visit{}
 	for _, info := range infos {
-		filePath := sftp.Join(dir, info.Name())
-		if filePath >= l.startAt {
+		filePath := filepath.Join(dir, info.Name())
+		startAt := l.startAt
+
+		// If this is a directory, filter it out based on the directory part of startAt. If we've
+		// process files like `a/b.csv` already, we still need to process files like `a/c.csv` and
+		// need to include the directory `a/` in the listing, even though `a/` is lexically before
+		// `a/b.csv`. But if we've process a file like `b/b.csv` `a/` should not be included since
+		// `a/` is lexically before `b/`.
+		if info.IsDir() {
+			// NB: IsDir() doesn't work for symlink directors, but symlink directories are already
+			// removed from consideration by Next().
+			startAt = filepath.Dir(filePath)
+		}
+
+		if filePath >= startAt {
 			visits = append(visits, visit{FileInfo: info, path: filePath})
 		}
 	}
