@@ -166,7 +166,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			break
 		}
 		for _, record := range next.records {
-			if err = stream.Documents(next.source.idx, record); err != nil {
+			if err = stream.Documents(next.source.bindingIndex, record); err != nil {
 				break
 			}
 		}
