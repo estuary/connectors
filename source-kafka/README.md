@@ -1,6 +1,6 @@
 # `source-kafka` Connector
 
-This is an [Airbyte Specification-compatible](https://docs.airbyte.io/understanding-airbyte/airbyte-specification) connector that reads from Kafka topics/partitions.
+This is a flow connector that reads from Kafka topics/partitions.
 
 ## Getting Started
 
