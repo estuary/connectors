@@ -384,34 +384,34 @@ func hwHashPartition(partitionId []byte) uint32 {
 	return uint32(highwayhash.Sum64(partitionId, highwayHashKey) >> 32)
 }
 
-func RangeIncludesHwHash(range_ *pf.RangeSpec, partitionID []byte) bool {
+func RangeIncludesHwHash(r *pf.RangeSpec, partitionID []byte) bool {
 	var hashed = hwHashPartition(partitionID)
-	return hashed >= range_.KeyBegin && hashed <= range_.KeyEnd
+	return RangeIncludes(r, hashed)
 }
 
 func RangeIncludes(r *pf.RangeSpec, hash uint32) bool {
 	return hash >= r.KeyBegin && hash <= r.KeyEnd
 }
 
-// RangeOverlap is the result of checking whether one Range overlaps another.
-type RangeOverlap int
+// RangeContain is the result of checking whether one Range contains another.
+type RangeContain int
 
 const (
-	NoRangeOverlap      RangeOverlap = 0
-	PartialRangeOverlap RangeOverlap = 1
-	FullRangeOverlap    RangeOverlap = 2
+	NoRangeContain      RangeContain = 0
+	PartialRangeContain RangeContain = 1
+	FullRangeContain    RangeContain = 2
 )
 
-func RangesOverlap(rangeOne *pf.RangeSpec, rangeTwo *pf.RangeSpec) RangeOverlap {
+func RangeContained(rangeOne *pf.RangeSpec, rangeTwo *pf.RangeSpec) RangeContain {
 	var includesBegin = RangeIncludes(rangeOne, rangeTwo.KeyBegin)
 	var includesEnd = RangeIncludes(rangeOne, rangeTwo.KeyEnd)
 
 	if includesBegin && includesEnd {
-		return FullRangeOverlap
+		return FullRangeContain
 	} else if includesBegin != includesEnd {
-		return PartialRangeOverlap
+		return PartialRangeContain
 	} else {
-		return NoRangeOverlap
+		return NoRangeContain
 	}
 }
 
