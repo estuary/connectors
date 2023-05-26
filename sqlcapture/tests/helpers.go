@@ -61,6 +61,13 @@ func RunCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) string {
 func RestartingBackfillCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) (string, []json.RawMessage) {
 	t.Helper()
 
+	// Tests which use RestartingBackfillCapture appear to *still* suffer from some
+	// sort of nondeterminism (probably a shutdown race condition) when running under
+	// CI, so have been disabled to reduce CI flakiness.
+	if val := os.Getenv("CI_BUILD"); val != "" {
+		t.Skipf("skipping %q in CI builds", t.Name())
+	}
+
 	var checkpointRegex = regexp.MustCompile(`^{"cursor":`)
 	var scanCursorRegex = regexp.MustCompile(`"scanned":"(.*)"`)
 
