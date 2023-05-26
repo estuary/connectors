@@ -264,8 +264,6 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 			range_:    open.Range,
 		}
 
-		r.shared.states = states
-
 		grp.Go(func() error {
 			if err := r.sweep(ctx); err != nil {
 				return fmt.Errorf("prefix %s: %w", prefix, err)
@@ -295,10 +293,6 @@ type reader struct {
 	binding int
 	stream *boilerplate.PullOutput
 	range_ *pf.RangeSpec
-
-	shared struct {
-		states States
-	}
 }
 
 func (r *reader) sweep(ctx context.Context) error {
@@ -428,11 +422,13 @@ func (r *reader) emit(lines []json.RawMessage) error {
 		}
 	}
 
-	r.shared.states[r.prefix] = r.state
+	var statePatch = map[string]State{
+		r.prefix: r.state,
+	};
 
-	if encodedCheckpoint, err := json.Marshal(r.shared.states); err != nil {
+	if encodedCheckpoint, err := json.Marshal(statePatch); err != nil {
 		return err
-	} else if err := r.stream.Checkpoint(encodedCheckpoint, false); err != nil {
+	} else if err := r.stream.Checkpoint(encodedCheckpoint, true); err != nil {
 		return err
 	}
 

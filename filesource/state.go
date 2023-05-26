@@ -23,22 +23,22 @@ func (p States) Validate() error {
 // State of a captured file prefix.
 type State struct {
 	// Exclusive lower bound modification time of files processed in this sweep.
-	MinBound time.Time `json:"minBound,omitempty"`
+	MinBound time.Time `json:"minBound"`
 	// MaxBound is the exclusive upper-bound of files being processed in this sweep.
 	// If MaxBound is nil, then this state checkpoint was generated after the completion
 	// of a prior sweep and before the commencement of the next one.
-	MaxBound *time.Time `json:"maxBound,omitempty"`
+	MaxBound *time.Time `json:"maxBound"`
 	// Maximum modification time of any object processed during this sweep,
 	// or nil if no files have been processed so far.
 	// The MaxMod of a current sweep becomes the MinBound of the next sweep.
-	MaxMod *time.Time `json:"maxMod,omitempty"`
+	MaxMod *time.Time `json:"maxMod"`
 
 	// Base path which is currently being processed, or was last processed (if Complete).
-	Path string `json:"path,omitempty"`
+	Path string `json:"path"`
 	// Number of records from the file at |Path| which have been emitted.
-	Records int `json:"records,omitempty"`
+	Records int `json:"records"`
 	// Whether the file at |Path| is complete.
-	Complete bool `json:"complete,omitempty"`
+	Complete bool `json:"complete"`
 
 	// skip is used for crash recovery. It's the number of records of the current
 	// Path which we'll skip, to seek to the point of prior maximum progres.
