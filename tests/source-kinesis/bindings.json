@@ -1,6 +1,15 @@
 {
+  "type": "object",
+  "required": [
+    "_meta"
+  ],
   "properties": {
     "_meta": {
+      "type": "object",
+      "required": [
+        "sequence_number",
+        "partition_key"
+      ],
       "properties": {
         "partition_key": {
           "type": "string"
@@ -8,17 +17,8 @@
         "sequence_number": {
           "type": "string"
         }
-      },
-      "required": [
-        "sequence_number",
-        "partition_key"
-      ],
-      "type": "object"
+      }
     }
   },
-  "required": [
-    "_meta"
-  ],
-  "type": "object",
   "x-infer-schema": true
 }

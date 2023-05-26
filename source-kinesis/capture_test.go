@@ -25,18 +25,20 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/flow/go/protocols/airbyte"
 	"github.com/stretchr/testify/require"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	pc "github.com/estuary/flow/go/protocols/capture"
 )
 
 func TestIsRecordWithinRange(t *testing.T) {
-	var flowRange = airbyte.Range{
-		Begin: 5,
-		End:   10,
+	var flowRange = pf.RangeSpec{
+		KeyBegin: 5,
+		KeyEnd:   10,
 	}
-	var kinesisRange = airbyte.Range{
-		Begin: 7,
-		End:   15,
+	var kinesisRange = pf.RangeSpec{
+		KeyBegin: 7,
+		KeyEnd:   15,
 	}
 	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 5))
 	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 7))
@@ -48,8 +50,8 @@ func TestIsRecordWithinRange(t *testing.T) {
 	require.False(t, isRecordWithinRange(flowRange, kinesisRange, 11))
 	require.False(t, isRecordWithinRange(flowRange, kinesisRange, 17))
 
-	flowRange.Begin = 8
-	flowRange.End = 20
+	flowRange.KeyBegin = 8
+	flowRange.KeyEnd = 20
 	// The record is no longer claimed by the flow shard because its range does not overlap the low
 	// end of the kinesis range
 	require.False(t, isRecordWithinRange(flowRange, kinesisRange, 4))
@@ -59,10 +61,13 @@ func TestIsRecordWithinRange(t *testing.T) {
 }
 
 func TestKinesisCaptureWithShardOverlap(t *testing.T) {
-	var configFile = airbyte.JSONFile("testdata/kinesis-config.json")
-	var conf = Config{}
-	var err = configFile.Parse(&conf)
-	require.NoError(t, err)
+	var conf = Config{
+    Region: "local",
+    Endpoint: "http://localhost:4566",
+    AWSAccessKeyID: "x",
+    AWSSecretAccessKey: "x",
+  }
+
 	client, err := connect(&conf)
 	require.NoError(t, err)
 
@@ -89,16 +94,16 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 	defer cancelFunc()
 	var waitGroup = new(sync.WaitGroup)
 
-	var shard1Range = airbyte.Range{
-		Begin: 0,
-		End:   math.MaxUint32 / 2,
+	var shard1Range = pf.RangeSpec{
+		KeyBegin: 0,
+		KeyEnd:   math.MaxUint32 / 2,
 	}
 	waitGroup.Add(1)
 	go readStream(ctx, shard1Range, client, stream, nil, dataCh, nil, waitGroup)
 
-	var shard2Range = airbyte.Range{
-		Begin: math.MaxUint32 / 2,
-		End:   math.MaxUint32,
+	var shard2Range = pf.RangeSpec{
+		KeyBegin: math.MaxUint32 / 2,
+		KeyEnd:   math.MaxUint32,
 	}
 	waitGroup.Add(1)
 	go readStream(ctx, shard2Range, client, stream, nil, dataCh, nil, waitGroup)
@@ -154,12 +159,12 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 }
 
 func TestKinesisCapture(t *testing.T) {
-	var configFile = airbyte.ConfigFile{
-		ConfigFile: airbyte.JSONFile("testdata/kinesis-config.json"),
-	}
-	var conf = Config{}
-	var err = configFile.ConfigFile.Parse(&conf)
-	require.NoError(t, err)
+	var conf = Config{
+    Region: "local",
+    Endpoint: "http://localhost:4566",
+    AWSAccessKeyID: "x",
+    AWSSecretAccessKey: "x",
+  }
 	client, err := connect(&conf)
 	require.NoError(t, err)
 
@@ -193,50 +198,62 @@ func TestKinesisCapture(t *testing.T) {
 	err = ioutil.WriteFile(stateFile, []byte(stateJson), 0644)
 	require.NoError(t, err)
 
+	var ctx, cancelFunc = context.WithCancel(context.Background())
+	defer cancelFunc()
 	// Test the discover command and assert that it returns the stream we just created
-	catalog, err := discoverCatalog(configFile)
-	require.NoError(t, err, "discover catalog failed")
+	streamNames, err := listAllStreams(ctx, client);
+  require.NoError(t, err)
 
-	require.GreaterOrEqual(t, len(catalog.Streams), 1)
-	var discoveredStream *airbyte.Stream
-	for _, s := range catalog.Streams {
-		if s.Name == stream {
+	bindings := discoverStreams(ctx, client, streamNames)
+
+	require.GreaterOrEqual(t, len(bindings), 1)
+	var discoveredStream *pc.Response_Discovered_Binding
+	for _, s := range bindings {
+		var res resource
+		err := pf.UnmarshalStrict(s.ResourceConfigJson, &res)
+    require.NoError(t, err);
+
+		if res.Stream == stream {
 			discoveredStream = &s
 			break
 		}
 	}
-	require.NotNil(t, discoveredStream, "missing expected stream")
-	var configuredCatalog = airbyte.ConfiguredCatalog{
-		Streams: []airbyte.ConfiguredStream{{
-			Stream:   *discoveredStream,
-			SyncMode: airbyte.SyncModeIncremental,
-		}},
-		Tail: true,
-	}
-	catalogJson, err := json.Marshal(&configuredCatalog)
+
+	start, err := time.Parse(time.RFC3339Nano, "2022-12-19T14:00:00Z")
 	require.NoError(t, err)
-	var catalogFile = path.Join(tmpDir, "catalog.json")
-	err = ioutil.WriteFile(catalogFile, catalogJson, 0644)
+	end, err := time.Parse(time.RFC3339Nano, "2022-12-19T14:10:00Z")
 	require.NoError(t, err)
 
-	// Test a basic read and assert that we get a proper state message at the end
-	var readArgs = airbyte.ReadCmd{
-		ConfigFile:  configFile,
-		CatalogFile: airbyte.JSONFile(catalogFile),
-		StateFile:   airbyte.JSONFile(stateFile),
+
+  capture := &st.CaptureSpec{
+		Driver:       new(driver),
+		EndpointSpec: conf,
+		Bindings:     bindings,
+		Validator:    &st.WatchdogValidator{
+			Inner:         &st.ChecksumValidator{},
+			WatchdogTimer: wdt,
+			ResetPeriod:   quiescentTimeout,
+		},
+		Sanitizers:   make(map[string]*regexp.Regexp),
 	}
 
-	var ctx, cancelFunc = context.WithCancel(context.Background())
-	defer cancelFunc()
-	var reader, writer = io.Pipe()
+	// We need to use a relatively long shutdown delay, since the backfill can potentially cover
+	// periods of time with no historical data.
+	const shutdownDelay = 5000 * time.Millisecond
+	var shutdownWatchdog *time.Timer
 
-	go func() {
-		var failure = readStreamsTo(ctx, readArgs, writer)
-		writer.Close()
-		if failure != nil {
-			fmt.Printf("readStreamsTo failed with error: %v\n", failure)
+	capture.Capture(captureCtx, t, func(data json.RawMessage) {
+		if shutdownWatchdog == nil {
+			shutdownWatchdog = time.AfterFunc(shutdownDelay, func() {
+				log.WithField("delay", shutdownDelay.String()).Debug("capture shutdown watchdog expired")
+				cancelCapture()
+			})
 		}
-	}()
+		shutdownWatchdog.Reset(shutdownDelay)
+	})
+	cupaloy.SnapshotT(t, capture.Summary())
+	capture.Reset()
+
 	var recordCount = 3
 	var lastSeq string
 	var shardId string
@@ -255,37 +272,6 @@ func TestKinesisCapture(t *testing.T) {
 			return err == nil
 		}, time.Second, time.Millisecond*20, "failed to put record")
 	}
-
-	var decoder = json.NewDecoder(reader)
-	var foundRecords = 0
-	for foundRecords < recordCount {
-		var msg = airbyte.Message{}
-		err = decoder.Decode(&msg)
-		require.NoError(t, err)
-		if msg.Record != nil {
-			foundRecords++
-		}
-	}
-	// After reading all the records, we should have a final state message.
-	// There may have been intermediate state messages, but the goal here is to verify the last
-	// one to make sure it includes the expected sequence number and the canary state we passed
-	// in at the beginning
-	var stateMessage = struct {
-		State struct {
-			Data map[string]map[string]string
-		}
-	}{}
-	err = decoder.Decode(&stateMessage)
-	require.NoError(t, err)
-	require.NotNil(t, stateMessage.State, "expected non-nill state")
-
-	var canaryResult, hasCanary = stateMessage.State.Data["canary"]
-	require.True(t, hasCanary, "missing canary state")
-	require.Equal(t, canaryState, canaryResult["foo"])
-
-	var streamResult, hasStream = stateMessage.State.Data[stream]
-	require.True(t, hasStream, "missing stream state")
-	require.Equal(t, lastSeq, streamResult[shardId])
 }
 
 // The kinesis stream could take a while before it becomes active, so this just polls until the
