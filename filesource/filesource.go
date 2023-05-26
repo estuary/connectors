@@ -128,8 +128,10 @@ type connector struct {
 }
 
 type resource struct {
-	Stream   string `json:"stream" jsonschema:"title=Stream to capture from" jsonschema_extras="x-collection-name=true"`
-	SyncMode string `json:"syncMode,omitempty" jsonschema:"-"`
+	Stream      string   `json:"stream" jsonschema:"title=Stream to capture from" jsonschema_extras="x-collection-name=true"`
+	SyncMode    string   `json:"syncMode,omitempty" jsonschema:"-"`
+	Namespace   string   `json:"namespace,omitempty" jsonschema:"-"`
+	CursorField []string `json:"cursorField,omitempty" jsonschema:"-"`
 }
 
 func (r resource) Validate() error {
