@@ -65,28 +65,28 @@ func TestShardRangeTranslation(t *testing.T) {
 	require.Equal(t, uint32(20), result.KeyEnd)
 }
 
-func TestShardRangeOverlaps(t *testing.T) {
-	testRangeOverlap(t, boilerplate.FullRangeOverlap, 0, math.MaxUint32, "0", maxKinesisHash)
-	testRangeOverlap(t, boilerplate.FullRangeOverlap, 0, math.MaxUint32, "1", maxKinesisHash)
-	testRangeOverlap(t, boilerplate.PartialRangeOverlap, 1, math.MaxUint32, "0", maxKinesisHash)
+func TestShardRangeContains(t *testing.T) {
+	testRangeContain(t, boilerplate.FullRangeContain, 0, math.MaxUint32, "0", maxKinesisHash)
+	testRangeContain(t, boilerplate.FullRangeContain, 0, math.MaxUint32, "1", maxKinesisHash)
+	testRangeContain(t, boilerplate.PartialRangeContain, 1, math.MaxUint32, "0", maxKinesisHash)
 	// This huge number is equivalent to 5 << 96, so this case is testing the boundary where the
 	// kinesis range begin is the same as the flow range exclusive end.
-	testRangeOverlap(t, boilerplate.PartialRangeOverlap, 0, 5, "396140812571321687967719751680", maxKinesisHash)
-	testRangeOverlap(t, boilerplate.NoRangeOverlap, 0, 5, "475368975085586025561263702016", maxKinesisHash)
+	testRangeContain(t, boilerplate.PartialRangeContain, 0, 5, "396140812571321687967719751680", maxKinesisHash)
+	testRangeContain(t, boilerplate.NoRangeContain, 0, 5, "475368975085586025561263702016", maxKinesisHash)
 
 	// This huge number is equivalent to 20 << 96, so should partially overlap
-	testRangeOverlap(t, boilerplate.PartialRangeOverlap, 10, 20, "1584563250285286751870879006720", maxKinesisHash)
-	testRangeOverlap(t, boilerplate.FullRangeOverlap, 20, 20, "1584563250285286751870879006720", "1584563250285286751870879006721")
+	testRangeContain(t, boilerplate.PartialRangeContain, 10, 20, "1584563250285286751870879006720", maxKinesisHash)
+	testRangeContain(t, boilerplate.FullRangeContain, 20, 20, "1584563250285286751870879006720", "1584563250285286751870879006721")
 }
 
-func testRangeOverlap(t *testing.T, expected boilerplate.RangeOverlap, flowBegin, flowEnd uint32, kinesisBegin, kinesisEnd string) {
+func testRangeContain(t *testing.T, expected boilerplate.RangeContain, flowBegin, flowEnd uint32, kinesisBegin, kinesisEnd string) {
 	var flowRange = &pf.RangeSpec{
 		KeyBegin: flowBegin,
 		KeyEnd:   flowEnd,
 	}
 	var kinesisRange, err = parseKinesisShardRange(kinesisBegin, kinesisEnd)
 	require.NoError(t, err, "failed to convert kinesis hash key range")
-	var result = boilerplate.RangesOverlap(flowRange, &kinesisRange)
+	var result = boilerplate.RangeContained(flowRange, &kinesisRange)
 
 	require.Equalf(t, expected, result, "flowRange: %#v, kinesisRange: %s-%s, translatedKinesisRange: %#v", flowRange, kinesisBegin, kinesisEnd, kinesisRange)
 }
