@@ -22,12 +22,12 @@ const (
 )
 
 type config struct {
-	Index          string `json:"index" jsonschema:"title=Pinecone Index" jsonschema_extras:"order=0"`
-	Environment    string `json:"environment" jsonschema:"title=Pinecone Environment" jsonschema_extras:"order=1"`
-	PineconeApiKey string `json:"pineconeApiKey" jsonschema:"title=Pinecone API Key" jsonschema_extras:"secret=true,order=2"`
-	OpenAiApiKey   string `json:"openAiApiKey" jsonschema:"title=OpenAI API Key" jsonschema_extras:"secret=true,order=3"`
-	EmbeddingModel string `json:"embeddingModel,omitempty" jsonschema:"title=Embedding Model ID,default=text-embedding-ada-002" jsonschema_extras:"order=4"`
-	OpenAiOrg      string `json:"openAiOrg,omitempty" jsonschema:"title=OpenAI Organization" jsonschema_extras:"order=5"`
+	Index          string         `json:"index" jsonschema:"title=Pinecone Index" jsonschema_extras:"order=0"`
+	Environment    string         `json:"environment" jsonschema:"title=Pinecone Environment" jsonschema_extras:"order=1"`
+	PineconeApiKey string         `json:"pineconeApiKey" jsonschema:"title=Pinecone API Key" jsonschema_extras:"secret=true,order=2"`
+	OpenAiApiKey   string         `json:"openAiApiKey" jsonschema:"title=OpenAI API Key" jsonschema_extras:"secret=true,order=3"`
+	EmbeddingModel string         `json:"embeddingModel,omitempty" jsonschema:"title=Embedding Model ID,default=text-embedding-ada-002" jsonschema_extras:"order=4"`
+	Advanced       advancedConfig `json:"advanced,omitempty" jsonschema_extras:"advanced=true"`
 }
 
 func (config) GetFieldDocString(fieldName string) string {
@@ -42,6 +42,19 @@ func (config) GetFieldDocString(fieldName string) string {
 		return "OpenAI API key used for authentication."
 	case "EmbeddingModel":
 		return "Embedding model ID for generating OpenAI bindings. The default text-embedding-ada-002 is recommended."
+	case "Advanced":
+		return "Options for advanced users. You should not typically need to modify these."
+	default:
+		return ""
+	}
+}
+
+type advancedConfig struct {
+	OpenAiOrg string `json:"openAiOrg,omitempty" jsonschema:"title=OpenAI Organization"`
+}
+
+func (advancedConfig) GetFieldDocString(fieldName string) string {
+	switch fieldName {
 	case "OpenAiOrg":
 		return "Optional organization name for OpenAI requests. Use this if you belong to multiple organizations to specify which organization is used for API requests."
 	default:
@@ -75,7 +88,7 @@ func (c *config) openAiClient() *client.OpenAiClient {
 		selectedModel = c.EmbeddingModel
 	}
 
-	return client.NewOpenAiClient(selectedModel, c.OpenAiOrg, c.OpenAiApiKey)
+	return client.NewOpenAiClient(selectedModel, c.Advanced.OpenAiOrg, c.OpenAiApiKey)
 }
 
 type resource struct {
