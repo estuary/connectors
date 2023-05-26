@@ -71,7 +71,7 @@ const configSchema = `{
 		},
     "skip_state": {
       "type": "boolean",
-      "title": "Skip sending an Airbyte state message",
+      "title": "Skip sending a checkpoint",
       "description": "Some Airbyte connectors do not send a state message. This option can be used to emulate those cases",
       "default": false
     },

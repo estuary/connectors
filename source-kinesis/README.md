@@ -1,7 +1,6 @@
 # source-kinesis
 
-This is a capture connector that implements the Airbyte specification and captures data from
-AWS Kinesis.
+This is a flow capture connector that captures data from AWS Kinesis.
 
 ### Configuration
 
