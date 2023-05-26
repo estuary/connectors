@@ -1,8 +1,7 @@
 Flow MySQL Source Connector
 ===========================
 
-This is an [Airbyte Specification](https://docs.airbyte.io/understanding-airbyte/airbyte-specification)
-compatible connector that captures change events from a MySQL database via the
+This is a flow connector that captures change events from a MySQL database via the
 [Binary Log](https://dev.mysql.com/doc/refman/8.0/en/binary-log.html).
 
 ## Getting Started
