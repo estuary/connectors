@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/estuary/flow/go/protocols/airbyte"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 )
 
 // Applies the same hash operation that kinesis uses to determine which shard a given record should
@@ -19,19 +20,19 @@ func hashPartitionKey(key string) uint32 {
 
 // Parses the kinesis shard range and translates it into a 32 bit PartitionRange, suitable for
 // comparison with the Flow shard range.
-func parseKinesisShardRange(begin, end string) (airbyte.Range, error) {
-	var r = airbyte.Range{}
+func parseKinesisShardRange(begin, end string) (pf.RangeSpec, error) {
+	var r = pf.RangeSpec{}
 	var begin128, ok = new(big.Int).SetString(begin, 10)
 	if !ok {
 		return r, fmt.Errorf("failed to parse kinesis shard range begin: '%s'", begin)
 	}
-	r.Begin = uint32(begin128.Rsh(begin128, 96).Uint64())
+	r.KeyBegin = uint32(begin128.Rsh(begin128, 96).Uint64())
 
 	end128, ok := new(big.Int).SetString(end, 10)
 	if !ok {
 		return r, fmt.Errorf("failed to parse kinesis shard range end: '%s'", end)
 	}
-	r.End = uint32(end128.Rsh(end128, 96).Uint64())
+	r.KeyEnd = uint32(end128.Rsh(end128, 96).Uint64())
 
 	return r, nil
 }
@@ -42,8 +43,8 @@ func parseKinesisShardRange(begin, end string) (airbyte.Range, error) {
 // `kinesisRange`, but this may not always be true if an "ExplicitHashKey" was used when adding the
 // record. In that case, this function will always produce a consistent result that guarantees that
 // exactly one Flow shard will process each record.
-func isRecordWithinRange(flowRange airbyte.Range, kinesisRange airbyte.Range, partitionKeyHash uint32) bool {
-	var rangeOverlap = flowRange.Intersection(kinesisRange)
+func isRecordWithinRange(flowRange *pf.RangeSpec, kinesisRange *pf.RangeSpec, partitionKeyHash uint32) bool {
+	var rangeOverlap = boilerplate.RangeIntersection(flowRange, kinesisRange)
 
 	// Normally, the kinesis range will always include the key hash because that's normally how the
 	// record would have been written to this kinesis shard in the first place. But kinesis also
@@ -52,11 +53,11 @@ func isRecordWithinRange(flowRange airbyte.Range, kinesisRange airbyte.Range, pa
 	// `ExplicitHashKey` was used, then the md5 hash of the partition key may fall outside of the
 	// kinesis hash key range. If so, then we may still claim that record in the second or third
 	// condition.
-	if kinesisRange.Includes(partitionKeyHash) {
-		return rangeOverlap.Includes(partitionKeyHash)
-	} else if flowRange.Begin <= kinesisRange.Begin && partitionKeyHash < kinesisRange.Begin {
+	if boilerplate.RangeIncludes(kinesisRange, partitionKeyHash) {
+		return boilerplate.RangeIncludes(&rangeOverlap, partitionKeyHash)
+	} else if flowRange.KeyBegin <= kinesisRange.KeyBegin && partitionKeyHash < kinesisRange.KeyBegin {
 		return true
-	} else if flowRange.End >= kinesisRange.End && partitionKeyHash >= kinesisRange.End {
+	} else if flowRange.KeyEnd >= kinesisRange.KeyEnd && partitionKeyHash >= kinesisRange.KeyEnd {
 		return true
 	}
 	return false

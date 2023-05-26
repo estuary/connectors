@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 
+use proto_flow::flow::{CaptureSpec, RangeSpec};
 use rdkafka::message::BorrowedMessage;
 use rdkafka::metadata::Metadata;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::{airbyte, catalog, connector, kafka};
+use crate::{catalog::{self, Resource, responsible_for_shard}, connector, kafka};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -105,16 +106,6 @@ impl Checkpoint {
     }
 }
 
-impl From<&Checkpoint> for airbyte::State {
-    fn from(checkpoint: &Checkpoint) -> Self {
-        airbyte::State::new(serde_json::json!({
-            (&checkpoint.topic): {
-                (checkpoint.partition.to_string()): checkpoint.offset
-            }
-        }))
-    }
-}
-
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct CheckpointSet(pub BTreeMap<String, BTreeMap<i32, Offset>>);
 
@@ -132,29 +123,39 @@ impl CheckpointSet {
     ///   3. The StateFile
     pub fn reconcile_catalog_state(
         metadata: &Metadata,
-        catalog: &catalog::ConfiguredCatalog,
+        capture: &CaptureSpec,
+        range: Option<&RangeSpec>,
         loaded_state: &CheckpointSet,
     ) -> Result<CheckpointSet, catalog::Error> {
         let mut reconciled = CheckpointSet::default();
 
-        for configured_stream in catalog.streams.iter() {
-            if let Some(topic) = kafka::find_topic(metadata, &configured_stream.stream.name) {
+        for binding in capture.bindings.iter() {
+            let res: Resource = serde_json::from_str(&binding.resource_config_json)?;
+            if let Some(topic) = kafka::find_topic(metadata, &res.stream) {
                 for partition in topic.partitions() {
-                    if catalog.responsible_for_shard(kafka::build_shard_key(topic, partition)) {
-                        info!("Responsible for {}/{}: YES", topic.name(), partition.id());
+                    if let Some(range) = range {
+                        if responsible_for_shard(range, kafka::build_shard_key(topic, partition)) {
+                            info!("Responsible for {}/{}: YES", topic.name(), partition.id());
 
+                            let offset = loaded_state
+                                .offset_for(topic.name(), partition.id())
+                                .unwrap_or(Offset::Start);
+
+                            reconciled.add(Checkpoint::new(topic.name(), partition.id(), offset));
+                        } else {
+                            info!("Responsible for {}/{}: NO", topic.name(), partition.id());
+                        }
+                    } else {
                         let offset = loaded_state
                             .offset_for(topic.name(), partition.id())
                             .unwrap_or(Offset::Start);
 
                         reconciled.add(Checkpoint::new(topic.name(), partition.id(), offset));
-                    } else {
-                        info!("Responsible for {}/{}: NO", topic.name(), partition.id());
                     }
                 }
             } else {
                 return Err(catalog::Error::MissingStream(
-                    configured_stream.stream.name.clone(),
+                    res.stream.clone(),
                 ));
             }
         }
@@ -180,8 +181,8 @@ impl CheckpointSet {
 impl connector::ConnectorConfig for CheckpointSet {
     type Error = Error;
 
-    fn parse(reader: impl std::io::Read) -> Result<Self, Self::Error> {
-        let checkpoints = serde_json::from_reader(reader)?;
+    fn parse(reader: &str) -> Result<Self, Self::Error> {
+        let checkpoints = serde_json::from_str(reader)?;
 
         Ok(checkpoints)
     }
@@ -201,10 +202,10 @@ mod test {
         };
 
         let update_offset = |checkpoint, new_offset| {
-            return Checkpoint {
+            Checkpoint {
                 offset: new_offset,
                 ..checkpoint
-            };
+            }
         };
 
         let mut checkpoints = CheckpointSet::default();
@@ -215,7 +216,7 @@ mod test {
 
         checkpoints.add(foo0.clone());
         checkpoints.add(foo1.clone());
-        checkpoints.add(bar0.clone());
+        checkpoints.add(bar0);
 
         check_offsets(
             &checkpoints,
@@ -254,22 +255,20 @@ mod test {
 
     #[test]
     fn parse_state_file_test() {
-        let input = std::io::Cursor::new(
-            r#"
+        let input = r#"
                 {
                     "test": {
                         "0": { "UpThrough": 100 }
                     }
                 }
-        "#,
-        );
+        "#;
 
         CheckpointSet::parse(input).expect("to parse");
     }
 
     #[test]
     fn parse_empty_state_file_test() {
-        let input = std::io::Cursor::new("{}\n");
+        let input = "{}\n";
 
         CheckpointSet::parse(input).expect("to parse");
     }

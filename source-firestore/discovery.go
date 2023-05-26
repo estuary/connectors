@@ -139,8 +139,8 @@ type discoveryState struct {
 	// Mutex-guarded state which may be modified from within worker goroutines.
 	shared struct {
 		sync.Mutex
-		counts   map[resourcePath]int              // Map from resource paths to the number of documents processed.
-		bindings []*pc.Response_Discovered_Binding // List of output bindings from inference workers which have terminated.
+		resources map[resourcePath]struct{} // Map from resource paths to voids representing the set of resources discovered.
+		counts    map[resourcePath]int      // Map from resource paths to the number of documents processed.
 	}
 }
 
@@ -152,6 +152,7 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.R
 		scanSemaphore: make(chan struct{}, discoverConcurrentScanners),
 	}
 	state.shared.counts = make(map[resourcePath]int)
+	state.shared.resources = make(map[resourcePath]struct{})
 
 	// Request processing of all top-level collections.
 	var collections, err = client.Collections(ctx).GetAll()
@@ -167,10 +168,31 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.R
 		return nil, err
 	}
 
+	// Convert the set of resources which exist into bindings and return them.
+	// Locking the mutex here should be unnecessary as all worker threads have
+	// completed.
+	state.shared.Lock()
+	defer state.shared.Unlock()
+	var bindings []*pc.Response_Discovered_Binding
+	for resourcePath := range state.shared.resources {
+		resourceJSON, err := json.Marshal(resource{
+			Path:         resourcePath,
+			BackfillMode: backfillModeAsync,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("resource %q: error serializing resource json: %w", resourcePath, err)
+		}
+		bindings = append(bindings, &pc.Response_Discovered_Binding{
+			RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
+			ResourceConfigJson: resourceJSON,
+			DocumentSchemaJson: minimalSchema,
+			Key:                []string{documentPath},
+		})
+	}
+
 	// Just to be extra nice, sort the bindings list by recommended name.
 	// Since prefixes sort before their longer versions this approximates
 	// a nice hierarchical interpretation.
-	var bindings = state.shared.bindings
 	sort.Slice(bindings, func(i, j int) bool {
 		return bindings[i].RecommendedName < bindings[j].RecommendedName
 	})
@@ -187,17 +209,19 @@ func (ds *discoveryState) discoverCollection(ctx context.Context, coll *firestor
 		"resource":   resourcePath,
 	})
 
-	// Acquire one of the scanner semaphores before doing any further work
-	ds.scanSemaphore <- struct{}{}
-	defer func() { <-ds.scanSemaphore }()
-
-	// Terminate immediately if the maximum number of documents has already been reached
+	// Note the existence of this resource.
 	ds.shared.Lock()
+	ds.shared.resources[resourcePath] = struct{}{}
 	if total := ds.shared.counts[resourcePath]; total >= discoverMaxDocumentsPerResource {
+		// Terminate immediately if the maximum number of documents has already been reached
 		ds.shared.Unlock()
 		return nil
 	}
 	ds.shared.Unlock()
+
+	// Acquire one of the scanner semaphores before doing any further work
+	ds.scanSemaphore <- struct{}{}
+	defer func() { <-ds.scanSemaphore }()
 
 	var numDocuments int
 	logEntry.Debug("scanning collection")
@@ -223,24 +247,6 @@ func (ds *discoveryState) discoverCollection(ctx context.Context, coll *firestor
 		}
 		numDocuments++
 	}
-
-	resourceJSON, err := json.Marshal(resource{
-		Path:         resourcePath,
-		BackfillMode: backfillModeAsync,
-	})
-	if err != nil {
-		return fmt.Errorf("error serializing resource json: %w", err)
-	}
-	var binding = &pc.Response_Discovered_Binding{
-		RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
-		ResourceConfigJson: resourceJSON,
-		DocumentSchemaJson: minimalSchema,
-		Key:                []string{documentPath},
-	}
-	ds.shared.Lock()
-	ds.shared.bindings = append(ds.shared.bindings, binding)
-	ds.shared.Unlock()
-
 	return nil
 }
 

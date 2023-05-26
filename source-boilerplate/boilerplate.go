@@ -13,7 +13,9 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"encoding/hex"
 
+	"github.com/minio/highwayhash"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -372,4 +374,62 @@ func (c *jsonCodec) SetHeader(metadata.MD) error {
 }
 func (c *jsonCodec) SetTrailer(metadata.MD) {
 	panic("SetTrailer is not supported")
+}
+
+// highwayHashKey is a fixed 32 bytes (as required by HighwayHash) read from /dev/random.
+// DO NOT MODIFY this value, as it is required to have consistent hash results.
+var highwayHashKey, _ = hex.DecodeString("332757d16f0fb1cf2d4f676f85e34c6a8b85aa58f42bb081449d8eb2e4ed529f")
+
+func hwHashPartition(partitionId []byte) uint32 {
+	return uint32(highwayhash.Sum64(partitionId, highwayHashKey) >> 32)
+}
+
+func RangeIncludesHwHash(r *pf.RangeSpec, partitionID []byte) bool {
+	var hashed = hwHashPartition(partitionID)
+	return RangeIncludes(r, hashed)
+}
+
+func RangeIncludes(r *pf.RangeSpec, hash uint32) bool {
+	return hash >= r.KeyBegin && hash <= r.KeyEnd
+}
+
+// RangeContain is the result of checking whether one Range contains another.
+type RangeContain int
+
+const (
+	NoRangeContain      RangeContain = 0
+	PartialRangeContain RangeContain = 1
+	FullRangeContain    RangeContain = 2
+)
+
+func RangeContained(rangeOne *pf.RangeSpec, rangeTwo *pf.RangeSpec) RangeContain {
+	var includesBegin = RangeIncludes(rangeOne, rangeTwo.KeyBegin)
+	var includesEnd = RangeIncludes(rangeOne, rangeTwo.KeyEnd)
+
+	if includesBegin && includesEnd {
+		return FullRangeContain
+	} else if includesBegin != includesEnd {
+		return PartialRangeContain
+	} else {
+		return NoRangeContain
+	}
+}
+
+// Intersection returns the intersection of two overlapping Ranges. If the ranges do not
+// overlap, this function will panic.
+func RangeIntersection(rangeOne *pf.RangeSpec, rangeTwo *pf.RangeSpec) pf.RangeSpec {
+	var result = pf.RangeSpec{}
+	result.KeyBegin = rangeOne.KeyBegin
+	result.KeyEnd = rangeOne.KeyEnd
+
+	if rangeTwo.KeyBegin > rangeOne.KeyBegin {
+		result.KeyBegin = rangeTwo.KeyBegin
+	}
+	if rangeTwo.KeyEnd < rangeOne.KeyEnd {
+		result.KeyEnd = rangeTwo.KeyEnd
+	}
+	if result.KeyBegin > result.KeyEnd {
+		panic("intersected partition ranges that do not overlap")
+	}
+	return result
 }

@@ -8,12 +8,14 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/estuary/connectors/filesource"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/estuary/flow/go/parser"
 	"github.com/pkg/sftp"
@@ -69,7 +71,7 @@ func (advancedConfig) GetFieldDocString(fieldName string) string {
 	}
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"username", c.Username},
 		{"password", c.Password},
@@ -98,23 +100,23 @@ func (c *config) Validate() error {
 	return nil
 }
 
-func (c *config) DiscoverRoot() string {
+func (c config) DiscoverRoot() string {
 	return c.Directory
 }
 
-func (c *config) FilesAreMonotonic() bool {
+func (c config) FilesAreMonotonic() bool {
 	return c.Advanced.AscendingKeys
 }
 
-func (c *config) ParserConfig() *parser.Config {
+func (c config) ParserConfig() *parser.Config {
 	return c.Parser
 }
 
-func (c *config) PathRegex() string {
+func (c config) PathRegex() string {
 	return c.MatchFiles
 }
 
-func newSftpSource(ctx context.Context, cfg *config) (filesource.Store, error) {
+func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 	sshConfig := ssh.ClientConfig{
 		User:            cfg.Username,
 		Auth:            []ssh.AuthMethod{},
@@ -277,8 +279,21 @@ func (l *sftpListing) pushDir(dir string) error {
 	// Filter out file names < query.StartAt and map to visits.
 	visits := []visit{}
 	for _, info := range infos {
-		filePath := sftp.Join(dir, info.Name())
-		if filePath >= l.startAt {
+		filePath := filepath.Join(dir, info.Name())
+		startAt := l.startAt
+
+		// If this is a directory, filter it out based on the directory part of startAt. If we've
+		// process files like `a/b.csv` already, we still need to process files like `a/c.csv` and
+		// need to include the directory `a/` in the listing, even though `a/` is lexically before
+		// `a/b.csv`. But if we've process a file like `b/b.csv` `a/` should not be included since
+		// `a/` is lexically before `b/`.
+		if info.IsDir() {
+			// NB: IsDir() doesn't work for symlink directors, but symlink directories are already
+			// removed from consideration by Next().
+			startAt = filepath.Dir(filePath)
+		}
+
+		if filePath >= startAt {
 			visits = append(visits, visit{FileInfo: info, path: filePath})
 		}
 	}
@@ -366,9 +381,15 @@ func (f *sftpFile) Close() error {
 
 func main() {
 	var src = filesource.Source{
-		NewConfig: func() filesource.Config { return new(config) },
+    NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
+      var cfg config
+      if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
+        return nil, fmt.Errorf("parsing config json: %w", err)
+      }
+      return cfg, nil
+    },
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
-			return newSftpSource(ctx, cfg.(*config))
+			return newSftpSource(ctx, cfg.(config))
 		},
 		ConfigSchema:     configSchema,
 		DocumentationURL: "https://go.estuary.dev/source-sftp",

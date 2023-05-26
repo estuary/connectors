@@ -9,7 +9,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/estuary/flow/go/protocols/airbyte"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
@@ -19,11 +20,12 @@ import (
 // The `wg` is expected to have been incremented once _prior_ to calling this function. It will be
 // further incremented and decremented behind the scenes, but will be decremented back down to the
 // prior value when the read is finished.
-func readStream(ctx context.Context, shardRange airbyte.Range, client *kinesis.Kinesis, stream string, state map[string]string, resultsCh chan<- readResult, wg *sync.WaitGroup) {
+func readStream(ctx context.Context, shardRange *pf.RangeSpec, client *kinesis.Kinesis, bindingIndex int, stream string, state map[string]string, resultsCh chan<- readResult, wg *sync.WaitGroup) {
 
 	var kc = &streamReader{
 		client:         client,
 		ctx:            ctx,
+		bindingIndex:   bindingIndex,
 		stream:         stream,
 		shardRange:     shardRange,
 		dataCh:         resultsCh,
@@ -40,6 +42,7 @@ func readStream(ctx context.Context, shardRange airbyte.Range, client *kinesis.K
 		select {
 		case resultsCh <- readResult{
 			source: &recordSource{
+				bindingIndex: bindingIndex,
 				stream: stream,
 			},
 			err: err,
@@ -55,8 +58,9 @@ func readStream(ctx context.Context, shardRange airbyte.Range, client *kinesis.K
 type streamReader struct {
 	client             *kinesis.Kinesis
 	ctx                context.Context
+	bindingIndex       int
 	stream             string
-	shardRange         airbyte.Range
+	shardRange         *pf.RangeSpec
 	dataCh             chan<- readResult
 	waitGroup          *sync.WaitGroup
 	readingShards      map[string]bool
@@ -69,8 +73,9 @@ type streamReader struct {
 }
 
 type recordSource struct {
-	stream  string
-	shardID string
+	bindingIndex   int
+	stream         string
+	shardID        string
 }
 
 // readResult is the message that's sent on the channel to the main thread. It will either contain
@@ -210,7 +215,7 @@ func (kc *streamReader) startReadingShardByID(shardID string) {
 			select {
 			case <-kc.ctx.Done():
 			case kc.dataCh <- readResult{
-				source: &recordSource{stream: kc.stream, shardID: shardID},
+				source: &recordSource{bindingIndex: kc.bindingIndex, stream: kc.stream, shardID: shardID},
 				err:    err,
 			}:
 			}
@@ -231,8 +236,8 @@ func (kc *streamReader) newShardReader(shardID string, getShard func(string) (*k
 	var logEntry = log.WithFields(log.Fields{
 		"kinesisStream":     kc.stream,
 		"kinesisShardId":    *shard.ShardId,
-		"captureRangeStart": kc.shardRange.Begin,
-		"captureRangeEnd":   kc.shardRange.End,
+		"captureRangeStart": kc.shardRange.KeyBegin,
+		"captureRangeEnd":   kc.shardRange.KeyEnd,
 	})
 	var source = &recordSource{
 		stream:  kc.stream,
@@ -242,8 +247,8 @@ func (kc *streamReader) newShardReader(shardID string, getShard func(string) (*k
 	if err != nil {
 		return nil, fmt.Errorf("parsing kinesis shard range: %w", err)
 	}
-	var rangeResult = kc.shardRange.Overlaps(kinesisRange)
-	if rangeResult == airbyte.NoRangeOverlap {
+	var rangeResult = boilerplate.RangeContained(kc.shardRange, &kinesisRange)
+	if rangeResult == boilerplate.NoRangeContain {
 		logEntry.Info("Will not read kinesis shard because it falls outside of our hash range")
 		return nil, nil
 	}
@@ -266,8 +271,8 @@ func (kc *streamReader) newShardReader(shardID string, getShard func(string) (*k
 	}
 
 	return &shardReader{
-		rangeOverlap:      rangeResult,
-		kinesisShardRange: kinesisRange,
+		rangeContain:      rangeResult,
+		kinesisShardRange: &kinesisRange,
 		parent:            kc,
 		source:            source,
 		lastSequenceID:    kc.shardSequences[*shard.ShardId],
@@ -296,10 +301,10 @@ func isMissingResource(err error) bool {
 
 // A reader of an individual kinesis shard.
 type shardReader struct {
-	rangeOverlap airbyte.RangeOverlap
+	rangeContain boilerplate.RangeContain
 	// The key hash range of the kinesis shard, which has been translated from 128bit to the 32bit
 	// space.
-	kinesisShardRange airbyte.Range
+	kinesisShardRange *pf.RangeSpec
 	parent            *streamReader
 	source            *recordSource
 	lastSequenceID    string
@@ -309,7 +314,7 @@ type shardReader struct {
 }
 
 func (r *shardReader) readShard() {
-	r.logEntry.WithField("RangeOverlap", r.rangeOverlap).Info("Starting read")
+	r.logEntry.WithField("RangeContain", r.rangeContain).Info("Starting read")
 	defer r.logEntry.Info("Finished reading kinesis shard")
 
 	for {
@@ -413,7 +418,7 @@ func (r *shardReader) readShardIterator(iteratorID string) error {
 // Extracts the records from a response, filtering the records if necessary due to claiming partial
 // ownership over the kinesis shard.
 func (r *shardReader) extractRecords(resp *kinesis.GetRecordsOutput) []json.RawMessage {
-	if r.rangeOverlap == airbyte.PartialRangeOverlap {
+	if r.rangeContain == boilerplate.PartialRangeContain {
 		var result []json.RawMessage
 		for _, rec := range resp.Records {
 			var keyHash = hashPartitionKey(*rec.PartitionKey)

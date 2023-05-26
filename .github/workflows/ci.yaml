@@ -93,6 +93,7 @@ jobs:
           - materialize-google-pubsub
           - materialize-google-sheets
           - materialize-mongodb
+          - materialize-pinecone
           - materialize-postgres
           - materialize-rockset
           - materialize-s3-parquet
@@ -112,6 +113,8 @@ jobs:
           echo ::set-output name=tag::${TAG}
           VERSION=$(cat ${{ matrix.connector }}/VERSION | tr -d '\n')
           echo ::set-output name=version::${VERSION}
+          VARIANTS="${{ matrix.connector }} $(cat ${{ matrix.connector }}/VARIANTS 2>/dev/null || true)"
+          echo ::set-output name=variants::${VARIANTS}
 
       - name: Download latest Flow release binaries and add them to $PATH
         run: |
@@ -180,12 +183,12 @@ jobs:
         if: |
           contains(fromJson('[
             "source-gcs",
-            "source-kafka",
             "source-kinesis",
             "source-mysql",
             "source-postgres",
             "source-s3",
             "source-sftp",
+            "source-kafka",
             "source-sqlserver"
             ]'), matrix.connector)
         env:
@@ -204,32 +207,41 @@ jobs:
           contains(fromJson('[
               "materialize-elasticsearch",
               "materialize-google-sheets",
+              "materialize-pinecone",
               "materialize-postgres",
               "materialize-s3-parquet",
               "materialize-mongodb"
             ]'), matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PINECONE_INDEX: ${{ vars.PINECONE_INDEX }}
+          PINECONE_PROJECT_ID: ${{ vars.PINECONE_PROJECT_ID }}
+          PINECONE_ENVIRONMENT: ${{ vars.PINECONE_ENVIRONMENT }}
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
-      - name: Push ${{ matrix.connector }} image with commit SHA tag
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          build-args: BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
-          file: ${{ matrix.connector }}/Dockerfile
-          push: true
-          tags: ghcr.io/estuary/${{ matrix.connector }}:${{ steps.prep.outputs.tag }}
+      - name: Push ${{ matrix.connector }} image(s) with commit SHA tag
+        run: |
+          for VARIANT in ${{ steps.prep.outputs.variants }}; do
+            echo "Building and pushing ${VARIANT}:${{ steps.prep.outputs.tag }}...";
+            docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.connector }}:local \
+                         --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
+                         --tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} \
+                         --file connector-variant.Dockerfile .;
+            docker image push ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }};
+          done
 
-      - name: Push ${{ matrix.connector }} image with 'dev' and $VERSION tag
+      - name: Push ${{ matrix.connector }} image(s) with 'dev' and '${{ steps.prep.outputs.version }}' tags
         if: ${{ github.event_name == 'push' }}
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          file: ${{ matrix.connector }}/Dockerfile
-          push: true # See 'if' above
-          tags: ghcr.io/estuary/${{ matrix.connector }}:dev,ghcr.io/estuary/${{ matrix.connector }}:${{ steps.prep.outputs.version }}
+        run: |
+          for VARIANT in ${{ steps.prep.outputs.variants }}; do
+            docker image tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} ghcr.io/estuary/${VARIANT}:dev;
+            docker image tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.version }};
+            docker image push ghcr.io/estuary/${VARIANT}:dev;
+            docker image push ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.version }};
+          done
 
       - name: Install psql
         if: ${{ github.event_name == 'push' }}
@@ -245,116 +257,9 @@ jobs:
           PGPASSWORD: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
           PGDATABASE: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
         run: |
-          echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
-                  WHERE connector_id IN (
-                    SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${{ matrix.connector }}'
-                  )
-                  AND
-                  image_tag IN (':${{ steps.prep.outputs.version }}', ':dev');" | psql
-
-  build_variants:
-    runs-on: ubuntu-20.04
-    needs: build_connectors
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          # Additional image variants, which are built by extending existing "base" dockerfiles and
-          # tagged as `tag`. The `docsURL` value is provided to the connector as an environment
-          # variable to override the default value. Currently only SQL capture and SQL
-          # materialization connectors support being built as variants in this way.
-          - tag: source-mariadb
-            base: source-mysql
-            docsURL: "https://go.estuary.dev/source-mariadb"
-          - tag: source-amazon-aurora-mysql
-            base: source-mysql
-            docsURL: "https://go.estuary.dev/source-amazon-aurora-mysql"
-          - tag: source-alloydb
-            base: source-postgres
-            docsURL: "https://go.estuary.dev/source-alloydb"
-          - tag: source-amazon-aurora-postgres
-            base: source-postgres
-            docsURL: "https://go.estuary.dev/source-amazon-aurora-postgres"
-          - tag: source-azure-sqlserver
-            base: source-sqlserver
-            docsURL: "https://go.estuary.dev/source-azure-sqlserver"
-          - tag: materialize-timescaledb
-            base: materialize-postgres
-            docsURL: "https://go.estuary.dev/materialize-timescaledb"
-          - tag: materialize-alloydb
-            base: materialize-postgres
-            docsURL: "https://go.estuary.dev/materialize-alloydb"
-          - tag: materialize-amazon-aurora-postgres
-            base: materialize-postgres
-            docsURL: "https://go.estuary.dev/materialize-amazon-aurora-postgres"
-          - tag: source-cosmosdb-mongodb
-            base: source-mongodb
-            docsURL: "https://go.estuary.dev/source-mongodb"
-          - tag: materialize-cosmosdb-mongodb
-            base: materialize-mongodb
-            docsURL: "https://go.estuary.dev/source-mongodb"
-
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: Prepare
-        id: prep
-        run: |
-          TAG=$(echo $GITHUB_SHA | head -c7)
-          echo ::set-output name=tag::${TAG}
-          VERSION=$(cat ${{ matrix.variant.base }}/VERSION | tr -d '\n')
-          echo ::set-output name=version::${VERSION}
-
-      - name: Login to GitHub package docker registry
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login --username ${{ github.actor }} --password-stdin ghcr.io
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Push ${{ matrix.variant.tag }} image with commit SHA tag
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          build-args: |
-            BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.variant.base }}:${{ steps.prep.outputs.tag }}
-            DOCS_URL=${{ matrix.variant.docsURL }}
-          file: connector-variant.Dockerfile
-          push: true
-          tags: ghcr.io/estuary/${{ matrix.variant.tag }}:${{ steps.prep.outputs.tag }}
-
-      - name: Push ${{ matrix.variant.tag }} image with 'dev' and $VERSION tag
-        if: ${{ github.event_name == 'push' }}
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          build-args: |
-            BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.variant.base }}:${{ steps.prep.outputs.tag }}
-            DOCS_URL=${{ matrix.variant.docsURL }}
-          file: connector-variant.Dockerfile
-          push: true # See 'if' above
-          tags: ghcr.io/estuary/${{ matrix.variant.tag }}:dev,ghcr.io/estuary/${{ matrix.variant.tag }}:${{ steps.prep.outputs.version }}
-
-      - name: Install psql
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          sudo apt update
-          sudo apt install postgresql
-
-      - name: Refresh connector tags for ${{ matrix.variant.tag }}
-        if: ${{ github.event_name == 'push' }}
-        env:
-          PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
-          PGUSER: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
-          PGPASSWORD: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
-          PGDATABASE: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
-        run: |
-          echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
-                  WHERE connector_id IN (
-                    SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${{ matrix.variant.tag }}'
-                  )
-                  AND
-                  image_tag IN (':${{ steps.prep.outputs.version }}', ':dev');" | psql
+          for VARIANT in ${{ steps.prep.outputs.variants }}; do
+            echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
+                    WHERE connector_id IN (
+                      SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${VARIANT}'
+                    ) AND image_tag IN (':${{ steps.prep.outputs.version }}', ':dev');" | psql;
+          done

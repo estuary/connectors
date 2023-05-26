@@ -54,13 +54,20 @@ func ValidateSelectedFields(constraints map[string]*pm.Response_Validated_Constr
 func ValidateNewSQLProjections(resource Resource, proposed *pf.CollectionSpec) map[string]*pm.Response_Validated_Constraint {
 	var constraints = make(map[string]*pm.Response_Validated_Constraint)
 	for _, projection := range proposed.Projections {
-		var constraint = validateNewProjection(resource, &projection)
+		var constraint = validateNewProjection(resource, projection)
 		constraints[projection.Field] = constraint
 	}
 	return constraints
 }
 
-func validateNewProjection(resource Resource, projection *pf.Projection) *pm.Response_Validated_Constraint {
+func validateNewProjection(resource Resource, projection pf.Projection) *pm.Response_Validated_Constraint {
+	// Allow for providing constraints based on a projection's SQL FlatType, which may recommended
+	// JSON strings that are formatted as numeric values.
+	sqlProjection := Projection{
+		Projection: projection,
+	}
+	flatType, _ := sqlProjection.AsFlatType()
+
 	var constraint = new(pm.Response_Validated_Constraint)
 	switch {
 	case len(projection.Field) > 63:
@@ -75,11 +82,11 @@ func validateNewProjection(resource Resource, projection *pf.Projection) *pm.Res
 	case projection.IsRootDocumentProjection():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "The root document must be materialized"
-	case projection.Inference.IsSingleScalarType():
+	case projection.Inference.IsSingleScalarType() || flatType == INTEGER || flatType == NUMBER:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
 
-	case projection.Inference.IsSingleType() || len(effectiveJsonTypes(projection)) == 1:
+	case projection.Inference.IsSingleType():
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "This field is able to be materialized"
 	default:
@@ -135,7 +142,7 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 	// fields that are not among our existing binding projections
 	for _, proj := range proposed.Projections {
 		if _, ok := constraints[proj.Field]; !ok {
-			var constraint = validateNewProjection(resource, &proj)
+			var constraint = validateNewProjection(resource, proj)
 			constraints[proj.Field] = constraint
 		}
 	}

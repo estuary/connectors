@@ -11,14 +11,15 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Build the connector projects we depend on.
+COPY go                 ./go
+COPY source-boilerplate ./source-boilerplate
 COPY source-hello-world ./source-hello-world
 
 # Run the unit tests.
 RUN go test -v ./source-hello-world/...
 
 # Build the connector.
-RUN go build -o ./connector -v ./source-hello-world/...
+RUN go build -o ./connector -v ./source-hello-world
 
 
 # Runtime Stage
@@ -33,12 +34,10 @@ COPY --from=busybox:latest /bin/sh /bin/sh
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./source-hello-world
 
+LABEL FLOW_RUNTIME_PROTOCOL=capture
+LABEL CONNECTOR_PROTOCOL=flow-capture
+
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-COPY --from=ghcr.io/estuary/airbyte-to-flow:dev /airbyte-to-flow ./
-ENTRYPOINT ["/connector/airbyte-to-flow", "--connector-entrypoint", "/connector/source-hello-world"]
-
-LABEL FLOW_RUNTIME_PROTOCOL=capture
-LABEL CONNECTOR_PROTOCOL=flow-capture
-LABEL FLOW_RUNTIME_CODEC=json
+ENTRYPOINT ["/connector/source-hello-world"]

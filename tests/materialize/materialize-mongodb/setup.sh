@@ -4,11 +4,17 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-chmod 400 materialize-mongodb/sample.key
+docker compose -f materialize-mongodb/docker-compose.yaml create
 docker compose -f materialize-mongodb/docker-compose.yaml up --detach
 
-docker exec materialize-mongodb-mongo-1 \
-	chown mongodb /etc/ssl/sample.key
+# Copying and permissining the key after launching the container is a bit of a race
+# condition but somehow there is no good way to get a key *copied* into a container
+# and editing the copy's permissions/ownership without first running the container,
+# so we're relying on MongoDB taking longer to start up than it takes us to run these
+# commands.
+docker cp materialize-mongodb/sample.key materialize-mongodb-mongo-1:/etc/ssl/sample.key
+docker exec materialize-mongodb-mongo-1 chmod 400 /etc/ssl/sample.key
+docker exec materialize-mongodb-mongo-1 chown mongodb /etc/ssl/sample.key
 
 set +e
 # need to wait some seconds before the replication server is set up

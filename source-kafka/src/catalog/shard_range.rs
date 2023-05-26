@@ -61,8 +61,8 @@ mod test {
         assert_eq!(0, u32::from(zero));
         assert_eq!(1, u32::from(one));
         assert_eq!(255, u32::from(two_five_five));
-        assert_eq!((2u32.pow(16) - 1) as u32, u32::from(sixty_four_k));
-        assert_eq!(u32::MAX as u32, u32::from(max));
+        assert_eq!({ 2u32.pow(16) - 1 }, u32::from(sixty_four_k));
+        assert_eq!({ u32::MAX }, u32::from(max));
 
         Ok(())
     }
