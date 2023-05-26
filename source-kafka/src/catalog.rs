@@ -2,8 +2,6 @@ use highway::{HighwayHash, HighwayHasher};
 use proto_flow::flow::RangeSpec;
 use serde::{Deserialize, Serialize};
 
-mod shard_range;
-
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("failed to read the catalog file")]
