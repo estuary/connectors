@@ -36,11 +36,18 @@
         "default": "text-embedding-ada-002",
         "order": 4
       },
-      "openAiOrg": {
-        "type": "string",
-        "title": "OpenAI Organization",
-        "description": "Optional organization name for OpenAI requests. Use this if you belong to multiple organizations to specify which organization is used for API requests.",
-        "order": 5
+      "advanced": {
+        "properties": {
+          "openAiOrg": {
+            "type": "string",
+            "title": "OpenAI Organization",
+            "description": "Optional organization name for OpenAI requests. Use this if you belong to multiple organizations to specify which organization is used for API requests."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
       }
     },
     "type": "object",
