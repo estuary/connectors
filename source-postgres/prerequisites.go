@@ -228,7 +228,8 @@ func (db *postgresDatabase) addTableToPublication(ctx context.Context, pubName s
 	logEntry.Info("attempting to add table to publication")
 
 	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`ALTER PUBLICATION "%s" ADD TABLE "%s"."%s";`, pubName, schema, table)); err != nil {
-		return fmt.Errorf("table %s.%s is not in publication %s and couldn't be added automatically", schema, table, pubName)
+		logEntry.Warn("table is not in publication, but we're ignoring that")
+		return nil
 	}
 
 	logEntry.Info("added table to publication")
