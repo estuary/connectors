@@ -184,7 +184,7 @@ func resolveResourceToExistingBinding(
 	} else if loadedBinding != nil {
 		constraints = ValidateMatchesExisting(resource, loadedBinding, collection)
 	} else {
-		constraints = ValidateNewSQLProjections(resource, collection)
+		constraints, err = ValidateNewSQLProjections(resource, collection)
 	}
 
 	return
