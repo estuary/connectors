@@ -126,7 +126,20 @@ func validateNewProjection(resource Resource, projection pf.Projection) *pm.Resp
 // be present in the proposed spec as well.
 func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec_Binding, proposed *pf.CollectionSpec) map[string]*pm.Response_Validated_Constraint {
 	var constraints = make(map[string]*pm.Response_Validated_Constraint)
+
+	for _, field := range existing.FieldSelection.Keys {
+    var constraint = new(pm.Response_Validated_Constraint)
+    constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
+    constraint.Reason = "This field is a key in the current materialization"
+    constraints[field] = constraint
+	}
+
 	for _, field := range existing.FieldSelection.AllFields() {
+		// we already have a constraint for this field
+		if _, ok := constraints[field]; ok {
+			continue
+		}
+
 		var constraint = new(pm.Response_Validated_Constraint)
 		// If a field has been removed from the proposed projection, we will migrate
 		// it at ApplyUpsert
@@ -143,18 +156,6 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 		}
 
 		constraints[field] = constraint
-	}
-	for _, field := range existing.FieldSelection.Keys {
-		// we already have a constraint for this field
-		if _, ok := constraints[field]; ok {
-			continue
-		}
-		if proposed.GetProjection(field) == nil {
-			var constraint = new(pm.Response_Validated_Constraint)
-			constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
-			constraint.Reason = "This field is a key in the current materialization"
-			constraints[field] = constraint
-		}
 	}
 	// We'll loop through the proposed projections and create a new constraint for
 	// fields that are not among our existing binding projections
