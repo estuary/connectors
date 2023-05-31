@@ -20,8 +20,11 @@ pub enum Error {
     #[error("error creating consumer from config")]
     Config(#[source] KafkaError),
 
-    #[error("failed to fetch cluster metadata")]
-    Metadata(#[source] KafkaError),
+    #[error("failed to fetch cluster metadata ({0})")]
+    Metadata(String, #[source] KafkaError),
+
+    #[error("failed to fetch watermarks")]
+    Watermarks(#[source] KafkaError),
 
     #[error("failed to subscribe to topic")]
     Subscription(#[source] KafkaError),
@@ -56,8 +59,8 @@ pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsume
     config.create().map_err(Error::Config)
 }
 
-pub fn test_connection<C: Consumer>(consumer: &C, bindings: Vec<request::validate::Binding>) -> Result<Response, Error> {
-    let metadata = fetch_metadata(consumer)?;
+pub fn test_connection<C: Consumer>(configuration: &Configuration, consumer: &C, bindings: Vec<request::validate::Binding>) -> Result<Response, Error> {
+    let metadata = fetch_metadata(configuration, consumer)?;
     Ok(Response {
         validated: Some(response::Validated {
             bindings: metadata.topics().iter().filter(|topic| {
@@ -75,10 +78,10 @@ pub fn test_connection<C: Consumer>(consumer: &C, bindings: Vec<request::validat
     })
 }
 
-pub fn fetch_metadata<C: Consumer>(consumer: &C) -> Result<Metadata, Error> {
+pub fn fetch_metadata<C: Consumer>(configuration: &Configuration, consumer: &C) -> Result<Metadata, Error> {
     consumer
         .fetch_metadata(None, Some(KAFKA_TIMEOUT))
-        .map_err(Error::Metadata)
+        .map_err(|err| Error::Metadata(configuration.brokers(), err))
 }
 
 pub fn available_streams(metadata: &Metadata) -> Vec<response::discovered::Binding> {
@@ -162,7 +165,7 @@ pub fn high_watermarks(
         // is effectively the index of the next message to be read.
         let (low, high) = consumer
             .fetch_watermarks(&checkpoint.topic, checkpoint.partition, KAFKA_TIMEOUT)
-            .map_err(Error::Metadata)?;
+            .map_err(Error::Watermarks)?;
 
         let offset = if high == 0 || high == low {
             // We can consider a partition to be at the beginning if:
