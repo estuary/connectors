@@ -50,7 +50,7 @@ impl connector::Connector for KafkaConnector {
     fn validate(output: &mut dyn Write, validate: request::Validate) -> eyre::Result<()> {
         let config = Self::Config::parse(&validate.config_json)?;
         let consumer = kafka::consumer_from_config(&config)?;
-        let message = kafka::test_connection(&consumer, validate.bindings)?;
+        let message = kafka::test_connection(&config, &consumer, validate.bindings)?;
 
         connector::write_message(output, message)?;
         Ok(())
@@ -59,7 +59,7 @@ impl connector::Connector for KafkaConnector {
     fn discover(output: &mut dyn Write, discover: request::Discover) -> eyre::Result<()> {
         let config = Self::Config::parse(&discover.config_json)?;
         let consumer = kafka::consumer_from_config(&config)?;
-        let metadata = kafka::fetch_metadata(&consumer)?;
+        let metadata = kafka::fetch_metadata(&config, &consumer)?;
         let bindings = kafka::available_streams(&metadata);
         let message = Response {
             discovered: Some(response::Discovered {
@@ -91,7 +91,7 @@ impl connector::Connector for KafkaConnector {
         persisted_state: Option<Self::State>,
     ) -> eyre::Result<()> {
         let consumer = kafka::consumer_from_config(&config)?;
-        let metadata = kafka::fetch_metadata(&consumer)?;
+        let metadata = kafka::fetch_metadata(&config, &consumer)?;
 
         let mut checkpoints = state::CheckpointSet::reconcile_catalog_state(
             &metadata,
