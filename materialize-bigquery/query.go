@@ -50,7 +50,7 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 	var job *bigquery.Job
 	var err error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		job, err := query.Run(ctx)
+		job, err = query.Run(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("run: %w", err)
 		}
@@ -59,7 +59,8 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 		// there might still have been an error reported by `status.Err()`. We always want both the
 		// err and the status so that we can check both. When `err != nil`, the status may still
 		// have some helpful info to log.
-		status, err := job.Wait(ctx)
+		var status *bigquery.JobStatus
+		status, err = job.Wait(ctx)
 		if status == nil {
 			status = job.LastStatus()
 		}
@@ -118,7 +119,7 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 
 		return job, nil
 	}
-	log.WithField("error", err).Error("job failed, exhausted retries")
+
 	return job, fmt.Errorf("exhausted retries: %w", err)
 }
 
