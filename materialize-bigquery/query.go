@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -36,9 +38,15 @@ func (c client) newQuery(queryString string, parameters ...interface{}) *bigquer
 	return query
 }
 
+const (
+	maxAttempts            = 10
+	initialBackoff float64 = 200 // Milliseconds
+	maxBackoff             = time.Duration(60 * time.Second)
+)
+
 // runQuery will run a query and return the completed job.
 func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.Job, error) {
-	var maxAttempts = 5
+	var backoff = initialBackoff
 	var job *bigquery.Job
 	var err error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
@@ -59,31 +67,47 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 			err = status.Err()
 		}
 
-		var logEntry = log.WithFields(log.Fields{
-			"attempt":   attempt,
-			"jobStatus": status,
-			"error":     err,
-		})
 		if err != nil {
 			// Is this a terminal error?
+
 			// We need to retry errors due to concurrent updates to the same table, but
-			// unfortunately there's no good way to identify such errors. The status code of
-			// that error is 400, but that also applies to many other errors. So we'll retry
-			// anything with a 400 status, but with a fairly low limit on the number of attempts,
-			// since these errors may actually be terminal.
-			if e, ok := err.(*googleapi.Error); ok {
-				if e.Code == 404 {
-					return nil, err
-				} else if e.Code != 400 {
-					logEntry.Error("job failed")
-					return nil, err // The error isn't considered retryable
+			// unfortunately there's no good way to identify such errors. The status code of that
+			// error is 400 and the status is "invalidQuery" (see
+			// https://cloud.google.com/bigquery/docs/error-messages), which also applies to several
+			// other scenarios like the instance being fenced off (from our use of RAISE), a table
+			// being referenced by the query not existing (which is for some reason not a 404), etc.
+
+			// Because of this we match on substrings in the error message to determine if a retry
+			// should be attempted. The two errors that may be encountered from concurrent shards
+			// operating in the same dataset have the error strings "Transaction is aborted due to
+			// concurrent update against table ..." (most common, seemingly), or "Could not
+			// serialize access to table ...". We retry only if the the error string contains these
+			// strings.
+			if _, ok := err.(*googleapi.Error); ok { // Sanity check that this is actually an error from the googleapi package
+				if strings.Contains(err.Error(), "Transaction is aborted due to concurrent update against table") || strings.Contains(err.Error(), "Could not serialize access to table") {
+					backoff *= math.Pow(2, 1+rand.Float64())
+					delay := time.Duration(backoff * float64(time.Millisecond))
+					if delay > maxBackoff {
+						delay = maxBackoff
+					}
+
+					log.WithFields(log.Fields{
+						"attempt":   attempt,
+						"jobStatus": status,
+						"error":     err,
+						"delay":     delay.String(),
+					}).Warn("job failed (will retry)")
+
+					select {
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					case <-time.After(delay):
+						continue
+					}
 				}
 			}
-			logEntry.Warn("job failed (will retry)")
-			// Wait between 50-150 milliseconds before continuing, so we have at least a little bit
-			// of jitter applied to retries.
-			time.Sleep(time.Duration(rand.Intn(100)+50) * time.Millisecond)
-			continue
+
+			return nil, err
 		}
 
 		// I think this is just documenting the assumption that the job must always be Done after
