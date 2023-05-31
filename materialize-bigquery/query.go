@@ -84,8 +84,14 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 			// concurrent update against table ..." (most common, seemingly), or "Could not
 			// serialize access to table ...". We retry only if the the error string contains these
 			// strings.
-			if _, ok := err.(*googleapi.Error); ok { // Sanity check that this is actually an error from the googleapi package
-				if strings.Contains(err.Error(), "Transaction is aborted due to concurrent update against table") || strings.Contains(err.Error(), "Could not serialize access to table") {
+
+			// Short term rate limit errors can also be retried using the same exponential backoff
+			// strategy. These kinds of errors can always be identified by their "Reason" being
+			// "jobRateLimitExceeded".
+			if e, ok := err.(*googleapi.Error); ok {
+				if strings.Contains(err.Error(), "Transaction is aborted due to concurrent update against table") ||
+					strings.Contains(err.Error(), "Could not serialize access to table") ||
+					(len(e.Errors) == 1 && e.Errors[0].Reason == "jobRateLimitExceeded") {
 					backoff *= math.Pow(2, 1+rand.Float64())
 					delay := time.Duration(backoff * float64(time.Millisecond))
 					if delay > maxBackoff {
