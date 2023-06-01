@@ -229,3 +229,12 @@ func TestTextCollation(t *testing.T) {
 	cs.Validator = &st.OrderedCaptureValidator{}
 	tests.VerifiedCapture(ctx, t, cs)
 }
+
+// TestDiscoveryIrrelevantConstraints verifies that discovery works correctly
+// even when there are other non-primary-key constraints on a table.
+func TestDiscoveryIrrelevantConstraints(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueString = "g21962"
+	tb.CreateTable(ctx, t, uniqueString, "(id VARCHAR(8) PRIMARY KEY, foo INTEGER UNIQUE, data TEXT)")
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+}
