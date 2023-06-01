@@ -139,9 +139,11 @@ func getColumns(ctx context.Context, conn *sql.DB) ([]sqlcapture.ColumnInfo, err
 }
 
 const queryDiscoverPrimaryKeys = `
-SELECT table_schema, table_name, column_name, ordinal_position
-  FROM information_schema.key_column_usage
-  ORDER BY table_schema, table_name, ordinal_position;
+SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position
+  FROM information_schema.key_column_usage kcu
+  JOIN information_schema.table_constraints tcs ON tcs.constraint_name = kcu.constraint_name
+  WHERE tcs.constraint_type = 'PRIMARY KEY'
+  ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;
 `
 
 func getPrimaryKeys(ctx context.Context, conn *sql.DB) (map[string][]string, error) {
