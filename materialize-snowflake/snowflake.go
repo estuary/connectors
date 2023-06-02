@@ -56,6 +56,7 @@ func (c *config) ToURI() string {
 
 func (c *config) asSnowflakeConfig() sf.Config {
 	var maxStatementCount string = "0"
+	var json string = "json"
 	return sf.Config{
 		Account:   c.Account,
 		Host:      c.Host,
@@ -69,7 +70,8 @@ func (c *config) asSnowflakeConfig() sf.Config {
 			// By default Snowflake expects the number of statements to be provided
 			// with every request. By setting this parameter to zero we are allowing a
 			// variable number of statements to be executed in a single request
-			"MULTI_STATEMENT_COUNT": &maxStatementCount,
+			"MULTI_STATEMENT_COUNT":  &maxStatementCount,
+			"GO_QUERY_RESULT_FORMAT": &json,
 		},
 	}
 }
@@ -390,7 +392,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 	// Issue a join of the target table and (now staged) load keys,
 	// and send results to the |loaded| callback.
-	rows, err := d.load.conn.QueryContext(ctx, loadAllSQL)
+	rows, err := d.load.conn.QueryContext(sf.WithStreamDownloader(ctx), loadAllSQL)
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
