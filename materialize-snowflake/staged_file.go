@@ -80,8 +80,8 @@ type stagedFile struct {
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
 
-func newStagedFile(tempdir string, suffix string) *stagedFile {
-	uuid := uuid.NewString() + "_" + suffix
+func newStagedFile(tempdir string) *stagedFile {
+	uuid := uuid.NewString()
 
 	return &stagedFile{
 		uuid: uuid,

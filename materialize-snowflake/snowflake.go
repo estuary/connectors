@@ -320,10 +320,10 @@ type binding struct {
 	}
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
-		insertStage *stagedFile
-		mergeStage  *stagedFile
-		mergeInto   string
-		copyInto    string
+		stage     *stagedFile
+		mergeInto string
+		copyInto  string
+		mustMerge bool
 	}
 }
 
@@ -337,17 +337,16 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	var err error
 	d.target = target
 
-	d.load.stage = newStagedFile(os.TempDir(), "load")
-	d.store.insertStage = newStagedFile(os.TempDir(), "insert")
-	d.store.mergeStage = newStagedFile(os.TempDir(), "merge")
+	d.load.stage = newStagedFile(os.TempDir())
+	d.store.stage = newStagedFile(os.TempDir())
 
 	if d.load.loadQuery, err = RenderTableWithRandomUUIDTemplate(target, d.load.stage.uuid, tplLoadQuery); err != nil {
 		return fmt.Errorf("loadQuery template: %w", err)
 	}
-	if d.store.copyInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.insertStage.uuid, tplCopyInto); err != nil {
+	if d.store.copyInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, tplCopyInto); err != nil {
 		return fmt.Errorf("copyInto template: %w", err)
 	}
-	if d.store.mergeInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.mergeStage.uuid, tplMergeInto); err != nil {
+	if d.store.mergeInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, tplMergeInto); err != nil {
 		return fmt.Errorf("mergeInto template: %w", err)
 	}
 
@@ -418,17 +417,16 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		stage := b.store.insertStage
-		if it.Exists {
-			stage = b.store.mergeStage
-		}
-
-		if err := stage.start(it.Context(), d.store.conn); err != nil {
+		if err := b.store.stage.start(it.Context(), d.store.conn); err != nil {
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
-		} else if err = stage.encodeRow(converted); err != nil {
+		} else if err = b.store.stage.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
+		}
+
+		if it.Exists {
+			b.store.mustMerge = true
 		}
 	}
 
@@ -465,21 +463,24 @@ func (d *transactor) commit(ctx context.Context) error {
 	}
 
 	for _, b := range d.bindings {
-		if b.store.insertStage.started {
-			if err := b.store.insertStage.flush(); err != nil {
-				return fmt.Errorf("flushing insert stage: %w", err)
-			} else if _, err = d.store.conn.ExecContext(ctx, b.store.copyInto); err != nil {
+		if !b.store.stage.started {
+			// No table update required
+		} else if err := b.store.stage.flush(); err != nil {
+			return err
+		} else if !b.store.mustMerge {
+			// We can issue a faster COPY INTO the target table.
+			if _, err = d.store.conn.ExecContext(ctx, b.store.copyInto); err != nil {
 				return fmt.Errorf("copying Store documents: %w", err)
 			}
-		}
-
-		if b.store.mergeStage.started {
-			if err := b.store.mergeStage.flush(); err != nil {
-				return fmt.Errorf("flushing merge stage: %w", err)
-			} else if _, err = d.store.conn.ExecContext(ctx, b.store.mergeInto); err != nil {
+		} else {
+			// We must MERGE into the target table.
+			if _, err = d.store.conn.ExecContext(ctx, b.store.mergeInto); err != nil {
 				return fmt.Errorf("merging Store documents: %w", err)
 			}
 		}
+
+		// Reset for next transaction.
+		b.store.mustMerge = false
 	}
 
 	if err = txn.Commit(); err != nil {
