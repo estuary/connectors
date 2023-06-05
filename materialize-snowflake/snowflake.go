@@ -73,6 +73,8 @@ func (c *config) asSnowflakeConfig() sf.Config {
 			"MULTI_STATEMENT_COUNT":  &maxStatementCount,
 			"GO_QUERY_RESULT_FORMAT": &json,
 		},
+		// For the Snowflake partner program.
+		Application: "tenant_EstuaryFlow",
 	}
 }
 
