@@ -6,6 +6,7 @@ import (
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 )
 
 // TablePath is a fully qualified table name (for example, with its schema).
@@ -116,6 +117,10 @@ func (t *Table) KeyPtrs() []*Column {
 	return out
 }
 
+type fieldConfigOptions struct {
+	IgnoreStringFormat bool `json:"ignoreStringFormat"`
+}
+
 // ResolveTable maps a TableShape into a Table using the given Dialect.
 func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 	var table = Table{
@@ -136,6 +141,31 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 
 	for index, col := range table.Columns() {
 		var err error
+
+		// TODO(whb): This bit of hackery is to provide backwards compatibility for materializations
+		// that use numeric-as-string fields with numeric formats which were created before support
+		// for materializing these fields as numeric values was added. It provides an escape hatch
+		// via the field config to ignore the string formatting and continue materializing the
+		// fields as a regular string, which will allow such materializations to continue working.
+		// It is not meant to be user-facing and is configured as-needed by Estuary support staff.
+
+		// We should remove this when there are no longer any materializations that need it (there's
+		// only 1 known case where it is needed currently), or a more comprehensive backwards
+		// compatibility layer is added to the materialization dialects.
+		if col.RawFieldConfig != nil {
+			var options fieldConfigOptions
+			if err := json.Unmarshal(col.RawFieldConfig, &options); err != nil {
+				return Table{}, fmt.Errorf("unmarshaling RawFieldConfig for column %s of %s: %w", col.Field, shape.Path, err)
+			} else if options.IgnoreStringFormat {
+				log.WithFields(log.Fields{
+					"collection": table.Source.String(),
+					"field":      col.Field,
+					"format":     col.Projection.Inference.String_.Format,
+				}).Info("ignoring string format for field")
+
+				col.Projection.Inference.String_.Format = ""
+			}
+		}
 
 		if col.MappedType, err = dialect.MapType(&col.Projection); err != nil {
 			return Table{}, fmt.Errorf("mapping column %s of %s: %w", col.Field, shape.Path, err)
