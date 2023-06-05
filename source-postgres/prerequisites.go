@@ -21,7 +21,7 @@ func (db *postgresDatabase) SetupPrerequisites(ctx context.Context) []error {
 
 	for _, prereq := range []func(ctx context.Context) error{
 		db.prerequisiteLogicalReplication,
-		//db.prerequisiteReplicationUser,
+		db.prerequisiteReplicationUser,
 		db.prerequisiteReplicationSlot,
 		db.prerequisitePublication,
 		db.prerequisiteWatermarksTable,
@@ -87,15 +87,28 @@ func (db *postgresDatabase) prerequisiteLogicalReplication(ctx context.Context) 
 }
 
 func (db *postgresDatabase) prerequisiteReplicationUser(ctx context.Context) error {
-	var query = fmt.Sprintf(`SELECT rolreplication FROM pg_catalog.pg_roles WHERE rolname = '%s'`, db.config.User)
-	var replication bool
-	if err := db.conn.QueryRow(ctx, query).Scan(&replication); err != nil {
+	// As a first resort, check if the user has the REPLICATION role. This check
+	// covers all managed Postgres providers except for RDS.
+	var rolreplication bool
+	if err := db.conn.QueryRow(ctx, fmt.Sprintf(`SELECT rolreplication FROM pg_catalog.pg_roles WHERE rolname = '%s'`, db.config.User)).Scan(&rolreplication); err != nil {
 		return fmt.Errorf("error querying REPLICATION role for user %q: %w", db.config.User, err)
 	}
-	if !replication {
-		return fmt.Errorf("user %q must have the REPLICATION role", db.config.User)
+	if rolreplication {
+		return nil
 	}
-	return nil
+
+	// If that check fails then the user doesn't have REPLICATION, but maybe we're
+	// on RDS which uses membership in the `rds_replication` role. Check that too.
+	// Note that this query will result in an error on non-RDS Postgres instances,
+	// so we ignore errors from this query.
+	var rdsreplication bool
+	if err := db.conn.QueryRow(ctx, fmt.Sprintf(`SELECT pg_has_role('%s', 'rds_replication', 'member');`, db.config.User)).Scan(&rdsreplication); err == nil {
+		if rdsreplication {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("user %q must have the REPLICATION role (or 'rds_replication' on RDS)", db.config.User)
 }
 
 func (db *postgresDatabase) prerequisiteReplicationSlot(ctx context.Context) error {
