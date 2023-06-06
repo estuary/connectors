@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
@@ -245,4 +246,43 @@ func TestCapitalizedTables(t *testing.T) {
 			tests.VerifiedCapture(ctx, t, cs)
 		})
 	})
+}
+
+func TestConfigURI(t *testing.T) {
+	for name, cfg := range map[string]Config{
+		"Basic": {
+			Address:  "example.com",
+			User:     "will",
+			Password: "secret1234",
+			Database: "somedb",
+		},
+		"RequireSSL": {
+			Address:  "example.com",
+			User:     "will",
+			Password: "secret1234",
+			Database: "somedb",
+			Advanced: advancedConfig{
+				SSLMode: "verify-full",
+			},
+		},
+		"IncorrectSSL": {
+			Address:  "example.com",
+			User:     "will",
+			Password: "secret1234",
+			Database: "somedb",
+			Advanced: advancedConfig{
+				SSLMode: "whoops-this-isnt-right",
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var valid = "config valid"
+			if err := cfg.Validate(); err != nil {
+				valid = err.Error()
+			}
+			cfg.SetDefaults()
+			var uri = cfg.ToURI()
+			cupaloy.SnapshotT(t, fmt.Sprintf("%s\n%s", uri, valid))
+		})
+	}
 }
