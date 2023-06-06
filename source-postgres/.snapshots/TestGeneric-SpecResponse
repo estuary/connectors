@@ -55,6 +55,18 @@
             "title": "Backfill Chunk Size",
             "description": "The number of rows which should be fetched from the database in a single backfill query.",
             "default": 32768
+          },
+          "sslmode": {
+            "type": "string",
+            "enum": [
+              "disable",
+              "prefer",
+              "require",
+              "verify-ca",
+              "verify-full"
+            ],
+            "title": "SSL Mode",
+            "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
           }
         },
         "additionalProperties": false,

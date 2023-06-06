@@ -102,6 +102,7 @@ type advancedConfig struct {
 	WatermarksTable   string `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 	SkipBackfills     string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=32768,description=The number of rows which should be fetched from the database in a single backfill query."`
+	SSLMode           string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -125,6 +126,11 @@ func (c *Config) Validate() error {
 			if !strings.Contains(skipStreamID, ".") {
 				return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
 			}
+		}
+	}
+	if c.Advanced.SSLMode != "" {
+		if !stringMatches(c.Advanced.SSLMode, []string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}) {
+			return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", c.Advanced.SSLMode)
 		}
 	}
 
@@ -171,6 +177,13 @@ func (c *Config) ToURI() string {
 	}
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
+	}
+	var params = make(url.Values)
+	if c.Advanced.SSLMode != "" {
+		params.Set("sslmode", c.Advanced.SSLMode)
+	}
+	if len(params) > 0 {
+		uri.RawQuery = params.Encode()
 	}
 	return uri.String()
 }
@@ -283,4 +296,13 @@ func (db *postgresDatabase) ShouldBackfill(streamID string) bool {
 		}
 	}
 	return true
+}
+
+func stringMatches(x string, alts []string) bool {
+	for _, alt := range alts {
+		if x == alt {
+			return true
+		}
+	}
+	return false
 }
