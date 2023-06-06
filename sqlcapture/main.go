@@ -159,7 +159,7 @@ func (d *Driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response
 			var streamID = JoinStreamID(res.Namespace, res.Stream)
 
 			if _, ok := discoveredTables[streamID]; !ok {
-				return nil, fmt.Errorf("could not find or access table %s", res.Stream)
+				return nil, fmt.Errorf("could not find or access table %q", streamID)
 			}
 		}
 	}
