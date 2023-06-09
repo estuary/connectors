@@ -187,6 +187,23 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("could not find collection %s in database %s", res.Collection, db.Name())
 		}
 
+		// Ensure a change stream can be initialized on each collection. This verifies that
+		// ReplicaSet is enabled on the database.
+		for _, name := range collections {
+			cursor, err := db.Collection(name).Watch(ctx, mongo.Pipeline{})
+			if err != nil {
+				if e, ok := err.(mongo.ServerError); ok {
+					if e.HasErrorMessage("The $changeStream stage is only supported on replica sets") {
+						return nil, cerrors.NewUserError(err, fmt.Sprintf("unable to verify that a change stream can be created for collection %s: ReplicaSet is not enabled on your database", name))
+					}
+				}
+
+				return nil, fmt.Errorf("creating change stream for collection %s: %w", name, err)
+			}
+
+			cursor.Close(ctx)
+		}
+
 		bindings = append(bindings, &pc.Response_Validated_Binding{
 			ResourcePath: []string{res.Database, res.Collection},
 		})
