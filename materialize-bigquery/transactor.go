@@ -17,7 +17,6 @@ import (
 )
 
 type transactor struct {
-	ep    *sql.Endpoint
 	fence *sql.Fence
 
 	client     *client
@@ -49,7 +48,6 @@ func newTransactor(
 	}
 
 	t := &transactor{
-		ep:         ep,
 		fence:      &fence,
 		client:     client,
 		bucketPath: cfg.BucketPath,

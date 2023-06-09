@@ -87,7 +87,10 @@ type Endpoint struct {
 	// CheckPrerequisites validates that the proposed configuration is able to connect to the
 	// endpoint and perform the required actions. It assumes that any required SSH tunneling is
 	// setup prior to its call.
-	CheckPrerequisites func(ctx context.Context, endpointConfig json.RawMessage) *PrereqErr
+	CheckPrerequisites func(ctx context.Context, ep *Endpoint) *PrereqErr
+
+	// Tenant owning this task, as determined from the task name.
+	Tenant string
 }
 
 // PrereqErr is a wrapper for recording accumulated errors during prerequisite checking and
