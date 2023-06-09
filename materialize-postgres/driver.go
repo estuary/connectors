@@ -133,7 +133,7 @@ func newPostgresDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-postgresql",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage) (*sql.Endpoint, error) {
+		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var cfg = new(config)
 			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
 				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
@@ -186,19 +186,15 @@ func newPostgresDriver() *sql.Driver {
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
 				CheckPrerequisites:          prereqs,
+				Tenant:                      tenant,
 			}, nil
 		},
 	}
 }
 
-func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
+func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
+	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
-
-	var cfg = new(config)
-	if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-		errs.Err(fmt.Errorf("cannot parse endpoint configuration: %w", err))
-		return errs
-	}
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to

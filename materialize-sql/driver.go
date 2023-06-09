@@ -24,7 +24,7 @@ type Driver struct {
 	// Instance of the type into which resource specifications are parsed.
 	ResourceSpecType Resource
 	// NewEndpoint returns an *Endpoint which will be used to handle interactions with the database.
-	NewEndpoint func(_ context.Context, endpointConfig json.RawMessage) (*Endpoint, error)
+	NewEndpoint func(_ context.Context, endpointConfig json.RawMessage, tenant string) (*Endpoint, error)
 }
 
 var _ boilerplate.Connector = &Driver{}
@@ -71,9 +71,9 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
-	} else if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson); err != nil {
+	} else if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson, mustGetTenantNameFromTaskName(req.Name.String())); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if prereqErrs := endpoint.CheckPrerequisites(ctx, req.ConfigJson); prereqErrs.Len() != 0 {
+	} else if prereqErrs := endpoint.CheckPrerequisites(ctx, endpoint); prereqErrs.Len() != 0 {
 		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
 	} else if loadedSpec, _, err = loadSpec(ctx, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
@@ -112,7 +112,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
-	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson); err != nil {
+	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson, mustGetTenantNameFromTaskName(req.Materialization.String())); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
 	} else if loadedSpec, _, err = loadSpec(ctx, endpoint, req.Materialization.Name); err != nil {
 		return nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
@@ -280,7 +280,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
 	var loadedVersion string
 
-	var endpoint, err = d.NewEndpoint(ctx, open.Materialization.ConfigJson)
+	var endpoint, err = d.NewEndpoint(ctx, open.Materialization.ConfigJson, mustGetTenantNameFromTaskName(open.Materialization.String()))
 	if err != nil {
 		return nil, nil, fmt.Errorf("building endpoint: %w", err)
 	}
@@ -388,4 +388,8 @@ func isBindingMigratable(existingBinding *pf.MaterializationSpec_Binding, newBin
 	}
 
 	return true
+}
+
+func mustGetTenantNameFromTaskName(taskName string) string {
+	return strings.Split(taskName, "/")[0]
 }

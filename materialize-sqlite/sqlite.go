@@ -61,7 +61,7 @@ func NewSQLiteDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-sqlite",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
-		NewEndpoint: func(ctx context.Context, _ json.RawMessage) (*sql.Endpoint, error) {
+		NewEndpoint: func(ctx context.Context, _ json.RawMessage, _ string) (*sql.Endpoint, error) {
 			var path = databasePath
 
 			// SQLite / go-sqlite3 is a bit fickle about raced opens of a newly created database,
@@ -88,7 +88,7 @@ func NewSQLiteDriver() *sql.Driver {
 				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
-				CheckPrerequisites:          func(_ context.Context, _ json.RawMessage) *sql.PrereqErr { return &sql.PrereqErr{} },
+				CheckPrerequisites:          func(_ context.Context, _ *sql.Endpoint) *sql.PrereqErr { return &sql.PrereqErr{} },
 			}, nil
 		},
 	}
