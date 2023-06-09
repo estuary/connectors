@@ -35,9 +35,9 @@ type config struct {
 }
 
 // ToURI converts the Config to a DSN string.
-func (c *config) ToURI() string {
+func (c *config) ToURI(tenant string) string {
 	// Build a DSN connection string.
-	var configCopy = c.asSnowflakeConfig()
+	var configCopy = c.asSnowflakeConfig(tenant)
 	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
 	// Without this, the authentication token will expire after 4 hours of inactivity.
 	// The Params map will not have been initialized if the endpoint config didn't specify
@@ -54,18 +54,19 @@ func (c *config) ToURI() string {
 	return dsn
 }
 
-func (c *config) asSnowflakeConfig() sf.Config {
+func (c *config) asSnowflakeConfig(tenant string) sf.Config {
 	var maxStatementCount string = "0"
 	var json string = "json"
 	return sf.Config{
-		Account:   c.Account,
-		Host:      c.Host,
-		User:      c.User,
-		Password:  c.Password,
-		Database:  c.Database,
-		Schema:    c.Schema,
-		Warehouse: c.Warehouse,
-		Role:      c.Role,
+		Account:     c.Account,
+		Host:        c.Host,
+		User:        c.User,
+		Password:    c.Password,
+		Database:    c.Database,
+		Schema:      c.Schema,
+		Warehouse:   c.Warehouse,
+		Role:        c.Role,
+		Application: fmt.Sprintf("%s_EstuaryFlow", tenant),
 		Params: map[string]*string{
 			// By default Snowflake expects the number of statements to be provided
 			// with every request. By setting this parameter to zero we are allowing a
@@ -148,19 +149,20 @@ func newSnowflakeDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage) (*sql.Endpoint, error) {
+		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var parsed = new(config)
 			if err := pf.UnmarshalStrict(raw, parsed); err != nil {
 				return nil, fmt.Errorf("parsing Snowflake configuration: %w", err)
 			}
 
-			var dsn = parsed.ToURI()
+			var dsn = parsed.ToURI(tenant)
 
 			log.WithFields(log.Fields{
 				"host":     parsed.Host,
 				"user":     parsed.User,
 				"database": parsed.Database,
 				"schema":   parsed.Schema,
+				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
 			var metaBase sql.TablePath
@@ -178,22 +180,17 @@ func newSnowflakeDriver() *sql.Driver {
 				NewResource:                 newTableConfig,
 				NewTransactor:               newTransactor,
 				CheckPrerequisites:          prereqs,
+				Tenant:                      tenant,
 			}, nil
 		},
 	}
 }
 
-func prereqs(ctx context.Context, raw json.RawMessage) *sql.PrereqErr {
+func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
+	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
 
-	var cfg = new(config)
-	if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-		// An error here is a logic error in the connector code.
-		errs.Err(fmt.Errorf("cannot parse endpoint configuration: %w", err))
-		return errs
-	}
-
-	if db, err := stdsql.Open("snowflake", cfg.ToURI()); err != nil {
+	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
 		errs.Err(err)
 	} else if err := db.PingContext(ctx); err != nil {
 		var sfError *sf.SnowflakeError
@@ -280,20 +277,20 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 ) (_ pm.Transactor, err error) {
+	var cfg = ep.Config.(*config)
+
 	var d = &transactor{
-		cfg: ep.Config.(*config),
+		cfg: cfg,
 	}
 	d.store.fence = &fence
 
-	var cfg = ep.Config.(*config)
-
 	// Establish connections.
-	if db, err := stdsql.Open("snowflake", cfg.ToURI()); err != nil {
+	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
 		return nil, fmt.Errorf("load stdsql.Open: %w", err)
 	} else if d.load.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("load db.Conn: %w", err)
 	}
-	if db, err := stdsql.Open("snowflake", cfg.ToURI()); err != nil {
+	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant)); err != nil {
 		return nil, fmt.Errorf("store stdsql.Open: %w", err)
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("store db.Conn: %w", err)

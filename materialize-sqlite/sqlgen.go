@@ -171,13 +171,4 @@ var (
 	tplAlterTableAddColumn = tplAll.Lookup("alterTableAddColumn")
 )
 
-const createStageSQL = `
-CREATE STAGE IF NOT EXISTS flow_v1
-FILE_FORMAT = (
-  TYPE = JSON
-  BINARY_FORMAT = BASE64
-)
-COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored documents'
-;`
-
 const attachSQL = "ATTACH DATABASE '' AS load ;"
