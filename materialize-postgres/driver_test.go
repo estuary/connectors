@@ -68,43 +68,43 @@ func TestPrereqs(t *testing.T) {
 
 	tests := []struct {
 		name string
-		cfg  func(config) config
+		cfg  func(config) *config
 		want []error
 	}{
 		{
 			name: "valid",
-			cfg:  func(cfg config) config { return cfg },
+			cfg:  func(cfg config) *config { return &cfg },
 			want: nil,
 		},
 		{
 			name: "wrong username",
-			cfg: func(cfg config) config {
+			cfg: func(cfg config) *config {
 				cfg.User = "wrong" + cfg.User
-				return cfg
+				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
 		},
 		{
 			name: "wrong password",
-			cfg: func(cfg config) config {
+			cfg: func(cfg config) *config {
 				cfg.Password = "wrong" + cfg.Password
-				return cfg
+				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
 		},
 		{
 			name: "wrong database",
-			cfg: func(cfg config) config {
+			cfg: func(cfg config) *config {
 				cfg.Database = "wrong" + cfg.Database
-				return cfg
+				return &cfg
 			},
 			want: []error{fmt.Errorf("database %q does not exist", "wrong"+cfg.Database)},
 		},
 		{
 			name: "wrong address",
-			cfg: func(cfg config) config {
+			cfg: func(cfg config) *config {
 				cfg.Address = "wrong." + cfg.Address
-				return cfg
+				return &cfg
 			},
 			want: []error{fmt.Errorf("host at address %q cannot be found", "wrong."+cfg.Address)},
 		},
