@@ -1,10 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
-	"os"
-	"encoding/json"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -16,7 +16,7 @@ import (
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
 	var specJson, err = os.ReadFile("testdata/spec.json")
-  require.NoError(t, err)
+	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(specJson, &spec))
 
 	// TODO(whb): These keys are manually set as "nullable" for now to test the query generation
@@ -48,13 +48,10 @@ func TestSQLGeneration(t *testing.T) {
 	for _, tpl := range []*template.Template{
 		tplCreateTargetTable,
 		tplCreateLoadTable,
-		tplPrepLoadInsert,
-		tplExecLoadInsert,
+		tplLoadInsert,
 		tplLoadQuery,
-		tplPrepStoreInsert,
-		tplExecStoreInsert,
-		tplPrepStoreUpdate,
-		tplExecStoreUpdate,
+		tplStoreInsert,
+		tplStoreUpdate,
 	} {
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
@@ -74,7 +71,7 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, err)
 
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized storeUpdate" + " ---\n")
-	require.NoError(t, tplPrepStoreUpdate.Execute(&snap, &tableNoValues))
+	require.NoError(t, tplStoreUpdate.Execute(&snap, &tableNoValues))
 	snap.WriteString("--- End " + "target_table_no_values_materialized storeUpdate" + " ---\n\n")
 
 	var fence = sqlDriver.Fence{

@@ -84,9 +84,7 @@ func (c *config) ToURI() string {
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
 	}
-	// Compatibility with pgBouncer. See:
-	// https://github.com/jackc/pgx/issues/650
-	uri.RawQuery = "statement_cache_mode=describe"
+
 	return uri.String()
 }
 
@@ -324,13 +322,10 @@ func newTransactor(
 type binding struct {
 	target             sql.Table
 	createLoadTableSQL string
-	execLoadInsertSQL  string
-	execStoreInsertSQL string
-	execStoreUpdateSQL string
+	loadInsertSQL      string
+	storeUpdateSQL     string
+	storeInsertSQL     string
 	loadQuerySQL       string
-	prepLoadInsertSQL  string
-	prepStoreInsertSQL string
-	prepStoreUpdateSQL string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
@@ -341,13 +336,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		tpl *template.Template
 	}{
 		{&b.createLoadTableSQL, tplCreateLoadTable},
-		{&b.execLoadInsertSQL, tplExecLoadInsert},
-		{&b.execStoreInsertSQL, tplExecStoreInsert},
-		{&b.execStoreUpdateSQL, tplExecStoreUpdate},
+		{&b.loadInsertSQL, tplLoadInsert},
+		{&b.storeInsertSQL, tplStoreInsert},
+		{&b.storeUpdateSQL, tplStoreUpdate},
 		{&b.loadQuerySQL, tplLoadQuery},
-		{&b.prepLoadInsertSQL, tplPrepLoadInsert},
-		{&b.prepStoreInsertSQL, tplPrepStoreInsert},
-		{&b.prepStoreUpdateSQL, tplPrepStoreUpdate},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
@@ -356,90 +348,88 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	}
 
 	t.bindings = append(t.bindings, b)
+
+	// Create a binding-scoped temporary table for staged keys to load.
+	if _, err := t.load.conn.Exec(ctx, b.createLoadTableSQL); err != nil {
+		return fmt.Errorf("Exec(%s): %w", b.createLoadTableSQL, err)
+	}
+
 	return nil
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	// We send SQL commands in batches to amortize network round-trips.
-	// All operations of Load run as a single transaction.
-	var batch = newPGBatch()
-	batch.queue(nil, "begin;")
-
-	for _, b := range d.bindings {
-		batch.queue(nil, b.createLoadTableSQL)
-		batch.queue(nil, b.prepLoadInsertSQL)
+	// Use a read-only "load" transaction, which will automatically
+	// truncate the temporary key staging tables on commit.
+	var txn, err = d.load.conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("DB.BeginTx: %w", err)
 	}
+	defer txn.Rollback(ctx)
 
+	var batch pgx.Batch
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
 		} else {
-			batch.queueParams(nil, b.execLoadInsertSQL, converted...)
-		}
-
-		if len(batch.buf) > 1024*1024 {
-			if err := batch.roundTrip(ctx, d.load.conn.PgConn()); err != nil {
-				return err
-			}
+			batch.Queue(b.loadInsertSQL, converted...)
 		}
 	}
 	if it.Err() != nil {
 		return it.Err()
 	}
 
-	var loadFn = func(rr *pgconn.ResultReader) error {
-		var fields = rr.FieldDescriptions()
-		for rr.NextRow() {
-			var binding int
-			var document json.RawMessage
-
-			if err := scanRow(d.load.conn.ConnInfo(), fields, rr.Values(), &binding, &document); err != nil {
-				return fmt.Errorf("scanning Load document: %w", err)
-			} else if err = loaded(binding, json.RawMessage(document)); err != nil {
-				return err
-			}
+	var results = txn.SendBatch(ctx, &batch)
+	for i := 0; i < batch.Len(); i++ {
+		if _, err := results.Exec(); err != nil {
+			return fmt.Errorf("load at index %d: %w", i, err)
 		}
-		return nil
+	}
+	if err = results.Close(); err != nil {
+		return fmt.Errorf("closing batch: %w", err)
 	}
 
-	// Issue a union join of the target tables and their (now staged) load keys.
-	batch.queue(loadFn, d.load.unionSQL)
-	// We're done with our prepared statements - clean them up.
-	batch.queue(nil, "deallocate prepare all;")
-	// Commit to drop temporary load table.
-	batch.queue(nil, "commit;")
+	// Issue a union join of the target tables and their (now staged) load keys,
+	// and send results to the |loaded| callback.
+	rows, err := txn.Query(ctx, d.load.unionSQL)
+	if err != nil {
+		return fmt.Errorf("querying Load documents: %w", err)
+	}
+	defer rows.Close()
 
-	return batch.roundTrip(ctx, d.load.conn.PgConn())
+	for rows.Next() {
+		var binding int
+		var document json.RawMessage
+
+		if err = rows.Scan(&binding, &document); err != nil {
+			return fmt.Errorf("scanning Load document: %w", err)
+		} else if err = loaded(binding, json.RawMessage(document)); err != nil {
+			return err
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("querying Loads: %w", err)
+	} else if err = txn.Commit(ctx); err != nil {
+		return fmt.Errorf("commiting Load transaction: %w", err)
+	}
+
+	return nil
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
-	var batch = newPGBatch()
-	batch.queue(nil, "begin;")
-
-	for _, b := range d.bindings {
-		batch.queue(nil, b.prepStoreInsertSQL)
-		batch.queue(nil, b.prepStoreUpdateSQL)
-	}
-
+	var batch pgx.Batch
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if it.Exists {
-			batch.queueParams(nil, b.execStoreUpdateSQL, converted...)
+			batch.Queue(b.storeUpdateSQL, converted...)
 		} else {
-			batch.queueParams(nil, b.execStoreInsertSQL, converted...)
-		}
-
-		if len(batch.buf) > 1024*1024 {
-			if err := batch.roundTrip(it.Context(), d.store.conn.PgConn()); err != nil {
-				return nil, err
-			}
+			batch.Queue(b.storeInsertSQL, converted...)
 		}
 	}
 
@@ -453,12 +443,40 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
-		batch.queue(nil, fenceUpdate.String())
+
+		// Add the update to the fence as the last statement in the batch.
+		batch.Queue(fenceUpdate.String())
 
 		return nil, pf.RunAsyncOperation(func() error {
-			batch.queue(nil, "deallocate prepare all;") // Cleanup prepared statements.
-			batch.queue(nil, "commit;")
-			return batch.roundTrip(ctx, d.store.conn.PgConn())
+			ctx := it.Context()
+
+			txn, err := d.store.conn.BeginTx(ctx, pgx.TxOptions{})
+			if err != nil {
+				return fmt.Errorf("DB.BeginTx: %w", err)
+			}
+			defer txn.Rollback(ctx)
+
+			results := txn.SendBatch(ctx, &batch)
+
+			// Execute all doc inserts & updates.
+			for i := 0; i < batch.Len()-1; i++ {
+				if _, err := results.Exec(); err != nil {
+					return fmt.Errorf("store at index %d: %w", i, err)
+				}
+			}
+
+			// The fence update is always the last operation in the batch.
+			if _, err := results.Exec(); err != nil {
+				return fmt.Errorf("updating flow checkpoint: %w", err)
+			} else if err = results.Close(); err != nil {
+				return fmt.Errorf("results.Close(): %w", err)
+			}
+
+			if err := txn.Commit(ctx); err != nil {
+				return fmt.Errorf("committing Store transaction: %w", err)
+			}
+
+			return nil
 		})
 	}, nil
 }
