@@ -17,12 +17,11 @@ collections:
       type: object
       properties:
         theKey: { type: string }
-        nullableKey: { type: string }
         aValue:
           type: integer
           description: A super-awesome value.
-      required: [theKey, nullableKey]
-    key: [/theKey, /nullableKey]
+      required: [theKey]
+    key: [/theKey]
 
   no_values:
     schema:

@@ -39,24 +39,19 @@
             "lower_case": {
               "type": "integer"
             },
-            "nullableKey": {
-              "type": "string"
-            },
             "value": {
               "type": "string"
             }
           },
           "required": [
             "key1",
-            "key!2",
-            "nullableKey"
+            "key!2"
           ],
           "type": "object"
         },
         "key": [
           "/key1",
-          "/key!2",
-          "/nullableKey"
+          "/key!2"
         ],
         "uuid_ptr": "/_meta/uuid",
         "projections": [
@@ -138,18 +133,6 @@
             }
           },
           {
-            "ptr": "/nullableKey",
-            "field": "nullableKey",
-            "is_primary_key": true,
-            "inference": {
-              "types": [
-                "string"
-              ],
-              "string": {},
-              "exists": 1
-            }
-          },
-          {
             "ptr": "/value",
             "field": "value",
             "inference": {
@@ -221,8 +204,7 @@
       "field_selection": {
         "keys": [
           "key1",
-          "key!2",
-          "nullableKey"
+          "key!2"
         ],
         "values": [
           "Camel_Case",
@@ -254,22 +236,17 @@
               "description": "A super-awesome value.",
               "type": "integer"
             },
-            "nullableKey": {
-              "type": "string"
-            },
             "theKey": {
               "type": "string"
             }
           },
           "required": [
-            "theKey",
-            "nullableKey"
+            "theKey"
           ],
           "type": "object"
         },
         "key": [
-          "/theKey",
-          "/nullableKey"
+          "/theKey"
         ],
         "uuid_ptr": "/_meta/uuid",
         "projections": [
@@ -290,18 +267,6 @@
               "types": [
                 "object"
               ],
-              "exists": 1
-            }
-          },
-          {
-            "ptr": "/nullableKey",
-            "field": "nullableKey",
-            "is_primary_key": true,
-            "inference": {
-              "types": [
-                "string"
-              ],
-              "string": {},
               "exists": 1
             }
           },
@@ -377,8 +342,7 @@
       },
       "field_selection": {
         "keys": [
-          "theKey",
-          "nullableKey"
+          "theKey"
         ],
         "values": [
           "aValue"
