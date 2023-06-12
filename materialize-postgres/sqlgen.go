@@ -107,13 +107,12 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
 	{{- end }}
-) ON COMMIT DROP;
+) ON COMMIT DELETE ROWS;
 {{ end }}
 
 -- Templated insertion into the temporary load table:
 
-{{ define "prepLoadInsert" }}
-PREPARE load_{{ $.Binding }} AS
+{{ define "loadInsert" }}
 INSERT INTO {{ template "temp_name" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{ end -}}
@@ -128,16 +127,8 @@ INSERT INTO {{ template "temp_name" . }} (
 );
 {{ end }}
 
-{{ define "execLoadInsert" -}}
-EXECUTE load_{{ $.Binding }}
-{{- end }}
-
 -- Templated query which joins keys from the load table with the target table, and returns values. It
--- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL. If the
--- column is not nullable, an efficient direct comparison can be made in the join condition. For
--- columns that may contain null, a less efficient comparison must be used. For this we use a more
--- cumbersome comparison operator than "is not distinct from" so that the table btree index will be
--- utilized.
+-- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL.
 
 {{ define "loadQuery" }}
 {{ if $.Document -}}
@@ -146,11 +137,7 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 	JOIN {{ $.Identifier}} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON  {{ end -}}
-		{{ if $key.MustExist -}}
-			l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
-		{{- else -}}
-			(l.{{ $key.Identifier }} = r.{{ $key.Identifier }} and l.{{ $key.Identifier }} is not null and r.{{ $key.Identifier }} is not null) or (l.{{ $key.Identifier }} is null and r.{{ $key.Identifier }} is null)
-		{{- end }}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
@@ -159,8 +146,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 
 -- Templated query which inserts a new, complete row to the target table:
 
-{{ define "prepStoreInsert" }}
-PREPARE insert_{{ $.Binding }} AS
+{{ define "storeInsert" }}
 INSERT INTO {{ $.Identifier }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
@@ -174,14 +160,9 @@ INSERT INTO {{ $.Identifier }} (
 );
 {{ end }}
 
-{{ define "execStoreInsert" -}}
-EXECUTE insert_{{ $.Binding }}
-{{- end }}
-
 -- Templated query which updates an existing row in the target table:
 
-{{ define "prepStoreUpdate" }}
-PREPARE update_{{ $.Binding }} AS
+{{ define "storeUpdate" }}
 UPDATE {{$.Identifier}} SET
 	{{- range $ind, $val := $.Values }}
 		{{- if $ind }},{{ end }}
@@ -193,18 +174,10 @@ UPDATE {{$.Identifier}} SET
 	{{- end -}}
 	{{ range $ind, $key := $.Keys }}
 	{{ if $ind }} AND   {{ else }} WHERE {{ end -}}
-	{{ if $key.MustExist -}}
-		{{ $key.Identifier }} = {{ $key.Placeholder }}
-	{{- else -}}
-		({{ $key.Identifier }} = {{ $key.Placeholder }} and {{ $key.Identifier }} is not null and {{ $key.Placeholder }} is not null) or ({{ $key.Identifier }} is null and {{ $key.Placeholder }} is null)
-	{{- end }}
+	{{ $key.Identifier }} = {{ $key.Placeholder }}
 	{{- end -}}
 	;
 {{ end }}
-
-{{ define "execStoreUpdate" -}}
-EXECUTE update_{{ $.Binding }}
-{{- end }}
 
 {{ define "installFence" }}
 with
@@ -263,13 +236,10 @@ END $$;
 `)
 	tplCreateLoadTable     = tplAll.Lookup("createLoadTable")
 	tplCreateTargetTable   = tplAll.Lookup("createTargetTable")
-	tplExecLoadInsert      = tplAll.Lookup("execLoadInsert")
-	tplExecStoreInsert     = tplAll.Lookup("execStoreInsert")
-	tplExecStoreUpdate     = tplAll.Lookup("execStoreUpdate")
+	tplLoadInsert          = tplAll.Lookup("loadInsert")
+	tplStoreInsert         = tplAll.Lookup("storeInsert")
+	tplStoreUpdate         = tplAll.Lookup("storeUpdate")
 	tplLoadQuery           = tplAll.Lookup("loadQuery")
-	tplPrepLoadInsert      = tplAll.Lookup("prepLoadInsert")
-	tplPrepStoreInsert     = tplAll.Lookup("prepStoreInsert")
-	tplPrepStoreUpdate     = tplAll.Lookup("prepStoreUpdate")
 	tplInstallFence        = tplAll.Lookup("installFence")
 	tplUpdateFence         = tplAll.Lookup("updateFence")
 	tplAlterColumnNullable = tplAll.Lookup("alterColumnNullable")
