@@ -2,7 +2,6 @@
 CREATE TABLE IF NOT EXISTS "a-schema".target_table (
 	key1 BIGINT,
 	"key!2" BOOLEAN,
-	nullableKey VARCHAR(4096),
 	Camel_Case BIGINT,
 	"a Time" TIMESTAMPTZ,
 	"array" SUPER,
@@ -16,7 +15,6 @@ COMMENT ON COLUMN "a-schema".target_table.key1 IS 'Key One Title
 Key One Description
 auto-generated projection of JSON at: /key1 with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".target_table."key!2" IS 'auto-generated projection of JSON at: /key!2 with inferred types: [boolean]';
-COMMENT ON COLUMN "a-schema".target_table.nullableKey IS 'auto-generated projection of JSON at: /nullableKey with inferred types: [string null]';
 COMMENT ON COLUMN "a-schema".target_table.Camel_Case IS 'auto-generated projection of JSON at: /Camel_Case with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".target_table."a Time" IS 'auto-generated projection of JSON at: /a Time with inferred types: [string]';
 COMMENT ON COLUMN "a-schema".target_table."array" IS 'This is an array!
@@ -29,13 +27,11 @@ COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'auto-generated proje
 --- Begin "Delta Updates" createTargetTable ---
 CREATE TABLE IF NOT EXISTS "Delta Updates" (
 	theKey VARCHAR(4096),
-	nullableKey VARCHAR(4096),
 	aValue BIGINT
 );
 
 COMMENT ON TABLE "Delta Updates" IS 'Generated for materialization test/sqlite of collection delta/updates';
 COMMENT ON COLUMN "Delta Updates".theKey IS 'auto-generated projection of JSON at: /theKey with inferred types: [string]';
-COMMENT ON COLUMN "Delta Updates".nullableKey IS 'auto-generated projection of JSON at: /nullableKey with inferred types: [string null]';
 COMMENT ON COLUMN "Delta Updates".aValue IS 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]';
 --- End "Delta Updates" createTargetTable ---
@@ -43,15 +39,13 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]';
 --- Begin "a-schema".target_table createLoadTable ---
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 	key1 BIGINT,
-	"key!2" BOOLEAN,
-	nullableKey VARCHAR(4096)
+	"key!2" BOOLEAN
 );
 --- End "a-schema".target_table createLoadTable ---
 
 --- Begin "Delta Updates" createLoadTable ---
 CREATE TEMPORARY TABLE flow_temp_table_1 (
-	theKey VARCHAR(4096),
-	nullableKey VARCHAR(4096)
+	theKey VARCHAR(4096)
 );
 --- End "Delta Updates" createLoadTable ---
 
@@ -70,13 +64,13 @@ CREATE TEMPORARY TABLE flow_temp_table_1 (
 --- Begin "a-schema".target_table storeUpdateDeleteExisting ---
 DELETE FROM "a-schema".target_table
 USING flow_temp_table_0
-WHERE "a-schema".target_table.key1 = flow_temp_table_0.key1 AND "a-schema".target_table."key!2" = flow_temp_table_0."key!2" AND "a-schema".target_table.nullableKey = flow_temp_table_0.nullableKey;
+WHERE "a-schema".target_table.key1 = flow_temp_table_0.key1 AND "a-schema".target_table."key!2" = flow_temp_table_0."key!2";
 --- End "a-schema".target_table storeUpdateDeleteExisting ---
 
 --- Begin "Delta Updates" storeUpdateDeleteExisting ---
 DELETE FROM "Delta Updates"
 USING flow_temp_table_1
-WHERE "Delta Updates".theKey = flow_temp_table_1.theKey AND "Delta Updates".nullableKey = flow_temp_table_1.nullableKey;
+WHERE "Delta Updates".theKey = flow_temp_table_1.theKey;
 --- End "Delta Updates" storeUpdateDeleteExisting ---
 
 --- Begin "a-schema".target_table storeUpdate ---
@@ -95,7 +89,6 @@ SELECT 0, r.flow_document
 	JOIN "a-schema".target_table AS r
 		 ON  l.key1 = r.key1
 		 AND l."key!2" = r."key!2"
-		 AND l.nullableKey = r.nullableKey
 --- End "a-schema".target_table loadQuery ---
 
 --- Begin "Delta Updates" loadQuery ---

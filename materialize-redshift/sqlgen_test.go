@@ -1,11 +1,11 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"text/template"
-	"encoding/json"
-	"os"
 
 	"github.com/bradleyjkemp/cupaloy"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
@@ -16,15 +16,8 @@ import (
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
 	var specJson, err = os.ReadFile("testdata/spec.json")
-  require.NoError(t, err)
+	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(specJson, &spec))
-
-	// TODO(whb): These keys are manually set as "nullable" for now to test the query generation
-	// with nullable keys. Once flow supports nullable keys natively, this should be cleaned up.
-	spec.Bindings[0].Collection.Projections[7].Inference.Exists = pf.Inference_MAY
-	spec.Bindings[0].Collection.Projections[7].Inference.Types = append(spec.Bindings[0].Collection.Projections[7].Inference.Types, "null")
-	spec.Bindings[1].Collection.Projections[2].Inference.Exists = pf.Inference_MAY
-	spec.Bindings[1].Collection.Projections[2].Inference.Types = append(spec.Bindings[1].Collection.Projections[2].Inference.Types, "null")
 
 	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
 		Schema: "a-schema",
