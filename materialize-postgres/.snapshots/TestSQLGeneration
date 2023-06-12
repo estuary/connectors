@@ -50,7 +50,7 @@ CREATE TEMPORARY TABLE flow_temp_table_0 (
 		key1 BIGINT NOT NULL,
 		"key!2" BOOLEAN NOT NULL,
 		"nullableKey" TEXT
-) ON COMMIT DROP;
+) ON COMMIT DELETE ROWS;
 --- End "a-schema".target_table createLoadTable ---
 
 --- Begin "Delta Updates" createLoadTable ---
@@ -58,28 +58,20 @@ CREATE TEMPORARY TABLE flow_temp_table_0 (
 CREATE TEMPORARY TABLE flow_temp_table_1 (
 		"theKey" TEXT NOT NULL,
 		"nullableKey" TEXT
-) ON COMMIT DROP;
+) ON COMMIT DELETE ROWS;
 --- End "Delta Updates" createLoadTable ---
 
---- Begin "a-schema".target_table prepLoadInsert ---
+--- Begin "a-schema".target_table loadInsert ---
 
-PREPARE load_0 AS
 INSERT INTO flow_temp_table_0 (key1, "key!2", "nullableKey")
 	VALUES ($1, $2, $3);
---- End "a-schema".target_table prepLoadInsert ---
+--- End "a-schema".target_table loadInsert ---
 
---- Begin "Delta Updates" prepLoadInsert ---
+--- Begin "Delta Updates" loadInsert ---
 
-PREPARE load_1 AS
 INSERT INTO flow_temp_table_1 ("theKey", "nullableKey")
 	VALUES ($1, $2);
---- End "Delta Updates" prepLoadInsert ---
-
---- Begin "a-schema".target_table execLoadInsert ---
-EXECUTE load_0--- End "a-schema".target_table execLoadInsert ---
-
---- Begin "Delta Updates" execLoadInsert ---
-EXECUTE load_1--- End "Delta Updates" execLoadInsert ---
+--- End "Delta Updates" loadInsert ---
 
 --- Begin "a-schema".target_table loadQuery ---
 
@@ -88,7 +80,7 @@ SELECT 0, r.flow_document
 	JOIN "a-schema".target_table AS r
 		 ON  l.key1 = r.key1
 		 AND l."key!2" = r."key!2"
-		 AND (l."nullableKey" = r."nullableKey" and l."nullableKey" is not null and r."nullableKey" is not null) or (l."nullableKey" is null and r."nullableKey" is null)
+		 AND l."nullableKey" = r."nullableKey"
 
 --- End "a-schema".target_table loadQuery ---
 
@@ -98,9 +90,8 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 
 --- End "Delta Updates" loadQuery ---
 
---- Begin "a-schema".target_table prepStoreInsert ---
+--- Begin "a-schema".target_table storeInsert ---
 
-PREPARE insert_0 AS
 INSERT INTO "a-schema".target_table (
 		key1,
 		"key!2",
@@ -112,27 +103,19 @@ INSERT INTO "a-schema".target_table (
 		"value",
 		flow_document
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
---- End "a-schema".target_table prepStoreInsert ---
+--- End "a-schema".target_table storeInsert ---
 
---- Begin "Delta Updates" prepStoreInsert ---
+--- Begin "Delta Updates" storeInsert ---
 
-PREPARE insert_1 AS
 INSERT INTO "Delta Updates" (
 		"theKey",
 		"nullableKey",
 		"aValue"
 ) VALUES ($1, $2, $3);
---- End "Delta Updates" prepStoreInsert ---
+--- End "Delta Updates" storeInsert ---
 
---- Begin "a-schema".target_table execStoreInsert ---
-EXECUTE insert_0--- End "a-schema".target_table execStoreInsert ---
+--- Begin "a-schema".target_table storeUpdate ---
 
---- Begin "Delta Updates" execStoreInsert ---
-EXECUTE insert_1--- End "Delta Updates" execStoreInsert ---
-
---- Begin "a-schema".target_table prepStoreUpdate ---
-
-PREPARE update_0 AS
 UPDATE "a-schema".target_table SET
 		"Camel_Case" = $4,
 		"a Time" = $5,
@@ -142,27 +125,19 @@ UPDATE "a-schema".target_table SET
 		flow_document = $9
 	 WHERE key1 = $1
 	 AND   "key!2" = $2
-	 AND   ("nullableKey" = $3 and "nullableKey" is not null and $3 is not null) or ("nullableKey" is null and $3 is null);
---- End "a-schema".target_table prepStoreUpdate ---
+	 AND   "nullableKey" = $3;
+--- End "a-schema".target_table storeUpdate ---
 
---- Begin "Delta Updates" prepStoreUpdate ---
+--- Begin "Delta Updates" storeUpdate ---
 
-PREPARE update_1 AS
 UPDATE "Delta Updates" SET
 		"aValue" = $3
 	 WHERE "theKey" = $1
-	 AND   ("nullableKey" = $2 and "nullableKey" is not null and $2 is not null) or ("nullableKey" is null and $2 is null);
---- End "Delta Updates" prepStoreUpdate ---
-
---- Begin "a-schema".target_table execStoreUpdate ---
-EXECUTE update_0--- End "a-schema".target_table execStoreUpdate ---
-
---- Begin "Delta Updates" execStoreUpdate ---
-EXECUTE update_1--- End "Delta Updates" execStoreUpdate ---
+	 AND   "nullableKey" = $2;
+--- End "Delta Updates" storeUpdate ---
 
 --- Begin target_table_no_values_materialized storeUpdate ---
 
-PREPARE update_2 AS
 UPDATE target_table_no_values_materialized SET
 		flow_document = $3
 	 WHERE key1 = $1
