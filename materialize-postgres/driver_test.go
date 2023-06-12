@@ -6,7 +6,6 @@ import (
 	"context"
 	stdsql "database/sql"
 	"fmt"
-	"math/rand"
 	"strings"
 	"testing"
 	"time"
@@ -16,8 +15,6 @@ import (
 )
 
 func TestFencingCases(t *testing.T) {
-	rand.Seed(time.Now().Unix())
-
 	var ctx = context.Background()
 	var client = client{uri: "postgresql://postgres:postgres@localhost:5432/postgres"}
 	sql.RunFenceTestCases(t,
