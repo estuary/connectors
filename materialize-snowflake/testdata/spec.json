@@ -209,22 +209,17 @@
               "description": "A super-awesome value.",
               "type": "integer"
             },
-            "nullableKey": {
-              "type": "string"
-            },
             "theKey": {
               "type": "string"
             }
           },
           "required": [
-            "theKey",
-            "nullableKey"
+            "theKey"
           ],
           "type": "object"
         },
         "key": [
-          "/theKey",
-          "/nullableKey"
+          "/theKey"
         ],
         "uuid_ptr": "/_meta/uuid",
         "projections": [
@@ -245,18 +240,6 @@
               "types": [
                 "object"
               ],
-              "exists": 1
-            }
-          },
-          {
-            "ptr": "/nullableKey",
-            "field": "nullableKey",
-            "is_primary_key": true,
-            "inference": {
-              "types": [
-                "string"
-              ],
-              "string": {},
               "exists": 1
             }
           },
@@ -332,8 +315,7 @@
       },
       "field_selection": {
         "keys": [
-          "theKey",
-          "nullableKey"
+          "theKey"
         ],
         "values": [
           "aValue"
