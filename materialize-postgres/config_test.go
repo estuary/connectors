@@ -19,19 +19,19 @@ func TestPostgresConfig(t *testing.T) {
 	}
 	require.NoError(t, validConfig.Validate())
 	var uri = validConfig.ToURI()
-	require.Equal(t, "postgres://youser:shmassword@post.toast:1234/namegame?statement_cache_mode=describe", uri)
+	require.Equal(t, "postgres://youser:shmassword@post.toast:1234/namegame", uri)
 
 	var minimal = validConfig
 	minimal.Database = ""
 	require.NoError(t, minimal.Validate())
 	uri = minimal.ToURI()
-	require.Equal(t, "postgres://youser:shmassword@post.toast:1234?statement_cache_mode=describe", uri)
+	require.Equal(t, "postgres://youser:shmassword@post.toast:1234", uri)
 
 	var noPort = validConfig
 	noPort.Address = "post.toast"
 	require.NoError(t, noPort.Validate())
 	uri = noPort.ToURI()
-	require.Equal(t, "postgres://youser:shmassword@post.toast:5432/namegame?statement_cache_mode=describe", uri)
+	require.Equal(t, "postgres://youser:shmassword@post.toast:5432/namegame", uri)
 
 	var noAddress = validConfig
 	noAddress.Address = ""
