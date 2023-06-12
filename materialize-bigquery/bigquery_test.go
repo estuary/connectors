@@ -148,27 +148,27 @@ func TestPrereqs(t *testing.T) {
 
 	tests := []struct {
 		name string
-		cfg  func(config) config
+		cfg  func(config) *config
 		want []error
 	}{
 		{
 			name: "valid",
-			cfg:  func(cfg config) config { return cfg },
+			cfg:  func(cfg config) *config { return &cfg },
 			want: nil,
 		},
 		{
 			name: "can't parse credentials",
-			cfg: func(cfg config) config {
+			cfg: func(cfg config) *config {
 				cfg.CredentialsJSON = cfg.CredentialsJSON + "wrong"
-				return cfg
+				return &cfg
 			},
 			want: []error{fmt.Errorf("cannot parse JSON credentials")},
 		},
 		{
 			name: "bucket doesn't exist",
-			cfg: func(cfg config) config {
+			cfg: func(cfg config) *config {
 				cfg.Bucket = nonExistentBucket
-				return cfg
+				return &cfg
 			},
 			want: []error{fmt.Errorf("bucket %q does not exist", nonExistentBucket)},
 		},
