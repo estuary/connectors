@@ -101,43 +101,43 @@ func TestPrereqs(t *testing.T) {
 
 	tests := []struct {
 		name string
-		cfg  func(config) config
+		cfg  func(config) *config
 		want []error
 	}{
 		{
 			name: "valid",
-			cfg:  func(cfg config) config { return cfg },
+			cfg:  func(cfg config) *config { return &cfg },
 			want: nil,
 		},
 		{
 			name: "wrong account identifier in host",
-			cfg: func(cfg config) config {
+			cfg: func(cfg config) *config {
 				cfg.Host = "wrong.snowflakecomputing.com"
-				return cfg
+				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect account identifier %q in host URL", "wrong")},
 		},
 		{
 			name: "wrong username",
-			cfg: func(cfg config) config {
+			cfg: func(cfg config) *config {
 				cfg.User = "wrong" + cfg.User
-				return cfg
+				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
 		},
 		{
 			name: "wrong password",
-			cfg: func(cfg config) config {
+			cfg: func(cfg config) *config {
 				cfg.Password = "wrong" + cfg.Password
-				return cfg
+				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
 		},
 		{
 			name: "wrong role",
-			cfg: func(cfg config) config {
+			cfg: func(cfg config) *config {
 				cfg.Role = "wrong" + cfg.Role
-				return cfg
+				return &cfg
 			},
 			want: []error{fmt.Errorf("role %q does not exist", "wrong"+cfg.Role)},
 		},
