@@ -317,14 +317,6 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}, nil
 }
 
-func (transactor) Commit(context.Context) error {
-	return nil
-}
-
-func (transactor) Acknowledge(context.Context) error {
-	return nil
-}
-
 func (transactor) Destroy() {
 }
 
