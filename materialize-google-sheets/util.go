@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"regexp"
 	"time"
 
@@ -312,9 +313,9 @@ func batchRequestWithRetry(
 		}
 
 		// If we encounter a rate limit error, retry after exponential back-off.
-		if e, ok := err.(*googleapi.Error); ok && e.Code == 429 {
+		if e, ok := err.(*googleapi.Error); ok && retryableErrorCodes[e.Code] {
 			var dur = time.Duration(1<<attempt) * time.Second
-			log.Println("rate limit exceeded. backing off for ", dur)
+			log.Println("received error ", e.Code, http.StatusText(e.Code), ", retrying after ", dur)
 			time.Sleep(dur)
 			continue
 		}
@@ -335,4 +336,11 @@ func parseSheetsID(sheetsURL string) (string, error) {
 		return "", fmt.Errorf("invalid Google Sheets URL: %s", sheetsURL)
 	}
 	return matches[1], nil
+}
+
+var retryableErrorCodes = map[int]bool{
+	http.StatusTooManyRequests:     true, // 429
+	http.StatusInternalServerError: true, // 500
+	http.StatusBadGateway:          true, // 502
+	http.StatusServiceUnavailable:  true, // 503
 }
