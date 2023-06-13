@@ -79,7 +79,6 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
 		DocumentationUrl:         "https://go.estuary.dev/materialize-slack",
 		Oauth2:                   Spec("channels:read", "groups:read", "im:read", "channels:join", "chat:write", "chat:write.customize"),
-		//	                      Spec("channels:history", "channels:join", "channels:read", "files:read", "groups:read", "links:read", "reactions:read", "remote_files:read", "team:read", "usergroups:read", "users.profile:read", "users:read"),
 	}, nil
 }
 
@@ -112,14 +111,6 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 				return nil, fmt.Errorf("error joining channel: %s, %w", res.Channel, err)
 			}
 		}
-
-		/*
-			projections:
-				blocks: /slack_blocks
-
-			`blocks` is a FIELD
-			`/slack_blocks` is a LOCATION
-		*/
 
 		var constraints = make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range binding.Collection.Projections {
@@ -170,13 +161,11 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 }
 
 func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	log.Debug("handling Apply request")
 	return &pm.Response_Applied{ActionDescription: "materialize-slack does not modify channels"}, nil
 }
 
 // Transactions implements the DriverServer interface.
 func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
-	log.Debug("handling Transactions request")
 
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
@@ -231,22 +220,18 @@ func buildDocument(b *binding, keys, values tuple.Tuple) map[string]interface{} 
 
 	// Add the keys to the document.
 	for i, value := range keys {
-		if i < len(b.spec.FieldSelection.Keys) {
-			var propName = b.spec.FieldSelection.Keys[i]
-			document[propName] = value
-		}
+		var propName = b.spec.FieldSelection.Keys[i]
+		document[propName] = value
 	}
 
 	// Add the non-keys to the document.
 	for i, value := range values {
-		if i < len(b.spec.FieldSelection.Values) {
-			var propName = b.spec.FieldSelection.Values[i]
+		var propName = b.spec.FieldSelection.Values[i]
 
-			if raw, ok := value.([]byte); ok {
-				document[propName] = json.RawMessage(raw)
-			} else {
-				document[propName] = value
-			}
+		if raw, ok := value.([]byte); ok {
+			document[propName] = json.RawMessage(raw)
+		} else {
+			document[propName] = value
 		}
 	}
 	return document
@@ -260,7 +245,6 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 }
 
 func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
-	log.Debug("handling Store operation")
 
 	for it.Next() {
 		var b = t.bindings[it.Binding]
@@ -277,7 +261,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, fmt.Errorf("missing text")
 		}
 
-		// Parse the timstamp as a time.Time
+		// Parse the timestamp as a time.Time
 		ts, err := time.Parse(time.RFC3339Nano, tsStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid timestamp %q", tsStr)
@@ -303,7 +287,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			log.Warn(fmt.Sprintf("Blocks apparently NOT okay: %+v", reflect.TypeOf(parsed["blocks"])))
 		}
 
-		// Accept messages from at most 30 minutes in the past
+		// Accept messages from at most 10 minutes in the past
 		if time.Since(ts).Minutes() < 10 {
 			if err := t.api.PostMessage(b.resource.Channel, text, blocksParsed.BlockSet, b.resource.SenderConfig); err != nil {
 				serializedBlocks, marshal_err := json.Marshal(blocksParsed)
@@ -312,8 +296,6 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 				}
 				log.Warn(fmt.Errorf("error sending message: %w", err))
 			}
-			// Mom can we get rate limiting?
-			// we have rate limiting at home
 			// rate limiting at home:
 			time.Sleep(time.Second * 10)
 		} else {
@@ -322,7 +304,6 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		log.Debug("handling Prepare operation")
 		var checkpoint = driverCheckpoint{}
 		var bs, err = json.Marshal(&checkpoint)
 		if err != nil {
@@ -337,17 +318,14 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 }
 
 func (transactor) Commit(context.Context) error {
-	log.Debug("handling Commit operation")
 	return nil
 }
 
 func (transactor) Acknowledge(context.Context) error {
-	log.Debug("handling Acknowledge operation")
 	return nil
 }
 
 func (transactor) Destroy() {
-	log.Debug("handling Destroy operation")
 }
 
 func main() {
