@@ -15,7 +15,6 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
-	"go.gazette.dev/core/consumer/protocol"
 )
 
 // driver implements the pm.DriverServer interface.
@@ -50,14 +49,6 @@ func (r resource) Validate() error {
 	if r.Channel == "" {
 		return fmt.Errorf("missing required channel name/id")
 	}
-	return nil
-}
-
-type driverCheckpoint struct {
-	BindingCollections []string `json:"binding_collections"`
-}
-
-func (c driverCheckpoint) Validate() error {
 	return nil
 }
 
@@ -170,11 +161,6 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
-	}
-
-	var checkpoint driverCheckpoint
-	if err := pf.UnmarshalStrict(open.StateJson, &checkpoint); err != nil {
-		return nil, nil, fmt.Errorf("parsing driver checkpoint: %w", err)
 	}
 
 	api, err := cfg.buildAPI()
@@ -303,18 +289,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		var checkpoint = driverCheckpoint{}
-		var bs, err = json.Marshal(&checkpoint)
-		if err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("error marshalling driver checkpoint: %w", err))
-		}
-
-		return &pf.ConnectorState{
-			UpdatedJson: json.RawMessage(bs),
-			MergePatch:  true,
-		}, nil
-	}, nil
+	return nil, nil
 }
 
 func (transactor) Destroy() {
