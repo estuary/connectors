@@ -97,8 +97,8 @@ type tableConfig struct {
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
 	return &tableConfig{
-		projectID: ep.Config.(config).ProjectID,
-		dataset:   ep.Config.(config).Dataset,
+		projectID: ep.Config.(*config).ProjectID,
+		dataset:   ep.Config.(*config).Dataset,
 	}
 }
 
@@ -149,8 +149,8 @@ func newBigQueryDriver() *sql.Driver {
 		EndpointSpecType: config{},
 		ResourceSpecType: tableConfig{},
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			cfg := config{}
-			if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
+			var cfg = new(config)
+			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
 				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
 			}
 
