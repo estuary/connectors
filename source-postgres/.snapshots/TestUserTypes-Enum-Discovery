@@ -1,19 +1,19 @@
 Binding 0:
 {
-    "recommended_name": "test_usertypes_enum_terror",
+    "recommended_name": "test_usertypes_enum_64812435",
     "resource_config_json": {
       "mode": "Normal",
       "namespace": "test",
-      "stream": "usertypes_enum_terror"
+      "stream": "usertypes_enum_64812435"
     },
     "document_schema_json": {
       "$defs": {
-        "TestUsertypes_enum_terror": {
+        "TestUsertypes_enum_64812435": {
           "type": "object",
           "required": [
             "id"
           ],
-          "$anchor": "TestUsertypes_enum_terror",
+          "$anchor": "TestUsertypes_enum_64812435",
           "properties": {
             "id": {
               "type": "integer"
@@ -41,7 +41,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#TestUsertypes_enum_terror",
+                  "$ref": "#TestUsertypes_enum_64812435",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -103,7 +103,7 @@ Binding 0:
           }
         },
         {
-          "$ref": "#TestUsertypes_enum_terror"
+          "$ref": "#TestUsertypes_enum_64812435"
         }
       ]
     },

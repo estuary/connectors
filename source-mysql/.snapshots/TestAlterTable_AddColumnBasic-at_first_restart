@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/test_altertable_addcolumnbasic_aaa": 2 Documents
+# Collection "acmeCo/test/test_altertable_addcolumnbasic_68678323": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_aaa","cursor":"binlog.000123:56789:123"}},"data":"kkk","extra_end":"extra_end_9","extra_start":"extra_start_9","id":9}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_aaa","cursor":"binlog.000123:56789:123"}},"data":"lll","extra_end":"extra_end_10","extra_start":"extra_start_10","id":10}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_68678323","cursor":"binlog.000123:56789:123"}},"data":"kkk","extra_end":"extra_end_9","extra_start":"extra_start_9","id":9}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_68678323","cursor":"binlog.000123:56789:123"}},"data":"lll","extra_end":"extra_end_10","extra_start":"extra_start_10","id":10}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.altertable_addcolumnbasic_aaa":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["extra_start","id","data","extra_end"],"types":{"data":"text","extra_end":"text","extra_start":"text","id":"int"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_addcolumnbasic_68678323":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["extra_start","id","data","extra_end"],"types":{"data":"text","extra_end":"text","extra_start":"text","id":"int"}}},"mode":"Active"}}}
 

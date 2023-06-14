@@ -1,11 +1,11 @@
 # ================================
-# Collection "acmeCo/test/test_generic_replicationupdates": 3 Documents
+# Collection "acmeCo/test/test_generic_replicationupdates_79710599": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationUpdates","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"A","id":0}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationUpdates","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"CDEFGHIJKLMNOP","id":2}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationUpdates","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"bbb","id":1}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationUpdates_79710599","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"A","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationUpdates_79710599","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"CDEFGHIJKLMNOP","id":2}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationUpdates_79710599","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"bbb","id":1}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationupdates":{"backfilled":3,"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationupdates_79710599":{"backfilled":3,"key_columns":["id"],"mode":"Active"}}}
 

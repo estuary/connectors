@@ -1,12 +1,12 @@
 # ================================
-# Collection "acmeCo/test/test_generic_multiplestreams_two": 4 Documents
+# Collection "acmeCo/test/test_generic_multiplestreams_26016615": 4 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_MultipleStreams_two","cursor":"backfill:0"}},"data":"three","id":3}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_MultipleStreams_two","cursor":"backfill:1"}},"data":"four","id":4}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_MultipleStreams_two","cursor":"backfill:2"}},"data":"five","id":5}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_MultipleStreams_two","cursor":"backfill:3"}},"data":"ten","id":10}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_MultipleStreams_26016615","cursor":"backfill:0"}},"data":"three","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_MultipleStreams_26016615","cursor":"backfill:1"}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_MultipleStreams_26016615","cursor":"backfill:2"}},"data":"five","id":5}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_MultipleStreams_26016615","cursor":"backfill:3"}},"data":"ten","id":10}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.generic_multiplestreams_one":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_three":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_two":{"backfilled":4,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.generic_multiplestreams_14930049":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_26016615":{"backfilled":4,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_30084965":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
 

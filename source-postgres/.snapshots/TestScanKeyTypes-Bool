@@ -2,26 +2,26 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_bool": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_bool_28040000": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_bool","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":false}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_bool_28040000","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":false}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"Jg=="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_bool_28040000":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"Jg=="}}}
 
 
 ####################################
 ### Capture from Key "Jg=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_bool": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_bool_28040000": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_bool","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":true}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_bool_28040000","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":true}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"Jw=="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_bool_28040000":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"Jw=="}}}
 
 
 ####################################
@@ -30,7 +30,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_bool":{"backfilled":2,"key_columns":["key"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_bool_28040000":{"backfilled":2,"key_columns":["key"],"mode":"Active"}}}
 
 
 

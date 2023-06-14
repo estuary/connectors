@@ -1,15 +1,15 @@
 # ================================
-# Collection "acmeCo/test/test_capturecapitalization_aaaaa": 2 Documents
+# Collection "acmeCo/test/test_capturecapitalization_aaaaa_69943814": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CaptureCapitalization_AaAaA","loc":[11111111,11111111,11111111]}},"data":"asdf","id":1}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CaptureCapitalization_AaAaA","loc":[11111111,11111111,11111111]}},"data":"hello","id":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CaptureCapitalization_AaAaA_69943814","loc":[11111111,11111111,11111111]}},"data":"asdf","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"CaptureCapitalization_AaAaA_69943814","loc":[11111111,11111111,11111111]}},"data":"hello","id":0}
 # ================================
-# Collection "acmeCo/test/test_capturecapitalization_bbbbb": 2 Documents
+# Collection "acmeCo/test/test_capturecapitalization_bbbbb_73423348": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"capturecapitalization_bbbbb","loc":[11111111,11111111,11111111]}},"data":"fdsa","id":3}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"capturecapitalization_bbbbb","loc":[11111111,11111111,11111111]}},"data":"world","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"capturecapitalization_bbbbb_73423348","loc":[11111111,11111111,11111111]}},"data":"fdsa","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"capturecapitalization_bbbbb_73423348","loc":[11111111,11111111,11111111]}},"data":"world","id":2}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.capturecapitalization_aaaaa":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"test.capturecapitalization_bbbbb":{"backfilled":2,"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.capturecapitalization_aaaaa_69943814":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"test.capturecapitalization_bbbbb_73423348":{"backfilled":2,"key_columns":["id"],"mode":"Active"}}}
 

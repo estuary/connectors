@@ -2,52 +2,52 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_integer": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_integer_754161260001": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer","cursor":"backfill:0"}},"data":"Data 1","k":-3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer_754161260001","cursor":"backfill:0"}},"data":"Data 1","k":-3}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer":{"backfilled":1,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"E/w="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer_754161260001":{"backfilled":1,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"E/w="}}}
 
 
 ####################################
 ### Capture from Key "E/w="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_integer": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_integer_754161260001": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer","cursor":"backfill:1"}},"data":"Data 0","k":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer_754161260001","cursor":"backfill:1"}},"data":"Data 0","k":0}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"FA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer_754161260001":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"FA=="}}}
 
 
 ####################################
 ### Capture from Key "FA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_integer": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_integer_754161260001": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer","cursor":"backfill:2"}},"data":"Data 2","k":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer_754161260001","cursor":"backfill:2"}},"data":"Data 2","k":2}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer":{"backfilled":3,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"FQI="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer_754161260001":{"backfilled":3,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"FQI="}}}
 
 
 ####################################
 ### Capture from Key "FQI="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_integer": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_integer_754161260001": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer","cursor":"backfill:3"}},"data":"Data 3","k":1723}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Integer_754161260001","cursor":"backfill:3"}},"data":"Data 3","k":1723}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer":{"backfilled":4,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"Fga7"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer_754161260001":{"backfilled":4,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Backfill","scanned":"Fga7"}}}
 
 
 ####################################
@@ -56,7 +56,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer":{"backfilled":4,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_integer_754161260001":{"backfilled":4,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"int"}}},"mode":"Active"}}}
 
 
 

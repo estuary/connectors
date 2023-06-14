@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/test_prerequisites_aaa": 2 Documents
+# Collection "acmeCo/test/test_prerequisites_18262250": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Prerequisites_aaa","cursor":"backfill:0"}},"data":"hello","id":0}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Prerequisites_aaa","cursor":"backfill:1"}},"data":"world","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Prerequisites_18262250","cursor":"backfill:0"}},"data":"hello","id":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Prerequisites_18262250","cursor":"backfill:1"}},"data":"world","id":1}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.prerequisites_aaa":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.prerequisites_bbb":{"backfilled":0,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.prerequisites_18262250":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.prerequisites_25515955":{"backfilled":0,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
 

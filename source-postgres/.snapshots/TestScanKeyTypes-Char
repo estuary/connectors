@@ -2,130 +2,130 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_28040012": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":"   "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char_28040012","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":"   "}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"AiAgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"AiAgIAA="}}}
 
 
 ####################################
 ### Capture from Key "AiAgIAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_28040012": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char","loc":[11111111,11111111,11111111]}},"data":"Data 4","key":"A  "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char_28040012","loc":[11111111,11111111,11111111]}},"data":"Data 4","key":"A  "}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"AkEgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"AkEgIAA="}}}
 
 
 ####################################
 ### Capture from Key "AkEgIAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_28040012": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char","loc":[11111111,11111111,11111111]}},"data":"Data 5","key":"B  "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char_28040012","loc":[11111111,11111111,11111111]}},"data":"Data 5","key":"B  "}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":3,"key_columns":["key"],"mode":"Backfill","scanned":"AkIgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":3,"key_columns":["key"],"mode":"Backfill","scanned":"AkIgIAA="}}}
 
 
 ####################################
 ### Capture from Key "AkIgIAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_28040012": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char","loc":[11111111,11111111,11111111]}},"data":"Data 6","key":"C  "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char_28040012","loc":[11111111,11111111,11111111]}},"data":"Data 6","key":"C  "}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":4,"key_columns":["key"],"mode":"Backfill","scanned":"AkMgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":4,"key_columns":["key"],"mode":"Backfill","scanned":"AkMgIAA="}}}
 
 
 ####################################
 ### Capture from Key "AkMgIAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_28040012": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char","loc":[11111111,11111111,11111111]}},"data":"Data 7","key":"_a "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char_28040012","loc":[11111111,11111111,11111111]}},"data":"Data 7","key":"_a "}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":5,"key_columns":["key"],"mode":"Backfill","scanned":"Al9hIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":5,"key_columns":["key"],"mode":"Backfill","scanned":"Al9hIAA="}}}
 
 
 ####################################
 ### Capture from Key "Al9hIAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_28040012": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char","loc":[11111111,11111111,11111111]}},"data":"Data 8","key":"_b "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char_28040012","loc":[11111111,11111111,11111111]}},"data":"Data 8","key":"_b "}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":6,"key_columns":["key"],"mode":"Backfill","scanned":"Al9iIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":6,"key_columns":["key"],"mode":"Backfill","scanned":"Al9iIAA="}}}
 
 
 ####################################
 ### Capture from Key "Al9iIAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_28040012": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char","loc":[11111111,11111111,11111111]}},"data":"Data 9","key":"_c "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char_28040012","loc":[11111111,11111111,11111111]}},"data":"Data 9","key":"_c "}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":7,"key_columns":["key"],"mode":"Backfill","scanned":"Al9jIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":7,"key_columns":["key"],"mode":"Backfill","scanned":"Al9jIAA="}}}
 
 
 ####################################
 ### Capture from Key "Al9jIAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_28040012": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":"a  "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char_28040012","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":"a  "}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":8,"key_columns":["key"],"mode":"Backfill","scanned":"AmEgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":8,"key_columns":["key"],"mode":"Backfill","scanned":"AmEgIAA="}}}
 
 
 ####################################
 ### Capture from Key "AmEgIAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_28040012": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":"b  "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char_28040012","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":"b  "}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":9,"key_columns":["key"],"mode":"Backfill","scanned":"AmIgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":9,"key_columns":["key"],"mode":"Backfill","scanned":"AmIgIAA="}}}
 
 
 ####################################
 ### Capture from Key "AmIgIAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_28040012": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":"c  "}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_char_28040012","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":"c  "}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":10,"key_columns":["key"],"mode":"Backfill","scanned":"AmMgIAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":10,"key_columns":["key"],"mode":"Backfill","scanned":"AmMgIAA="}}}
 
 
 ####################################
@@ -134,7 +134,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_char":{"backfilled":10,"key_columns":["key"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_char_28040012":{"backfilled":10,"key_columns":["key"],"mode":"Active"}}}
 
 
 

@@ -1,11 +1,11 @@
 # ================================
-# Collection "acmeCo/test/test_generic_replicationinserts": 3 Documents
+# Collection "acmeCo/test/test_generic_replicationinserts_58418982": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationInserts","cursor":"binlog.000123:56789:123"}},"data":"more","id":1000}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationInserts","cursor":"binlog.000123:56789:123"}},"data":"rows","id":1001}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationInserts","cursor":"binlog.000123:56789:123"}},"data":"some","id":1002}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationInserts_58418982","cursor":"binlog.000123:56789:123"}},"data":"more","id":1000}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationInserts_58418982","cursor":"binlog.000123:56789:123"}},"data":"rows","id":1001}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationInserts_58418982","cursor":"binlog.000123:56789:123"}},"data":"some","id":1002}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.generic_replicationinserts":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.generic_replicationinserts_58418982":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
 
