@@ -34,23 +34,14 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 			testName = testName[:8]
 		}
 		t.Run(fmt.Sprintf("%d_%s", idx, testName), func(t *testing.T) {
-			var uniqueSuffix = fmt.Sprintf("scrabbled_%d_quinine", idx)
-			var tableName = tb.CreateTable(ctx, t, uniqueSuffix, fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
+			var uniqueID = fmt.Sprintf("1%07d", idx)
+			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(a INTEGER PRIMARY KEY, b %s)", tc.ColumnType))
 			var stream *capture.Response_Discovered_Binding
 
 			// Perform discovery and verify that the generated JSON schema looks correct
 			t.Run("discovery", func(t *testing.T) {
-				var bindings = tb.CaptureSpec(ctx, t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueSuffix)))
-				if len(bindings) == 0 {
-					t.Errorf("column type %q: no table named %q discovered", tc.ColumnType, tableName)
-					return
-				}
-				if len(bindings) > 1 {
-					t.Errorf("column type %q: multiple tables named %q discovered", tc.ColumnType, tableName)
-					return
-				}
+				var bindings = tb.CaptureSpec(ctx, t).Discover(ctx, t, regexp.MustCompile(uniqueID))
 				stream = bindings[0]
-
 				var skimmed = struct {
 					Definitions map[string]struct {
 						Properties map[string]json.RawMessage
@@ -69,7 +60,7 @@ func TestDatatypes(ctx context.Context, t *testing.T, tb TestBackend, cases []Da
 
 			// Insert a test row and scan it back out, then do the same via replication
 			t.Run("roundtrip", func(t *testing.T) {
-				var cs = tb.CaptureSpec(ctx, t, tableName)
+				var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 				// Don't sanitize anything, we're only looking for the output value field
 				// and sometimes that could contain a timestamp-looking value.

@@ -96,7 +96,7 @@ func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 	replicationBufferSize = 0
 }
 
-func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs ...string) *st.CaptureSpec {
+func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
 	for k, v := range st.DefaultSanitizers {
 		sanitizers[k] = v
@@ -112,8 +112,8 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs 
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   sanitizers,
 	}
-	if len(streamIDs) > 0 {
-		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamIDs...)
+	if len(streamMatchers) > 0 {
+		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamMatchers...)
 	}
 	return cs
 }

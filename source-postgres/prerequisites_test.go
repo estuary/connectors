@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -13,14 +14,15 @@ import (
 func TestPrerequisites(t *testing.T) {
 	// Table A exists and contains data, table B exists but is empty, and table C does not exist.
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var uniqueA, uniqueB, uniqueC = "12111583", "25518078", "35527129"
+	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableA, [][]any{{0, "hello"}, {1, "world"}})
 	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tb.config.Advanced.WatermarksTable))
 
-	var bindings = tests.DiscoverBindings(ctx, t, tb, tableA, tableB)
+	var bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
 	var bindingA, bindingB = bindings[0], bindings[1]
-	var bindingC = tests.BindingReplace(bindingA, "aaa", "ccc")
+	var bindingC = tests.BindingReplace(bindingA, uniqueA, uniqueC)
 
 	t.Run("validateAB", func(t *testing.T) {
 		var cs = tb.CaptureSpec(ctx, t)

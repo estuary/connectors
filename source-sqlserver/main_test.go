@@ -96,7 +96,7 @@ type testBackend struct {
 	config  Config
 }
 
-func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs ...string) *st.CaptureSpec {
+func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
 	for k, v := range st.DefaultSanitizers {
 		sanitizers[k] = v
@@ -112,8 +112,8 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs 
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   sanitizers,
 	}
-	if len(streamIDs) > 0 {
-		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamIDs...)
+	if len(streamMatchers) > 0 {
+		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamMatchers...)
 	}
 	return cs
 }
@@ -216,16 +216,18 @@ func TestGeneric(t *testing.T) {
 
 func TestColumnNameQuoting(t *testing.T) {
 	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var tableName = tb.CreateTable(ctx, t, "", "([id] INTEGER, [data] INTEGER, [CAPITALIZED] INTEGER, [unique] INTEGER, [type] INTEGER, PRIMARY KEY ([id], [data], [capitalized], [unique], [type]))")
+	var uniqueID = "79126849"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "([id] INTEGER, [data] INTEGER, [CAPITALIZED] INTEGER, [unique] INTEGER, [type] INTEGER, PRIMARY KEY ([id], [data], [capitalized], [unique], [type]))")
 	tb.Insert(ctx, t, tableName, [][]any{{0, 0, 0, 0, 0}, {1, 1, 1, 1, 1}, {2, 2, 2, 2, 2}})
-	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, tableName))
+	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID)))
 }
 
 func TestTextCollation(t *testing.T) {
 	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var tableName = tb.CreateTable(ctx, t, "", "(id VARCHAR(8) PRIMARY KEY, data TEXT)")
+	var uniqueID = "89620867"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id VARCHAR(8) PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableName, [][]any{{"AAA", "1"}, {"BBB", "2"}, {"-J C", "3"}, {"H R", "4"}})
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = &st.OrderedCaptureValidator{}
 	tests.VerifiedCapture(ctx, t, cs)
 }
@@ -234,7 +236,7 @@ func TestTextCollation(t *testing.T) {
 // even when there are other non-primary-key constraints on a table.
 func TestDiscoveryIrrelevantConstraints(t *testing.T) {
 	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueString = "g21962"
-	tb.CreateTable(ctx, t, uniqueString, "(id VARCHAR(8) PRIMARY KEY, foo INTEGER UNIQUE, data TEXT)")
-	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+	var uniqueID = "44516719"
+	tb.CreateTable(ctx, t, uniqueID, "(id VARCHAR(8) PRIMARY KEY, foo INTEGER UNIQUE, data TEXT)")
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -136,28 +135,19 @@ func RestartingBackfillCapture(ctx context.Context, t testing.TB, cs *st.Capture
 	return summary.String(), checkpoints
 }
 
-func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamIDs ...string) []*flow.CaptureSpec_Binding {
+func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamMatchers ...*regexp.Regexp) []*flow.CaptureSpec_Binding {
 	t.Helper()
 	var cs = tb.CaptureSpec(ctx, t)
 
-	// Perform discovery and build a map from streamID to discovery binding response
-	var discoveredBindings = cs.Discover(ctx, t, regexp.MustCompile(`.*`))
-	var discovery = make(map[string]*capture.Response_Discovered_Binding)
-	for _, d := range discoveredBindings {
-		var res sqlcapture.Resource
-		require.NoError(t, json.Unmarshal(d.ResourceConfigJson, &res))
-		var streamID = sqlcapture.JoinStreamID(res.Namespace, res.Stream)
-		discovery[strings.ToLower(streamID)] = d
+	// Perform discovery, expecting to match one stream with each provided regexp.
+	var discovery = cs.Discover(ctx, t, streamMatchers...)
+	if len(discovery) != len(streamMatchers) {
+		t.Fatalf("discovered incorrect number of streams: got %d, expected %d", len(discovery), len(streamMatchers))
 	}
 
-	// For each streamID named in our arguments, select the matching discovery result
-	// and generate a corresponding capture binding.
+	// Translate discovery bindings into capture bindings.
 	var bindings []*flow.CaptureSpec_Binding
-	for _, streamID := range streamIDs {
-		var b, ok = discovery[strings.ToLower(streamID)]
-		if !ok {
-			t.Fatalf("stream %q not found in discovery", streamID)
-		}
+	for _, b := range discovery {
 		var res sqlcapture.Resource
 		require.NoError(t, json.Unmarshal(b.ResourceConfigJson, &res))
 		bindings = append(bindings, &flow.CaptureSpec_Binding{

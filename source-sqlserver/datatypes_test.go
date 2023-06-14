@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -61,7 +62,7 @@ func TestDatatypes(t *testing.T) {
 
 func TestScanKeyTypes(t *testing.T) {
 	var ctx, tb = context.Background(), sqlserverTestBackend(t)
-	for _, tc := range []struct {
+	for idx, tc := range []struct {
 		Name       string
 		ColumnType string
 		Values     []interface{}
@@ -70,14 +71,15 @@ func TestScanKeyTypes(t *testing.T) {
 		{"DateTimeOffset", "DATETIMEOFFSET", []any{"1991-08-31T12:34:54.125-06:00", "1991-08-31T12:34:54.126-06:00", "2000-01-01T01:01:01Z"}},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
-			var tableName = tb.CreateTable(ctx, t, "", fmt.Sprintf("(k %s PRIMARY KEY, v TEXT)", tc.ColumnType))
+			var uniqueID = fmt.Sprintf("88929806%04d", idx)
+			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(k %s PRIMARY KEY, v TEXT)", tc.ColumnType))
 			var rows [][]interface{}
 			for idx, val := range tc.Values {
 				rows = append(rows, []interface{}{val, fmt.Sprintf("Data %d", idx)})
 			}
 			tb.Insert(ctx, t, tableName, rows)
 
-			var cs = tb.CaptureSpec(ctx, t, tableName)
+			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 			cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
 			var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 			cupaloy.SnapshotT(t, summary)

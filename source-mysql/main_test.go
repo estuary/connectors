@@ -92,7 +92,7 @@ func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 	replicationBufferSize = 0
 }
 
-func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs ...string) *st.CaptureSpec {
+func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
 	for k, v := range st.DefaultSanitizers {
 		sanitizers[k] = v
@@ -108,8 +108,8 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamIDs 
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   sanitizers,
 	}
-	if len(streamIDs) > 0 {
-		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamIDs...)
+	if len(streamMatchers) > 0 {
+		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamMatchers...)
 	}
 	return cs
 }
@@ -193,12 +193,13 @@ func TestGeneric(t *testing.T) {
 
 func TestAlterTable_Unsupported(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var uniqueA, uniqueB, uniqueC = "17220185", "28221107", "31129906"
+	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableC = tb.CreateTable(ctx, t, uniqueC, "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "abc"}, {2, "def"}})
 
-	var cs = tb.CaptureSpec(ctx, t, tableA, tableB)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Altering tableC, which is not being captured, should be fine
@@ -214,11 +215,11 @@ func TestAlterTable_Unsupported(t *testing.T) {
 	t.Run("capture3-fails", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// But removing the problematic table should fix it
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, tableA)
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA))
 	t.Run("capture4", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// And we can then re-add the table and it should start over after the problem
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, tableA, tableB)
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
 	t.Run("capture5", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Finally we exercise the trickiest edge case, in which a new table (C)
@@ -227,19 +228,20 @@ func TestAlterTable_Unsupported(t *testing.T) {
 	// after the first stream-to-watermark operation.
 	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN data BOOL;", tableC))
 	tb.Insert(ctx, t, tableC, [][]interface{}{{5, true}, {6, false}})
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, tableA, tableB, tableC)
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB), regexp.MustCompile(uniqueC))
 	t.Run("capture6", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
 func TestAlterTable_AddColumnBasic(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var table = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var uniqueID = "68678323"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, table, [][]interface{}{
 		{1, "aaa"},
 		{2, "bbb"},
 	})
 
-	var cs = tb.CaptureSpec(ctx, t, table)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Can add a column at the end of the table.
@@ -250,7 +252,7 @@ func TestAlterTable_AddColumnBasic(t *testing.T) {
 	})
 	t.Run("at_end", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueID))
 	tb.Insert(ctx, t, table, [][]interface{}{
 		{5, "ggg", "extra_end_5"},
 		{6, "hhh", "extra_end_6"},
@@ -265,7 +267,7 @@ func TestAlterTable_AddColumnBasic(t *testing.T) {
 	})
 	t.Run("at_first", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueID))
 	tb.Insert(ctx, t, table, [][]interface{}{
 		{"extra_start_9", 9, "kkk", "extra_end_9"},
 		{"extra_start_10", 10, "lll", "extra_end_10"},
@@ -280,7 +282,7 @@ func TestAlterTable_AddColumnBasic(t *testing.T) {
 	})
 	t.Run("at_middle", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueID))
 	tb.Insert(ctx, t, table, [][]interface{}{
 		{"extra_start_13", 13, "extra_middle_13", "ooo", "extra_end_13"},
 		{"extra_start_14", 14, "extra_middle_14", "ppp", "extra_end_14"},
@@ -290,13 +292,14 @@ func TestAlterTable_AddColumnBasic(t *testing.T) {
 
 func TestAlterTable_MultipleAlterations(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var table = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var uniqueID = "95139670"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, table, [][]interface{}{
 		{1, "aaa"},
 		{2, "bbb"},
 	})
 
-	var cs = tb.CaptureSpec(ctx, t, table)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	tb.Query(ctx, t, fmt.Sprintf(`
@@ -318,13 +321,14 @@ func TestAlterTable_MultipleAlterations(t *testing.T) {
 func TestAlterTable_AddColumnSetEnum(t *testing.T) {
 	t.Run("enum", func(t *testing.T) {
 		var tb, ctx = mysqlTestBackend(t), context.Background()
-		var table = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+		var uniqueID = "76927424"
+		var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 		tb.Insert(ctx, t, table, [][]interface{}{
 			{1, "aaa"},
 			{2, "bbb"},
 		})
 
-		var cs = tb.CaptureSpec(ctx, t, table)
+		var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 		t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 		tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD enumCol ENUM('someValue','anotherValue');;", table))
@@ -334,7 +338,7 @@ func TestAlterTable_AddColumnSetEnum(t *testing.T) {
 		})
 		t.Run("stream", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueID))
 		tb.Insert(ctx, t, table, [][]interface{}{
 			{5, "eee", "someValue"},
 			{6, "fff", "someValue"},
@@ -344,13 +348,14 @@ func TestAlterTable_AddColumnSetEnum(t *testing.T) {
 
 	t.Run("set", func(t *testing.T) {
 		var tb, ctx = mysqlTestBackend(t), context.Background()
-		var table = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+		var uniqueID = "14622082"
+		var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 		tb.Insert(ctx, t, table, [][]interface{}{
 			{1, "aaa"},
 			{2, "bbb"},
 		})
 
-		var cs = tb.CaptureSpec(ctx, t, table)
+		var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 		t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 		tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD setCol SET('a','b','c');;", table))
@@ -360,7 +365,7 @@ func TestAlterTable_AddColumnSetEnum(t *testing.T) {
 		})
 		t.Run("stream", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueID))
 		tb.Insert(ctx, t, table, [][]interface{}{
 			{5, "eee", "a,c"},
 			{6, "fff", "b,c"},
@@ -371,10 +376,11 @@ func TestAlterTable_AddColumnSetEnum(t *testing.T) {
 
 func TestAlterTable_DropColumn(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var table = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var uniqueID = "44468116"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, table, [][]interface{}{{1, "abc"}, {2, "def"}})
 
-	var cs = tb.CaptureSpec(ctx, t, table)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s DROP COLUMN data;", table))
@@ -382,7 +388,7 @@ func TestAlterTable_DropColumn(t *testing.T) {
 	tb.Insert(ctx, t, table, [][]interface{}{{3, "ghi"}, {4, "jkl"}})
 	t.Run("stream", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, table)
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueID))
 	tb.Insert(ctx, t, table, [][]interface{}{{5, "mno"}, {6, "pqr"}})
 	t.Run("restart", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
@@ -437,14 +443,15 @@ func TestSkipBackfills(t *testing.T) {
 	// but a configuration which specifies that tables A and C should skip backfilling
 	// and only capture new changes.
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var tableA = tb.CreateTable(ctx, t, "aaa", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableB = tb.CreateTable(ctx, t, "bbb", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableC = tb.CreateTable(ctx, t, "ccc", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var uniqueA, uniqueB, uniqueC = "11917332", "20812231", "30443514"
+	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableC = tb.CreateTable(ctx, t, uniqueC, "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "one"}, {2, "two"}, {3, "three"}})
 	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
 	tb.Insert(ctx, t, tableC, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
 
-	var cs = tb.CaptureSpec(ctx, t, tableA, tableB, tableC)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB), regexp.MustCompile(uniqueC))
 	cs.EndpointSpec.(*Config).Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
 
 	// Run an initial capture, which should only backfill events from table B
@@ -461,14 +468,15 @@ func TestSkipBackfills(t *testing.T) {
 // and repeatedly restarts it after each row of capture output.
 func TestCursorResume(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var tableName = tb.CreateTable(ctx, t, "", "(epoch VARCHAR(8), count INTEGER, data TEXT, PRIMARY KEY (epoch, count))")
+	var uniqueID = "26865190"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(epoch VARCHAR(8), count INTEGER, data TEXT, PRIMARY KEY (epoch, count))")
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{"aaa", 1, "bvzf"}, {"aaa", 2, "ukwh"}, {"aaa", 3, "lntg"}, {"bbb", -100, "bycz"},
 		{"bbb", 2, "ajgp"}, {"bbb", 333, "zljj"}, {"bbb", 4096, "lhnw"}, {"bbb", 800000, "iask"},
 		{"ccc", 1234, "bikh"}, {"ddd", -10000, "dhqc"}, {"x", 1, "djsf"}, {"y", 1, "iwnx"},
 		{"z", 1, "qmjp"}, {"", 0, "xakg"}, {"", -1, "kvxr"}, {"   ", 3, "gboj"},
 	})
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
 	// restarted after each scan key update, this means we'll advance over the keys
@@ -485,9 +493,10 @@ func TestCursorResume(t *testing.T) {
 // some concurrent modifications to row ranges already-scanned and not-yet-scanned.
 func TestComplexDataset(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER, PRIMARY KEY (year, state))")
+	var uniqueID = "56015963"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER, PRIMARY KEY (year, state))")
 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	// Reduce the backfill chunk size to 10 rows for this test.
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10
