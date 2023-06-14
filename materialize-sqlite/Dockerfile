@@ -44,7 +44,7 @@ RUN apt-get update && \
   rm -rf /var/lib/apt && \
   rm -rf /var/lib/dpkg/info/*
 
-RUN pip install https://github.com/simonw/datasette/archive/refs/tags/${DATASETTE_VERSION}.zip && \
+RUN pip install https://github.com/simonw/datasette/archive/refs/tags/${DATASETTE_VERSION}.zip --break-system-packages && \
   find /usr/local/lib -name '__pycache__' | xargs rm -r && \
   rm -rf /root/.cache/pip
 
