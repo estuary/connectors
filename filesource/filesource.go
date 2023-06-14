@@ -5,18 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	"github.com/estuary/flow/go/parser"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	schemagen "github.com/estuary/connectors/go/schema-gen"
-	"github.com/estuary/flow/go/parser"
-	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -128,7 +127,7 @@ type connector struct {
 }
 
 type resource struct {
-	Stream      string   `json:"stream" jsonschema:"title=Stream to capture from" jsonschema_extras="x-collection-name=true"`
+	Stream      string   `json:"stream" jsonschema:"title=Stream to capture from" jsonschema_extras:"x-collection-name=true"`
 	SyncMode    string   `json:"syncMode,omitempty" jsonschema:"-"`
 	Namespace   string   `json:"namespace,omitempty" jsonschema:"-"`
 	CursorField []string `json:"cursorField,omitempty" jsonschema:"-"`
@@ -196,6 +195,9 @@ func (src *Source) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.
 
 	var root = conn.config.DiscoverRoot()
 	resourceJSON, err := json.Marshal(resource{Stream: root})
+	if err != nil {
+		return nil, fmt.Errorf("marshalling resource: %w", err)
+	}
 
 	return &pc.Response_Discovered{Bindings: []*pc.Response_Discovered_Binding{{
 		RecommendedName:    pf.Collection(strings.Trim(root, "/")),
@@ -288,18 +290,18 @@ func (src *Source) Main() {
 type reader struct {
 	*connector
 
-	pathRe *regexp.Regexp
-	prefix string
-	schema json.RawMessage
-	state  State
+	pathRe  *regexp.Regexp
+	prefix  string
+	schema  json.RawMessage
+	state   State
 	binding int
-	stream *boilerplate.PullOutput
-	range_ *pf.RangeSpec
+	stream  *boilerplate.PullOutput
+	range_  *pf.RangeSpec
 }
 
 func (r *reader) sweep(ctx context.Context) error {
 	log.Info(fmt.Sprintf("sweeping %s starting at %q, from %s through %s",
-	r.prefix, r.state.Path, r.state.MinBound, r.state.MaxBound))
+		r.prefix, r.state.Path, r.state.MinBound, r.state.MaxBound))
 
 	var listing, err = r.store.List(ctx, Query{
 		Prefix:    r.prefix,
@@ -328,7 +330,7 @@ func (r *reader) sweep(ctx context.Context) error {
 	}
 
 	log.Info(fmt.Sprintf("completed sweep of %s from %s through %s",
-	r.prefix, r.state.MinBound, r.state.MaxBound))
+		r.prefix, r.state.MinBound, r.state.MaxBound))
 	r.state.finishSweep(r.config.FilesAreMonotonic())
 
 	// Write a final checkpoint to mark the completion of the sweep.
@@ -379,7 +381,7 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 	}
 	log.Info(fmt.Sprintf("processing file %q modified at %s", obj.Path, obj.ModTime))
 
-	tmp, err := ioutil.TempFile("", "parser-config-*.json")
+	tmp, err := os.CreateTemp("", "parser-config-*.json")
 	if err != nil {
 		return fmt.Errorf("creating parser config: %w", err)
 	}
@@ -426,7 +428,7 @@ func (r *reader) emit(lines []json.RawMessage) error {
 
 	var statePatch = map[string]State{
 		r.prefix: r.state,
-	};
+	}
 
 	if encodedCheckpoint, err := json.Marshal(statePatch); err != nil {
 		return err
