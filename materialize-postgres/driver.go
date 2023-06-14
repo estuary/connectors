@@ -25,6 +25,15 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
+const (
+	// These are coarse limits on the amount of memory that will be used to buffer insert/update
+	// batches for load and store operations. In the future it may be interesting to investigate
+	// using the Postgres copy protocol in the future for bulk loading data tables instead of with
+	// DML statements.
+	storeBatchSizeLimit = 4096                    // Assuming store records average ~2kB then 4k * 2kB = 8MB
+	loadBatchSizeLimit  = storeBatchSizeLimit * 5 // Load records are keys-only so allow for more in a batch
+)
+
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
 	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
@@ -377,19 +386,22 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		} else {
 			batch.Queue(b.loadInsertSQL, converted...)
 		}
+
+		if batch.Len() >= loadBatchSizeLimit {
+			if err := sendBatch(ctx, txn, &batch); err != nil {
+				return fmt.Errorf("sending load batch: %w", err)
+			}
+		}
 	}
 	if it.Err() != nil {
 		return it.Err()
 	}
 
-	var results = txn.SendBatch(ctx, &batch)
-	for i := 0; i < batch.Len(); i++ {
-		if _, err := results.Exec(); err != nil {
-			return fmt.Errorf("load at index %d: %w", i, err)
+	// Send any remaining keys for this load.
+	if batch.Len() > 0 {
+		if err := sendBatch(ctx, txn, &batch); err != nil {
+			return fmt.Errorf("sending final load batch: %w", err)
 		}
-	}
-	if err = results.Close(); err != nil {
-		return fmt.Errorf("closing batch: %w", err)
 	}
 
 	// Issue a union join of the target tables and their (now staged) load keys,
@@ -419,7 +431,18 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return nil
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
+	ctx := it.Context()
+	txn, err := d.store.conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("DB.BeginTx: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			txn.Rollback(ctx)
+		}
+	}()
+
 	var batch pgx.Batch
 	for it.Next() {
 		var b = d.bindings[it.Binding]
@@ -431,34 +454,34 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		} else {
 			batch.Queue(b.storeInsertSQL, converted...)
 		}
+
+		if batch.Len() >= storeBatchSizeLimit {
+			if err := sendBatch(ctx, txn, &batch); err != nil {
+				return nil, fmt.Errorf("sending store batch: %w", err)
+			}
+		}
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		var err error
-		if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
-		}
-
-		var fenceUpdate strings.Builder
-		if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
-		}
-
-		// Add the update to the fence as the last statement in the batch.
-		batch.Queue(fenceUpdate.String())
-
 		return nil, pf.RunAsyncOperation(func() error {
-			ctx := it.Context()
-
-			txn, err := d.store.conn.BeginTx(ctx, pgx.TxOptions{})
-			if err != nil {
-				return fmt.Errorf("DB.BeginTx: %w", err)
-			}
 			defer txn.Rollback(ctx)
+
+			var err error
+			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+				return fmt.Errorf("marshalling checkpoint: %w", err)
+			}
+
+			var fenceUpdate strings.Builder
+			if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+				return fmt.Errorf("evaluating fence template: %w", err)
+			}
+
+			// Add the update to the fence as the last statement in the batch.
+			batch.Queue(fenceUpdate.String())
 
 			results := txn.SendBatch(ctx, &batch)
 
-			// Execute all doc inserts & updates.
+			// Execute all remaining doc inserts & updates.
 			for i := 0; i < batch.Len()-1; i++ {
 				if _, err := results.Exec(); err != nil {
 					return fmt.Errorf("store at index %d: %w", i, err)
@@ -488,4 +511,23 @@ func (d *transactor) Destroy() {
 
 func main() {
 	boilerplate.RunMain(newPostgresDriver())
+}
+
+// Send a single batch of queries with the given transaction, discarding any results. The batch is
+// zero'd upon completion.
+func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) error {
+	results := txn.SendBatch(ctx, batch)
+	for i := 0; i < batch.Len(); i++ {
+		if _, err := results.Exec(); err != nil {
+			return fmt.Errorf("exec at index %d: %w", i, err)
+		}
+	}
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("closing batch: %w", err)
+	}
+
+	var newBatch pgx.Batch
+	*batch = newBatch
+
+	return nil
 }
