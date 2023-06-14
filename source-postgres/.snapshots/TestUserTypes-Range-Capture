@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/test_usertypes_range_morsel": 2 Documents
+# Collection "acmeCo/test/test_usertypes_range_91324557": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"usertypes_range_morsel","loc":[11111111,11111111,11111111]}},"id":1,"value":"(1,2]"}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"usertypes_range_morsel","loc":[11111111,11111111,11111111]}},"id":2,"value":"[3,)"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"usertypes_range_91324557","loc":[11111111,11111111,11111111]}},"id":1,"value":"(1,2]"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"usertypes_range_91324557","loc":[11111111,11111111,11111111]}},"id":2,"value":"[3,)"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.usertypes_range_morsel":{"backfilled":2,"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.usertypes_range_91324557":{"backfilled":2,"key_columns":["id"],"mode":"Active"}}}
 

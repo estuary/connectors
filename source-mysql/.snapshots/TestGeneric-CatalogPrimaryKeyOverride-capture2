@@ -1,11 +1,11 @@
 # ================================
-# Collection "acmeCo/test/generic_catalogprimarykeyoverride": 3 Documents
+# Collection "acmeCo/test/test_generic_catalogprimarykeyoverride_83617880": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKeyOverride","cursor":"binlog.000123:56789:123"}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKeyOverride","cursor":"binlog.000123:56789:123"}},"fullname":"No Such State","population":12345,"state":"XX","year":1970}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKeyOverride","cursor":"binlog.000123:56789:123"}},"fullname":"No Such State","population":123456,"state":"XX","year":1990}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKeyOverride_83617880","cursor":"binlog.000123:56789:123"}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKeyOverride_83617880","cursor":"binlog.000123:56789:123"}},"fullname":"No Such State","population":12345,"state":"XX","year":1970}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKeyOverride_83617880","cursor":"binlog.000123:56789:123"}},"fullname":"No Such State","population":123456,"state":"XX","year":1990}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.generic_catalogprimarykeyoverride":{"backfilled":100,"key_columns":["fullname","year"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.generic_catalogprimarykeyoverride_83617880":{"backfilled":100,"key_columns":["fullname","year"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Active"}}}
 

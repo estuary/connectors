@@ -2,39 +2,39 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_uuid": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_uuid_28040014": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_uuid","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":"4ab4044a-9aab-415c-96c6-17fa338060fa"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_uuid_28040014","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":"4ab4044a-9aab-415c-96c6-17fa338060fa"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"AjRhYjQwNDRhLTlhYWItNDE1Yy05NmM2LTE3ZmEzMzgwNjBmYQA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid_28040014":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"AjRhYjQwNDRhLTlhYWItNDE1Yy05NmM2LTE3ZmEzMzgwNjBmYQA="}}}
 
 
 ####################################
 ### Capture from Key "AjRhYjQwNDRhLTlhYWItNDE1Yy05NmM2LTE3ZmEzMzgwNjBmYQA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_uuid": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_uuid_28040014": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_uuid","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":"66b968a7-aeca-4401-8239-5d57958d1572"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_uuid_28040014","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":"66b968a7-aeca-4401-8239-5d57958d1572"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"AjY2Yjk2OGE3LWFlY2EtNDQwMS04MjM5LTVkNTc5NThkMTU3MgA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid_28040014":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"AjY2Yjk2OGE3LWFlY2EtNDQwMS04MjM5LTVkNTc5NThkMTU3MgA="}}}
 
 
 ####################################
 ### Capture from Key "AjY2Yjk2OGE3LWFlY2EtNDQwMS04MjM5LTVkNTc5NThkMTU3MgA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_uuid": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_uuid_28040014": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_uuid","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":"c32fb585-fc7f-4347-8fe2-97448f4e93cd"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_uuid_28040014","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":"c32fb585-fc7f-4347-8fe2-97448f4e93cd"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"backfilled":3,"key_columns":["key"],"mode":"Backfill","scanned":"AmMzMmZiNTg1LWZjN2YtNDM0Ny04ZmUyLTk3NDQ4ZjRlOTNjZAA="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid_28040014":{"backfilled":3,"key_columns":["key"],"mode":"Backfill","scanned":"AmMzMmZiNTg1LWZjN2YtNDM0Ny04ZmUyLTk3NDQ4ZjRlOTNjZAA="}}}
 
 
 ####################################
@@ -43,7 +43,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid":{"backfilled":3,"key_columns":["key"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_uuid_28040014":{"backfilled":3,"key_columns":["key"],"mode":"Active"}}}
 
 
 

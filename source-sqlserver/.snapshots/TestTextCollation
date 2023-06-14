@@ -1,12 +1,12 @@
 # ================================
-# Collection "acmeCo/test/test_textcollation": 4 Documents
+# Collection "acmeCo/test/test_textcollation_89620867": 4 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"3","id":"-J C"}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"1","id":"AAA"}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"2","id":"BBB"}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"4","id":"H R"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation_89620867","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"3","id":"-J C"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation_89620867","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"1","id":"AAA"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation_89620867","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"2","id":"BBB"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation_89620867","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"4","id":"H R"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_textcollation":{"backfilled":4,"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_textcollation_89620867":{"backfilled":4,"key_columns":["id"],"mode":"Active"}}}
 

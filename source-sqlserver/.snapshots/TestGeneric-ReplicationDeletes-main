@@ -1,13 +1,13 @@
 # ================================
-# Collection "acmeCo/test/test_generic_replicationdeletes": 5 Documents
+# Collection "acmeCo/test/test_generic_replicationdeletes_65713151": 5 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_replicationdeletes","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"more","id":1000}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_replicationdeletes","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"rows","id":1001}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_replicationdeletes","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"some","id":1002}
-{"_meta":{"op":"d","source":{"schema":"dbo","table":"test_generic_replicationdeletes","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":null,"id":1002}
-{"_meta":{"op":"d","source":{"schema":"dbo","table":"test_generic_replicationdeletes","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":null,"id":1}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_replicationdeletes_65713151","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"more","id":1000}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_replicationdeletes_65713151","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"rows","id":1001}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_replicationdeletes_65713151","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"some","id":1002}
+{"_meta":{"op":"d","source":{"schema":"dbo","table":"test_generic_replicationdeletes_65713151","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":null,"id":1002}
+{"_meta":{"op":"d","source":{"schema":"dbo","table":"test_generic_replicationdeletes_65713151","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":null,"id":1}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationdeletes":{"backfilled":5,"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationdeletes_65713151":{"backfilled":5,"key_columns":["id"],"mode":"Active"}}}
 

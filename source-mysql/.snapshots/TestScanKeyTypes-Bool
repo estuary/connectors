@@ -2,26 +2,26 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_bool": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_bool_754161260000": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool","cursor":"backfill:0"}},"data":"Data 1","k":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool_754161260000","cursor":"backfill:0"}},"data":"Data 1","k":0}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_bool":{"backfilled":1,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Backfill","scanned":"FA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_bool_754161260000":{"backfilled":1,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Backfill","scanned":"FA=="}}}
 
 
 ####################################
 ### Capture from Key "FA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_bool": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_bool_754161260000": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool","cursor":"backfill:1"}},"data":"Data 0","k":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool_754161260000","cursor":"backfill:1"}},"data":"Data 0","k":1}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_bool":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Backfill","scanned":"FQE="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_bool_754161260000":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Backfill","scanned":"FQE="}}}
 
 
 ####################################
@@ -30,7 +30,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_bool":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_bool_754161260000":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"tinyint"}}},"mode":"Active"}}}
 
 
 

@@ -1,19 +1,19 @@
 Binding 0:
 {
-    "recommended_name": "test_usertypes_tuple_byways",
+    "recommended_name": "test_usertypes_tuple_51424093",
     "resource_config_json": {
       "mode": "Normal",
       "namespace": "test",
-      "stream": "usertypes_tuple_byways"
+      "stream": "usertypes_tuple_51424093"
     },
     "document_schema_json": {
       "$defs": {
-        "TestUsertypes_tuple_byways": {
+        "TestUsertypes_tuple_51424093": {
           "type": "object",
           "required": [
             "id"
           ],
-          "$anchor": "TestUsertypes_tuple_byways",
+          "$anchor": "TestUsertypes_tuple_51424093",
           "properties": {
             "id": {
               "type": "integer"
@@ -38,7 +38,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#TestUsertypes_tuple_byways",
+                  "$ref": "#TestUsertypes_tuple_51424093",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -100,7 +100,7 @@ Binding 0:
           }
         },
         {
-          "$ref": "#TestUsertypes_tuple_byways"
+          "$ref": "#TestUsertypes_tuple_51424093"
         }
       ]
     },

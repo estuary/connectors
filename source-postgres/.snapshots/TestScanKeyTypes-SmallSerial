@@ -2,52 +2,52 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_smallserial": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_smallserial_28040005": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallserial","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":-3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallserial_28040005","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":-3}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"E/w="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial_28040005":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"E/w="}}}
 
 
 ####################################
 ### Capture from Key "E/w="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_smallserial": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_smallserial_28040005": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallserial","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallserial_28040005","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":0}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"FA=="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial_28040005":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"FA=="}}}
 
 
 ####################################
 ### Capture from Key "FA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_smallserial": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_smallserial_28040005": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallserial","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallserial_28040005","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":2}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"backfilled":3,"key_columns":["key"],"mode":"Backfill","scanned":"FQI="}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial_28040005":{"backfilled":3,"key_columns":["key"],"mode":"Backfill","scanned":"FQI="}}}
 
 
 ####################################
 ### Capture from Key "FQI="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_smallserial": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_smallserial_28040005": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallserial","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":1723}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_smallserial_28040005","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":1723}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"backfilled":4,"key_columns":["key"],"mode":"Backfill","scanned":"Fga7"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial_28040005":{"backfilled":4,"key_columns":["key"],"mode":"Backfill","scanned":"Fga7"}}}
 
 
 ####################################
@@ -56,7 +56,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial":{"backfilled":4,"key_columns":["key"],"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test.scankeytypes_smallserial_28040005":{"backfilled":4,"key_columns":["key"],"mode":"Active"}}}
 
 
 

@@ -1,19 +1,19 @@
 Binding 0:
 {
-    "recommended_name": "test_usertypes_range_morsel",
+    "recommended_name": "test_usertypes_range_91324557",
     "resource_config_json": {
       "mode": "Normal",
       "namespace": "test",
-      "stream": "usertypes_range_morsel"
+      "stream": "usertypes_range_91324557"
     },
     "document_schema_json": {
       "$defs": {
-        "TestUsertypes_range_morsel": {
+        "TestUsertypes_range_91324557": {
           "type": "object",
           "required": [
             "id"
           ],
-          "$anchor": "TestUsertypes_range_morsel",
+          "$anchor": "TestUsertypes_range_91324557",
           "properties": {
             "id": {
               "type": "integer"
@@ -41,7 +41,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#TestUsertypes_range_morsel",
+                  "$ref": "#TestUsertypes_range_91324557",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -103,7 +103,7 @@ Binding 0:
           }
         },
         {
-          "$ref": "#TestUsertypes_range_morsel"
+          "$ref": "#TestUsertypes_range_91324557"
         }
       ]
     },

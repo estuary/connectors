@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/test_altertable_addcolumnsetenum_enum_aaa": 2 Documents
+# Collection "acmeCo/test/test_altertable_addcolumnsetenum_enum_76927424": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddColumnSetEnum_enum_aaa","cursor":"backfill:0"}},"data":"aaa","id":1}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddColumnSetEnum_enum_aaa","cursor":"backfill:1"}},"data":"bbb","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddColumnSetEnum_enum_76927424","cursor":"backfill:0"}},"data":"aaa","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddColumnSetEnum_enum_76927424","cursor":"backfill:1"}},"data":"bbb","id":2}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.altertable_addcolumnsetenum_enum_aaa":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.altertable_addcolumnsetenum_enum_76927424":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
 

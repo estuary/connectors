@@ -1,13 +1,13 @@
 # ================================
-# Collection "acmeCo/test/test_generic_replicationdeletes": 5 Documents
+# Collection "acmeCo/test/test_generic_replicationdeletes_65713151": 5 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes","cursor":"backfill:0"}},"data":"A","id":0}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes","cursor":"backfill:1"}},"data":"bbb","id":1}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes","cursor":"backfill:2"}},"data":"CDEFGHIJKLMNOP","id":2}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes","cursor":"backfill:3"}},"data":"Four","id":3}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes","cursor":"backfill:4"}},"data":"5","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes_65713151","cursor":"backfill:0"}},"data":"A","id":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes_65713151","cursor":"backfill:1"}},"data":"bbb","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes_65713151","cursor":"backfill:2"}},"data":"CDEFGHIJKLMNOP","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes_65713151","cursor":"backfill:3"}},"data":"Four","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_ReplicationDeletes_65713151","cursor":"backfill:4"}},"data":"5","id":4}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.generic_replicationdeletes":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.generic_replicationdeletes_65713151":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
 

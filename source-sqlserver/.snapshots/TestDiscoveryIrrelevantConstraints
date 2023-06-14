@@ -1,19 +1,19 @@
 Binding 0:
 {
-    "recommended_name": "test_discoveryirrelevantconstraints_g21962",
+    "recommended_name": "test_discoveryirrelevantconstraints_44516719",
     "resource_config_json": {
       "mode": "Normal",
       "namespace": "dbo",
-      "stream": "test_DiscoveryIrrelevantConstraints_g21962"
+      "stream": "test_DiscoveryIrrelevantConstraints_44516719"
     },
     "document_schema_json": {
       "$defs": {
-        "DboTest_DiscoveryIrrelevantConstraints_g21962": {
+        "DboTest_DiscoveryIrrelevantConstraints_44516719": {
           "type": "object",
           "required": [
             "id"
           ],
-          "$anchor": "DboTest_DiscoveryIrrelevantConstraints_g21962",
+          "$anchor": "DboTest_DiscoveryIrrelevantConstraints_44516719",
           "properties": {
             "data": {
               "type": [
@@ -47,7 +47,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#DboTest_DiscoveryIrrelevantConstraints_g21962",
+                  "$ref": "#DboTest_DiscoveryIrrelevantConstraints_44516719",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -114,7 +114,7 @@ Binding 0:
           }
         },
         {
-          "$ref": "#DboTest_DiscoveryIrrelevantConstraints_g21962"
+          "$ref": "#DboTest_DiscoveryIrrelevantConstraints_44516719"
         }
       ]
     },
