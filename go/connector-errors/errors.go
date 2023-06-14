@@ -36,10 +36,27 @@ func (e *UserError) Source() error {
 	return e.source
 }
 
-// LogFinalError logs the UserError as a structured final log if the error is a UserError. Otherwise
-// the raw error message is written to stdout as a newline. In either case the process will exit
-// with status 1.
-func LogFinalError(err error) {
+// TransparentError is used for exiting with a status code of 1 and not logging any additional error
+// information. This can be used in cases where some other process will provide the final error
+// message logging and the connector is acting as a proxy for it, such as parsing in filesource
+// captures.
+type TransparentError struct {
+	source error
+}
+
+// NewUserError creates a Transparent error wrapping a source error, but will not produce any
+// additional logging when processed by HandleFinalError.
+func NewTransparentError(source error) *TransparentError {
+	return &TransparentError{
+		source: source,
+	}
+}
+
+func (e *TransparentError) Error() string { return e.source.Error() }
+
+// HandleFinalError performs special handling for final errors when the error type is one that is
+// defined in this package. For other errors, the error is logged on a newline.
+func HandleFinalError(err error) {
 	var userError *UserError
 	if errors.As(err, &userError) {
 		// Log the structured information from the error if this was specifically a user-facing
@@ -49,6 +66,12 @@ func LogFinalError(err error) {
 			// presentation (markdown, etc.).
 			"source": userError.Source(),
 		}).Fatal(userError)
+	}
+
+	var transparentError *TransparentError
+	if errors.As(err, &transparentError) {
+		// Exit without any additional logging.
+		os.Exit(1)
 	}
 
 	_, _ = os.Stderr.WriteString(err.Error())
