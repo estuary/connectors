@@ -6,5 +6,5 @@
 # Captures Terminated With Errors
 # ================================
 the capture cannot run due to the following error(s):
- - table "dbo.test_prerequisites_ccc" has no capture instances and user "flow_capture" cannot create one
+ - table "dbo.test_prerequisites_33352647" has no capture instances and user "flow_capture" cannot create one
 

@@ -2,39 +2,39 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_datetimeoffset": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_datetimeoffset_889298060001": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 0"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset_889298060001","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 0"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI1MDAwMDAwLTA2OjAwAA=="}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset_889298060001":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI1MDAwMDAwLTA2OjAwAA=="}}}
 
 
 ####################################
 ### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI1MDAwMDAwLTA2OjAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_datetimeoffset": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_datetimeoffset_889298060001": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 1"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset_889298060001","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 1"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI2MDAwMDAwLTA2OjAwAA=="}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset_889298060001":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI2MDAwMDAwLTA2OjAwAA=="}}}
 
 
 ####################################
 ### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTI2MDAwMDAwLTA2OjAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_datetimeoffset": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_datetimeoffset_889298060001": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 2"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTimeOffset_889298060001","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 2"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwMDAwMDAwWgA="}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset_889298060001":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwMDAwMDAwWgA="}}}
 
 
 ####################################
@@ -43,7 +43,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset":{"backfilled":3,"key_columns":["k"],"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_datetimeoffset_889298060001":{"backfilled":3,"key_columns":["k"],"mode":"Active"}}}
 
 
 

@@ -1,13 +1,13 @@
 # ================================
-# Collection "acmeCo/test/test_generic_multiplestreams_one": 1 Documents
+# Collection "acmeCo/test/test_generic_multiplestreams_14930049": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_one","cursor":"binlog.000123:56789:123"}},"data":"nine","id":9}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_14930049","cursor":"binlog.000123:56789:123"}},"data":"nine","id":9}
 # ================================
-# Collection "acmeCo/test/test_generic_multiplestreams_three": 1 Documents
+# Collection "acmeCo/test/test_generic_multiplestreams_30084965": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_three","cursor":"binlog.000123:56789:123"}},"data":"eleven","id":11}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_30084965","cursor":"binlog.000123:56789:123"}},"data":"eleven","id":11}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.generic_multiplestreams_one":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_three":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_two":{"backfilled":0,"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Ignore"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.generic_multiplestreams_14930049":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"},"test.generic_multiplestreams_26016615":{"backfilled":0,"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Ignore"},"test.generic_multiplestreams_30084965":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":"int"}}},"mode":"Active"}}}
 

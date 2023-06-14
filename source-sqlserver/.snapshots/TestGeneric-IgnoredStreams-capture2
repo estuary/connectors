@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/test_generic_ignoredstreams_one": 2 Documents
+# Collection "acmeCo/test/test_generic_ignoredstreams_17789375": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_ignoredstreams_one","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"eight","id":8}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_ignoredstreams_one","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"six","id":6}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_ignoredstreams_17789375","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"eight","id":8}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_generic_ignoredstreams_17789375","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"six","id":6}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_ignoredstreams_one":{"backfilled":3,"key_columns":["id"],"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_ignoredstreams_17789375":{"backfilled":3,"key_columns":["id"],"mode":"Active"}}}
 

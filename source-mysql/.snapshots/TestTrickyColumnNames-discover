@@ -1,19 +1,19 @@
 Binding 0:
 {
-    "recommended_name": "test_trickycolumnnames_fizzed_cupcake_a",
+    "recommended_name": "test_trickycolumnnames_14055203",
     "resource_config_json": {
       "mode": "Normal",
       "namespace": "test",
-      "stream": "TrickyColumnNames_fizzed_cupcake_a"
+      "stream": "TrickyColumnNames_14055203"
     },
     "document_schema_json": {
       "$defs": {
-        "TestTrickyColumnNames_fizzed_cupcake_a": {
+        "TestTrickyColumnNames_14055203": {
           "type": "object",
           "required": [
             "Meta/`wtf`~ID"
           ],
-          "$anchor": "TestTrickyColumnNames_fizzed_cupcake_a",
+          "$anchor": "TestTrickyColumnNames_14055203",
           "properties": {
             "Meta/`wtf`~ID": {
               "type": "integer"
@@ -41,7 +41,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#TestTrickyColumnNames_fizzed_cupcake_a",
+                  "$ref": "#TestTrickyColumnNames_14055203",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -98,7 +98,7 @@ Binding 0:
           }
         },
         {
-          "$ref": "#TestTrickyColumnNames_fizzed_cupcake_a"
+          "$ref": "#TestTrickyColumnNames_14055203"
         }
       ]
     },
@@ -108,20 +108,20 @@ Binding 0:
   }
 Binding 1:
 {
-    "recommended_name": "test_trickycolumnnames_fizzed_cupcake_b",
+    "recommended_name": "test_trickycolumnnames_28395292",
     "resource_config_json": {
       "mode": "Normal",
       "namespace": "test",
-      "stream": "TrickyColumnNames_fizzed_cupcake_b"
+      "stream": "TrickyColumnNames_28395292"
     },
     "document_schema_json": {
       "$defs": {
-        "TestTrickyColumnNames_fizzed_cupcake_b": {
+        "TestTrickyColumnNames_28395292": {
           "type": "object",
           "required": [
             "table"
           ],
-          "$anchor": "TestTrickyColumnNames_fizzed_cupcake_b",
+          "$anchor": "TestTrickyColumnNames_28395292",
           "properties": {
             "data": {
               "type": [
@@ -149,7 +149,7 @@ Binding 1:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#TestTrickyColumnNames_fizzed_cupcake_b",
+                  "$ref": "#TestTrickyColumnNames_28395292",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -206,7 +206,7 @@ Binding 1:
           }
         },
         {
-          "$ref": "#TestTrickyColumnNames_fizzed_cupcake_b"
+          "$ref": "#TestTrickyColumnNames_28395292"
         }
       ]
     },

@@ -2,130 +2,130 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_754161260009": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char","cursor":"backfill:0"}},"data":"Data 0","k":""}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char_754161260009","cursor":"backfill:0"}},"data":"Data 0","k":""}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":1,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AQA="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":1,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AQA="}}}
 
 
 ####################################
 ### Capture from Key "AQA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_754161260009": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char","cursor":"backfill:1"}},"data":"Data 4","k":"B"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char_754161260009","cursor":"backfill:1"}},"data":"Data 4","k":"B"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AUIA"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":2,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AUIA"}}}
 
 
 ####################################
 ### Capture from Key "AUIA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_754161260009": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char","cursor":"backfill:2"}},"data":"Data 5","k":"E"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char_754161260009","cursor":"backfill:2"}},"data":"Data 5","k":"E"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":3,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AUUA"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":3,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AUUA"}}}
 
 
 ####################################
 ### Capture from Key "AUUA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_754161260009": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char","cursor":"backfill:3"}},"data":"Data 6","k":"H"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char_754161260009","cursor":"backfill:3"}},"data":"Data 6","k":"H"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":4,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AUgA"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":4,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AUgA"}}}
 
 
 ####################################
 ### Capture from Key "AUgA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_754161260009": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char","cursor":"backfill:4"}},"data":"Data 7","k":"_c"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char_754161260009","cursor":"backfill:4"}},"data":"Data 7","k":"_c"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":5,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AV9jAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":5,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AV9jAA=="}}}
 
 
 ####################################
 ### Capture from Key "AV9jAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_754161260009": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char","cursor":"backfill:5"}},"data":"Data 8","k":"_f"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char_754161260009","cursor":"backfill:5"}},"data":"Data 8","k":"_f"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":6,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AV9mAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":6,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AV9mAA=="}}}
 
 
 ####################################
 ### Capture from Key "AV9mAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_754161260009": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char","cursor":"backfill:6"}},"data":"Data 9","k":"_i"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char_754161260009","cursor":"backfill:6"}},"data":"Data 9","k":"_i"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":7,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AV9pAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":7,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AV9pAA=="}}}
 
 
 ####################################
 ### Capture from Key "AV9pAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_754161260009": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char","cursor":"backfill:7"}},"data":"Data 1","k":"a"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char_754161260009","cursor":"backfill:7"}},"data":"Data 1","k":"a"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":8,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AWEA"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":8,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AWEA"}}}
 
 
 ####################################
 ### Capture from Key "AWEA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_754161260009": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char","cursor":"backfill:8"}},"data":"Data 2","k":"d"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char_754161260009","cursor":"backfill:8"}},"data":"Data 2","k":"d"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":9,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AWQA"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":9,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AWQA"}}}
 
 
 ####################################
 ### Capture from Key "AWQA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test_scankeytypes_char": 1 Documents
+# Collection "acmeCo/test/test_scankeytypes_char_754161260009": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char","cursor":"backfill:9"}},"data":"Data 3","k":"g"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Char_754161260009","cursor":"backfill:9"}},"data":"Data 3","k":"g"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":10,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AWcA"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":10,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Backfill","scanned":"AWcA"}}}
 
 
 ####################################
@@ -134,7 +134,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char":{"backfilled":10,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeytypes_char_754161260009":{"backfilled":10,"key_columns":["k"],"metadata":{"schema":{"columns":["k","data"],"types":{"data":"text","k":"char"}}},"mode":"Active"}}}
 
 
 

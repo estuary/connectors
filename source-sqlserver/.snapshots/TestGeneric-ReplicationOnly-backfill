@@ -1,5 +1,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationonly":{"backfilled":0,"mode":"Active"}}}
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_generic_replicationonly_34322067":{"backfilled":0,"mode":"Active"}}}
 

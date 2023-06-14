@@ -1,5 +1,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.generic_replicationonly":{"backfilled":0,"mode":"Active"}}}
+{"cursor":"binlog.000123:56789","streams":{"test.generic_replicationonly_34322067":{"backfilled":0,"mode":"Active"}}}
 
