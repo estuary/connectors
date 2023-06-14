@@ -17,19 +17,19 @@ func TestTrickyColumnNames(t *testing.T) {
 	// Create a table with some 'difficult' column names (a reserved word, a capitalized
 	// name, and one containing special characters which also happens to be the primary key).
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	const uniqueString = "fizzed_cupcake"
-	var tableA = tb.CreateTable(ctx, t, uniqueString+"_a", "(`Meta/``wtf``~ID` INTEGER PRIMARY KEY, data TEXT)")
-	var tableB = tb.CreateTable(ctx, t, uniqueString+"_b", "(`table` INTEGER PRIMARY KEY, data TEXT)")
+	var uniqueA, uniqueB = "14055203", "28395292"
+	var tableA = tb.CreateTable(ctx, t, uniqueA, "(`Meta/``wtf``~ID` INTEGER PRIMARY KEY, data TEXT)")
+	var tableB = tb.CreateTable(ctx, t, uniqueB, "(`table` INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "aaa"}, {2, "bbb"}})
 	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ccc"}, {4, "ddd"}})
 
 	// Discover the catalog and verify that the table schemas looks correct
 	t.Run("discover", func(t *testing.T) {
-		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
 	})
 
 	// Perform an initial backfill
-	var cs = tb.CaptureSpec(ctx, t, tableA, tableB)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
 	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Add more data and read it via replication

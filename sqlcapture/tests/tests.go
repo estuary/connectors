@@ -57,26 +57,28 @@ func testConfigSchema(ctx context.Context, t *testing.T, tb TestBackend) {
 // and then verifies both that a stream with the expected name exists, and that it
 // matches a golden snapshot
 func testSimpleDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
-	const uniqueString = "magnanimous_outshine"
-	tb.CreateTable(ctx, t, uniqueString, "(a INTEGER PRIMARY KEY, b TEXT, c REAL NOT NULL, d VARCHAR(255))")
-	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+	var uniqueID = "49210954"
+	tb.CreateTable(ctx, t, uniqueID, "(a INTEGER PRIMARY KEY, b TEXT, c REAL NOT NULL, d VARCHAR(255))")
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
 }
 
 // testSimpleCapture initializes a DB table with a few rows, then runs a capture
 // which should emit all rows during table-scanning, start replication, and then
 // shut down due to a lack of further events.
 func testSimpleCapture(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var uniqueID = "24869578"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
-	VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, tableName))
+	VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID)))
 }
 
 // testReplicationInserts runs two captures, where the first will perform the
 // initial table scan and the second capture will use replication to receive
 // additional inserts performed after the first capture.
 func testReplicationInserts(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var uniqueID = "58418982"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	t.Run("init", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
@@ -88,8 +90,9 @@ func testReplicationInserts(ctx context.Context, t *testing.T, tb TestBackend) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts and row updates performed after the first capture.
 func testReplicationUpdates(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var uniqueID = "79710599"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}})
 	t.Run("init", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
@@ -103,8 +106,9 @@ func testReplicationUpdates(ctx context.Context, t *testing.T, tb TestBackend) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts and deletions performed after the first capture.
 func testReplicationDeletes(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var uniqueID = "65713151"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	t.Run("init", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
@@ -117,8 +121,9 @@ func testReplicationDeletes(ctx context.Context, t *testing.T, tb TestBackend) {
 // testEmptyTable leaves the table empty during the initial table backfill
 // and only adds data after replication has begun.
 func testEmptyTable(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var uniqueID = "91431165"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	t.Run("init", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
 	tb.Insert(ctx, t, tableName, [][]interface{}{{1002, "some"}, {1000, "more"}, {1001, "rows"}})
@@ -128,12 +133,13 @@ func testEmptyTable(ctx context.Context, t *testing.T, tb TestBackend) {
 // testIgnoredStreams checks that replicated changes are only reported
 // for tables which are configured in the catalog.
 func testIgnoredStreams(ctx context.Context, t *testing.T, tb TestBackend) {
-	var table1 = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var table2 = tb.CreateTable(ctx, t, "two", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var unique1, unique2 = "17789375", "24120951"
+	var table1 = tb.CreateTable(ctx, t, unique1, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var table2 = tb.CreateTable(ctx, t, unique2, "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
 	tb.Insert(ctx, t, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
 
-	var cs = tb.CaptureSpec(ctx, t, table1)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(unique1))
 	t.Run("capture1", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
 	tb.Insert(ctx, t, table1, [][]interface{}{{6, "six"}})
 	tb.Insert(ctx, t, table2, [][]interface{}{{7, "seven"}})
@@ -145,18 +151,19 @@ func testIgnoredStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 // testMultipleStreams exercises captures with multiple stream configured, as
 // well as adding/removing/re-adding a stream.
 func testMultipleStreams(ctx context.Context, t *testing.T, tb TestBackend) {
-	var table1 = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var table2 = tb.CreateTable(ctx, t, "two", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var table3 = tb.CreateTable(ctx, t, "three", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var unique1, unique2, unique3 = "14930049", "26016615", "30084965"
+	var table1 = tb.CreateTable(ctx, t, unique1, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var table2 = tb.CreateTable(ctx, t, unique2, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var table3 = tb.CreateTable(ctx, t, unique3, "(id INTEGER PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
 	tb.Insert(ctx, t, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
 	tb.Insert(ctx, t, table3, [][]interface{}{{6, "six"}, {7, "seven"}, {8, "eight"}})
 
-	var cs = tb.CaptureSpec(ctx, t, table1)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(unique1))
 	t.Run("capture1", func(t *testing.T) { VerifiedCapture(ctx, t, cs) }) // Scan table1
-	cs.Bindings = DiscoverBindings(ctx, t, tb, table1, table2, table3)
+	cs.Bindings = DiscoverBindings(ctx, t, tb, regexp.MustCompile(unique1), regexp.MustCompile(unique2), regexp.MustCompile(unique3))
 	t.Run("capture2", func(t *testing.T) { VerifiedCapture(ctx, t, cs) }) // Add table2 and table3
-	cs.Bindings = DiscoverBindings(ctx, t, tb, table1, table3)
+	cs.Bindings = DiscoverBindings(ctx, t, tb, regexp.MustCompile(unique1), regexp.MustCompile(unique3))
 	t.Run("capture3", func(t *testing.T) { VerifiedCapture(ctx, t, cs) }) // Forget about table2
 
 	tb.Insert(ctx, t, table1, [][]interface{}{{9, "nine"}})
@@ -164,32 +171,27 @@ func testMultipleStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 	tb.Insert(ctx, t, table3, [][]interface{}{{11, "eleven"}})
 	t.Run("capture4", func(t *testing.T) { VerifiedCapture(ctx, t, cs) }) // Replicate changes from table1 and table3 only
 
-	cs.Bindings = DiscoverBindings(ctx, t, tb, table1, table2, table3)
+	cs.Bindings = DiscoverBindings(ctx, t, tb, regexp.MustCompile(unique1), regexp.MustCompile(unique2), regexp.MustCompile(unique3))
 	t.Run("capture5", func(t *testing.T) { VerifiedCapture(ctx, t, cs) }) // Re-scan table2 including the new row
 }
 
 // testCatalogPrimaryKey sets up a table with no primary key in the database
 // and instead specifies one in the catalog configuration.
 func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER)")
+	var uniqueID = "46055452"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER)")
 	LoadCSV(ctx, t, tb, tableName, "statepop.csv", 100)
-	var cs = tb.CaptureSpec(ctx, t)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
-	var nameParts = strings.SplitN(tableName, ".", 2)
-	var specJSON, err = json.Marshal(sqlcapture.Resource{
-		Mode:       sqlcapture.BackfillModeNormal,
-		Namespace:  nameParts[0],
-		Stream:     nameParts[1],
-		PrimaryKey: []string{"fullname", "year"},
-	})
+	// Override capture mode to 'Normal' and primary key to [fullname year]
+	var res sqlcapture.Resource
+	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
+	res.Mode = sqlcapture.BackfillModeNormal
+	res.PrimaryKey = []string{"fullname", "year"}
+	resourceJSON, err := json.Marshal(res)
 	require.NoError(t, err)
-	cs.Bindings = append(cs.Bindings, &flow.CaptureSpec_Binding{
-		Collection: flow.CollectionSpec{
-			Name: flow.Collection("acmeCo/test/" + strings.ToLower(nameParts[1])),
-		},
-		ResourceConfigJson: specJSON,
-		ResourcePath:       nameParts,
-	})
+	cs.Bindings[0].ResourceConfigJson = resourceJSON
+	cs.Bindings[0].Collection.Key = res.PrimaryKey
 
 	t.Run("capture1", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
 	tb.Insert(ctx, t, tableName, [][]interface{}{
@@ -203,24 +205,20 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 // testCatalogPrimaryKeyOverride sets up a table with a primary key, but
 // then overrides that via the catalog configuration.
 func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER, PRIMARY KEY (year, state))")
+	var uniqueID = "83617880"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2), fullname VARCHAR(64), population INTEGER, PRIMARY KEY (year, state))")
 	LoadCSV(ctx, t, tb, tableName, "statepop.csv", 100)
-	var cs = tb.CaptureSpec(ctx, t)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
-	var nameParts = strings.SplitN(tableName, ".", 2)
-	var specJSON, err = json.Marshal(sqlcapture.Resource{
-		Namespace:  nameParts[0],
-		Stream:     nameParts[1],
-		PrimaryKey: []string{"fullname", "year"},
-	})
+	// Override capture mode to 'Normal' and primary key to [fullname year]
+	var res sqlcapture.Resource
+	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
+	res.Mode = sqlcapture.BackfillModeNormal
+	res.PrimaryKey = []string{"fullname", "year"}
+	resourceJSON, err := json.Marshal(res)
 	require.NoError(t, err)
-	cs.Bindings = append(cs.Bindings, &flow.CaptureSpec_Binding{
-		Collection: flow.CollectionSpec{
-			Name: flow.Collection("acmeCo/test/" + strings.ToLower(nameParts[1])),
-		},
-		ResourceConfigJson: specJSON,
-		ResourcePath:       nameParts,
-	})
+	cs.Bindings[0].ResourceConfigJson = resourceJSON
+	cs.Bindings[0].Collection.Key = res.PrimaryKey
 
 	t.Run("capture1", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
 	tb.Insert(ctx, t, tableName, [][]interface{}{
@@ -234,18 +232,20 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 // testMissingTable verifies that things fail cleanly if a capture
 // binding doesn't actually exist.
 func testMissingTable(ctx context.Context, t *testing.T, tb TestBackend) {
-	var table1 = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, data TEXT)")
-	var binding1 = DiscoverBindings(ctx, t, tb, table1)[0]
-	var binding2 = BindingReplace(binding1, "one", "two")
+	var unique1, unique2 = "18865235", "27607177"
+	tb.CreateTable(ctx, t, unique1, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var binding1 = DiscoverBindings(ctx, t, tb, regexp.MustCompile(unique1))[0]
+	var binding2 = BindingReplace(binding1, unique1, unique2)
 	var cs = tb.CaptureSpec(ctx, t)
 	cs.Bindings = []*flow.CaptureSpec_Binding{binding1, binding2}
 	VerifiedCapture(ctx, t, cs)
 }
 
 func testDuplicatedScanKey(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(id VARCHAR(8), data TEXT)")
+	var uniqueID = "92011048"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id VARCHAR(8), data TEXT)")
 	tb.Insert(ctx, t, tableName, [][]any{{"AAA", "1"}, {"BBB", "2"}, {"BBB", "3"}, {"CCC", "4"}})
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Bindings[0].Collection.Key = []string{"id"}
 	VerifiedCapture(ctx, t, cs)
 }
@@ -281,8 +281,9 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	var tableName = tb.CreateTable(ctx, t, "one", "(id INTEGER PRIMARY KEY, counter INTEGER)")
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var uniqueID = "51314288"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, counter INTEGER)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = &correctnessInvariantsCaptureValidator{
 		NumExpectedIDs: numTotalIDs,
 	}
@@ -439,13 +440,14 @@ func (v *correctnessInvariantsCaptureValidator) Summarize(w io.Writer) error {
 }
 
 func testReplicationOnly(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER, data TEXT)")
+	var uniqueID = "34322067"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER, data TEXT)")
 
 	// Create a capture spec and replace the suggested "Without Key" backfill mode
 	// with the "Only Changes" one. This mirrors the deliberate user action which
 	// would be required in the UI to get this mode of operation.
-	var cs = tb.CaptureSpec(ctx, t, tableName)
-	cs.Bindings[0].ResourceConfigJson = json.RawMessage(strings.ReplaceAll(string(cs.Bindings[0].ResourceConfigJson), string(sqlcapture.BackfillModeWithoutKey), string(sqlcapture.BackfillModeOnlyChanges)))
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Bindings[0] = BindingReplace(cs.Bindings[0], string(sqlcapture.BackfillModeWithoutKey), string(sqlcapture.BackfillModeOnlyChanges))
 
 	for i := 0; i < 8; i++ {
 		var batch [][]any
@@ -474,7 +476,8 @@ func testKeylessDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 }
 
 func testKeylessCapture(ctx context.Context, t *testing.T, tb TestBackend) {
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER, data TEXT)")
+	var uniqueID = "91511186"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER, data TEXT)")
 	var generate = func(n, m int) [][]any {
 		var rows [][]any
 		for i := n; i < m; i++ {
@@ -483,7 +486,7 @@ func testKeylessCapture(ctx context.Context, t *testing.T, tb TestBackend) {
 		return rows
 	}
 
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = &st.OrderedCaptureValidator{}
 
 	tb.Insert(ctx, t, tableName, generate(0, 500))

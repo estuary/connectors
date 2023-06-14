@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -162,7 +163,8 @@ func TestDatetimes(t *testing.T) {
 
 func TestScanKeyDatetimes(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var tableName = tb.CreateTable(ctx, t, "", "(ts DATETIME(3) PRIMARY KEY, data TEXT)")
+	var uniqueID = "42322082"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(ts DATETIME(3) PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{"1991-08-31 12:34:56.000", "aood"},
 		{"1991-08-31 12:34:56.111", "xwxt"},
@@ -175,7 +177,7 @@ func TestScanKeyDatetimes(t *testing.T) {
 		{"1991-08-31 12:34:56.888", "vdug"},
 		{"1991-08-31 12:34:56.999", "xerk"},
 	})
-	var cs = tb.CaptureSpec(ctx, t, tableName)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
 	// restarted after each scan key update, this means we'll advance over the keys
@@ -188,7 +190,7 @@ func TestScanKeyDatetimes(t *testing.T) {
 
 func TestScanKeyTypes(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	for _, tc := range []struct {
+	for idx, tc := range []struct {
 		Name       string
 		ColumnType string
 		Values     []interface{}
@@ -205,14 +207,15 @@ func TestScanKeyTypes(t *testing.T) {
 		{"Char", "CHAR(3)", []interface{}{"", "a", "d", "g", "B", "E", "H", "_c", "_f", "_i"}},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
-			var tableName = tb.CreateTable(ctx, t, "", fmt.Sprintf("(k %s PRIMARY KEY, data TEXT)", tc.ColumnType))
+			var uniqueID = fmt.Sprintf("75416126%04d", idx)
+			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(k %s PRIMARY KEY, data TEXT)", tc.ColumnType))
 			var rows [][]interface{}
 			for idx, val := range tc.Values {
 				rows = append(rows, []interface{}{val, fmt.Sprintf("Data %d", idx)})
 			}
 			tb.Insert(ctx, t, tableName, rows)
 
-			var cs = tb.CaptureSpec(ctx, t, tableName)
+			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 			cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
 			var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 			cupaloy.SnapshotT(t, summary)
