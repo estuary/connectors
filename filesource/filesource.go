@@ -3,13 +3,16 @@ package filesource
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/flow/go/parser"
@@ -398,6 +401,14 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 		return r.emit(lines)
 	})
 	if err != nil {
+		// An *exec.ExitError means the parser command failed and returned a non-zero exit code. In
+		// this case the parser command will log the error message and the connector should exit
+		// without any additional logging.
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return cerrors.NewTransparentError(err)
+		}
+
 		return fmt.Errorf("failed to parse object %q: %w", obj.Path, err)
 	}
 	r.state.finishPath()

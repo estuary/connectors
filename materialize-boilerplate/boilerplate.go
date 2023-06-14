@@ -70,7 +70,7 @@ func RunMain(connector Connector) {
 	var server = ConnectorServer{connector}
 
 	if err := server.Materialize(stream); err != nil {
-		cerrors.LogFinalError(err)
+		cerrors.HandleFinalError(err)
 	}
 	os.Exit(0)
 }

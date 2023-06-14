@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,15 +14,14 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"encoding/hex"
 
-	"github.com/minio/highwayhash"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	protoio "github.com/gogo/protobuf/io"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
+	"github.com/minio/highwayhash"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 )
@@ -75,7 +75,7 @@ func RunMain(connector Connector) {
 	var server = ConnectorServer{connector}
 
 	if err := server.Capture(stream); err != nil {
-		cerrors.LogFinalError(err)
+		cerrors.HandleFinalError(err)
 	}
 	os.Exit(0)
 }
