@@ -264,7 +264,7 @@ func (c *PineconeClient) whoami(ctx context.Context) (whoamiResponse, error) {
 }
 
 var (
-	maxRetries             = 30
+	maxRetries             = 10
 	initialBackoff float64 = 200 // Milliseconds
 	maxBackoff             = time.Duration(60 * time.Second)
 	retryableCodes         = []int{http.StatusTooManyRequests, http.StatusInternalServerError}
