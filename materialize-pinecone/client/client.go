@@ -52,6 +52,13 @@ func NewOpenAiClient(embeddingModel string, org string, apiKey string) *OpenAiCl
 	}
 }
 
+type openAiEmbeddingsError struct {
+	Error struct {
+		Message string `json:"message"`
+		Type    string `json:"type"`
+	} `json:"error"`
+}
+
 func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]Embedding, error) {
 	res, err := withRetry(ctx, func() (*http.Response, error) {
 		body := new(bytes.Buffer)
@@ -79,6 +86,17 @@ func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]
 		return nil, err
 	}
 	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusTooManyRequests {
+		var errorBody openAiEmbeddingsError
+		if err := json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
+			log.WithField("error", err).Warn("could not decode error response body")
+		} else if errorBody.Error.Message != "" {
+			return nil, fmt.Errorf("creating embeddings failed (%s): %s", res.Status, errorBody.Error.Message)
+		} else {
+			log.WithField("errorBody", errorBody).Warn("errorBody error message was empty")
+		}
+	}
 
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("OpenAiClient CreateEmbeddings unexpected status: %s", res.Status)
@@ -283,8 +301,6 @@ func withRetry(ctx context.Context, fn func() (*http.Response, error)) (*http.Re
 		}
 
 		if containsCode(retryableCodes, res.StatusCode) {
-			res.Body.Close()
-
 			if n > maxRetries {
 				log.WithFields(log.Fields{
 					"host":       res.Request.URL.Host,
@@ -293,9 +309,10 @@ func withRetry(ctx context.Context, fn func() (*http.Response, error)) (*http.Re
 					"lastCode":   res.StatusCode,
 					"lastStatus": res.Status,
 				}).Warn("exceeded retry limit")
-				return nil, fmt.Errorf("request failed with status %s", res.Status)
+				return res, nil
 			}
 
+			res.Body.Close()
 			backoff *= math.Pow(2, 1+rand.Float64())
 			delay := time.Duration(backoff * float64(time.Millisecond))
 			if delay > maxBackoff {
