@@ -16,7 +16,7 @@ COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-pinecone    ./materialize-pinecone
 
 # Test and build the connector.
-# RUN go test  -tags nozstd -v ./materialize-pinecone/...
+RUN go test  -tags nozstd -v ./materialize-pinecone/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-pinecone
 
 # Runtime Stage
