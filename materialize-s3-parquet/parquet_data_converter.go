@@ -150,14 +150,20 @@ func (f *floatStrategy) reflectType() reflect.Type {
 	return reflect.TypeOf(float64(0))
 }
 func (f *floatStrategy) set(t tuple.TupleElement, fldToSet reflect.Value) error {
-	switch v := reflect.ValueOf(t); v.Kind() {
-	case reflect.Float32, reflect.Float64:
+	var v = reflect.ValueOf(t)
+
+	if v.CanFloat() {
 		fldToSet.SetFloat(v.Float())
-		return nil
-	default:
+	} else if v.CanUint() {
+		fldToSet.SetFloat(float64(v.Uint()))
+	} else if v.CanInt() {
+		fldToSet.SetFloat(float64(v.Int()))
+	} else {
 		return fmt.Errorf("invalid float type (%s)", v.Kind().String())
 	}
+	return nil
 }
+
 func newFloatField(name string, optional bool) *pqField {
 	return &pqField{
 		name:         name,
@@ -198,7 +204,7 @@ type jsonStrategy struct{}
 
 func (b *jsonStrategy) tag(name, internalName, repetitionType string) string {
 	return fmt.Sprintf(`{"Tag": "name=%s, inname=%s, type=BYTE_ARRAY, logicaltype=STRING, repetitiontype=%s"}`,
-	name, internalName, repetitionType)
+		name, internalName, repetitionType)
 }
 func (b *jsonStrategy) reflectType() reflect.Type {
 	return reflect.TypeOf("")
