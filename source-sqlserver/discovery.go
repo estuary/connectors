@@ -138,10 +138,19 @@ func getColumns(ctx context.Context, conn *sql.DB) ([]sqlcapture.ColumnInfo, err
 	return columns, nil
 }
 
+// Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
+// overkill but shouldn't hurt, and helps to make absolutely sure that we're
+// matching up the constraint type with the column names/positions correctly.
 const queryDiscoverPrimaryKeys = `
 SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position
   FROM information_schema.key_column_usage kcu
-  JOIN information_schema.table_constraints tcs ON tcs.constraint_name = kcu.constraint_name
+  JOIN information_schema.table_constraints tcs
+    ON  tcs.constraint_catalog = kcu.constraint_catalog
+    AND tcs.constraint_schema = kcu.constraint_schema
+    AND tcs.constraint_name = kcu.constraint_name
+    AND tcs.table_catalog = kcu.table_catalog
+    AND tcs.table_schema = kcu.table_schema
+    AND tcs.table_name = kcu.table_name
   WHERE tcs.constraint_type = 'PRIMARY KEY'
   ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;
 `
