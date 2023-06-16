@@ -118,6 +118,8 @@ func TestOptionalIntField(t *testing.T) {
 var floatTests = []test{
 	{input: tuple.TupleElement(float32(-11.1234)), expected: float64(-11.1234)},
 	{input: tuple.TupleElement(float64(12.12345678)), expected: float64(12.12345678)},
+	{input: tuple.TupleElement(int64(-1234)), expected: float64(-1234)},
+	{input: tuple.TupleElement(uint32(1234)), expected: float64(1234)},
 }
 
 func TestFloatField(t *testing.T) {
@@ -143,8 +145,8 @@ func TestFloatField(t *testing.T) {
 	var err1 = fld.Set(nil, v)
 	require.EqualError(t, err1, "unexpected nil value to a non-optional field")
 
-	var err2 = fld.Set(tuple.TupleElement(int(0)), v)
-	require.EqualError(t, err2, "invalid float type (int)")
+	var err2 = fld.Set(tuple.TupleElement("whoops"), v)
+	require.EqualError(t, err2, "invalid float type (string)")
 }
 
 func TestOptionalFloatField(t *testing.T) {
@@ -170,8 +172,8 @@ func TestOptionalFloatField(t *testing.T) {
 	fld.Set(nil, v)
 	require.True(t, v.IsNil())
 
-	var actualError = fld.Set(tuple.TupleElement(int(0)), reflect.New(structField.Type).Elem())
-	require.EqualError(t, actualError, "invalid float type (int)")
+	var actualError = fld.Set(tuple.TupleElement("whoops"), reflect.New(structField.Type).Elem())
+	require.EqualError(t, actualError, "invalid float type (string)")
 }
 
 var boolTests = []test{
