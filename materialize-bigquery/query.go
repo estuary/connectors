@@ -91,6 +91,7 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 			if e, ok := err.(*googleapi.Error); ok {
 				if strings.Contains(err.Error(), "Transaction is aborted due to concurrent update against table") ||
 					strings.Contains(err.Error(), "Could not serialize access to table") ||
+					strings.Contains(err.Error(), "The job encountered an error during execution. Retrying the job may solve the problem.") ||
 					(len(e.Errors) == 1 && e.Errors[0].Reason == "jobRateLimitExceeded") {
 					backoff *= math.Pow(2, 1+rand.Float64())
 					delay := time.Duration(backoff * float64(time.Millisecond))
