@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -55,4 +56,42 @@ func TestSpecification(t *testing.T) {
 	require.NoError(t, err)
 
 	cupaloy.SnapshotT(t, formatted)
+}
+
+func TestConfigURI(t *testing.T) {
+	for name, cfg := range map[string]config{
+		"Basic": {
+			Address:  "example.com",
+			User:     "will",
+			Password: "secret1234",
+			Database: "somedb",
+		},
+		"RequireSSL": {
+			Address:  "example.com",
+			User:     "will",
+			Password: "secret1234",
+			Database: "somedb",
+			Advanced: advancedConfig{
+				SSLMode: "verify-full",
+			},
+		},
+		"IncorrectSSL": {
+			Address:  "example.com",
+			User:     "will",
+			Password: "secret1234",
+			Database: "somedb",
+			Advanced: advancedConfig{
+				SSLMode: "whoops-this-isnt-right",
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var valid = "config valid"
+			if err := cfg.Validate(); err != nil {
+				valid = err.Error()
+			}
+			var uri = cfg.ToURI()
+			cupaloy.SnapshotT(t, fmt.Sprintf("%s\n%s", uri, valid))
+		})
+	}
 }

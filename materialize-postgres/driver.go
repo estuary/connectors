@@ -45,13 +45,18 @@ type tunnelConfig struct {
 
 // config represents the endpoint configuration for postgres.
 type config struct {
-	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Schema   string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
+	Address  string         `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
+	User     string         `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password string         `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database string         `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Schema   string         `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+}
+
+type advancedConfig struct {
+	SSLMode string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
 }
 
 // Validate the configuration.
@@ -66,6 +71,13 @@ func (c *config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+
+	if c.Advanced.SSLMode != "" {
+		if !stringMatches(c.Advanced.SSLMode, []string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}) {
+			return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", c.Advanced.SSLMode)
+		}
+	}
+
 	return nil
 }
 
@@ -92,6 +104,13 @@ func (c *config) ToURI() string {
 	}
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
+	}
+	var params = make(url.Values)
+	if c.Advanced.SSLMode != "" {
+		params.Set("sslmode", c.Advanced.SSLMode)
+	}
+	if len(params) > 0 {
+		uri.RawQuery = params.Encode()
 	}
 
 	return uri.String()
@@ -530,4 +549,13 @@ func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) error {
 	*batch = newBatch
 
 	return nil
+}
+
+func stringMatches(x string, alts []string) bool {
+	for _, alt := range alts {
+		if x == alt {
+			return true
+		}
+	}
+	return false
 }
