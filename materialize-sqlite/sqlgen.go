@@ -1,45 +1,47 @@
 package main
-import (
-  "strings"
 
-  sql "github.com/estuary/connectors/materialize-sql"
+import (
+	"strings"
+
+	"github.com/estuary/connectors/go/pkg/slices"
+	sql "github.com/estuary/connectors/materialize-sql"
 )
 
-var sqliteDialect = func () sql.Dialect {
-  var typeMappings = sql.ProjectionTypeMapper{
-    sql.ARRAY:   sql.NewStaticMapper("TEXT"),
-    sql.BINARY:  sql.NewStaticMapper("BLOB"),
-    sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
-    sql.INTEGER: sql.NewStaticMapper("INTEGER"),
-    sql.NUMBER:  sql.NewStaticMapper("REAL"),
-    sql.OBJECT:  sql.NewStaticMapper("TEXT"),
-    sql.STRING: sql.StringTypeMapper{
-      Fallback: sql.NewStaticMapper("TEXT"),
-    },
-  }
-  var nullable sql.TypeMapper = sql.NullableMapper{
-    NotNullText: "NOT NULL",
-    Delegate:       typeMappings,
-  }
+var sqliteDialect = func() sql.Dialect {
+	var typeMappings = sql.ProjectionTypeMapper{
+		sql.ARRAY:   sql.NewStaticMapper("TEXT"),
+		sql.BINARY:  sql.NewStaticMapper("BLOB"),
+		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
+		sql.INTEGER: sql.NewStaticMapper("INTEGER"),
+		sql.NUMBER:  sql.NewStaticMapper("REAL"),
+		sql.OBJECT:  sql.NewStaticMapper("TEXT"),
+		sql.STRING: sql.StringTypeMapper{
+			Fallback: sql.NewStaticMapper("TEXT"),
+		},
+	}
+	var nullable sql.TypeMapper = sql.NullableMapper{
+		NotNullText: "NOT NULL",
+		Delegate:    typeMappings,
+	}
 
-  return sql.Dialect{
-    Identifierer:       sql.IdentifierFn(sql.JoinTransform(".", 
-    sql.PassThroughTransform(
-      func(s string) bool {
-        return sql.IsSimpleIdentifier(s) && !sql.SliceContains(strings.ToLower(s), SQLITE_RESERVED_WORDS)
-      },
-      sql.QuoteTransform("\"", "\\\""),
-    ))),
-    Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
-    Placeholderer: sql.PlaceholderFn(func(_ int) string {
-      return "?"
-    }),
-    TypeMapper: nullable,
-  }
+	return sql.Dialect{
+		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
+			sql.PassThroughTransform(
+				func(s string) bool {
+					return sql.IsSimpleIdentifier(s) && !slices.Contains(SQLITE_RESERVED_WORDS, strings.ToLower(s))
+				},
+				sql.QuoteTransform("\"", "\\\""),
+			))),
+		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
+		Placeholderer: sql.PlaceholderFn(func(_ int) string {
+			return "?"
+		}),
+		TypeMapper: nullable,
+	}
 }()
 
 var (
-  tplAll = sql.MustParseTemplate(sqliteDialect, "root", `
+	tplAll = sql.MustParseTemplate(sqliteDialect, "root", `
   {{ define "temp_name" -}}
   flow_temp_table_{{ $.Binding }}
   {{- end }}
@@ -158,15 +160,15 @@ var (
   ;
   {{ end }}
   `)
-  tplCreateTargetTable   = tplAll.Lookup("createTargetTable")
-  tplCreateLoadTable     = tplAll.Lookup("createLoadTable")
+	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
+	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
 
-  tplLoadInsert          = tplAll.Lookup("loadInsert")
-  tplLoadQuery           = tplAll.Lookup("loadQuery")
-  tplLoadTruncate        = tplAll.Lookup("loadTruncate")
+	tplLoadInsert   = tplAll.Lookup("loadInsert")
+	tplLoadQuery    = tplAll.Lookup("loadQuery")
+	tplLoadTruncate = tplAll.Lookup("loadTruncate")
 
-  tplStoreInsert         = tplAll.Lookup("storeInsert")
-  tplStoreUpdate         = tplAll.Lookup("storeUpdate")
+	tplStoreInsert = tplAll.Lookup("storeInsert")
+	tplStoreUpdate = tplAll.Lookup("storeUpdate")
 
 	tplAlterTableAddColumn = tplAll.Lookup("alterTableAddColumn")
 )

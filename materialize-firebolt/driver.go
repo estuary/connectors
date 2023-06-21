@@ -177,13 +177,4 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	return &pm.Response_Applied{ActionDescription: fmt.Sprint("created tables: ", strings.Join(tables, ","))}, nil
 }
 
-func SliceContains(expected string, actual []string) bool {
-	for _, ty := range actual {
-		if ty == expected {
-			return true
-		}
-	}
-	return false
-}
-
 func main() { boilerplate.RunMain(new(driver)) }

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/estuary/connectors/go/pkg/slices"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
@@ -85,7 +86,7 @@ var bqDialect = func() sql.Dialect {
 				func(s string) bool {
 					// Note: The BigQuery reserved words list must be in all-caps, as they are
 					// listed in the BigQuery docs. Quoting must be applied regardless of case.
-					return simpleIdentifierRegexp.MatchString(s) && !sql.SliceContains(strings.ToUpper(s), BQ_RESERVED_WORDS)
+					return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(BQ_RESERVED_WORDS, strings.ToUpper(s))
 				},
 				sql.QuoteTransform("`", "\\`"),
 			)))),

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -167,7 +168,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 				var previousProjection = loadedBinding.Collection.GetProjection(field)
 
 				// Make sure new columns are added to the table
-				if !SliceContains(field, loadedBinding.FieldSelection.Values) {
+				if !slices.Contains(loadedBinding.FieldSelection.Values, field) {
 					var table, err = ResolveTable(tableShape, endpoint.Dialect)
 					if err != nil {
 						return nil, err
@@ -182,8 +183,8 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 						statements = append(statements, statement)
 					}
 				} else {
-					var previousNullable = previousProjection.Inference.Exists != pf.Inference_MUST || SliceContains("null", p.Inference.Types)
-					var newNullable = p.Inference.Exists != pf.Inference_MUST || SliceContains("null", p.Inference.Types)
+					var previousNullable = previousProjection.Inference.Exists != pf.Inference_MUST || slices.Contains(p.Inference.Types, "null")
+					var newNullable = p.Inference.Exists != pf.Inference_MUST || slices.Contains(p.Inference.Types, "null")
 
 					// If the table has already been created, make sure all non-null fields
 					// are marked as such
@@ -210,7 +211,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 			// Mark columns that have been removed from field selection as nullable
 			for _, field := range loadedBinding.FieldSelection.AllFields() {
 				// If the projection is part of the new field selection, just skip
-				if SliceContains(field, allNewFields) {
+				if slices.Contains(allNewFields, field) {
 					continue
 				}
 
@@ -367,7 +368,7 @@ func isBindingMigratable(existingBinding *pf.MaterializationSpec_Binding, newBin
 
 	for _, field := range allExistingKeys {
 		// All keys in the existing binding must also be present in the new binding
-		if !SliceContains(field, allNewKeys) {
+		if !slices.Contains(allNewKeys, field) {
 			return false
 		}
 
@@ -378,9 +379,9 @@ func isBindingMigratable(existingBinding *pf.MaterializationSpec_Binding, newBin
 
 	for _, field := range allNewFields {
 		// Make sure new fields are nullable
-		if !SliceContains(field, allExistingFields) {
+		if !slices.Contains(allExistingFields, field) {
 			var p = newBinding.Collection.GetProjection(field)
-			var isNullable = p.Inference.Exists != pf.Inference_MUST || SliceContains("null", p.Inference.Types)
+			var isNullable = p.Inference.Exists != pf.Inference_MUST || slices.Contains(p.Inference.Types, "null")
 			if !isNullable {
 				return false
 			}

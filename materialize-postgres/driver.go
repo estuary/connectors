@@ -14,6 +14,7 @@ import (
 	"time"
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/pkg/slices"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -73,7 +74,7 @@ func (c *config) Validate() error {
 	}
 
 	if c.Advanced.SSLMode != "" {
-		if !stringMatches(c.Advanced.SSLMode, []string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}) {
+		if !slices.Contains([]string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}, c.Advanced.SSLMode) {
 			return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", c.Advanced.SSLMode)
 		}
 	}
@@ -549,13 +550,4 @@ func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) error {
 	*batch = newBatch
 
 	return nil
-}
-
-func stringMatches(x string, alts []string) bool {
-	for _, alt := range alts {
-		if x == alt {
-			return true
-		}
-	}
-	return false
 }

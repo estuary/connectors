@@ -240,15 +240,6 @@ func resolveResourceConfig(specJson json.RawMessage) (resource, error) {
 	return res, nil
 }
 
-func SliceContains(expected string, actual []string) bool {
-	for _, ty := range actual {
-		if ty == expected {
-			return true
-		}
-	}
-	return false
-}
-
 func main() {
 	boilerplate.RunMain(driver{})
 }
