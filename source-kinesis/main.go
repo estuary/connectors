@@ -7,11 +7,12 @@ import (
 	"math"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
-	pc "github.com/estuary/flow/go/protocols/capture"
-	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	pc "github.com/estuary/flow/go/protocols/capture"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 )
 
 type driver struct{}
@@ -52,12 +53,12 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		return nil, fmt.Errorf("parsing config json: %w", err)
 	}
 
-	client, err := connect(&config);
+	client, err := connect(&config)
 	if err != nil {
-		err = fmt.Errorf("failed to connect: %w", err)
+		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	streamNames, err := listAllStreams(ctx, client);
+	streamNames, err := listAllStreams(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("listing streams: %w", err)
 	}
@@ -70,7 +71,7 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 
-		if !SliceContains(res.Stream, streamNames) {
+		if !slices.Contains(streamNames, res.Stream) {
 			return nil, fmt.Errorf("stream %s does not exist", res.Stream)
 		}
 
@@ -89,12 +90,12 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		return nil, fmt.Errorf("parsing config json: %w", err)
 	}
 
-	client, err := connect(&config);
+	client, err := connect(&config)
 	if err != nil {
-		err = fmt.Errorf("failed to connect: %w", err)
+		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	streamNames, err := listAllStreams(ctx, client);
+	streamNames, err := listAllStreams(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("listing streams: %w", err)
 	}
@@ -119,7 +120,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 
-	client, err := connect(&config);
+	client, err := connect(&config)
 	if err != nil {
 		err = fmt.Errorf("failed to connect: %w", err)
 	}
@@ -127,6 +128,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	var dataCh = make(chan readResult, 8)
 	var ctx = stream.Context()
 	ctx, cancelFunc := context.WithCancel(ctx)
+	defer cancelFunc()
 
 	log.WithField("bindings count", open.Capture.Bindings).Info("Starting to read stream(s)")
 
@@ -144,7 +146,6 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 		streamState, err := copyStreamState(stateMap, res.Stream)
 		if err != nil {
-			cancelFunc()
 			return fmt.Errorf("invalid state for stream %s: %w", res.Stream, err)
 		}
 		waitGroup.Add(1)
@@ -184,7 +185,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			break
 		}
 	}
-	cancelFunc()
+
 	return err
 }
 
@@ -227,13 +228,4 @@ type stateMap map[string]map[string]string
 
 func (s stateMap) Validate() error {
 	return nil // No-op.
-}
-
-func SliceContains(expected string, actual []string) bool {
-	for _, ty := range actual {
-		if ty == expected {
-			return true
-		}
-	}
-	return false
 }

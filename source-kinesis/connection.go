@@ -14,7 +14,7 @@ import (
 // Config represents the fully merged endpoint configuration for Kinesis.
 // It matches the `KinesisConfig` struct in `crates/sources/src/specs.rs`
 type Config struct {
-	Endpoint           string `json:"endpoint,omitempty" jsonschema:"title=AWS Endpoint" jsonschema_description="The AWS endpoint URI to connect to, useful if you're capturing from a kinesis-compatible API that isn't provided by AWS"`
+	Endpoint           string `json:"endpoint,omitempty" jsonschema:"title=AWS Endpoint,description=The AWS endpoint URI to connect to (useful if you're capturing from a kinesis-compatible API that isn't provided by AWS)"`
 	Region             string `json:"region" jsonschema:"title=AWS Region,description=The name of the AWS region where the Kinesis stream is located"`
 	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=AWS Access Key ID,description=Part of the AWS credentials that will be used to connect to Kinesis"`
 	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=AWS Secret Access Key,description=Part of the AWS credentials that will be used to connect to Kinesis"`

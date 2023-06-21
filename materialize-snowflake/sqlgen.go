@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"text/template"
 
+	"github.com/estuary/connectors/go/pkg/slices"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
@@ -74,7 +75,7 @@ var snowflakeDialect = func() sql.Dialect {
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
-					return simpleIdentifierRegexp.MatchString(s) && !sql.SliceContains(strings.ToLower(s), SF_RESERVED_WORDS)
+					return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(SF_RESERVED_WORDS, strings.ToLower(s))
 				},
 				sql.QuoteTransform("\"", "\\\""),
 			))),

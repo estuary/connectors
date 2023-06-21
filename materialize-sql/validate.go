@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/estuary/connectors/go/pkg/slices"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
@@ -34,7 +35,7 @@ func ValidateSelectedFields(constraints map[string]*pm.Response_Validated_Constr
 		switch constraint.Type {
 		case pm.Response_Validated_Constraint_FIELD_REQUIRED:
 			var projection = proposed.Collection.GetProjection(field)
-			if !SliceContains(field, allFields) {
+			if !slices.Contains(allFields, field) {
 				return fmt.Errorf("Required field '%s' is missing. It is required because: %s", field, constraint.Reason)
 			}
 			if projection == nil || projection.Inference.Exists != pf.Inference_MUST {
@@ -128,10 +129,10 @@ func ValidateMatchesExisting(resource Resource, existing *pf.MaterializationSpec
 	var constraints = make(map[string]*pm.Response_Validated_Constraint)
 
 	for _, field := range existing.FieldSelection.Keys {
-    var constraint = new(pm.Response_Validated_Constraint)
-    constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
-    constraint.Reason = "This field is a key in the current materialization"
-    constraints[field] = constraint
+		var constraint = new(pm.Response_Validated_Constraint)
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
+		constraint.Reason = "This field is a key in the current materialization"
+		constraints[field] = constraint
 	}
 
 	for _, field := range existing.FieldSelection.AllFields() {
@@ -180,19 +181,10 @@ func checkTypeError(field string, existing *pf.CollectionSpec, proposed *pf.Coll
 	// compatible if they do not alter the effective FlatType, such as adding a string formatted as
 	// an integer to an existing integer type.
 	for _, pt := range effectiveJsonTypes(proposedProjection) {
-		if !SliceContains(pt, existingEffectiveType) && pt != "null" {
+		if !slices.Contains(existingEffectiveType, pt) && pt != "null" {
 			return fmt.Sprintf("The existing materialization for field %q of collection %q has type %q, but the proposed update requires the field type to be %q which is not compatible. Please consider materializing to a new table.", field, existing.Name, strings.Join(existingEffectiveType, ","), pt)
 		}
 	}
 
 	return ""
-}
-
-func SliceContains(expected string, actual []string) bool {
-	for _, ty := range actual {
-		if ty == expected {
-			return true
-		}
-	}
-	return false
 }

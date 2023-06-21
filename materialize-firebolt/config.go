@@ -65,7 +65,7 @@ func (config) GetFieldDocString(fieldName string) string {
 
 type resource struct {
 	Table     string `json:"table" jsonschema:"title=Table" jsonschema_extras:"x-collection-name=true"`
-	TableType string `json:"table_type" jsonschema:"title=Table Type,enum=fact,enum=dimension",default=fact`
+	TableType string `json:"table_type" jsonschema:"title=Table Type,enum=fact,enum=dimension,default=fact"`
 }
 
 func (r resource) Validate() error {
