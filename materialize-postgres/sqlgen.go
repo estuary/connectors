@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/estuary/connectors/go/pkg/slices"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
@@ -38,7 +39,7 @@ var pgDialect = func() sql.Dialect {
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
-					return sql.IsSimpleIdentifier(s) && !sql.SliceContains(strings.ToLower(s), PG_RESERVED_WORDS)
+					return sql.IsSimpleIdentifier(s) && !slices.Contains(PG_RESERVED_WORDS, strings.ToLower(s))
 				},
 				sql.QuoteTransform("\"", "\\\""),
 			))),

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -172,7 +173,7 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 
-		if !SliceContains(res.Database, existingDatabases) {
+		if !slices.Contains(existingDatabases, res.Database) {
 			return nil, fmt.Errorf("database %s does not exist", res.Database)
 		}
 
@@ -183,7 +184,7 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("listing collections in database %s: %w", db.Name(), err)
 		}
 
-		if !SliceContains(res.Collection, collections) {
+		if !slices.Contains(collections, res.Collection) {
 			return nil, fmt.Errorf("could not find collection %s in database %s", res.Collection, db.Name())
 		}
 
@@ -219,13 +220,4 @@ func (d *driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response
 
 func main() {
 	boilerplate.RunMain(new(driver))
-}
-
-func SliceContains(expected string, actual []string) bool {
-	for _, ty := range actual {
-		if ty == expected {
-			return true
-		}
-	}
-	return false
 }

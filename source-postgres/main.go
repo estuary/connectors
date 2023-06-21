@@ -12,6 +12,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
@@ -129,7 +130,7 @@ func (c *Config) Validate() error {
 		}
 	}
 	if c.Advanced.SSLMode != "" {
-		if !stringMatches(c.Advanced.SSLMode, []string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}) {
+		if !slices.Contains([]string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}, c.Advanced.SSLMode) {
 			return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", c.Advanced.SSLMode)
 		}
 	}
@@ -296,13 +297,4 @@ func (db *postgresDatabase) ShouldBackfill(streamID string) bool {
 		}
 	}
 	return true
-}
-
-func stringMatches(x string, alts []string) bool {
-	for _, alt := range alts {
-		if x == alt {
-			return true
-		}
-	}
-	return false
 }

@@ -91,7 +91,8 @@
           "dimension"
         ],
         "title": "Table Type",
-        "description": "Type of the Firebolt table to store materialized results in. See https://docs.firebolt.io/working-with-tables.html for more details."
+        "description": "Type of the Firebolt table to store materialized results in. See https://docs.firebolt.io/working-with-tables.html for more details.",
+        "default": "fact"
       }
     },
     "type": "object",
