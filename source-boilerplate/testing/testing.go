@@ -111,7 +111,7 @@ func (cs *CaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*
 	var matchedNames []string
 	for _, binding := range discovery.Bindings {
 		if matchers == nil || matchesAny(matchers, string(binding.ResourceConfigJson)) {
-			var name = binding.RecommendedName.String()
+			var name = binding.RecommendedName
 			matchedNames = append(matchedNames, name)
 			matchedBindings[name] = binding
 		}
