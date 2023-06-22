@@ -18,6 +18,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -163,7 +164,7 @@ func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamI
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
 			ResourceConfigJson: b.ResourceConfigJson,
 			Collection: flow.CollectionSpec{
-				Name:           "acmeCo/test/" + b.RecommendedName,
+				Name:           pf.Collection("acmeCo/test/" + b.RecommendedName),
 				ReadSchemaJson: b.DocumentSchemaJson,
 				Key:            b.Key,
 			},

@@ -203,7 +203,7 @@ func (src *Source) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.
 	}
 
 	return &pc.Response_Discovered{Bindings: []*pc.Response_Discovered_Binding{{
-		RecommendedName:    pf.Collection(strings.Trim(root, "/")),
+		RecommendedName:    strings.Trim(root, "/"),
 		ResourceConfigJson: resourceJSON,
 		DocumentSchemaJson: json.RawMessage(minimalDocumentSchema),
 		Key:                []string{"/_meta/file", "/_meta/offset"},

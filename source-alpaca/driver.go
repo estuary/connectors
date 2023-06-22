@@ -91,7 +91,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 
 	return &pc.Response_Discovered{
 		Bindings: []*pc.Response_Discovered_Binding{{
-			RecommendedName:    pf.Collection(cfg.Feed),
+			RecommendedName:    cfg.Feed,
 			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: documentSchema,
 			Key:                []string{"/ID", "/Symbol", "/Exchange", "/Timestamp"},
