@@ -7,7 +7,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/kinesis"
 	pc "github.com/estuary/flow/go/protocols/capture"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
 )
 
@@ -59,7 +58,7 @@ func discoverStreams(ctx context.Context, client *kinesis.Kinesis, streamNames [
 			panic(fmt.Errorf("serializing resource json: %w", err))
 		}
 		streams[i] = &pc.Response_Discovered_Binding{
-			RecommendedName:    pf.Collection(name),
+			RecommendedName:    name,
 			DocumentSchemaJson: json.RawMessage(bs),
 			ResourceConfigJson: resourceJSON,
 			Key:                []string{fmt.Sprintf("/%s/%s", metaProperty, sequenceNumber), fmt.Sprintf("/%s/%s", metaProperty, partitionKey)},

@@ -109,7 +109,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
-			RecommendedName:    pf.Collection(fmt.Sprintf("%s/%s", db.Name(), collection.Name)),
+			RecommendedName:    fmt.Sprintf("%s/%s", db.Name(), collection.Name),
 			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: minimalSchema,
 			Key:                []string{"/" + idProperty},

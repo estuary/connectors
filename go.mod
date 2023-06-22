@@ -19,7 +19,7 @@ require (
 	github.com/benbjohnson/clock v1.3.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/elastic/go-elasticsearch/v7 v7.17.1
-	github.com/estuary/flow v0.1.9-0.20230405122715-43db16b1b0cb
+	github.com/estuary/flow v0.2.4-0.20230623123341-b5c714e822e3
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/gogo/protobuf v1.3.2
@@ -44,7 +44,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/xitongsys/parquet-go v1.6.2
 	github.com/xitongsys/parquet-go-source v0.0.0-20220527110425-ba4adb87a31b
-	go.gazette.dev/core v0.89.1-0.20230106205712-a2d374cdd6be
+	go.gazette.dev/core v0.89.1-0.20230613200500-3826e464243e
 	go.mongodb.org/mongo-driver v1.11.2
 	golang.org/x/crypto v0.9.0
 	golang.org/x/oauth2 v0.4.0
@@ -94,6 +94,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.18.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/coreos/go-semver v0.3.1 // indirect
+	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/ristretto v0.1.1 // indirect
@@ -149,6 +151,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.4.0 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
+	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tinylib/msgp v1.1.8 // indirect
@@ -161,8 +164,13 @@ require (
 	github.com/xdg-go/stringprep v1.0.3 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
+	go.etcd.io/etcd/api/v3 v3.5.7 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.5.7 // indirect
+	go.etcd.io/etcd/client/v3 v3.5.7 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/multierr v1.9.0 // indirect
+	go.uber.org/zap v1.23.0 // indirect
 	go4.org/intern v0.0.0-20220617035311-6925f38cc365 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
 	golang.org/x/mod v0.8.0 // indirect
