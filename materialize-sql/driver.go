@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/pkg/slices"
@@ -14,6 +15,7 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 )
 
@@ -393,4 +395,59 @@ func isBindingMigratable(existingBinding *pf.MaterializationSpec_Binding, newBin
 
 func mustGetTenantNameFromTaskName(taskName string) string {
 	return strings.Split(taskName, "/")[0]
+}
+
+// storeThreshold is a somewhat crude indication that a transaction was likely part of a backfill
+// vs. a smaller incremental streaming transaction. If a materialization is configured with a commit
+// delay, it should only apply that delay to transactions that occur after it has fully backfilled
+// from the collection. The idea is that if a transaction stored a lot of documents it's probably
+// part of a backfill.
+var storeThreshold = 5_000_000
+
+// CommitWithDelay wraps a commitFn in an async operation that may add additional delay prior to
+// returning. When used as the returned OpFuture from a materialization utilizing async commits,
+// this can spread out transaction processing and result in fewer, larger transactions which may be
+// desirable to reduce warehouse compute costs or comply with rate limits. The delay is bypassed if
+// the actual commit operation takes longer than the configured delay, or if they number of stored
+// documents is large (see storeThreshold above).
+//
+// Delaying the return from this function delays acknowledgement back to the runtime that the commit
+// has finished. The commit will still apply to the endpoint, but holding back the runtime
+// acknowledgement will delay the start of the next transaction while allowing the runtime to
+// continue combining over documents for the next transaction.
+//
+// It is always possible for a connector to restart between committing to the endpoint and sending
+// the runtime acknowledgement of that commit. The chance of this happening is greater when
+// intentionally adding a delay between these events. When the endpoint is authoritative and
+// persists checkpoints transactionally with updating the state of the view (as is typical with a
+// SQL materialization), what will happen in this case is that when the connector restarts it will
+// read the previously persisted checkpoint and acknowledge it to the runtime then. In this way the
+// materialization will resume from where it left off with respect to the endpoint state.
+func CommitWithDelay(ctx context.Context, delay time.Duration, stored int, commitFn func(context.Context) error) pf.OpFuture {
+	return pf.RunAsyncOperation(func() error {
+		started := time.Now()
+
+		if err := commitFn(ctx); err != nil {
+			return err
+		}
+
+		remainingDelay := delay - time.Since(started)
+
+		if stored > storeThreshold || remainingDelay <= 0 {
+			log.WithFields(log.Fields{
+				"stored":          stored,
+				"storedThreshold": storeThreshold,
+				"remainingDelay":  remainingDelay.String(),
+				"configuredDelay": delay.String(),
+			}).Debug("will acknowledge commit without further delay")
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(remainingDelay):
+			return nil
+		}
+	})
 }
