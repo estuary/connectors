@@ -78,6 +78,11 @@ func (db *sqlserverDatabase) translateRecordField(columnType interface{}, val in
 			return val.Format("2006-01-02"), nil
 		case "time":
 			return val.Format("15:04:05.9999999"), nil
+		case "datetime", "datetime2", "smalldatetime":
+			// The SQL Server client library translates DATETIME columns into Go time.Time values
+			// in the UTC location. We need to reinterpret the same YYYY-MM-DD HH:MM:SS.NNN values
+			// in the actual user-specified location instead.
+			return time.Date(val.Year(), val.Month(), val.Day(), val.Hour(), val.Minute(), val.Second(), val.Nanosecond(), db.datetimeLocation), nil
 		}
 	}
 	return val, nil

@@ -27,6 +27,13 @@
         "description": "Logical database name to capture from.",
         "order": 3
       },
+      "timezone": {
+        "type": "string",
+        "title": "Time Zone",
+        "description": "The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank.",
+        "default": "UTC",
+        "order": 4
+      },
       "advanced": {
         "properties": {
           "watermarksTable": {
