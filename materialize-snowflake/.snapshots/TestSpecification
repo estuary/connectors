@@ -51,6 +51,25 @@
         "title": "Role",
         "description": "The user role used to perform actions.",
         "order": 7
+      },
+      "advanced": {
+        "properties": {
+          "updateDelay": {
+            "type": "integer",
+            "enum": [
+              15,
+              30,
+              60
+            ],
+            "title": "Update Delay (minutes)",
+            "description": "Potentially reduce active warehouse time by increasing the delay between updates."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
       }
     },
     "type": "object",
