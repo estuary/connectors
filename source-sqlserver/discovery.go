@@ -184,7 +184,7 @@ FROM sys.indexes idx
      JOIN sys.tables tbl ON tbl.object_id = idx.object_id
 	 JOIN sys.schemas sch ON sch.schema_id = tbl.schema_id
 	 JOIN sys.index_columns ic ON ic.index_id = idx.index_id AND ic.object_id = tbl.object_id
-WHERE idx.is_unique = 1 AND sch.name NOT IN ('cdc')
+WHERE ic.key_ordinal != 0 AND idx.is_unique = 1 AND sch.name NOT IN ('cdc')
 ORDER BY sch.name, tbl.name, idx.name, ic.key_ordinal
 `
 

@@ -45,3 +45,14 @@ func TestSecondaryIndexDiscovery(t *testing.T) {
 		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
 	})
 }
+
+// TestIndexIncludedDiscovery tests discovery when a secondary unique index contains
+// some included non-key columns.
+func TestIndexIncludedDiscovery(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "98476798"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)")
+	var shortName = tableName[strings.Index(tableName, ".")+1:]
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE UNIQUE INDEX %s_k23 ON %s (k2, k3) INCLUDE (k1)`, shortName, tableName))
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+}
