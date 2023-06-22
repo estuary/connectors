@@ -306,5 +306,7 @@ var sqlserverTypeToJSON = map[string]columnSchema{
 
 	"xml": {jsonType: "string"},
 
-	//"datetime": {jsonType: "string", format: "date-time"},
+	"datetime":      {jsonType: "string", format: "date-time"},
+	"datetime2":     {jsonType: "string", format: "date-time"},
+	"smalldatetime": {jsonType: "string", format: "date-time"},
 }

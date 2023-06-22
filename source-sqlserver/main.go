@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -39,6 +40,7 @@ type Config struct {
 	User          string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
 	Password      string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database      string         `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	Timezone      string         `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4"`
 	Advanced      advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 	NetworkTunnel *tunnelConfig  `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
@@ -72,6 +74,12 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.Timezone != "" {
+		if _, err := sqlcapture.ParseTimezone(c.Timezone); err != nil {
+			return err
+		}
+	}
+
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
 		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
 	}
@@ -94,6 +102,9 @@ func (c *Config) SetDefaults() {
 	}
 	if c.Advanced.BackfillChunkSize <= 0 {
 		c.Advanced.BackfillChunkSize = 32768
+	}
+	if c.Timezone == "" {
+		c.Timezone = "UTC"
 	}
 
 	// The address config property should accept a host or host:port
@@ -176,6 +187,8 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 type sqlserverDatabase struct {
 	config *Config
 	conn   *sql.DB
+
+	datetimeLocation *time.Location // The location in which to interpret DATETIME column values as timestamps.
 }
 
 func (db *sqlserverDatabase) connect(ctx context.Context) error {
@@ -188,10 +201,8 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
-
 	if err := conn.PingContext(ctx); err != nil {
 		var mssqlErr mssqldb.Error
-
 		if errors.As(err, &mssqlErr) {
 			switch mssqlErr.Number {
 			case 18456:
@@ -200,11 +211,20 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 				return cerrors.NewUserError(err, fmt.Sprintf("cannot open database %q: database does not exist or user %q does not have access", db.config.Database, db.config.User))
 			}
 		}
-
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
-
 	db.conn = conn
+
+	loc, err := sqlcapture.ParseTimezone(db.config.Timezone)
+	if err != nil {
+		return fmt.Errorf("invalid config timezone: %w", err)
+	}
+	log.WithFields(log.Fields{
+		"tzName": db.config.Timezone,
+		"loc":    loc.String(),
+	}).Debug("using datetime location from config")
+	db.datetimeLocation = loc
+
 	return nil
 }
 

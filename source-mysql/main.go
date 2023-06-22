@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -147,8 +146,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("passwords used as part of replication cannot exceed 32 characters in length due to an internal limitation in MySQL: password length of %d characters is too long, please use a shorter password", len(c.Password))
 	}
 	if c.Timezone != "" {
-		if _, err := parseTimeZone(c.Timezone); err != nil {
-			return fmt.Errorf("unknown or invalid timezone %q: must be a valid IANA time zone name or +HH:MM offset", c.Timezone)
+		if _, err := sqlcapture.ParseTimezone(c.Timezone); err != nil {
+			return err
 		}
 	}
 
@@ -254,9 +253,9 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	if db.config.Timezone != "" {
 		// The user-entered timezone value is verified to parse without error in (*Config).Validate,
 		// so this parsing is not expected to fail.
-		loc, err := parseTimeZone(db.config.Timezone)
+		loc, err := sqlcapture.ParseTimezone(db.config.Timezone)
 		if err != nil {
-			return fmt.Errorf("parsing timezone from config: %w", err)
+			return fmt.Errorf("invalid config timezone: %w", err)
 		}
 		logrus.WithFields(logrus.Fields{
 			"tzName": db.config.Timezone,
@@ -269,7 +268,7 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		var tzName string
 		if tzName, err = queryTimeZone(conn); err == nil {
 			var loc *time.Location
-			if loc, err = parseTimeZone(tzName); err == nil {
+			if loc, err = sqlcapture.ParseTimezone(tzName); err == nil {
 				logrus.WithFields(logrus.Fields{
 					"tzName": tzName,
 					"loc":    loc.String(),
@@ -294,8 +293,6 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	return nil
 }
 
-var timeZoneOffsetRegex = regexp.MustCompile(`^[-+][0-9]{1,2}:[0-9]{2}$`)
-
 func queryTimeZone(conn *client.Conn) (string, error) {
 	var tzName, err = queryStringVariable(conn, `SELECT @@GLOBAL.time_zone;`)
 	if err != nil {
@@ -307,25 +304,6 @@ func queryTimeZone(conn *client.Conn) (string, error) {
 	}
 
 	return tzName, nil
-}
-
-func parseTimeZone(tzName string) (*time.Location, error) {
-	// If the time zone setting is a valid IANA zone name then return that.
-	loc, err := time.LoadLocation(tzName)
-	if err == nil {
-		return loc, nil
-	}
-
-	// If it looks like a numeric offset then parse a fixed-offset time zone from that.
-	if timeZoneOffsetRegex.MatchString(tzName) {
-		var t, err = time.Parse("-07:00", tzName)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing %q: %w", tzName, err)
-		}
-		return t.Location(), nil
-	}
-
-	return nil, fmt.Errorf("unknown or invalid time_zone %q: %w", tzName, errDatabaseTimezoneUnknown)
 }
 
 func queryStringVariable(conn *client.Conn, query string) (string, error) {

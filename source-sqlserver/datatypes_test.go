@@ -12,6 +12,7 @@ import (
 // TestDatatypes tests discovery and value capture with various database column types,
 func TestDatatypes(t *testing.T) {
 	var ctx, tb = context.Background(), sqlserverTestBackend(t)
+	tb.config.Timezone = "America/Chicago" // Interpret DATETIME column values here
 	tests.TestDatatypes(ctx, t, tb, []tests.DatatypeTestCase{
 		{ColumnType: `integer`, ExpectType: `{"type":["integer","null"]}`, InputValue: `123`, ExpectValue: `123`},
 		{ColumnType: `integer not null`, ExpectType: `{"type":"integer"}`, InputValue: `-0451`, ExpectValue: `-451`},
@@ -46,11 +47,9 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `time`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `12:34:54.125`, ExpectValue: `"12:34:54.125"`},
 		{ColumnType: `datetimeoffset`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `1991-08-31T12:34:54.125-06:00`, ExpectValue: `"1991-08-31T12:34:54.125-06:00"`},
 
-		// TODO(wgd): Figure out how we want to handle 'datetime' columns. They're just
-		// as awful as every timezone-unaware datetime type always is.
-		//{ColumnType: `datetime`, ExpectType: `{"type":["","null"]}`, InputValue: ``, ExpectValue: ``},
-		//{ColumnType: `datetime2`, ExpectType: `{"type":["","null"]}`, InputValue: ``, ExpectValue: ``},
-		//{ColumnType: `smalldatetime`, ExpectType: `{"type":["","null"]}`, InputValue: ``, ExpectValue: ``},
+		{ColumnType: `datetime`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `1991-08-31T12:34:56.789`, ExpectValue: `"1991-08-31T12:34:56.79-05:00"`},
+		{ColumnType: `datetime2`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `1991-08-31T12:34:56.789`, ExpectValue: `"1991-08-31T12:34:56.789-05:00"`},
+		{ColumnType: `smalldatetime`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `1991-08-31T12:34:56.789`, ExpectValue: `"1991-08-31T12:35:00-05:00"`},
 
 		{ColumnType: `uniqueidentifier`, ExpectType: `{"type":["string","null"],"format":"uuid"}`, InputValue: `8292f3cb-0cce-41e8-86aa-ae09bcc988e9`, ExpectValue: `"8292f3cb-0cce-41e8-86aa-ae09bcc988e9"`},
 
