@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -14,6 +15,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/iterator"
+)
+
+const (
+	// BigQuery imposes a limit of 1500 table operations per day.
+	transactionDelay = 2 * time.Minute
 )
 
 type transactor struct {
@@ -264,7 +270,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return t.commit(ctx) })
+		return nil, sql.CommitWithDelay(ctx, transactionDelay, it.Total, t.commit)
 	}, nil
 }
 
