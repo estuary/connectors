@@ -183,7 +183,7 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.R
 			return nil, fmt.Errorf("resource %q: error serializing resource json: %w", resourcePath, err)
 		}
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
-			RecommendedName:    pf.Collection(collectionRecommendedName(resourcePath)),
+			RecommendedName:    collectionRecommendedName(resourcePath),
 			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: minimalSchema,
 			Key:                []string{documentPath},

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
 )
@@ -153,7 +152,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		}
 
 		catalog = append(catalog, &pc.Response_Discovered_Binding{
-			RecommendedName:    pf.Collection(recommendedCatalogName(table.Schema, table.Name)),
+			RecommendedName:    recommendedCatalogName(table.Schema, table.Name),
 			ResourceConfigJson: resourceSpecJSON,
 			DocumentSchemaJson: rawSchema,
 			Key:                keyPointers,
