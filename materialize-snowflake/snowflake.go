@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -32,6 +33,12 @@ type config struct {
 	Schema    string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use." jsonschema_extras:"order=5"`
 	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries." jsonschema_extras:"order=6"`
 	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=7"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+}
+
+type advancedConfig struct {
+	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active warehouse time by increasing the delay between updates.,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
 }
 
 // ToURI converts the Config to a DSN string.
@@ -106,6 +113,17 @@ func (c *config) Validate() error {
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
+		}
+	}
+
+	if c.Advanced.UpdateDelay != "" {
+		parsed, err := time.ParseDuration(c.Advanced.UpdateDelay)
+		if err != nil {
+			return fmt.Errorf("could not parse Update Delay '%s': must be a valid Go duration string", c.Advanced.UpdateDelay)
+		}
+
+		if parsed < 0 {
+			return fmt.Errorf("update delay '%s' must not be negative", c.Advanced.UpdateDelay)
 		}
 	}
 
@@ -268,7 +286,8 @@ type transactor struct {
 		conn  *stdsql.Conn
 		fence *sql.Fence
 	}
-	bindings []*binding
+	bindings    []*binding
+	updateDelay time.Duration
 }
 
 func newTransactor(
@@ -282,6 +301,16 @@ func newTransactor(
 	var d = &transactor{
 		cfg: cfg,
 	}
+
+	if cfg.Advanced.UpdateDelay != "" {
+		// UpdateDelay has already been validated in (*config).Validate. This parsing is not
+		// expected to fail.
+		d.updateDelay, err = time.ParseDuration(cfg.Advanced.UpdateDelay)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse UpdateDelay '%s'", cfg.Advanced.UpdateDelay)
+		}
+	}
+
 	d.store.fence = &fence
 
 	// Establish connections.
@@ -435,7 +464,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx) })
+		return nil, sql.CommitWithDelay(ctx, d.updateDelay, it.Total, d.commit)
 	}, nil
 }
 
