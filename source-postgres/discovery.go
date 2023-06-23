@@ -15,6 +15,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	infinityTimestamp         = "9999-12-31T23:59:59"
+	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
+)
+
 // DiscoverTables queries the database for information about tables available for capture.
 func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
 	// Get lists of all columns and primary keys in the database
@@ -245,6 +250,18 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		// information, this will need to be plumbed through the array translation
 		// logic so that the same behavior can apply to individual array elements.
 		return translateArray(nil, x)
+	case pgtype.InfinityModifier:
+		// Postgres has special timestamp values for "infinity" and "-infinity" which it handles
+		// internally for performing comparisions. We do our best to represent these as an RFC3339
+		// timestamp string here, as the smallest possible timestamp in the case of negative
+		// infinity and the largest possible for infinity. There is also a pgtype.None infinity
+		// modifier which is being left unhandled currently as I don't know that it has any meaning
+		// for a captured value.
+		if x == pgtype.Infinity {
+			return infinityTimestamp, nil
+		} else if x == pgtype.NegativeInfinity {
+			return negativeInfinityTimestamp, nil
+		}
 	}
 	if _, ok := val.(json.Marshaler); ok {
 		return val, nil
