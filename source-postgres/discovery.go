@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	infinityTimestamp         = "9999-12-31T23:59:59"
+	infinityTimestamp         = "9999-12-31T23:59:59Z"
 	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
 )
 
