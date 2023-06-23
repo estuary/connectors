@@ -423,7 +423,7 @@ var storeThreshold = 5_000_000
 // SQL materialization), what will happen in this case is that when the connector restarts it will
 // read the previously persisted checkpoint and acknowledge it to the runtime then. In this way the
 // materialization will resume from where it left off with respect to the endpoint state.
-func CommitWithDelay(ctx context.Context, delay time.Duration, stored int, commitFn func(context.Context) error) pf.OpFuture {
+func CommitWithDelay(ctx context.Context, skipDelay bool, delay time.Duration, stored int, commitFn func(context.Context) error) pf.OpFuture {
 	return pf.RunAsyncOperation(func() error {
 		started := time.Now()
 
@@ -431,17 +431,26 @@ func CommitWithDelay(ctx context.Context, delay time.Duration, stored int, commi
 			return err
 		}
 
-		remainingDelay := delay - time.Since(started)
-
-		if stored > storeThreshold || remainingDelay <= 0 {
-			log.WithFields(log.Fields{
-				"stored":          stored,
-				"storedThreshold": storeThreshold,
-				"remainingDelay":  remainingDelay.String(),
-				"configuredDelay": delay.String(),
-			}).Debug("will acknowledge commit without further delay")
+		if skipDelay {
+			log.Debug("will not delay commit acknowledge since skipDelay was true")
 			return nil
 		}
+
+		remainingDelay := delay - time.Since(started)
+
+		logEntry := log.WithFields(log.Fields{
+			"stored":          stored,
+			"storedThreshold": storeThreshold,
+			"remainingDelay":  remainingDelay.String(),
+			"configuredDelay": delay.String(),
+		})
+
+		if stored > storeThreshold || remainingDelay <= 0 {
+			logEntry.Debug("will acknowledge commit without further delay")
+			return nil
+		}
+
+		logEntry.Debug("delaying before acknowledging commit")
 
 		select {
 		case <-ctx.Done():
