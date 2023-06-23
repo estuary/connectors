@@ -281,10 +281,11 @@ type transactor struct {
 	load struct {
 		conn *stdsql.Conn
 	}
-	// Variables accessed by Prepare, Store, and Commit.
+	// Variables exclusively used by Store.
 	store struct {
 		conn  *stdsql.Conn
 		fence *sql.Fence
+		round int
 	}
 	bindings    []*binding
 	updateDelay time.Duration
@@ -442,6 +443,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+	d.store.round++
+
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -464,7 +467,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		return nil, sql.CommitWithDelay(ctx, d.updateDelay, it.Total, d.commit)
+		return nil, sql.CommitWithDelay(ctx, d.store.round == 1, d.updateDelay, it.Total, d.commit)
 	}, nil
 }
 
