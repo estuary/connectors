@@ -270,7 +270,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		return nil, sql.CommitWithDelay(ctx, transactionDelay, it.Total, t.commit)
+		return nil, sql.CommitWithDelay(ctx, false, transactionDelay, it.Total, t.commit)
 	}, nil
 }
 
