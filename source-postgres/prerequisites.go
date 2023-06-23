@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/jackc/pgx/v4"
 	"github.com/sirupsen/logrus"
 )
 
@@ -112,19 +114,35 @@ func (db *postgresDatabase) prerequisiteReplicationUser(ctx context.Context) err
 }
 
 func (db *postgresDatabase) prerequisiteReplicationSlot(ctx context.Context) error {
-	// If the replication slot already exists then we're satisfied
+	// If the replication slot already exists in our configured database then we're satisfied.
 	var slotName = db.config.Advanced.SlotName
-	var logEntry = logrus.WithField("slot", slotName)
-	var count int
-	if err := db.conn.QueryRow(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM pg_catalog.pg_replication_slots WHERE slot_name = '%s' AND slot_type = 'logical';`, slotName)).Scan(&count); err != nil {
-		return fmt.Errorf("error querying replication slots: %w", err)
+	var configuredDatabase = db.config.Database
+	var logEntry = logrus.WithFields(logrus.Fields{
+		"slot":     slotName,
+		"database": configuredDatabase,
+	})
+	var slotDatabase string
+	if err := db.conn.QueryRow(ctx, fmt.Sprintf(`SELECT database FROM pg_catalog.pg_replication_slots WHERE slot_name = '%s' AND slot_type = 'logical';`, slotName)).Scan(&slotDatabase); err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("error querying replication slots: %w", err)
+		}
 	}
-	if count == 1 {
+	if slotDatabase == configuredDatabase {
 		logEntry.Debug("replication slot exists")
 		return nil
 	}
 
-	// Otherwise try and create it
+	// Slot exists, but not in our database.
+	if slotDatabase != "" {
+		return fmt.Errorf(
+			"replication slot %q exists in database %q, but the configured database is %q: consider using a different slot name or removing the existing slot",
+			slotName,
+			slotDatabase,
+			configuredDatabase,
+		)
+	}
+
+	// Slot does not exist in any database. Try to create it.
 	logEntry.Info("attempting to create replication slot")
 	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`SELECT pg_create_logical_replication_slot('%s', 'pgoutput');`, slotName)); err != nil {
 		return fmt.Errorf("replication slot %q doesn't exist and couldn't be created", slotName)
