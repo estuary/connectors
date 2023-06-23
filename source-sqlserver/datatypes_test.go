@@ -54,6 +54,8 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `uniqueidentifier`, ExpectType: `{"type":["string","null"],"format":"uuid"}`, InputValue: `8292f3cb-0cce-41e8-86aa-ae09bcc988e9`, ExpectValue: `"8292f3cb-0cce-41e8-86aa-ae09bcc988e9"`},
 
 		{ColumnType: `xml`, ExpectType: `{"type":["string","null"]}`, InputValue: `<hello>world</hello>`, ExpectValue: `"\u003chello\u003eworld\u003c/hello\u003e"`},
+
+		{ColumnType: `hierarchyid`, ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: `/1/2/3/`, ExpectValue: `"W14="`},
 	})
 }
 

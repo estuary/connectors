@@ -309,4 +309,6 @@ var sqlserverTypeToJSON = map[string]columnSchema{
 	"datetime":      {jsonType: "string", format: "date-time"},
 	"datetime2":     {jsonType: "string", format: "date-time"},
 	"smalldatetime": {jsonType: "string", format: "date-time"},
+
+	"hierarchyid": {jsonType: "string", contentEncoding: "base64"},
 }
