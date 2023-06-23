@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -18,6 +19,9 @@ const (
 	// Maximum number of cells allowed for any single binding to either read from the Store iterator
 	// or hold in-memory in the binding's rows.
 	cellsLimit = 1000000
+
+	// Accommodate API rate limits.
+	transactionDelay = 2 * time.Second
 )
 
 func checkCellCount(rows int, cellsPerRow int) error {
@@ -86,6 +90,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+	started := time.Now()
+
 	// The commit of this transaction within the recovery log will permanently
 	// increment the current `round`. On recovery, the next connector will
 	// examine `round` to determine whether this in-progress transaction committed
@@ -258,6 +264,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	); err != nil {
 		return nil, err
 	}
+
+	// Ensure transactions are spread out enough to not exceed google sheets rate limits.
+	<-time.After(transactionDelay - time.Since(started))
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
 		return &pf.ConnectorState{
