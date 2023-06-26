@@ -27,6 +27,7 @@ var (
 	dbCapturePass = flag.String("db_capture_pass", "we2rie1E", "The password for the capture user")
 
 	enableCDCWhenCreatingTables = flag.Bool("enable_cdc_when_creating_tables", true, "Set to true if CDC should be enabled before the test capture runs")
+	testSchemaName              = flag.String("test_schema_name", "dbo", "The schema in which to create test tables.")
 )
 
 func TestMain(m *testing.M) {
@@ -132,29 +133,28 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 	for _, str := range []string{"/", "=", "(", ")"} {
 		tableName = strings.ReplaceAll(tableName, str, "_")
 	}
-	var fullTableName = "dbo." + tableName
+	var quotedTableName = fmt.Sprintf("[%s].[%s]", *testSchemaName, tableName)
 
-	log.WithFields(log.Fields{"table": fullTableName, "cols": tableDef}).Debug("creating test table")
+	log.WithFields(log.Fields{"table": quotedTableName, "cols": tableDef}).Debug("creating test table")
 
-	tb.Query(ctx, t, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
-	tb.Query(ctx, t, fmt.Sprintf("CREATE TABLE %s%s;", fullTableName, tableDef))
+	tb.Query(ctx, t, fmt.Sprintf("IF OBJECT_ID('%[1]s', 'U') IS NOT NULL DROP TABLE %[1]s;", quotedTableName))
+	tb.Query(ctx, t, fmt.Sprintf("CREATE TABLE %s%s;", quotedTableName, tableDef))
 
 	if *enableCDCWhenCreatingTables {
-		var instanceName = "dbo_" + strings.ToLower(tableName)
-		var query = fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = '%s', @role_name = '%s', @capture_instance = '%s';`,
+		var query = fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%s', @source_name = '%s', @role_name = '%s';`,
+			*testSchemaName,
 			tableName,
 			*dbCaptureUser,
-			instanceName,
 		)
 		tb.Query(ctx, t, query)
 	}
 
 	t.Cleanup(func() {
-		log.WithField("table", fullTableName).Debug("destroying test table")
-		tb.Query(ctx, t, fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", fullTableName, fullTableName))
+		log.WithField("table", quotedTableName).Debug("destroying test table")
+		tb.Query(ctx, t, fmt.Sprintf("IF OBJECT_ID('%[1]s', 'U') IS NOT NULL DROP TABLE %[1]s;", quotedTableName))
 	})
 
-	return fullTableName
+	return quotedTableName
 }
 
 // Insert adds all provided rows to the specified table in a single transaction.
