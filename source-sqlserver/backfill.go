@@ -154,7 +154,7 @@ var columnTypeCollatedText = map[string]bool{
 
 func (db *sqlserverDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM %s.%s", schemaName, tableName)
+	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
 	fmt.Fprintf(query, " ORDER BY %%%%physloc%%%%")
 	fmt.Fprintf(query, " OFFSET @p1 ROWS FETCH FIRST %d ROWS ONLY;", db.config.Advanced.BackfillChunkSize)
 	return query.String()
@@ -179,7 +179,7 @@ func (db *sqlserverDatabase) buildScanQuery(start bool, keyColumns []string, col
 	}
 
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM %s.%s", schemaName, tableName)
+	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
 	if !start {
 		for i := range pkey {
 			if i == 0 {
