@@ -1,0 +1,218 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ffff-ffff-ffff-00ffffffffff","v":"Data 10"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAEA/////////////////////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAEA/////////////////////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ffff-ffff-ffff-ff00ffffffff","v":"Data 11"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/AP///////////////////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH/AP///////////////////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ffff-ffff-ffff-ffff00ffffff","v":"Data 12"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//wD//////////////////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH//wD//////////////////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ffff-ffff-ffff-ffffff00ffff","v":"Data 13"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":4,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///8A/////////////////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH///8A/////////////////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ffff-ffff-ffff-ffffffff00ff","v":"Data 14"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":5,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////AP///////////////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH/////AP///////////////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ffff-ffff-ffff-ffffffffff00","v":"Data 15"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":6,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////wD//////////////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH//////wD//////////////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ffff-ffff-00ff-ffffffffffff","v":"Data 8"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":7,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////8A/////////////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH///////8A/////////////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ffff-ffff-ff00-ffffffffffff","v":"Data 9"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":8,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////////AP///////////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH/////////AP///////////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ffff-ff00-ffff-ffffffffffff","v":"Data 7"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":9,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////////wD//////////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH//////////wD//////////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ffff-00ff-ffff-ffffffffffff","v":"Data 6"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":10,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////////8A/////////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH///////////8A/////////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-ff00-ffff-ffff-ffffffffffff","v":"Data 5"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":11,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////////////AP///////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH/////////////AP///////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffffff-00ff-ffff-ffff-ffffffffffff","v":"Data 4"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":12,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////////////wD//////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH//////////////wD//////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffffff00-ffff-ffff-ffff-ffffffffffff","v":"Data 3"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":13,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////////////8A/////wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH///////////////8A/////wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ffff00ff-ffff-ffff-ffff-ffffffffffff","v":"Data 2"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":14,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH/////////////////AP///wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH/////////////////AP///wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"ff00ffff-ffff-ffff-ffff-ffffffffffff","v":"Data 1"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":15,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH//////////////////wD//wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH//////////////////wD//wAA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_uniqueidentifier_889298060002": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_UniqueIdentifier_889298060002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"00ffffff-ffff-ffff-ffff-ffffffffffff","v":"Data 0"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":16,"key_columns":["k"],"mode":"Backfill","scanned":"BQJ1dWlkAAH///////////////////8A/wAA"}}}
+
+
+####################################
+### Capture from Key "BQJ1dWlkAAH///////////////////8A/wAA"
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_scankeytypes_uniqueidentifier_889298060002":{"backfilled":16,"key_columns":["k"],"mode":"Active"}}}
+
+
+
