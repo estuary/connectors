@@ -240,3 +240,30 @@ func TestDiscoveryIrrelevantConstraints(t *testing.T) {
 	tb.CreateTable(ctx, t, uniqueID, "(id VARCHAR(8) PRIMARY KEY, foo INTEGER UNIQUE, data TEXT)")
 	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
 }
+
+func TestUUIDCaptureOrder(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "1794630882"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id UNIQUEIDENTIFIER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, tableName, [][]any{
+		{"00ffffff-ffff-ffff-ffff-ffffffffffff", "sixteen"},
+		{"ff00ffff-ffff-ffff-ffff-ffffffffffff", "fifteen"},
+		{"ffff00ff-ffff-ffff-ffff-ffffffffffff", "fourteen"},
+		{"ffffff00-ffff-ffff-ffff-ffffffffffff", "thirteen"},
+		{"ffffffff-00ff-ffff-ffff-ffffffffffff", "twelve"},
+		{"ffffffff-ff00-ffff-ffff-ffffffffffff", "eleven"},
+		{"ffffffff-ffff-00ff-ffff-ffffffffffff", "ten"},
+		{"ffffffff-ffff-ff00-ffff-ffffffffffff", "nine"},
+		{"ffffffff-ffff-ffff-00ff-ffffffffffff", "seven"},
+		{"ffffffff-ffff-ffff-ff00-ffffffffffff", "eight"},
+		{"ffffffff-ffff-ffff-ffff-00ffffffffff", "one"},
+		{"ffffffff-ffff-ffff-ffff-ff00ffffffff", "two"},
+		{"ffffffff-ffff-ffff-ffff-ffff00ffffff", "three"},
+		{"ffffffff-ffff-ffff-ffff-ffffff00ffff", "four"},
+		{"ffffffff-ffff-ffff-ffff-ffffffff00ff", "five"},
+		{"ffffffff-ffff-ffff-ffff-ffffffffff00", "six"},
+	})
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	tests.VerifiedCapture(ctx, t, cs)
+}
