@@ -1,0 +1,24 @@
+# ================================
+# Collection "acmeCo/test/test_uuidcaptureorder_1794630882": 16 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"one","id":"ffffffff-ffff-ffff-ffff-00ffffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"two","id":"ffffffff-ffff-ffff-ffff-ff00ffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"three","id":"ffffffff-ffff-ffff-ffff-ffff00ffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"four","id":"ffffffff-ffff-ffff-ffff-ffffff00ffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"five","id":"ffffffff-ffff-ffff-ffff-ffffffff00ff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"six","id":"ffffffff-ffff-ffff-ffff-ffffffffff00"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"seven","id":"ffffffff-ffff-ffff-00ff-ffffffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"eight","id":"ffffffff-ffff-ffff-ff00-ffffffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"nine","id":"ffffffff-ffff-ff00-ffff-ffffffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"ten","id":"ffffffff-ffff-00ff-ffff-ffffffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"eleven","id":"ffffffff-ff00-ffff-ffff-ffffffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"twelve","id":"ffffffff-00ff-ffff-ffff-ffffffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"thirteen","id":"ffffff00-ffff-ffff-ffff-ffffffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"fourteen","id":"ffff00ff-ffff-ffff-ffff-ffffffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"fifteen","id":"ff00ffff-ffff-ffff-ffff-ffffffffffff"}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"sixteen","id":"00ffffff-ffff-ffff-ffff-ffffffffffff"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"AAAAAAAAAAAAAA==","streams":{"dbo.test_uuidcaptureorder_1794630882":{"backfilled":16,"key_columns":["id"],"mode":"Active"}}}
+

@@ -69,6 +69,24 @@ func TestScanKeyTypes(t *testing.T) {
 	}{
 		{"Integer", "INTEGER", []any{0, -3, 2, 1723}},
 		{"DateTimeOffset", "DATETIMEOFFSET", []any{"1991-08-31T12:34:54.125-06:00", "1991-08-31T12:34:54.126-06:00", "2000-01-01T01:01:01Z"}},
+		{"UniqueIdentifier", "UNIQUEIDENTIFIER", []any{
+			"00ffffff-ffff-ffff-ffff-ffffffffffff",
+			"ff00ffff-ffff-ffff-ffff-ffffffffffff",
+			"ffff00ff-ffff-ffff-ffff-ffffffffffff",
+			"ffffff00-ffff-ffff-ffff-ffffffffffff",
+			"ffffffff-00ff-ffff-ffff-ffffffffffff",
+			"ffffffff-ff00-ffff-ffff-ffffffffffff",
+			"ffffffff-ffff-00ff-ffff-ffffffffffff",
+			"ffffffff-ffff-ff00-ffff-ffffffffffff",
+			"ffffffff-ffff-ffff-00ff-ffffffffffff",
+			"ffffffff-ffff-ffff-ff00-ffffffffffff",
+			"ffffffff-ffff-ffff-ffff-00ffffffffff",
+			"ffffffff-ffff-ffff-ffff-ff00ffffffff",
+			"ffffffff-ffff-ffff-ffff-ffff00ffffff",
+			"ffffffff-ffff-ffff-ffff-ffffff00ffff",
+			"ffffffff-ffff-ffff-ffff-ffffffff00ff",
+			"ffffffff-ffff-ffff-ffff-ffffffffff00",
+		}},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
 			var uniqueID = fmt.Sprintf("88929806%04d", idx)
