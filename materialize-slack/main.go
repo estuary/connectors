@@ -53,8 +53,6 @@ func (r resource) Validate() error {
 }
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	log.Debug("handling Spec request")
-
 	endpointSchema, err := schemagen.GenerateSchema("Slack Connection", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
@@ -74,8 +72,6 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 }
 
 func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	log.Debug("handling Validate request")
-
 	var cfg config
 	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, err
