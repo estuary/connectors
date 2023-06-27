@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	slack "github.com/slack-go/slack"
 )
 
@@ -45,21 +45,7 @@ func (api *SlackAPI) PostMessage(channel, text string, blocks []slack.Block, con
 		slack.MsgOptionIconEmoji(config.LogoEmoji),
 		slack.MsgOptionIconURL(config.LogoPicture),
 	)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type slackListChannelsResponse struct {
-	Okay     bool                     `json:"ok"`
-	Error    string                   `json:"error"`
-	Channels []slackListChannelsEntry `json:"channels"`
-}
-
-type slackListChannelsEntry struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	return err
 }
 
 func (api *SlackAPI) GetChannelID(name string) (string, error) {
@@ -68,7 +54,6 @@ func (api *SlackAPI) GetChannelID(name string) (string, error) {
 	}
 
 	if api.channelIDs == nil {
-		log.Println("fetching channels list...")
 		var channels []slack.Channel
 		var cursor string
 
@@ -116,15 +101,6 @@ func (api *SlackAPI) ConversationInfo(name string) (*slack.Channel, error) {
 	}
 
 	return resp, nil
-}
-
-type slackJoinChannelRequest struct {
-	Channel string `json:"channel"` // The channel ID to join
-}
-
-type slackJoinChannelResponse struct {
-	Okay  bool   `json:"ok"`
-	Error string `json:"error"`
 }
 
 func (api *SlackAPI) JoinChannel(name string) error {
