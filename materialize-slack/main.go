@@ -272,10 +272,6 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		// Accept messages from at most 10 minutes in the past
 		if time.Since(ts).Minutes() < 10 {
 			if err := t.api.PostMessage(b.resource.Channel, text, blocksParsed.BlockSet, b.resource.SenderConfig); err != nil {
-				serializedBlocks, marshal_err := json.Marshal(blocksParsed)
-				if marshal_err == nil {
-					log.Warn(fmt.Sprintf("Parse Blocks: %+v", string(serializedBlocks)))
-				}
 				log.Warn(fmt.Errorf("error sending message: %w", err))
 			}
 			// rate limiting at home:
