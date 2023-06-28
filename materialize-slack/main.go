@@ -77,26 +77,11 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, err
 	}
 
-	var api, err = cfg.buildAPI()
-	if err != nil {
-		return nil, err
-	}
-
 	var out []*pm.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
-		}
-		var channelInfo, err = api.ConversationInfo(res.Channel)
-		if err != nil {
-			return nil, fmt.Errorf("error getting channel: %s, %w", res.Channel, err)
-		}
-
-		if !channelInfo.IsMember {
-			if err := api.JoinChannel(res.Channel); err != nil {
-				return nil, fmt.Errorf("error joining channel: %s, %w", res.Channel, err)
-			}
 		}
 
 		var constraints = make(map[string]*pm.Response_Validated_Constraint)
@@ -148,6 +133,33 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 }
 
 func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	var cfg config
+	if err := pf.UnmarshalStrict(req.Materialization.ConfigJson, &cfg); err != nil {
+		return nil, err
+	}
+
+	api, apiErr := cfg.buildAPI()
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	for _, binding := range req.Materialization.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return nil, fmt.Errorf("parsing resource config: %w", err)
+		}
+
+		var channelInfo, err = api.ConversationInfo(res.Channel)
+		if err != nil {
+			return nil, fmt.Errorf("error getting channel: %s, %w", res.Channel, err)
+		}
+
+		if !channelInfo.IsMember {
+			if err := api.JoinChannel(res.Channel); err != nil {
+				return nil, fmt.Errorf("error joining channel: %s, %w", res.Channel, err)
+			}
+		}
+	}
 	return &pm.Response_Applied{ActionDescription: "materialize-slack does not modify channels"}, nil
 }
 
