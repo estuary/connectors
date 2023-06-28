@@ -121,6 +121,9 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		if constraints["text"] == nil {
 			return nil, fmt.Errorf("'text' field required")
 		}
+		if constraints["ts"] == nil {
+			return nil, fmt.Errorf("'ts' field required")
+		}
 
 		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
@@ -179,8 +182,7 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 	var bindings []*binding
 	for _, b := range open.Materialization.Bindings {
 		var res resource
-		err = json.Unmarshal(b.ResourceConfigJson, &res)
-		if err != nil {
+		if err := json.Unmarshal(b.ResourceConfigJson, &res); err != nil {
 			return nil, nil, fmt.Errorf("unable to parse resource config: %w", err)
 		}
 		bindings = append(bindings, &binding{
@@ -245,7 +247,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		var parsed = buildDocument(b, it.Key, it.Values)
 		var tsStr, tsOk = parsed["ts"].(string)
 		var text, textOk = parsed["text"].(string)
-		var blocks, blocksOk = parsed["blocks"].(json.RawMessage)
+		var blocks = parsed["blocks"].(json.RawMessage)
 
 		if !tsOk {
 			return nil, fmt.Errorf("missing timestamp")
@@ -262,31 +264,25 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 
 		var blocksParsed slack.Blocks
-		if blocksOk {
-			// Is this jank? This should really be taken care of by the
-			// serialization logic in slack.Block, but it can't be _that_
-			// bad to do it here... right? see below:
-			// https://api.slack.com/reference/surfaces/formatting#escaping
-			var escaped_blocks = string(blocks)
-			escaped_blocks = strings.ReplaceAll(escaped_blocks, "&", "&amp;")
-			escaped_blocks = strings.ReplaceAll(escaped_blocks, "<", "&lt;")
-			escaped_blocks = strings.ReplaceAll(escaped_blocks, ">", "&gt;")
 
-			err = json.Unmarshal([]byte(escaped_blocks), &blocksParsed)
+		// Is this jank? This should really be taken care of by the
+		// serialization logic in slack.Block, but it can't be _that_
+		// bad to do it here... right? see below:
+		// https://api.slack.com/reference/surfaces/formatting#escaping
+		var escaped_blocks = string(blocks)
+		escaped_blocks = strings.ReplaceAll(escaped_blocks, "&", "&amp;")
+		escaped_blocks = strings.ReplaceAll(escaped_blocks, "<", "&lt;")
+		escaped_blocks = strings.ReplaceAll(escaped_blocks, ">", "&gt;")
 
-			if err != nil {
-				return nil, fmt.Errorf("invalid blocks value %q, %q: %w", reflect.TypeOf(blocks), string(blocks), err)
-			}
-		} else {
-			log.Warn(fmt.Sprintf("Blocks apparently NOT okay: %+v", reflect.TypeOf(parsed["blocks"])))
+		if err := json.Unmarshal([]byte(escaped_blocks), &blocksParsed); err != nil {
+			return nil, fmt.Errorf("invalid blocks value %q, %q: %w", reflect.TypeOf(blocks), string(blocks), err)
 		}
 
 		// Accept messages from at most 10 minutes in the past
 		if time.Since(ts).Minutes() < 10 {
 			if err := t.api.PostMessage(b.resource.Channel, text, blocksParsed.BlockSet, b.resource.SenderConfig); err != nil {
-				log.Warn(fmt.Errorf("error sending message: %w", err))
+				return nil, fmt.Errorf("error sending message: %w", err)
 			}
-			// rate limiting at home:
 			time.Sleep(time.Second * 10)
 		} else {
 			log.Warn(fmt.Sprintf("Ignoring message from the past: %q", ts))
@@ -300,7 +296,5 @@ func (transactor) Destroy() {
 }
 
 func main() {
-	log.SetLevel(log.DebugLevel)
-	log.Info("connector starting")
 	boilerplate.RunMain(new(driver))
 }
