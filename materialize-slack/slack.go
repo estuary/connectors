@@ -74,7 +74,7 @@ func (api *SlackAPI) GetChannelID(name string) (string, error) {
 
 		api.channelIDs = make(map[string]string)
 		for _, channel := range channels {
-			log.Printf("  + channel %q with id %q", channel.Name, channel.ID)
+			log.WithFields(log.Fields{"channel": channel.Name, "id": channel.ID}).Info("joining channel")
 			api.channelIDs[channel.Name] = channel.ID
 		}
 	}
