@@ -68,12 +68,6 @@
         "title": "Pinecone Namespace",
         "description": "Name of the Pinecone namespace that this collection will materialize vectors into.",
         "x-collection-name": true
-      },
-      "inputProjection": {
-        "type": "string",
-        "title": "Input Projection Name",
-        "description": "Alternate name of the collection projection to use as input for creating the vector embedding. Defaults to 'input'.",
-        "default": "input"
       }
     },
     "type": "object",
