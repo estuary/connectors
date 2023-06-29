@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/estuary/connectors/materialize-pinecone/client"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -27,14 +28,8 @@ type transactor struct {
 }
 
 type binding struct {
-	namespace string
-	// Indexes the position of the "input" value from the combined list of keys + values. The value
-	// at this position should be converted to a vector embedding. All values (including the
-	// "input") will be included as metadata.
-	inputIdx int
-	// Metadata is provided as a set of key/value pairs. The "headers" are the keys and the values
-	// are the values.
-	metaHeaders []string
+	namespace   string
+	dataHeaders []string
 }
 
 type upsertDoc struct {
@@ -63,26 +58,27 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		allFields := append(it.Key, it.Values...)
 
-		input, ok := allFields[b.inputIdx].(string)
-		if !ok {
-			return nil, fmt.Errorf("document value for embedding must be a string: was type %T", allFields[b.inputIdx])
-		}
-
-		metadata := make(map[string]interface{})
+		data := make(map[string]interface{})
 		for idx, val := range allFields {
 			if val != nil {
-				// Per Pinecone's docs, null metadata fields should be omitted from the payload
-				// rather than explicitly set as null.
-				metadata[b.metaHeaders[idx]] = val
+				data[b.dataHeaders[idx]] = val
 			}
+		}
+
+		embeddingInput, err := makeInput(data)
+		if err != nil {
+			return nil, err
 		}
 
 		namespace := t.bindings[it.Binding].namespace
 
 		batches[namespace] = append(batches[namespace], upsertDoc{
-			input:    input,
-			key:      base64.RawURLEncoding.EncodeToString(it.PackedKey),
-			metadata: metadata,
+			input: embeddingInput,
+			key:   base64.RawURLEncoding.EncodeToString(it.PackedKey),
+			// Only the document is included as metadata.
+			metadata: map[string]interface{}{
+				"flow_document": string(it.RawJSON),
+			},
 		})
 
 		if len(batches[namespace]) >= batchSize {
@@ -103,6 +99,30 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}
 
 	return nil, t.group.Wait()
+}
+
+// The embedding input is an aggregate string of all included keys and values of the
+// materialization. It is arranged as "key: value" pairs on newlines with the value being the
+// stringified JSON-encoded of the field value. Since only scalar types are permitted this results
+// in a reasonable representation of the input data.
+func makeInput(fields map[string]interface{}) (string, error) {
+	var out strings.Builder
+
+	count := 0
+	for k, v := range fields {
+		m, err := json.Marshal(v)
+		if err != nil {
+			return "", fmt.Errorf("serializing input field: %w", err)
+		}
+		out.WriteString(k + ": " + string(m))
+
+		count++
+		if count < len(fields) {
+			out.WriteString("\n")
+		}
+	}
+
+	return out.String(), nil
 }
 
 func (t *transactor) sendBatch(namespace string, batch []upsertDoc) error {

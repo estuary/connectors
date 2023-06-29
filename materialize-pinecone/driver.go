@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -16,7 +15,6 @@ import (
 )
 
 const (
-	defaultInputProjectionName      = "input"
 	textEmbeddingAda002             = "text-embedding-ada-002"
 	textEmbeddingAda002VectorLength = 1536
 )
@@ -92,27 +90,16 @@ func (c *config) openAiClient() *client.OpenAiClient {
 }
 
 type resource struct {
-	Namespace       string `json:"namespace" jsonschema:"title=Pinecone Namespace" jsonschema_extras:"x-collection-name=true"`
-	InputProjection string `json:"inputProjection,omitempty" jsonschema:"title=Input Projection Name,default=input"`
+	Namespace string `json:"namespace" jsonschema:"title=Pinecone Namespace" jsonschema_extras:"x-collection-name=true"`
 }
 
 func (resource) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Namespace":
 		return "Name of the Pinecone namespace that this collection will materialize vectors into."
-	case "InputProjection":
-		return "Alternate name of the collection projection to use as input for creating the vector embedding. Defaults to 'input'."
 	default:
 		return ""
 	}
-}
-
-func (r resource) inputProjectionName() string {
-	out := defaultInputProjectionName
-	if r.InputProjection != "" {
-		out = r.InputProjection
-	}
-	return out
 }
 
 func (r resource) Validate() error {
@@ -185,37 +172,12 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		if err != nil {
 			return nil, err
 		}
-		inputProjectionName := res.inputProjectionName()
-
-		var foundInput bool
-		foundProjections := []string{}
 
 		constraints := make(map[string]*pm.Response_Validated_Constraint)
 		for _, projection := range b.Collection.Projections {
-			foundProjections = append(foundProjections, projection.Field)
 
 			var constraint = new(pm.Response_Validated_Constraint)
 			switch {
-			case projection.Field == inputProjectionName:
-				if !reflect.DeepEqual(projection.Inference.Types, []string{"string"}) {
-					return nil, fmt.Errorf(
-						"%q must reference a string projection in collection %q: found types %s",
-						inputProjectionName,
-						b.Collection.Name.String(),
-						projection.Inference.Types,
-					)
-				} else if projection.Inference.Exists != pf.Inference_MUST {
-					return nil, fmt.Errorf(
-						"%q cannot reference nullable projection in collection %q",
-						inputProjectionName,
-						b.Collection.Name.String(),
-					)
-				}
-				foundInput = true
-
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = fmt.Sprintf("The %q projection must be materialized", inputProjectionName)
-
 			// We require collection keys be materialized because it seems pretty reasonable to
 			// require they be included as metadata since the composite key is used as the basis for
 			// the vector ID, and also to avoid complications from
@@ -223,18 +185,17 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			case projection.IsPrimaryKey:
 				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = "Components of the collection key must be materialized"
-			case isPossibleMetadata(&projection):
+			case projection.Inference.IsSingleScalarType():
 				constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-				constraint.Reason = "The projection can be materialized as metadata"
+				constraint.Reason = "The projection has a single scalar type"
+			case projection.IsRootDocumentProjection():
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+				constraint.Reason = "The root document must be materialized"
 			default:
 				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-				constraint.Reason = fmt.Sprintf("Pinecone only materializes %q and compatible metadata", inputProjectionName)
+				constraint.Reason = "Cannot materialize this field"
 			}
 			constraints[projection.Field] = constraint
-		}
-
-		if !foundInput {
-			return nil, fmt.Errorf("a projection named %q does not exist in collection %q: found projections %s", inputProjectionName, b.Collection.Name.String(), foundProjections)
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
@@ -245,31 +206,6 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 	}
 
 	return &pm.Response_Validated{Bindings: out}, nil
-}
-
-// See https://docs.pinecone.io/docs/metadata-filtering#supported-metadata-types for Pinecone's
-// supported metadata types. String, numeric (number or integer), and bool are supported. Lists of
-// strings (arrays) are also supported but we do not currently have the `items` property available
-// from projection inference as far as I can tell.
-func isPossibleMetadata(p *pf.Projection) bool {
-	var types []string
-
-	// Remove "null" from the list of types, since metadata fields can be nullable.
-	for _, t := range p.Inference.Types {
-		if t != pf.JsonTypeNull {
-			types = append(types, t)
-		}
-	}
-
-	// Only single types are permitted.
-	if len(types) != 1 {
-		return false
-	}
-
-	return types[0] == pf.JsonTypeString ||
-		types[0] == pf.JsonTypeInteger ||
-		types[0] == pf.JsonTypeNumber ||
-		types[0] == pf.JsonTypeBoolean
 }
 
 func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
@@ -292,30 +228,9 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 			return nil, nil, err
 		}
 
-		inputProjectionName := res.inputProjectionName()
-		if inputProjectionName != defaultInputProjectionName {
-			log.WithFields(log.Fields{
-				"collection":     b.Collection.Name.String(),
-				"projectionName": inputProjectionName,
-			}).Info("using alternate input projection name")
-		}
-
-		inputIdx := -1
-		metaHeaders := []string{}
-		for i, f := range b.FieldSelection.AllFields() {
-			if f == inputProjectionName {
-				inputIdx = i
-			}
-			metaHeaders = append(metaHeaders, f)
-		}
-		if inputIdx == -1 {
-			return nil, nil, fmt.Errorf("did not find %q in fields for collection %q", inputProjectionName, b.Collection.Name.String())
-		}
-
 		bindings = append(bindings, binding{
 			namespace:   res.Namespace,
-			inputIdx:    inputIdx,
-			metaHeaders: metaHeaders,
+			dataHeaders: b.FieldSelection.AllFields(),
 		})
 	}
 
