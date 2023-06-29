@@ -19,22 +19,19 @@ config_json_template='{
 resources_json_template='[
   {
     "resource": {
-      "namespace":        "simple",
-      "inputProjection":  "canary"
+      "namespace": "simple"
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
   },
   {
     "resource": {
-      "namespace":        "duplicated-keys",
-      "inputProjection":  "str"
+      "namespace": "duplicated-keys"
     },
     "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
   },
   {
     "resource": {
-      "namespace":        "multiple-types",
-      "inputProjection":  "str_field"
+      "namespace": "multiple-types"
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}"
   }

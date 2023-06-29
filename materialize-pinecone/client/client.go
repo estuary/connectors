@@ -156,6 +156,14 @@ type PineconeIndexResponse struct {
 	IndexFullness float64                `json:"index_fullness"`
 }
 
+type PineconeIndexDescribeResponse struct {
+	Database struct {
+		MetadataConfig struct {
+			Indexed []string `json:"indexed"`
+		} `json:"metadata_config"`
+	} `json:"database"`
+}
+
 type whoamiResponse struct {
 	ProjectName string `json:"project_name"`
 }
