@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-pinecone/client"
@@ -164,6 +165,24 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		)
 	} else if err := cfg.openAiClient().Ping(ctx); err != nil {
 		return nil, fmt.Errorf("connecting to OpenAI: %w", err)
+	}
+
+	// Log a warning message if the 'flow_document' metadata field has not been excluded from
+	// metadata indexing. This is a high cardinality field and is potentially large, and such fields
+	// are not recommended to be indexed.
+	indexDescribe, err := pc.DescribeIndex(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("describing index: %w", err)
+	}
+	entry := log.WithFields(log.Fields{
+		"index":       cfg.Index,
+		"environment": cfg.Environment,
+	})
+	if indexDescribe.Database.MetadataConfig.Indexed == nil {
+		// If no explicit metadata configuration for which fields are indexed has been provided all fields are indexed.
+		entry.Warn("Metadata field 'flow_document' will be indexed since this index is not configured with selective metadata indexing. Consider using selective metadata indexing to prevent this field from being indexed to optimize memory utilization.")
+	} else if slices.Contains(indexDescribe.Database.MetadataConfig.Indexed, "flow_document") {
+		entry.Warn("Metadata field 'flow_document' will be indexed. This may not result in optimal memory utilization for the index.")
 	}
 
 	var out []*pm.Response_Validated_Binding
