@@ -150,7 +150,7 @@ type PineconeUpsertResponse struct {
 	UpsertedCount int `json:"upsertedCount"`
 }
 
-type PineconeIndexResponse struct {
+type PineconeIndexStatsResponse struct {
 	Namespaces    map[string]interface{} `json:"namespaces"`
 	Dimension     int                    `json:"dimension"`
 	IndexFullness float64                `json:"index_fullness"`
@@ -198,10 +198,10 @@ func (c *PineconeClient) baseUrl() string {
 	return fmt.Sprintf("https://%s-%s.svc.%s.pinecone.io", c.index, c.projectName, c.environment)
 }
 
-func (c *PineconeClient) DescribeIndexStats(ctx context.Context) (PineconeIndexResponse, error) {
+func (c *PineconeClient) DescribeIndexStats(ctx context.Context) (PineconeIndexStatsResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "POST", c.baseUrl()+"/describe_index_stats", nil)
 	if err != nil {
-		return PineconeIndexResponse{}, err
+		return PineconeIndexStatsResponse{}, err
 	}
 	req.Header.Set("accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
@@ -209,17 +209,44 @@ func (c *PineconeClient) DescribeIndexStats(ctx context.Context) (PineconeIndexR
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return PineconeIndexResponse{}, err
+		return PineconeIndexStatsResponse{}, err
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return PineconeIndexResponse{}, fmt.Errorf("PineconeClient DescribeIndexStats unexpected status: %s", res.Status)
+		return PineconeIndexStatsResponse{}, fmt.Errorf("PineconeClient DescribeIndexStats unexpected status: %s", res.Status)
 	}
 
-	indexResponse := PineconeIndexResponse{}
+	indexResponse := PineconeIndexStatsResponse{}
 	if err := json.NewDecoder(res.Body).Decode(&indexResponse); err != nil {
-		return PineconeIndexResponse{}, err
+		return PineconeIndexStatsResponse{}, err
+	}
+
+	return indexResponse, nil
+}
+
+func (c *PineconeClient) DescribeIndex(ctx context.Context) (PineconeIndexDescribeResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://controller.%s.pinecone.io/databases/%s", c.environment, c.index), nil)
+	if err != nil {
+		return PineconeIndexDescribeResponse{}, err
+	}
+	req.Header.Set("accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Api-Key", c.apiKey)
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return PineconeIndexDescribeResponse{}, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return PineconeIndexDescribeResponse{}, fmt.Errorf("PineconeClient DescribeIndex unexpected status: %s", res.Status)
+	}
+
+	indexResponse := PineconeIndexDescribeResponse{}
+	if err := json.NewDecoder(res.Body).Decode(&indexResponse); err != nil {
+		return PineconeIndexDescribeResponse{}, err
 	}
 
 	return indexResponse, nil
