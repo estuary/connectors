@@ -445,6 +445,7 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	switch stmt := stmt.(type) {
 	case *sqlparser.CreateDatabase:
 	case *sqlparser.CreateTable:
+	case *sqlparser.Savepoint:
 		logrus.WithField("query", query).Trace("ignoring benign query")
 	case *sqlparser.AlterTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
