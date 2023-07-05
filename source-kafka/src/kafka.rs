@@ -206,6 +206,9 @@ pub enum ProcessingError {
 
     #[error("message contained no payload")]
     EmptyMessage,
+
+    #[error("invalid payload received: {0}")]
+    InvalidPayload(String)
 }
 
 pub fn process_message<'m>(
@@ -224,12 +227,16 @@ pub fn process_message<'m>(
         "offset": msg.offset()
     });
 
-    payload.as_object_mut().unwrap()
+    let doc_json = serde_json::to_string(&payload).map_err(ProcessingError::Encoding)?;
+    let err = ProcessingError::InvalidPayload(doc_json);
+    payload.as_object_mut().ok_or(err)?
         .insert("_meta".to_string(), meta);
+
+    let doc_json = serde_json::to_string(&payload).map_err(ProcessingError::Encoding)?;
 
     let message = response::Captured {
         binding: binding_index as u32,
-        doc_json: serde_json::to_string(&payload).map_err(ProcessingError::Encoding)?,
+        doc_json,
     };
     let checkpoint = state::Checkpoint::new(msg.topic(), msg.partition(), state::Offset::from(msg));
     Ok((message, checkpoint))
