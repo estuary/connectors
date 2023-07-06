@@ -69,3 +69,50 @@ func TestTrickyTableNames(t *testing.T) {
 		})
 	})
 }
+
+func TestPartitionedTable(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "83812828"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, `(
+	  grp INTEGER,
+	  id INTEGER,
+	  data TEXT,
+	  PRIMARY KEY (grp, id)
+	)
+	PARTITION BY RANGE (grp)
+	SUBPARTITION BY HASH(id) SUBPARTITIONS 2
+	(
+        PARTITION p0 VALUES LESS THAN (3),
+        PARTITION p1 VALUES LESS THAN (5),
+        PARTITION p2 VALUES LESS THAN (7),
+        PARTITION p3 VALUES LESS THAN (10)
+	);`)
+
+	var rows [][]any
+	for group := 0; group < 10; group++ {
+		for idx := 0; idx < 10; idx++ {
+			rows = append(rows, []any{group, idx, fmt.Sprintf("Group #%d Value #%d", group, idx)})
+		}
+	}
+	tb.Insert(ctx, t, tableName, rows)
+
+	t.Run("Discovery", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	t.Run("Capture", func(t *testing.T) {
+		tests.VerifiedCapture(ctx, t, cs)
+
+		var rows [][]any
+		for group := 0; group < 10; group++ {
+			for idx := 10; idx < 20; idx++ {
+				rows = append(rows, []any{group, idx, fmt.Sprintf("Group #%d Value #%d", group, idx)})
+			}
+		}
+		tb.Insert(ctx, t, tableName, rows)
+
+		t.Run("Replication", func(t *testing.T) {
+			tests.VerifiedCapture(ctx, t, cs)
+		})
+	})
+}
