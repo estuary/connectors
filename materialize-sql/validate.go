@@ -101,6 +101,9 @@ func validateNewProjection(resource Resource, projection pf.Projection) *pm.Resp
 	case projection.IsRootDocumentProjection():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "The root document must be materialized"
+	case strings.HasPrefix(projection.Field, "_meta/") && projection.Inference.IsSingleType():
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Metadata fields fields are able to be materialized"
 	case projection.Inference.IsSingleScalarType() || flatType == INTEGER || flatType == NUMBER:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
