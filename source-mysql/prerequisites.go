@@ -179,11 +179,15 @@ func (db *mysqlDatabase) prerequisiteUserPermissions(ctx context.Context) error 
 	// The SHOW SLAVE HOSTS command (called SHOW REPLICAS in newer versions, but we're
 	// using the deprecated form here for compatibility with old MySQL releases) requires
 	// the REPLICATION SLAVE permission, which we need for CDC.
-	results, err = db.conn.Execute("SHOW SLAVE HOSTS;")
-	if err != nil {
-		return fmt.Errorf("user %q needs the REPLICATION SLAVE permission", db.config.User)
-	}
-	results.Close()
+	//
+	// This check is currently disabled due to reports that it may be producing false
+	// positives in some setups.
+	//
+	// results, err = db.conn.Execute("SHOW SLAVE HOSTS;")
+	// if err != nil {
+	// 	return fmt.Errorf("user %q needs the REPLICATION SLAVE permission", db.config.User)
+	// }
+	// results.Close()
 	return nil
 }
 
