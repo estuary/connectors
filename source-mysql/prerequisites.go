@@ -39,8 +39,8 @@ func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 const (
 	// TODO(whb): MySQL 5.7 current does not appear to work with our connector, see
 	// https://github.com/estuary/connectors/issues/682.
-	mysqlReqMajorVersion = 8
-	mysqlReqMinorVersion = 0
+	mysqlReqMajorVersion = 5
+	mysqlReqMinorVersion = 7
 
 	mariadbReqMajorVersion = 10
 	mariadbReqMinorVersion = 3
