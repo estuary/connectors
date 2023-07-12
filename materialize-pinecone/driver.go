@@ -211,8 +211,8 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 				constraint.Reason = "The root document must be materialized"
 			default:
-				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-				constraint.Reason = "Cannot materialize this field"
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+				constraint.Reason = "This field can be materializaed"
 			}
 			constraints[projection.Field] = constraint
 		}
