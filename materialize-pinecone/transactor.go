@@ -103,13 +103,18 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 // The embedding input is an aggregate string of all included keys and values of the
 // materialization. It is arranged as "key: value" pairs on newlines with the value being the
-// stringified JSON-encoded of the field value. Since only scalar types are permitted this results
-// in a reasonable representation of the input data.
+// stringified JSON-encoded of the field value.
 func makeInput(fields map[string]interface{}) (string, error) {
 	var out strings.Builder
 
 	count := 0
 	for k, v := range fields {
+		if c, ok := v.([]byte); ok {
+			// We get JSON arrays and objects as raw bytes of their encoded JSON. Rather than
+			// encoding that as a base64-string, we want to handle these bytes as precomputed JSON.
+			v = json.RawMessage(c)
+		}
+
 		m, err := json.Marshal(v)
 		if err != nil {
 			return "", fmt.Errorf("serializing input field: %w", err)
