@@ -28,6 +28,9 @@
   "loaded": {
     "binding": 1,
     "doc": {
+      "_meta": {
+        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
+      },
       "id": 1,
       "int": 1,
       "str": "str 1"
@@ -38,6 +41,9 @@
   "loaded": {
     "binding": 1,
     "doc": {
+      "_meta": {
+        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
+      },
       "id": 2,
       "int": 2,
       "str": "str 2"
@@ -48,6 +54,9 @@
   "loaded": {
     "binding": 1,
     "doc": {
+      "_meta": {
+        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
+      },
       "id": 3,
       "int": 3,
       "str": "str 3"
@@ -58,6 +67,9 @@
   "loaded": {
     "binding": 1,
     "doc": {
+      "_meta": {
+        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
+      },
       "id": 4,
       "int": 4,
       "str": "str 4"
@@ -68,6 +80,9 @@
   "loaded": {
     "binding": 1,
     "doc": {
+      "_meta": {
+        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
+      },
       "id": 5,
       "int": 5,
       "str": "str 5"
@@ -78,25 +93,9 @@
   "loaded": {
     "binding": 2,
     "doc": {
-      "array_int": [
-        1,
-        2
-      ],
-      "bool_field": true,
-      "float_field": 10.1,
-      "id": 10,
-      "nested": {
-        "id": "i10"
+      "_meta": {
+        "uuid": "5fc54530-20e1-11ee-990b-ffd12dfcd47f"
       },
-      "nullable_int": 10,
-      "str_field": "str10"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
       "array_int": [
         61,
         62
@@ -116,6 +115,9 @@
   "loaded": {
     "binding": 2,
     "doc": {
+      "_meta": {
+        "uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"
+      },
       "array_int": [
         71,
         72
@@ -135,6 +137,9 @@
   "loaded": {
     "binding": 2,
     "doc": {
+      "_meta": {
+        "uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"
+      },
       "array_int": [
         81,
         82
@@ -154,6 +159,9 @@
   "loaded": {
     "binding": 2,
     "doc": {
+      "_meta": {
+        "uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"
+      },
       "array_int": [
         91,
         92
@@ -166,6 +174,28 @@
       },
       "nullable_int": null,
       "str_field": "str9"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "_meta": {
+        "uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        1,
+        2
+      ],
+      "bool_field": true,
+      "float_field": 10.1,
+      "id": 10,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10"
     }
   }
 }
@@ -195,6 +225,11 @@
       "userEnteredValue": {
         "stringValue": "canary"
       }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "flow_published_at"
+      }
     }
   ]
 }
@@ -208,6 +243,11 @@
     {
       "userEnteredValue": {
         "stringValue": "amputation's"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:18:11.537199Z"
       }
     }
   ]
@@ -223,6 +263,11 @@
       "userEnteredValue": {
         "stringValue": "armament's"
       }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:18:24.946758Z"
+      }
     }
   ]
 }
@@ -236,6 +281,11 @@
     {
       "userEnteredValue": {
         "stringValue": "splatters"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:18:48.441281Z"
       }
     }
   ]
@@ -251,6 +301,11 @@
       "userEnteredValue": {
         "stringValue": "strengthen"
       }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:19:15.034186Z"
+      }
     }
   ]
 }
@@ -264,6 +319,11 @@
     {
       "userEnteredValue": {
         "stringValue": "Kringle's"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:19:57.165604Z"
       }
     }
   ]
@@ -279,6 +339,11 @@
       "userEnteredValue": {
         "stringValue": "grosbeak's"
       }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:20:10.962631Z"
+      }
     }
   ]
 }
@@ -292,6 +357,11 @@
     {
       "userEnteredValue": {
         "stringValue": "pieced"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:22:35.841647Z"
       }
     }
   ]
@@ -307,6 +377,11 @@
       "userEnteredValue": {
         "stringValue": "roaches"
       }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:22:49.755893Z"
+      }
     }
   ]
 }
@@ -320,6 +395,11 @@
     {
       "userEnteredValue": {
         "stringValue": "devilish"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:25:35.173533Z"
       }
     }
   ]
@@ -335,6 +415,11 @@
       "userEnteredValue": {
         "stringValue": "glucose's"
       }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:25:45.520064Z"
+      }
     }
   ]
 }
@@ -343,6 +428,11 @@
     {
       "userEnteredValue": {
         "stringValue": "id"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "flow_published_at"
       }
     },
     {
@@ -366,6 +456,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "2023-07-12T18:26:01.560712Z"
+      }
+    },
+    {
+      "userEnteredValue": {
         "numberValue": 6
       }
     },
@@ -381,6 +476,11 @@
     {
       "userEnteredValue": {
         "numberValue": 2
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:26:14.215494Z"
       }
     },
     {
@@ -404,6 +504,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "2023-07-12T18:26:23.495167Z"
+      }
+    },
+    {
+      "userEnteredValue": {
         "numberValue": 8
       }
     },
@@ -423,6 +528,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "2023-07-12T18:26:33.697752Z"
+      }
+    },
+    {
+      "userEnteredValue": {
         "numberValue": 9
       }
     },
@@ -438,6 +548,11 @@
     {
       "userEnteredValue": {
         "numberValue": 5
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:26:42.518724Z"
       }
     },
     {
@@ -467,6 +582,11 @@
     {
       "userEnteredValue": {
         "stringValue": "float_field"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "flow_published_at"
       }
     },
     {
@@ -505,6 +625,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "2023-07-12T18:23:50.55822Z"
+      }
+    },
+    {
+      "userEnteredValue": {
         "stringValue": "i1"
       }
     },
@@ -531,6 +656,11 @@
     {
       "userEnteredValue": {
         "numberValue": 2.2
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:24:09.67518Z"
       }
     },
     {
@@ -569,6 +699,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "2023-07-12T18:24:19.384Z"
+      }
+    },
+    {
+      "userEnteredValue": {
         "stringValue": "i3"
       }
     },
@@ -595,6 +730,11 @@
     {
       "userEnteredValue": {
         "numberValue": 4.4
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:24:28.397025Z"
       }
     },
     {
@@ -633,6 +773,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "2023-07-12T18:24:36.112031Z"
+      }
+    },
+    {
+      "userEnteredValue": {
         "stringValue": "i5"
       }
     },
@@ -659,6 +804,11 @@
     {
       "userEnteredValue": {
         "numberValue": 66.66
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:28:27.194541Z"
       }
     },
     {
@@ -697,6 +847,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "2023-07-12T18:28:38.169062Z"
+      }
+    },
+    {
+      "userEnteredValue": {
         "stringValue": "i7"
       }
     },
@@ -723,6 +878,11 @@
     {
       "userEnteredValue": {
         "numberValue": 88.88
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:28:48.465279Z"
       }
     },
     {
@@ -761,6 +921,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "2023-07-12T18:28:55.677252Z"
+      }
+    },
+    {
+      "userEnteredValue": {
         "stringValue": "i9"
       }
     },
@@ -787,6 +952,11 @@
     {
       "userEnteredValue": {
         "numberValue": 1010.101
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "2023-07-12T18:29:04.671352Z"
       }
     },
     {

@@ -22,25 +22,9 @@
   "loaded": {
     "binding": 2,
     "doc": {
-      "array_int": [
-        1,
-        2
-      ],
-      "bool_field": true,
-      "float_field": 10.1,
-      "id": 10,
-      "nested": {
-        "id": "i10"
+      "_meta": {
+        "uuid": "5fc54530-20e1-11ee-990b-ffd12dfcd47f"
       },
-      "nullable_int": 10,
-      "str_field": "str10"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 2,
-    "doc": {
       "array_int": [
         61,
         62
@@ -60,6 +44,9 @@
   "loaded": {
     "binding": 2,
     "doc": {
+      "_meta": {
+        "uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"
+      },
       "array_int": [
         71,
         72
@@ -79,6 +66,9 @@
   "loaded": {
     "binding": 2,
     "doc": {
+      "_meta": {
+        "uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"
+      },
       "array_int": [
         81,
         82
@@ -98,6 +88,9 @@
   "loaded": {
     "binding": 2,
     "doc": {
+      "_meta": {
+        "uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"
+      },
       "array_int": [
         91,
         92
@@ -110,6 +103,28 @@
       },
       "nullable_int": null,
       "str_field": "str9"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 2,
+    "doc": {
+      "_meta": {
+        "uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        1,
+        2
+      ],
+      "bool_field": true,
+      "float_field": 10.1,
+      "id": 10,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10"
     }
   }
 }
