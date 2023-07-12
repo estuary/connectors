@@ -33,7 +33,15 @@ resources_json_template='[
     "resource": {
       "namespace": "multiple-types"
     },
-    "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}"
+    "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
+    "fields": {
+      "recommended": true,
+      "exclude": ["nested/id"],
+      "include": {
+        "nested": {},
+        "array_int": {}
+      }
+    }
   }
 ]'
 
