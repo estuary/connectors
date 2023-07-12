@@ -31,48 +31,59 @@
 }
 {
   "canary": "amputation's",
+  "flow_published_at": "2023-07-12T18:18:11.537199Z",
   "id": 1
 }
 {
   "canary": "armament's",
+  "flow_published_at": "2023-07-12T18:18:24.946758Z",
   "id": 2
 }
 {
   "canary": "splatters",
+  "flow_published_at": "2023-07-12T18:18:48.441281Z",
   "id": 3
 }
 {
   "canary": "strengthen",
+  "flow_published_at": "2023-07-12T18:19:15.034186Z",
   "id": 4
 }
 {
   "canary": "Kringle's",
+  "flow_published_at": "2023-07-12T18:19:57.165604Z",
   "id": 5
 }
 {
   "canary": "grosbeak's",
+  "flow_published_at": "2023-07-12T18:20:10.962631Z",
   "id": 6
 }
 {
   "canary": "pieced",
+  "flow_published_at": "2023-07-12T18:22:35.841647Z",
   "id": 7
 }
 {
   "canary": "roaches",
+  "flow_published_at": "2023-07-12T18:22:49.755893Z",
   "id": 8
 }
 {
   "canary": "devilish",
+  "flow_published_at": "2023-07-12T18:25:35.173533Z",
   "id": 9
 }
 {
   "canary": "glucose's",
+  "flow_published_at": "2023-07-12T18:25:45.520064Z",
   "id": 10
 }
 {
   "array_int": "[11,12]",
   "bool_field": false,
   "float_field": 1.1,
+  "flow_published_at": "2023-07-12T18:23:50.55822Z",
   "id": 1,
   "nested": "{\"id\":\"i1\"}",
   "nested/id": "i1",
@@ -82,6 +93,7 @@
   "array_int": "[21,22]",
   "bool_field": true,
   "float_field": 2.2,
+  "flow_published_at": "2023-07-12T18:24:09.67518Z",
   "id": 2,
   "nested": "{\"id\":\"i2\"}",
   "nested/id": "i2",
@@ -92,6 +104,7 @@
   "array_int": "[31,32]",
   "bool_field": false,
   "float_field": 3.3,
+  "flow_published_at": "2023-07-12T18:24:19.384Z",
   "id": 3,
   "nested": "{\"id\":\"i3\"}",
   "nested/id": "i3",
@@ -101,6 +114,7 @@
   "array_int": "[41,42]",
   "bool_field": true,
   "float_field": 4.4,
+  "flow_published_at": "2023-07-12T18:24:28.397025Z",
   "id": 4,
   "nested": "{\"id\":\"i4\"}",
   "nested/id": "i4",
@@ -111,6 +125,7 @@
   "array_int": "[51,52]",
   "bool_field": false,
   "float_field": 5.5,
+  "flow_published_at": "2023-07-12T18:24:36.112031Z",
   "id": 5,
   "nested": "{\"id\":\"i5\"}",
   "nested/id": "i5",
@@ -120,6 +135,7 @@
   "array_int": "[61,62]",
   "bool_field": true,
   "float_field": 6.6,
+  "flow_published_at": "2023-07-12T18:24:44.155832Z",
   "id": 6,
   "nested": "{\"id\":\"i6\"}",
   "nested/id": "i6",
@@ -130,6 +146,7 @@
   "array_int": "[71,72]",
   "bool_field": false,
   "float_field": 7.7,
+  "flow_published_at": "2023-07-12T18:24:52.428519Z",
   "id": 7,
   "nested": "{\"id\":\"i7\"}",
   "nested/id": "i7",
@@ -139,6 +156,7 @@
   "array_int": "[81,82]",
   "bool_field": true,
   "float_field": 8.8,
+  "flow_published_at": "2023-07-12T18:25:02.651706Z",
   "id": 8,
   "nested": "{\"id\":\"i8\"}",
   "nested/id": "i8",
@@ -149,6 +167,7 @@
   "array_int": "[91,92]",
   "bool_field": false,
   "float_field": 9.9,
+  "flow_published_at": "2023-07-12T18:25:11.322369Z",
   "id": 9,
   "nested": "{\"id\":\"i9\"}",
   "nested/id": "i9",
@@ -158,6 +177,7 @@
   "array_int": "[1,2]",
   "bool_field": true,
   "float_field": 10.1,
+  "flow_published_at": "2023-07-12T18:25:20.45195Z",
   "id": 10,
   "nested": "{\"id\":\"i10\"}",
   "nested/id": "i10",
@@ -168,6 +188,7 @@
   "array_int": "[61,62]",
   "bool_field": true,
   "float_field": 66.66,
+  "flow_published_at": "2023-07-12T18:28:27.194541Z",
   "id": 6,
   "nested": "{\"id\":\"i6\"}",
   "nested/id": "i6",
@@ -178,6 +199,7 @@
   "array_int": "[71,72]",
   "bool_field": false,
   "float_field": 77.77,
+  "flow_published_at": "2023-07-12T18:28:38.169062Z",
   "id": 7,
   "nested": "{\"id\":\"i7\"}",
   "nested/id": "i7",
@@ -187,6 +209,7 @@
   "array_int": "[81,82]",
   "bool_field": true,
   "float_field": 88.88,
+  "flow_published_at": "2023-07-12T18:28:48.465279Z",
   "id": 8,
   "nested": "{\"id\":\"i8\"}",
   "nested/id": "i8",
@@ -197,6 +220,7 @@
   "array_int": "[91,92]",
   "bool_field": false,
   "float_field": 99.99,
+  "flow_published_at": "2023-07-12T18:28:55.677252Z",
   "id": 9,
   "nested": "{\"id\":\"i9\"}",
   "nested/id": "i9",
@@ -206,6 +230,7 @@
   "array_int": "[1,2]",
   "bool_field": true,
   "float_field": 1010.101,
+  "flow_published_at": "2023-07-12T18:29:04.671352Z",
   "id": 10,
   "nested": "{\"id\":\"i10\"}",
   "nested/id": "i10",
