@@ -29,8 +29,9 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 
 	// Shared schema of the embedded "source" property.
 	var sourceSchema = (&jsonschema.Reflector{
-		ExpandedStruct: true,
-		DoNotReference: true,
+		ExpandedStruct:            true,
+		DoNotReference:            true,
+		AllowAdditionalProperties: true,
 	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
 
