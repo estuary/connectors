@@ -98,7 +98,6 @@ Binding 0:
                       "description": "A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"
                     }
                   },
-                  "additionalProperties": false,
                   "type": "object",
                   "required": [
                     "schema",
