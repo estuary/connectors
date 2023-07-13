@@ -533,6 +533,11 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.LSN, 
 		}
 
 		switch msg := msg.(type) {
+		case *pgproto3.ParameterStatus:
+			logrus.WithFields(logrus.Fields{
+				"name":  msg.Name,
+				"value": msg.Value,
+			}).Debug("ignoring parameter status message")
 		case *pgproto3.CopyData:
 			switch msg.Data[0] {
 			case pglogrepl.PrimaryKeepaliveMessageByteID:
@@ -557,7 +562,7 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.LSN, 
 				return 0, nil, fmt.Errorf("unknown CopyData message: %v", msg)
 			}
 		default:
-			return 0, nil, fmt.Errorf("unexpected message: %v", msg)
+			return 0, nil, fmt.Errorf("unexpected message: %#v", msg)
 		}
 	}
 }
