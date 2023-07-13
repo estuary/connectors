@@ -84,7 +84,6 @@ Binding 0:
                       "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
                     }
                   },
-                  "additionalProperties": false,
                   "type": "object",
                   "required": [
                     "schema",
@@ -197,7 +196,6 @@ Binding 1:
                       "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
                     }
                   },
-                  "additionalProperties": false,
                   "type": "object",
                   "required": [
                     "schema",

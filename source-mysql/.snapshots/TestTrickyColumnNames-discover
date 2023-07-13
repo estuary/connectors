@@ -79,7 +79,6 @@ Binding 0:
                       "description": "Cursor value representing the current position in the binlog."
                     }
                   },
-                  "additionalProperties": false,
                   "type": "object",
                   "required": [
                     "schema",
@@ -187,7 +186,6 @@ Binding 1:
                       "description": "Cursor value representing the current position in the binlog."
                     }
                   },
-                  "additionalProperties": false,
                   "type": "object",
                   "required": [
                     "schema",
