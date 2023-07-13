@@ -1,9 +1,9 @@
 # ================================
 # Collection "acmeCo/test/test_generic_catalogprimarykey_46055452": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKey_46055452","cursor":"binlog.000123:56789:123"}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKey_46055452","cursor":"binlog.000123:56789:123"}},"fullname":"No Such State","population":12345,"state":"XX","year":1970}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKey_46055452","cursor":"binlog.000123:56789:123"}},"fullname":"No Such State","population":123456,"state":"XX","year":1990}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKey_46055452","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKey_46055452","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"fullname":"No Such State","population":12345,"state":"XX","year":1970}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_CatalogPrimaryKey_46055452","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"fullname":"No Such State","population":123456,"state":"XX","year":1990}
 # ================================
 # Final State Checkpoint
 # ================================

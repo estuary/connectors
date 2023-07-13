@@ -14,7 +14,7 @@
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:137"}},"fullname":"South Dakota","population":641000,"state":"SD","year":1940}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:138"}},"fullname":"Tennessee","population":2935000,"state":"TN","year":1940}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:139"}},"fullname":"Texas","population":6425000,"state":"TX","year":1940}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"ComplexDataset_56015963","cursor":"binlog.000123:56789:123"}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"ComplexDataset_56015963","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
 # ================================
 # Final State Checkpoint
 # ================================
