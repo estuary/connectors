@@ -116,8 +116,8 @@ type postgresSource struct {
 	// * `lsn` is the log sequence number of this event. It's equal to loc[1].
 	// * `sequence` is a string-serialized JSON array which embeds a lexicographic
 	//    ordering of all events. It's equal to [loc[0], loc[1]].
-	// * `txId` is an opaque monotonic transaction identifier,
-	//   and defines its event boundaries. It can be set as loc[2].
+
+	XID uint32 `json:"xid,omitempty" jsonschema:"description=The 32-bit transaction ID assigned by Postgres to the commit which produced this change."`
 }
 
 // Named constants for the LSN locations within a postgresSource.Location.
@@ -150,6 +150,7 @@ type replicationStream struct {
 	lastTxnEndLSN   pglogrepl.LSN // End LSN (record + 1) of the last completed transaction.
 	nextTxnFinalLSN pglogrepl.LSN // Final LSN of the commit currently being processed, or zero if between transactions.
 	nextTxnMillis   int64         // Unix timestamp (in millis) at which the change originally occurred.
+	nextTxnXID      uint32        // XID of the commit currently being processed.
 
 	// standbyStatusDeadline is the time at which we need to stop receiving
 	// replication messages and go send a Standby Status Update message to
@@ -314,6 +315,7 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		}
 		s.nextTxnFinalLSN = msg.FinalLSN
 		s.nextTxnMillis = msg.CommitTime.UnixMilli()
+		s.nextTxnXID = msg.Xid
 		return nil, nil
 	case *pglogrepl.InsertMessage:
 		return s.decodeChangeEvent(sqlcapture.InsertOp, lsn, 0, nil, msg.Tuple, msg.RelationID)
@@ -330,6 +332,7 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		}
 		s.nextTxnFinalLSN = 0
 		s.nextTxnMillis = 0
+		s.nextTxnXID = 0
 		s.lastTxnEndLSN = msg.TransactionEndLSN
 		var event = &sqlcapture.FlushEvent{
 			Cursor: s.lastTxnEndLSN.String(),
@@ -448,6 +451,7 @@ func (s *replicationStream) decodeChangeEvent(
 				int(lsn),
 				int(s.nextTxnFinalLSN),
 			},
+			XID: s.nextTxnXID,
 		},
 		Before: bf,
 		After:  af,
