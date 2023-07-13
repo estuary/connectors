@@ -3,7 +3,7 @@ version: "3.7"
 services:
   db:
     image: 'mysql:latest'
-    command: []
+    command: [ "--gtid-mode=ON", "--enforce-gtid-consistency=ON" ]
     ## Alternative setup for testing MariaDB:
     # image: 'mariadb:latest'
     # command: [ "--log-bin", "--binlog-format=ROW" ]
