@@ -87,7 +87,7 @@ func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == http.StatusTooManyRequests {
+	if res.StatusCode != http.StatusOK {
 		var errorBody openAiEmbeddingsError
 		if err := json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
 			log.WithField("error", err).Warn("could not decode error response body")
@@ -96,9 +96,7 @@ func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]
 		} else {
 			log.WithField("errorBody", errorBody).Warn("errorBody error message was empty")
 		}
-	}
 
-	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("OpenAiClient CreateEmbeddings unexpected status: %s", res.Status)
 	}
 
