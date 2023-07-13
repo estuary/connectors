@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/test_usertypes_range_91324557": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_range_91324557","loc":[11111111,11111111,11111111]}},"id":3,"value":"(,4]"}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_range_91324557","loc":[11111111,11111111,11111111]}},"id":4,"value":"[5,6)"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_range_91324557","loc":[11111111,11111111,11111111],"xid":111111}},"id":3,"value":"(,4]"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_range_91324557","loc":[11111111,11111111,11111111],"xid":111111}},"id":4,"value":"[5,6)"}
 # ================================
 # Final State Checkpoint
 # ================================

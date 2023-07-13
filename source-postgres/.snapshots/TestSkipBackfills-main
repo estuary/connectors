@@ -1,21 +1,21 @@
 # ================================
 # Collection "acmeCo/test/test_skipbackfills_18110541": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_18110541","loc":[11111111,11111111,11111111]}},"data":"eleven","id":11}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_18110541","loc":[11111111,11111111,11111111]}},"data":"ten","id":10}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_18110541","loc":[11111111,11111111,11111111]}},"data":"twelve","id":12}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_18110541","loc":[11111111,11111111,11111111],"xid":111111}},"data":"eleven","id":11}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_18110541","loc":[11111111,11111111,11111111],"xid":111111}},"data":"ten","id":10}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_18110541","loc":[11111111,11111111,11111111],"xid":111111}},"data":"twelve","id":12}
 # ================================
 # Collection "acmeCo/test/test_skipbackfills_24310805": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_24310805","loc":[11111111,11111111,11111111]}},"data":"fifteen","id":15}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_24310805","loc":[11111111,11111111,11111111]}},"data":"fourteen","id":14}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_24310805","loc":[11111111,11111111,11111111]}},"data":"thirteen","id":13}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_24310805","loc":[11111111,11111111,11111111],"xid":111111}},"data":"fifteen","id":15}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_24310805","loc":[11111111,11111111,11111111],"xid":111111}},"data":"fourteen","id":14}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_24310805","loc":[11111111,11111111,11111111],"xid":111111}},"data":"thirteen","id":13}
 # ================================
 # Collection "acmeCo/test/test_skipbackfills_38410024": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_38410024","loc":[11111111,11111111,11111111]}},"data":"eighteen","id":18}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_38410024","loc":[11111111,11111111,11111111]}},"data":"seventeen","id":17}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_38410024","loc":[11111111,11111111,11111111]}},"data":"sixteen","id":16}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_38410024","loc":[11111111,11111111,11111111],"xid":111111}},"data":"eighteen","id":18}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_38410024","loc":[11111111,11111111,11111111],"xid":111111}},"data":"seventeen","id":17}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"skipbackfills_38410024","loc":[11111111,11111111,11111111],"xid":111111}},"data":"sixteen","id":16}
 # ================================
 # Final State Checkpoint
 # ================================

@@ -1,13 +1,13 @@
 # ================================
 # Collection "acmeCo/test/test_trickycolumnnames_39256824": 2 Documents
 # ================================
-{"Meta/\"wtf\"~ID":5,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"trickycolumnnames_39256824","loc":[11111111,11111111,11111111]}},"data":"eee"}
-{"Meta/\"wtf\"~ID":6,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"trickycolumnnames_39256824","loc":[11111111,11111111,11111111]}},"data":"fff"}
+{"Meta/\"wtf\"~ID":5,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"trickycolumnnames_39256824","loc":[11111111,11111111,11111111],"xid":111111}},"data":"eee"}
+{"Meta/\"wtf\"~ID":6,"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"trickycolumnnames_39256824","loc":[11111111,11111111,11111111],"xid":111111}},"data":"fff"}
 # ================================
 # Collection "acmeCo/test/test_trickycolumnnames_42531495": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"trickycolumnnames_42531495","loc":[11111111,11111111,11111111]}},"data":"ggg","table":7}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"trickycolumnnames_42531495","loc":[11111111,11111111,11111111]}},"data":"hhh","table":8}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"trickycolumnnames_42531495","loc":[11111111,11111111,11111111],"xid":111111}},"data":"ggg","table":7}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"trickycolumnnames_42531495","loc":[11111111,11111111,11111111],"xid":111111}},"data":"hhh","table":8}
 # ================================
 # Final State Checkpoint
 # ================================
