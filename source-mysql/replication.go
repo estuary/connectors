@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -15,6 +16,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	"vitess.io/vitess/go/vt/sqlparser"
@@ -148,6 +150,7 @@ type mysqlReplicationStream struct {
 	errCh  chan error         // Error output channel for the replication worker goroutine
 
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
+	gtidString    string    // The GTID value of the last GTID event, formatted as a "<uuid>:<counter>" string.
 
 	// The active tables set and associated metadata, guarded by a
 	// mutex so it can be modified from the main goroutine while it's
@@ -287,6 +290,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 							// connector change so that instead of a single `cursor` property we have
 							// separate fields for filename, position, and row index within the event.
 							EventCursor: fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx),
+							GTID:        rs.gtidString,
 						},
 					}
 				}
@@ -320,6 +324,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 							Source: &mysqlSourceInfo{
 								SourceCommon: sourceCommon,
 								EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx/2),
+								GTID:         rs.gtidString,
 							},
 						}
 					}
@@ -344,6 +349,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						Source: &mysqlSourceInfo{
 							SourceCommon: sourceCommon,
 							EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx),
+							GTID:         rs.gtidString,
 						},
 					}
 				}
@@ -363,6 +369,16 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		case *replication.GTIDEvent:
 			logrus.WithField("data", data).Trace("GTID Event")
 			rs.gtidTimestamp = data.OriginalCommitTime()
+
+			if len(data.SID) != 16 || (data.GNO == 0 && bytes.Equal(data.SID, []byte("\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"))) {
+				rs.gtidString = ""
+			} else {
+				var sourceUUID, err = uuid.FromBytes(data.SID)
+				if err != nil {
+					return fmt.Errorf("internal error: failed to parse GTID source %q: %w", data.SID, err)
+				}
+				rs.gtidString = fmt.Sprintf("%s:%d", sourceUUID.String(), data.GNO)
+			}
 		case *replication.PreviousGTIDsEvent:
 			logrus.WithField("gtids", data.GTIDSets).Trace("PreviousGTIDs Event")
 		case *replication.QueryEvent:

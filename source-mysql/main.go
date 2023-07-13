@@ -376,6 +376,7 @@ func (db *mysqlDatabase) ShouldBackfill(streamID string) bool {
 type mysqlSourceInfo struct {
 	sqlcapture.SourceCommon
 	EventCursor string `json:"cursor" jsonschema:"description=Cursor value representing the current position in the binlog."`
+	GTID        string `json:"gtid,omitempty" jsonschema:"description=The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."`
 }
 
 func (s *mysqlSourceInfo) Common() sqlcapture.SourceCommon {
