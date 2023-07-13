@@ -32,20 +32,28 @@ const (
 	// So instead we can apply some common-sense policy which mimics what a user might
 	// do: check the first N exhaustively and then start skimming through and randomly
 	// picking a document to check every so often.
-	discoverSubresourceMinimum     = 100
+	discoverSubresourceMinimum     = 50
 	discoverSubresourceProbability = 0.01
 
 	// discoverMaxDocumentsPerCollection limits the maximum number of documents which
 	// will be fetched from any specific collection.
-	discoverMaxDocumentsPerCollection = 1000
+	discoverMaxDocumentsPerCollection = 500
 
 	// discoverMaxDocumentsPerResource *approximately* limits the maximum number of
 	// documents which will be fetched from any specific resource path.
-	discoverMaxDocumentsPerResource = 10000
+	discoverMaxDocumentsPerResource = 1000
+
+	// discoverMaxCollectionsPerDocument limits the maximum number of collections
+	// which will be recursed into below any single document.
+	discoverMaxCollectionsPerDocument = 20
+
+	// discoverMaxTotalCollections places a hard limit on the number of discovery
+	// worker threads which will ever be launched.
+	discoverMaxTotalCollections = 10000
 
 	// discoverConcurrentScanners limits the number of scan worker goroutines which
 	// may execute concurrently.
-	discoverConcurrentScanners = 16
+	discoverConcurrentScanners = 8
 )
 
 const (
@@ -139,8 +147,9 @@ type discoveryState struct {
 	// Mutex-guarded state which may be modified from within worker goroutines.
 	shared struct {
 		sync.Mutex
-		resources map[resourcePath]struct{} // Map from resource paths to voids representing the set of resources discovered.
-		counts    map[resourcePath]int      // Map from resource paths to the number of documents processed.
+		totalCollectionsDiscovered int                       // Counter of the total number of collections for which handleCollection() dispatched a new worker thread.
+		resources                  map[resourcePath]struct{} // Map from resource paths to voids representing the set of resources discovered.
+		counts                     map[resourcePath]int      // Map from resource paths to the number of documents processed.
 	}
 }
 
@@ -209,6 +218,10 @@ func (ds *discoveryState) discoverCollection(ctx context.Context, coll *firestor
 		"resource":   resourcePath,
 	})
 
+	// Acquire one of the scanner semaphores before doing any further work
+	ds.scanSemaphore <- struct{}{}
+	defer func() { <-ds.scanSemaphore }()
+
 	// Note the existence of this resource.
 	ds.shared.Lock()
 	ds.shared.resources[resourcePath] = struct{}{}
@@ -218,10 +231,6 @@ func (ds *discoveryState) discoverCollection(ctx context.Context, coll *firestor
 		return nil
 	}
 	ds.shared.Unlock()
-
-	// Acquire one of the scanner semaphores before doing any further work
-	ds.scanSemaphore <- struct{}{}
-	defer func() { <-ds.scanSemaphore }()
 
 	var numDocuments int
 	logEntry.Debug("scanning collection")
@@ -264,25 +273,37 @@ func (ds *discoveryState) handleDocument(ctx context.Context, doc *firestore.Doc
 	// according to an "Always check the first K and then randomly check P% of the rest"
 	// heuristic.
 	if count < discoverSubresourceMinimum || rand.Float64() < discoverSubresourceProbability {
-		ds.scanners.Go(func() error {
-			subcolls, err := doc.Ref.Collections(ctx).GetAll()
-			if err != nil {
-				log.WithFields(log.Fields{
-					"doc": doc.Ref.Path,
-					"err": err,
-				}).Error("error listing subcollections")
-				return fmt.Errorf("error listing subcollections: %w", err)
-			}
-			for _, subcoll := range subcolls {
-				ds.handleCollection(ctx, subcoll)
-			}
-			return nil
+		subcolls, err := doc.Ref.Collections(ctx).GetAll()
+		if err != nil {
+			log.WithFields(log.Fields{
+				"doc": doc.Ref.Path,
+				"err": err,
+			}).Error("error listing subcollections")
+			return fmt.Errorf("error listing subcollections: %w", err)
+		}
+		// Iterate over subcollections in shuffled order
+		rand.Shuffle(len(subcolls), func(i, j int) {
+			subcolls[i], subcolls[j] = subcolls[j], subcolls[i]
 		})
+		for idx, subcoll := range subcolls {
+			if idx >= discoverMaxCollectionsPerDocument {
+				break
+			}
+			ds.handleCollection(ctx, subcoll)
+		}
 	}
 	return nil
 }
 
 func (ds *discoveryState) handleCollection(ctx context.Context, coll *firestore.CollectionRef) {
+	ds.shared.Lock()
+	if ds.shared.totalCollectionsDiscovered >= discoverMaxTotalCollections {
+		ds.shared.Unlock()
+		return
+	}
+	ds.shared.totalCollectionsDiscovered++
+	ds.shared.Unlock()
+
 	ds.scanners.Go(func() error {
 		var err = ds.discoverCollection(ctx, coll)
 		if err != nil {
@@ -291,7 +312,6 @@ func (ds *discoveryState) handleCollection(ctx context.Context, coll *firestore.
 				"error":      err,
 			}).Error("error scanning collection")
 		}
-
 		return err
 	})
 }
