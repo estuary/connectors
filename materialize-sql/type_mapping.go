@@ -328,13 +328,12 @@ func (m ProjectionTypeMapper) MapType(p *Projection) (MappedType, error) {
 	}
 }
 
-// MaxLengthMapper checks if the projection is a STRING type Projection having a MaxLength.
-// If it is, it invokes WithLength with the MaxLength to map the Projection and returns
-// the result. Otherwise, it invokes and returns Fallback.
+// MaxLengthMapper checks if the projection is a STRING type Projection having a MaxLength. If it
+// is, it invokes WithLength to map the Projection and returns the result. Otherwise, it invokes and
+// returns Fallback.
 type MaxLengthMapper struct {
-	WithLength           TypeMapper
-	WithLengthFmtPattern string
-	Fallback             TypeMapper
+	WithLength TypeMapper
+	Fallback   TypeMapper
 }
 
 var _ TypeMapper = MaxLengthMapper{}
@@ -347,7 +346,6 @@ func (m MaxLengthMapper) MapType(p *Projection) (MappedType, error) {
 	} else if mapped, err := m.WithLength.MapType(p); err != nil {
 		return MappedType{}, err
 	} else {
-		mapped.DDL = fmt.Sprintf(mapped.DDL, p.Inference.String_.MaxLength)
 		return mapped, nil
 	}
 }

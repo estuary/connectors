@@ -26,7 +26,7 @@ COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'auto-generated proje
 
 --- Begin "Delta Updates" createTargetTable ---
 CREATE TABLE IF NOT EXISTS "Delta Updates" (
-	theKey VARCHAR(4096),
+	theKey VARCHAR(MAX),
 	aValue BIGINT
 );
 
@@ -45,7 +45,7 @@ CREATE TEMPORARY TABLE flow_temp_table_0 (
 
 --- Begin "Delta Updates" createLoadTable ---
 CREATE TEMPORARY TABLE flow_temp_table_1 (
-	theKey VARCHAR(4096)
+	theKey VARCHAR(MAX)
 );
 --- End "Delta Updates" createLoadTable ---
 

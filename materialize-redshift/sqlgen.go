@@ -17,7 +17,14 @@ import (
 // default.
 var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
-const defaultMaxStringLength = 4096
+type varcharColumnMapper struct{}
+
+func (varcharColumnMapper) MapType(p *sql.Projection) (sql.MappedType, error) {
+	return sql.MappedType{
+		DDL:       fmt.Sprintf("VARCHAR(%d)", p.Inference.String_.MaxLength),
+		Converter: func(te tuple.TupleElement) (interface{}, error) { return te, nil },
+	}, nil
+}
 
 var rsDialect = func() sql.Dialect {
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
@@ -32,25 +39,14 @@ var rsDialect = func() sql.Dialect {
 				// The Redshift TEXT type allows for strings with a maximum byte-length of 256
 				// (equivalent to VARCHAR(256)). This is actually pretty short and would likely
 				// cause problems with common data sets, so we create the generic "string" column
-				// with more available length. There are inefficiencies that arise from excessively
-				// large length limits so we don't go as far as setting this field to VARCHAR(MAX).
-				// Using the MaxLengthMapper allows for direct control of how this field is created
-				// if desired by setting the maxLength constraint for the respective string fields
-				// in the JSON schema for the materialized collection.
-				WithLength: sql.NewStaticMapper("VARCHAR(%d)"),
-				Fallback: sql.NewStaticMapper(fmt.Sprintf("VARCHAR(%d)", defaultMaxStringLength), sql.WithElementConverter(
-					func(te tuple.TupleElement) (interface{}, error) {
-						// Provide a more helpful error message than the cryptic "Check
-						// 'stl_load_errors' system table for details" message that is output on a
-						// failed COPY job if a string is too long.
-						if s, ok := te.(string); ok {
-							if len(s) > defaultMaxStringLength {
-								return nil, fmt.Errorf("string with byte-length %d exceeded maximum allowable of %d", len(s), defaultMaxStringLength)
-							}
-						}
-
-						return te, nil
-					})),
+				// with more available length. If no MaxLength annotation is available from the
+				// schema we will create columns with the maximum possible length to minimize
+				// incompatibilities, but respect MaxLength schema annotations with the
+				// MaxLengthMapper. Creating columns as VARCHAR(MAX) may lead to some
+				// inefficiencies, but users are able to alter their tables after the fact to set a
+				// smaller length limit if needed.
+				WithLength: varcharColumnMapper{},
+				Fallback:   sql.NewStaticMapper("VARCHAR(MAX)"),
 			},
 			WithFormat: map[string]sql.TypeMapper{
 				"date": sql.NewStaticMapper("DATE"),
