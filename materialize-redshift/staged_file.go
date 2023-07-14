@@ -31,25 +31,27 @@ import (
 // uploading the file, the file location is returned as well as a callback that can be used to
 // delete the created file.
 type stagedFile struct {
-	cols         []*sql.Column
-	client       *s3.Client
-	uploader     *manager.Uploader
-	bucket       string
-	bucketPath   string
-	group        *errgroup.Group
-	uploadOutput *manager.UploadOutput
-	pipeWriter   *io.PipeWriter
-	encoder      *json.Encoder
-	started      bool
+	cols          []*sql.Column
+	client        *s3.Client
+	uploader      *manager.Uploader
+	uploaderErrCh chan (error)
+	bucket        string
+	bucketPath    string
+	group         *errgroup.Group
+	uploadOutput  *manager.UploadOutput
+	pipeWriter    *io.PipeWriter
+	encoder       *json.Encoder
+	started       bool
 }
 
 func newStagedFile(client *s3.Client, bucket string, bucketPath string, cols []*sql.Column) *stagedFile {
 	return &stagedFile{
-		cols:       cols,
-		client:     client,
-		uploader:   manager.NewUploader(client),
-		bucket:     bucket,
-		bucketPath: bucketPath,
+		cols:          cols,
+		client:        client,
+		uploader:      manager.NewUploader(client),
+		uploaderErrCh: make(chan error, 1), // Must be buffered to prevent blocking the uploader goroutine on error
+		bucket:        bucket,
+		bucketPath:    bucketPath,
 	}
 }
 
@@ -74,6 +76,16 @@ func (f *stagedFile) start(ctx context.Context) {
 			Body:   r,
 		})
 		if err != nil {
+			// This send cannot block since we are the only sender on the buffered channel. The
+			// error value sent here may be picked up in a call to encodeRow. Or if the error
+			// results after a flush begins, it will retrieved via group.Wait() from the error
+			// returned below.
+			f.uploaderErrCh <- err
+
+			// Close the writer channel now that the uploader has failed and no further writes to
+			// the pipe will be read. This will cause new & outstanding writes to the pipe to return
+			// a "closed pipe" error.
+			f.pipeWriter.Close()
 			return err
 		}
 
@@ -95,10 +107,26 @@ func (f *stagedFile) encodeRow(row []interface{}) error {
 		d[f.cols[idx].Field] = row[idx]
 	}
 
-	return f.encoder.Encode(d)
+	if err := f.encoder.Encode(d); err != nil {
+		select {
+		case uploadErr := <-f.uploaderErrCh:
+			// If the uploader goroutine has failed while encoding rows for this transaction, report
+			// that more useful error instead of the "closed pipe" error that would otherwise be
+			// returned.
+			err = uploadErr
+		default:
+			// Fallthrough for all other errors.
+		}
+
+		return fmt.Errorf("encoding row for staging: %w", err)
+	}
+
+	return nil
 }
 
 func (f *stagedFile) flush() (string, func(context.Context) error, error) {
+	// Close the write end of the pipe and wait for the uploader goroutine to return. Note that it
+	// is safe to call Close multiple times since io.Pipe internally manages this with a sync.Once.
 	f.pipeWriter.Close()
 	if err := f.group.Wait(); err != nil {
 		return "", nil, err
