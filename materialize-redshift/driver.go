@@ -230,12 +230,12 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
 	// bail out well before then.
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
 	if db, err := stdsql.Open("pgx", cfg.toURI()); err != nil {
 		errs.Err(err)
-	} else if err := db.PingContext(ctx); err != nil {
+	} else if err := db.PingContext(pingCtx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var pgErr *pgconn.PgError
 		var netConnErr *net.DNSError
