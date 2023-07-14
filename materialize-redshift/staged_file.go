@@ -74,6 +74,9 @@ func (f *stagedFile) start(ctx context.Context) {
 			Body:   r,
 		})
 		if err != nil {
+			// Closing the read half of the pipe will cause subsequent writes to fail, with the
+			// error received here propagated.
+			r.CloseWithError(err)
 			return err
 		}
 
