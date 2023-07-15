@@ -101,6 +101,7 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "1992-01-01 12:34:56", ExpectValue: `"1992-01-01T18:34:56Z"`},
 		// Handle the special "zero" value datetime by converting it to a valid sentinel RFC3339 datetime.
 		{ColumnType: "datetime", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "0000-00-00 00:00:00", ExpectValue: `"0001-01-01T00:00:00Z"`},
+		{ColumnType: "datetime(6)", ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: "0000-00-00 00:00:00", ExpectValue: `"0001-01-01T00:00:00Z"`},
 
 		// The TIMESTAMP column type will be converted by MySQL from the local time zone (which as mentioned
 		// above was set to 'America/Chicago' and acts as UTC-5 or UTC-6 depending on the date) to UTC for
