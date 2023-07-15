@@ -16,11 +16,10 @@ import (
 func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 	var errs []error
 
+	// Our version checking may have been overly conservative, so let's err in the
+	// other direction for a while and disengage the check entirely.
 	if err := db.prerequisiteVersion(ctx); err != nil {
-		// Return early if the database version is incompatible with the connector since additional
-		// errors will be of minimal use.
-		errs = append(errs, err)
-		return errs
+		logrus.WithField("err", err).Warn("database version may be insufficient")
 	}
 
 	for _, prereq := range []func(ctx context.Context) error{
