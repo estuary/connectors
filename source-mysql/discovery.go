@@ -211,7 +211,10 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 				// it could it wouldn't be a valid RFC3339 timestamp. Since this is the
 				// "your data is junk" sentinel value we replace it with a similar one
 				// that actually is a valid RFC3339 timestamp.
-				if string(val) == "0000-00-00 00:00:00" {
+				//
+				// MySQL doesn't allow timestamp values with a zero YYYY-MM-DD to have
+				// nonzero fractional seconds, so a simple prefix match can be used.
+				if strings.HasPrefix(string(val), "0000-00-00 00:00:00") {
 					return "0001-01-01T00:00:00Z", nil
 				}
 
@@ -224,7 +227,7 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 				// See note above in the "timestamp" case about replacing this default sentinel
 				// value with a valid RFC3339 timestamp sentinel value. The same reasoning applies
 				// here for "datetime".
-				if string(val) == "0000-00-00 00:00:00" {
+				if strings.HasPrefix(string(val), "0000-00-00 00:00:00") {
 					return "0001-01-01T00:00:00Z", nil
 				}
 				if db.datetimeLocation == nil {
