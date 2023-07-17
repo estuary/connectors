@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -233,15 +232,9 @@ func getBinlogExpiry(conn *client.Conn) (time.Duration, error) {
 	// When running on Amazon RDS MySQL there's an RDS-specific configuration
 	// for binlog retention, so that takes precedence if it exists.
 	rdsRetentionHours, err := queryNumericVariable(conn, `SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
-	logrus.WithFields(logrus.Fields{"hours": rdsRetentionHours, "err": fmt.Sprintf("%#v", err)}).Debug("queried RDS-specific binlog retention setting")
-	var merr = new(mysql.MyError)
-	if err == nil || !errors.As(err, &merr) || merr.Code != mysql.ER_NO_SUCH_TABLE {
-		// On RDS either the error will be nil *or* it will be some sort of permission-denied
-		// error. In either case we want to return the result and the error.
-		//
-		// On vanilla MySQL the error should always be "no such table", so in that case we
-		// will continue on to check the vanilla MySQL config variables.
-		return time.Duration(rdsRetentionHours) * time.Hour, err
+	logrus.WithFields(logrus.Fields{"hours": rdsRetentionHours, "err": err}).Debug("queried RDS-specific binlog retention setting")
+	if err == nil {
+		return time.Duration(rdsRetentionHours) * time.Hour, nil
 	}
 
 	// The newer 'binlog_expire_logs_seconds' variable takes priority if it exists and is nonzero.
