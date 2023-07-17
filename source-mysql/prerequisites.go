@@ -122,11 +122,13 @@ func (db *mysqlDatabase) prerequisiteBinlogExpiry(ctx context.Context) error {
 	// This check can be manually disabled by the user. It's dangerous, but
 	// might be desired in some edge cases.
 	if db.config.Advanced.SkipBinlogRetentionCheck {
+		logrus.Info("skipping binlog retention sanity check")
 		return nil
 	}
 
 	// Sanity-check binlog retention and error out if it's insufficiently long.
 	expiryTime, err := getBinlogExpiry(db.conn)
+	logrus.WithField("expiry", expiryTime.String()).Debug("queried binlog expiry time")
 	if err != nil {
 		return fmt.Errorf("error querying binlog expiry time: %w", err)
 	}
