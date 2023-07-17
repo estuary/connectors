@@ -264,7 +264,7 @@ func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo
 		var typeName = string(row[5].AsString())
 		var dataType interface{}
 		if typeName == "enum" {
-			dataType = &mysqlColumnType{Type: "enum", EnumValues: parseEnumValues(string(row[6].AsString()))}
+			dataType = &mysqlColumnType{Type: "enum", EnumValues: append(parseEnumValues(string(row[6].AsString())), "")}
 		} else if typeName == "set" {
 			dataType = &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(string(row[6].AsString()))}
 		} else {
