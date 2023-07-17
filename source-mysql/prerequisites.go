@@ -128,7 +128,7 @@ func (db *mysqlDatabase) prerequisiteBinlogExpiry(ctx context.Context) error {
 
 	// Sanity-check binlog retention and error out if it's insufficiently long.
 	expiryTime, err := getBinlogExpiry(db.conn)
-	logrus.WithField("expiry", expiryTime.String()).Debug("queried binlog expiry time")
+	logrus.WithField("expiry", expiryTime.String()).Info("queried binlog expiry time")
 	if err != nil {
 		return fmt.Errorf("error querying binlog expiry time: %w", err)
 	}
@@ -232,18 +232,21 @@ func getBinlogExpiry(conn *client.Conn) (time.Duration, error) {
 	// When running on Amazon RDS MySQL there's an RDS-specific configuration
 	// for binlog retention, so that takes precedence if it exists.
 	rdsRetentionHours, err := queryNumericVariable(conn, `SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
+	logrus.WithFields(logrus.Fields{"hours": rdsRetentionHours, "err": err}).Debug("queried RDS-specific binlog retention setting")
 	if err == nil {
 		return time.Duration(rdsRetentionHours) * time.Hour, nil
 	}
 
 	// The newer 'binlog_expire_logs_seconds' variable takes priority if it exists and is nonzero.
 	expireLogsSeconds, err := queryNumericVariable(conn, `SHOW VARIABLES LIKE 'binlog_expire_logs_seconds';`)
+	logrus.WithFields(logrus.Fields{"seconds": expireLogsSeconds, "err": err}).Debug("queried MySQL variable 'binlog_expire_logs_seconds'")
 	if err == nil && expireLogsSeconds > 0 {
 		return time.Duration(expireLogsSeconds * float64(time.Second)), nil
 	}
 
 	// And as the final resort we'll check 'expire_logs_days' if 'seconds' was zero or nonexistent.
 	expireLogsDays, err := queryNumericVariable(conn, `SHOW VARIABLES LIKE 'expire_logs_days';`)
+	logrus.WithFields(logrus.Fields{"days": expireLogsDays, "err": err}).Debug("queried MySQL variable 'expire_logs_days'")
 	if err != nil {
 		return 0, err
 	}
