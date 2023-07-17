@@ -50,9 +50,9 @@ impl Configuration {
     pub fn security_protocol(&self) -> &'static str {
         match (&self.authentication, &self.tls) {
             (None, Some(TlsSettings::SystemCertificates)) => "SSL",
-            (None, None) => "PLAINTEXT",
+            (None, None | Some(TlsSettings::Disabled)) => "PLAINTEXT",
             (Some(_), Some(TlsSettings::SystemCertificates)) => "SASL_SSL",
-            (Some(_), None) => "SASL_PLAINTEXT",
+            (Some(_), None | Some(TlsSettings::Disabled)) => "SASL_PLAINTEXT",
         }
     }
 }
@@ -123,7 +123,8 @@ impl JsonSchema for Configuration {
                     "default": "system_certificates",
                     "description": "Controls how should TLS certificates be found or used.",
                     "enum": [
-                        "system_certificates"
+                        "system_certificates",
+                        "disabled"
                     ],
                     "title": "TLS Settings",
                     "type": "string",
@@ -277,11 +278,11 @@ pub enum TlsSettings {
     /// Use the TLS certificates bundled with openssl.
     #[default]
     SystemCertificates,
+    /// Disable TLS and transfer over plaintext via explicit configuration.
+    Disabled,
     // TODO: allow the user to specify custom TLS certs, authorities, etc.
     // CustomCertificates(CustomTlsSettings),
 }
-
-
 
 #[cfg(test)]
 mod test {
