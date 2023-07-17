@@ -54,7 +54,7 @@ require (
 	google.golang.org/genproto v0.0.0-20230131230820-1c016267d619
 	google.golang.org/grpc v1.52.3
 	google.golang.org/protobuf v1.28.1
-	vitess.io/vitess v0.16.2
+	vitess.io/vitess v0.15.3
 )
 
 require (
@@ -130,6 +130,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-ieproxy v0.0.9 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
