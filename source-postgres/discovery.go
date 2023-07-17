@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"time"
 	"fmt"
 	"net"
 	"reflect"
@@ -18,6 +19,7 @@ import (
 const (
 	infinityTimestamp         = "9999-12-31T23:59:59Z"
 	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
+	RFC3339TimeFormat         = "15:04:05.999999999Z07:00"
 )
 
 // DiscoverTables queries the database for information about tables available for capture.
@@ -220,6 +222,11 @@ func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interfa
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
 func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
+	var dataType interface{}
+	if column != nil {
+		dataType = column.DataType
+	}
+
 	switch x := val.(type) {
 	case *net.IPNet:
 		return x.String(), nil
@@ -261,6 +268,28 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 			return infinityTimestamp, nil
 		} else if x == pgtype.NegativeInfinity {
 			return negativeInfinityTimestamp, nil
+		}
+	case pgtype.Timestamptz:
+		return x.Time.Format(time.RFC3339Nano), nil
+	case pgtype.Timestamp:
+		return x.Time.Format(time.RFC3339Nano), nil
+	case time.Time:
+		return x.Format(time.RFC3339Nano), nil
+	}
+	switch dataType {
+	case "timetz":
+		if x, ok := val.(string); ok {
+			var formats = []string{
+				"15:04:05.999999999Z07:00",
+				"15:04:05.999999999Z07",
+				"15:04:05Z07:00",
+				"15:04:05Z07",
+			}
+			for _, format := range formats {
+				if t, err := time.Parse(format, x); err == nil {
+					return t.Format(RFC3339TimeFormat), nil
+				}
+			}
 		}
 	}
 	if _, ok := val.(json.Marshaler); ok {
