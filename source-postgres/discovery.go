@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"time"
 	"fmt"
 	"net"
 	"reflect"
@@ -262,6 +263,8 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		} else if x == pgtype.NegativeInfinity {
 			return negativeInfinityTimestamp, nil
 		}
+	case time.Time:
+		return x.Format(time.RFC3339Nano), nil
 	}
 	if _, ok := val.(json.Marshaler); ok {
 		return val, nil
