@@ -92,6 +92,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 	}
 	stream.tables.active = make(map[string]struct{})
 	stream.tables.keyColumns = make(map[string][]string)
+	stream.tables.discovery = make(map[string]*sqlcapture.DiscoveryInfo)
 	return stream, nil
 }
 
@@ -170,6 +171,7 @@ type replicationStream struct {
 		sync.RWMutex
 		active     map[string]struct{}
 		keyColumns map[string][]string
+		discovery  map[string]*sqlcapture.DiscoveryInfo
 	}
 }
 
@@ -420,10 +422,14 @@ func (s *replicationStream) decodeChangeEvent(
 		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 	}
 
-	if err := translateRecordFields(nil, bf); err != nil {
+	discovery, ok := s.tables.discovery[streamID]
+	if !ok {
+		return nil, fmt.Errorf("unknown discovery info for stream %q", streamID)
+	}
+	if err := translateRecordFields(discovery, bf); err != nil {
 		return nil, fmt.Errorf("error translating 'before' tuple: %w", err)
 	}
-	if err := translateRecordFields(nil, af); err != nil {
+	if err := translateRecordFields(discovery, af); err != nil {
 		return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
 	}
 
@@ -585,6 +591,7 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 	s.tables.Lock()
 	s.tables.active[streamID] = struct{}{}
 	s.tables.keyColumns[streamID] = keyColumns
+	s.tables.discovery[streamID] = discovery
 	s.tables.Unlock()
 	return nil
 }
