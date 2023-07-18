@@ -19,7 +19,7 @@ require (
 	github.com/benbjohnson/clock v1.3.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/elastic/go-elasticsearch/v7 v7.17.1
-	github.com/estuary/flow v0.3.4-0.20230714153247-33844329ca87
+	github.com/estuary/flow v0.3.4-0.20230718195208-1aed3cc73e86
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/gogo/protobuf v1.3.2
@@ -44,7 +44,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/xitongsys/parquet-go v1.6.2
 	github.com/xitongsys/parquet-go-source v0.0.0-20220527110425-ba4adb87a31b
-	go.gazette.dev/core v0.89.1-0.20230713153522-d685bc1c4e90
+	go.gazette.dev/core v0.89.1-0.20230717210749-2615d43e1202
 	go.mongodb.org/mongo-driver v1.11.2
 	golang.org/x/crypto v0.10.0
 	golang.org/x/oauth2 v0.4.0
