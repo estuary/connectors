@@ -41,7 +41,7 @@ const retryInterval = 300 * time.Second
 const progressLogInterval = 10000
 
 const (
-	backfillChunkSize   = 1024
+	backfillChunkSize   = 256
 	concurrentBackfills = 2
 )
 
