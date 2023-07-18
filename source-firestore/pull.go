@@ -40,6 +40,11 @@ const retryInterval = 300 * time.Second
 // Log progress messages after every N documents on a particular stream
 const progressLogInterval = 10000
 
+const (
+	backfillChunkSize   = 1024
+	concurrentBackfills = 2
+)
+
 func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
 
@@ -75,6 +80,8 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 			Resources: updatedResourceStates,
 		},
 		Output: stream,
+
+		backfillSemaphore: make(chan struct{}, concurrentBackfills),
 	}
 	return capture.Run(stream.Context())
 }
@@ -83,6 +90,8 @@ type capture struct {
 	Config config
 	State  *captureState
 	Output *boilerplate.PullOutput
+
+	backfillSemaphore chan struct{}
 }
 
 type captureState struct {
@@ -323,8 +332,6 @@ func (c *capture) Run(ctx context.Context) error {
 	return nil
 }
 
-const backfillChunkSize = 1024
-
 func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, collectionID string, resumeState *backfillState) error {
 	var logEntry = log.WithFields(log.Fields{"collection": collectionID})
 
@@ -359,8 +366,23 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 		cursor = resumeDocument
 	}
 
+	// In order to limit the number of concurrent backfills we're buffering
+	// in memory at any moment we use a semaphore. Instead of waiting to
+	// acquire the semaphore before each query, we instead acquire it up-
+	// front so that we can ensure that any return path from this function
+	// will correctly release it. Then before each query we *release and
+	// reacquire* the semaphore to give other backfills a chance to make
+	// progress.
+	c.backfillSemaphore <- struct{}{}
+	defer func() { <-c.backfillSemaphore }()
+
 	var numDocuments int
 	for {
+		// Give other backfills a chance to acquire the semaphore, then take
+		// it back for ourselves.
+		<-c.backfillSemaphore
+		c.backfillSemaphore <- struct{}{}
+
 		var query firestore.Query = client.CollectionGroup(collectionID).Query
 		if cursor != nil {
 			query = query.StartAfter(cursor)
