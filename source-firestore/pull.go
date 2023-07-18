@@ -401,7 +401,9 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 
 			// Convert the document into JSON-serializable form
 			var fields = doc.Data()
-			fields = sanitizeDocument(fields)
+			for key, value := range fields {
+				fields[key] = sanitizeValue(value)
+			}
 			fields[metaProperty] = &documentMetadata{
 				Path:       doc.Ref.Path,
 				CreateTime: &doc.CreateTime,
@@ -757,17 +759,22 @@ func translateValue(val *firestore_pb.Value) (interface{}, error) {
 	return nil, fmt.Errorf("unknown value type %T", val)
 }
 
-func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
-	for key, value := range doc {
-		switch v := value.(type) {
-		case float64:
-			if math.IsNaN(v) {
-				doc[key] = "NaN"
-			}
-		case map[string]interface{}:
-			doc[key] = sanitizeDocument(v)
+func sanitizeValue(x interface{}) interface{} {
+	switch x := x.(type) {
+	case float64:
+		if math.IsNaN(x) {
+			return "NaN"
 		}
+	case []interface{}:
+		for idx, value := range x {
+			x[idx] = sanitizeValue(value)
+		}
+		return x
+	case map[string]interface{}:
+		for key, value := range x {
+			x[key] = sanitizeValue(value)
+		}
+		return x
 	}
-
-	return doc
+	return x
 }
