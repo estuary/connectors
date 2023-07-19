@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS "a-schema".target_table (
 	"a Time" TIMESTAMPTZ,
 	"array" SUPER,
 	lower_case BIGINT,
-	value VARCHAR(4096),
+	value TEXT,
 	flow_document SUPER
 );
 
@@ -26,7 +26,7 @@ COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'auto-generated proje
 
 --- Begin "Delta Updates" createTargetTable ---
 CREATE TABLE IF NOT EXISTS "Delta Updates" (
-	theKey VARCHAR(4096),
+	theKey TEXT,
 	aValue BIGINT
 );
 
@@ -45,7 +45,7 @@ CREATE TEMPORARY TABLE flow_temp_table_0 (
 
 --- Begin "Delta Updates" createLoadTable ---
 CREATE TEMPORARY TABLE flow_temp_table_1 (
-	theKey VARCHAR(4096)
+	theKey TEXT
 );
 --- End "Delta Updates" createLoadTable ---
 
