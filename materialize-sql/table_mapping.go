@@ -149,9 +149,8 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 		// fields as a regular string, which will allow such materializations to continue working.
 		// It is not meant to be user-facing and is configured as-needed by Estuary support staff.
 
-		// We should remove this when there are no longer any materializations that need it (there's
-		// only 1 known case where it is needed currently), or a more comprehensive backwards
-		// compatibility layer is added to the materialization dialects.
+		// We should remove this when a more comprehensive backwards compatibility layer is added
+		// to the materialization dialects.
 		if col.RawFieldConfig != nil {
 			var options fieldConfigOptions
 			if err := json.Unmarshal(col.RawFieldConfig, &options); err != nil {
