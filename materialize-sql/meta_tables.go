@@ -82,11 +82,6 @@ func FlowCheckpointsTable(path ...string) TableShape {
 						Types:  []string{"string"},
 						Exists: flow.Inference_MUST,
 						String_: &flow.Inference_String{
-							// NOTE(johnny): Checkpoints *are* base64, but we lie to the
-							// connector to coerce it to select a regular text column type
-							// rather than a binary one for historical reasons. We should
-							// revisit when we figure out a clean migration path.
-							IsBase64:    false,
 							ContentType: "application/x-protobuf; proto=consumer.Checkpoint",
 						},
 					},
@@ -142,11 +137,6 @@ func FlowMaterializationsTable(path ...string) TableShape {
 						Types:  []string{"string"},
 						Exists: flow.Inference_MUST,
 						String_: &flow.Inference_String{
-							// NOTE(johnny): Specifications *are* base64, but we lie to the
-							// connector to coerce it to select a regular text column type
-							// rather than a binary one for historical reasons. We should
-							// revisit when we figure out a clean migration path.
-							IsBase64:    false,
 							ContentType: "application/x-protobuf; proto=flow.MaterializationSpec",
 						},
 					},
