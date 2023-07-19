@@ -618,8 +618,6 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 	}
 	defer txn.Rollback(ctx)
 
-	var batch pgx.Batch
-
 	// If there are multiple materializations operating on different tables within the same database
 	// using the same metadata table path, they will need to concurrently update the checkpoints
 	// table. Aquiring a table-level lock prevents "serializable isolation violation" errors in this
@@ -628,7 +626,11 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 	// table. For best performance, a single materialization per database should be used, or
 	// separate materializations within the same database should use a different schema for their
 	// metadata.
-	batch.Queue(fmt.Sprintf("lock %s;", rsDialect.Identifier(d.fence.TablePath...)))
+	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", rsDialect.Identifier(d.fence.TablePath...))); err != nil {
+		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
+	}
+
+	var batch pgx.Batch
 
 	for idx, b := range d.bindings {
 		if !b.storeFile.started {
