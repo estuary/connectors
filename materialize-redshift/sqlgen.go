@@ -17,8 +17,6 @@ import (
 // default.
 var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
-const defaultMaxStringLength = 4096
-
 var rsDialect = func() sql.Dialect {
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.INTEGER: sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
@@ -28,30 +26,7 @@ var rsDialect = func() sql.Dialect {
 		sql.ARRAY:   sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.BINARY:  sql.NewStaticMapper("VARBYTE"),
 		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.MaxLengthMapper{
-				// The Redshift TEXT type allows for strings with a maximum byte-length of 256
-				// (equivalent to VARCHAR(256)). This is actually pretty short and would likely
-				// cause problems with common data sets, so we create the generic "string" column
-				// with more available length. There are inefficiencies that arise from excessively
-				// large length limits so we don't go as far as setting this field to VARCHAR(MAX).
-				// Using the MaxLengthMapper allows for direct control of how this field is created
-				// if desired by setting the maxLength constraint for the respective string fields
-				// in the JSON schema for the materialized collection.
-				WithLength: sql.NewStaticMapper("VARCHAR(%d)"),
-				Fallback: sql.NewStaticMapper(fmt.Sprintf("VARCHAR(%d)", defaultMaxStringLength), sql.WithElementConverter(
-					func(te tuple.TupleElement) (interface{}, error) {
-						// Provide a more helpful error message than the cryptic "Check
-						// 'stl_load_errors' system table for details" message that is output on a
-						// failed COPY job if a string is too long.
-						if s, ok := te.(string); ok {
-							if len(s) > defaultMaxStringLength {
-								return nil, fmt.Errorf("string with byte-length %d exceeded maximum allowable of %d", len(s), defaultMaxStringLength)
-							}
-						}
-
-						return te, nil
-					})),
-			},
+			Fallback: sql.NewStaticMapper("TEXT"), // Note: Actually a VARCHAR(256)
 			WithFormat: map[string]sql.TypeMapper{
 				"date": sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(
@@ -238,3 +213,5 @@ TIMEFORMAT 'auto';
 	tplUpdateFence               = tplAll.Lookup("updateFence")
 	tplCopyFromS3                = tplAll.Lookup("copyFromS3")
 )
+
+const varcharTableAlter = "ALTER TABLE %s ALTER COLUMN %s TYPE VARCHAR(MAX);"

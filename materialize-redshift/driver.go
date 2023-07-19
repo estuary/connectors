@@ -32,6 +32,26 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
+const (
+	// This is the maximum length that any redshift VARCHAR column can be. There is no variable
+	// unlimited length text column type (equivalent to Postgres TEXT type, for example), and there
+	// are negative query performance implications from creating string columns with this maximum
+	// length by default.
+	//
+	// Because of this we create string columns as their default maximum length of 256 characters
+	// initially (somewhat confusingly, using the Redshift TEXT type, which is actually a
+	// VARCHAR(256)), and only enlarge the columns to the maximum length if we observe a string that
+	// is longer than 256 bytes. Strings longer than 65535 bytes will result in a connector error.
+	//
+	// One potential resolution to this error would be create a derived collection that truncates
+	// strings over a maximum length. Another solution would be to exclude the field from the
+	// materialization via field selection, and _also_ exclude flow_document from from the
+	// materialization - only possible for delta updates. flow_document must be exluded as well
+	// because Redshift SUPER types impose the same limits on their individual field values as the
+	// columns, so a string can only be this long as a field value in a SUPER type too.
+	redshiftVarcharMaxLength = 65535
+)
+
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
 	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
@@ -398,8 +418,26 @@ func newTransactor(
 		return nil, err
 	}
 
+	conn, err := pgx.Connect(ctx, d.cfg.toURI())
+	if err != nil {
+		return nil, fmt.Errorf("newTransactor pgx.Connect: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	tableVarchars, err := getVarcharLengths(ctx, conn)
+	if err != nil {
+		return nil, fmt.Errorf("getting existing varchar column lengths: %w", err)
+	}
+
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, d.cfg.Bucket, d.cfg.BucketPath, s3client); err != nil {
+		if err = d.addBinding(
+			ctx,
+			binding,
+			d.cfg.Bucket,
+			d.cfg.BucketPath,
+			s3client,
+			tableVarchars[strings.ToLower(binding.Identifier)], // Redshift lowercases all table identifiers
+		); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -416,6 +454,7 @@ func newTransactor(
 
 type binding struct {
 	target                       sql.Table
+	varcharColumnMetas           []varcharColumnMeta
 	loadFile                     *stagedFile
 	storeFile                    *stagedFile
 	createLoadTableSQL           string
@@ -425,7 +464,22 @@ type binding struct {
 	loadQuerySQL                 string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, bucket string, bucketPath string, client *s3.Client) error {
+// varcharColumnMeta contains metadata about Redshift varchar columns. Currently this is just the
+// maximum length of the field as reported from the database, populated upon connector startup.
+type varcharColumnMeta struct {
+	identifier string
+	maxLength  int
+	isVarchar  bool
+}
+
+func (t *transactor) addBinding(
+	ctx context.Context,
+	target sql.Table,
+	bucket string,
+	bucketPath string,
+	client *s3.Client,
+	varchars map[string]int,
+) error {
 	var b = &binding{
 		target:    target,
 		loadFile:  newStagedFile(client, bucket, bucketPath, target.KeyPtrs()),
@@ -447,6 +501,33 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, bucket st
 			return err
 		}
 	}
+
+	// Retain column metadata information for this binding as a snapshot of the table configuration
+	// when the connector started, indexed in the same order as values will be received from the
+	// runtime for Store requests. Only VARCHAR columns will have non-zero-valued varcharColumnMeta.
+	allColumns := target.Columns()
+	columnMetas := make([]varcharColumnMeta, len(allColumns))
+	if varchars != nil { // There may not be any varchar columns for this binding
+		for idx, col := range allColumns {
+			// If this column is not found in varchars, it must not have been a VARCHAR column.
+			if existingMaxLength, ok := varchars[strings.ToLower(col.Identifier)]; ok { // Redshift lowercases all column identifiers
+				columnMetas[idx] = varcharColumnMeta{
+					identifier: col.Identifier,
+					maxLength:  existingMaxLength,
+					isVarchar:  true,
+				}
+
+				log.WithFields(log.Fields{
+					"table":            b.target.Identifier,
+					"column":           col.Identifier,
+					"varcharMaxLength": existingMaxLength,
+					"collection":       b.target.Source.String(),
+					"field":            col.Field,
+				}).Debug("matched string collection field to table VARCHAR column")
+			}
+		}
+	}
+	b.varcharColumnMetas = columnMetas
 
 	t.bindings = append(t.bindings, b)
 	return nil
@@ -570,6 +651,12 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	// can be performed into the target table rather than copying into a staging table and merging
 	// into the target table.
 	hasUpdates := make([]bool, len(d.bindings))
+
+	// varcharColumnUpdates records any VARCHAR columns that need their lengths increased. The keys
+	// are table identifiers, and the values are a list of column identifiers that need altered.
+	// Columns will only ever be to altered it to VARCHAR(MAX).
+	varcharColumnUpdates := make(map[string][]string)
+
 	for it.Next() {
 		if it.Exists {
 			hasUpdates[it.Binding] = true
@@ -581,6 +668,35 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
+		}
+
+		// See if we need to increase any VARCHAR column lengths, or error because the string fields
+		// are too long to materialize.
+		for idx, c := range converted {
+			varcharMeta := b.varcharColumnMetas[idx]
+			if varcharMeta.isVarchar {
+				l := len(c.(string))
+				if l > redshiftVarcharMaxLength {
+					// This value cannot be materialized since it is longer than a Redshift VARCHAR
+					// column can possibly allow.
+					return nil, fmt.Errorf(
+						"cannot materialize string value to column %s of table %s: string byte length %d exceeds maximum allowable length %d",
+						varcharMeta.identifier,
+						b.target.Identifier,
+						l,
+						redshiftVarcharMaxLength,
+					)
+				} else if l > varcharMeta.maxLength {
+					log.WithFields(log.Fields{
+						"table":               b.target.Identifier,
+						"column":              varcharMeta.identifier,
+						"currentColumnLength": varcharMeta.maxLength,
+						"stringValueLength":   l,
+					}).Info("column will be altered to VARCHAR(MAX) to accommodate large string value")
+					varcharColumnUpdates[b.target.Identifier] = append(varcharColumnUpdates[b.target.Identifier], varcharMeta.identifier)
+					b.varcharColumnMetas[idx].maxLength = redshiftVarcharMaxLength // Do not need to alter this column again.
+				}
+			}
 		}
 
 		b.storeFile.encodeRow(converted)
@@ -601,16 +717,46 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String(), hasUpdates) })
+		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates) })
 	}, nil
 }
 
-func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates []bool) error {
+func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates []bool, varcharColumnUpdates map[string][]string) error {
 	conn, err := pgx.Connect(ctx, d.cfg.toURI())
 	if err != nil {
 		return fmt.Errorf("store pgx.Connect: %w", err)
 	}
 	defer conn.Close(ctx)
+
+	// Update any columns that require setting to VARCHAR(MAX) for storing large strings. ALTER
+	// TABLE ALTER COLUMN statements cannot be run inside transaction blocks.
+	for table, updates := range varcharColumnUpdates {
+		for _, column := range updates {
+			if _, err := conn.Exec(ctx, fmt.Sprintf(varcharTableAlter, table, column)); err != nil {
+				// It is possible that another shard of this materialization will have already
+				// updated this column. Practically this means we will try to set a column that is
+				// already VARCHAR(MAX) to VARCHAR(MAX), and Redshift returns a specific error in
+				// this case that can be safely discarded.
+				var pgErr *pgconn.PgError
+				if errors.As(err, &pgErr) {
+					if pgErr.Code == "0A000" && strings.Contains(pgErr.Message, "target column size should be different") {
+						log.WithFields(log.Fields{
+							"table":  table,
+							"column": column,
+						}).Info("attempted to alter column VARCHAR(MAX) but it was already VARCHAR(MAX)")
+						continue
+					}
+				}
+
+				return fmt.Errorf("altering size for column %s of table %s: %w", column, table, err)
+			}
+
+			log.WithFields(log.Fields{
+				"table":  table,
+				"column": column,
+			}).Info("column altered to VARCHAR(MAX) to accommodate large string value")
+		}
+	}
 
 	txn, err := conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
