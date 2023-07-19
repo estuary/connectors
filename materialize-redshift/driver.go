@@ -681,7 +681,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 						// This value cannot be materialized since it is longer than a Redshift VARCHAR
 						// column can possibly allow.
 						return nil, fmt.Errorf(
-							"cannot materialize string value to column %s of table %s: string byte length %d exceeds maximum allowable length %d",
+							"cannot materialize string field to column '%s' of table '%s': string byte length %d exceeds Redshift maximum allowable length %d for a VARCHAR column",
 							varcharMeta.identifier,
 							b.target.Identifier,
 							len(v),
