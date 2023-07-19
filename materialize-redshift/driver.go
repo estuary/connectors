@@ -675,26 +675,35 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		for idx, c := range converted {
 			varcharMeta := b.varcharColumnMetas[idx]
 			if varcharMeta.isVarchar {
-				l := len(c.(string))
-				if l > redshiftVarcharMaxLength {
-					// This value cannot be materialized since it is longer than a Redshift VARCHAR
-					// column can possibly allow.
-					return nil, fmt.Errorf(
-						"cannot materialize string value to column %s of table %s: string byte length %d exceeds maximum allowable length %d",
-						varcharMeta.identifier,
-						b.target.Identifier,
-						l,
-						redshiftVarcharMaxLength,
-					)
-				} else if l > varcharMeta.maxLength {
-					log.WithFields(log.Fields{
-						"table":               b.target.Identifier,
-						"column":              varcharMeta.identifier,
-						"currentColumnLength": varcharMeta.maxLength,
-						"stringValueLength":   l,
-					}).Info("column will be altered to VARCHAR(MAX) to accommodate large string value")
-					varcharColumnUpdates[b.target.Identifier] = append(varcharColumnUpdates[b.target.Identifier], varcharMeta.identifier)
-					b.varcharColumnMetas[idx].maxLength = redshiftVarcharMaxLength // Do not need to alter this column again.
+				switch v := c.(type) {
+				case string:
+					if len(v) > redshiftVarcharMaxLength {
+						// This value cannot be materialized since it is longer than a Redshift VARCHAR
+						// column can possibly allow.
+						return nil, fmt.Errorf(
+							"cannot materialize string value to column %s of table %s: string byte length %d exceeds maximum allowable length %d",
+							varcharMeta.identifier,
+							b.target.Identifier,
+							len(v),
+							redshiftVarcharMaxLength,
+						)
+					} else if len(v) > varcharMeta.maxLength {
+						log.WithFields(log.Fields{
+							"table":               b.target.Identifier,
+							"column":              varcharMeta.identifier,
+							"currentColumnLength": varcharMeta.maxLength,
+							"stringValueLength":   len(v),
+						}).Info("column will be altered to VARCHAR(MAX) to accommodate large string value")
+						varcharColumnUpdates[b.target.Identifier] = append(varcharColumnUpdates[b.target.Identifier], varcharMeta.identifier)
+						b.varcharColumnMetas[idx].maxLength = redshiftVarcharMaxLength // Do not need to alter this column again.
+					}
+				case nil:
+					// Values for string fields may be null, in which case there is nothing to do.
+					continue
+				default:
+					// Invariant: This value must either be a string or nil, since the column it is
+					// going into is a VARCHAR.
+					return nil, fmt.Errorf("expected type string or nil for column %s of table %s, got %T", varcharMeta.identifier, b.target.Identifier, c)
 				}
 			}
 		}
