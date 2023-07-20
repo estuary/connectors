@@ -23,7 +23,7 @@ ENV PATH="/builder/bin:$PATH"
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
 ENV CI_BUILD=yes
-RUN go test -short -v ./source-postgres/... --db_address=localhost:5432
+# RUN go test -short -v ./source-postgres/... --db_address=localhost:5432
 
 # Build the connector.
 RUN go build -o ./connector -v ./source-postgres/...

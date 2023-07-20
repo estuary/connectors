@@ -492,6 +492,7 @@ func (s *replicationStream) decodeTuple(
 		case 'n':
 			fields[colName] = nil
 		case 't':
+			logrus.WithField("colName", colName).Info("decodeTextColumnData")
 			var val, err = s.decodeTextColumnData(col.Data, rel.Columns[idx].DataType)
 			if err != nil {
 				return nil, fmt.Errorf("error decoding column data: %w", err)
@@ -514,7 +515,9 @@ func (s *replicationStream) decodeTuple(
 
 func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (interface{}, error) {
 	var decoder pgtype.TextDecoder
+	logrus.WithField("dataType", dataType).WithField("data", string(data)).Info("decodeTextColumnData")
 	if dt, ok := s.connInfo.DataTypeForOID(dataType); ok {
+		logrus.WithField("dt", dataType).Info("decodeTextColumnData")
 		decoder, ok = dt.Value.(pgtype.TextDecoder)
 		if !ok {
 			decoder = &pgtype.GenericText{}
@@ -522,6 +525,7 @@ func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (
 	} else {
 		decoder = &pgtype.GenericText{}
 	}
+	logrus.WithField("decoder", decoder).Info("decodeTextColumnData")
 	if err := decoder.DecodeText(s.connInfo, data); err != nil {
 		return nil, err
 	}
