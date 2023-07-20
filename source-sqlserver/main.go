@@ -244,3 +244,5 @@ func (db *sqlserverDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 func (db *sqlserverDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/lsn", "/_meta/source/seqval"}
 }
+
+func (db *sqlserverDatabase) RequestTxIDs(schema, table string) {}

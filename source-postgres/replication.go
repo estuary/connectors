@@ -78,6 +78,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 	}
 
 	var stream = &replicationStream{
+		db:       db,
 		conn:     conn,
 		pubName:  publication,
 		replSlot: slot,
@@ -116,7 +117,7 @@ type postgresSource struct {
 	// * `sequence` is a string-serialized JSON array which embeds a lexicographic
 	//    ordering of all events. It's equal to [loc[0], loc[1]].
 
-	XID uint32 `json:"xid,omitempty" jsonschema:"description=The 32-bit transaction ID assigned by Postgres to the commit which produced this change."`
+	TxID uint32 `json:"txid,omitempty" jsonschema:"description=The 32-bit transaction ID assigned by Postgres to the commit which produced this change."`
 }
 
 // Named constants for the LSN locations within a postgresSource.Location.
@@ -136,6 +137,7 @@ func (s *postgresSource) Common() sqlcapture.SourceCommon {
 // is no built-in concurrency, so Process() must be called reasonably
 // soon after StartReplication() in order to not time out.
 type replicationStream struct {
+	db       *postgresDatabase
 	conn     *pgconn.PgConn // The PostgreSQL replication connection
 	pubName  string         // The name of the PostgreSQL publication to use
 	replSlot string         // The name of the PostgreSQL replication slot to use
@@ -430,25 +432,28 @@ func (s *replicationStream) decodeChangeEvent(
 		return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
 	}
 
+	var sourceInfo = &postgresSource{
+		SourceCommon: sqlcapture.SourceCommon{
+			Millis:   s.nextTxnMillis,
+			Schema:   rel.Namespace,
+			Snapshot: false,
+			Table:    rel.RelationName,
+		},
+		Location: [3]int{
+			int(s.lastTxnEndLSN),
+			int(lsn),
+			int(s.nextTxnFinalLSN),
+		},
+	}
+	if s.db.includeTxIDs[streamID] {
+		sourceInfo.TxID = s.nextTxnXID
+	}
 	var event = &sqlcapture.ChangeEvent{
 		Operation: op,
 		RowKey:    rowKey,
-		Source: &postgresSource{
-			SourceCommon: sqlcapture.SourceCommon{
-				Millis:   s.nextTxnMillis,
-				Schema:   rel.Namespace,
-				Snapshot: false,
-				Table:    rel.RelationName,
-			},
-			Location: [3]int{
-				int(s.lastTxnEndLSN),
-				int(lsn),
-				int(s.nextTxnFinalLSN),
-			},
-			XID: s.nextTxnXID,
-		},
-		Before: bf,
-		After:  af,
+		Source:    sourceInfo,
+		Before:    bf,
+		After:     af,
 	}
 	return event, nil
 }

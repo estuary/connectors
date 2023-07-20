@@ -279,6 +279,16 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			continue
 		}
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
+
+		// TODO: Remove the whole 'Enable TxIDs' thing and instead include them unconditionally
+		// at some point in the future once automatic schema updates are a thing and the
+		// number of captures which would be broken by the change is acceptably small.
+		for _, projection := range binding.Collection.Projections {
+			if projection.Ptr == "/_meta/source/txid" {
+				db.RequestTxIDs(res.Namespace, res.Stream)
+			}
+		}
+
 		bindings[streamID] = &Binding{
 			Index:         uint32(idx),
 			Resource:      res,

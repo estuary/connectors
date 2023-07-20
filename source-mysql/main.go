@@ -209,6 +209,7 @@ type mysqlDatabase struct {
 	conn             *client.Conn
 	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
 	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
+	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.
 }
 
 func (db *mysqlDatabase) connect(ctx context.Context) error {
@@ -372,11 +373,18 @@ func (db *mysqlDatabase) ShouldBackfill(streamID string) bool {
 	return true
 }
 
+func (db *mysqlDatabase) RequestTxIDs(schema, table string) {
+	if db.includeTxIDs == nil {
+		db.includeTxIDs = make(map[string]bool)
+	}
+	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
+}
+
 // mysqlSourceInfo is source metadata for data capture events.
 type mysqlSourceInfo struct {
 	sqlcapture.SourceCommon
 	EventCursor string `json:"cursor" jsonschema:"description=Cursor value representing the current position in the binlog."`
-	GTID        string `json:"gtid,omitempty" jsonschema:"description=The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."`
+	TxID        string `json:"txid,omitempty" jsonschema:"description=The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."`
 }
 
 func (s *mysqlSourceInfo) Common() sqlcapture.SourceCommon {
