@@ -52,7 +52,7 @@ require (
 	golang.org/x/time v0.3.0
 	google.golang.org/api v0.109.0
 	google.golang.org/genproto v0.0.0-20230131230820-1c016267d619
-	google.golang.org/grpc v1.52.3
+	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.1
 	vitess.io/vitess v0.15.3
 )
