@@ -547,8 +547,9 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			return fmt.Errorf("converting Load key: %w", err)
 		}
 
-		b.loadFile.encodeRow(converted)
-
+		if err := b.loadFile.encodeRow(converted); err != nil {
+			return fmt.Errorf("encoding row for load: %w", err)
+		}
 	}
 	if it.Err() != nil {
 		return it.Err()
@@ -708,8 +709,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			}
 		}
 
-		b.storeFile.encodeRow(converted)
-
+		if err := b.storeFile.encodeRow(converted); err != nil {
+			return nil, fmt.Errorf("encoding row for store: %w", err)
+		}
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
