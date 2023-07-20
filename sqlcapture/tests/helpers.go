@@ -157,7 +157,12 @@ func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamM
 				Name:           pf.Collection("acmeCo/test/" + b.RecommendedName),
 				ReadSchemaJson: b.DocumentSchemaJson,
 				Key:            b.Key,
+				// Converting the discovered schema into a list of projections would be quite
+				// a task and all we actually need it for is to enable transaction IDs in
+				// MySQL and Postgres.
+				Projections: []pf.Projection{{Ptr: "/_meta/source/txid"}},
 			},
+
 			ResourcePath: []string{res.Namespace, res.Stream},
 		})
 	}

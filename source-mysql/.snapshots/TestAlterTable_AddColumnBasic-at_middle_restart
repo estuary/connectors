@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/test_altertable_addcolumnbasic_68678323": 2 Documents
 # ================================
-{"Extra_MIDDLE":"extra_middle_13","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_68678323","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"data":"ooo","extra_end":"extra_end_13","extra_start":"extra_start_13","id":13}
-{"Extra_MIDDLE":"extra_middle_14","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_68678323","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"data":"ppp","extra_end":"extra_end_14","extra_start":"extra_start_14","id":14}
+{"Extra_MIDDLE":"extra_middle_13","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_68678323","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"ooo","extra_end":"extra_end_13","extra_start":"extra_start_13","id":13}
+{"Extra_MIDDLE":"extra_middle_14","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AlterTable_AddColumnBasic_68678323","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"ppp","extra_end":"extra_end_14","extra_start":"extra_start_14","id":14}
 # ================================
 # Final State Checkpoint
 # ================================

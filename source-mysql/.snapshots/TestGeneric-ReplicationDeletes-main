@@ -1,11 +1,11 @@
 # ================================
 # Collection "acmeCo/test/test_generic_replicationdeletes_65713151": 5 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationDeletes_65713151","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"data":"more","id":1000}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationDeletes_65713151","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"data":"rows","id":1001}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationDeletes_65713151","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"data":"some","id":1002}
-{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationDeletes_65713151","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"data":"bbb","id":1}
-{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationDeletes_65713151","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"data":"some","id":1002}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationDeletes_65713151","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"more","id":1000}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationDeletes_65713151","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"rows","id":1001}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationDeletes_65713151","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"some","id":1002}
+{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationDeletes_65713151","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"bbb","id":1}
+{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_ReplicationDeletes_65713151","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"some","id":1002}
 # ================================
 # Final State Checkpoint
 # ================================
