@@ -200,7 +200,8 @@ CREDENTIALS 'aws_access_key_id={{ $.Config.AWSAccessKeyID }};aws_secret_access_k
 REGION '{{ $.Config.Region }}'
 JSON 'auto ignorecase'
 DATEFORMAT 'auto'
-TIMEFORMAT 'auto';
+TIMEFORMAT 'auto'
+TRUNCATECOLUMNS;
 {{ end }}
 `)
 	tplCreateTargetTable         = tplAll.Lookup("createTargetTable")
