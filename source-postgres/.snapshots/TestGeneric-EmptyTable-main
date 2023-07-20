@@ -1,9 +1,9 @@
 # ================================
 # Collection "acmeCo/test/test_generic_emptytable_91431165": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_emptytable_91431165","loc":[11111111,11111111,11111111],"xid":111111}},"data":"more","id":1000}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_emptytable_91431165","loc":[11111111,11111111,11111111],"xid":111111}},"data":"rows","id":1001}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_emptytable_91431165","loc":[11111111,11111111,11111111],"xid":111111}},"data":"some","id":1002}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_emptytable_91431165","loc":[11111111,11111111,11111111],"txid":111111}},"data":"more","id":1000}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_emptytable_91431165","loc":[11111111,11111111,11111111],"txid":111111}},"data":"rows","id":1001}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"generic_emptytable_91431165","loc":[11111111,11111111,11111111],"txid":111111}},"data":"some","id":1002}
 # ================================
 # Final State Checkpoint
 # ================================

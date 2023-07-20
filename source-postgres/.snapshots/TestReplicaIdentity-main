@@ -1,10 +1,10 @@
 # ================================
 # Collection "acmeCo/test/test_replicaidentity_64422387": 4 Documents
 # ================================
-{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"replicaidentity_64422387","loc":[11111111,11111111,11111111],"xid":111111}},"data":"Four","id":3}
-{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"replicaidentity_64422387","loc":[11111111,11111111,11111111],"xid":111111}},"id":1}
-{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"replicaidentity_64422387","loc":[11111111,11111111,11111111],"xid":111111},"before":{"data":"5","id":4}},"data":"UPDATED","id":4}
-{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"replicaidentity_64422387","loc":[11111111,11111111,11111111],"xid":111111}},"data":"UPDATED","id":2}
+{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"replicaidentity_64422387","loc":[11111111,11111111,11111111],"txid":111111}},"data":"Four","id":3}
+{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"replicaidentity_64422387","loc":[11111111,11111111,11111111],"txid":111111}},"id":1}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"replicaidentity_64422387","loc":[11111111,11111111,11111111],"txid":111111},"before":{"data":"5","id":4}},"data":"UPDATED","id":4}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"replicaidentity_64422387","loc":[11111111,11111111,11111111],"txid":111111}},"data":"UPDATED","id":2}
 # ================================
 # Final State Checkpoint
 # ================================

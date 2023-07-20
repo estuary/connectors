@@ -1,11 +1,11 @@
 # ================================
 # Collection "acmeCo/test/test_generic_multiplestreams_14930049": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_14930049","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"data":"nine","id":9}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_14930049","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"nine","id":9}
 # ================================
 # Collection "acmeCo/test/test_generic_multiplestreams_30084965": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_30084965","cursor":"binlog.000123:56789:123","gtid":"11111111-1111-1111-1111-111111111111:111"}},"data":"eleven","id":11}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"Generic_MultipleStreams_30084965","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"eleven","id":11}
 # ================================
 # Final State Checkpoint
 # ================================

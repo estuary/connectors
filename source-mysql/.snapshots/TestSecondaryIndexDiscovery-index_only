@@ -88,7 +88,7 @@ Binding 0:
                       "type": "string",
                       "description": "Cursor value representing the current position in the binlog."
                     },
-                    "gtid": {
+                    "txid": {
                       "type": "string",
                       "description": "The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."
                     }
