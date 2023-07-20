@@ -1,9 +1,9 @@
 # ================================
 # Collection "acmeCo/test/test_usertypes_enum_64812435": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_enum_64812435","loc":[11111111,11111111,11111111],"xid":111111}},"id":4,"value":"blue"}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_enum_64812435","loc":[11111111,11111111,11111111],"xid":111111}},"id":5,"value":"red"}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_enum_64812435","loc":[11111111,11111111,11111111],"xid":111111}},"id":6,"value":"green"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_enum_64812435","loc":[11111111,11111111,11111111],"txid":111111}},"id":4,"value":"blue"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_enum_64812435","loc":[11111111,11111111,11111111],"txid":111111}},"id":5,"value":"red"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_enum_64812435","loc":[11111111,11111111,11111111],"txid":111111}},"id":6,"value":"green"}
 # ================================
 # Final State Checkpoint
 # ================================

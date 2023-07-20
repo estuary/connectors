@@ -80,7 +80,7 @@ Binding 0:
                       "minItems": 3,
                       "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
                     },
-                    "xid": {
+                    "txid": {
                       "type": "integer",
                       "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
                     }

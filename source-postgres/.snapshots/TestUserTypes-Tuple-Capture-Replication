@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/test_usertypes_tuple_51424093": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_tuple_51424093","loc":[11111111,11111111,11111111],"xid":111111}},"id":3,"value":"(34,64,\" 'asdf'\")"}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_tuple_51424093","loc":[11111111,11111111,11111111],"xid":111111}},"id":4,"value":"(83,12,\" 'fdsa'\")"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_tuple_51424093","loc":[11111111,11111111,11111111],"txid":111111}},"id":3,"value":"(34,64,\" 'asdf'\")"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"usertypes_tuple_51424093","loc":[11111111,11111111,11111111],"txid":111111}},"id":4,"value":"(83,12,\" 'fdsa'\")"}
 # ================================
 # Final State Checkpoint
 # ================================

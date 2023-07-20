@@ -104,7 +104,7 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 	sanitizers[`"loc":[11111111,11111111,11111111]`] = regexp.MustCompile(`"loc":\[(-1|[0-9]+),[0-9]+,[0-9]+\]`)
 	sanitizers[`"cursor":"0/1111111"`] = regexp.MustCompile(`"cursor":"0/[0-9A-F]+"`)
 	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
-	sanitizers[`"xid":111111`] = regexp.MustCompile(`"xid":[0-9]+`)
+	sanitizers[`"txid":111111`] = regexp.MustCompile(`"txid":[0-9]+`)
 
 	var cfg = tb.config
 	var cs = &st.CaptureSpec{
@@ -231,6 +231,9 @@ func TestCapitalizedTables(t *testing.T) {
 	})
 	require.NoError(t, err)
 	cs.Bindings = []*flow.CaptureSpec_Binding{{
+		// Because we're explicitly constructing the collection spec here this test accidentally
+		// exercises the "legacy collection without a /_meta/source/txid property" case, so we
+		// may as well leave it like that.
 		Collection:         flow.CollectionSpec{Name: flow.Collection("acmeCo/test/users")},
 		ResourceConfigJson: resourceSpecJSON,
 		ResourcePath:       []string{testSchemaName, "USERS"},
