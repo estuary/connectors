@@ -111,7 +111,8 @@ CREDENTIALS 'aws_access_key_id=accessKeyID;aws_secret_access_key=secretKey'
 REGION 'us-somewhere-1'
 JSON 'auto ignorecase'
 DATEFORMAT 'auto'
-TIMEFORMAT 'auto';
+TIMEFORMAT 'auto'
+TRUNCATECOLUMNS;
 --- End Copy From S3 ---
 
 
