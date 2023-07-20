@@ -133,6 +133,12 @@ type Database interface {
 	// source metadata which encodes the database change sequence.
 	FallbackCollectionKey() []string
 
+	// Request that replication events for the specified table include transaction IDs.
+	// This method is part of a temporary hack which includes XID/GTID metadata only for
+	// collections which expect the properties (as inferred based on projections), and
+	// should be removed in the future once this hack is no longer necessary.
+	RequestTxIDs(schema, table string)
+
 	// SetupPrerequisites verifies that various database requirements (things like
 	// "Is CDC enabled on this DB?" and "Does the user have replication access?")
 	// are met, and possibly attempts to perform some setup. It may return multiple

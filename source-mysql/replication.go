@@ -280,18 +280,18 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if err := rs.db.translateRecordFields(columnTypes, after); err != nil {
 						return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 					}
+					var sourceInfo = &mysqlSourceInfo{
+						SourceCommon: sourceCommon,
+						EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx),
+					}
+					if rs.db.includeTxIDs[streamID] {
+						sourceInfo.TxID = rs.gtidString
+					}
 					rs.events <- &sqlcapture.ChangeEvent{
 						Operation: sqlcapture.InsertOp,
 						RowKey:    rowKey,
 						After:     after,
-						Source: &mysqlSourceInfo{
-							SourceCommon: sourceCommon,
-							// TODO(wgd): At some point in the future we'd like to make a breaking
-							// connector change so that instead of a single `cursor` property we have
-							// separate fields for filename, position, and row index within the event.
-							EventCursor: fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx),
-							GTID:        rs.gtidString,
-						},
+						Source:    sourceInfo,
 					}
 				}
 			case replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
@@ -316,16 +316,19 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						if err := rs.db.translateRecordFields(columnTypes, after); err != nil {
 							return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
 						}
+						var sourceInfo = &mysqlSourceInfo{
+							SourceCommon: sourceCommon,
+							EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx/2),
+						}
+						if rs.db.includeTxIDs[streamID] {
+							sourceInfo.TxID = rs.gtidString
+						}
 						rs.events <- &sqlcapture.ChangeEvent{
 							Operation: sqlcapture.UpdateOp,
 							RowKey:    rowKey,
 							Before:    before,
 							After:     after,
-							Source: &mysqlSourceInfo{
-								SourceCommon: sourceCommon,
-								EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx/2),
-								GTID:         rs.gtidString,
-							},
+							Source:    sourceInfo,
 						}
 					}
 				}
@@ -342,15 +345,19 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if err := rs.db.translateRecordFields(columnTypes, before); err != nil {
 						return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
 					}
+					var sourceInfo = &mysqlSourceInfo{
+						SourceCommon: sourceCommon,
+						EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx),
+						TxID:         rs.gtidString,
+					}
+					if rs.db.includeTxIDs[streamID] {
+						sourceInfo.TxID = rs.gtidString
+					}
 					rs.events <- &sqlcapture.ChangeEvent{
 						Operation: sqlcapture.DeleteOp,
 						RowKey:    rowKey,
 						Before:    before,
-						Source: &mysqlSourceInfo{
-							SourceCommon: sourceCommon,
-							EventCursor:  fmt.Sprintf("%s:%d:%d", rs.cursor.Name, rs.cursor.Pos, rowIdx),
-							GTID:         rs.gtidString,
-						},
+						Source:    sourceInfo,
 					}
 				}
 			default:
