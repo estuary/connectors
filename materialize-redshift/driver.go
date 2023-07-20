@@ -41,14 +41,12 @@ const (
 	// Because of this we create string columns as their default maximum length of 256 characters
 	// initially (somewhat confusingly, using the Redshift TEXT type, which is actually a
 	// VARCHAR(256)), and only enlarge the columns to the maximum length if we observe a string that
-	// is longer than 256 bytes. Strings longer than 65535 bytes will result in a connector error.
+	// is longer than 256 bytes.
 	//
-	// One potential resolution to this error would be create a derived collection that truncates
-	// strings over a maximum length. Another solution would be to exclude the field from the
-	// materialization via field selection, and _also_ exclude flow_document from from the
-	// materialization - only possible for delta updates. flow_document must be exluded as well
-	// because Redshift SUPER types impose the same limits on their individual field values as the
-	// columns, so a string can only be this long as a field value in a SUPER type too.
+	// Strings longer than 65535 bytes will be truncated automatically by Redshift: In the
+	// materialized columns if they are included in the field selection via setting TRUNCATECOLUMNS
+	// in the COPY command, and in the `flow_document` column by setting
+	// `json_parse_truncate_strings=ON` in the session that performs the Store to the target table.
 	redshiftVarcharMaxLength = 65535
 )
 
@@ -671,24 +669,16 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
 
-		// See if we need to increase any VARCHAR column lengths, or error because the string fields
-		// are too long to materialize.
+		// See if we need to increase any VARCHAR column lengths.
 		for idx, c := range converted {
 			varcharMeta := b.varcharColumnMetas[idx]
 			if varcharMeta.isVarchar {
 				switch v := c.(type) {
 				case string:
-					if len(v) > redshiftVarcharMaxLength {
-						// This value cannot be materialized since it is longer than a Redshift VARCHAR
-						// column can possibly allow.
-						return nil, fmt.Errorf(
-							"cannot materialize string field to column '%s' of table '%s': string byte length %d exceeds Redshift maximum allowable length %d for a VARCHAR column",
-							varcharMeta.identifier,
-							b.target.Identifier,
-							len(v),
-							redshiftVarcharMaxLength,
-						)
-					} else if len(v) > varcharMeta.maxLength {
+					// If the column is already at its maximum length, it can't be enlarged any
+					// more. The string values will be truncated by Redshift when loading them into
+					// the table.
+					if len(v) > varcharMeta.maxLength && varcharMeta.maxLength != redshiftVarcharMaxLength {
 						log.WithFields(log.Fields{
 							"table":               b.target.Identifier,
 							"column":              varcharMeta.identifier,
@@ -738,6 +728,14 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		return fmt.Errorf("store pgx.Connect: %w", err)
 	}
 	defer conn.Close(ctx)
+
+	// Truncate strings within SUPER types by setting this option, since these have the same limits
+	// on maximum VARCHAR lengths as table columns do. Notably, this will truncate any strings in
+	// `flow_document` (stored as a SUPER column) that otherwise would prevent the row from being
+	// added to the table.
+	if _, err := conn.Exec(ctx, "SET json_parse_truncate_strings=ON;"); err != nil {
+		return fmt.Errorf("configuring json_parse_truncate_strings=ON: %w", err)
+	}
 
 	// Update any columns that require setting to VARCHAR(MAX) for storing large strings. ALTER
 	// TABLE ALTER COLUMN statements cannot be run inside transaction blocks.
