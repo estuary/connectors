@@ -199,9 +199,10 @@ func configSchema() json.RawMessage {
 }
 
 type postgresDatabase struct {
-	config    *Config
-	conn      *pgx.Conn
-	explained map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
+	config       *Config
+	conn         *pgx.Conn
+	explained    map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
+	includeTxIDs map[string]bool     // Tracks which tables should have XID properties in their replication metadata
 }
 
 func (db *postgresDatabase) connect(ctx context.Context) error {
@@ -297,4 +298,11 @@ func (db *postgresDatabase) ShouldBackfill(streamID string) bool {
 		}
 	}
 	return true
+}
+
+func (db *postgresDatabase) RequestTxIDs(schema, table string) {
+	if db.includeTxIDs == nil {
+		db.includeTxIDs = make(map[string]bool)
+	}
+	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
 }
