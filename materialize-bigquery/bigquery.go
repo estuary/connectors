@@ -170,18 +170,16 @@ func newBigQueryDriver() *sql.Driver {
 			}
 
 			return &sql.Endpoint{
-				Config:                      cfg,
-				Dialect:                     bqDialect,
-				MetaSpecs:                   &metaSpecs,
-				MetaCheckpoints:             &metaCheckpoints,
-				Client:                      client,
-				CreateTableTemplate:         tplCreateTargetTable,
-				AlterColumnNullableTemplate: tplAlterColumnNullable,
-				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
-				NewResource:                 newTableConfig,
-				NewTransactor:               newTransactor,
-				CheckPrerequisites:          prereqs,
-				Tenant:                      tenant,
+				Config:              cfg,
+				Dialect:             bqDialect,
+				MetaSpecs:           &metaSpecs,
+				MetaCheckpoints:     &metaCheckpoints,
+				Client:              client,
+				CreateTableTemplate: tplCreateTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+				CheckPrerequisites:  prereqs,
+				Tenant:              tenant,
 			}, nil
 		},
 	}
@@ -276,6 +274,48 @@ type client struct {
 	bigqueryClient     *bigquery.Client
 	cloudStorageClient *storage.Client
 	config             config
+}
+
+func (c client) AddColumnToTable(ctx context.Context, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
+	query := fmt.Sprintf(
+		"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
+		tableIdentifier,
+		columnIdentifier,
+		columnDDL,
+	)
+
+	if _, err := c.query(ctx, query); err != nil {
+		return "", err
+	}
+
+	return query, nil
+}
+
+func (c client) DropNotNullForColumn(ctx context.Context, tableIdentifier string, columnIdentifier string) (string, error) {
+	query := fmt.Sprintf(
+		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
+		tableIdentifier,
+		columnIdentifier,
+	)
+
+	if _, err := c.query(ctx, query); err != nil {
+		// BigQuery will return an error if the column did not have a NOT NULL constraint and we try
+		// to drop it, so match on that error as best we can here.
+		var googleErr *googleapi.Error
+		if errors.As(err, &googleErr) &&
+			googleErr.Code == http.StatusBadRequest &&
+			strings.HasSuffix(googleErr.Message, "which does not have a NOT NULL constraint.") {
+			log.WithFields(log.Fields{
+				"table":  tableIdentifier,
+				"column": columnIdentifier,
+				"err":    err.Error(),
+			}).Debug("column was already nullable")
+		} else {
+			return "", err
+		}
+	}
+
+	return query, nil
 }
 
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
