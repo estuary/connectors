@@ -225,17 +225,16 @@ func newRedshiftDriver() *sql.Driver {
 			}
 
 			return &sql.Endpoint{
-				Config:                      cfg,
-				Dialect:                     rsDialect,
-				MetaSpecs:                   &metaSpecs,
-				MetaCheckpoints:             &metaCheckpoints,
-				Client:                      client{uri: cfg.toURI()},
-				CreateTableTemplate:         tplCreateTargetTable,
-				AlterColumnNullableTemplate: tplAlterColumnNullable,
-				NewResource:                 newTableConfig,
-				NewTransactor:               newTransactor,
-				CheckPrerequisites:          prereqs,
-				Tenant:                      tenant,
+				Config:              cfg,
+				Dialect:             rsDialect,
+				MetaSpecs:           &metaSpecs,
+				MetaCheckpoints:     &metaCheckpoints,
+				Client:              client{uri: cfg.toURI()},
+				CreateTableTemplate: tplCreateTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+				CheckPrerequisites:  prereqs,
+				Tenant:              tenant,
 			}, nil
 		},
 	}
@@ -344,6 +343,45 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 // client implements the sql.Client interface.
 type client struct {
 	uri string
+}
+
+func (c client) AddColumnToTable(ctx context.Context, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
+	query := fmt.Sprintf(
+		"ALTER TABLE %s ADD COLUMN %s %s",
+		tableIdentifier,
+		columnIdentifier,
+		columnDDL,
+	)
+
+	if err := c.withDB(func(db *stdsql.DB) error {
+		if _, err := db.ExecContext(ctx, query); err != nil {
+			var pgErr *pgconn.PgError
+			// Error code 42701 is the Postgres "duplicate_column" error code:
+			// https://www.postgresql.org/docs/current/errcodes-appendix.html
+			if errors.As(err, &pgErr); pgErr.Code == "42701" {
+				log.WithFields(log.Fields{
+					"table":  tableIdentifier,
+					"column": columnIdentifier,
+					"ddl":    columnDDL,
+					"err":    err.Error(),
+				}).Debug("column already existed in table")
+				err = nil
+			}
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return "", err
+	}
+
+	return query, nil
+}
+
+func (c client) DropNotNullForColumn(ctx context.Context, tableIdentifier string, columnIdentifier string) (string, error) {
+	// No-op since Redshift does not support dropping NOT NULL constraints for columns, and the
+	// connector always creates columns as nullable because of this.
+	return "", nil
 }
 
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
