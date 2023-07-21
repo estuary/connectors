@@ -26,7 +26,22 @@ var rsDialect = func() sql.Dialect {
 		sql.ARRAY:   sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.BINARY:  sql.NewStaticMapper("VARBYTE"),
 		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("TEXT"), // Note: Actually a VARCHAR(256)
+			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter( // Note: Actually a VARCHAR(256)
+				func(te tuple.TupleElement) (interface{}, error) {
+					if s, ok := te.(string); ok {
+						// Redshift will terminate values going into VARCHAR columns where the null
+						// escape sequence occurs. This is especially a problem when it is the first
+						// thing in the string and is followed by other characters, as this results
+						// in the load error "Invalid null byte - field longer than 1 byte". Adding
+						// an additional escape to the beginning of the string allows the value to
+						// be loaded with the initial "\u0000" as a regular string
+						if strings.HasPrefix(s, "\u0000") {
+							return `\` + s, nil
+						}
+					}
+
+					return te, nil
+				})),
 			WithFormat: map[string]sql.TypeMapper{
 				"date": sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(
