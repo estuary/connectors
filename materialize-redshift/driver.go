@@ -795,11 +795,11 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 			continue
 		}
 
-		objectLocation, delete, err := b.storeFile.flush()
+		objectLocation, _, err := b.storeFile.flush()
 		if err != nil {
 			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
-		defer delete(ctx)
+		// defer delete(ctx)
 
 		var dest string
 		if hasUpdates[idx] {
