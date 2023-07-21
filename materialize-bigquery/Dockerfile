@@ -21,6 +21,7 @@ COPY materialize-sql         ./materialize-sql
 COPY testsupport             ./testsupport
 
 # Test and build the connector.
+RUN go test  -tags nozstd -v ./materialize-sql/...
 RUN go test  -tags nozstd -v ./materialize-bigquery/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/cmd/connector
 
