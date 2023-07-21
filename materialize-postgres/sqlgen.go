@@ -83,23 +83,6 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 {{- end}}
 {{ end }}
 
--- Alter column and mark it as nullable
-
-{{ define "alterColumnNullable" }}
-ALTER TABLE {{ $.Table.Identifier }} ALTER COLUMN {{ $.Identifier }} DROP NOT NULL;
-{{ end }}
-
--- Alter table and add a new column
-
-{{ define "alterTableAddColumn" }}
-ALTER TABLE {{ $.Table.Identifier }} ADD COLUMN
-	{{ range $ind, $col := $.Table.Columns -}}
-		{{- if (eq $col.Identifier $.Identifier) -}}
-			{{ $col.Identifier }} {{ $col.DDL }}
-		{{- end -}}
-	{{- end }};
-{{ end }}
-
 -- Templated creation of a temporary load table:
 
 {{ define "createLoadTable" }}
@@ -235,14 +218,12 @@ BEGIN
 END $$;
 {{ end }}
 `)
-	tplCreateLoadTable     = tplAll.Lookup("createLoadTable")
-	tplCreateTargetTable   = tplAll.Lookup("createTargetTable")
-	tplLoadInsert          = tplAll.Lookup("loadInsert")
-	tplStoreInsert         = tplAll.Lookup("storeInsert")
-	tplStoreUpdate         = tplAll.Lookup("storeUpdate")
-	tplLoadQuery           = tplAll.Lookup("loadQuery")
-	tplInstallFence        = tplAll.Lookup("installFence")
-	tplUpdateFence         = tplAll.Lookup("updateFence")
-	tplAlterColumnNullable = tplAll.Lookup("alterColumnNullable")
-	tplAlterTableAddColumn = tplAll.Lookup("alterTableAddColumn")
+	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
+	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
+	tplLoadInsert        = tplAll.Lookup("loadInsert")
+	tplStoreInsert       = tplAll.Lookup("storeInsert")
+	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
+	tplLoadQuery         = tplAll.Lookup("loadQuery")
+	tplInstallFence      = tplAll.Lookup("installFence")
+	tplUpdateFence       = tplAll.Lookup("updateFence")
 )
