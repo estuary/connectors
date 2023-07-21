@@ -32,18 +32,3 @@ func RenderTableTemplate(table Table, tpl *template.Template) (string, error) {
 	log.WithField("rendered", s).WithField("table", table).Debug("rendered template")
 	return s, nil
 }
-
-type AlterInput struct {
-	Table      Table
-	Identifier string
-}
-
-func RenderAlterTemplate(input AlterInput, tpl *template.Template) (string, error) {
-	var w strings.Builder
-	if err := tpl.Execute(&w, &input); err != nil {
-		return "", err
-	}
-	var s = w.String()
-	log.WithField("rendered", s).WithField("input", input).Debug("rendered template")
-	return s, nil
-}

@@ -1,4 +1,0 @@
-
-	ALTER TABLE one."reserved".checkpoints ADD COLUMN
-		checkpoint TEXT NOT NULL;
-  

@@ -135,6 +135,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 	}
 
 	var statements []string
+	var executedColumnModifications []string
 
 	for bindingIndex, bindingSpec := range req.Materialization.Bindings {
 		var collection = bindingSpec.Collection.Name
@@ -153,56 +154,48 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		} else if err = ValidateSelectedFields(constraints, bindingSpec); err != nil {
 			// The applied binding is not a valid solution for its own constraints.
 			return nil, fmt.Errorf("binding for %s: %w", collection, err)
-		} else if loadedBinding != nil && !bindingSpec.FieldSelection.Equal(&loadedBinding.FieldSelection) && !isBindingMigratable(loadedBinding, bindingSpec) {
-			// if the binding is not migratable, we require that the list of
-			// fields in the request is identical to the current fields.
-			return nil, fmt.Errorf(
-				"the set of binding %s fields in the request differs from the existing fields,"+
-					"which is disallowed because this driver only supports automatic migration for adding new nullable fields and removing non-key fields. "+
-					"Request fields: %s , Existing fields: %s",
-				collection,
-				bindingSpec.FieldSelection.String(),
-				loadedBinding.FieldSelection.String(),
-			)
 		} else if loadedBinding != nil {
-			for _, field := range bindingSpec.FieldSelection.Values {
-				var p = bindingSpec.Collection.GetProjection(field)
-				var previousProjection = loadedBinding.Collection.GetProjection(field)
+			newTable, err := ResolveTable(tableShape, endpoint.Dialect)
+			if err != nil {
+				return nil, err
+			}
 
-				// Make sure new columns are added to the table
-				if !slices.Contains(loadedBinding.FieldSelection.Values, field) {
-					var table, err = ResolveTable(tableShape, endpoint.Dialect)
+			for _, newCol := range newTable.Columns() {
+				// Add any new columns.
+				if !slices.Contains(loadedBinding.FieldSelection.AllFields(), newCol.Field) {
+					// New columns are always created as nullable.
+					nullableProjection := newCol.Projection
+					nullableProjection.Inference.Exists = pf.Inference_MAY
+
+					// Get the dialect-specific DDL for this field, in its nullable form.
+					mapped, err := endpoint.MapType(&nullableProjection)
 					if err != nil {
 						return nil, err
 					}
-					var input = AlterInput{
-						Table:      table,
-						Identifier: endpoint.Identifier(field),
+
+					addAction, err := endpoint.Client.AddColumnToTable(ctx, newTable.Identifier, newCol.Identifier, mapped.DDL)
+					if err != nil {
+						return nil, fmt.Errorf("adding column '%s %s' to table '%s': %w", newTable.Identifier, mapped.DDL, newCol.Identifier, err)
 					}
-					if statement, err := RenderAlterTemplate(input, endpoint.AlterTableAddColumnTemplate); err != nil {
-						return nil, err
-					} else {
-						statements = append(statements, statement)
+
+					if addAction != "" {
+						executedColumnModifications = append(executedColumnModifications, addAction)
 					}
 				} else {
-					var previousNullable = previousProjection.Inference.Exists != pf.Inference_MUST || slices.Contains(p.Inference.Types, "null")
-					var newNullable = p.Inference.Exists != pf.Inference_MUST || slices.Contains(p.Inference.Types, "null")
+					// The new column is part of the existing table.
+					previousProjection := loadedBinding.Collection.GetProjection(newCol.Field)
+					previousNullable := previousProjection.Inference.Exists != pf.Inference_MUST || slices.Contains(previousProjection.Inference.Types, "null")
 
-					// If the table has already been created, make sure all non-null fields
-					// are marked as such
-					if !previousNullable && newNullable {
-						var table, err = ResolveTable(tableShape, endpoint.Dialect)
+					// The column was previously created as not nullable, but the new specification
+					// indicates that it now nullable. Drop the "NOT NULL" constraint on the table.
+					if !previousNullable && !newCol.MustExist {
+						alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, newTable.Identifier, newCol.Identifier)
 						if err != nil {
-							return nil, err
+							return nil, fmt.Errorf("dropping NOT NULL constraint for on longer required field for column '%s' in table '%s': %w", newTable.Identifier, newCol.Identifier, err)
 						}
-						var input = AlterInput{
-							Table:      table,
-							Identifier: endpoint.Identifier(field),
-						}
-						if statement, err := RenderAlterTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
-							return nil, err
-						} else {
-							statements = append(statements, statement)
+
+						if alterAction != "" {
+							executedColumnModifications = append(executedColumnModifications, alterAction)
 						}
 					}
 				}
@@ -217,21 +210,18 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 					continue
 				}
 
-				var table, err = ResolveTable(tableShape, endpoint.Dialect)
+				alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, newTable.Identifier, endpoint.Identifier(field))
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("dropping NOT NULL constraint for removed field for column '%s' in table '%s': %w", newTable.Identifier, endpoint.Identifier(field), err)
 				}
-				var input = AlterInput{
-					Table:      table,
-					Identifier: endpoint.Identifier(field),
-				}
-				if statement, err := RenderAlterTemplate(input, endpoint.AlterColumnNullableTemplate); err != nil {
-					return nil, err
-				} else {
-					statements = append(statements, statement)
+
+				if alterAction != "" {
+					executedColumnModifications = append(executedColumnModifications, alterAction)
 				}
 			}
 
+			// For existing tables, do not add the rendered CreateTableTemplate, since the tables
+			// already exist and do not need to be re-created.
 			continue
 		}
 
@@ -277,7 +267,9 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 	}
 
 	// Build and return a description of what happened (or would have happened).
-	return &pm.Response_Applied{ActionDescription: strings.Join(statements, "\n")}, nil
+	return &pm.Response_Applied{
+		ActionDescription: strings.Join(append(statements, executedColumnModifications...), "\n"),
+	}, nil
 }
 
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
@@ -358,39 +350,6 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tr
 	}
 
 	return transactor, &pm.Response_Opened{RuntimeCheckpoint: cp}, nil
-}
-
-func isBindingMigratable(existingBinding *pf.MaterializationSpec_Binding, newBinding *pf.MaterializationSpec_Binding) bool {
-	var existingFields = existingBinding.FieldSelection
-	var allExistingFields = existingFields.AllFields()
-	var allExistingKeys = existingFields.Keys
-	var newFields = newBinding.FieldSelection
-	var allNewFields = newFields.AllFields()
-	var allNewKeys = newFields.Keys
-
-	for _, field := range allExistingKeys {
-		// All keys in the existing binding must also be present in the new binding
-		if !slices.Contains(allNewKeys, field) {
-			return false
-		}
-
-		if string(existingFields.FieldConfigJsonMap[field]) != string(newFields.FieldConfigJsonMap[field]) {
-			return false
-		}
-	}
-
-	for _, field := range allNewFields {
-		// Make sure new fields are nullable
-		if !slices.Contains(allExistingFields, field) {
-			var p = newBinding.Collection.GetProjection(field)
-			var isNullable = p.Inference.Exists != pf.Inference_MUST || slices.Contains(p.Inference.Types, "null")
-			if !isNullable {
-				return false
-			}
-		}
-	}
-
-	return true
 }
 
 func mustGetTenantNameFromTaskName(taskName string) string {
