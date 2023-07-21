@@ -79,19 +79,31 @@ func NewSQLiteDriver() *sql.Driver {
 			}
 
 			return &sql.Endpoint{
-				Config:                      config{path: path},
-				Dialect:                     sqliteDialect,
-				MetaSpecs:                   nil,
-				MetaCheckpoints:             nil,
-				Client:                      client{path: path},
-				CreateTableTemplate:         tplCreateTargetTable,
-				AlterTableAddColumnTemplate: tplAlterTableAddColumn,
-				NewResource:                 newTableConfig,
-				NewTransactor:               newTransactor,
-				CheckPrerequisites:          func(_ context.Context, _ *sql.Endpoint) *sql.PrereqErr { return &sql.PrereqErr{} },
+				Config:              config{path: path},
+				Dialect:             sqliteDialect,
+				MetaSpecs:           nil,
+				MetaCheckpoints:     nil,
+				Client:              client{path: path},
+				CreateTableTemplate: tplCreateTargetTable,
+				NewResource:         newTableConfig,
+				NewTransactor:       newTransactor,
+				CheckPrerequisites:  func(_ context.Context, _ *sql.Endpoint) *sql.PrereqErr { return &sql.PrereqErr{} },
 			}, nil
 		},
 	}
+}
+
+// AddColumnToTable and DropNotNullForColumn are no-opssince SQLite does not persist a
+// materialization spec, so there is no way for the connector to know if a column is new, removed,
+// or newly nullable. We may revisit this in the future if we want SQLite materialization to update
+// on the fly, but for now they can just be restarted which will re-create their tables in
+// accordance with the collection schema.
+func (c client) AddColumnToTable(ctx context.Context, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
+	return "", nil
+}
+
+func (c client) DropNotNullForColumn(ctx context.Context, tableIdentifier string, columnIdentifier string) (string, error) {
+	return "", nil
 }
 
 type client struct {
