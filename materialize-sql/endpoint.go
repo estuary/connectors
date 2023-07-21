@@ -20,6 +20,24 @@ type Client interface {
 	FetchSpecAndVersion(ctx context.Context, specs Table, materialization pf.Materialization) (specB64, version string, _ error)
 	ExecStatements(ctx context.Context, statements []string) error
 	InstallFence(ctx context.Context, checkpoints Table, fence Fence) (Fence, error)
+
+	// Driver-specific method for adding a column to a table. Some databases support syntax like
+	// "ADD COLUMN IF NOT EXISTS", and others need specific error handling for cases where a column
+	// already exists in a table. This is important for situations where a materialized table was
+	// initially created, had a field removed from the field selection, and then has the field added
+	// back to the field selection.
+	AddColumnToTable(ctx context.Context, tableIdentifier, columnIdentifier, columnDDL string) (string, error)
+
+	// Driver specific method for dropping a NOT NULL constraint from a table. Some databases treat
+	// this as an idempotent action, where a column that is already NOT NULL returns a successful
+	// outcome. Others report and error, and still others don't support doing this at all and treat
+	// it as a no-op - all columns in the table must be created as NOT NULL for these cases.
+	// Handling these different cases is important for removing a field from a materialization if
+	// the table column is not nullable since we will always try to drop the NOT NULL constraint for
+	// the table when a field is removed. We cannot rely on the field being required in the
+	// collection schema because required fields added to a table after initial creation will be
+	// created as nullable.
+	DropNotNullForColumn(ctx context.Context, tableIdentifier, columnIdentifier string) (string, error)
 }
 
 // Resource is a driver-provided type which represents the SQL resource
@@ -73,12 +91,6 @@ type Endpoint struct {
 	Client Client
 	// CreateTableTemplate evaluates a Table into an endpoint statement which creates it.
 	CreateTableTemplate *template.Template
-	// AlterFieldNullable alters a column and marks it as nullable
-	AlterColumnNullableTemplate *template.Template
-	// AlterTableAddColumn alters a table and adds a new column (usually with
-	// default null value)
-	AlterTableAddColumnTemplate *template.Template
-
 	// NewResource returns an uninitialized or partially-initialized Resource
 	// which will be parsed into and validated from a resource configuration.
 	NewResource func(*Endpoint) Resource
