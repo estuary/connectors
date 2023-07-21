@@ -62,7 +62,7 @@ var rsDialect = func() sql.Dialect {
 	// NB: We are not using sql.NullableMapper so that all columns are created as nullable. This is
 	// necessary because Redshift does not support dropping a NOT NULL constraint, so we need to
 	// create columns as nullable to preserve the ability to change collection schema fields from
-	// required to not required.
+	// required to not required or remove fields from the materialization.
 
 	return sql.Dialect{
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
@@ -110,13 +110,6 @@ COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
 {{- range $col := .Columns }}
 COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment}};
 {{- end}}
-{{ end }}
-
--- Redshift does not support dropping NOT NULL constraints. Instead, Redshift columns are always
--- created as nullable and alterColumnNullable is a noop.
-
-{{ define "alterColumnNullable" }}
-SELECT NULL LIMIT 0;
 {{ end }}
 
 -- Idempotent creation of the load table for staging load keys.
@@ -210,7 +203,6 @@ TRUNCATECOLUMNS;
 	tplStoreUpdateDeleteExisting = tplAll.Lookup("storeUpdateDeleteExisting")
 	tplStoreUpdate               = tplAll.Lookup("storeUpdate")
 	tplLoadQuery                 = tplAll.Lookup("loadQuery")
-	tplAlterColumnNullable       = tplAll.Lookup("alterColumnNullable")
 	tplUpdateFence               = tplAll.Lookup("updateFence")
 	tplCopyFromS3                = tplAll.Lookup("copyFromS3")
 )
