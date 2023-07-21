@@ -265,7 +265,7 @@ type client struct {
 	uri string
 }
 
-func (c client) AddColumnToTable(ctx context.Context, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
+func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
 	query := fmt.Sprintf(
 		"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
 		tableIdentifier,
@@ -273,22 +273,26 @@ func (c client) AddColumnToTable(ctx context.Context, tableIdentifier string, co
 		columnDDL,
 	)
 
-	if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-		return "", err
+	if !dryRun {
+		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
+			return "", err
+		}
 	}
 
 	return query, nil
 }
 
-func (c client) DropNotNullForColumn(ctx context.Context, tableIdentifier string, columnIdentifier string) (string, error) {
+func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string) (string, error) {
 	query := fmt.Sprintf(
 		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
 		tableIdentifier,
 		columnIdentifier,
 	)
 
-	if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-		return "", err
+	if !dryRun {
+		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
+			return "", err
+		}
 	}
 
 	return query, nil

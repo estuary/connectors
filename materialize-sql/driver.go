@@ -173,7 +173,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 						return nil, err
 					}
 
-					addAction, err := endpoint.Client.AddColumnToTable(ctx, newTable.Identifier, newCol.Identifier, mapped.DDL)
+					addAction, err := endpoint.Client.AddColumnToTable(ctx, req.DryRun, newTable.Identifier, newCol.Identifier, mapped.DDL)
 					if err != nil {
 						return nil, fmt.Errorf("adding column '%s %s' to table '%s': %w", newTable.Identifier, mapped.DDL, newCol.Identifier, err)
 					}
@@ -189,7 +189,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 					// The column was previously created as not nullable, but the new specification
 					// indicates that it now nullable. Drop the "NOT NULL" constraint on the table.
 					if !previousNullable && !newCol.MustExist {
-						alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, newTable.Identifier, newCol.Identifier)
+						alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, req.DryRun, newTable.Identifier, newCol.Identifier)
 						if err != nil {
 							return nil, fmt.Errorf("dropping NOT NULL constraint for on longer required field for column '%s' in table '%s': %w", newTable.Identifier, newCol.Identifier, err)
 						}
@@ -210,7 +210,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 					continue
 				}
 
-				alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, newTable.Identifier, endpoint.Identifier(field))
+				alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, req.DryRun, newTable.Identifier, endpoint.Identifier(field))
 				if err != nil {
 					return nil, fmt.Errorf("dropping NOT NULL constraint for removed field for column '%s' in table '%s': %w", newTable.Identifier, endpoint.Identifier(field), err)
 				}
