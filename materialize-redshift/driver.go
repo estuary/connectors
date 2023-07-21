@@ -345,7 +345,7 @@ type client struct {
 	uri string
 }
 
-func (c client) AddColumnToTable(ctx context.Context, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
+func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
 	query := fmt.Sprintf(
 		"ALTER TABLE %s ADD COLUMN %s %s",
 		tableIdentifier,
@@ -353,32 +353,34 @@ func (c client) AddColumnToTable(ctx context.Context, tableIdentifier string, co
 		columnDDL,
 	)
 
-	if err := c.withDB(func(db *stdsql.DB) error {
-		if _, err := db.ExecContext(ctx, query); err != nil {
-			var pgErr *pgconn.PgError
-			// Error code 42701 is the Postgres "duplicate_column" error code:
-			// https://www.postgresql.org/docs/current/errcodes-appendix.html
-			if errors.As(err, &pgErr); pgErr.Code == "42701" {
-				log.WithFields(log.Fields{
-					"table":  tableIdentifier,
-					"column": columnIdentifier,
-					"ddl":    columnDDL,
-					"err":    err.Error(),
-				}).Debug("column already existed in table")
-				err = nil
+	if !dryRun {
+		if err := c.withDB(func(db *stdsql.DB) error {
+			if _, err := db.ExecContext(ctx, query); err != nil {
+				var pgErr *pgconn.PgError
+				// Error code 42701 is the Postgres "duplicate_column" error code:
+				// https://www.postgresql.org/docs/current/errcodes-appendix.html
+				if errors.As(err, &pgErr); pgErr.Code == "42701" {
+					log.WithFields(log.Fields{
+						"table":  tableIdentifier,
+						"column": columnIdentifier,
+						"ddl":    columnDDL,
+						"err":    err.Error(),
+					}).Debug("column already existed in table")
+					err = nil
+				}
+				return err
 			}
-			return err
-		}
 
-		return nil
-	}); err != nil {
-		return "", err
+			return nil
+		}); err != nil {
+			return "", err
+		}
 	}
 
 	return query, nil
 }
 
-func (c client) DropNotNullForColumn(ctx context.Context, tableIdentifier string, columnIdentifier string) (string, error) {
+func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string) (string, error) {
 	// No-op since Redshift does not support dropping NOT NULL constraints for columns, and the
 	// connector always creates columns as nullable because of this.
 	return "", nil

@@ -26,7 +26,7 @@ type Client interface {
 	// already exists in a table. This is important for situations where a materialized table was
 	// initially created, had a field removed from the field selection, and then has the field added
 	// back to the field selection.
-	AddColumnToTable(ctx context.Context, tableIdentifier, columnIdentifier, columnDDL string) (string, error)
+	AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier, columnIdentifier, columnDDL string) (string, error)
 
 	// Driver specific method for dropping a NOT NULL constraint from a table. Some databases treat
 	// this as an idempotent action, where a column that is already NOT NULL returns a successful
@@ -37,7 +37,7 @@ type Client interface {
 	// the table when a field is removed. We cannot rely on the field being required in the
 	// collection schema because required fields added to a table after initial creation will be
 	// created as nullable.
-	DropNotNullForColumn(ctx context.Context, tableIdentifier, columnIdentifier string) (string, error)
+	DropNotNullForColumn(ctx context.Context, dryRun bool, tableIdentifier, columnIdentifier string) (string, error)
 }
 
 // Resource is a driver-provided type which represents the SQL resource

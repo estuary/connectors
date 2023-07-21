@@ -243,25 +243,27 @@ type client struct {
 	uri string
 }
 
-func (c client) DropNotNullForColumn(ctx context.Context, tableIdentifier string, columnIdentifier string) (string, error) {
+func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string) (string, error) {
 	query := fmt.Sprintf(
 		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL",
 		tableIdentifier,
 		columnIdentifier,
 	)
 
-	if err := c.withDB(func(db *stdsql.DB) error {
-		// Snowflake columns that are already NOT NULL will return successfully.
-		_, err := db.ExecContext(ctx, query)
-		return err
-	}); err != nil {
-		return "", err
+	if !dryRun {
+		if err := c.withDB(func(db *stdsql.DB) error {
+			// Snowflake columns that are already NOT NULL will return successfully.
+			_, err := db.ExecContext(ctx, query)
+			return err
+		}); err != nil {
+			return "", err
+		}
 	}
 
 	return query, nil
 }
 
-func (c client) AddColumnToTable(ctx context.Context, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
+func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
 	query := fmt.Sprintf(
 		"ALTER TABLE %s ADD COLUMN %s %s",
 		tableIdentifier,
@@ -269,32 +271,34 @@ func (c client) AddColumnToTable(ctx context.Context, tableIdentifier string, co
 		columnDDL,
 	)
 
-	if err := c.withDB(func(db *stdsql.DB) error {
-		if _, err := db.ExecContext(ctx, query); err != nil {
-			var sfError *sf.SnowflakeError
-			// There is no documentation for error number 1430 anywhere that I can find so I am not
-			// 100% sure if this error number is exclusively used for "column already exists" types
-			// of errors. So to be safe this error condition will match on the reported SQLState and
-			// the error text itself that has been observed for a table with a column that already
-			// exists.
-			if errors.As(err, &sfError) &&
-				sfError.Number == 1430 &&
-				sfError.SQLState == "42601" &&
-				strings.HasSuffix(err.Error(), "already exists") {
-				log.WithFields(log.Fields{
-					"table":  tableIdentifier,
-					"column": columnIdentifier,
-					"ddl":    columnDDL,
-					"err":    err.Error(),
-				}).Debug("column already existed in table")
-				err = nil
+	if !dryRun {
+		if err := c.withDB(func(db *stdsql.DB) error {
+			if _, err := db.ExecContext(ctx, query); err != nil {
+				var sfError *sf.SnowflakeError
+				// There is no documentation for error number 1430 anywhere that I can find so I am not
+				// 100% sure if this error number is exclusively used for "column already exists" types
+				// of errors. So to be safe this error condition will match on the reported SQLState and
+				// the error text itself that has been observed for a table with a column that already
+				// exists.
+				if errors.As(err, &sfError) &&
+					sfError.Number == 1430 &&
+					sfError.SQLState == "42601" &&
+					strings.HasSuffix(err.Error(), "already exists") {
+					log.WithFields(log.Fields{
+						"table":  tableIdentifier,
+						"column": columnIdentifier,
+						"ddl":    columnDDL,
+						"err":    err.Error(),
+					}).Debug("column already existed in table")
+					err = nil
+				}
+				return err
 			}
-			return err
-		}
 
-		return nil
-	}); err != nil {
-		return "", err
+			return nil
+		}); err != nil {
+			return "", err
+		}
 	}
 
 	return query, nil
