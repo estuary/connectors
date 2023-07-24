@@ -192,3 +192,37 @@ func TestAsFlatType(t *testing.T) {
 		})
 	}
 }
+
+func TestStdStrToInt(t *testing.T) {
+	for _, tt := range []struct {
+		input string
+		want  int64
+	}{
+		{
+			input: "11.0",
+			want:  11,
+		},
+		{
+			input: "11.0000000",
+			want:  11,
+		},
+		{
+			input: "1",
+			want:  1,
+		},
+		{
+			input: "-3",
+			want:  -3,
+		},
+		{
+			input: "-14.0",
+			want:  -14,
+		},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := StdStrToInt()(tt.input)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got.(int64))
+		})
+	}
+}

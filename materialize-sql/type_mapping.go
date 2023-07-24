@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -241,6 +242,14 @@ func StringCastConverter(fn func(string) (interface{}, error)) ElementConverter 
 // can be used for endpoints that do not require more digits than an int64 can provide.
 func StdStrToInt() ElementConverter {
 	return StringCastConverter(func(str string) (interface{}, error) {
+		// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers
+		// per JSON specification so we must handle this possibility here. Anything after the
+		// decimal is discarded on the assumption that Flow has validated the data and verified that
+		// the decimal component is all 0's.
+		if idx := strings.Index(str, "."); idx != -1 {
+			str = str[:idx]
+		}
+
 		out, err := strconv.ParseInt(str, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert %q to int64: %w", str, err)

@@ -36,6 +36,14 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 
 // Snowflake INTEGER values support up to 38 digits, which is more than an int64.
 func strToSfInt(str string) (interface{}, error) {
+	// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers per
+	// JSON specification so we must handle this possibility here. Anything after the decimal is
+	// discarded on the assumption that Flow has validated the data and verified that the decimal
+	// component is all 0's.
+	if idx := strings.Index(str, "."); idx != -1 {
+		str = str[:idx]
+	}
+
 	var i big.Int
 	out, ok := i.SetString(str, 10)
 	if !ok {
