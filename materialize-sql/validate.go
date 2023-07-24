@@ -72,7 +72,7 @@ func ValidateNewSQLProjections(resource Resource, proposed *pf.CollectionSpec) (
 			}
 		case pm.Response_Validated_Constraint_LOCATION_REQUIRED:
 			if projection.Inference.Exists != pf.Inference_MUST {
-				return nil, fmt.Errorf("The materialization must include a projection of location '%s', but no such projection is included. It is required because: %s", projection.Field, constraint.Reason)
+				return nil, fmt.Errorf("Required location '%s' is marked as optional in collection schema. It is required because: %s", projection.Field, constraint.Reason)
 			}
 		}
 	}
