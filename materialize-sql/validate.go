@@ -34,20 +34,13 @@ func ValidateSelectedFields(constraints map[string]*pm.Response_Validated_Constr
 	for field, constraint := range constraints {
 		switch constraint.Type {
 		case pm.Response_Validated_Constraint_FIELD_REQUIRED:
-			var projection = proposed.Collection.GetProjection(field)
 			if !slices.Contains(allFields, field) {
 				return fmt.Errorf("Required field '%s' is missing. It is required because: %s", field, constraint.Reason)
-			}
-			if projection == nil || projection.Inference.Exists != pf.Inference_MUST {
-				return fmt.Errorf("Required field '%s' is marked as optional in collection schema. It is required because: %s", field, constraint.Reason)
 			}
 		case pm.Response_Validated_Constraint_LOCATION_REQUIRED:
 			var projection = proposed.Collection.GetProjection(field)
 			if !includedPointers[projection.Ptr] {
 				return fmt.Errorf("The materialization must include a projections of location '%s', but no such projection is included. It is required because: %s", projection.Ptr, constraint.Reason)
-			}
-			if projection == nil || projection.Inference.Exists != pf.Inference_MUST {
-				return fmt.Errorf("The materialization must include a projection of location '%s', but no such projection is included. It is required because: %s", field, constraint.Reason)
 			}
 		}
 	}
@@ -59,24 +52,13 @@ func ValidateSelectedFields(constraints map[string]*pm.Response_Validated_Constr
 // **new** materialization (one that is not running and has never been Applied). Note that this will
 // "recommend" all projections of single scalar types, which is what drives the default field
 // selection in flowctl.
-func ValidateNewSQLProjections(resource Resource, proposed *pf.CollectionSpec) (map[string]*pm.Response_Validated_Constraint, error) {
+func ValidateNewSQLProjections(resource Resource, proposed *pf.CollectionSpec) map[string]*pm.Response_Validated_Constraint {
 	var constraints = make(map[string]*pm.Response_Validated_Constraint)
 	for _, projection := range proposed.Projections {
 		var constraint = validateNewProjection(resource, projection)
 		constraints[projection.Field] = constraint
-
-		switch constraint.Type {
-		case pm.Response_Validated_Constraint_FIELD_REQUIRED:
-			if projection.Inference.Exists != pf.Inference_MUST {
-				return nil, fmt.Errorf("Required field '%s' is marked as optional in collection schema. It is required because: %s", projection.Field, constraint.Reason)
-			}
-		case pm.Response_Validated_Constraint_LOCATION_REQUIRED:
-			if projection.Inference.Exists != pf.Inference_MUST {
-				return nil, fmt.Errorf("The materialization must include a projection of location '%s', but no such projection is included. It is required because: %s", projection.Field, constraint.Reason)
-			}
-		}
 	}
-	return constraints, nil
+	return constraints
 }
 
 func validateNewProjection(resource Resource, projection pf.Projection) *pm.Response_Validated_Constraint {
