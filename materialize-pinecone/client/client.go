@@ -108,10 +108,8 @@ func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]
 	return embeddings.Data, nil
 }
 
-// This ping method functions as a means to verify connectivity with the OpenAI API via a request to
-// the /models endpoint.
-func (c *OpenAiClient) Ping(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.openai.com/v1/models", nil)
+func (c *OpenAiClient) VerifyModelExists(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.openai.com/v1/models/%s", c.embeddingModel), nil)
 	if err != nil {
 		return err
 	}
@@ -127,7 +125,16 @@ func (c *OpenAiClient) Ping(ctx context.Context) error {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("OpenAiClient Ping unexpected status: %s", res.Status)
+		var errorBody openAiEmbeddingsError
+		if err := json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
+			log.WithField("error", err).Warn("could not decode error response body")
+		} else if errorBody.Error.Message != "" {
+			return fmt.Errorf("could not verify OpenAI embeddings model %s exists (%s): %s", c.embeddingModel, res.Status, errorBody.Error.Message)
+		} else {
+			log.WithField("errorBody", errorBody).Warn("errorBody error message was empty")
+		}
+
+		return fmt.Errorf("OpenAiClient VerifyModelExists unexpected status: %s", res.Status)
 	}
 
 	return nil
