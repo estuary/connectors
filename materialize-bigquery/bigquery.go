@@ -35,6 +35,9 @@ func (c *config) Validate() error {
 	if c.ProjectID == "" {
 		return fmt.Errorf("expected project_id")
 	}
+	if c.CredentialsJSON == "" {
+		return fmt.Errorf("expected credentials_json")
+	}
 	if c.Dataset == "" {
 		return fmt.Errorf("expected dataset")
 	}
@@ -43,6 +46,13 @@ func (c *config) Validate() error {
 	}
 	if c.Bucket == "" {
 		return fmt.Errorf("expected bucket")
+	}
+
+	// Sanity check: Are the provided credentials valid JSON? A common error is to upload
+	// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
+	// directly to bigquery.NewClient.
+	if !json.Valid([]byte(c.CredentialsJSON)) {
+		return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 	}
 
 	if c.BucketPath != "" {
@@ -187,15 +197,8 @@ func newBigQueryDriver() *sql.Driver {
 
 func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
+	client := ep.Client.(*client)
 	errs := &sql.PrereqErr{}
-
-	client, err := cfg.client(ctx)
-	if err != nil {
-		// The user-provided JSON credentials could not be parsed and no further checks are
-		// possible.
-		errs.Err(fmt.Errorf("cannot parse JSON credentials"))
-		return errs
-	}
 
 	var googleErr *googleapi.Error
 
