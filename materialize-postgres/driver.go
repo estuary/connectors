@@ -241,6 +241,16 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 				err = fmt.Errorf("incorrect username or password")
 			case "3D000":
 				err = fmt.Errorf("database %q does not exist", cfg.Database)
+			case "XX000":
+				// These error messages are returned when trying to connect to NeonDB without having
+				// sslmode=verify-full. The first one is what you get when no sslmode is set, and
+				// the advice of setting sslmode=require results in the second one since we are
+				// using the Go client library. Neither of these errors are helpful at all, so we
+				// report a more useful error message instead.
+				if strings.Contains(pgErr.Message, "connection is insecure (try using `sslmode=require`)") ||
+					strings.Contains(pgErr.Message, "Endpoint ID is not specified. Either please upgrade the postgres client library (libpq) for SNI support or pass the endpoint ID (first part of the domain name) as a parameter") {
+					err = fmt.Errorf("sslmode configuration was not accepted: the database may require sslmode=verify-full, which can be set in the advanced configuration")
+				}
 			}
 		} else if errors.As(err, &netConnErr) {
 			if netConnErr.IsNotFound {

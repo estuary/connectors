@@ -233,6 +233,16 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 				return cerrors.NewUserError(err, fmt.Sprintf("database %q does not exist", db.config.Database))
 			case "42501":
 				return cerrors.NewUserError(err, fmt.Sprintf("user %q does not have CONNECT privilege to database %q", db.config.User, db.config.Database))
+			case "XX000":
+				// These error messages are returned when trying to connect to NeonDB without having
+				// sslmode=verify-full. The first one is what you get when no sslmode is set, and
+				// the advice of setting sslmode=require results in the second one since we are
+				// using the Go client library. Neither of these errors are helpful at all, so we
+				// report a more useful error message instead.
+				if strings.Contains(pgErr.Message, "connection is insecure (try using `sslmode=require`)") ||
+					strings.Contains(pgErr.Message, "Endpoint ID is not specified. Either please upgrade the postgres client library (libpq) for SNI support or pass the endpoint ID (first part of the domain name) as a parameter") {
+					err = fmt.Errorf("sslmode configuration was not accepted: the database may require sslmode=verify-full, which can be set in the advanced configuration")
+				}
 			}
 		}
 
