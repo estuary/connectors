@@ -157,14 +157,6 @@ func TestPrereqs(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "can't parse credentials",
-			cfg: func(cfg config) *config {
-				cfg.CredentialsJSON = cfg.CredentialsJSON + "wrong"
-				return &cfg
-			},
-			want: []error{fmt.Errorf("cannot parse JSON credentials")},
-		},
-		{
 			name: "bucket doesn't exist",
 			cfg: func(cfg config) *config {
 				cfg.Bucket = nonExistentBucket
@@ -176,8 +168,13 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.cfg(cfg)
+			client, err := cfg.client(context.Background())
+			require.NoError(t, err)
+
 			require.Equal(t, tt.want, prereqs(context.Background(), &sql.Endpoint{
-				Config: tt.cfg(cfg),
+				Config: cfg,
+				Client: client,
 				Tenant: "tenant",
 			}).Unwrap())
 		})
