@@ -13,6 +13,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	protoio "github.com/gogo/protobuf/io"
@@ -66,6 +69,13 @@ func RunMain(connector Connector) {
 	default:
 		log.WithField("codec", codec).Fatal("invalid FLOW_RUNTIME_CODEC (expected 'json', or 'proto')")
 	}
+
+	go func() {
+		log.WithField("port", 6060).Debug("starting pprof server")
+		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+			log.WithField("err", err).Info("pprof server shut down unexpectedly")
+		}
+	}()
 
 	var server = ConnectorServer{connector}
 
