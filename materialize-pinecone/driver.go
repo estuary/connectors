@@ -163,8 +163,8 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			textEmbeddingAda002VectorLength,
 			textEmbeddingAda002,
 		)
-	} else if err := cfg.openAiClient().Ping(ctx); err != nil {
-		return nil, fmt.Errorf("connecting to OpenAI: %w", err)
+	} else if err := cfg.openAiClient().VerifyModelExists(ctx); err != nil {
+		return nil, err
 	}
 
 	// Log a warning message if the 'flow_document' metadata field has not been excluded from
