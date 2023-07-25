@@ -181,7 +181,14 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 			if err = c.Output.Documents(binding, js); err != nil {
 				return fmt.Errorf("output documents failed: %w", err)
 			}
-		} else {
+		} else if ev.FullDocument != nil {
+			// FullDocument can be "null" if another operation has deleted the
+			// document. This happens because update change events do not hold a copy of the
+			// full document, but rather it is at query time that the full document is
+			// looked up, and in these cases, the FullDocument can end up being null
+			// (if deleted) or different from the deltas in the update event. We
+			// ignore events where fullDocument is null. Another change event of type
+			// delete will eventually come and delete the document (if not already).
 			var doc = sanitizeDocument(ev.FullDocument)
 
 			js, err := json.Marshal(doc)
