@@ -2,10 +2,12 @@ use crate::{transactor::Transactor, Binding, EndpointConfig};
 
 use anyhow::Context;
 use axum::{
-    extract::{Json, Path, State},
+    body::Bytes,
+    extract::{DefaultBodyLimit, Json, Path, State},
     routing, Router,
 };
 use http::status::StatusCode;
+use serde_json::Value;
 use utoipa::openapi::{self, schema, security, OpenApi, OpenApiBuilder};
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -25,6 +27,8 @@ pub async fn run_server(
     let handler = Handler::try_new(stdin, stdout, endpoint_config, bindings)?;
 
     let router = Router::new()
+        // Set the body limit to be the same as the max document size allowed by Flow (64MiB)
+        .layer(DefaultBodyLimit::max(64 * 1024 * 1024))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-doc/openapi.json", openapi_spec))
         // The root path redirects to the swagger ui, so that a user who clicks a link to just
         // the hostname will be redirected to a more useful page.
@@ -54,8 +58,8 @@ async fn handle_webhook(
     State(handler): State<Arc<Handler>>,
     request_headers: axum::http::header::HeaderMap,
     Path(path): Path<String>,
-    Json(body): Json<serde_json::Value>,
-) -> (StatusCode, Json<serde_json::Value>) {
+    body: Bytes,
+) -> (StatusCode, Json<Value>) {
     let resp = match handler.handle_webhook(path, request_headers, body).await {
         Ok(resp) => resp,
         Err(err) => {
@@ -91,7 +95,12 @@ fn required_string_header<'a>(
         })
 }
 
-fn err_response(status: StatusCode, err: anyhow::Error) -> (StatusCode, Json<serde_json::Value>) {
+fn err_response(
+    status: StatusCode,
+    err: anyhow::Error,
+    request_path: &str,
+) -> (StatusCode, Json<Value>) {
+    tracing::info!(%request_path, error = ?err, "responding with error");
     let json = serde_json::json!({ "error": err.to_string() });
     (status, Json(json))
 }
@@ -99,9 +108,9 @@ fn err_response(status: StatusCode, err: anyhow::Error) -> (StatusCode, Json<ser
 impl CollectionHandler {
     fn prepare_document(
         &self,
-        mut body: serde_json::Value,
+        mut body: Value,
         request_headers: axum::http::header::HeaderMap,
-    ) -> anyhow::Result<serde_json::Value> {
+    ) -> anyhow::Result<Value> {
         let id = if let Some(header_key) = self.id_header.as_ref() {
             // If the config specified a header to use as the id, then require it to be present.
             required_string_header(&request_headers, header_key.as_str())?.to_owned()
@@ -112,7 +121,7 @@ impl CollectionHandler {
 
         let id_pointer = doc::Pointer::from_str("/_meta/webhookId");
         if let Some(loc) = id_pointer.create_value(&mut body) {
-            *loc = serde_json::Value::String(id);
+            *loc = Value::String(id);
         } else {
             anyhow::bail!("invalid document, cannot create _meta object");
         }
@@ -137,7 +146,7 @@ impl CollectionHandler {
                 // If we're unable to create the /_meta/headers object, then don't consider it an error.
                 // These headers are nice to have, but are not necessarily requried.
                 if let Some(loc) = ptr.create_value(&mut body) {
-                    *loc = serde_json::Value::String(value_str.to_owned());
+                    *loc = Value::String(value_str.to_owned());
                 }
             }
         }
@@ -147,7 +156,7 @@ impl CollectionHandler {
             let ts = time::OffsetDateTime::now_utc()
                 .format(&time::format_description::well_known::Rfc3339)
                 .unwrap();
-            *loc = serde_json::Value::String(ts);
+            *loc = Value::String(ts);
         }
 
         Ok(body)
@@ -195,9 +204,8 @@ impl Handler {
                 url_path
             };
 
-            let schema_value =
-                serde_json::from_str::<serde_json::Value>(&collection.write_schema_json)
-                    .context("parsing write_schema_json")?;
+            let schema_value = serde_json::from_str::<Value>(&collection.write_schema_json)
+                .context("parsing write_schema_json")?;
             let uri = url::Url::parse("http://not.areal.host/").unwrap();
             let schema = json::schema::build::build_schema(uri, &schema_value)?;
             let validator = doc::Validator::new(schema)?;
@@ -233,8 +241,8 @@ impl Handler {
         &self,
         collection_path: String,
         request_headers: axum::http::header::HeaderMap,
-        body: serde_json::Value,
-    ) -> anyhow::Result<(StatusCode, Json<serde_json::Value>)> {
+        body: Bytes,
+    ) -> anyhow::Result<(StatusCode, Json<Value>)> {
         if let Some(expected_header) = self.require_auth_header.as_ref() {
             match required_string_header(&request_headers, "Authorization") {
                 Ok(auth) if auth == expected_header => { /* request is authorized */ }
@@ -242,12 +250,43 @@ impl Handler {
                     return Ok(err_response(
                         StatusCode::FORBIDDEN,
                         anyhow::anyhow!("invalid authorization token"),
+                        &collection_path,
                     ));
                 }
                 Err(err) => {
-                    return Ok(err_response(StatusCode::UNAUTHORIZED, err));
+                    return Ok(err_response(
+                        StatusCode::UNAUTHORIZED,
+                        err,
+                        &collection_path,
+                    ));
                 }
             }
+        }
+
+        // Try to deserialize the body as json _before_ acquiring the handlers lock,
+        // to prevent slow connection from impacting others.
+        let json: Value = match serde_json::from_slice(&body) {
+            Ok(j) => j,
+            Err(err) => {
+                let content_type = request_headers.get("content-type");
+                let content_encoding = request_headers.get("content-encoding");
+
+                let req_body = String::from_utf8_lossy(&body);
+                tracing::warn!(%collection_path, ?content_type, ?content_encoding, %req_body, error = ?err, "failed parsing request body as json");
+                return Ok(err_response(
+                    StatusCode::BAD_REQUEST,
+                    anyhow::anyhow!("invalid json: {err}"),
+                    &collection_path,
+                ));
+            }
+        };
+
+        if !json.is_object() {
+            return Ok(err_response(
+                StatusCode::BAD_REQUEST,
+                anyhow::anyhow!("request body must be an object"),
+                &collection_path,
+            ));
         }
 
         let start = std::time::Instant::now();
@@ -255,13 +294,14 @@ impl Handler {
         let mut handlers_guard = self.handlers_by_path.lock().await;
 
         let Some(collection) = handlers_guard.get_mut(collection_path.as_str()) else {
+            tracing::info!(uri_path = %collection_path, "unknown uri path");
             return Ok((StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "not found"}))));
         };
 
         tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "resolved handler");
-        let enhanced_doc = match collection.prepare_document(body, request_headers) {
+        let enhanced_doc = match collection.prepare_document(json, request_headers) {
             Ok(doc) => doc,
-            Err(err) => return Ok(err_response(StatusCode::BAD_REQUEST, err)),
+            Err(err) => return Ok(err_response(StatusCode::BAD_REQUEST, err, &collection_path)),
         };
 
         let validation_result = collection.validator.validate(None, &enhanced_doc)?;
