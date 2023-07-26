@@ -346,7 +346,7 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 			var relation = s.relations[relID]
 			var streamID = sqlcapture.JoinStreamID(relation.Namespace, relation.RelationName)
 			if s.tableActive(streamID) {
-				return nil, fmt.Errorf("unsupported operation TRUNCATE on table %q", streamID)
+				logrus.WithField("table", streamID).Warn("ignoring TRUNCATE on active table")
 			}
 		}
 		return nil, nil

@@ -488,7 +488,7 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 		}
 	case *sqlparser.TruncateTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
-			return fmt.Errorf("unsupported operation (go.estuary.dev/eVVwet): %s", query)
+			logrus.WithField("table", streamID).Warn("ignoring TRUNCATE on active table")
 		}
 	case *sqlparser.RenameTable:
 		for _, pair := range stmt.TablePairs {
