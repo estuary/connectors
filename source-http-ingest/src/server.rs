@@ -3,11 +3,14 @@ use crate::{transactor::Transactor, Binding, EndpointConfig};
 use anyhow::Context;
 use axum::{
     body::Bytes,
+    error_handling::HandleErrorLayer,
     extract::{DefaultBodyLimit, Json, Path, State},
-    routing, Router,
+    routing, BoxError, Router,
 };
 use http::status::StatusCode;
 use serde_json::Value;
+use tower::ServiceBuilder;
+use tower_http::decompression::RequestDecompressionLayer;
 use utoipa::openapi::{self, schema, security, OpenApi, OpenApiBuilder};
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -27,8 +30,6 @@ pub async fn run_server(
     let handler = Handler::try_new(stdin, stdout, endpoint_config, bindings)?;
 
     let router = Router::new()
-        // Set the body limit to be the same as the max document size allowed by Flow (64MiB)
-        .layer(DefaultBodyLimit::max(64 * 1024 * 1024))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-doc/openapi.json", openapi_spec))
         // The root path redirects to the swagger ui, so that a user who clicks a link to just
         // the hostname will be redirected to a more useful page.
@@ -38,6 +39,22 @@ pub async fn run_server(
         )
         // There's just one route that handles all bindings. The path will be provided as an argument.
         .route("/*path", routing::post(handle_webhook).put(handle_webhook))
+        // Set the body limit to be the same as the max document size allowed by Flow (64MiB)
+        .layer(DefaultBodyLimit::max(64 * 1024 * 1024))
+        .layer(
+            // Handle decompression of request bodies. The order of these is important!
+            // This layer applies to all routes defined _before_ it, so the max body size is
+            // the size after decompression.
+            ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(|error: BoxError| async move {
+                    tracing::info!(%error, "request body decompression error");
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "error decompressing request body",
+                    )
+                }))
+                .layer(RequestDecompressionLayer::new()),
+        )
         .with_state(Arc::new(handler));
 
     let address = std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, listen_on_port()));
