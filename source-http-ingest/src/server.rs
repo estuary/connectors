@@ -250,12 +250,15 @@ impl Handler {
             }
         }
 
+        let start = std::time::Instant::now();
+        tracing::debug!(path = %collection_path, "looking up handler for path");
         let mut handlers_guard = self.handlers_by_path.lock().await;
 
         let Some(collection) = handlers_guard.get_mut(collection_path.as_str()) else {
             return Ok((StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "not found"}))));
         };
 
+        tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "resolved handler");
         let enhanced_doc = match collection.prepare_document(body, request_headers) {
             Ok(doc) => doc,
             Err(err) => return Ok(err_response(StatusCode::BAD_REQUEST, err)),
@@ -273,7 +276,9 @@ impl Handler {
         let txn = vec![(collection.binding_index, enhanced_doc)];
         std::mem::drop(handlers_guard);
 
+        tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "document is valid and ready to publish");
         self.io.publish(txn).await?;
+        tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "document published successfully");
         Ok((StatusCode::OK, Json(serde_json::json!({"published": 1 }))))
     }
 }
