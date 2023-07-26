@@ -26,8 +26,11 @@ fn start_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
     // So map the debug level to a filter that will still use info level for other crates.
     // We may want to do something similar for the trace level, but I'm leaving that for later.
     let level_str = match std::env::var("LOG_LEVEL").ok() {
+        Some(lvl) if lvl.as_str() == "trace" => {
+            "source_http_ingest=trace,doc=debug,json=debug,axum::rejection=trace,info".to_string()
+        }
         Some(lvl) if lvl.as_str() == "debug" => {
-            "source_http_ingest=debug,doc=debug,json=debug,info".to_string()
+            "source_http_ingest=debug,doc=debug,json=debug,axum::rejection=trace,info".to_string()
         }
         Some(other) => other,
         None => "info".to_string(),
