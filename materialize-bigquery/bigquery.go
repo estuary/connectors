@@ -51,7 +51,7 @@ func (c *config) Validate() error {
 	// Sanity check: Are the provided credentials valid JSON? A common error is to upload
 	// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
 	// directly to bigquery.NewClient.
-	if !json.Valid([]byte(c.CredentialsJSON)) {
+	if !json.Valid(decodeCredentials(c.CredentialsJSON)) {
 		return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 	}
 
