@@ -215,7 +215,8 @@ func TestTruncatedTables(t *testing.T) {
 
 	// Truncating table A will cause the capture to fail though, as it should.
 	tb.Query(ctx, t, fmt.Sprintf("TRUNCATE TABLE %s;", tableA))
-	t.Run("capture2-fails", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	tb.Insert(ctx, t, tableA, [][]interface{}{{10, "ten"}, {11, "eleven"}, {12, "twelve"}})
+	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
 func TestTrickyColumnNames(t *testing.T) {
