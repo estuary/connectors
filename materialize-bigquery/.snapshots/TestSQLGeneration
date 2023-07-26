@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS projectID.dataset.target_table (
 		integer INT64 NOT NULL,
 		string STRING NOT NULL,
 		`defAULT` STRING,
-		number FLOAT64,
+		number BIGNUMERIC,
 		person_place_ STRING,
 		source_name STRING,
 		`with-dash` STRING,
