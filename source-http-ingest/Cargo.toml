@@ -26,6 +26,8 @@ utoipa-swagger-ui = { version = "3.0.2", features = ["axum"] }
 time = { version = "0.3.20", features = ["formatting"] }
 uuid = { version = "1.3.0", features = ["v4"] }
 lazy_static = "1.4.0"
+tower-http = { version = "0.4.3", features = ["decompression-full"] }
+tower = "0.4.13"
 
 [dev-dependencies]
 insta = { version = "1.28.0", features = ["json", "serde"] }
