@@ -542,7 +542,6 @@ func (c *Capture) emitBuffered(results *resultSet) error {
 }
 
 func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resultSet, error) {
-	logrus.WithField("streams", streams).Info("backfilling streams")
 	var results = newResultSet()
 
 	// TODO(wgd): Add a sanity-check assertion that the current watermark value
@@ -556,6 +555,11 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 	if len(streams) != 0 {
 		var streamID = streams[rand.Intn(len(streams))]
 		var streamState = c.State.Streams[streamID]
+
+		logrus.WithFields(logrus.Fields{
+			"streams":  streams,
+			"selected": streamID,
+		}).Info("backfilling streams")
 
 		discoveryInfo, ok := c.discovery[streamID]
 		if !ok {
@@ -662,15 +666,17 @@ func (c *Capture) emitMessage(out *boilerplate.PullOutput, msg interface{}) erro
 		}
 		record["_meta"] = &meta
 
-		var bs, err = json.Marshal(record)
-		if err != nil {
-			return fmt.Errorf("error serializing record data: %w", err)
-		}
 		var sourceCommon = msg.Source.Common()
 		var streamID = JoinStreamID(sourceCommon.Schema, sourceCommon.Table)
 		var binding, ok = c.Bindings[streamID]
 		if !ok {
 			return fmt.Errorf("capture output to invalid stream %q", streamID)
+		}
+
+		var bs, err = json.Marshal(record)
+		if err != nil {
+			return fmt.Errorf("error serializing table %s.%s record data: %w",
+				sourceCommon.Schema, sourceCommon.Table, err)
 		}
 		return out.Documents(int(binding.Index), bs)
 	case *PersistentState:
