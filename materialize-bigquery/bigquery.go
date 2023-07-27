@@ -78,13 +78,11 @@ func (c *config) client(ctx context.Context) (*client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating bigquery client: %w", err)
 	}
-	log.WithField("projectID", billingProjectID).Info("bigquery client successfully created")
 
 	cloudStorageClient, err := storage.NewClient(ctx, clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating cloud storage client: %w", err)
 	}
-	log.Info("cloud storage client successfully created")
 
 	return &client{
 		bigqueryClient:     bigqueryClient,
@@ -378,7 +376,6 @@ func (c client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence) 
 		Fence      int64  `bigquery:"fence"`
 		Checkpoint string `bigquery:"checkpoint"`
 	}
-	log.Info("reading installed fence")
 	if err = c.fetchOne(ctx, job, &bqFence); err != nil {
 		return fence, fmt.Errorf("read fence: %w", err)
 	}
@@ -390,14 +387,6 @@ func (c client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence) 
 
 	fence.Fence = bqFence.Fence
 	fence.Checkpoint = checkpoint
-
-	log.WithFields(log.Fields{
-		"fence":            fence.Fence,
-		"keyBegin":         fence.KeyBegin,
-		"keyEnd":           fence.KeyEnd,
-		"materialization":  fence.Materialization.String(),
-		"checkpointsTable": fence.TablePath,
-	}).Info("fence installed successfully")
 
 	return fence, nil
 }
