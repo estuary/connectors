@@ -78,13 +78,11 @@ func (c *config) client(ctx context.Context) (*client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating bigquery client: %w", err)
 	}
-	log.WithField("projectID", billingProjectID).Info("bigquery client successfully created")
 
 	cloudStorageClient, err := storage.NewClient(ctx, clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating cloud storage client: %w", err)
 	}
-	log.Info("cloud storage client successfully created")
 
 	return &client{
 		bigqueryClient:     bigqueryClient,

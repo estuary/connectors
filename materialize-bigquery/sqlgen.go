@@ -45,6 +45,12 @@ func identifierSanitizer(delegate func(string) string) func(string) string {
 	}
 }
 
+// translateFlowIdentifier returns the column or table name that will be created for a given
+// collection name or field name, without any quoting applied.
+func translateFlowIdentifier(f string) string {
+	return identifierSanitizerRegexp.ReplaceAllString(f, "_")
+}
+
 var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
 	switch ii := te.(type) {
 	case []byte:
