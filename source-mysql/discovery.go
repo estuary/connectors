@@ -200,6 +200,9 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 			case "blob", "tinyblob", "mediumblob", "longblob":
 				return val, nil
 			case "json":
+				if len(val) == 0 {
+					return nil, nil
+				}
 				return json.RawMessage(val), nil
 			case "timestamp":
 				// Per the MySQL docs:
