@@ -2,5 +2,16 @@
 
 set -e
 
-# TODO(johnny): This mostly works because deleting bindings also drops the tables.
-# But, this script should nuke it from orbit and ensure we get back to a clean state.
+function dropTable() {
+    go run ${TEST_DIR}/materialize-bigquery/fetch-data.go --delete "$1"
+}
+
+# Remove materialized tables.
+dropTable "simple"
+dropTable "duplicate_keys"
+dropTable "multiple_types"
+dropTable "formatted_strings"
+
+# Remove the persisted materialization spec & checkpoint for this test materialization so subsequent
+# runs start from scratch.
+go run ${TEST_DIR}/materialize-bigquery/fetch-data.go --delete-specs notable

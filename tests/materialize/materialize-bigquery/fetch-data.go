@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -14,7 +15,17 @@ import (
 	"google.golang.org/api/option"
 )
 
+var deleteTable = flag.Bool("delete", false, "delete the table instead of dumping its contents")
+var deleteSpecs = flag.Bool("delete-specs", false, "stored materialize checkpoint and specs")
+
 func main() {
+	flag.Parse()
+
+	tables := flag.Args()
+	if len(tables) != 1 {
+		log.Fatal("must provide table name as an argument")
+	}
+
 	saKey, ok := os.LookupEnv("GCP_SERVICE_ACCOUNT_KEY")
 	if !ok {
 		log.Fatal("missing GCP_SERVICE_ACCOUNT_KEY environment variable")
@@ -35,11 +46,6 @@ func main() {
 		log.Fatal("missing GCP_BQ_REGION environment variable")
 	}
 
-	tables := os.Args[1:]
-	if len(tables) != 1 {
-		log.Fatal("must provide table name as an argument")
-	}
-
 	ctx := context.Background()
 
 	client, err := bigquery.NewClient(
@@ -48,6 +54,34 @@ func main() {
 		option.WithCredentialsJSON([]byte(saKey)))
 	if err != nil {
 		log.Fatal(fmt.Errorf("building bigquery client: %w", err))
+	}
+
+	// Handle cleanup cases of for dropping a table and deleting the stored materialization spec &
+	// checkpoint if flags were provided.
+	if *deleteTable {
+		if err := client.DatasetInProject(projectID, dataset).Table(tables[0]).Delete(ctx); err != nil {
+			fmt.Println(fmt.Errorf("could not drop table %s: %w", tables[0], err))
+		}
+		os.Exit(0)
+	} else if *deleteSpecs {
+		query := fmt.Sprintf(
+			"delete from %s.flow_checkpoints_v1 where materialization='tests/materialize-bigquery/materialize';delete from %s.flow_materializations_v2 where materialization='tests/materialize-bigquery/materialize';",
+			dataset,
+			dataset,
+		)
+
+		job, err := client.Query(query).Run(ctx)
+		if err != nil {
+			fmt.Println(fmt.Errorf("could not delete stored materialization spec/checkpoint: %w", err))
+			os.Exit(1)
+		}
+
+		if _, err := job.Wait(ctx); err != nil {
+			fmt.Println(fmt.Errorf("could not delete stored materialization spec/checkpoint: %w", err))
+			os.Exit(1)
+		}
+
+		os.Exit(0)
 	}
 
 	queryString := fmt.Sprintf("SELECT * FROM %s", strings.Join([]string{projectID, dataset, tables[0]}, "."))
@@ -80,30 +114,13 @@ func main() {
 		rows = append(rows, values)
 	}
 
-	// Remove the "flow document" entry, which contains a random uuid.
-	cleaned := [][]bigquery.Value{}
-	for _, r := range rows {
-		vals := []bigquery.Value{}
-
-		for _, v := range r {
-			if val, ok := v.(string); ok {
-				if strings.Contains(val, "uuid") {
-					continue
-				}
-			}
-			vals = append(vals, v)
-		}
-
-		cleaned = append(cleaned, vals)
-	}
-
 	// Sort by ID
-	sort.Slice(cleaned, func(i, j int) bool {
-		return cleaned[i][0].(int64) < cleaned[j][0].(int64)
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i][0].(int64) < rows[j][0].(int64)
 	})
 
 	var enc = json.NewEncoder(os.Stdout)
-	for _, row := range cleaned {
+	for _, row := range rows {
 		enc.Encode(row)
 	}
 }
