@@ -112,71 +112,103 @@ fn required_string_header<'a>(
         })
 }
 
-fn err_response(
-    status: StatusCode,
-    err: anyhow::Error,
-    request_path: &str,
-) -> (StatusCode, Json<Value>) {
-    tracing::info!(%request_path, error = ?err, "responding with error");
-    let json = serde_json::json!({ "error": err.to_string() });
-    (status, Json(json))
+/// Known locations where we populate metadata in the documents we capture.
+mod pointers {
+    use doc::Pointer;
+
+    lazy_static::lazy_static! {
+        pub static ref ID: Pointer = Pointer::from_str("/_meta/webhookId");
+        pub static ref TS: Pointer = Pointer::from_str("/_meta/receivedAt");
+        pub static ref HEADERS: Pointer = Pointer::from_str("/_meta/headers");
+    }
 }
 
 impl CollectionHandler {
-    fn prepare_document(
+    fn prepare_doc(
         &self,
-        mut body: Value,
-        request_headers: axum::http::header::HeaderMap,
-    ) -> anyhow::Result<Value> {
-        let id = if let Some(header_key) = self.id_header.as_ref() {
-            // If the config specified a header to use as the id, then require it to be present.
-            required_string_header(&request_headers, header_key.as_str())?.to_owned()
-        } else {
-            // we're supposed to generate a random uuid.
-            uuid::Uuid::new_v4().to_string()
-        };
+        mut object: Value,
+        id: String,
+        headers: serde_json::Map<String, Value>,
+        ts: String,
+    ) -> anyhow::Result<(u32, Value)> {
+        if !object.is_object() {
+            anyhow::bail!("expected a JSON object, got {}", type_name(&object));
+        }
 
-        let id_pointer = doc::Pointer::from_str("/_meta/webhookId");
-        if let Some(loc) = id_pointer.create_value(&mut body) {
+        if let Some(loc) = pointers::ID.create_value(&mut object) {
             *loc = Value::String(id);
         } else {
             anyhow::bail!("invalid document, cannot create _meta object");
         }
 
-        for (maybe_key, value) in request_headers {
-            // Are both the key and value ascii strings? If not, then skip this header.
-            let Some(key) = maybe_key else {
-                continue;
-            };
-            let Ok(value_str) = value.to_str() else {
-                continue;
-            };
-
-            // Filter out any sensitive headers or useless headers. Note that we don't do
-            // json pointer escaping on the header names. We _could_, but it hardly seems
-            // worth the extra code complexity, given that these character rarely appear in
-            // header keys, and the consequence if they do are that we'll either ignore the
-            // header (due to `ptr.create_value` returning `None`), or else the document will
-            // fail validation (due to a header value being an object or array).
-            if !REDACT_HEADERS.contains(&key) {
-                let ptr = doc::Pointer::from_str(&format!("/_meta/headers/{}", key.as_str()));
-                // If we're unable to create the /_meta/headers object, then don't consider it an error.
-                // These headers are nice to have, but are not necessarily requried.
-                if let Some(loc) = ptr.create_value(&mut body) {
-                    *loc = Value::String(value_str.to_owned());
-                }
-            }
-        }
-
-        let ts_pointer = doc::Pointer::from_str("/_meta/receivedAt");
-        if let Some(loc) = ts_pointer.create_value(&mut body) {
-            let ts = time::OffsetDateTime::now_utc()
-                .format(&time::format_description::well_known::Rfc3339)
-                .unwrap();
+        if let Some(loc) = pointers::TS.create_value(&mut object) {
             *loc = Value::String(ts);
         }
 
-        Ok(body)
+        if let Some(loc) = pointers::HEADERS.create_value(&mut object) {
+            *loc = Value::Object(headers);
+        }
+        Ok((self.binding_index, object))
+    }
+
+    /// Turns a JSON request body into an array of one or more documents, along with
+    /// the binding index of the collection.
+    fn prepare_documents(
+        &self,
+        body: Value,
+        request_headers: axum::http::header::HeaderMap,
+    ) -> anyhow::Result<Vec<(u32, Value)>> {
+        let header_id = if let Some(header_key) = self.id_header.as_ref() {
+            // If the config specified a header to use as the id, then require it to be present.
+            Some(required_string_header(&request_headers, header_key.as_str())?.to_owned())
+        } else {
+            None
+        };
+
+        // Build the JSON object containing headers to add to the document(s)
+        let header_json = request_headers
+            .into_iter()
+            .filter_map(|(maybe_key, value)| {
+                maybe_key // Ignore empty header names
+                    // Filter out any sensitive headers or useless headers.
+                    .filter(|k| REDACT_HEADERS.contains(k))
+                    .and_then(|key| {
+                        value // Ignores values that are not valid utf8
+                            .to_str()
+                            .ok()
+                            .map(|value| (key.to_string(), Value::String(value.to_string())))
+                    })
+            })
+            .collect::<serde_json::Map<_, _>>();
+
+        let ts = time::OffsetDateTime::now_utc()
+            .format(&time::format_description::well_known::Rfc3339)
+            .unwrap();
+
+        match body {
+            obj @ Value::Object(_) => {
+                let id = header_id.unwrap_or_else(new_uuid);
+                let prepped = self.prepare_doc(obj, id, header_json, ts)?;
+                Ok(vec![prepped])
+            }
+            Value::Array(arr) => {
+                let mut prepped = Vec::with_capacity(arr.len());
+                for (i, inner) in arr.into_iter().enumerate() {
+                    // suffix the header id, if provided, with the index of each
+                    // document in the array so that each has a unique id.
+                    let id = header_id
+                        .as_ref()
+                        .map(|header| format!("{header}/{i}"))
+                        .unwrap_or_else(new_uuid);
+                    prepped.push(self.prepare_doc(inner, id, header_json.clone(), ts.clone())?);
+                }
+                Ok(prepped)
+            }
+            other => Err(anyhow::anyhow!(
+                "expected an object or array, got {}",
+                type_name(&other)
+            )),
+        }
     }
 }
 
@@ -301,16 +333,7 @@ impl Handler {
             }
         };
 
-        if !json.is_object() {
-            return Ok(err_response(
-                StatusCode::BAD_REQUEST,
-                anyhow::anyhow!("request body must be an object"),
-                &collection_path,
-            ));
-        }
-
         let start = std::time::Instant::now();
-        tracing::debug!(path = %collection_path, "looking up handler for path");
         let mut handlers_guard = self.handlers_by_path.lock().await;
 
         let Some(collection) = handlers_guard.get_mut(collection_path.as_str()) else {
@@ -318,29 +341,39 @@ impl Handler {
             return Ok((StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "not found"}))));
         };
 
-        tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "resolved handler");
-        let enhanced_doc = match collection.prepare_document(json, request_headers) {
-            Ok(doc) => doc,
+        tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "acquired lock on handler");
+        let enhanced_docs = match collection.prepare_documents(json, request_headers) {
+            Ok(docs) => docs,
             Err(err) => return Ok(err_response(StatusCode::BAD_REQUEST, err, &collection_path)),
         };
 
-        let validation_result = collection.validator.validate(None, &enhanced_doc)?;
-        if let Err(validation_err) = validation_result.ok() {
-            tracing::info!(error = %validation_err, uri_path = %collection_path, "request document failed validation");
-            return Ok((
-                StatusCode::BAD_REQUEST,
-                Json(
-                    serde_json::json!({"error": "request body failed validation", "validationError": validation_err }),
-                ),
-            ));
+        // It's important that we validate all the documents before publishing
+        // any of them. We don't have the ability to "roll back" a partial
+        // publish apart from exiting with an error, which would potentially
+        // impact other requests. So this ensures that each request is all-or-
+        // nothing, which is probably simpler for users to reason about anyway.
+        for (_, doc) in enhanced_docs.iter() {
+            let validation_result = collection.validator.validate(None, doc)?;
+            if let Err(validation_err) = validation_result.ok() {
+                tracing::info!(error = %validation_err, uri_path = %collection_path, "request document failed validation");
+                return Ok((
+                    StatusCode::BAD_REQUEST,
+                    Json(
+                        serde_json::json!({"error": "request body failed validation", "validationError": validation_err }),
+                    ),
+                ));
+            }
         }
-        let txn = vec![(collection.binding_index, enhanced_doc)];
         std::mem::drop(handlers_guard);
 
-        tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "document is valid and ready to publish");
-        self.io.publish(txn).await?;
-        tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "document published successfully");
-        Ok((StatusCode::OK, Json(serde_json::json!({"published": 1 }))))
+        let n_docs = enhanced_docs.len();
+        tracing::debug!(%n_docs, elapsed_ms = %start.elapsed().as_millis(), "documents are valid and ready to publish");
+        self.io.publish(enhanced_docs).await?;
+        tracing::debug!(%n_docs, elapsed_ms = %start.elapsed().as_millis(), "documents published successfully");
+        Ok((
+            StatusCode::OK,
+            Json(serde_json::json!({ "published": n_docs })),
+        ))
     }
 }
 
@@ -575,4 +608,29 @@ mod test {
         let json = spec.to_pretty_json().expect("failed to serialize json");
         insta::assert_snapshot!(json);
     }
+}
+
+fn err_response(
+    status: StatusCode,
+    err: anyhow::Error,
+    request_path: &str,
+) -> (StatusCode, Json<Value>) {
+    tracing::info!(%request_path, error = ?err, "responding with error");
+    let json = serde_json::json!({ "error": err.to_string() });
+    (status, Json(json))
+}
+
+fn type_name(val: &Value) -> &'static str {
+    match val {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}
+
+fn new_uuid() -> String {
+    uuid::Uuid::new_v4().to_string()
 }
