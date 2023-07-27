@@ -40,14 +40,6 @@ func newTransactor(
 ) (_ pm.Transactor, err error) {
 	cfg := ep.Config.(*config)
 
-	log.WithFields(log.Fields{
-		"project_id":  cfg.ProjectID,
-		"dataset":     cfg.Dataset,
-		"region":      cfg.Region,
-		"bucket":      cfg.Bucket,
-		"bucket_path": cfg.BucketPath,
-	}).Info("creating transactor")
-
 	client, err := cfg.client(ctx)
 	if err != nil {
 		return nil, err
@@ -61,23 +53,41 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = t.addBinding(ctx, binding); err != nil {
+		// The name of the table itself is always the last element of the path.
+		table := binding.TableShape.Path[len(binding.TableShape.Path)-1]
+
+		// Lookup metadata for the table to build the schema for the external file that will be used
+		// for loading data. Schema definitions from the actual table columns are queried instead of
+		// directly using the dialect's output for JSON schema type to provide some degree in
+		// flexibility in changing the dialect and having it still work for existing tables. As long
+		// as the JSON encoding of the values is the same they may be used for columns that would
+		// have been created differently due to evolution of the dialect's column types.
+		meta, err := client.bigqueryClient.Dataset(cfg.Dataset).Table(translateFlowIdentifier(table)).Metadata(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting table metadata: %w", err)
+		}
+
+		fieldSchemas := make(map[string]*bigquery.FieldSchema)
+		for _, f := range meta.Schema {
+			fieldSchemas[f.Name] = f
+		}
+
+		if err = t.addBinding(ctx, binding, fieldSchemas); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
 
-	log.Info("transactor created successfully")
 	return t, nil
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, fieldSchemas map[string]*bigquery.FieldSchema) error {
 	var b = &binding{target: target}
 
 	var err error
-	if b.loadExtDataConfig, err = configForCols(target.KeyPtrs()); err != nil {
+	if b.loadExtDataConfig, err = configForCols(target.KeyPtrs(), fieldSchemas); err != nil {
 		return err
 	}
-	if b.storeExtDataConfig, err = configForCols(target.Columns()); err != nil {
+	if b.storeExtDataConfig, err = configForCols(target.Columns(), fieldSchemas); err != nil {
 		return err
 	}
 
@@ -100,34 +110,22 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	return nil
 }
 
-func configForCols(cols []*sql.Column) (*bigquery.ExternalDataConfig, error) {
+func configForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSchema) (*bigquery.ExternalDataConfig, error) {
 	config := &bigquery.ExternalDataConfig{
 		SourceFormat: bigquery.JSON,
 		Schema:       make([]*bigquery.FieldSchema, 0, len(cols)),
 	}
 
 	for _, col := range cols {
-		mt, err := bqTypeMapper.MapType(&col.Projection)
-		if err != nil {
-			return nil, fmt.Errorf("map type for external data config schema: %v", err)
+		schema, ok := fieldSchemas[translateFlowIdentifier(col.Field)]
+		if !ok {
+			return nil, fmt.Errorf("could not find metadata for field '%s'", col.Field)
 		}
 
-		_, mustExist := col.AsFlatType()
-		config.Schema = append(config.Schema, &bigquery.FieldSchema{
-			Name:     unquotedIdentifier(col.Identifier),
-			Repeated: false,
-			Required: mustExist,
-			Type:     bigquery.FieldType(mt.DDL),
-		})
+		config.Schema = append(config.Schema, schema)
 	}
 
 	return config, nil
-}
-
-// unquotedIdentifier strips identifier quoting (if present) so that the name is suitable for use in
-// a FieldSchema. There should only be identifer quoting if the column name matches a reserved word.
-func unquotedIdentifier(ident string) string {
-	return strings.TrimSuffix(strings.TrimPrefix(ident, "`"), "`")
 }
 
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
