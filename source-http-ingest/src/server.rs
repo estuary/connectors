@@ -171,7 +171,7 @@ impl CollectionHandler {
             .filter_map(|(maybe_key, value)| {
                 maybe_key // Ignore empty header names
                     // Filter out any sensitive headers or useless headers.
-                    .filter(|k| REDACT_HEADERS.contains(k))
+                    .filter(|k| !REDACT_HEADERS.contains(k))
                     .and_then(|key| {
                         value // Ignores values that are not valid utf8
                             .to_str()
