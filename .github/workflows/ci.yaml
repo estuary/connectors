@@ -103,6 +103,7 @@ jobs:
           - materialize-sqlite
           - materialize-snowflake
           - materialize-webhook
+          - materialize-mysql
 
     steps:
       - uses: actions/checkout@v2
@@ -214,6 +215,7 @@ jobs:
               "materialize-google-sheets",
               "materialize-pinecone",
               "materialize-postgres",
+              "materialize-mysql",
               "materialize-s3-parquet",
               "materialize-mongodb"
             ]'), matrix.connector)
