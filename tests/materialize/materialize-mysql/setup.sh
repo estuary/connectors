@@ -5,22 +5,28 @@ set -o pipefail
 set -o nounset
 
 # Ensure canonical Postgres environment variables are set.
-export PGHOST="${PGHOST:=materialize-postgres-postgres-1.flow-test}"
-export PGPORT="${PGPORT:=5432}"
-export PGDATABASE="${PGDATABASE:=flow}"
-export PGPASSWORD="${PGPASSWORD:=flow}"
-export PGUSER="${PGUSER:=flow}"
+export MYSQL_HOST="${MYSQL_HOST:=materialize-mysql-mysql-1.flow-test}"
+export MYSQL_PORT="${MYSQL_PORT:=3306}"
+export MYSQL_DATABASE="${MYSQL_DATABASE:=flow}"
+export MYSQL_PASSWORD="${MYSQL_PASSWORD:=flow}"
+export MYSQL_USER="${MYSQL_USER:=flow}"
 
-docker compose -f materialize-postgres/docker-compose.yaml up --detach
+docker compose -f materialize-mysql/docker-compose.yaml up --detach
 # Give it time to start.
-sleep 5
+sleep 10
+
+function query() {
+  echo "$1" | docker exec -i \
+    materialize-mysql-mysql-1 mysqlsh --host=127.0.0.1 --port=$MYSQL_PORT --user=root --password=$MYSQL_PASSWORD --database $MYSQL_DATABASE --sql --json=raw
+}
+
+query "GRANT ALL PRIVILEGES ON *.* TO 'flow'@'%' WITH GRANT OPTION"
 
 config_json_template='{
-   "address":  "$PGHOST:$PGPORT",
-   "database": "$PGDATABASE",
-   "password": "$PGPASSWORD",
-   "user":     "$PGUSER",
-   "schema":   "public"
+   "address":  "$MYSQL_HOST:$MYSQL_PORT",
+   "database": "$MYSQL_DATABASE",
+   "password": "$MYSQL_PASSWORD",
+   "user":     "$MYSQL_USER"
 }'
 
 resources_json_template='[

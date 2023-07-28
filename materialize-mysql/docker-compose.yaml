@@ -1,0 +1,20 @@
+version: "3.7"
+
+services:
+  mysql:
+    image: 'mysql:latest'
+    environment: {"MYSQL_DATABASE": "flow", "MYSQL_USER": "flow", "MYSQL_PASSWORD": "flow", "MYSQL_ROOT_PASSWORD": "flow"}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - flow-test
+    ports:
+      - "3306:3306"
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+
+volumes:
+  mysql_data: {}
