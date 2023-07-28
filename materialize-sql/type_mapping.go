@@ -296,6 +296,28 @@ func (m NullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
 	return
 }
 
+// PrimaryKeyMapper wraps a ColumnMapper to specify the type of the column in
+// the case that it is a primary key. This is useful for cases where specific
+// databases require certain variations of a type for primary keys. For example,
+// MySQL does not accept TEXT as a primary key, but a VARCHAR with specified
+// size works.
+type PrimaryKeyMapper struct {
+	PrimaryKeyType  TypeMapper
+	Delegate        TypeMapper
+}
+
+var _ TypeMapper = PrimaryKeyMapper{}
+
+func (m PrimaryKeyMapper) MapType(p *Projection) (mapped MappedType, err error) {
+	if p.IsPrimaryKey {
+		return m.PrimaryKeyType.MapType(p)
+	} else {
+		return m.Delegate.MapType(p)
+	}
+
+	return
+}
+
 // StringTypeMapper is a special TypeMapper for string type columns, which can take the format
 // and/or content type into account when deciding what sql column type to generate.
 type StringTypeMapper struct {

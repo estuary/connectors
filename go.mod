@@ -25,6 +25,7 @@ require (
 	github.com/estuary/flow v0.3.4-0.20230718195208-1aed3cc73e86
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/uuid v1.3.0
 	github.com/iancoleman/orderedmap v0.2.0
