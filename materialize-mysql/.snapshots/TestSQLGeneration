@@ -1,0 +1,170 @@
+--- Begin target_table createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS target_table (
+		key1 BIGINT NOT NULL COMMENT 'Key One Title
+Key One Description
+auto-generated projection of JSON at: /key1 with inferred types: [integer]',
+		`key!2` BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key!2 with inferred types: [boolean]',
+		`Camel_Case` BIGINT COMMENT 'auto-generated projection of JSON at: /Camel_Case with inferred types: [integer]',
+		`a Time` TIMESTAMP COMMENT 'auto-generated projection of JSON at: /a Time with inferred types: [string]',
+		`array` JSON COMMENT 'This is an array!
+auto-generated projection of JSON at: /array with inferred types: [array]',
+		lower_case BIGINT COMMENT 'auto-generated projection of JSON at: /lower_case with inferred types: [integer]',
+		`value` TEXT COMMENT 'auto-generated projection of JSON at: /value with inferred types: [string]',
+		flow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',
+
+		PRIMARY KEY (key1, `key!2`)
+) COMMENT='Generated for materialization test/sqlite of collection key/value';
+--- End target_table createTargetTable ---
+
+--- Begin `Delta Updates` createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS `Delta Updates` (
+		`theKey` VARCHAR(255) NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
+		`aValue` BIGINT COMMENT 'A super-awesome value.
+auto-generated projection of JSON at: /aValue with inferred types: [integer]'
+) COMMENT='Generated for materialization test/sqlite of collection delta/updates';
+--- End `Delta Updates` createTargetTable ---
+
+--- Begin target_table createLoadTable ---
+
+CREATE TEMPORARY TABLE flow_temp_table_0 (
+		key1 BIGINT NOT NULL,
+		`key!2` BOOLEAN NOT NULL
+);
+--- End target_table createLoadTable ---
+
+--- Begin `Delta Updates` createLoadTable ---
+
+CREATE TEMPORARY TABLE flow_temp_table_1 (
+		`theKey` VARCHAR(255) NOT NULL
+);
+--- End `Delta Updates` createLoadTable ---
+
+--- Begin target_table loadInsert ---
+
+INSERT INTO flow_temp_table_0 (key1, `key!2`)
+	VALUES (?, ?);
+--- End target_table loadInsert ---
+
+--- Begin `Delta Updates` loadInsert ---
+
+INSERT INTO flow_temp_table_1 (`theKey`)
+	VALUES (?);
+--- End `Delta Updates` loadInsert ---
+
+--- Begin target_table loadQuery ---
+
+SELECT 0, r.flow_document
+	FROM flow_temp_table_0 AS l
+	JOIN target_table AS r
+		 ON  l.key1 = r.key1
+		 AND l.`key!2` = r.`key!2`
+
+--- End target_table loadQuery ---
+
+--- Begin `Delta Updates` loadQuery ---
+
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
+
+--- End `Delta Updates` loadQuery ---
+
+--- Begin target_table storeInsert ---
+
+INSERT INTO target_table (
+		key1,
+		`key!2`,
+		`Camel_Case`,
+		`a Time`,
+		`array`,
+		lower_case,
+		`value`,
+		flow_document
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+--- End target_table storeInsert ---
+
+--- Begin `Delta Updates` storeInsert ---
+
+INSERT INTO `Delta Updates` (
+		`theKey`,
+		`aValue`
+) VALUES (?, ?);
+--- End `Delta Updates` storeInsert ---
+
+--- Begin target_table storeUpdate ---
+
+UPDATE target_table SET
+		`Camel_Case` = ?,
+		`a Time` = ?,
+		`array` = ?,
+		lower_case = ?,
+		`value` = ?,
+		flow_document = ?
+	 WHERE key1 = ?
+	 AND   `key!2` = ?;
+--- End target_table storeUpdate ---
+
+--- Begin `Delta Updates` storeUpdate ---
+
+UPDATE `Delta Updates` SET
+		`aValue` = ?
+	 WHERE `theKey` = ?;
+--- End `Delta Updates` storeUpdate ---
+
+--- Begin target_table_no_values_materialized storeUpdate ---
+
+UPDATE target_table_no_values_materialized SET
+		flow_document = ?
+	 WHERE key1 = ?
+	 AND   key2 = ?;
+--- End target_table_no_values_materialized storeUpdate ---
+
+--- Begin Fence Install ---
+
+with
+-- Increment the fence value of _any_ checkpoint which overlaps our key range.
+update_covered as (
+	update `path`.`To`.checkpoints
+		set   fence = fence + 1
+		where materialization = 'some/Materialization'
+		and   key_end >= 1122867
+		and   key_begin <= 4293844428
+	returning *
+),
+-- Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
+best_match as (
+	select materialization, key_begin, key_end, fence, checkpoint from update_covered
+		where materialization = 'some/Materialization'
+		and 	key_begin <= 1122867
+		and   key_end >= 4293844428
+		order by key_end - key_begin asc
+		limit 1
+),
+-- Install a new checkpoint if best_match is not an exact match.
+install_new as (
+	insert into `path`.`To`.checkpoints (materialization, key_begin, key_end, fence, checkpoint)
+		-- Case: best_match is a non-empty covering span but not an exact match
+		select 'some/Materialization', 1122867, 4293844428, fence, checkpoint
+			from best_match where key_begin != 1122867 or key_end != 4293844428
+		union all
+		-- Case: best_match is empty
+		select 'some/Materialization', 1122867, 4293844428, 123, 'AAECAwQFBgcICQ=='
+			where (select count(*) from best_match) = 0
+	returning *
+)
+select fence, decode(checkpoint, 'base64') from install_new
+union all
+select fence, decode(checkpoint, 'base64') from best_match
+limit 1
+;
+--- End Fence Install ---
+--- Begin Fence Update ---
+
+UPDATE `path`.`To`.checkpoints
+	SET   checkpoint = 'AAECAwQFBgcICQ=='
+	WHERE materialization = 'some/Materialization'
+	AND   key_begin = 1122867
+	AND   key_end   = 4293844428
+	AND   fence     = 123;
+--- End Fence Update ---
+
