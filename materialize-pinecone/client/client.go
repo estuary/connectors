@@ -166,6 +166,12 @@ type whoamiResponse struct {
 	ProjectName string `json:"project_name"`
 }
 
+type pineconeUpsertError struct {
+	Code    int      `json:"code"`
+	Message string   `json:"message"`
+	Details []string `json:"details"`
+}
+
 type PineconeClient struct {
 	http        *http.Client
 	index       string
@@ -273,6 +279,15 @@ func (c *PineconeClient) Upsert(ctx context.Context, req PineconeUpsertRequest) 
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
+		var errorBody pineconeUpsertError
+		if err := json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
+			log.WithField("error", err).Warn("could not decode error response body")
+		} else if errorBody.Message != "" {
+			return fmt.Errorf("pinecone vector upsert failed (%s): %s", res.Status, errorBody.Message)
+		} else {
+			log.WithField("errorBody", errorBody).Warn("errorBody error message was empty")
+		}
+
 		return fmt.Errorf("PineconeClient Upsert unexpected status: %s", res.Status)
 	}
 
