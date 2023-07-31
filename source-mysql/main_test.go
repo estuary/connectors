@@ -145,7 +145,7 @@ func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, r
 		t.Fatalf("error beginning transaction: %v", err)
 	}
 	var argc = len(rows[0])
-	var query = fmt.Sprintf("INSERT INTO %s VALUES %s", table, argsTuple(argc))
+	var query = fmt.Sprintf("INSERT IGNORE INTO %s VALUES %s", table, argsTuple(argc))
 	for _, row := range rows {
 		if len(row) != argc {
 			t.Fatalf("incorrect number of values in row %q (expected %d)", row, len(rows[0]))

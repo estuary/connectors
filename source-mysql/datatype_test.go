@@ -82,6 +82,7 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `enum('sm', 'med', 'lg')`, ExpectType: `{"type":["string","null"],"enum":["sm","med","lg","",null]}`, InputValue: nil, ExpectValue: `null`},
 		{ColumnType: `enum('sm', 'med', 'lg') not null`, ExpectType: `{"type":"string","enum":["sm","med","lg",""]}`, InputValue: "sm", ExpectValue: `"sm"`},
 		{ColumnType: `enum('s,m', 'med', '\'lg\'')`, ExpectType: `{"type":["string","null"],"enum":["s,m","med","'lg'","",null]}`, InputValue: `'lg'`, ExpectValue: `"'lg'"`},
+		{ColumnType: `enum('s,m', 'med', '\'lg\'')`, ExpectType: `{"type":["string","null"],"enum":["s,m","med","'lg'","",null]}`, InputValue: `invalid`, ExpectValue: `""`},
 
 		{ColumnType: "set('a', 'b', 'c')", ExpectType: `{"type":["string","null"]}`, InputValue: "b", ExpectValue: `"b"`},
 		{ColumnType: "set('a', 'b', 'c')", ExpectType: `{"type":["string","null"]}`, InputValue: "a,c", ExpectValue: `"a,c"`},
