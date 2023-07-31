@@ -301,6 +301,12 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 		if index, ok := val.(int64); ok {
 			if 1 <= index && index <= int64(len(t.EnumValues)) {
 				return t.EnumValues[index-1], nil
+			} else if index == 0 {
+				// Illegal values are represented internally by MySQL as the integer 0.
+				// Backfill queries return this as the empty string, which is our chosen
+				// representation as well, but we have to handle the conversion of replicated
+				// values since they're just provided as the raw integer.
+				return "", nil
 			}
 		} else if bs, ok := val.([]byte); ok {
 			return string(bs), nil
