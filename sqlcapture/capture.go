@@ -339,6 +339,26 @@ func (c *Capture) updateState(ctx context.Context) error {
 			return fmt.Errorf("stream %q: primary key must be specified", streamID)
 		}
 
+		// See if the stream is already initialized. If it's not, then create it.
+		var streamState, ok = c.State.Streams[streamID]
+		if !ok || streamState.Mode == TableModeIgnore {
+			c.State.Streams[streamID] = &TableState{Mode: TableModePending, KeyColumns: primaryKey, dirty: true}
+			continue
+		}
+
+		// The following safety checks only matter if we're actively backfilling the table or
+		// intend to start backfilling it shortly. But checking for that would risk silently
+		// failing if a new keyed backfill mode were added in the future, so instead we check
+		// for the set of known-to-be-fine situations here.
+		var notBackfilling = (streamState.Mode == TableModeIgnore)
+		notBackfilling = notBackfilling || (streamState.Mode == TableModeActive)
+		notBackfilling = notBackfilling || (streamState.Mode == TableModeKeylessBackfill)
+		notBackfilling = notBackfilling || (streamState.Mode == TableModePending && binding.Resource.Mode == BackfillModeOnlyChanges)
+		notBackfilling = notBackfilling || (streamState.Mode == TableModePending && binding.Resource.Mode == BackfillModeWithoutKey)
+		if notBackfilling {
+			continue
+		}
+
 		// Print a warning if the primary key we'll be using differs from the database's primary key.
 		if strings.Join(primaryKey, ",") != strings.Join(discoveryInfo.PrimaryKey, ",") {
 			logrus.WithFields(logrus.Fields{
@@ -346,13 +366,6 @@ func (c *Capture) updateState(ctx context.Context) error {
 				"backfillKey": primaryKey,
 				"databaseKey": discoveryInfo.PrimaryKey,
 			}).Warn("primary key for backfill differs from database table primary key")
-		}
-
-		// See if the stream is already initialized. If it's not, then create it.
-		var streamState, ok = c.State.Streams[streamID]
-		if !ok || streamState.Mode == TableModeIgnore {
-			c.State.Streams[streamID] = &TableState{Mode: TableModePending, KeyColumns: primaryKey, dirty: true}
-			continue
 		}
 
 		// Error out if the stream state was previously initialized with a different key
