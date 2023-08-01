@@ -534,6 +534,12 @@ func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, q
 
 	for _, alterOpt := range stmt.AlterOptions {
 		switch alter := alterOpt.(type) {
+		// These should be all of the table alterations which might possibly impact our capture
+		// in ways we don't currently support, so the default behavior can be to log and ignore.
+		case *sqlparser.AlterColumn, *sqlparser.ChangeColumn, *sqlparser.ModifyColumn, *sqlparser.RenameColumn:
+			return fmt.Errorf("unsupported column alteration (go.estuary.dev/eVVwet): %s", query)
+		case *sqlparser.DropKey, *sqlparser.RenameTableName:
+			return fmt.Errorf("unsupported table alteration (go.estuary.dev/eVVwet): %s", query)
 		case *sqlparser.AddColumns:
 			insertAt := len(meta.Schema.Columns)
 			if alter.First {
@@ -578,7 +584,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, q
 			meta.Schema.Columns = append(meta.Schema.Columns[:idx], meta.Schema.Columns[idx+1:]...)
 			meta.Schema.ColumnTypes[dropped] = nil
 		default:
-			return fmt.Errorf("unsupported operation (go.estuary.dev/eVVwet): %s", query)
+			logrus.WithField("query", query).Info("ignorable table alteration")
 		}
 	}
 
