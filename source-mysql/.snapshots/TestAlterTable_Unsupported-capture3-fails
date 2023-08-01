@@ -5,5 +5,5 @@
 # ================================
 # Captures Terminated With Errors
 # ================================
-error processing query event: unsupported operation (go.estuary.dev/eVVwet): ALTER TABLE test.AlterTable_Unsupported_28221107 MODIFY COLUMN data INTEGER
+error processing query event: unsupported column alteration (go.estuary.dev/eVVwet): ALTER TABLE test.AlterTable_Unsupported_28221107 MODIFY COLUMN data INTEGER
 
