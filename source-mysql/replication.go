@@ -538,7 +538,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, q
 		// in ways we don't currently support, so the default behavior can be to log and ignore.
 		case *sqlparser.AlterColumn, *sqlparser.ChangeColumn, *sqlparser.ModifyColumn, *sqlparser.RenameColumn:
 			return fmt.Errorf("unsupported column alteration (go.estuary.dev/eVVwet): %s", query)
-		case *sqlparser.DropKey, *sqlparser.RenameTableName:
+		case *sqlparser.RenameTableName:
 			return fmt.Errorf("unsupported table alteration (go.estuary.dev/eVVwet): %s", query)
 		case *sqlparser.AddColumns:
 			insertAt := len(meta.Schema.Columns)
