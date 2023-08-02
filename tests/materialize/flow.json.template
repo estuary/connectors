@@ -33,7 +33,8 @@
            "bool_field": {"type": "boolean"},
            "nullable_int": {"type": ["null", "integer"]},
            "array_int": {"type": "array", "items": {"type": "integer"}},
-           "nested": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}}
+           "nested": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}},
+           "multiple": {"type": ["array", "object", "string", "integer", "number", "boolean", "null"]}
           },
           "required": ["id", "str_field"],
           "type": "object"

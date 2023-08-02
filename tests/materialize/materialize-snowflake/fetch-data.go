@@ -34,6 +34,7 @@ func mustDSN() string {
 		{"SNOWFLAKE_PASSWORD", &conf.Password},
 		{"SNOWFLAKE_DATABASE", &conf.Database},
 		{"SNOWFLAKE_SCHEMA", &conf.Schema},
+		{"SNOWFLAKE_WAREHOUSE", &conf.Warehouse},
 	} {
 		*prop.dest = os.Getenv(prop.key)
 	}

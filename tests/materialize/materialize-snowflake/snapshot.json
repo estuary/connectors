@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "\n  CREATE TABLE IF NOT EXISTS flow_materializations_v2 (\n    materialization STRING NOT NULL,\n    version STRING NOT NULL,\n    spec STRING NOT NULL,\n\n    PRIMARY KEY (materialization)\n  );\n\n  COMMENT ON TABLE flow_materializations_v2 IS 'This table is the source of truth for all materializations into this system.';\n  COMMENT ON COLUMN flow_materializations_v2.materialization IS 'The name of the materialization.';\n  COMMENT ON COLUMN flow_materializations_v2.version IS 'Version of the materialization.';\n  COMMENT ON COLUMN flow_materializations_v2.spec IS 'Specification of the materialization, encoded as base64 protobuf.';\n  \n\n  CREATE TABLE IF NOT EXISTS flow_checkpoints_v1 (\n    materialization STRING NOT NULL,\n    key_begin INTEGER NOT NULL,\n    key_end INTEGER NOT NULL,\n    fence INTEGER NOT NULL,\n    checkpoint STRING NOT NULL,\n\n    PRIMARY KEY (materialization, key_begin, key_end)\n  );\n\n  COMMENT ON TABLE flow_checkpoints_v1 IS 'This table holds Flow processing checkpoints used for exactly-once processing of materializations';\n  COMMENT ON COLUMN flow_checkpoints_v1.materialization IS 'The name of the materialization.';\n  COMMENT ON COLUMN flow_checkpoints_v1.key_begin IS 'The inclusive lower-bound key hash covered by this checkpoint.';\n  COMMENT ON COLUMN flow_checkpoints_v1.key_end IS 'The inclusive upper-bound key hash covered by this checkpoint.';\n  COMMENT ON COLUMN flow_checkpoints_v1.fence IS 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.';\n  COMMENT ON COLUMN flow_checkpoints_v1.checkpoint IS 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.';\n  \n\n  CREATE TABLE IF NOT EXISTS Simple (\n    id INTEGER NOT NULL,\n    canary STRING NOT NULL,\n    flow_document VARIANT NOT NULL,\n\n    PRIMARY KEY (id)\n  );\n\n  COMMENT ON TABLE Simple IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/simple';\n  COMMENT ON COLUMN Simple.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN Simple.canary IS 'auto-generated projection of JSON at: /canary with inferred types: [string]';\n  COMMENT ON COLUMN Simple.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n  \n\n  CREATE TABLE IF NOT EXISTS duplicate_keys_standard (\n    id INTEGER NOT NULL,\n    int INTEGER,\n    str STRING NOT NULL,\n    flow_document VARIANT NOT NULL,\n\n    PRIMARY KEY (id)\n  );\n\n  COMMENT ON TABLE duplicate_keys_standard IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/duplicated-keys';\n  COMMENT ON COLUMN duplicate_keys_standard.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_standard.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_standard.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n  COMMENT ON COLUMN duplicate_keys_standard.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n  \n\n  CREATE TABLE IF NOT EXISTS duplicate_keys_delta (\n    id INTEGER NOT NULL,\n    int INTEGER,\n    str STRING NOT NULL,\n    flow_document VARIANT NOT NULL\n  );\n\n  COMMENT ON TABLE duplicate_keys_delta IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/duplicated-keys';\n  COMMENT ON COLUMN duplicate_keys_delta.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_delta.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_delta.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n  COMMENT ON COLUMN duplicate_keys_delta.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n  \n\n  CREATE TABLE IF NOT EXISTS duplicate_keys_delta_exclude_flow_doc (\n    id INTEGER NOT NULL,\n    int INTEGER,\n    str STRING NOT NULL\n  );\n\n  COMMENT ON TABLE duplicate_keys_delta_exclude_flow_doc IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/duplicated-keys';\n  COMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n  \n\n  CREATE TABLE IF NOT EXISTS \"Multiple Types\" (\n    id INTEGER NOT NULL,\n    array_int VARIANT,\n    bool_field BOOLEAN,\n    float_field DOUBLE,\n    nested VARIANT,\n    nullable_int INTEGER,\n    str_field STRING NOT NULL,\n    flow_document VARIANT NOT NULL,\n\n    PRIMARY KEY (id)\n  );\n\n  COMMENT ON TABLE \"Multiple Types\" IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/multiple-data-types';\n  COMMENT ON COLUMN \"Multiple Types\".id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN \"Multiple Types\".array_int IS 'auto-generated projection of JSON at: /array_int with inferred types: [array]';\n  COMMENT ON COLUMN \"Multiple Types\".bool_field IS 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]';\n  COMMENT ON COLUMN \"Multiple Types\".float_field IS 'auto-generated projection of JSON at: /float_field with inferred types: [number]';\n  COMMENT ON COLUMN \"Multiple Types\".nested IS 'auto-generated projection of JSON at: /nested with inferred types: [object]';\n  COMMENT ON COLUMN \"Multiple Types\".nullable_int IS 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]';\n  COMMENT ON COLUMN \"Multiple Types\".str_field IS 'auto-generated projection of JSON at: /str_field with inferred types: [string]';\n  COMMENT ON COLUMN \"Multiple Types\".flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n  \n\n  CREATE TABLE IF NOT EXISTS \"Formatted Strings\" (\n    id INTEGER NOT NULL,\n    int_and_str INTEGER,\n    int_str INTEGER,\n    num_and_str DOUBLE,\n    num_str DOUBLE,\n    flow_document VARIANT NOT NULL,\n\n    PRIMARY KEY (id)\n  );\n\n  COMMENT ON TABLE \"Formatted Strings\" IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/formatted-strings';\n  COMMENT ON COLUMN \"Formatted Strings\".id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN \"Formatted Strings\".int_and_str IS 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]';\n  COMMENT ON COLUMN \"Formatted Strings\".int_str IS 'auto-generated projection of JSON at: /int_str with inferred types: [string]';\n  COMMENT ON COLUMN \"Formatted Strings\".num_and_str IS 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]';\n  COMMENT ON COLUMN \"Formatted Strings\".num_str IS 'auto-generated projection of JSON at: /num_str with inferred types: [string]';\n  COMMENT ON COLUMN \"Formatted Strings\".flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n  \nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-snowflake/materialize');"
+    "actionDescription": "\n  CREATE TABLE IF NOT EXISTS flow_materializations_v2 (\n    materialization STRING NOT NULL,\n    version STRING NOT NULL,\n    spec STRING NOT NULL,\n\n    PRIMARY KEY (materialization)\n  );\n\n  COMMENT ON TABLE flow_materializations_v2 IS 'This table is the source of truth for all materializations into this system.';\n  COMMENT ON COLUMN flow_materializations_v2.materialization IS 'The name of the materialization.';\n  COMMENT ON COLUMN flow_materializations_v2.version IS 'Version of the materialization.';\n  COMMENT ON COLUMN flow_materializations_v2.spec IS 'Specification of the materialization, encoded as base64 protobuf.';\n  \n\n  CREATE TABLE IF NOT EXISTS flow_checkpoints_v1 (\n    materialization STRING NOT NULL,\n    key_begin INTEGER NOT NULL,\n    key_end INTEGER NOT NULL,\n    fence INTEGER NOT NULL,\n    checkpoint STRING NOT NULL,\n\n    PRIMARY KEY (materialization, key_begin, key_end)\n  );\n\n  COMMENT ON TABLE flow_checkpoints_v1 IS 'This table holds Flow processing checkpoints used for exactly-once processing of materializations';\n  COMMENT ON COLUMN flow_checkpoints_v1.materialization IS 'The name of the materialization.';\n  COMMENT ON COLUMN flow_checkpoints_v1.key_begin IS 'The inclusive lower-bound key hash covered by this checkpoint.';\n  COMMENT ON COLUMN flow_checkpoints_v1.key_end IS 'The inclusive upper-bound key hash covered by this checkpoint.';\n  COMMENT ON COLUMN flow_checkpoints_v1.fence IS 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.';\n  COMMENT ON COLUMN flow_checkpoints_v1.checkpoint IS 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.';\n  \n\n  CREATE TABLE IF NOT EXISTS Simple (\n    id INTEGER NOT NULL,\n    canary STRING NOT NULL,\n    flow_published_at TIMESTAMP NOT NULL,\n    flow_document VARIANT NOT NULL,\n\n    PRIMARY KEY (id)\n  );\n\n  COMMENT ON TABLE Simple IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/simple';\n  COMMENT ON COLUMN Simple.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN Simple.canary IS 'auto-generated projection of JSON at: /canary with inferred types: [string]';\n  COMMENT ON COLUMN Simple.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\n  COMMENT ON COLUMN Simple.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n  \n\n  CREATE TABLE IF NOT EXISTS duplicate_keys_standard (\n    id INTEGER NOT NULL,\n    flow_published_at TIMESTAMP NOT NULL,\n    int INTEGER,\n    str STRING NOT NULL,\n    flow_document VARIANT NOT NULL,\n\n    PRIMARY KEY (id)\n  );\n\n  COMMENT ON TABLE duplicate_keys_standard IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/duplicated-keys';\n  COMMENT ON COLUMN duplicate_keys_standard.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_standard.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\n  COMMENT ON COLUMN duplicate_keys_standard.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_standard.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n  COMMENT ON COLUMN duplicate_keys_standard.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n  \n\n  CREATE TABLE IF NOT EXISTS duplicate_keys_delta (\n    id INTEGER NOT NULL,\n    flow_published_at TIMESTAMP NOT NULL,\n    int INTEGER,\n    str STRING NOT NULL,\n    flow_document VARIANT NOT NULL\n  );\n\n  COMMENT ON TABLE duplicate_keys_delta IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/duplicated-keys';\n  COMMENT ON COLUMN duplicate_keys_delta.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_delta.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\n  COMMENT ON COLUMN duplicate_keys_delta.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_delta.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n  COMMENT ON COLUMN duplicate_keys_delta.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n  \n\n  CREATE TABLE IF NOT EXISTS duplicate_keys_delta_exclude_flow_doc (\n    id INTEGER NOT NULL,\n    flow_published_at TIMESTAMP NOT NULL,\n    int INTEGER,\n    str STRING NOT NULL\n  );\n\n  COMMENT ON TABLE duplicate_keys_delta_exclude_flow_doc IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/duplicated-keys';\n  COMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\n  COMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\n  COMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n  \n\n  CREATE TABLE IF NOT EXISTS \"Multiple Types\" (\n    id INTEGER NOT NULL,\n    array_int VARIANT,\n    bool_field BOOLEAN,\n    float_field DOUBLE,\n    flow_published_at TIMESTAMP NOT NULL,\n    multiple VARIANT,\n    nested VARIANT,\n    nullable_int INTEGER,\n    str_field STRING NOT NULL,\n    flow_document VARIANT NOT NULL,\n\n    PRIMARY KEY (id)\n  );\n\n  COMMENT ON TABLE \"Multiple Types\" IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/multiple-data-types';\n  COMMENT ON COLUMN \"Multiple Types\".id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN \"Multiple Types\".array_int IS 'auto-generated projection of JSON at: /array_int with inferred types: [array]';\n  COMMENT ON COLUMN \"Multiple Types\".bool_field IS 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]';\n  COMMENT ON COLUMN \"Multiple Types\".float_field IS 'auto-generated projection of JSON at: /float_field with inferred types: [number]';\n  COMMENT ON COLUMN \"Multiple Types\".flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\n  COMMENT ON COLUMN \"Multiple Types\".multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string]';\n  COMMENT ON COLUMN \"Multiple Types\".nested IS 'auto-generated projection of JSON at: /nested with inferred types: [object]';\n  COMMENT ON COLUMN \"Multiple Types\".nullable_int IS 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]';\n  COMMENT ON COLUMN \"Multiple Types\".str_field IS 'auto-generated projection of JSON at: /str_field with inferred types: [string]';\n  COMMENT ON COLUMN \"Multiple Types\".flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n  \n\n  CREATE TABLE IF NOT EXISTS \"Formatted Strings\" (\n    id INTEGER NOT NULL,\n    flow_published_at TIMESTAMP NOT NULL,\n    int_and_str INTEGER,\n    int_str INTEGER,\n    num_and_str DOUBLE,\n    num_str DOUBLE,\n    flow_document VARIANT NOT NULL,\n\n    PRIMARY KEY (id)\n  );\n\n  COMMENT ON TABLE \"Formatted Strings\" IS 'Generated for materialization tests/materialize-snowflake/materialize of collection tests/formatted-strings';\n  COMMENT ON COLUMN \"Formatted Strings\".id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\n  COMMENT ON COLUMN \"Formatted Strings\".flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\n  COMMENT ON COLUMN \"Formatted Strings\".int_and_str IS 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]';\n  COMMENT ON COLUMN \"Formatted Strings\".int_str IS 'auto-generated projection of JSON at: /int_str with inferred types: [string]';\n  COMMENT ON COLUMN \"Formatted Strings\".num_and_str IS 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]';\n  COMMENT ON COLUMN \"Formatted Strings\".num_str IS 'auto-generated projection of JSON at: /num_str with inferred types: [string]';\n  COMMENT ON COLUMN \"Formatted Strings\".flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n  \nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-snowflake/materialize');"
   }
 }
 {
@@ -24,6 +24,9 @@
   "loaded": {
     "binding": 1,
     "doc": {
+      "_meta": {
+        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
+      },
       "id": 1,
       "int": 1,
       "str": "str 1"
@@ -34,6 +37,9 @@
   "loaded": {
     "binding": 1,
     "doc": {
+      "_meta": {
+        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
+      },
       "id": 2,
       "int": 2,
       "str": "str 2"
@@ -44,6 +50,9 @@
   "loaded": {
     "binding": 1,
     "doc": {
+      "_meta": {
+        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
+      },
       "id": 3,
       "int": 3,
       "str": "str 3"
@@ -54,6 +63,9 @@
   "loaded": {
     "binding": 1,
     "doc": {
+      "_meta": {
+        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
+      },
       "id": 4,
       "int": 4,
       "str": "str 4"
@@ -64,6 +76,9 @@
   "loaded": {
     "binding": 1,
     "doc": {
+      "_meta": {
+        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
+      },
       "id": 5,
       "int": 5,
       "str": "str 5"
@@ -74,25 +89,9 @@
   "loaded": {
     "binding": 4,
     "doc": {
-      "array_int": [
-        1,
-        2
-      ],
-      "bool_field": true,
-      "float_field": 10.1,
-      "id": 10,
-      "nested": {
-        "id": "i10"
+      "_meta": {
+        "uuid": "5fc54530-20e1-11ee-990b-ffd12dfcd47f"
       },
-      "nullable_int": 10,
-      "str_field": "str10"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
       "array_int": [
         61,
         62
@@ -100,6 +99,11 @@
       "bool_field": true,
       "float_field": 6.6,
       "id": 6,
+      "multiple": [
+        "one",
+        2,
+        true
+      ],
       "nested": {
         "id": "i6"
       },
@@ -112,6 +116,9 @@
   "loaded": {
     "binding": 4,
     "doc": {
+      "_meta": {
+        "uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"
+      },
       "array_int": [
         71,
         72
@@ -119,6 +126,9 @@
       "bool_field": false,
       "float_field": 7.7,
       "id": 7,
+      "multiple": {
+        "object": "seven"
+      },
       "nested": {
         "id": "i7"
       },
@@ -131,6 +141,9 @@
   "loaded": {
     "binding": 4,
     "doc": {
+      "_meta": {
+        "uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"
+      },
       "array_int": [
         81,
         82
@@ -138,6 +151,7 @@
       "bool_field": true,
       "float_field": 8.8,
       "id": 8,
+      "multiple": null,
       "nested": {
         "id": "i8"
       },
@@ -150,6 +164,9 @@
   "loaded": {
     "binding": 4,
     "doc": {
+      "_meta": {
+        "uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"
+      },
       "array_int": [
         91,
         92
@@ -166,6 +183,28 @@
   }
 }
 {
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        1,
+        2
+      ],
+      "bool_field": true,
+      "float_field": 10.1,
+      "id": 10,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10"
+    }
+  }
+}
+{
   "flushed": {}
 }
 {
@@ -177,190 +216,225 @@
 [
   "1",
   "amputation's",
-  "{\n  \"canary\": \"amputation's\",\n  \"id\": 1\n}"
+  "2023-07-12T18:18:11.537199Z",
+  "{\n  \"_meta\": {\n    \"uuid\": \"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"canary\": \"amputation's\",\n  \"id\": 1\n}"
 ]
 [
   "2",
   "armament's",
-  "{\n  \"canary\": \"armament's\",\n  \"id\": 2\n}"
+  "2023-07-12T18:18:24.946758Z",
+  "{\n  \"_meta\": {\n    \"uuid\": \"7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"canary\": \"armament's\",\n  \"id\": 2\n}"
 ]
 [
   "3",
   "splatters",
-  "{\n  \"canary\": \"splatters\",\n  \"id\": 3\n}"
+  "2023-07-12T18:18:48.441281Z",
+  "{\n  \"_meta\": {\n    \"uuid\": \"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"canary\": \"splatters\",\n  \"id\": 3\n}"
 ]
 [
   "4",
   "strengthen",
-  "{\n  \"canary\": \"strengthen\",\n  \"id\": 4\n}"
+  "2023-07-12T18:19:15.034186Z",
+  "{\n  \"_meta\": {\n    \"uuid\": \"9b994ae4-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"canary\": \"strengthen\",\n  \"id\": 4\n}"
 ]
 [
   "5",
   "Kringle's",
-  "{\n  \"canary\": \"Kringle's\",\n  \"id\": 5\n}"
+  "2023-07-12T18:19:57.165604Z",
+  "{\n  \"_meta\": {\n    \"uuid\": \"b4b60968-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"canary\": \"Kringle's\",\n  \"id\": 5\n}"
 ]
 [
   "6",
   "grosbeak's",
-  "{\n  \"canary\": \"grosbeak's\",\n  \"id\": 6\n}"
+  "2023-07-12T18:20:10.962631Z",
+  "{\n  \"_meta\": {\n    \"uuid\": \"bcef4bc6-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"canary\": \"grosbeak's\",\n  \"id\": 6\n}"
 ]
 [
   "7",
   "pieced",
-  "{\n  \"canary\": \"pieced\",\n  \"id\": 7\n}"
+  "2023-07-12T18:22:35.841647Z",
+  "{\n  \"_meta\": {\n    \"uuid\": \"134a1456-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"canary\": \"pieced\",\n  \"id\": 7\n}"
 ]
 [
   "8",
   "roaches",
-  "{\n  \"canary\": \"roaches\",\n  \"id\": 8\n}"
+  "2023-07-12T18:22:49.755893Z",
+  "{\n  \"_meta\": {\n    \"uuid\": \"1b953992-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"canary\": \"roaches\",\n  \"id\": 8\n}"
 ]
 [
   "9",
   "devilish",
-  "{\n  \"canary\": \"devilish\",\n  \"id\": 9\n}"
+  "2023-07-12T18:25:35.173533Z",
+  "{\n  \"_meta\": {\n    \"uuid\": \"7e2df422-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"canary\": \"devilish\",\n  \"id\": 9\n}"
 ]
 [
   "10",
   "glucose's",
-  "{\n  \"canary\": \"glucose's\",\n  \"id\": 10\n}"
+  "2023-07-12T18:25:45.520064Z",
+  "{\n  \"_meta\": {\n    \"uuid\": \"8458b580-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"canary\": \"glucose's\",\n  \"id\": 10\n}"
 ]
 [
   "1",
+  "2023-07-12T18:26:01.560712Z",
   "6",
   "str 6",
-  "{\n  \"id\": 1,\n  \"int\": 6,\n  \"str\": \"str 6\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"8de85150-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 1,\n  \"int\": 6,\n  \"str\": \"str 6\"\n}"
 ]
 [
   "2",
+  "2023-07-12T18:26:14.215494Z",
   "7",
   "str 7",
-  "{\n  \"id\": 2,\n  \"int\": 7,\n  \"str\": \"str 7\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"957348bc-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 2,\n  \"int\": 7,\n  \"str\": \"str 7\"\n}"
 ]
 [
   "3",
+  "2023-07-12T18:26:23.495167Z",
   "8",
   "str 8",
-  "{\n  \"id\": 3,\n  \"int\": 8,\n  \"str\": \"str 8\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"9afb3ff6-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 3,\n  \"int\": 8,\n  \"str\": \"str 8\"\n}"
 ]
 [
   "4",
+  "2023-07-12T18:26:33.697752Z",
   "9",
   "str 9",
-  "{\n  \"id\": 4,\n  \"int\": 9,\n  \"str\": \"str 9\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"a1100a70-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 4,\n  \"int\": 9,\n  \"str\": \"str 9\"\n}"
 ]
 [
   "5",
+  "2023-07-12T18:26:42.518724Z",
   "10",
   "str 10",
-  "{\n  \"id\": 5,\n  \"int\": 10,\n  \"str\": \"str 10\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"a65203a8-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 5,\n  \"int\": 10,\n  \"str\": \"str 10\"\n}"
 ]
 [
   "1",
+  "2023-07-12T18:18:11.537199Z",
   "1",
   "str 1",
-  "{\n  \"id\": 1,\n  \"int\": 1,\n  \"str\": \"str 1\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 1,\n  \"int\": 1,\n  \"str\": \"str 1\"\n}"
 ]
 [
   "1",
+  "2023-07-12T18:26:01.560712Z",
   "6",
   "str 6",
-  "{\n  \"id\": 1,\n  \"int\": 6,\n  \"str\": \"str 6\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"8de85150-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 1,\n  \"int\": 6,\n  \"str\": \"str 6\"\n}"
 ]
 [
   "2",
+  "2023-07-12T18:18:24.946758Z",
   "2",
   "str 2",
-  "{\n  \"id\": 2,\n  \"int\": 2,\n  \"str\": \"str 2\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 2,\n  \"int\": 2,\n  \"str\": \"str 2\"\n}"
 ]
 [
   "2",
+  "2023-07-12T18:26:14.215494Z",
   "7",
   "str 7",
-  "{\n  \"id\": 2,\n  \"int\": 7,\n  \"str\": \"str 7\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"957348bc-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 2,\n  \"int\": 7,\n  \"str\": \"str 7\"\n}"
 ]
 [
   "3",
+  "2023-07-12T18:18:48.441281Z",
   "3",
   "str 3",
-  "{\n  \"id\": 3,\n  \"int\": 3,\n  \"str\": \"str 3\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 3,\n  \"int\": 3,\n  \"str\": \"str 3\"\n}"
 ]
 [
   "3",
+  "2023-07-12T18:26:23.495167Z",
   "8",
   "str 8",
-  "{\n  \"id\": 3,\n  \"int\": 8,\n  \"str\": \"str 8\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"9afb3ff6-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 3,\n  \"int\": 8,\n  \"str\": \"str 8\"\n}"
 ]
 [
   "4",
+  "2023-07-12T18:19:15.034186Z",
   "4",
   "str 4",
-  "{\n  \"id\": 4,\n  \"int\": 4,\n  \"str\": \"str 4\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"9b994ae4-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 4,\n  \"int\": 4,\n  \"str\": \"str 4\"\n}"
 ]
 [
   "4",
+  "2023-07-12T18:26:33.697752Z",
   "9",
   "str 9",
-  "{\n  \"id\": 4,\n  \"int\": 9,\n  \"str\": \"str 9\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"a1100a70-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 4,\n  \"int\": 9,\n  \"str\": \"str 9\"\n}"
 ]
 [
   "5",
+  "2023-07-12T18:20:10.962631Z",
   "5",
   "str 5",
-  "{\n  \"id\": 5,\n  \"int\": 5,\n  \"str\": \"str 5\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"bcef4bc6-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 5,\n  \"int\": 5,\n  \"str\": \"str 5\"\n}"
 ]
 [
   "5",
+  "2023-07-12T18:26:42.518724Z",
   "10",
   "str 10",
-  "{\n  \"id\": 5,\n  \"int\": 10,\n  \"str\": \"str 10\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"a65203a8-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 5,\n  \"int\": 10,\n  \"str\": \"str 10\"\n}"
 ]
 [
   "1",
+  "2023-07-12T18:18:11.537199Z",
   "1",
   "str 1"
 ]
 [
   "1",
+  "2023-07-12T18:26:01.560712Z",
   "6",
   "str 6"
 ]
 [
   "2",
+  "2023-07-12T18:18:24.946758Z",
   "2",
   "str 2"
 ]
 [
   "2",
+  "2023-07-12T18:26:14.215494Z",
   "7",
   "str 7"
 ]
 [
   "3",
+  "2023-07-12T18:18:48.441281Z",
   "3",
   "str 3"
 ]
 [
   "3",
+  "2023-07-12T18:26:23.495167Z",
   "8",
   "str 8"
 ]
 [
   "4",
+  "2023-07-12T18:19:15.034186Z",
   "4",
   "str 4"
 ]
 [
   "4",
+  "2023-07-12T18:26:33.697752Z",
   "9",
   "str 9"
 ]
 [
   "5",
+  "2023-07-12T18:20:10.962631Z",
   "5",
   "str 5"
 ]
 [
   "5",
+  "2023-07-12T18:26:42.518724Z",
   "10",
   "str 10"
 ]
@@ -369,140 +443,165 @@
   "[\n  11,\n  12\n]",
   false,
   1.1,
+  "2023-07-12T18:23:50.55822Z",
+  "1",
   "{\n  \"id\": \"i1\"\n}",
   null,
   "str1",
-  "{\n  \"array_int\": [\n    11,\n    12\n  ],\n  \"bool_field\": false,\n  \"float_field\": 1.1,\n  \"id\": 1,\n  \"nested\": {\n    \"id\": \"i1\"\n  },\n  \"nullable_int\": null,\n  \"str_field\": \"str1\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"3fd2ec78-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"array_int\": [\n    11,\n    12\n  ],\n  \"bool_field\": false,\n  \"float_field\": 1.1,\n  \"id\": 1,\n  \"multiple\": 1,\n  \"nested\": {\n    \"id\": \"i1\"\n  },\n  \"nullable_int\": null,\n  \"str_field\": \"str1\"\n}"
 ]
 [
   "2",
   "[\n  21,\n  22\n]",
   true,
   2.2,
+  "2023-07-12T18:24:09.67518Z",
+  "2.2",
   "{\n  \"id\": \"i2\"\n}",
   "2",
   "str2",
-  "{\n  \"array_int\": [\n    21,\n    22\n  ],\n  \"bool_field\": true,\n  \"float_field\": 2.2,\n  \"id\": 2,\n  \"nested\": {\n    \"id\": \"i2\"\n  },\n  \"nullable_int\": 2,\n  \"str_field\": \"str2\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"4b37f0b8-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"array_int\": [\n    21,\n    22\n  ],\n  \"bool_field\": true,\n  \"float_field\": 2.2,\n  \"id\": 2,\n  \"multiple\": 2.2,\n  \"nested\": {\n    \"id\": \"i2\"\n  },\n  \"nullable_int\": 2,\n  \"str_field\": \"str2\"\n}"
 ]
 [
   "3",
   "[\n  31,\n  32\n]",
   false,
   3.3,
+  "2023-07-12T18:24:19.384Z",
+  "true",
   "{\n  \"id\": \"i3\"\n}",
   null,
   "str3",
-  "{\n  \"array_int\": [\n    31,\n    32\n  ],\n  \"bool_field\": false,\n  \"float_field\": 3.3,\n  \"id\": 3,\n  \"nested\": {\n    \"id\": \"i3\"\n  },\n  \"nullable_int\": null,\n  \"str_field\": \"str3\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"51016380-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"array_int\": [\n    31,\n    32\n  ],\n  \"bool_field\": false,\n  \"float_field\": 3.3,\n  \"id\": 3,\n  \"multiple\": true,\n  \"nested\": {\n    \"id\": \"i3\"\n  },\n  \"nullable_int\": null,\n  \"str_field\": \"str3\"\n}"
 ]
 [
   "4",
   "[\n  41,\n  42\n]",
   true,
   4.4,
+  "2023-07-12T18:24:28.397025Z",
+  "false",
   "{\n  \"id\": \"i4\"\n}",
   "4",
   "str4",
-  "{\n  \"array_int\": [\n    41,\n    42\n  ],\n  \"bool_field\": true,\n  \"float_field\": 4.4,\n  \"id\": 4,\n  \"nested\": {\n    \"id\": \"i4\"\n  },\n  \"nullable_int\": 4,\n  \"str_field\": \"str4\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"5660aaca-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"array_int\": [\n    41,\n    42\n  ],\n  \"bool_field\": true,\n  \"float_field\": 4.4,\n  \"id\": 4,\n  \"multiple\": false,\n  \"nested\": {\n    \"id\": \"i4\"\n  },\n  \"nullable_int\": 4,\n  \"str_field\": \"str4\"\n}"
 ]
 [
   "5",
   "[\n  51,\n  52\n]",
   false,
   5.5,
+  "2023-07-12T18:24:36.112031Z",
+  "\"string five\"",
   "{\n  \"id\": \"i5\"\n}",
   null,
   "str5",
-  "{\n  \"array_int\": [\n    51,\n    52\n  ],\n  \"bool_field\": false,\n  \"float_field\": 5.5,\n  \"id\": 5,\n  \"nested\": {\n    \"id\": \"i5\"\n  },\n  \"nullable_int\": null,\n  \"str_field\": \"str5\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"5af9e236-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"array_int\": [\n    51,\n    52\n  ],\n  \"bool_field\": false,\n  \"float_field\": 5.5,\n  \"id\": 5,\n  \"multiple\": \"string five\",\n  \"nested\": {\n    \"id\": \"i5\"\n  },\n  \"nullable_int\": null,\n  \"str_field\": \"str5\"\n}"
 ]
 [
   "6",
   "[\n  61,\n  62\n]",
   true,
   66.66,
+  "2023-07-12T18:28:27.194541Z",
+  "[\n  \"one\",\n  2,\n  true\n]",
   "{\n  \"id\": \"i6\"\n}",
   "6",
   "str6 v2",
-  "{\n  \"array_int\": [\n    61,\n    62\n  ],\n  \"bool_field\": true,\n  \"float_field\": 66.66,\n  \"id\": 6,\n  \"nested\": {\n    \"id\": \"i6\"\n  },\n  \"nullable_int\": 6,\n  \"str_field\": \"str6 v2\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"e4b646c2-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"array_int\": [\n    61,\n    62\n  ],\n  \"bool_field\": true,\n  \"float_field\": 66.66,\n  \"id\": 6,\n  \"multiple\": [\n    \"one\",\n    2,\n    true\n  ],\n  \"nested\": {\n    \"id\": \"i6\"\n  },\n  \"nullable_int\": 6,\n  \"str_field\": \"str6 v2\"\n}"
 ]
 [
   "7",
   "[\n  71,\n  72\n]",
   false,
   77.77,
+  "2023-07-12T18:28:38.169062Z",
+  "{\n  \"object\": \"seven\"\n}",
   "{\n  \"id\": \"i7\"\n}",
   null,
   "str7 v2",
-  "{\n  \"array_int\": [\n    71,\n    72\n  ],\n  \"bool_field\": false,\n  \"float_field\": 77.77,\n  \"id\": 7,\n  \"nested\": {\n    \"id\": \"i7\"\n  },\n  \"nullable_int\": null,\n  \"str_field\": \"str7 v2\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"eb40dafc-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"array_int\": [\n    71,\n    72\n  ],\n  \"bool_field\": false,\n  \"float_field\": 77.77,\n  \"id\": 7,\n  \"multiple\": {\n    \"object\": \"seven\"\n  },\n  \"nested\": {\n    \"id\": \"i7\"\n  },\n  \"nullable_int\": null,\n  \"str_field\": \"str7 v2\"\n}"
 ]
 [
   "8",
   "[\n  81,\n  82\n]",
   true,
   88.88,
+  "2023-07-12T18:28:48.465279Z",
+  "null",
   "{\n  \"id\": \"i8\"\n}",
   "8",
   "str8 v2",
-  "{\n  \"array_int\": [\n    81,\n    82\n  ],\n  \"bool_field\": true,\n  \"float_field\": 88.88,\n  \"id\": 8,\n  \"nested\": {\n    \"id\": \"i8\"\n  },\n  \"nullable_int\": 8,\n  \"str_field\": \"str8 v2\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"f163eef6-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"array_int\": [\n    81,\n    82\n  ],\n  \"bool_field\": true,\n  \"float_field\": 88.88,\n  \"id\": 8,\n  \"multiple\": null,\n  \"nested\": {\n    \"id\": \"i8\"\n  },\n  \"nullable_int\": 8,\n  \"str_field\": \"str8 v2\"\n}"
 ]
 [
   "9",
   "[\n  91,\n  92\n]",
   false,
   99.99,
+  "2023-07-12T18:28:55.677252Z",
+  "null",
   "{\n  \"id\": \"i9\"\n}",
   null,
   "str9 v2",
-  "{\n  \"array_int\": [\n    91,\n    92\n  ],\n  \"bool_field\": false,\n  \"float_field\": 99.99,\n  \"id\": 9,\n  \"nested\": {\n    \"id\": \"i9\"\n  },\n  \"nullable_int\": null,\n  \"str_field\": \"str9 v2\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"f5b064a8-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"array_int\": [\n    91,\n    92\n  ],\n  \"bool_field\": false,\n  \"float_field\": 99.99,\n  \"id\": 9,\n  \"nested\": {\n    \"id\": \"i9\"\n  },\n  \"nullable_int\": null,\n  \"str_field\": \"str9 v2\"\n}"
 ]
 [
   "10",
   "[\n  1,\n  2\n]",
   true,
   1010.101,
+  "2023-07-12T18:29:04.671352Z",
+  "null",
   "{\n  \"id\": \"i10\"\n}",
   "10",
   "str10 v2",
-  "{\n  \"array_int\": [\n    1,\n    2\n  ],\n  \"bool_field\": true,\n  \"float_field\": 1010.101,\n  \"id\": 10,\n  \"nested\": {\n    \"id\": \"i10\"\n  },\n  \"nullable_int\": 10,\n  \"str_field\": \"str10 v2\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"array_int\": [\n    1,\n    2\n  ],\n  \"bool_field\": true,\n  \"float_field\": 1010.101,\n  \"id\": 10,\n  \"nested\": {\n    \"id\": \"i10\"\n  },\n  \"nullable_int\": 10,\n  \"str_field\": \"str10 v2\"\n}"
 ]
 [
   "1",
+  "2023-07-12T18:27:01.912219Z",
   "1",
   "10",
   1.1,
   10.1,
-  "{\n  \"id\": 1,\n  \"int_and_str\": 1,\n  \"int_str\": \"10\",\n  \"num_and_str\": 1.1,\n  \"num_str\": \"10.1\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"b1e13a0e-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 1,\n  \"int_and_str\": 1,\n  \"int_str\": \"10\",\n  \"num_and_str\": 1.1,\n  \"num_str\": \"10.1\"\n}"
 ]
 [
   "2",
+  "2023-07-12T18:27:12.35461Z",
   "2",
   "20",
   2.1,
   20.1,
-  "{\n  \"id\": 2,\n  \"int_and_str\": 2,\n  \"int_str\": \"20\",\n  \"num_and_str\": 2.1,\n  \"num_str\": \"20.1\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"b81a9bf4-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 2,\n  \"int_and_str\": 2,\n  \"int_str\": \"20\",\n  \"num_and_str\": 2.1,\n  \"num_str\": \"20.1\"\n}"
 ]
 [
   "3",
+  "2023-07-12T18:18:11.537199Z",
   "3",
   "30",
   3.1,
   30.1,
-  "{\n  \"id\": 3,\n  \"int_and_str\": 3,\n  \"int_str\": \"30\",\n  \"num_and_str\": 3.1,\n  \"num_str\": \"30.1\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 3,\n  \"int_and_str\": 3,\n  \"int_str\": \"30\",\n  \"num_and_str\": 3.1,\n  \"num_str\": \"30.1\"\n}"
 ]
 [
   "4",
+  "2023-07-12T18:18:48.441281Z",
   "4",
   "40",
   4.1,
   40.1,
-  "{\n  \"id\": 4,\n  \"int_and_str\": \"4\",\n  \"int_str\": \"40\",\n  \"num_and_str\": \"4.1\",\n  \"num_str\": \"40.1\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 4,\n  \"int_and_str\": \"4\",\n  \"int_str\": \"40\",\n  \"num_and_str\": \"4.1\",\n  \"num_str\": \"40.1\"\n}"
 ]
 [
   "5",
+  "2023-07-12T18:27:25.889321Z",
   "5",
   "50",
   5.1,
   50.1,
-  "{\n  \"id\": 5,\n  \"int_and_str\": \"5\",\n  \"int_str\": \"50\",\n  \"num_and_str\": \"5.1\",\n  \"num_str\": \"50.1\"\n}"
+  "{\n  \"_meta\": {\n    \"uuid\": \"c02bd79a-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 5,\n  \"int_and_str\": \"5\",\n  \"int_str\": \"50\",\n  \"num_and_str\": \"5.1\",\n  \"num_str\": \"50.1\"\n}"
 ]
 {
   "applied": {
