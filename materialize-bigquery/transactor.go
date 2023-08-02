@@ -62,7 +62,7 @@ func newTransactor(
 		// flexibility in changing the dialect and having it still work for existing tables. As long
 		// as the JSON encoding of the values is the same they may be used for columns that would
 		// have been created differently due to evolution of the dialect's column types.
-		meta, err := client.bigqueryClient.Dataset(cfg.Dataset).Table(translateFlowIdentifier(table)).Metadata(ctx)
+		meta, err := client.bigqueryClient.DatasetInProject(cfg.ProjectID, cfg.Dataset).Table(translateFlowIdentifier(table)).Metadata(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("getting table metadata: %w", err)
 		}
