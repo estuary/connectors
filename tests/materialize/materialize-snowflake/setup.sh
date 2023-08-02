@@ -10,6 +10,7 @@ export SNOWFLAKE_USER="${SNOWFLAKE_USER}"
 export SNOWFLAKE_PASSWORD="${SNOWFLAKE_PASSWORD}"
 export SNOWFLAKE_DATABASE="${SNOWFLAKE_DATABASE}"
 export SNOWFLAKE_SCHEMA="${SNOWFLAKE_SCHEMA}"
+export SNOWFLAKE_WAREHOUSE="${SNOWFLAKE_WAREHOUSE}"
 
 config_json_template='{
    "host":      "$SNOWFLAKE_HOST",
@@ -17,7 +18,8 @@ config_json_template='{
    "user":      "$SNOWFLAKE_USER",
    "password":  "$SNOWFLAKE_PASSWORD",
    "database":  "$SNOWFLAKE_DATABASE",
-   "schema":    "$SNOWFLAKE_SCHEMA"
+   "schema":    "$SNOWFLAKE_SCHEMA",
+   "warehouse": "$SNOWFLAKE_WAREHOUSE"
 }'
 
 resources_json_template='[
@@ -63,7 +65,8 @@ resources_json_template='[
       "exclude": ["nested/id"],
       "include": {
         "nested": {},
-        "array_int": {}
+        "array_int": {},
+        "multiple": {}
       }
     }
   },

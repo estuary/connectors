@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INT64 NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INT64,\n\t\tstr STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INT64 NOT NULL,\n\t\tarray_int STRING,\n\t\tbool_field BOOL,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tnested STRING,\n\t\tnullable_int INT64,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str INT64,\n\t\tint_str INT64,\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nINSERT INTO `estuary-theatre`.testing.flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-bigquery/materialize');"
+    "actionDescription": "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INT64 NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INT64,\n\t\tstr STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INT64 NOT NULL,\n\t\tarray_int STRING,\n\t\tbool_field BOOL,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested STRING,\n\t\tnullable_int INT64,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str INT64,\n\t\tint_str INT64,\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nINSERT INTO `estuary-theatre`.testing.flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-bigquery/materialize');"
   }
 }
 {
@@ -99,6 +99,11 @@
       "bool_field": true,
       "float_field": 6.6,
       "id": 6,
+      "multiple": [
+        "one",
+        2,
+        true
+      ],
       "nested": {
         "id": "i6"
       },
@@ -121,6 +126,9 @@
       "bool_field": false,
       "float_field": 7.7,
       "id": 7,
+      "multiple": {
+        "object": "seven"
+      },
       "nested": {
         "id": "i7"
       },
@@ -143,6 +151,7 @@
       "bool_field": true,
       "float_field": 8.8,
       "id": 8,
+      "multiple": null,
       "nested": {
         "id": "i8"
       },
@@ -305,10 +314,11 @@
   false,
   1.1,
   "2023-07-12T18:23:50.55822Z",
+  "1",
   "{\"id\":\"i1\"}",
   null,
   "str1",
-  "{\"_meta\":{\"uuid\":\"3fd2ec78-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}"
+  "{\"_meta\":{\"uuid\":\"3fd2ec78-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}"
 ]
 [
   2,
@@ -316,10 +326,11 @@
   true,
   2.2,
   "2023-07-12T18:24:09.67518Z",
+  "2.2",
   "{\"id\":\"i2\"}",
   2,
   "str2",
-  "{\"_meta\":{\"uuid\":\"4b37f0b8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}"
+  "{\"_meta\":{\"uuid\":\"4b37f0b8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}"
 ]
 [
   3,
@@ -327,10 +338,11 @@
   false,
   3.3,
   "2023-07-12T18:24:19.384Z",
+  "true",
   "{\"id\":\"i3\"}",
   null,
   "str3",
-  "{\"_meta\":{\"uuid\":\"51016380-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}"
+  "{\"_meta\":{\"uuid\":\"51016380-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}"
 ]
 [
   4,
@@ -338,10 +350,11 @@
   true,
   4.4,
   "2023-07-12T18:24:28.397025Z",
+  "false",
   "{\"id\":\"i4\"}",
   4,
   "str4",
-  "{\"_meta\":{\"uuid\":\"5660aaca-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}"
+  "{\"_meta\":{\"uuid\":\"5660aaca-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}"
 ]
 [
   5,
@@ -349,10 +362,11 @@
   false,
   5.5,
   "2023-07-12T18:24:36.112031Z",
+  "\"string five\"",
   "{\"id\":\"i5\"}",
   null,
   "str5",
-  "{\"_meta\":{\"uuid\":\"5af9e236-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}"
+  "{\"_meta\":{\"uuid\":\"5af9e236-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}"
 ]
 [
   6,
@@ -360,10 +374,11 @@
   true,
   66.66,
   "2023-07-12T18:28:27.194541Z",
+  "[\"one\",2,true]",
   "{\"id\":\"i6\"}",
   6,
   "str6 v2",
-  "{\"_meta\":{\"uuid\":\"e4b646c2-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}"
+  "{\"_meta\":{\"uuid\":\"e4b646c2-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}"
 ]
 [
   7,
@@ -371,10 +386,11 @@
   false,
   77.77,
   "2023-07-12T18:28:38.169062Z",
+  "{\"object\":\"seven\"}",
   "{\"id\":\"i7\"}",
   null,
   "str7 v2",
-  "{\"_meta\":{\"uuid\":\"eb40dafc-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}"
+  "{\"_meta\":{\"uuid\":\"eb40dafc-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}"
 ]
 [
   8,
@@ -382,10 +398,11 @@
   true,
   88.88,
   "2023-07-12T18:28:48.465279Z",
+  "null",
   "{\"id\":\"i8\"}",
   8,
   "str8 v2",
-  "{\"_meta\":{\"uuid\":\"f163eef6-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}"
+  "{\"_meta\":{\"uuid\":\"f163eef6-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}"
 ]
 [
   9,
@@ -393,6 +410,7 @@
   false,
   99.99,
   "2023-07-12T18:28:55.677252Z",
+  "null",
   "{\"id\":\"i9\"}",
   null,
   "str9 v2",
@@ -404,6 +422,7 @@
   true,
   1010.101,
   "2023-07-12T18:29:04.671352Z",
+  "null",
   "{\"id\":\"i10\"}",
   10,
   "str10 v2",

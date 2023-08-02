@@ -66,7 +66,8 @@ resources_json_template='[
       "exclude": ["nested/id"],
       "include": {
         "nested": {},
-        "array_int": {}
+        "array_int": {},
+        "multiple": {}
       }
     }
   },

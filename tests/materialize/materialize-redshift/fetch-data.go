@@ -77,7 +77,6 @@ func main() {
 		for idx, col := range cols {
 			jsonlRow[col] = row[idx]
 		}
-		delete(jsonlRow, "flow_document")
 
 		if err := out.Encode(jsonlRow); err != nil {
 			log.Fatal(fmt.Errorf("encoding row result: %w", err))
