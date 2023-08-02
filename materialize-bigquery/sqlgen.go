@@ -65,12 +65,13 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 }
 
 var bqTypeMapper = sql.ProjectionTypeMapper{
-	sql.ARRAY:   sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
-	sql.BINARY:  sql.NewStaticMapper("BYTES"),
-	sql.BOOLEAN: sql.NewStaticMapper("BOOL"),
-	sql.INTEGER: sql.NewStaticMapper("INT64", sql.WithElementConverter(sql.StdStrToInt())),
-	sql.NUMBER:  sql.NewStaticMapper("FLOAT64", sql.WithElementConverter(sql.StdStrToFloat())),
-	sql.OBJECT:  sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
+	sql.ARRAY:    sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
+	sql.BINARY:   sql.NewStaticMapper("BYTES"),
+	sql.BOOLEAN:  sql.NewStaticMapper("BOOL"),
+	sql.INTEGER:  sql.NewStaticMapper("INT64", sql.WithElementConverter(sql.StdStrToInt())),
+	sql.NUMBER:   sql.NewStaticMapper("FLOAT64", sql.WithElementConverter(sql.StdStrToFloat())),
+	sql.OBJECT:   sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
+	sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
 	sql.STRING: sql.StringTypeMapper{
 		Fallback: sql.NewStaticMapper("STRING"),
 		WithFormat: map[string]sql.TypeMapper{
