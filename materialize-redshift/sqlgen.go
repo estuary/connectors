@@ -19,12 +19,13 @@ var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
 var rsDialect = func() sql.Dialect {
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER: sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
-		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
-		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
-		sql.OBJECT:  sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.ARRAY:   sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.BINARY:  sql.NewStaticMapper("VARBYTE"),
+		sql.INTEGER:  sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
+		sql.NUMBER:   sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
+		sql.OBJECT:   sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
+		sql.ARRAY:    sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
+		sql.BINARY:   sql.NewStaticMapper("VARBYTE"),
+		sql.MULTIPLE: sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter( // Note: Actually a VARCHAR(256)
 				func(te tuple.TupleElement) (interface{}, error) {
