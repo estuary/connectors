@@ -2,6 +2,7 @@ package sql
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/estuary/connectors/go/pkg/slices"
@@ -83,23 +84,21 @@ func validateNewProjection(resource Resource, projection pf.Projection) *pm.Resp
 	case projection.IsRootDocumentProjection():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "The root document must be materialized"
-	case strings.HasPrefix(projection.Field, "_meta/") && projection.Inference.IsSingleType():
+	case strings.HasPrefix(projection.Field, "_meta/"):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "Metadata fields fields are able to be materialized"
 	case projection.Inference.IsSingleScalarType() || flatType == INTEGER || flatType == NUMBER:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
+	case reflect.DeepEqual(projection.Inference.Types, []string{"null"}):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
 
-	case projection.Inference.IsSingleType():
+	default:
+		// Any other case is one where the field has multiple types, which will be materialized as a
+		// JSON (or equivalent) column with the default JSON serialization of the value.
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "This field is able to be materialized"
-	default:
-		// If we got here, then either the field may have multiple incompatible types, or the
-		// only possible type is "null". In either case, we're not going to allow it.
-		// Technically, we could allow the null type to be materialized, but I can't think of a
-		// use case where that would be desirable.
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-		constraint.Reason = "Cannot materialize this field"
 	}
 	return constraint
 }

@@ -64,8 +64,9 @@ var snowflakeDialect = func() sql.Dialect {
 			"INTEGER",
 			sql.WithElementConverter(sql.StringCastConverter(strToSfInt)),
 		),
-		sql.NUMBER: sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat())),
-		sql.OBJECT: variantMapper,
+		sql.NUMBER:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat())),
+		sql.OBJECT:   variantMapper,
+		sql.MULTIPLE: sql.NewStaticMapper("VARIANT", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("STRING"),
 			WithFormat: map[string]sql.TypeMapper{
