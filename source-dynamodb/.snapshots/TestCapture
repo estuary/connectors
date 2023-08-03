@@ -1,0 +1,59 @@
+# ================================
+# Collection "acmeCo/test/tableOne": 15 Documents
+# ================================
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"onlyColumn":"onlyColumn val 0","partitionKeyString":"pk val 0"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"onlyColumn":"onlyColumn val 1","partitionKeyString":"pk val 1"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"onlyColumn":"onlyColumn val 2","partitionKeyString":"pk val 2"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"onlyColumn":"onlyColumn val 3","partitionKeyString":"pk val 3"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"onlyColumn":"onlyColumn val 4","partitionKeyString":"pk val 4"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"onlyColumn":"onlyColumn val 5","partitionKeyString":"pk val 5"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"onlyColumn":"onlyColumn val 6","partitionKeyString":"pk val 6"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"onlyColumn":"onlyColumn val 7","partitionKeyString":"pk val 7"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"onlyColumn":"onlyColumn val 8","partitionKeyString":"pk val 8"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"onlyColumn":"onlyColumn val 9","partitionKeyString":"pk val 9"}
+{"_meta":{"snapshot":true,"op":"c"},"onlyColumn":"onlyColumn val 0","partitionKeyString":"pk val 0"}
+{"_meta":{"snapshot":true,"op":"c"},"onlyColumn":"onlyColumn val 1","partitionKeyString":"pk val 1"}
+{"_meta":{"snapshot":true,"op":"c"},"onlyColumn":"onlyColumn val 2","partitionKeyString":"pk val 2"}
+{"_meta":{"snapshot":true,"op":"c"},"onlyColumn":"onlyColumn val 3","partitionKeyString":"pk val 3"}
+{"_meta":{"snapshot":true,"op":"c"},"onlyColumn":"onlyColumn val 4","partitionKeyString":"pk val 4"}
+# ================================
+# Collection "acmeCo/test/tableThree": 15 Documents
+# ================================
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 0","partitionKeyBinary":"cGsgdmFsIDA=","secondColumn":"secondColumn val 0","sortKey":"sk val 0","thirdColumn":"thirdColumn val 0"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 1","partitionKeyBinary":"cGsgdmFsIDE=","secondColumn":"secondColumn val 1","sortKey":"sk val 1","thirdColumn":"thirdColumn val 1"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 2","partitionKeyBinary":"cGsgdmFsIDI=","secondColumn":"secondColumn val 2","sortKey":"sk val 2","thirdColumn":"thirdColumn val 2"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 3","partitionKeyBinary":"cGsgdmFsIDM=","secondColumn":"secondColumn val 3","sortKey":"sk val 3","thirdColumn":"thirdColumn val 3"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 4","partitionKeyBinary":"cGsgdmFsIDQ=","secondColumn":"secondColumn val 4","sortKey":"sk val 4","thirdColumn":"thirdColumn val 4"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 5","partitionKeyBinary":"cGsgdmFsIDU=","secondColumn":"secondColumn val 5","sortKey":"sk val 5","thirdColumn":"thirdColumn val 5"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 6","partitionKeyBinary":"cGsgdmFsIDY=","secondColumn":"secondColumn val 6","sortKey":"sk val 6","thirdColumn":"thirdColumn val 6"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 7","partitionKeyBinary":"cGsgdmFsIDc=","secondColumn":"secondColumn val 7","sortKey":"sk val 7","thirdColumn":"thirdColumn val 7"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 8","partitionKeyBinary":"cGsgdmFsIDg=","secondColumn":"secondColumn val 8","sortKey":"sk val 8","thirdColumn":"thirdColumn val 8"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 9","partitionKeyBinary":"cGsgdmFsIDk=","secondColumn":"secondColumn val 9","sortKey":"sk val 9","thirdColumn":"thirdColumn val 9"}
+{"_meta":{"snapshot":true,"op":"c"},"firstColumn":"firstColumn val 0","partitionKeyBinary":"cGsgdmFsIDA=","secondColumn":"secondColumn val 0","sortKey":"sk val 0","thirdColumn":"thirdColumn val 0"}
+{"_meta":{"snapshot":true,"op":"c"},"firstColumn":"firstColumn val 1","partitionKeyBinary":"cGsgdmFsIDE=","secondColumn":"secondColumn val 1","sortKey":"sk val 1","thirdColumn":"thirdColumn val 1"}
+{"_meta":{"snapshot":true,"op":"c"},"firstColumn":"firstColumn val 2","partitionKeyBinary":"cGsgdmFsIDI=","secondColumn":"secondColumn val 2","sortKey":"sk val 2","thirdColumn":"thirdColumn val 2"}
+{"_meta":{"snapshot":true,"op":"c"},"firstColumn":"firstColumn val 3","partitionKeyBinary":"cGsgdmFsIDM=","secondColumn":"secondColumn val 3","sortKey":"sk val 3","thirdColumn":"thirdColumn val 3"}
+{"_meta":{"snapshot":true,"op":"c"},"firstColumn":"firstColumn val 4","partitionKeyBinary":"cGsgdmFsIDQ=","secondColumn":"secondColumn val 4","sortKey":"sk val 4","thirdColumn":"thirdColumn val 4"}
+# ================================
+# Collection "acmeCo/test/tableTwo": 15 Documents
+# ================================
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 0","partitionKeyNumber":"0","secondColumn":"secondColumn val 0","sortKey":"sk val 0"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 1","partitionKeyNumber":"1.5","secondColumn":"secondColumn val 1","sortKey":"sk val 1"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 2","partitionKeyNumber":"2","secondColumn":"secondColumn val 2","sortKey":"sk val 2"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 3","partitionKeyNumber":"3.5","secondColumn":"secondColumn val 3","sortKey":"sk val 3"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 4","partitionKeyNumber":"4","secondColumn":"secondColumn val 4","sortKey":"sk val 4"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 5","partitionKeyNumber":"5.5","secondColumn":"secondColumn val 5","sortKey":"sk val 5"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 6","partitionKeyNumber":"6","secondColumn":"secondColumn val 6","sortKey":"sk val 6"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 7","partitionKeyNumber":"7.5","secondColumn":"secondColumn val 7","sortKey":"sk val 7"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 8","partitionKeyNumber":"8","secondColumn":"secondColumn val 8","sortKey":"sk val 8"}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"firstColumn":"firstColumn val 9","partitionKeyNumber":"9.5","secondColumn":"secondColumn val 9","sortKey":"sk val 9"}
+{"_meta":{"snapshot":true,"op":"c"},"firstColumn":"firstColumn val 0","partitionKeyNumber":"0","secondColumn":"secondColumn val 0","sortKey":"sk val 0"}
+{"_meta":{"snapshot":true,"op":"c"},"firstColumn":"firstColumn val 1","partitionKeyNumber":"1.5","secondColumn":"secondColumn val 1","sortKey":"sk val 1"}
+{"_meta":{"snapshot":true,"op":"c"},"firstColumn":"firstColumn val 2","partitionKeyNumber":"2","secondColumn":"secondColumn val 2","sortKey":"sk val 2"}
+{"_meta":{"snapshot":true,"op":"c"},"firstColumn":"firstColumn val 3","partitionKeyNumber":"3.5","secondColumn":"secondColumn val 3","sortKey":"sk val 3"}
+{"_meta":{"snapshot":true,"op":"c"},"firstColumn":"firstColumn val 4","partitionKeyNumber":"4","secondColumn":"secondColumn val 4","sortKey":"sk val 4"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"tables":{"tableOne":{"backfillFinishedAt":"<TIMESTAMP>","totalBackfillSegments":2,"backfillSegmentProgress":{"0":{"exclusiveStartKey":{},"finishedAt":"<TIMESTAMP>"},"1":{"exclusiveStartKey":{"partitionKeyString":{"attrType":"S","value":"pk val 3"}},"finishedAt":"<TIMESTAMP>"}},"shards":{"<SHARD_ID>":{"lastReadSequence":"<SEQUENCE_NUM>"}},"streamArn":"<STREAM_ARN>"},"tableThree":{"backfillFinishedAt":"<TIMESTAMP>","totalBackfillSegments":2,"backfillSegmentProgress":{"0":{"exclusiveStartKey":{},"finishedAt":"<TIMESTAMP>"},"1":{"exclusiveStartKey":{"partitionKeyBinary":{"attrType":"B","value":"cGsgdmFsIDM="},"sortKey":{"attrType":"S","value":"sk val 3"}},"finishedAt":"<TIMESTAMP>"}},"shards":{"<SHARD_ID>":{"lastReadSequence":"<SEQUENCE_NUM>"}},"streamArn":"<STREAM_ARN>"},"tableTwo":{"backfillFinishedAt":"<TIMESTAMP>","totalBackfillSegments":2,"backfillSegmentProgress":{"0":{"exclusiveStartKey":{},"finishedAt":"<TIMESTAMP>"},"1":{"exclusiveStartKey":{"partitionKeyNumber":{"attrType":"N","value":"3.5"},"sortKey":{"attrType":"S","value":"sk val 3"}},"finishedAt":"<TIMESTAMP>"}},"shards":{"<SHARD_ID>":{"lastReadSequence":"<SEQUENCE_NUM>"}},"streamArn":"<STREAM_ARN>"}}}
+

@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/datatypes": 2 Documents
+# ================================
+{"_meta":{"snapshot":true,"op":"c"},"binary":"AQID","binarySet":["AQID","BAUG"],"booleanFalse":false,"booleanTrue":true,"decimal":123.45,"integer":123,"list":["stringValue",123],"map":{"numberKey":123,"stringKey":"stringValue"},"null":null,"numberSet":[123,123.45],"pk":"pk","string":"stringValue","stringSet":["anotherStringValue","stringValue"]}
+{"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"binary":"AQID","binarySet":["AQID","BAUG"],"booleanFalse":false,"booleanTrue":true,"decimal":123.45,"integer":123,"list":["stringValue",123],"map":{"numberKey":123,"stringKey":"stringValue"},"null":null,"numberSet":[123,123.45],"pk":"pk","string":"stringValue","stringSet":["anotherStringValue","stringValue"]}
+# ================================
+# Final State Checkpoint
+# ================================
+{"tables":{"datatypes":{"backfillFinishedAt":"<TIMESTAMP>","totalBackfillSegments":2,"backfillSegmentProgress":{"0":{"exclusiveStartKey":{},"finishedAt":"<TIMESTAMP>"},"1":{"exclusiveStartKey":{},"finishedAt":"<TIMESTAMP>"}},"shards":{"<SHARD_ID>":{"lastReadSequence":"<SEQUENCE_NUM>"}},"streamArn":"<STREAM_ARN>"}}}
+
