@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -19,68 +19,17 @@ import (
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-
-	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
-// Config tells the connector how to connect to and interact with the source database.
-type Config struct {
-	Address  string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User     string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
-	// TODO(wgd): Add network tunnel support
-}
+// BatchSQLDriver represents a generic "batch SQL" capture behavior, parameterized
+// by a config schema, connect function, and value translation logic.
+type BatchSQLDriver struct {
+	DocumentationURL string
+	ConfigSchema     json.RawMessage
 
-type advancedConfig struct {
-	SSLMode string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
-}
-
-// Validate checks that the configuration possesses all required properties.
-func (c *Config) Validate() error {
-	var requiredProperties = [][]string{
-		{"address", c.Address},
-		{"user", c.User},
-		{"password", c.Password},
-	}
-	for _, req := range requiredProperties {
-		if req[1] == "" {
-			return fmt.Errorf("missing '%s'", req[0])
-		}
-	}
-	return nil
-}
-
-// SetDefaults fills in the default values for unset optional parameters.
-func (c *Config) SetDefaults() {
-	// The address config property should accept a host or host:port
-	// value, and if the port is unspecified it should be the PostgreSQL
-	// default 5432.
-	if !strings.Contains(c.Address, ":") {
-		c.Address += ":5432"
-	}
-}
-
-// ToURI converts the Config to a DSN string.
-func (c *Config) ToURI() string {
-	var address = c.Address
-	var uri = url.URL{
-		Scheme: "postgres",
-		Host:   address,
-		User:   url.UserPassword(c.User, c.Password),
-	}
-	if c.Database != "" {
-		uri.Path = "/" + c.Database
-	}
-	var params = make(url.Values)
-	if c.Advanced.SSLMode != "" {
-		params.Set("sslmode", c.Advanced.SSLMode)
-	}
-	if len(params) > 0 {
-		uri.RawQuery = params.Encode()
-	}
-	return uri.String()
+	Connect          func(ctx context.Context, configJSON json.RawMessage) (*sql.DB, error)
+	TranslateValue   func(val any, databaseTypeName string) (any, error)
+	GenerateResource func(resourceName, schemaName, tableName, tableType string) (*Resource, error)
 }
 
 // Resource represents the capture configuration of a single resource binding.
@@ -156,56 +105,41 @@ func generateMinimalSchema() json.RawMessage {
 	return json.RawMessage(bs)
 }
 
-type driver struct{}
-
-func main() {
-	boilerplate.RunMain(new(driver))
-}
-
-func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
-	var endpointSchema, err = schemagen.GenerateSchema("Batch SQL", &Config{}).MarshalJSON()
-	if err != nil {
-		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
-	}
+// Spec returns metadata about the capture connector.
+func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
 	resourceSchema, err := schemagen.GenerateSchema("Batch SQL Resource Spec", &Resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
 	return &pc.Response_Spec{
-		ConfigSchemaJson:         json.RawMessage(endpointSchema),
-		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:         "https://go.estuary.dev/source-batchsql",
+		ConfigSchemaJson:         drv.ConfigSchema,
+		ResourceConfigSchemaJson: resourceSchema,
+		DocumentationUrl:         drv.DocumentationURL,
 	}, nil
 }
 
-func (driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
+// Apply does nothing for batch SQL captures.
+func (BatchSQLDriver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
 	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
-const discoverQuery = `
-SELECT table_schema, table_name, table_type
-  FROM information_schema.tables
-  WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'pg_internal', 'catalog_history', 'cron');
-`
+const discoverQuery = `SELECT table_schema, table_name, table_type FROM information_schema.tables;`
 
-func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
-	var cfg Config
-	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
-	}
+var excludedSystemSchemas = []string{
+	"pg_catalog",
+	"information_schema",
+	"pg_internal",
+	"catalog_history",
+	"cron",
+}
 
-	// Validate connection to database
-	log.WithFields(log.Fields{
-		"address":  cfg.Address,
-		"user":     cfg.User,
-		"database": cfg.Database,
-	}).Info("connecting to database")
-	var db, err = sql.Open("pgx", cfg.ToURI())
+// Discover enumerates tables and views from `information_schema.tables` and generates
+// placeholder capture queries for thos tables.
+func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
+	var db, err = drv.Connect(ctx, req.ConfigJson)
 	if err != nil {
-		return nil, fmt.Errorf("error opening database connection: %w", err)
-	} else if err := db.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("error pinging database: %w", err)
+		return nil, err
 	}
 	defer db.Close()
 
@@ -222,18 +156,28 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 
-		var resourceName = recommendedCatalogName(tableSchema, tableName)
-		var res = &Resource{
-			Name:     resourceName,
-			Template: fmt.Sprintf(`SELECT * FROM "%s"."%s";`, tableSchema, tableName),
+		// Exclude tables in "system schemas" such as information_schema or pg_catalog.
+		if slices.Contains(excludedSystemSchemas, tableSchema) {
+			continue
 		}
-		var resourceConfigJSON, err = json.Marshal(res)
+
+		var recommendedName = recommendedCatalogName(tableSchema, tableName)
+		var res, err = drv.GenerateResource(recommendedName, tableSchema, tableName, tableType)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"reason": err,
+				"schema": tableSchema,
+				"table":  tableName,
+				"type":   tableType,
+			}).Warn("unable to generate resource spec for entity")
+		}
+		resourceConfigJSON, err := json.Marshal(res)
 		if err != nil {
 			return nil, fmt.Errorf("error serializing resource spec: %w", err)
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
-			RecommendedName:    resourceName,
+			RecommendedName:    recommendedName,
 			ResourceConfigJson: resourceConfigJSON,
 			DocumentSchemaJson: minimalSchema,
 			Key:                defaultKey,
@@ -257,26 +201,19 @@ func recommendedCatalogName(schema, table string) string {
 	return catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(catalogName), "_")
 }
 
-func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
-	var cfg Config
-	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+// Validate checks that the configuration appears correct and that we can connect
+// to the database and execute queries.
+func (drv *BatchSQLDriver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
+	// Perform discovery, which inherently validates that the config is well-formed
+	// and that we can connect to the database and execute (some) queries.
+	if _, err := drv.Discover(ctx, &pc.Request_Discover{
+		ConnectorType: req.ConnectorType,
+		ConfigJson:    req.ConfigJson,
+	}); err != nil {
+		return nil, err
 	}
 
-	// Validate connection to database
-	log.WithFields(log.Fields{
-		"address":  cfg.Address,
-		"user":     cfg.User,
-		"database": cfg.Database,
-	}).Info("connecting to database")
-	var db, err = sql.Open("pgx", cfg.ToURI())
-	if err != nil {
-		return nil, fmt.Errorf("error opening database connection: %w", err)
-	} else if err := db.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("error pinging database: %w", err)
-	}
-	defer db.Close()
-
+	// Unmarshal and validate resource bindings to make sure they're well-formed too.
 	var out []*pc.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 		var res Resource
@@ -291,11 +228,13 @@ func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Respo
 	return &pc.Response_Validated{Bindings: out}, nil
 }
 
-func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
-	var cfg Config
-	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
-		return fmt.Errorf("parsing endpoint config: %w", err)
+// Pull is the heart of a capture connector and outputs a neverending stream of documents.
+func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
+	var db, err = drv.Connect(stream.Context(), open.Capture.ConfigJson)
+	if err != nil {
+		return err
 	}
+	defer db.Close()
 
 	var resources []Resource
 	for _, binding := range open.Capture.Bindings {
@@ -307,38 +246,26 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 	}
 
 	if open.StateJson != nil {
-		// TODO: Consider implementing persistent state, based on the resource name property.
+		// TODO: Consider implementing persistent state, keyed on the resource name property.
 	}
 
 	var capture = &capture{
-		Config:    cfg,
-		Resources: resources,
-		Output:    stream,
+		DB:             db,
+		Resources:      resources,
+		Output:         stream,
+		TranslateValue: drv.TranslateValue,
 	}
 	return capture.Run(stream.Context())
 }
 
 type capture struct {
-	Config    Config
-	Resources []Resource
-	Output    *boilerplate.PullOutput
+	DB             *sql.DB
+	Resources      []Resource
+	Output         *boilerplate.PullOutput
+	TranslateValue func(val any, databaseTypeName string) (any, error)
 }
 
 func (c *capture) Run(ctx context.Context) error {
-	log.WithFields(log.Fields{
-		"address":  c.Config.Address,
-		"user":     c.Config.User,
-		"database": c.Config.Database,
-	}).Info("connecting to database")
-	var db, err = sql.Open("pgx", c.Config.ToURI())
-	if err != nil {
-		return fmt.Errorf("error connecting to database: %w", err)
-	} else if err := db.PingContext(ctx); err != nil {
-		return fmt.Errorf("error connecting to database: %w", err)
-	}
-	defer db.Close()
-	log.Info("connected")
-
 	// Notify Flow that we're starting.
 	if err := c.Output.Ready(false); err != nil {
 		return err
@@ -353,7 +280,7 @@ func (c *capture) Run(ctx context.Context) error {
 			time.Sleep(5 * time.Second)
 		}
 		var idx, res = idx, res // Copy for goroutine closure
-		eg.Go(func() error { return c.worker(workerCtx, db, idx, &res) })
+		eg.Go(func() error { return c.worker(workerCtx, idx, &res) })
 	}
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("capture terminated with error: %w", err)
@@ -361,8 +288,13 @@ func (c *capture) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *capture) worker(ctx context.Context, db *sql.DB, bindingIndex int, res *Resource) error {
-	log.WithField("name", res.Name).Info("starting worker")
+func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) error {
+	log.WithFields(log.Fields{
+		"name":   res.Name,
+		"tmpl":   res.Template,
+		"cursor": res.Cursor,
+		"poll":   res.PollInterval,
+	}).Info("starting worker")
 
 	var queryTemplate, err = template.New("query").Parse(res.Template)
 	if err != nil {
@@ -381,7 +313,7 @@ func (c *capture) worker(ctx context.Context, db *sql.DB, bindingIndex int, res 
 	var cursorValues []any
 	for ctx.Err() == nil {
 		log.WithField("name", res.Name).Info("polling for updates")
-		var nextCursor, err = c.poll(ctx, db, bindingIndex, queryTemplate, res.Cursor, cursorValues)
+		var nextCursor, err = c.poll(ctx, bindingIndex, queryTemplate, res.Cursor, cursorValues)
 		if err != nil {
 			return fmt.Errorf("error polling table: %w", err)
 		}
@@ -391,7 +323,7 @@ func (c *capture) worker(ctx context.Context, db *sql.DB, bindingIndex int, res 
 	return ctx.Err()
 }
 
-func (c *capture) poll(ctx context.Context, db *sql.DB, bindingIndex int, tmpl *template.Template, cursorNames []string, cursorValues []any) ([]any, error) {
+func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Template, cursorNames []string, cursorValues []any) ([]any, error) {
 	var templateArg = map[string]any{
 		"IsFirstQuery": len(cursorValues) == 0,
 	}
@@ -405,7 +337,7 @@ func (c *capture) poll(ctx context.Context, db *sql.DB, bindingIndex int, tmpl *
 	var pollTime = time.Now().UTC()
 
 	log.WithFields(log.Fields{"query": query, "args": cursorValues}).Info("executing query")
-	var rows, err = db.QueryContext(ctx, query, cursorValues...)
+	var rows, err = c.DB.QueryContext(ctx, query, cursorValues...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
@@ -445,7 +377,7 @@ func (c *capture) poll(ctx context.Context, db *sql.DB, bindingIndex int, tmpl *
 		}
 
 		for i, name := range columnNames {
-			var translatedVal, err = translateRecordField(columnTypes[i].DatabaseTypeName(), columnValues[i])
+			var translatedVal, err = c.TranslateValue(columnValues[i], columnTypes[i].DatabaseTypeName())
 			if err != nil {
 				return nil, fmt.Errorf("error translating column value: %w", err)
 			}
@@ -463,7 +395,6 @@ func (c *capture) poll(ctx context.Context, db *sql.DB, bindingIndex int, tmpl *
 		} else if err := c.Output.Documents(bindingIndex, bs); err != nil {
 			return nil, fmt.Errorf("error emitting document: %w", err)
 		} else if err := c.Output.Checkpoint(json.RawMessage(`{}`), true); err != nil {
-			// TODO(wgd): Consider adding actual checkpoint updating
 			return nil, fmt.Errorf("error emitting checkpoint: %w", err)
 		}
 

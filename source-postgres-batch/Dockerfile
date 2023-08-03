@@ -19,9 +19,9 @@ RUN go install -v ./source-boilerplate/...
 RUN go install -v github.com/jackc/pgx/v4
 
 # Run tests and build the connector
-COPY source-batchsql ./source-batchsql
-# RUN go test -v ./source-batchsql/...  # Currently no tests
-RUN go build -o ./connector -v ./source-batchsql/...
+COPY source-postgres-batch ./source-postgres-batch
+# RUN go test -v ./source-postgres-batch/...  # Currently no tests
+RUN go build -o ./connector -v ./source-postgres-batch/...
 
 # Runtime Stage
 ################################################################################
@@ -31,7 +31,7 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
-COPY --from=builder /builder/connector ./source-batchsql
+COPY --from=builder /builder/connector ./source-postgres-batch
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture
@@ -39,4 +39,4 @@ LABEL CONNECTOR_PROTOCOL=flow-capture
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-ENTRYPOINT ["/connector/source-batchsql"]
+ENTRYPOINT ["/connector/source-postgres-batch"]
