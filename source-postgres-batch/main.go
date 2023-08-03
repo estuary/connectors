@@ -141,6 +141,18 @@ func generatePostgresResource(resourceName, schemaName, tableName, tableType str
 	}, nil
 }
 
+func translatePostgresValue(val any, databaseTypeName string) (any, error) {
+	if val, ok := val.([]byte); ok {
+		switch {
+		case strings.EqualFold(databaseTypeName, "JSON"):
+			return json.RawMessage(val), nil
+		case strings.EqualFold(databaseTypeName, "JSONB"):
+			return json.RawMessage(val), nil
+		}
+	}
+	return val, nil
+}
+
 func main() {
 	var endpointSchema, err = schemagen.GenerateSchema("Batch SQL", &Config{}).MarshalJSON()
 	if err != nil {
@@ -153,9 +165,7 @@ func main() {
 		ConfigSchema:     json.RawMessage(endpointSchema),
 		Connect:          connectPostgres,
 		GenerateResource: generatePostgresResource,
-		TranslateValue: func(val any, databaseTypeName string) (any, error) {
-			return val, nil
-		},
+		TranslateValue:   translatePostgresValue,
 	}
 	boilerplate.RunMain(drv)
 }
