@@ -37,7 +37,7 @@ type Client interface {
 	// the table when a field is removed. We cannot rely on the field being required in the
 	// collection schema because required fields added to a table after initial creation will be
 	// created as nullable.
-	DropNotNullForColumn(ctx context.Context, dryRun bool, tableIdentifier, columnIdentifier string) (string, error)
+	DropNotNullForColumn(ctx context.Context, dryRun bool, table Table, column Column) (string, error)
 }
 
 // Resource is a driver-provided type which represents the SQL resource

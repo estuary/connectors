@@ -22,12 +22,6 @@ func TestMySQLConfig(t *testing.T) {
 	var uri = validConfig.ToURI()
 	require.Equal(t, "youser:shmassword@tcp(post.toast:1234)/namegame?time_zone=%27%2B00%3A00%27", uri)
 
-	var minimal = validConfig
-	minimal.Database = ""
-	require.NoError(t, minimal.Validate())
-	uri = minimal.ToURI()
-	require.Equal(t, "youser:shmassword@tcp(post.toast:1234)?time_zone=%27%2B00%3A00%27", uri)
-
 	var noPort = validConfig
 	noPort.Address = "post.toast"
 	require.NoError(t, noPort.Validate())
@@ -48,7 +42,7 @@ func TestMySQLConfig(t *testing.T) {
 }
 
 func TestSpecification(t *testing.T) {
-	var resp, err = newPostgresDriver().
+	var resp, err = newMysqlDriver().
 		Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
@@ -72,7 +66,7 @@ func TestConfigURI(t *testing.T) {
 			Password: "secret1234",
 			Database: "somedb",
 			Advanced: advancedConfig{
-				SSLMode: "verify-full",
+				SSLMode: "verify_identity",
 			},
 		},
 		"IncorrectSSL": {

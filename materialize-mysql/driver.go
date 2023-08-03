@@ -25,12 +25,8 @@ import (
 )
 
 const (
-	// These are coarse limits on the amount of memory that will be used to buffer insert/update
-	// batches for load and store operations. In the future it may be interesting to investigate
-	// using the Postgres copy protocol in the future for bulk loading data tables instead of with
-	// DML statements.
-	storeBatchSizeLimit = 4096                    // Assuming store records average ~2kB then 4k * 2kB = 8MB
-	loadBatchSizeLimit  = storeBatchSizeLimit * 5 // Load records are keys-only so allow for more in a batch
+	storeBatchSize = 4096                    // Assuming store records average ~2kB then 4k * 2kB = 8MB
+	loadBatchSize  = storeBatchSize * 5 // Load records are keys-only so allow for more in a batch
 )
 
 type sshForwarding struct {
@@ -47,14 +43,14 @@ type config struct {
 	Address  string         `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 3306 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
 	User     string         `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password string         `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string         `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Database string         `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
-	SSLMode string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	SSLMode string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disabled,enum=preferred,enum=required,enum=verify_ca,enum=verify_identity"`
 }
 
 // Validate the configuration.
@@ -63,6 +59,7 @@ func (c *config) Validate() error {
 		{"address", c.Address},
 		{"user", c.User},
 		{"password", c.Password},
+		{"database", c.Database},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -71,7 +68,7 @@ func (c *config) Validate() error {
 	}
 
 	if c.Advanced.SSLMode != "" {
-		if !slices.Contains([]string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}, c.Advanced.SSLMode) {
+		if !slices.Contains([]string{"disabled", "preferred", "required", "verify_ca", "verify_identity"}, c.Advanced.SSLMode) {
 			return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", c.Advanced.SSLMode)
 		}
 	}
@@ -146,7 +143,7 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-func newPostgresDriver() *sql.Driver {
+func newMysqlDriver() *sql.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-mysql",
 		EndpointSpecType: new(config),
@@ -257,27 +254,59 @@ type client struct {
 }
 
 func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
-		tableIdentifier,
-		columnIdentifier,
-		columnDDL,
-	)
+	var query string
 
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-			return "", err
+	err := c.withDB(func(db *stdsql.DB) error {
+		var conn, err = db.Conn(ctx)
+		if err != nil {
+			return err
 		}
+
+		rows, err := conn.QueryContext(ctx, "SELECT * FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name=?", tableIdentifier, columnIdentifier)
+		if err != nil {
+			return err
+		}
+
+		var exists = rows.Next()
+
+		if !exists {
+			query = fmt.Sprintf(
+				"ALTER TABLE %s ADD COLUMN %s %s;",
+				tableIdentifier,
+				columnIdentifier,
+				columnDDL,
+			)
+
+			if !dryRun {
+				if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	});
+
+	if err != nil {
+		return "", err
 	}
 
 	return query, nil
 }
 
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string) (string, error) {
+func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
+	var projection = column.Projection
+	projection.Inference.Exists = pf.Inference_MAY
+	var mapped, err = mysqlDialect.TypeMapper.MapType(&projection)
+	if err != nil {
+		return "", fmt.Errorf("drop not null: mapping type of %s failed: %w", column.Identifier, err)
+	}
+
 	query := fmt.Sprintf(
-		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
-		tableIdentifier,
-		columnIdentifier,
+		"ALTER TABLE %s MODIFY %s %s;",
+		table.Identifier,
+		column.Identifier,
+		mapped.DDL,
 	)
 
 	if !dryRun {
@@ -297,10 +326,9 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 	return
 }
 
-// ExecStatements is used for the DDL statements of ApplyUpsert and ApplyDelete. Postgres supports
-// transactional DDL statements, so the statements are wrapped in a transaction.
+// ExecStatements is used for the DDL statements of ApplyUpsert and ApplyDelete.
+// Mysql does not support transactional DDL statements
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	statements = append(append([]string{"begin;"}, statements...), "commit;")
 	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
 }
 
@@ -358,8 +386,24 @@ func newTransactor(
 		return nil, fmt.Errorf("store db.Conn: %w", err)
 	}
 
+	db, err := stdsql.Open("mysql", cfg.ToURI())
+	if err != nil {
+		return nil, fmt.Errorf("newTransactor sql.Open: %w", err)
+	}
+	defer db.Close()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("newTransactor db.Conn: %w", err)
+	}
+	defer conn.Close()
+	
+	tableVarchars, err := getVarcharDetails(ctx, cfg.Database, conn)
+	if err != nil {
+		return nil, fmt.Errorf("getting existing varchar column lengths: %w", err)
+	}
+
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding); err != nil {
+		if err = d.addBinding(ctx, binding, tableVarchars[binding.Identifier]); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -374,16 +418,29 @@ func newTransactor(
 	return d, nil
 }
 
-type binding struct {
-	target             sql.Table
-	createLoadTableSQL string
-	loadInsertSQL      string
-	storeUpdateSQL     string
-	storeInsertSQL     string
-	loadQuerySQL       string
+// varcharColumnMeta contains metadata about mysql varchar columns. Currently this is just the
+// maximum length of the field as reported from the database, populated upon connector startup.
+type varcharColumnMeta struct {
+	identifier string
+	maxLength int
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
+type binding struct {
+	target              sql.Table
+	varcharColumnMetas  []varcharColumnMeta
+	tempVarcharMetas    []varcharColumnMeta
+	tempTableName       string
+	tempTruncate        string
+	createLoadTableSQL  string
+	loadInsertSQL       string
+	loadInsertBatchSQL  string
+	storeUpdateSQL      string
+	storeInsertSQL      string
+	storeInsertBatchSQL string
+	loadQuerySQL        string
+}
+
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars map[string]int) error {
 	var b = &binding{target: target}
 
 	for _, m := range []struct {
@@ -392,15 +449,45 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	}{
 		{&b.createLoadTableSQL, tplCreateLoadTable},
 		{&b.loadInsertSQL, tplLoadInsert},
+		{&b.loadInsertBatchSQL, tplLoadInsertBatch},
 		{&b.storeInsertSQL, tplStoreInsert},
+		{&b.storeInsertBatchSQL, tplStoreInsertBatch},
 		{&b.storeUpdateSQL, tplStoreUpdate},
 		{&b.loadQuerySQL, tplLoadQuery},
+		{&b.tempTableName, tplTempTableName},
+		{&b.tempTruncate, tplTempTruncate},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
 			return err
 		}
 	}
+
+	// Retain column metadata information for this binding as a snapshot of the table configuration
+	// when the connector started, indexed in the same order as values will be received from the
+	// runtime for Store requests. Only VARCHAR columns will have non-zero-valued varcharColumnMeta.
+	allColumns := target.Columns()
+	columnMetas := make([]varcharColumnMeta, len(allColumns))
+	if varchars != nil { // There may not be any varchar columns for this binding
+		for idx, col := range allColumns {
+			// If this column is not found in varchars, it must not have been a VARCHAR column.
+			if maxLength, ok := varchars[col.Identifier]; ok {
+				columnMetas[idx] = varcharColumnMeta{
+					identifier: col.Identifier,
+					maxLength:  maxLength,
+				}
+
+				log.WithFields(log.Fields{
+					"table":            b.target.Identifier,
+					"column":           col.Identifier,
+					"varcharMaxLength": maxLength,
+					"collection":       b.target.Source.String(),
+					"field":            col.Field,
+				}).Debug("matched string collection field to table VARCHAR column")
+			}
+		}
+	}
+	b.varcharColumnMetas = columnMetas
 
 	t.bindings = append(t.bindings, b)
 
@@ -409,12 +496,48 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		return fmt.Errorf("Exec(%s): %w", b.createLoadTableSQL, err)
 	}
 
+	tempColumnMetas := make([]varcharColumnMeta, len(allColumns))
+	for idx, key := range target.Keys {
+		columnType, err := mysqlDialect.TypeMapper.MapType(&key.Projection)
+		if err != nil {
+			return fmt.Errorf("temp column metas: %w", err)
+		}
+		
+		if strings.Contains(columnType.DDL, "VARCHAR(256)") {
+			tempColumnMetas[idx] = varcharColumnMeta{
+				identifier: key.Identifier,
+				maxLength: 256,
+			}
+		}
+	}
+
+	b.tempVarcharMetas = tempColumnMetas
+
+	return nil
+}
+
+type batchRequest struct {
+	args []any
+	query string
+}
+
+func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch []batchRequest) error {
+	var flatArgs = []any{}
+	for _, b := range batch {
+		flatArgs = append(flatArgs, b.args...)
+	}
+
+	if _, err := txn.ExecContext(ctx, query, flatArgs...); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
+  log.Info("starting load phase")
 	// Use a read-only "load" transaction, which will automatically
 	// truncate the temporary key staging tables on commit.
   var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{ReadOnly: true})
@@ -423,13 +546,64 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 	defer txn.Rollback()
 
+	var batches = make(map[string][]batchRequest)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
 		} else {
-			txn.ExecContext(ctx, b.loadInsertSQL, converted...)
+			// See if we need to increase any VARCHAR column lengths
+			for idx, c := range converted {
+				varcharMeta := b.tempVarcharMetas[idx]
+				if varcharMeta.identifier != "" {
+					l := len(c.(string))
+
+					if l > varcharMeta.maxLength {
+						log.WithFields(log.Fields{
+							"table":               b.target.Identifier,
+							"column":              varcharMeta.identifier,
+							"currentColumnLength": varcharMeta.maxLength,
+							"stringValueLength":   l,
+							"query": fmt.Sprintf(varcharTableAlter, b.tempTableName, varcharMeta.identifier, l),
+						}).Info("column will be altered to VARCHAR(stringLength) to accommodate large string value")
+						b.tempVarcharMetas[idx].maxLength = l
+
+						if _, err := d.load.conn.ExecContext(ctx, fmt.Sprintf(varcharTableAlter, b.tempTableName, varcharMeta.identifier, l)); err != nil {
+							return fmt.Errorf("altering size for column %s of table %s: %w", varcharMeta.identifier, b.tempTableName, err)
+						}
+					}
+				}
+			}
+
+			if batch, ok := batches[b.target.Identifier]; !ok {
+				batches[b.target.Identifier] = []batchRequest{batchRequest{
+					query: b.loadInsertSQL,
+					args: converted,
+				}}
+			} else {
+				batches[b.target.Identifier] = append(batch, batchRequest{
+					query: b.loadInsertSQL,
+					args: converted,
+				});
+
+				if len(batches[b.target.Identifier]) >= loadBatchSize {
+					if err := drainBatch(ctx, txn, b.loadInsertBatchSQL, batches[b.target.Identifier]); err != nil {
+						return err
+					}
+					batches[b.target.Identifier] = nil
+				}
+			}
+		}
+	}
+
+	for _, batch := range batches {
+		if len(batch) > 0 {
+			for _, b := range batch {
+				if _, err := txn.ExecContext(ctx, b.query, b.args...); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
@@ -457,10 +631,19 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("querying Loads: %w", err)
-	} else if err = txn.Commit(); err != nil {
+	}
+
+	for _, b := range d.bindings {
+		if _, err = txn.ExecContext(ctx, b.tempTruncate); err != nil {
+			return fmt.Errorf("truncating load table: %w", err)
+		}
+	}
+
+	if err = txn.Commit(); err != nil {
 		return fmt.Errorf("commiting Load transaction: %w", err)
 	}
 
+  log.Info("load phase done")
 	return nil
 }
 
@@ -476,24 +659,77 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 	}()
 
+  log.Info("starting store phase")
+
+	var batches = map[string][]batchRequest{}
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON);
+		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if it.Exists {
+		}
+
+		// See if we need to increase any VARCHAR column lengths
+		for idx, c := range converted {
+			varcharMeta := b.varcharColumnMetas[idx]
+			if varcharMeta.identifier != "" {
+				l := len(c.(string))
+
+				if l > varcharMeta.maxLength {
+					log.WithFields(log.Fields{
+						"table":               b.target.Identifier,
+						"column":              varcharMeta.identifier,
+						"currentColumnLength": varcharMeta.maxLength,
+						"stringValueLength":   l,
+					}).Info("column will be altered to VARCHAR(MAX) to accommodate large string value")
+					b.varcharColumnMetas[idx].maxLength = l
+
+					if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf(varcharTableAlter, b.target.Identifier, varcharMeta.identifier, l)); err != nil {
+						return nil, fmt.Errorf("altering size for column %s of table %s: %w", varcharMeta.identifier, b.target.Identifier, err)
+					}
+				}
+			}
+		}
+
+		if it.Exists {
       // MySQL does not support indexed placeholders, and in case of the update
       // query, the WHERE statement which includes the key comes last in the
       // query, and as such we need to put the key as the last argument to the
       // query
       converted = append(converted[1:], converted[0])
-      if _, err := txn.ExecContext(ctx, b.storeUpdateSQL, converted...); err != nil {
+			if _, err := txn.ExecContext(ctx, b.storeUpdateSQL, converted...); err != nil {
         return nil, fmt.Errorf("store update: %w", err)
       }
 		} else {
-      if _, err := txn.ExecContext(ctx, b.storeInsertSQL, converted...); err != nil {
-        return nil, fmt.Errorf("store insert: %w", err)
-      }
+			if batch, ok := batches[b.target.Identifier]; !ok {
+				batches[b.target.Identifier] = []batchRequest{batchRequest{
+					query: b.storeInsertSQL,
+					args: converted,
+				}}
+			} else {
+				batches[b.target.Identifier] = append(batch, batchRequest{
+					query: b.storeInsertSQL,
+					args: converted,
+				});
+
+				if len(batches[b.target.Identifier]) >= storeBatchSize {
+					if err := drainBatch(ctx, txn, b.storeInsertBatchSQL, batches[b.target.Identifier]); err != nil {
+						return nil, fmt.Errorf("store insert: %w", err)
+					}
+					batches[b.target.Identifier] = nil
+				}
+			}
+		}
+	}
+
+	for _, batch := range batches {
+		if len(batch) > 0 {
+			for _, b := range batch {
+				if _, err := txn.ExecContext(ctx, b.query, b.args...); err != nil {
+					return nil, fmt.Errorf("store insert: %w", err)
+				}
+			}
 		}
 	}
 
@@ -523,6 +759,8 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 				return fmt.Errorf("committing Store transaction: %w", err)
 			}
 
+      log.Info("store phase done")
+
 			return nil
 		})
 	}, nil
@@ -534,5 +772,5 @@ func (d *transactor) Destroy() {
 }
 
 func main() {
-	boilerplate.RunMain(newPostgresDriver())
+	boilerplate.RunMain(newMysqlDriver())
 }

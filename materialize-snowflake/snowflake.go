@@ -243,11 +243,11 @@ type client struct {
 	uri string
 }
 
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string) (string, error) {
+func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
 	query := fmt.Sprintf(
 		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL",
-		tableIdentifier,
-		columnIdentifier,
+		table.Identifier,
+		column.Identifier,
 	)
 
 	if !dryRun {

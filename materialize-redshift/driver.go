@@ -382,7 +382,7 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 	return query, nil
 }
 
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string) (string, error) {
+func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
 	// No-op since Redshift does not support dropping NOT NULL constraints for columns, and the
 	// connector always creates columns as nullable because of this.
 	return "", nil

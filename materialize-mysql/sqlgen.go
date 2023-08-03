@@ -16,23 +16,26 @@ var mysqlDialect = func() sql.Dialect {
 		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:  sql.NewStaticMapper("JSON"),
 		sql.ARRAY:   sql.NewStaticMapper("JSON"),
-		sql.BINARY:  sql.NewStaticMapper("BYTEA"),
-		sql.STRING: sql.PrimaryKeyMapper {
-			PrimaryKeyType: sql.NewStaticMapper("VARCHAR(255)"),
+		sql.BINARY:  sql.NewStaticMapper("LONGBLOB"),
+		sql.STRING:  sql.PrimaryKeyMapper {
+			PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
 			Delegate: sql.StringTypeMapper{
-				Fallback: sql.NewStaticMapper("TEXT"),
+				Fallback: sql.NewStaticMapper("LONGTEXT"),
 				WithFormat: map[string]sql.TypeMapper{
 					"date":      sql.NewStaticMapper("DATE"),
 					"date-time": sql.NewStaticMapper("TIMESTAMP", sql.WithElementConverter(rfc3339ToUTC())),
-					"duration":  sql.NewStaticMapper("INTERVAL"),
-					"ipv4":      sql.NewStaticMapper("CIDR"),
-					"ipv6":      sql.NewStaticMapper("CIDR"),
-					"macaddr":   sql.NewStaticMapper("MACADDR"),
-					"macaddr8":  sql.NewStaticMapper("MACADDR8"),
 					"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
+				},
+				WithContentType: map[string]sql.TypeMapper{
+					// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
+					// checkpoints can be quite long, so we need to use as large of column size as
+					// possible for these tables.
+					"application/x-protobuf; proto=flow.MaterializationSpec": sql.NewStaticMapper("LONGBLOB"),
+					"application/x-protobuf; proto=consumer.Checkpoint":      sql.NewStaticMapper("LONGBLOB"),
 				},
 			},
 		},
+		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
 	}
 	mapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
@@ -77,8 +80,6 @@ func rfc3339TimeToUTC() sql.ElementConverter {
 			return t.UTC().Format("15:04:05.999999999"), nil
 		} else if t, err = time.Parse("15:04:05Z07:00", str); err == nil {
 			return t.UTC().Format(time.TimeOnly), nil
-		} else if t, err = time.Parse(time.TimeOnly, str); err == nil {
-			return t.UTC().Format(time.TimeOnly), nil
 		}
 
 		return nil, fmt.Errorf("could not parse %q as RFC3339 time: %w", str, err)
@@ -108,7 +109,7 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- end -}}
 	)
 	{{- end }}
-){{- if $.Comment }} COMMENT={{Literal $.Comment}} {{- end }};
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin {{- if $.Comment }} COMMENT={{Literal $.Comment}} {{- end }};
 {{ end }}
 
 -- Templated creation of a temporary load table:
@@ -119,7 +120,13 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
 	{{- end }}
-);
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
+{{ end }}
+
+-- Templated truncation of the temporary load table:
+
+{{ define "truncateTempTable" }}
+TRUNCATE {{ template "temp_name" . }};
 {{ end }}
 
 -- Templated insertion into the temporary load table:
@@ -137,6 +144,28 @@ INSERT INTO {{ template "temp_name" . }} (
 		{{ $key.Placeholder }}
 	{{- end -}}
 );
+{{ end }}
+
+-- Templated insertion into the temporary load table:
+
+{{ define "loadInsertBatch" }}
+INSERT INTO {{ template "temp_name" . }} (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{ end -}}
+		{{ $key.Identifier }}
+	{{- end -}}
+	)
+	VALUES 
+	{{- range $it, $x := (Repeat 20480) }}
+	{{- if $it}}, {{ end -}}
+	(
+		{{- range $ind, $key := $.Keys }}
+			{{- if $ind }}, {{ end -}}
+			{{ $key.Placeholder }}
+		{{- end -}}
+	)
+	{{- end -}}
+;
 {{ end }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values. It
@@ -170,6 +199,27 @@ INSERT INTO {{ $.Identifier }} (
 		{{ $col.Placeholder }}
 	{{- end -}}
 );
+{{ end }}
+
+-- Templated query which inserts a new, complete row to the target table:
+
+{{ define "storeInsertBatch" }}
+INSERT INTO {{ $.Identifier }} (
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}
+	{{- end }}
+) VALUES
+	{{- range $it, $x := (Repeat 4096) }}
+	{{- if $it}}, {{ end -}}
+	(
+		{{- range $ind, $col := $.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ $col.Placeholder }}
+		{{- end -}}
+	)
+	{{- end -}}
+;
 {{ end }}
 
 -- Templated query which updates an existing row in the target table:
@@ -239,12 +289,18 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
+	tplTempTableName     = tplAll.Lookup("temp_name")
+	tplTempTruncate      = tplAll.Lookup("truncateTempTable")
 	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
 	tplLoadInsert        = tplAll.Lookup("loadInsert")
+	tplLoadInsertBatch   = tplAll.Lookup("loadInsertBatch")
 	tplStoreInsert       = tplAll.Lookup("storeInsert")
+	tplStoreInsertBatch  = tplAll.Lookup("storeInsertBatch")
 	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
 	tplLoadQuery         = tplAll.Lookup("loadQuery")
 	tplInstallFence      = tplAll.Lookup("installFence")
 	tplUpdateFence       = tplAll.Lookup("updateFence")
 )
+
+const varcharTableAlter = "ALTER TABLE %s MODIFY COLUMN %s VARCHAR(%d);"

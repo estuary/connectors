@@ -2,8 +2,7 @@ version: "3.7"
 
 services:
   mysql:
-    image: 'mysql:5.7'
-    platform: linux/amd64
+    image: 'mysql:5.6'
     environment: {"MYSQL_DATABASE": "flow", "MYSQL_USER": "flow", "MYSQL_PASSWORD": "flow", "MYSQL_ROOT_PASSWORD": "flow"}
     volumes:
       - mysql_data:/var/lib/mysql
