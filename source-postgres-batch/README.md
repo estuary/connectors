@@ -8,16 +8,16 @@ if extended with suitable discovery logic it could become much more usable.
 
 Useful commands:
 
-    $ docker build -t ghcr.io/estuary/source-batchsql:local -f source-batchsql/Dockerfile .
+    $ docker build -t ghcr.io/estuary/source-postgres-batch:local -f source-postgres-batch/Dockerfile .
     $ flowctl raw capture acmeCo/flow.yaml
 
 Example catalog:
 
     captures:
-      acmeCo/something/source-batchsql:
+      acmeCo/something/source-postgres-batch:
         endpoint:
           connector:
-            image: "ghcr.io/estuary/source-batchsql:local"
+            image: "ghcr.io/estuary/source-postgres-batch:local"
             config:
               address: "localhost:5432"
               database: "postgres"
