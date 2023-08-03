@@ -1,0 +1,99 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-postgres-batch/config",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Server Address",
+        "description": "The host or host:port at which the database can be reached.",
+        "order": 0
+      },
+      "user": {
+        "type": "string",
+        "description": "The database user to authenticate as.",
+        "default": "flow_capture",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "description": "Password for the specified database user.",
+        "order": 2,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "description": "Logical database name to capture from.",
+        "default": "postgres",
+        "order": 3
+      },
+      "advanced": {
+        "properties": {
+          "sslmode": {
+            "type": "string",
+            "enum": [
+              "disable",
+              "allow",
+              "prefer",
+              "require",
+              "verify-ca",
+              "verify-full"
+            ],
+            "title": "SSL Mode",
+            "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "user",
+      "password",
+      "database"
+    ],
+    "title": "Batch SQL"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-postgres-batch/resource",
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "description": "The unique name of this resource."
+      },
+      "template": {
+        "type": "string",
+        "title": "Query Template",
+        "description": "The query template (pkg.go.dev/text/template) which will be rendered and then executed.",
+        "multiline": true
+      },
+      "cursor": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array",
+        "title": "Cursor Columns",
+        "description": "The names of columns which should be persisted between query executions as a cursor."
+      },
+      "poll": {
+        "type": "string",
+        "title": "Poll Interval",
+        "description": "How often to execute the fetch query. Defaults to 5 minutes if unset."
+      }
+    },
+    "type": "object",
+    "required": [
+      "name",
+      "template",
+      "cursor"
+    ],
+    "title": "Batch SQL Resource Spec"
+  },
+  "documentation_url": "https://go.estuary.dev/source-postgres-batch"
+}

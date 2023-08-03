@@ -35,9 +35,9 @@ type BatchSQLDriver struct {
 // Resource represents the capture configuration of a single resource binding.
 type Resource struct {
 	Name         string   `json:"name" jsonschema:"title=Name,description=The unique name of this resource."`
-	Template     string   `json:"template" jsonschema:"title=Query Template,description=The query template (pkg.go.dev/text/template) to execute to fetch new data,multiline=true"`
-	Cursor       []string `json:"cursor" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor"`
-	PollInterval string   `json:"poll,omitempty" jsonschema:"title=Poll Interval,description=How often to execute the fetch query."`
+	Template     string   `json:"template" jsonschema:"title=Query Template,description=The query template (pkg.go.dev/text/template) which will be rendered and then executed." jsonschema_extras:"multiline=true"`
+	Cursor       []string `json:"cursor" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor."`
+	PollInterval string   `json:"poll,omitempty" jsonschema:"title=Poll Interval,description=How often to execute the fetch query. Defaults to 5 minutes if unset."`
 }
 
 // Validate checks that the resource spec possesses all required properties.
