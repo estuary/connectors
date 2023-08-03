@@ -72,6 +72,7 @@ jobs:
       matrix:
         connector:
           - source-alpaca
+          - source-dynamodb
           - source-firestore
           - source-gcs
           - source-google-drive
@@ -156,6 +157,7 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: |
           contains(fromJson('[
+            "source-dynamodb",
             "source-mysql",
             "source-postgres",
             "source-sftp",
@@ -184,6 +186,7 @@ jobs:
       - name: Source connector ${{ matrix.connector }} integration tests
         if: |
           contains(fromJson('[
+            "source-dynamodb",
             "source-gcs",
             "source-kinesis",
             "source-mysql",
