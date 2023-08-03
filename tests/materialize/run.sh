@@ -43,6 +43,7 @@ export TEST_COLLECTION_SIMPLE="tests/simple"
 export TEST_COLLECTION_DUPLICATED_KEYS="tests/duplicated-keys"
 export TEST_COLLECTION_MULTIPLE_DATATYPES="tests/multiple-data-types"
 export TEST_COLLECTION_FORMATTED_STRINGS="tests/formatted-strings"
+export TEST_COLLECTION_LONG_STRING="tests/long-string"
 
 source ${TEST_DIR}/${CONNECTOR}/setup.sh || bail "setup failed"
 
@@ -102,6 +103,11 @@ source ${TEST_DIR}/${CONNECTOR}/fetch.sh | jq -S '.' >> ${SNAPSHOT} || bail "fet
 
 # Drive it again to excercise any cleanup behavior when bindings are removed.
 drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.yaml
+
+if [[ -f "${TEST_DIR}/${CONNECTOR}/checks.sh" ]]; then
+  # Run connector-specific checks
+  source ${TEST_DIR}/${CONNECTOR}/checks.sh || bail "connector-specific checks failed"
+fi
 
 # Compare actual and expected snapshots.
 # Produce patch output, so that differences in CI can be reviewed and manually

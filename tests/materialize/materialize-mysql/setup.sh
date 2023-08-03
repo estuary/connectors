@@ -11,7 +11,7 @@ export MYSQL_DATABASE="${MYSQL_DATABASE:=flow}"
 export MYSQL_PASSWORD="${MYSQL_PASSWORD:=flow}"
 export MYSQL_USER="${MYSQL_USER:=flow}"
 
-docker compose -f materialize-mysql/docker-compose.yaml up --detach
+docker compose -f materialize-mysql/docker-compose.yaml up --wait
 # Give it time to start.
 sleep 10
 
@@ -90,6 +90,12 @@ resources_json_template='[
         "num_str": {}
       }
     }
+  },
+  {
+    "resource": {
+      "table": "long-string"
+    },
+    "source": "${TEST_COLLECTION_LONG_STRING}"
   }
 ]'
 

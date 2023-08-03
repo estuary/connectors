@@ -10,20 +10,20 @@ auto-generated projection of JSON at: /key1 with inferred types: [integer]',
 		`array` JSON COMMENT 'This is an array!
 auto-generated projection of JSON at: /array with inferred types: [array]',
 		lower_case BIGINT COMMENT 'auto-generated projection of JSON at: /lower_case with inferred types: [integer]',
-		`value` TEXT COMMENT 'auto-generated projection of JSON at: /value with inferred types: [string]',
+		`value` LONGTEXT COMMENT 'auto-generated projection of JSON at: /value with inferred types: [string]',
 		flow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',
 
 		PRIMARY KEY (key1, `key!2`)
-) COMMENT='Generated for materialization test/sqlite of collection key/value';
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization test/sqlite of collection key/value';
 --- End target_table createTargetTable ---
 
 --- Begin `Delta Updates` createTargetTable ---
 
 CREATE TABLE IF NOT EXISTS `Delta Updates` (
-		`theKey` VARCHAR(255) NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
+		`theKey` VARCHAR(256) NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
 		`aValue` BIGINT COMMENT 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]'
-) COMMENT='Generated for materialization test/sqlite of collection delta/updates';
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization test/sqlite of collection delta/updates';
 --- End `Delta Updates` createTargetTable ---
 
 --- Begin target_table createLoadTable ---
@@ -31,14 +31,14 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]'
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 		key1 BIGINT NOT NULL,
 		`key!2` BOOLEAN NOT NULL
-);
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
 --- End target_table createLoadTable ---
 
 --- Begin `Delta Updates` createLoadTable ---
 
 CREATE TEMPORARY TABLE flow_temp_table_1 (
-		`theKey` VARCHAR(255) NOT NULL
-);
+		`theKey` VARCHAR(256) NOT NULL
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
 --- End `Delta Updates` createLoadTable ---
 
 --- Begin target_table loadInsert ---
