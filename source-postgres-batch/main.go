@@ -99,9 +99,9 @@ func connectPostgres(ctx context.Context, configJSON json.RawMessage) (*sql.DB, 
 }
 
 const tableQueryTemplateTemplate = `{{if .IsFirstQuery -}}
-  SELECT xmin AS txid, * FROM %[1]s;
+  SELECT xmin AS txid, * FROM %[1]s ORDER BY xmin::text::bigint;
 {{- else -}}
-  SELECT xmin AS txid, * FROM %[1]s WHERE xmin::text::bigint > $1;
+  SELECT xmin AS txid, * FROM %[1]s WHERE xmin::text::bigint > $1 ORDER BY xmin::text::bigint;
 {{- end}}`
 
 // This is currently unused, but is a useful example of how the function
