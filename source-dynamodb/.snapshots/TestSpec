@@ -1,0 +1,79 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-dynamodb/config",
+    "properties": {
+      "awsAccessKeyId": {
+        "type": "string",
+        "title": "Access Key ID",
+        "description": "AWS Access Key ID for capturing from the DynamoDB table.",
+        "order": 1
+      },
+      "awsSecretAccessKey": {
+        "type": "string",
+        "title": "Secret Access Key",
+        "description": "AWS Secret Access Key for capturing from the DynamoDB table.",
+        "order": 2,
+        "secret": true
+      },
+      "region": {
+        "type": "string",
+        "title": "Region",
+        "description": "Region of the DynamoDB table.",
+        "order": 3
+      },
+      "advanced": {
+        "properties": {
+          "backfillSegments": {
+            "type": "integer",
+            "title": "Backfill Table Segments",
+            "description": "Number of segments to use for backfill table scans. Has no effect if changed after the backfill has started."
+          },
+          "scanLimit": {
+            "type": "integer",
+            "title": "Scan Limit",
+            "description": "Limit the number of items to evaluate for each table backfill scan request."
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "AWS Endpoint",
+            "description": "The AWS endpoint URI to connect to. Use if you're capturing from a compatible API that isn't provided by AWS."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
+      }
+    },
+    "type": "object",
+    "required": [
+      "awsAccessKeyId",
+      "awsSecretAccessKey",
+      "region"
+    ],
+    "title": "Source DynamoDB Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-dynamodb/resource",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table Name",
+        "description": "The name of the table to be captured."
+      },
+      "rcuAllocation": {
+        "type": "integer",
+        "title": "RCU Allocation",
+        "description": "Read capacity units the capture will attempt to consume during the table backfill. Leave blank to automatically determine based on the provisioned capacity of the table."
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "Resource"
+  },
+  "documentation_url": "https://go.estuary.dev/source-dynamodb"
+}

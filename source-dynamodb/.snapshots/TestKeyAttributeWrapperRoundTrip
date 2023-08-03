@@ -1,0 +1,18 @@
+{
+	"binary": {
+		"attrType": "B",
+		"value": "AQID"
+	},
+	"decimal": {
+		"attrType": "N",
+		"value": "123.45"
+	},
+	"integer": {
+		"attrType": "N",
+		"value": "123"
+	},
+	"string": {
+		"attrType": "S",
+		"value": "stringValue"
+	}
+}

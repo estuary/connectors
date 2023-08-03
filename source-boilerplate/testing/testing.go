@@ -167,9 +167,11 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 		callback:   callback,
 	}
 
-	if err := cs.Driver.Pull(open.Open, &boilerplate.PullOutput{
+	stream := &boilerplate.PullOutput{
 		Connector_CaptureServer: adapter,
-	}); err != nil {
+	}
+
+	if err := cs.Driver.Pull(open.Open, stream); err != nil {
 		if errors.Is(err, context.Canceled) {
 			log.Info("capture shut down")
 		} else {
@@ -177,6 +179,9 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 			cs.Errors = append(cs.Errors, err)
 		}
 	}
+
+	stream.Lock()
+	defer stream.Unlock()
 	cs.Checkpoint = adapter.checkpoint
 	return cs
 }
