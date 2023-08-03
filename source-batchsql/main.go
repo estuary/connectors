@@ -233,7 +233,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
-			RecommendedName:    pf.Collection(resourceName),
+			RecommendedName:    resourceName,
 			ResourceConfigJson: resourceConfigJSON,
 			DocumentSchemaJson: minimalSchema,
 			Key:                defaultKey,
@@ -393,7 +393,7 @@ func (c *capture) worker(ctx context.Context, db *sql.DB, bindingIndex int, res 
 
 func (c *capture) poll(ctx context.Context, db *sql.DB, bindingIndex int, tmpl *template.Template, cursorNames []string, cursorValues []any) ([]any, error) {
 	var templateArg = map[string]any{
-		"subsequent": len(cursorValues) != 0,
+		"IsFirstQuery": len(cursorValues) == 0,
 	}
 
 	var queryBuf = new(strings.Builder)
