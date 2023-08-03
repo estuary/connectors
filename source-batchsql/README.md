@@ -27,9 +27,12 @@ Example catalog:
           - resource:
               name: "foobar"
               template: >
-                SELECT xmin, * FROM public.foobar
-                {{if .subsequent}}
-                    WHERE xmin::text::bigint > $1 ORDER BY xmin::text::bigint
+                {{if .IsFirstQuery}}
+                  SELECT xmin, * FROM public.foobar;
+                {{else}}
+                  SELECT xmin, * FROM public.foobar
+                    WHERE xmin::text::bigint > $1
+                    ORDER BY xmin::text::bigint;
                 {{end}}
               cursor: ["xmin"]
               poll: 5s
