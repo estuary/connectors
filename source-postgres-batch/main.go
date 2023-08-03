@@ -154,7 +154,7 @@ func main() {
 		Connect:          connectPostgres,
 		GenerateResource: generatePostgresResource,
 		TranslateValue: func(val any, databaseTypeName string) (any, error) {
-			return translateRecordField(databaseTypeName, val)
+			return val, nil
 		},
 	}
 	boilerplate.RunMain(drv)
