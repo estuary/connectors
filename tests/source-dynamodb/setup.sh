@@ -1,9 +1,9 @@
 #!/bin/bash
 
 set -e
-export DYNAMODB_ACCESS_KEY_ID="${DYNAMODB_ACCESS_KEY_ID:=test}"
-export DYNAMODB_SECRET_ACCESS_KEY="${DYNAMODB_SECRET_ACCESS_KEY:=test}"
-export DYNAMODB_REGION="${DYNAMODB_REGION:=test}"
+export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:=test}"
+export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:=test}"
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:=test}"
 export DYNAMODB_ENDPOINT="${DYNAMODB_ENDPOINT:=http://source-dynamodb-db-1.flow-test:8000}"
 
 export TEST_STREAM="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
@@ -16,9 +16,9 @@ export DYNAMODB_LOCAL_ENDPOINT="http://localhost:8000"
 export ID_TYPE=string
 
 config_json_template='{
-    "awsAccessKeyId": "${DYNAMODB_ACCESS_KEY_ID}",
-    "awsSecretAccessKey": "${DYNAMODB_SECRET_ACCESS_KEY}",
-    "region": "${DYNAMODB_REGION}",
+    "awsAccessKeyId": "${AWS_ACCESS_KEY_ID}",
+    "awsSecretAccessKey": "${AWS_SECRET_ACCESS_KEY}",
+    "region": "${AWS_DEFAULT_REGION}",
     "advanced": {
         "endpoint": "${DYNAMODB_ENDPOINT}"
     }
@@ -29,12 +29,19 @@ echo "Connector configuration is: ${CONNECTOR_CONFIG}".
 
 docker compose -f source-dynamodb/docker-compose.yaml up --detach
 
-for i in {1..20}; do
-    if aws dynamodb list-tables --endpoint-url "${DYNAMODB_LOCAL_ENDPOINT}" >/dev/null; then
+retry_counter=0
+while true; do
+    if aws dynamodb list-tables --endpoint-url "${DYNAMODB_LOCAL_ENDPOINT}"; then
         echo "DynamoDB container ready"
         break
     fi
-    echo "DynamoDB container not ready, retrying ${i}"
+
+    retry_counter=$((retry_counter + 1))
+    if [[ "$retry_counter" -eq "30" ]]; then
+        bail "Timeout reached"
+    fi
+
+    echo "DynamoDB container not ready, retrying ${retry_counter}"
     sleep 1
 done
 
@@ -52,13 +59,20 @@ aws dynamodb create-table \
     --stream-specification StreamEnabled=true,StreamViewType=NEW_AND_OLD_IMAGES \
     --endpoint-url "${DYNAMODB_LOCAL_ENDPOINT}" >/dev/null
 
-for i in {1..20}; do
+retry_counter=0
+while true; do
     status=$(aws dynamodb describe-table --table-name "${TEST_STREAM}" --endpoint-url "${DYNAMODB_LOCAL_ENDPOINT}" | jq '.Table.TableStatus')
-    if [ $status == "\"ACTIVE\"" ]; then
+    if [ "$status" == "\"ACTIVE\"" ]; then
         echo "Table '${TEST_STREAM}' ready"
         break
     fi
-    echo "Table not ready (${status}), retrying ${i}"
+
+    retry_counter=$((retry_counter + 1))
+    if [[ "$retry_counter" -eq "30" ]]; then
+        bail "Timeout reached"
+    fi
+
+    echo "Table not ready (${status}), retrying ${retry_counter}"
     sleep 1
 done
 
