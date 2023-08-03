@@ -358,8 +358,24 @@ func newTransactor(
 		return nil, fmt.Errorf("store db.Conn: %w", err)
 	}
 
+	db, err := stdsql.Open("mysql", cfg.ToURI())
+	if err != nil {
+		return nil, fmt.Errorf("newTransactor sql.Open: %w", err)
+	}
+	defer db.Close()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("newTransactor db.Conn: %w", err)
+	}
+	defer conn.Close()
+	
+	tableVarchars, err := getVarcharDetails(ctx, cfg.Database, conn)
+	if err != nil {
+		return nil, fmt.Errorf("getting existing varchar column lengths: %w", err)
+	}
+
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding); err != nil {
+		if err = d.addBinding(ctx, binding, tableVarchars[binding.Identifier]); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -374,8 +390,16 @@ func newTransactor(
 	return d, nil
 }
 
+// varcharColumnMeta contains metadata about mysql varchar columns. Currently this is just the
+// maximum length of the field as reported from the database, populated upon connector startup.
+type varcharColumnMeta struct {
+	identifier string
+	maxLength int
+}
+
 type binding struct {
 	target             sql.Table
+	varcharColumnMetas []varcharColumnMeta
 	createLoadTableSQL string
 	loadInsertSQL      string
 	storeUpdateSQL     string
@@ -383,7 +407,7 @@ type binding struct {
 	loadQuerySQL       string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars map[string]colDetails) error {
 	var b = &binding{target: target}
 
 	for _, m := range []struct {
@@ -401,6 +425,32 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 			return err
 		}
 	}
+
+	// Retain column metadata information for this binding as a snapshot of the table configuration
+	// when the connector started, indexed in the same order as values will be received from the
+	// runtime for Store requests. Only VARCHAR columns will have non-zero-valued varcharColumnMeta.
+	allColumns := target.Columns()
+	columnMetas := make([]varcharColumnMeta, len(allColumns))
+	if varchars != nil { // There may not be any varchar columns for this binding
+		for idx, col := range allColumns {
+			// If this column is not found in varchars, it must not have been a VARCHAR column.
+			if details, ok := varchars[col.Identifier]; ok {
+				columnMetas[idx] = varcharColumnMeta{
+					identifier: col.Identifier,
+					maxLength:  details.maxLength,
+				}
+
+				log.WithFields(log.Fields{
+					"table":            b.target.Identifier,
+					"column":           col.Identifier,
+					"varcharMaxLength": details.maxLength,
+					"collection":       b.target.Source.String(),
+					"field":            col.Field,
+				}).Info("matched string collection field to table VARCHAR column")
+			}
+		}
+	}
+	b.varcharColumnMetas = columnMetas
 
 	t.bindings = append(t.bindings, b)
 
@@ -476,12 +526,44 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 	}()
 
+	// varcharColumnUpdates records any VARCHAR columns that need their lengths increased. The keys
+	// are table identifiers, and the values are a list of column identifiers that need altered.
+	// Columns will only ever be to altered it to VARCHAR(MAX).
+	varcharColumnUpdates := make(map[string][]string)
+
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON);
+		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if it.Exists {
+		}
+
+		// See if we need to increase any VARCHAR column lengths, or error because the string fields
+		// are too long to materialize.
+		for idx, c := range converted {
+			varcharMeta := b.varcharColumnMetas[idx]
+			if varcharMeta.identifier != "" {
+				l := len(c.(string))
+
+				if l > varcharMeta.maxLength {
+					log.WithFields(log.Fields{
+						"table":               b.target.Identifier,
+						"column":              varcharMeta.identifier,
+						"currentColumnLength": varcharMeta.maxLength,
+						"stringValueLength":   l,
+					}).Info("column will be altered to VARCHAR(MAX) to accommodate large string value")
+					varcharColumnUpdates[b.target.Identifier] = append(varcharColumnUpdates[b.target.Identifier], varcharMeta.identifier)
+					b.varcharColumnMetas[idx].maxLength = l
+
+					if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf(varcharTableAlter, b.target.Identifier, varcharMeta.identifier, l)); err != nil {
+						return nil, fmt.Errorf("altering size for column %s of table %s: %w", varcharMeta.identifier, b.target.Identifier, err)
+					}
+				}
+			}
+		}
+
+		if it.Exists {
       // MySQL does not support indexed placeholders, and in case of the update
       // query, the WHERE statement which includes the key comes last in the
       // query, and as such we need to put the key as the last argument to the

@@ -17,10 +17,10 @@ var mysqlDialect = func() sql.Dialect {
 		sql.OBJECT:  sql.NewStaticMapper("JSON"),
 		sql.ARRAY:   sql.NewStaticMapper("JSON"),
 		sql.BINARY:  sql.NewStaticMapper("BYTEA"),
-		sql.STRING: sql.PrimaryKeyMapper {
-			PrimaryKeyType: sql.NewStaticMapper("VARCHAR(255)"),
+		sql.STRING:  sql.PrimaryKeyMapper {
+			PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
 			Delegate: sql.StringTypeMapper{
-				Fallback: sql.NewStaticMapper("TEXT"),
+				Fallback: sql.NewStaticMapper("LONGTEXT"),
 				WithFormat: map[string]sql.TypeMapper{
 					"date":      sql.NewStaticMapper("DATE"),
 					"date-time": sql.NewStaticMapper("TIMESTAMP", sql.WithElementConverter(rfc3339ToUTC())),
@@ -30,6 +30,13 @@ var mysqlDialect = func() sql.Dialect {
 					"macaddr":   sql.NewStaticMapper("MACADDR"),
 					"macaddr8":  sql.NewStaticMapper("MACADDR8"),
 					"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
+				},
+				WithContentType: map[string]sql.TypeMapper{
+					// The largest allowable size for a VARBYTE is 1,024,000 bytes. Our stored specs and
+					// checkpoints can be quite long, so we need to use as large of column size as
+					// possible for these tables.
+					"application/x-protobuf; proto=flow.MaterializationSpec": sql.NewStaticMapper("BLOB"),
+					"application/x-protobuf; proto=consumer.Checkpoint":      sql.NewStaticMapper("BLOB"),
 				},
 			},
 		},
@@ -248,3 +255,5 @@ UPDATE {{ Identifier $.TablePath }}
 	tplInstallFence      = tplAll.Lookup("installFence")
 	tplUpdateFence       = tplAll.Lookup("updateFence")
 )
+
+const varcharTableAlter = "ALTER TABLE %s MODIFY COLUMN %s VARCHAR(%d);"

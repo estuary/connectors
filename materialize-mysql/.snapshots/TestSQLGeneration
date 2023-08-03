@@ -10,7 +10,7 @@ auto-generated projection of JSON at: /key1 with inferred types: [integer]',
 		`array` JSON COMMENT 'This is an array!
 auto-generated projection of JSON at: /array with inferred types: [array]',
 		lower_case BIGINT COMMENT 'auto-generated projection of JSON at: /lower_case with inferred types: [integer]',
-		`value` TEXT COMMENT 'auto-generated projection of JSON at: /value with inferred types: [string]',
+		`value` LONGTEXT COMMENT 'auto-generated projection of JSON at: /value with inferred types: [string]',
 		flow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',
 
 		PRIMARY KEY (key1, `key!2`)
@@ -20,7 +20,7 @@ auto-generated projection of JSON at: /array with inferred types: [array]',
 --- Begin `Delta Updates` createTargetTable ---
 
 CREATE TABLE IF NOT EXISTS `Delta Updates` (
-		`theKey` VARCHAR(255) NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
+		`theKey` VARCHAR(256) NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
 		`aValue` BIGINT COMMENT 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]'
 ) COMMENT='Generated for materialization test/sqlite of collection delta/updates';
@@ -37,7 +37,7 @@ CREATE TEMPORARY TABLE flow_temp_table_0 (
 --- Begin `Delta Updates` createLoadTable ---
 
 CREATE TEMPORARY TABLE flow_temp_table_1 (
-		`theKey` VARCHAR(255) NOT NULL
+		`theKey` VARCHAR(256) NOT NULL
 );
 --- End `Delta Updates` createLoadTable ---
 

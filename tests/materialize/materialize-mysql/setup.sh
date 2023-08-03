@@ -90,6 +90,12 @@ resources_json_template='[
         "num_str": {}
       }
     }
+  },
+  {
+    "resource": {
+      "table": "long-string"
+    },
+    "source": "${TEST_COLLECTION_LONG_STRING}"
   }
 ]'
 

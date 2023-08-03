@@ -53,7 +53,18 @@
           "type": "object"
        },
        "key": ["/id"]
-    }
+    },
+    "tests/long-string": {
+       "schema": {
+       "properties": {
+           "id": { "type": "string" },
+           "str_field": { "type": "string" },
+          },
+          "required": ["id", "str_field"],
+          "type": "object"
+       },
+       "key": ["/id"]
+    },
   },
 
   "materializations": {
