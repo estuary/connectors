@@ -20,6 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake"
 	"go.gazette.dev/core/consumer/protocol"
+	"golang.org/x/sync/errgroup"
 )
 
 // config represents the endpoint configuration for snowflake.
@@ -313,7 +314,49 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 }
 
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
+	var (
+		tableCreateBatchSize = 25
+	)
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	batch := []string{}
+
+	doBatch := func(stmts []string) {
+		group.Go(func() error {
+			return c.withDB(func(db *stdsql.DB) error {
+				_, err := db.ExecContext(groupCtx, strings.Join(stmts, "\n"))
+				return err
+			})
+		})
+	}
+
+	// Run all but the last statement in the list using parallel, batched calls to the database.
+	// Snowflake table creation cannot be done within a transaction, and running parallel calls
+	// drastically speeds up table creation when there is a large number of tables. The final
+	// statement provided is reserved for the spec statement and will be run only after all table
+	// creation statements have completed without error.
+	for _, tableCreate := range statements[:len(statements)-1] {
+		batch = append(batch, tableCreate)
+		if len(batch) == tableCreateBatchSize {
+			doBatch(batch)
+			batch = []string{}
+		}
+	}
+	if len(batch) > 0 {
+		doBatch(batch)
+	}
+
+	if err := group.Wait(); err != nil {
+		return fmt.Errorf("table create batch: %w", err)
+	}
+
+	// Once all table creation statements have completed, update the stored specification.
+	return c.withDB(func(db *stdsql.DB) error {
+		if _, err := db.ExecContext(ctx, statements[len(statements)-1]); err != nil {
+			return fmt.Errorf("updating spec: %w", err)
+		}
+		return nil
+	})
 }
 
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
