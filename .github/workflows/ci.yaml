@@ -83,6 +83,7 @@ jobs:
           - source-mongodb
           - source-mysql
           - source-postgres
+          - source-postgres-batch
           - source-s3
           - source-sftp
           - source-sqlserver
