@@ -153,19 +153,22 @@ func translatePostgresValue(val any, databaseTypeName string) (any, error) {
 	return val, nil
 }
 
-func main() {
-	var endpointSchema, err = schemagen.GenerateSchema("Batch SQL", &Config{}).MarshalJSON()
-	if err != nil {
-		fmt.Println(fmt.Errorf("generating endpoint schema: %w", err))
-		return
-	}
+var postgresDriver = &BatchSQLDriver{
+	DocumentationURL: "https://go.estuary.dev/source-postgres-batch",
+	ConfigSchema:     generateConfigSchema(),
+	Connect:          connectPostgres,
+	GenerateResource: generatePostgresResource,
+	TranslateValue:   translatePostgresValue,
+}
 
-	var drv = &BatchSQLDriver{
-		DocumentationURL: "https://go.estuary.dev/source-postgres-batch",
-		ConfigSchema:     json.RawMessage(endpointSchema),
-		Connect:          connectPostgres,
-		GenerateResource: generatePostgresResource,
-		TranslateValue:   translatePostgresValue,
+func generateConfigSchema() json.RawMessage {
+	var configSchema, err = schemagen.GenerateSchema("Batch SQL", &Config{}).MarshalJSON()
+	if err != nil {
+		panic(fmt.Errorf("generating endpoint schema: %w", err))
 	}
-	boilerplate.RunMain(drv)
+	return json.RawMessage(configSchema)
+}
+
+func main() {
+	boilerplate.RunMain(postgresDriver)
 }

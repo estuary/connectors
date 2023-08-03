@@ -20,7 +20,7 @@ RUN go install -v github.com/jackc/pgx/v4
 
 # Run tests and build the connector
 COPY source-postgres-batch ./source-postgres-batch
-# RUN go test -v ./source-postgres-batch/...  # Currently no tests
+RUN go test -v ./source-postgres-batch/...
 RUN go build -o ./connector -v ./source-postgres-batch/...
 
 # Runtime Stage
