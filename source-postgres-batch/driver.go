@@ -170,6 +170,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 				"table":  tableName,
 				"type":   tableType,
 			}).Warn("unable to generate resource spec for entity")
+			continue
 		}
 		resourceConfigJSON, err := json.Marshal(res)
 		if err != nil {
