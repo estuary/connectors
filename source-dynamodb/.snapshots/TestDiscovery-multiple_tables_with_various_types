@@ -1,0 +1,299 @@
+Binding 0:
+{
+    "recommended_name": "discoverTable",
+    "resource_config_json": {
+      "table": "discoverTable"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "discoverTable": {
+          "type": "object",
+          "required": [
+            "partitionKey"
+          ],
+          "$anchor": "discoverTable",
+          "properties": {
+            "partitionKey": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op"
+              ],
+              "properties": {
+                "approximateCreationDateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "The approximate date and time when the stream record was created, in UNIX epoch time format and rounded down to the closest second."
+                },
+                "before": {
+                  "$ref": "#discoverTable",
+                  "description": "The item in the DynamoDB table as it appeared before it was modified.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "eventId": {
+                  "type": "string",
+                  "description": "A globally unique identifier for the event that was recorded in this stream record."
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from reading a stream record."
+                },
+                "userIdentity": {
+                  "type": "object",
+                  "description": "Contains details about the type of identity that made the request.",
+                  "properties": {
+                    "principalId": {
+                      "type": "string",
+                      "description": "A unique identifier for the entity that made the call. For Time To Live, the principalId is 'dynamodb.amazonaws.com'."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The type of the identity. For Time To Live, the type is 'Service'."
+                    }
+                  }
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          },
+          "reduce": {
+            "strategy": "merge"
+          },
+          "x-infer-schema": true
+        },
+        {
+          "$ref": "#discoverTable"
+        }
+      ]
+    },
+    "key": [
+      "/partitionKey"
+    ]
+  }
+Binding 1:
+{
+    "recommended_name": "secondTable",
+    "resource_config_json": {
+      "table": "secondTable"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "secondTable": {
+          "type": "object",
+          "required": [
+            "partitionKeyString",
+            "sortKeyNumber"
+          ],
+          "$anchor": "secondTable",
+          "properties": {
+            "partitionKeyString": {
+              "type": "string"
+            },
+            "sortKeyNumber": {
+              "type": "string",
+              "format": "number"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op"
+              ],
+              "properties": {
+                "approximateCreationDateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "The approximate date and time when the stream record was created, in UNIX epoch time format and rounded down to the closest second."
+                },
+                "before": {
+                  "$ref": "#secondTable",
+                  "description": "The item in the DynamoDB table as it appeared before it was modified.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "eventId": {
+                  "type": "string",
+                  "description": "A globally unique identifier for the event that was recorded in this stream record."
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from reading a stream record."
+                },
+                "userIdentity": {
+                  "type": "object",
+                  "description": "Contains details about the type of identity that made the request.",
+                  "properties": {
+                    "principalId": {
+                      "type": "string",
+                      "description": "A unique identifier for the entity that made the call. For Time To Live, the principalId is 'dynamodb.amazonaws.com'."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The type of the identity. For Time To Live, the type is 'Service'."
+                    }
+                  }
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          },
+          "reduce": {
+            "strategy": "merge"
+          },
+          "x-infer-schema": true
+        },
+        {
+          "$ref": "#secondTable"
+        }
+      ]
+    },
+    "key": [
+      "/partitionKeyString",
+      "/sortKeyNumber"
+    ]
+  }
+Binding 2:
+{
+    "recommended_name": "thirdTable",
+    "resource_config_json": {
+      "table": "thirdTable"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "thirdTable": {
+          "type": "object",
+          "required": [
+            "partitionKeyBinary",
+            "sortKeyBinary"
+          ],
+          "$anchor": "thirdTable",
+          "properties": {
+            "partitionKeyBinary": {
+              "type": "string",
+              "contentEncoding": "base64"
+            },
+            "sortKeyBinary": {
+              "type": "string",
+              "contentEncoding": "base64"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op"
+              ],
+              "properties": {
+                "approximateCreationDateTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "The approximate date and time when the stream record was created, in UNIX epoch time format and rounded down to the closest second."
+                },
+                "before": {
+                  "$ref": "#thirdTable",
+                  "description": "The item in the DynamoDB table as it appeared before it was modified.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "eventId": {
+                  "type": "string",
+                  "description": "A globally unique identifier for the event that was recorded in this stream record."
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from reading a stream record."
+                },
+                "userIdentity": {
+                  "type": "object",
+                  "description": "Contains details about the type of identity that made the request.",
+                  "properties": {
+                    "principalId": {
+                      "type": "string",
+                      "description": "A unique identifier for the entity that made the call. For Time To Live, the principalId is 'dynamodb.amazonaws.com'."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The type of the identity. For Time To Live, the type is 'Service'."
+                    }
+                  }
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          },
+          "reduce": {
+            "strategy": "merge"
+          },
+          "x-infer-schema": true
+        },
+        {
+          "$ref": "#thirdTable"
+        }
+      ]
+    },
+    "key": [
+      "/partitionKeyBinary",
+      "/sortKeyBinary"
+    ]
+  }
+
