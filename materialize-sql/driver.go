@@ -188,7 +188,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 					// The column was previously created as not nullable, but the new specification
 					// indicates that it now nullable. Drop the "NOT NULL" constraint on the table.
 					if !previousNullable && !newCol.MustExist {
-						alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, req.DryRun, newTable.Identifier, newCol.Identifier)
+						alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, req.DryRun, newTable, *newCol)
 						if err != nil {
 							return nil, fmt.Errorf("dropping NOT NULL constraint for column '%s' in table '%s' because it is no longer a required property: %w", newTable.Identifier, newCol.Identifier, err)
 						}
@@ -209,9 +209,13 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 					continue
 				}
 
-				alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, req.DryRun, newTable.Identifier, endpoint.Identifier(field))
+				var col = Column{
+					Identifier: endpoint.Identifier(field),
+					Projection: Projection{ Projection: *loadedBinding.Collection.GetProjection(field) },
+				}
+				alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, req.DryRun, newTable, col)
 				if err != nil {
-					return nil, fmt.Errorf("dropping NOT NULL constraint for removed field for column '%s' in table '%s': %w", newTable.Identifier, endpoint.Identifier(field), err)
+					return nil, fmt.Errorf("dropping NOT NULL constraint for removed field for column '%s' in table '%s': %w", newTable.Identifier, field, err)
 				}
 
 				if alterAction != "" {

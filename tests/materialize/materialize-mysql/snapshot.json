@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "\nCREATE TABLE IF NOT EXISTS flow_materializations_v2 (\n\t\tmaterialization VARCHAR(255) NOT NULL COMMENT 'The name of the materialization.',\n\t\tversion TEXT NOT NULL COMMENT 'Version of the materialization.',\n\t\tspec TEXT NOT NULL COMMENT 'Specification of the materialization, encoded as base64 protobuf.',\n\n\t\tPRIMARY KEY (materialization)\n) COMMENT='This table is the source of truth for all materializations into this system.';\n\n\nCREATE TABLE IF NOT EXISTS flow_checkpoints_v1 (\n\t\tmaterialization VARCHAR(255) NOT NULL COMMENT 'The name of the materialization.',\n\t\tkey_begin BIGINT NOT NULL COMMENT 'The inclusive lower-bound key hash covered by this checkpoint.',\n\t\tkey_end BIGINT NOT NULL COMMENT 'The inclusive upper-bound key hash covered by this checkpoint.',\n\t\tfence BIGINT NOT NULL COMMENT 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.',\n\t\tcheckpoint TEXT NOT NULL COMMENT 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.',\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n) COMMENT='This table holds Flow processing checkpoints used for exactly-once processing of materializations';\n\n\nCREATE TABLE IF NOT EXISTS `Simple` (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tcanary TEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /canary with inferred types: [string]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',\n\n\t\tPRIMARY KEY (id)\n) COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/simple';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_standard (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\t`int` BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n\t\tstr TEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',\n\n\t\tPRIMARY KEY (id)\n) COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_delta (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\t`int` BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n\t\tstr TEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\t`int` BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n\t\tstr TEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]'\n) COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `Multiple Types` (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tarray_int JSON COMMENT 'auto-generated projection of JSON at: /array_int with inferred types: [array]',\n\t\tbool_field BOOLEAN COMMENT 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]',\n\t\tfloat_field DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /float_field with inferred types: [number]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\t`nested` JSON COMMENT 'auto-generated projection of JSON at: /nested with inferred types: [object]',\n\t\tnullable_int BIGINT COMMENT 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]',\n\t\tstr_field TEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /str_field with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',\n\n\t\tPRIMARY KEY (id)\n) COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/multiple-data-types';\n\n\nCREATE TABLE IF NOT EXISTS `Formatted Strings` (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\tint_and_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]',\n\t\tint_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_str with inferred types: [string]',\n\t\tnum_and_str DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]',\n\t\tnum_str DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /num_str with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',\n\n\t\tPRIMARY KEY (id)\n) COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/formatted-strings';\n\nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-mysql/materialize');"
+    "actionDescription": "\nCREATE TABLE IF NOT EXISTS flow_materializations_v2 (\n\t\tmaterialization VARCHAR(256) NOT NULL COMMENT 'The name of the materialization.',\n\t\tversion LONGTEXT NOT NULL COMMENT 'Version of the materialization.',\n\t\tspec LONGBLOB NOT NULL COMMENT 'Specification of the materialization, encoded as base64 protobuf.',\n\n\t\tPRIMARY KEY (materialization)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='This table is the source of truth for all materializations into this system.';\n\n\nCREATE TABLE IF NOT EXISTS flow_checkpoints_v1 (\n\t\tmaterialization VARCHAR(256) NOT NULL COMMENT 'The name of the materialization.',\n\t\tkey_begin BIGINT NOT NULL COMMENT 'The inclusive lower-bound key hash covered by this checkpoint.',\n\t\tkey_end BIGINT NOT NULL COMMENT 'The inclusive upper-bound key hash covered by this checkpoint.',\n\t\tfence BIGINT NOT NULL COMMENT 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.',\n\t\tcheckpoint LONGBLOB NOT NULL COMMENT 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.',\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='This table holds Flow processing checkpoints used for exactly-once processing of materializations';\n\n\nCREATE TABLE IF NOT EXISTS `Simple` (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tcanary LONGTEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /canary with inferred types: [string]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',\n\n\t\tPRIMARY KEY (id)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/simple';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_standard (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\t`int` BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n\t\tstr LONGTEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',\n\n\t\tPRIMARY KEY (id)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_delta (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\t`int` BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n\t\tstr LONGTEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\t`int` BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n\t\tstr LONGTEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]'\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `Multiple Types` (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tarray_int JSON COMMENT 'auto-generated projection of JSON at: /array_int with inferred types: [array]',\n\t\tbool_field BOOLEAN COMMENT 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]',\n\t\tfloat_field DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /float_field with inferred types: [number]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\t`nested` JSON COMMENT 'auto-generated projection of JSON at: /nested with inferred types: [object]',\n\t\tnullable_int BIGINT COMMENT 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]',\n\t\tstr_field LONGTEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /str_field with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',\n\n\t\tPRIMARY KEY (id)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/multiple-data-types';\n\n\nCREATE TABLE IF NOT EXISTS `Formatted Strings` (\n\t\tid BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\tint_and_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]',\n\t\tint_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_str with inferred types: [string]',\n\t\tnum_and_str DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]',\n\t\tnum_str DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /num_str with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',\n\n\t\tPRIMARY KEY (id)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/formatted-strings';\n\n\nCREATE TABLE IF NOT EXISTS `long-string` (\n\t\tid VARCHAR(256) NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [string]',\n\t\tflow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n\t\tstr_field LONGTEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /str_field with inferred types: [string]',\n\t\tflow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',\n\n\t\tPRIMARY KEY (id)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization tests/materialize-mysql/materialize of collection tests/long-string';\n\nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-mysql/materialize');"
   }
 }
 {
@@ -38,50 +38,11 @@
     "binding": 1,
     "doc": {
       "_meta": {
-        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 1,
-      "int": 1,
-      "str": "str 1"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
         "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
       },
       "id": 2,
       "int": 2,
       "str": "str 2"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 2,
-      "int": 2,
-      "str": "str 2"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 3,
-      "int": 3,
-      "str": "str 3"
     }
   }
 }
@@ -116,147 +77,11 @@
     "binding": 1,
     "doc": {
       "_meta": {
-        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 4,
-      "int": 4,
-      "str": "str 4"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
         "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
       },
       "id": 5,
       "int": 5,
       "str": "str 5"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 1,
-    "doc": {
-      "_meta": {
-        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 5,
-      "int": 5,
-      "str": "str 5"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "3fd2ec78-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        11,
-        12
-      ],
-      "bool_field": false,
-      "float_field": 1.1,
-      "id": 1,
-      "nested": {
-        "id": "i1"
-      },
-      "nullable_int": null,
-      "str_field": "str1"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "4b37f0b8-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        21,
-        22
-      ],
-      "bool_field": true,
-      "float_field": 2.2,
-      "id": 2,
-      "nested": {
-        "id": "i2"
-      },
-      "nullable_int": 2,
-      "str_field": "str2"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "51016380-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        31,
-        32
-      ],
-      "bool_field": false,
-      "float_field": 3.3,
-      "id": 3,
-      "nested": {
-        "id": "i3"
-      },
-      "nullable_int": null,
-      "str_field": "str3"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "5660aaca-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        41,
-        42
-      ],
-      "bool_field": true,
-      "float_field": 4.4,
-      "id": 4,
-      "nested": {
-        "id": "i4"
-      },
-      "nullable_int": 4,
-      "str_field": "str4"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "5af9e236-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        51,
-        52
-      ],
-      "bool_field": false,
-      "float_field": 5.5,
-      "id": 5,
-      "nested": {
-        "id": "i5"
-      },
-      "nullable_int": null,
-      "str_field": "str5"
     }
   }
 }
@@ -274,28 +99,11 @@
       "bool_field": true,
       "float_field": 6.6,
       "id": 6,
-      "nested": {
-        "id": "i6"
-      },
-      "nullable_int": 6,
-      "str_field": "str6"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "5fc54530-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        61,
-        62
+      "multiple": [
+        "one",
+        2,
+        true
       ],
-      "bool_field": true,
-      "float_field": 6.6,
-      "id": 6,
       "nested": {
         "id": "i6"
       },
@@ -318,28 +126,9 @@
       "bool_field": false,
       "float_field": 7.7,
       "id": 7,
-      "nested": {
-        "id": "i7"
+      "multiple": {
+        "object": "seven"
       },
-      "nullable_int": null,
-      "str_field": "str7"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        71,
-        72
-      ],
-      "bool_field": false,
-      "float_field": 7.7,
-      "id": 7,
       "nested": {
         "id": "i7"
       },
@@ -362,55 +151,12 @@
       "bool_field": true,
       "float_field": 8.8,
       "id": 8,
+      "multiple": null,
       "nested": {
         "id": "i8"
       },
       "nullable_int": 8,
       "str_field": "str8"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        81,
-        82
-      ],
-      "bool_field": true,
-      "float_field": 8.8,
-      "id": 8,
-      "nested": {
-        "id": "i8"
-      },
-      "nullable_int": 8,
-      "str_field": "str8"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        91,
-        92
-      ],
-      "bool_field": false,
-      "float_field": 9.9,
-      "id": 9,
-      "nested": {
-        "id": "i9"
-      },
-      "nullable_int": null,
-      "str_field": "str9"
     }
   }
 }
@@ -455,124 +201,6 @@
       },
       "nullable_int": 10,
       "str_field": "str10"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 4,
-    "doc": {
-      "_meta": {
-        "uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"
-      },
-      "array_int": [
-        1,
-        2
-      ],
-      "bool_field": true,
-      "float_field": 10.1,
-      "id": 10,
-      "nested": {
-        "id": "i10"
-      },
-      "nullable_int": 10,
-      "str_field": "str10"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 5,
-    "doc": {
-      "_meta": {
-        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 3,
-      "int_and_str": 3,
-      "int_str": "30",
-      "num_and_str": 3.1,
-      "num_str": "30.1"
-    }
-  }
-}
-{
-  "loaded": {
-    "binding": 5,
-    "doc": {
-      "_meta": {
-        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "id": 4,
-      "int_and_str": "4",
-      "int_str": "40",
-      "num_and_str": "4.1",
-      "num_str": "40.1"
-    }
-  }
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "canary": "amputation's",
-      "id": 1
-    }
-  }
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "canary": "armament's",
-      "id": 2
-    }
-  }
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "canary": "splatters",
-      "id": 3
-    }
-  }
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "canary": "strengthen",
-      "id": 4
-    }
-  }
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "b4b60968-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "canary": "Kringle's",
-      "id": 5
-    }
-  }
-}
-{
-  "loaded": {
-    "doc": {
-      "_meta": {
-        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
-      },
-      "canary": "grosbeak's",
-      "id": 6
     }
   }
 }
@@ -1126,8 +754,16 @@
   "table": "Formatted Strings"
 }
 {
+  "row": {
+    "flow_published_at": "2023-07-12 18:29:05",
+    "id": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru.",
+    "str_field": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru."
+  },
+  "table": "long-string"
+}
+{
   "applied": {
-    "actionDescription": "\nCREATE TABLE IF NOT EXISTS flow_materializations_v2 (\n\t\tmaterialization VARCHAR(255) NOT NULL COMMENT 'The name of the materialization.',\n\t\tversion TEXT NOT NULL COMMENT 'Version of the materialization.',\n\t\tspec TEXT NOT NULL COMMENT 'Specification of the materialization, encoded as base64 protobuf.',\n\n\t\tPRIMARY KEY (materialization)\n) COMMENT='This table is the source of truth for all materializations into this system.';\n\n\nCREATE TABLE IF NOT EXISTS flow_checkpoints_v1 (\n\t\tmaterialization VARCHAR(255) NOT NULL COMMENT 'The name of the materialization.',\n\t\tkey_begin BIGINT NOT NULL COMMENT 'The inclusive lower-bound key hash covered by this checkpoint.',\n\t\tkey_end BIGINT NOT NULL COMMENT 'The inclusive upper-bound key hash covered by this checkpoint.',\n\t\tfence BIGINT NOT NULL COMMENT 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.',\n\t\tcheckpoint TEXT NOT NULL COMMENT 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.',\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n) COMMENT='This table holds Flow processing checkpoints used for exactly-once processing of materializations';\n\nUPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-mysql/materialize';"
+    "actionDescription": "\nCREATE TABLE IF NOT EXISTS flow_materializations_v2 (\n\t\tmaterialization VARCHAR(256) NOT NULL COMMENT 'The name of the materialization.',\n\t\tversion LONGTEXT NOT NULL COMMENT 'Version of the materialization.',\n\t\tspec LONGBLOB NOT NULL COMMENT 'Specification of the materialization, encoded as base64 protobuf.',\n\n\t\tPRIMARY KEY (materialization)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='This table is the source of truth for all materializations into this system.';\n\n\nCREATE TABLE IF NOT EXISTS flow_checkpoints_v1 (\n\t\tmaterialization VARCHAR(256) NOT NULL COMMENT 'The name of the materialization.',\n\t\tkey_begin BIGINT NOT NULL COMMENT 'The inclusive lower-bound key hash covered by this checkpoint.',\n\t\tkey_end BIGINT NOT NULL COMMENT 'The inclusive upper-bound key hash covered by this checkpoint.',\n\t\tfence BIGINT NOT NULL COMMENT 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.',\n\t\tcheckpoint LONGBLOB NOT NULL COMMENT 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.',\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='This table holds Flow processing checkpoints used for exactly-once processing of materializations';\n\nUPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-mysql/materialize';"
   }
 }
 {

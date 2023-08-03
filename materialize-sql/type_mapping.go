@@ -302,7 +302,7 @@ func (m NullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
 // MySQL does not accept TEXT as a primary key, but a VARCHAR with specified
 // size works.
 type PrimaryKeyMapper struct {
-	PrimaryKeyType  TypeMapper
+	PrimaryKey      TypeMapper
 	Delegate        TypeMapper
 }
 
@@ -310,7 +310,7 @@ var _ TypeMapper = PrimaryKeyMapper{}
 
 func (m PrimaryKeyMapper) MapType(p *Projection) (mapped MappedType, err error) {
 	if p.IsPrimaryKey {
-		return m.PrimaryKeyType.MapType(p)
+		return m.PrimaryKey.MapType(p)
 	} else {
 		return m.Delegate.MapType(p)
 	}

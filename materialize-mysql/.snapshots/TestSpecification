@@ -33,12 +33,11 @@
           "sslmode": {
             "type": "string",
             "enum": [
-              "disable",
-              "allow",
-              "prefer",
-              "require",
-              "verify-ca",
-              "verify-full"
+              "disabled",
+              "preferred",
+              "required",
+              "verify_ca",
+              "verify_identity"
             ],
             "title": "SSL Mode",
             "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
@@ -87,7 +86,8 @@
     "required": [
       "address",
       "user",
-      "password"
+      "password",
+      "database"
     ],
     "title": "SQL Connection"
   },
