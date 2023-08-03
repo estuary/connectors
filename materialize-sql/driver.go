@@ -134,7 +134,6 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		tableShapes = append(tableShapes, *endpoint.MetaCheckpoints)
 	}
 
-	var statements []string
 	var executedColumnModifications []string
 
 	for bindingIndex, bindingSpec := range req.Materialization.Bindings {
@@ -228,6 +227,8 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		tableShapes = append(tableShapes, tableShape)
 	}
 
+	// Build a list of table creation statements, followed by the spec update statement.
+	var statements []string
 	for _, shape := range tableShapes {
 		var table, err = ResolveTable(shape, endpoint.Dialect)
 		if err != nil {
