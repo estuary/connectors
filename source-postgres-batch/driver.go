@@ -408,5 +408,9 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 
 		count++
 	}
+	log.WithFields(log.Fields{
+		"query": query,
+		"count": count,
+	}).Info("query complete")
 	return cursorValues, nil
 }
