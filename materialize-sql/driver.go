@@ -191,7 +191,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 					if !previousNullable && !newCol.MustExist {
 						alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, req.DryRun, newTable.Identifier, newCol.Identifier)
 						if err != nil {
-							return nil, fmt.Errorf("dropping NOT NULL constraint for no longer required field for column '%s' in table '%s': %w", newTable.Identifier, newCol.Identifier, err)
+							return nil, fmt.Errorf("dropping NOT NULL constraint for column '%s' in table '%s' because it is no longer a required property: %w", newTable.Identifier, newCol.Identifier, err)
 						}
 
 						if alterAction != "" {
