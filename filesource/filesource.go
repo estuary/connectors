@@ -50,6 +50,8 @@ type Source struct {
 	Connect func(context.Context, Config) (Store, error)
 	// DocumentationURL links to the Source's extended user documentation.
 	DocumentationURL string
+	// Oauth connector configuration.
+	Oauth2 *pf.OAuth2
 	// TimeHorizonDelta is added to the current time in order to determine the upper time bound for
 	// a sweep of the store. The final upper time bound used to bound modification times we'll
 	// examine in a given sweep of the Store. Given a sampled wall-time T, we presume (hope) that no
@@ -108,6 +110,8 @@ type ObjectInfo struct {
 	ContentEncoding string
 	// ModTime of the object.
 	ModTime time.Time
+	// Extra object metadata attached by the driver for its own use.
+	Extra any
 }
 
 // PathToParts splits a path into a bucket and key. The key may be empty.
@@ -162,10 +166,19 @@ func (src Source) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_
 		ConfigSchemaJson:         json.RawMessage(endpointSchema),
 		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
 		DocumentationUrl:         src.DocumentationURL,
+		Oauth2:                   src.Oauth2,
 	}, nil
 }
 
 func (src *Source) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
+	if cfg, err := src.NewConfig(req.ConfigJson); err != nil {
+		return nil, err
+	} else if _, err = regexp.Compile(cfg.PathRegex()); err != nil {
+		return nil, fmt.Errorf("path regular expression is invalid: %w", err)
+	} else if _, err := src.Connect(ctx, cfg); err != nil {
+		return nil, fmt.Errorf("connecting to file storage: %w", err)
+	}
+
 	var bindings = []*pc.Response_Validated_Binding{}
 
 	for _, binding := range req.Bindings {
@@ -203,7 +216,7 @@ func (src *Source) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.
 	}
 
 	return &pc.Response_Discovered{Bindings: []*pc.Response_Discovered_Binding{{
-		RecommendedName:    strings.Trim(root, "/"),
+		RecommendedName:    "file-data",
 		ResourceConfigJson: resourceJSON,
 		DocumentSchemaJson: json.RawMessage(minimalDocumentSchema),
 		Key:                []string{"/_meta/file", "/_meta/offset"},
