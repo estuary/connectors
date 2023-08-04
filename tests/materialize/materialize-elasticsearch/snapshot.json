@@ -32,6 +32,11 @@
       "bool_field": true,
       "float_field": 6.6,
       "id": 6,
+      "multiple": [
+        "one",
+        2,
+        true
+      ],
       "nested": {
         "id": "i6"
       },
@@ -54,6 +59,9 @@
       "bool_field": false,
       "float_field": 7.7,
       "id": 7,
+      "multiple": {
+        "object": "seven"
+      },
       "nested": {
         "id": "i7"
       },
@@ -76,6 +84,7 @@
       "bool_field": true,
       "float_field": 8.8,
       "id": 8,
+      "multiple": null,
       "nested": {
         "id": "i8"
       },
@@ -233,6 +242,7 @@
       "bool_field": false,
       "float_field": 1.1,
       "id": 1,
+      "multiple": 1,
       "nested": {
         "id": "i1"
       },
@@ -247,6 +257,7 @@
       "bool_field": true,
       "float_field": 2.2,
       "id": 2,
+      "multiple": 2.2,
       "nested": {
         "id": "i2"
       },
@@ -261,6 +272,7 @@
       "bool_field": false,
       "float_field": 3.3,
       "id": 3,
+      "multiple": true,
       "nested": {
         "id": "i3"
       },
@@ -275,6 +287,7 @@
       "bool_field": true,
       "float_field": 4.4,
       "id": 4,
+      "multiple": false,
       "nested": {
         "id": "i4"
       },
@@ -289,6 +302,7 @@
       "bool_field": false,
       "float_field": 5.5,
       "id": 5,
+      "multiple": "string five",
       "nested": {
         "id": "i5"
       },
@@ -303,6 +317,11 @@
       "bool_field": true,
       "float_field": 66.66,
       "id": 6,
+      "multiple": [
+        "one",
+        2,
+        true
+      ],
       "nested": {
         "id": "i6"
       },
@@ -317,6 +336,9 @@
       "bool_field": false,
       "float_field": 77.77,
       "id": 7,
+      "multiple": {
+        "object": "seven"
+      },
       "nested": {
         "id": "i7"
       },
@@ -331,6 +353,7 @@
       "bool_field": true,
       "float_field": 88.88,
       "id": 8,
+      "multiple": null,
       "nested": {
         "id": "i8"
       },
