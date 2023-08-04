@@ -68,13 +68,10 @@ type documentMetadata struct {
 	Index  int       `json:"index" jsonschema:"title=Result Index,description=The index of this document within the query execution which produced it."`
 }
 
-// minimalSchema is the maximally-permissive schema which just specifies the metadata our connector adds.
-var minimalSchema = generateMinimalSchema()
-
 // The default collection key just refers to the polling iteration and result index of each document.
 var defaultKey = []string{"/_meta/polled", "/_meta/index"}
 
-func generateMinimalSchema() json.RawMessage {
+func generateCollectionSchema(key []string) json.RawMessage {
 	// Generate schema for the metadata via reflection
 	var reflector = jsonschema.Reflector{
 		ExpandedStruct: true,
@@ -84,15 +81,27 @@ func generateMinimalSchema() json.RawMessage {
 	metadataSchema.Definitions = nil
 	metadataSchema.AdditionalProperties = nil
 
-	// Wrap metadata into an enclosing object schema with a /_meta property
+	var keyElementSchema = &jsonschema.Schema{
+		Extras: map[string]any{
+			"type": []string{"integer", "string", "boolean"},
+		},
+	}
+
+	var required = []string{"_meta"}
+	var properties = map[string]*jsonschema.Schema{
+		"_meta": metadataSchema,
+	}
+	for _, colName := range key {
+		properties[colName] = keyElementSchema
+		required = append(required, colName)
+	}
+
 	var schema = &jsonschema.Schema{
 		Type:                 "object",
-		Required:             []string{"_meta"},
+		Required:             required,
 		AdditionalProperties: nil,
 		Extras: map[string]interface{}{
-			"properties": map[string]*jsonschema.Schema{
-				"_meta": metadataSchema,
-			},
+			"properties":     properties,
 			"x-infer-schema": true,
 		},
 	}
@@ -124,8 +133,6 @@ func (BatchSQLDriver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Res
 	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
-const discoverQuery = `SELECT table_schema, table_name, table_type FROM information_schema.tables;`
-
 var excludedSystemSchemas = []string{
 	"pg_catalog",
 	"information_schema",
@@ -143,32 +150,39 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 	defer db.Close()
 
-	rows, err := db.QueryContext(ctx, discoverQuery)
+	tables, err := discoverTables(ctx, db)
 	if err != nil {
-		return nil, fmt.Errorf("error executing discovery query: %w", err)
+		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
-	defer rows.Close()
+	keys, err := discoverPrimaryKeys(ctx, db)
+	if err != nil {
+		return nil, fmt.Errorf("error listing primary keys: %w", err)
+	}
+
+	// We rebuild this map even though `discoverPrimaryKeys` already built and
+	// discarded it, in order to keep the `discoverTables` / `discoverPrimaryKeys`
+	// interface as stupidly simple as possible, which ought to make it just that
+	// little bit easier to do this generically for multiple databases.
+	var keysByTable = make(map[string][]string)
+	for _, key := range keys {
+		keysByTable[key.Schema+"."+key.Table] = key.Columns
+	}
 
 	var bindings []*pc.Response_Discovered_Binding
-	for rows.Next() {
-		var tableSchema, tableName, tableType string
-		if err := rows.Scan(&tableSchema, &tableName, &tableType); err != nil {
-			return nil, fmt.Errorf("error scanning result row: %w", err)
-		}
-
+	for _, table := range tables {
 		// Exclude tables in "system schemas" such as information_schema or pg_catalog.
-		if slices.Contains(excludedSystemSchemas, tableSchema) {
+		if slices.Contains(excludedSystemSchemas, table.Schema) {
 			continue
 		}
 
-		var recommendedName = recommendedCatalogName(tableSchema, tableName)
-		var res, err = drv.GenerateResource(recommendedName, tableSchema, tableName, tableType)
+		var recommendedName = recommendedCatalogName(table.Schema, table.Name)
+		var res, err = drv.GenerateResource(recommendedName, table.Schema, table.Name, table.Type)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"reason": err,
-				"schema": tableSchema,
-				"table":  tableName,
-				"type":   tableType,
+				"schema": table.Schema,
+				"table":  table.Name,
+				"type":   table.Type,
 			}).Warn("unable to generate resource spec for entity")
 			continue
 		}
@@ -177,15 +191,123 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			return nil, fmt.Errorf("error serializing resource spec: %w", err)
 		}
 
+		var tableKey = keysByTable[table.Schema+"."+table.Name]
+		var collectionSchema = generateCollectionSchema(tableKey)
+		var collectionKey = defaultKey
+		if len(tableKey) != 0 {
+			collectionKey = nil
+			for _, colName := range tableKey {
+				collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
+			}
+		}
+
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
 			RecommendedName:    recommendedName,
 			ResourceConfigJson: resourceConfigJSON,
-			DocumentSchemaJson: minimalSchema,
-			Key:                defaultKey,
+			DocumentSchemaJson: collectionSchema,
+			Key:                collectionKey,
 		})
 	}
 
 	return &pc.Response_Discovered{Bindings: bindings}, nil
+}
+
+// primaryKeyToCollectionKey converts a database primary key column name into a Flow collection key
+// JSON pointer with escaping for '~' and '/' applied per RFC6901.
+func primaryKeyToCollectionKey(key string) string {
+	// Any encoded '~' must be escaped first to prevent a second escape on escaped '/' values as
+	// '~1'.
+	key = strings.ReplaceAll(key, "~", "~0")
+	key = strings.ReplaceAll(key, "/", "~1")
+	return "/" + key
+}
+
+const queryDiscoverTables = `SELECT table_schema, table_name, table_type FROM information_schema.tables;`
+
+type discoveredTable struct {
+	Schema string
+	Name   string
+	Type   string // Usually 'BASE TABLE' or 'VIEW'
+}
+
+func discoverTables(ctx context.Context, db *sql.DB) ([]*discoveredTable, error) {
+	rows, err := db.QueryContext(ctx, queryDiscoverTables)
+	if err != nil {
+		return nil, fmt.Errorf("error executing discovery query: %w", err)
+	}
+	defer rows.Close()
+
+	var tables []*discoveredTable
+	for rows.Next() {
+		var tableSchema, tableName, tableType string
+		if err := rows.Scan(&tableSchema, &tableName, &tableType); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+
+		tables = append(tables, &discoveredTable{
+			Schema: tableSchema,
+			Name:   tableName,
+			Type:   tableType,
+		})
+	}
+	return tables, nil
+}
+
+// Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
+// overkill but shouldn't hurt, and helps to make absolutely sure that we're
+// matching up the constraint type with the column names/positions correctly.
+const queryDiscoverPrimaryKeys = `
+SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position
+  FROM information_schema.key_column_usage kcu
+  JOIN information_schema.table_constraints tcs
+    ON  tcs.constraint_catalog = kcu.constraint_catalog
+    AND tcs.constraint_schema = kcu.constraint_schema
+    AND tcs.constraint_name = kcu.constraint_name
+    AND tcs.table_catalog = kcu.table_catalog
+    AND tcs.table_schema = kcu.table_schema
+    AND tcs.table_name = kcu.table_name
+  WHERE tcs.constraint_type = 'PRIMARY KEY'
+  ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;
+`
+
+type discoveredPrimaryKey struct {
+	Schema  string
+	Table   string
+	Columns []string
+}
+
+func discoverPrimaryKeys(ctx context.Context, db *sql.DB) ([]*discoveredPrimaryKey, error) {
+	rows, err := db.QueryContext(ctx, queryDiscoverPrimaryKeys)
+	if err != nil {
+		return nil, fmt.Errorf("error executing discovery query: %w", err)
+	}
+	defer rows.Close()
+
+	var keysByTable = make(map[string]*discoveredPrimaryKey)
+	for rows.Next() {
+		var tableSchema, tableName, columnName string
+		var ordinalPosition int
+		if err := rows.Scan(&tableSchema, &tableName, &columnName, &ordinalPosition); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+
+		var tableID = tableSchema + "." + tableName
+		var keyInfo = keysByTable[tableID]
+		if keyInfo == nil {
+			keyInfo = &discoveredPrimaryKey{Schema: tableSchema, Table: tableName}
+			keysByTable[tableID] = keyInfo
+		}
+		keyInfo.Columns = append(keyInfo.Columns, columnName)
+		if ordinalPosition != len(keyInfo.Columns) {
+			return nil, fmt.Errorf("primary key column %q (of table %q) appears out of order", columnName, tableID)
+		}
+	}
+
+	var keys []*discoveredPrimaryKey
+	for _, key := range keysByTable {
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
