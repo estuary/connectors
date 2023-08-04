@@ -99,9 +99,9 @@ func connectPostgres(ctx context.Context, configJSON json.RawMessage) (*sql.DB, 
 }
 
 const tableQueryTemplateTemplate = `{{if .IsFirstQuery -}}
-  SELECT xmin, * FROM %[1]s;
+  SELECT xmin AS txid, * FROM %[1]s;
 {{- else -}}
-  SELECT xmin, * FROM %[1]s WHERE xmin::text::bigint > $1;
+  SELECT xmin AS txid, * FROM %[1]s WHERE xmin::text::bigint > $1;
 {{- end}}`
 
 // This is currently unused, but is a useful example of how the function
@@ -129,7 +129,7 @@ func generatePostgresResource(resourceName, schemaName, tableName, tableType str
 	var cursorColumns []string
 	if strings.EqualFold(tableType, "BASE TABLE") {
 		queryTemplate = fmt.Sprintf(tableQueryTemplateTemplate, quoteTableName(schemaName, tableName))
-		cursorColumns = []string{"xmin"}
+		cursorColumns = []string{"txid"}
 	} else {
 		return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
 	}
