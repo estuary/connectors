@@ -72,12 +72,12 @@ jobs:
       matrix:
         connector:
           - source-alpaca
+          - source-firestore
           - source-gcs
+          - source-google-drive
           - source-hello-world
           - source-http-file
           - source-http-ingest
-          - source-test
-          - source-firestore
           - source-kafka
           - source-kinesis
           - source-mongodb
@@ -87,6 +87,7 @@ jobs:
           - source-s3
           - source-sftp
           - source-sqlserver
+          - source-test
           - materialize-bigquery
           - materialize-redshift
           - materialize-elasticsearch

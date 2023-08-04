@@ -11,8 +11,8 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/estuary/connectors/filesource"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/estuary/flow/go/parser"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -173,13 +173,13 @@ func (s *gcStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadC
 
 func main() {
 	var src = filesource.Source{
-    NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
-      var cfg config
-      if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
-        return nil, fmt.Errorf("parsing config json: %w", err)
-      }
-      return cfg, nil
-    },
+		NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
+			var cfg config
+			if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
+				return nil, fmt.Errorf("parsing config json: %w", err)
+			}
+			return cfg, nil
+		},
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
 			return newGCStore(ctx, cfg.(config))
 		},
@@ -240,7 +240,7 @@ func main() {
 		DocumentationURL: "https://go.estuary.dev/source-gcs",
 		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
 		// timestamp that's equal to the `MinBound` in the state.
-		TimeHorizonDelta:    time.Second * -30,
+		TimeHorizonDelta: time.Second * -30,
 	}
 
 	src.Main()
