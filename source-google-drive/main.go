@@ -66,8 +66,12 @@ func (c config) buildService(ctx context.Context) (*drive.FilesService, error) {
 		return nil, fmt.Errorf("initializing Google credentials: %w", err)
 	} else if client, err := drive.NewService(ctx, option.WithCredentials(creds)); err != nil {
 		return nil, fmt.Errorf("initializing drive file service: %w", err)
-	} else if _, err = readdirPage(client.Files, ctx, c.DiscoverRoot(), ""); err != nil {
+	} else if page, err := readdirPage(client.Files, ctx, c.DiscoverRoot(), ""); err != nil {
 		return nil, fmt.Errorf("failed to list folder: %w", err)
+	} else if len(page.Files) == 0 {
+		return nil, fmt.Errorf("listing of folder returned no results.\n" +
+			"Please verify that the folder has been shared with the OAuth user or service account,\n" +
+			"and that it has at least one file or sub-folder")
 	} else {
 		return client.Files, nil
 	}
