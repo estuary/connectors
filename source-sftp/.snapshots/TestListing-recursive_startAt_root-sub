@@ -5,7 +5,8 @@
 	"Size": 17,
 	"ContentType": "",
 	"ContentEncoding": "",
-	"ModTime": "2001-09-09T01:46:40Z"
+	"ModTime": "2001-09-09T01:46:40Z",
+	"Extra": null
 }
 {
 	"Path": "root/sub/y.csv",
@@ -14,7 +15,8 @@
 	"Size": 18,
 	"ContentType": "",
 	"ContentEncoding": "",
-	"ModTime": "2017-07-14T02:40:00Z"
+	"ModTime": "2017-07-14T02:40:00Z",
+	"Extra": null
 }
 {
 	"Path": "root/sub/z.csv",
@@ -23,6 +25,7 @@
 	"Size": 18,
 	"ContentType": "",
 	"ContentEncoding": "",
-	"ModTime": "2017-07-14T02:40:00Z"
+	"ModTime": "2017-07-14T02:40:00Z",
+	"Extra": null
 }
 
