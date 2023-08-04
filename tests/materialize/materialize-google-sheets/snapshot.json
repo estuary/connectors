@@ -103,6 +103,11 @@
       "bool_field": true,
       "float_field": 6.6,
       "id": 6,
+      "multiple": [
+        "one",
+        2,
+        true
+      ],
       "nested": {
         "id": "i6"
       },
@@ -125,6 +130,9 @@
       "bool_field": false,
       "float_field": 7.7,
       "id": 7,
+      "multiple": {
+        "object": "seven"
+      },
       "nested": {
         "id": "i7"
       },
@@ -147,6 +155,7 @@
       "bool_field": true,
       "float_field": 8.8,
       "id": 8,
+      "multiple": null,
       "nested": {
         "id": "i8"
       },

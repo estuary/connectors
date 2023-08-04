@@ -162,7 +162,7 @@
     {
       "id": "FQE",
       "metadata": {
-        "flow_document": "{\"_meta\":{\"uuid\":\"3fd2ec78-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}"
+        "flow_document": "{\"_meta\":{\"uuid\":\"3fd2ec78-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}"
       },
       "score": 0,
       "values": "<VECTOR>"
@@ -170,7 +170,7 @@
     {
       "id": "FQI",
       "metadata": {
-        "flow_document": "{\"_meta\":{\"uuid\":\"4b37f0b8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}"
+        "flow_document": "{\"_meta\":{\"uuid\":\"4b37f0b8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}"
       },
       "score": 0,
       "values": "<VECTOR>"
@@ -178,7 +178,7 @@
     {
       "id": "FQM",
       "metadata": {
-        "flow_document": "{\"_meta\":{\"uuid\":\"51016380-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}"
+        "flow_document": "{\"_meta\":{\"uuid\":\"51016380-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}"
       },
       "score": 0,
       "values": "<VECTOR>"
@@ -186,7 +186,7 @@
     {
       "id": "FQQ",
       "metadata": {
-        "flow_document": "{\"_meta\":{\"uuid\":\"5660aaca-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}"
+        "flow_document": "{\"_meta\":{\"uuid\":\"5660aaca-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}"
       },
       "score": 0,
       "values": "<VECTOR>"
@@ -194,7 +194,7 @@
     {
       "id": "FQU",
       "metadata": {
-        "flow_document": "{\"_meta\":{\"uuid\":\"5af9e236-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}"
+        "flow_document": "{\"_meta\":{\"uuid\":\"5af9e236-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}"
       },
       "score": 0,
       "values": "<VECTOR>"
@@ -202,7 +202,7 @@
     {
       "id": "FQY",
       "metadata": {
-        "flow_document": "{\"_meta\":{\"uuid\":\"e4b646c2-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}"
+        "flow_document": "{\"_meta\":{\"uuid\":\"e4b646c2-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}"
       },
       "score": 0,
       "values": "<VECTOR>"
@@ -210,7 +210,7 @@
     {
       "id": "FQc",
       "metadata": {
-        "flow_document": "{\"_meta\":{\"uuid\":\"eb40dafc-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}"
+        "flow_document": "{\"_meta\":{\"uuid\":\"eb40dafc-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}"
       },
       "score": 0,
       "values": "<VECTOR>"
@@ -218,7 +218,7 @@
     {
       "id": "FQg",
       "metadata": {
-        "flow_document": "{\"_meta\":{\"uuid\":\"f163eef6-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}"
+        "flow_document": "{\"_meta\":{\"uuid\":\"f163eef6-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}"
       },
       "score": 0,
       "values": "<VECTOR>"
