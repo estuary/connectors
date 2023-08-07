@@ -264,25 +264,25 @@ func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo
 
 	var columns []sqlcapture.ColumnInfo
 	for _, row := range results.Values {
-		var typeName = string(row[5].AsString())
-		var dataType interface{}
-		if typeName == "enum" {
-			dataType = &mysqlColumnType{Type: "enum", EnumValues: append(parseEnumValues(string(row[6].AsString())), "")}
-		} else if typeName == "set" {
-			dataType = &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(string(row[6].AsString()))}
-		} else {
-			dataType = typeName
-		}
 		columns = append(columns, sqlcapture.ColumnInfo{
 			TableSchema: string(row[0].AsString()),
 			TableName:   string(row[1].AsString()),
 			Index:       int(row[2].AsInt64()),
 			Name:        string(row[3].AsString()),
 			IsNullable:  string(row[4].AsString()) != "NO",
-			DataType:    dataType,
+			DataType:    parseDataType(string(row[5].AsString()), string(row[6].AsString())),
 		})
 	}
 	return columns, err
+}
+
+func parseDataType(typeName, fullColumnType string) any {
+	if typeName == "enum" {
+		return &mysqlColumnType{Type: "enum", EnumValues: append(parseEnumValues(fullColumnType), "")}
+	} else if typeName == "set" {
+		return &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(fullColumnType)}
+	}
+	return typeName
 }
 
 type mysqlColumnType struct {
