@@ -68,10 +68,10 @@ type documentMetadata struct {
 	Index  int       `json:"index" jsonschema:"title=Result Index,description=The index of this document within the query execution which produced it."`
 }
 
-// The default collection key just refers to the polling iteration and result index of each document.
-var defaultKey = []string{"/_meta/polled", "/_meta/index"}
+// The fallback collection key just refers to the polling iteration and result index of each document.
+var fallbackKey = []string{"/_meta/polled", "/_meta/index"}
 
-func generateCollectionSchema(key []string) json.RawMessage {
+func generateCollectionSchema(keyColumns []string, columnTypes map[string]*jsonschema.Schema) (json.RawMessage, error) {
 	// Generate schema for the metadata via reflection
 	var reflector = jsonschema.Reflector{
 		ExpandedStruct: true,
@@ -81,18 +81,17 @@ func generateCollectionSchema(key []string) json.RawMessage {
 	metadataSchema.Definitions = nil
 	metadataSchema.AdditionalProperties = nil
 
-	var keyElementSchema = &jsonschema.Schema{
-		Extras: map[string]any{
-			"type": []string{"integer", "string", "boolean"},
-		},
-	}
-
 	var required = []string{"_meta"}
 	var properties = map[string]*jsonschema.Schema{
 		"_meta": metadataSchema,
 	}
-	for _, colName := range key {
-		properties[colName] = keyElementSchema
+
+	for _, colName := range keyColumns {
+		var columnType = columnTypes[colName]
+		if columnType == nil {
+			return nil, fmt.Errorf("unable to add key column %q to schema: type unknown", colName)
+		}
+		properties[colName] = columnType
 		required = append(required, colName)
 	}
 
@@ -109,10 +108,18 @@ func generateCollectionSchema(key []string) json.RawMessage {
 	// Marshal schema to JSON
 	bs, err := json.Marshal(schema)
 	if err != nil {
-		panic(fmt.Errorf("error generating schema: %v", err))
+		return nil, fmt.Errorf("error serializing schema: %w", err)
 	}
-	return json.RawMessage(bs)
+	return json.RawMessage(bs), nil
 }
+
+var minimalSchema = func() json.RawMessage {
+	var schema, err = generateCollectionSchema(nil, nil)
+	if err != nil {
+		panic(err)
+	}
+	return schema
+}()
 
 // Spec returns metadata about the capture connector.
 func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
@@ -163,9 +170,9 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	// discarded it, in order to keep the `discoverTables` / `discoverPrimaryKeys`
 	// interface as stupidly simple as possible, which ought to make it just that
 	// little bit easier to do this generically for multiple databases.
-	var keysByTable = make(map[string][]string)
+	var keysByTable = make(map[string]*discoveredPrimaryKey)
 	for _, key := range keys {
-		keysByTable[key.Schema+"."+key.Table] = key.Columns
+		keysByTable[key.Schema+"."+key.Table] = key
 	}
 
 	var bindings []*pc.Response_Discovered_Binding
@@ -175,15 +182,16 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			continue
 		}
 
+		var tableID = table.Schema + "." + table.Name
+
 		var recommendedName = recommendedCatalogName(table.Schema, table.Name)
 		var res, err = drv.GenerateResource(recommendedName, table.Schema, table.Name, table.Type)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"reason": err,
-				"schema": table.Schema,
-				"table":  table.Name,
+				"table":  tableID,
 				"type":   table.Type,
-			}).Warn("unable to generate resource spec for entity")
+			}).Warn("unable to generate resource spec")
 			continue
 		}
 		resourceConfigJSON, err := json.Marshal(res)
@@ -191,13 +199,19 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			return nil, fmt.Errorf("error serializing resource spec: %w", err)
 		}
 
-		var tableKey = keysByTable[table.Schema+"."+table.Name]
-		var collectionSchema = generateCollectionSchema(tableKey)
-		var collectionKey = defaultKey
-		if len(tableKey) != 0 {
-			collectionKey = nil
-			for _, colName := range tableKey {
-				collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
+		// Try to generate a useful collection schema, but on error fall back to the
+		// minimal schema with the default key [/_meta/polled, /_meta/index].
+		var collectionSchema = minimalSchema
+		var collectionKey = fallbackKey
+		if tableKey, ok := keysByTable[tableID]; ok {
+			if generatedSchema, err := generateCollectionSchema(tableKey.Columns, tableKey.ColumnTypes); err == nil {
+				collectionSchema = generatedSchema
+				collectionKey = nil
+				for _, colName := range tableKey.Columns {
+					collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
+				}
+			} else {
+				log.WithFields(log.Fields{"table": tableID, "err": err}).Warn("unable to generate collection schema")
 			}
 		}
 
@@ -257,7 +271,7 @@ func discoverTables(ctx context.Context, db *sql.DB) ([]*discoveredTable, error)
 // overkill but shouldn't hurt, and helps to make absolutely sure that we're
 // matching up the constraint type with the column names/positions correctly.
 const queryDiscoverPrimaryKeys = `
-SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position
+SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position, col.data_type
   FROM information_schema.key_column_usage kcu
   JOIN information_schema.table_constraints tcs
     ON  tcs.constraint_catalog = kcu.constraint_catalog
@@ -266,14 +280,20 @@ SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position
     AND tcs.table_catalog = kcu.table_catalog
     AND tcs.table_schema = kcu.table_schema
     AND tcs.table_name = kcu.table_name
+  JOIN information_schema.columns col
+    ON  col.table_catalog = kcu.table_catalog
+	AND col.table_schema = kcu.table_schema
+	AND col.table_name = kcu.table_name
+	AND col.column_name = kcu.column_name
   WHERE tcs.constraint_type = 'PRIMARY KEY'
   ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;
 `
 
 type discoveredPrimaryKey struct {
-	Schema  string
-	Table   string
-	Columns []string
+	Schema      string
+	Table       string
+	Columns     []string
+	ColumnTypes map[string]*jsonschema.Schema
 }
 
 func discoverPrimaryKeys(ctx context.Context, db *sql.DB) ([]*discoveredPrimaryKey, error) {
@@ -285,19 +305,30 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB) ([]*discoveredPrimaryK
 
 	var keysByTable = make(map[string]*discoveredPrimaryKey)
 	for rows.Next() {
-		var tableSchema, tableName, columnName string
+		var tableSchema, tableName, columnName, dataType string
 		var ordinalPosition int
-		if err := rows.Scan(&tableSchema, &tableName, &columnName, &ordinalPosition); err != nil {
+		if err := rows.Scan(&tableSchema, &tableName, &columnName, &ordinalPosition, &dataType); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 
 		var tableID = tableSchema + "." + tableName
 		var keyInfo = keysByTable[tableID]
 		if keyInfo == nil {
-			keyInfo = &discoveredPrimaryKey{Schema: tableSchema, Table: tableName}
+			keyInfo = &discoveredPrimaryKey{
+				Schema:      tableSchema,
+				Table:       tableName,
+				ColumnTypes: make(map[string]*jsonschema.Schema),
+			}
 			keysByTable[tableID] = keyInfo
 		}
 		keyInfo.Columns = append(keyInfo.Columns, columnName)
+		if jsonSchema, ok := databaseTypeToJSON[dataType]; ok {
+			keyInfo.ColumnTypes[columnName] = jsonSchema
+		} else {
+			// Assume unknown types are strings, because it's almost always a string.
+			// (Or it's an object, but those can't be Flow collection keys anyway)
+			keyInfo.ColumnTypes[columnName] = &jsonschema.Schema{Type: "string"}
+		}
 		if ordinalPosition != len(keyInfo.Columns) {
 			return nil, fmt.Errorf("primary key column %q (of table %q) appears out of order", columnName, tableID)
 		}
@@ -308,6 +339,13 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB) ([]*discoveredPrimaryK
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+var databaseTypeToJSON = map[string]*jsonschema.Schema{
+	"integer":  {Type: "integer"},
+	"bigint":   {Type: "integer"},
+	"smallint": {Type: "integer"},
+	"boolean":  {Type: "boolean"},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
