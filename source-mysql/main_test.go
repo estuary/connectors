@@ -204,11 +204,11 @@ func TestAlterTable_Unsupported(t *testing.T) {
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Altering tableC, which is not being captured, should be fine
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN data INTEGER;", tableC))
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s CHANGE COLUMN data data2 INTEGER;", tableC))
 	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
 	// Altering tableB, which is being captured, should result in an error
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN data INTEGER;", tableB))
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s CHANGE COLUMN data data2 INTEGER;", tableB))
 	tb.Insert(ctx, t, tableB, [][]interface{}{{3, 30}, {4, 40}})
 	t.Run("capture2-fails", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
@@ -227,7 +227,7 @@ func TestAlterTable_Unsupported(t *testing.T) {
 	// is added to the capture *when it was also altered after the last state
 	// checkpoint*. This should still work, because tables only become active
 	// after the first stream-to-watermark operation.
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN data BOOL;", tableC))
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s CHANGE COLUMN data2 data3 BOOL;", tableC))
 	tb.Insert(ctx, t, tableC, [][]interface{}{{5, true}, {6, false}})
 	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB), regexp.MustCompile(uniqueC))
 	t.Run("capture6", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })

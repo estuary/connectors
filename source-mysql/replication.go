@@ -536,10 +536,29 @@ func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, q
 		switch alter := alterOpt.(type) {
 		// These should be all of the table alterations which might possibly impact our capture
 		// in ways we don't currently support, so the default behavior can be to log and ignore.
-		case *sqlparser.AlterColumn, *sqlparser.ChangeColumn, *sqlparser.ModifyColumn, *sqlparser.RenameColumn:
+		case *sqlparser.AlterColumn, *sqlparser.RenameColumn:
 			return fmt.Errorf("unsupported column alteration (go.estuary.dev/eVVwet): %s", query)
 		case *sqlparser.RenameTableName:
 			return fmt.Errorf("unsupported table alteration (go.estuary.dev/eVVwet): %s", query)
+		case *sqlparser.ChangeColumn:
+			if !alter.OldColumn.Name.Equal(alter.NewColDefinition.Name) {
+				return fmt.Errorf("unsupported query %q: cannot currently process column renaming", query)
+			}
+			if alter.First || alter.After != nil {
+				return fmt.Errorf("unsupported query %q: cannot currently process column repositioning", query)
+			}
+			var newName = alter.NewColDefinition.Name.String()
+			var newType = translateDataType(alter.NewColDefinition.Type)
+			logrus.WithField("name", newName).WithField("type", newType).Info("processed CHANGE COLUMN alteration")
+			meta.Schema.ColumnTypes[newName] = newType
+		case *sqlparser.ModifyColumn:
+			if alter.First || alter.After != nil {
+				return fmt.Errorf("unsupported query %q: cannot currently process column repositioning", query)
+			}
+			var newName = alter.NewColDefinition.Name.String()
+			var newType = translateDataType(alter.NewColDefinition.Type)
+			logrus.WithField("name", newName).WithField("type", newType).Info("processed MODIFY COLUMN alteration")
+			meta.Schema.ColumnTypes[newName] = newType
 		case *sqlparser.AddColumns:
 			insertAt := len(meta.Schema.Columns)
 			if alter.First {
@@ -555,17 +574,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, q
 			newCols := []string{}
 			for _, col := range alter.Columns {
 				newCols = append(newCols, col.Name.String())
-
-				typeName := strings.ToLower(col.Type.Type)
-				var dataType interface{}
-				if typeName == "enum" {
-					dataType = &mysqlColumnType{Type: "enum", EnumValues: col.Type.EnumValues}
-				} else if typeName == "set" {
-					dataType = &mysqlColumnType{Type: "set", EnumValues: col.Type.EnumValues}
-				} else {
-					dataType = typeName
-				}
-
+				var dataType = translateDataType(col.Type)
 				meta.Schema.ColumnTypes[col.Name.String()] = dataType
 			}
 
@@ -598,6 +607,14 @@ func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, q
 	}
 
 	return nil
+}
+
+func translateDataType(t sqlparser.ColumnType) any {
+	var typeName = strings.ToLower(t.Type)
+	if typeName == "enum" || typeName == "set" {
+		return &mysqlColumnType{Type: typeName, EnumValues: t.EnumValues}
+	}
+	return typeName
 }
 
 func findStr(needle string, cols []string) int {
