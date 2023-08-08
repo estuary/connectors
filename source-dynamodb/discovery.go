@@ -19,13 +19,11 @@ import (
 type discoveredTable struct {
 	name      string
 	streamArn string
-	key       []tableKey
+	// keyFields and keyTypes are ordered as partition key followed by sort key, if there is a sort
+	// key.
+	keyFields []string
+	keyTypes  []types.ScalarAttributeType
 	rcus      int
-}
-
-type tableKey struct {
-	name          string
-	attributeType types.ScalarAttributeType
 }
 
 type columnSchema struct {
@@ -79,7 +77,8 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 	for _, table := range tables {
 		log.WithFields(log.Fields{
 			"table":     table.name,
-			"key":       table.key,
+			"key":       table.keyFields,
+			"keyTypes":  table.keyTypes,
 			"streamArn": table.streamArn,
 		}).Debug("discovered table")
 
@@ -89,10 +88,10 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		required := []string{}
 		keyPtrs := []string{}
 
-		for _, k := range table.key {
-			properties[k.name] = dynamodbTypeToJSON[k.attributeType].toType()
-			required = append(required, k.name)
-			keyPtrs = append(keyPtrs, "/"+k.name)
+		for idx, k := range table.keyFields {
+			properties[k] = dynamodbTypeToJSON[table.keyTypes[idx]].toType()
+			required = append(required, k)
+			keyPtrs = append(keyPtrs, "/"+k)
 		}
 
 		schema := jsonschema.Schema{
@@ -303,6 +302,11 @@ func discoverTable(ctx context.Context, c *client, table string) (discoveredTabl
 		foundTypes[*def.AttributeName] = def.AttributeType
 	}
 
+	type tableKey struct {
+		name          string
+		attributeType types.ScalarAttributeType
+	}
+
 	var partitionKey, sortKey *tableKey
 
 	for _, key := range tableDescribe.Table.KeySchema {
@@ -319,11 +323,12 @@ func discoverTable(ctx context.Context, c *client, table string) (discoveredTabl
 		}
 	}
 
-	if partitionKey != nil {
-		out.key = append(out.key, *partitionKey)
-	}
+	out.keyFields = append(out.keyFields, partitionKey.name)
+	out.keyTypes = append(out.keyTypes, partitionKey.attributeType)
+
 	if sortKey != nil {
-		out.key = append(out.key, *sortKey)
+		out.keyFields = append(out.keyFields, sortKey.name)
+		out.keyTypes = append(out.keyTypes, sortKey.attributeType)
 	}
 
 	return out, true, nil

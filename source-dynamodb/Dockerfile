@@ -11,6 +11,7 @@ RUN go mod download
 
 COPY go                 ./go
 COPY source-boilerplate ./source-boilerplate
+COPY sqlcapture         ./sqlcapture
 COPY source-dynamodb    ./source-dynamodb
 
 # Run automated tests. To skip tests which interact with an external database,
@@ -33,7 +34,6 @@ ENV PATH="/connector:$PATH"
 COPY --from=builder /builder/connector ./source-dynamodb
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
-LABEL CONNECTOR_PROTOCOL=flow-capture
 
 # Avoid running the connector as root.
 USER nonroot:nonroot

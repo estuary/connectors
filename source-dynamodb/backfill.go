@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,6 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/estuary/connectors/sqlcapture"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
@@ -125,11 +125,15 @@ func (c *capture) backfillWorker(ctx context.Context, t *table, scanLimit *int32
 		}).Debug("backfilling segment")
 
 		state := c.getSegmentState(t.tableName, segment)
-		startKey := state.ExclusiveStartKey.inner
+
+		startKey, err := decodeKey(t.keyFields, state.ExclusiveStartKey)
+		if err != nil {
+			return fmt.Errorf("unpacking resume key for segment %d of table %s: %w", segment, t.tableName, err)
+		}
 
 		scanned, err := c.doScan(ctx, t, scanLimit, limiter, rcusPerRequest, segment, startKey)
 		if err != nil {
-			return fmt.Errorf("backfill worker doScan: %w", err)
+			return err
 		}
 
 		newState := segmentState{}
@@ -139,13 +143,15 @@ func (c *capture) backfillWorker(ctx context.Context, t *table, scanLimit *int32
 			// benefit of test snapshots.
 			newState.ExclusiveStartKey = state.ExclusiveStartKey
 		} else {
-			newState.ExclusiveStartKey = keyAttributeWrapper{
-				inner: scanned.LastEvaluatedKey,
+			newStartKey, err := encodeKey(t.keyFields, scanned.LastEvaluatedKey)
+			if err != nil {
+				return fmt.Errorf("encoding resume key for segment %d of table %s: %w", segment, t.tableName, err)
 			}
+			newState.ExclusiveStartKey = newStartKey
 		}
 
 		if err := c.emitBackfill(t.bindingIdx, t.tableName, segment, newState, scanned.Items, t.keyFields); err != nil {
-			return fmt.Errorf("emitting backfill documents for segment %d: %w", segment, err)
+			return fmt.Errorf("emitting backfill documents for segment %d of table %s: %w", segment, t.tableName, err)
 		}
 
 		if len(scanned.Items) > 0 {
@@ -237,86 +243,76 @@ func (c *capture) doScan(
 	return nil, fmt.Errorf("failed to scan segment %d of table %q after %d attempts", segment, t.tableName, maxAttempts)
 }
 
-// keyAttributeWrapper makes it possible to serialize a DynamoDB attribute value as JSON for
-// checkpointing, and deserialize that checkpoint JSON back into a DynamoDB attribute value. The
-// primary reason this is so weird is because of the possibility for binary type keys: The AWS SDK
-// handles these as []byte, but JSON serialization encodes them as base64 strings. So we need a way
-// to tell the difference between a regular string value and a string value that actually represents
-// binary data as base64. The attribute type and its value (always a string) is encoded/decoded
-// using attributeJson. DynamoDB keys can only be strings, numbers, or binary, so we handle them all
-// with this wrapper.
-type keyAttributeWrapper struct {
-	inner map[string]types.AttributeValue
+func encodeKey(keyFields []string, av map[string]types.AttributeValue) ([]byte, error) {
+	fields := make(map[string]any)
+	for k, v := range av {
+		fields[k] = v
+	}
+
+	return sqlcapture.EncodeRowKey(keyFields, fields, nil, encodeKeyFDB)
 }
 
-type attributeJson struct {
-	AttrType types.ScalarAttributeType `json:"attrType"`
-	Value    string                    `json:"value"`
-}
+func decodeKey(keyFields []string, key []byte) (map[string]types.AttributeValue, error) {
+	if key == nil {
+		return nil, nil
+	}
 
-func (w keyAttributeWrapper) MarshalJSON() ([]byte, error) {
-	out := make(map[string]attributeJson)
+	out := make(map[string]types.AttributeValue)
 
-	for name, val := range w.inner {
-		switch av := val.(type) {
-		case *types.AttributeValueMemberS:
-			out[name] = attributeJson{
-				AttrType: types.ScalarAttributeTypeS,
-				Value:    av.Value,
-			}
-		case *types.AttributeValueMemberN:
-			out[name] = attributeJson{
-				AttrType: types.ScalarAttributeTypeN,
-				Value:    av.Value,
-			}
-		case *types.AttributeValueMemberB:
-			out[name] = attributeJson{
-				AttrType: types.ScalarAttributeTypeB,
-				// Standard JSON encoding would do this conversion anyway, but doing it here allows
-				// for a consistent type of string for `attributeJson.Value`.
-				Value: base64.StdEncoding.EncodeToString(av.Value),
-			}
+	tuple, err := sqlcapture.UnpackTuple(key, decodeKeyFDB)
+	if err != nil {
+		return nil, fmt.Errorf("unpacking tuple: %w", err)
+	}
+
+	if len(tuple) != len(keyFields) {
+		return nil, fmt.Errorf("key tuple fields count does not match table fields count: %d vs %d", len(tuple), len(keyFields))
+	}
+
+	for idx, field := range keyFields {
+		switch v := tuple[idx].(type) {
+		case types.AttributeValueMemberS:
+			out[field] = &v
+		case types.AttributeValueMemberN:
+			out[field] = &v
+		case types.AttributeValueMemberB:
+			out[field] = &v
 		default:
-			return nil, fmt.Errorf("invalid attribute value type for %s: %T", name, val)
-
+			return nil, fmt.Errorf("invalid tuple element type %T (%#v)", tuple[idx], tuple[idx])
 		}
 	}
 
-	return json.Marshal(out)
+	return out, nil
 }
 
-func (w *keyAttributeWrapper) UnmarshalJSON(data []byte) error {
-	v := make(map[string]attributeJson)
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+const numericKey = "N"
+
+func encodeKeyFDB(key, ktype any) (tuple.TupleElement, error) {
+	switch av := key.(types.AttributeValue).(type) {
+	case *types.AttributeValueMemberS:
+		return av.Value, nil
+	case *types.AttributeValueMemberN:
+		return tuple.Tuple{numericKey, av.Value}, nil
+	case *types.AttributeValueMemberB:
+		return av.Value, nil
+	default:
+		return nil, fmt.Errorf("invalid attribute value type %T (%#v)", key, key)
 	}
+}
 
-	w.inner = make(map[string]types.AttributeValue)
-
-	for name, val := range v {
-		switch val.AttrType {
-		case types.ScalarAttributeTypeS:
-			w.inner[name] = &types.AttributeValueMemberS{
-				Value: val.Value,
+func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
+	switch t := t.(type) {
+	case tuple.Tuple:
+		if len(t) == 2 && t[0] == numericKey {
+			if sv, ok := t[1].(string); ok {
+				return types.AttributeValueMemberN{Value: sv}, nil
 			}
-		case types.ScalarAttributeTypeN:
-			w.inner[name] = &types.AttributeValueMemberN{
-				Value: val.Value,
-			}
-		case types.ScalarAttributeTypeB:
-			// Get the bytes back out of the base64 string.
-			bytes, err := base64.StdEncoding.DecodeString(val.Value)
-			if err != nil {
-				return fmt.Errorf("value for %s could not be base64 decoded", name)
-			}
-
-			w.inner[name] = &types.AttributeValueMemberB{
-				Value: bytes,
-			}
-		default:
-			return fmt.Errorf("invalid attribute value type for %s: %s", name, val.AttrType)
 		}
+		return nil, fmt.Errorf("failed to decode fdb tuple %#v", t)
+	case string:
+		return types.AttributeValueMemberS{Value: t}, nil
+	case []byte:
+		return types.AttributeValueMemberB{Value: t}, nil
+	default:
+		return nil, fmt.Errorf("invalid tuple type %T (%#v)", t, t)
 	}
-
-	return nil
 }
