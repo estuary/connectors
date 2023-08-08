@@ -6,5 +6,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"tables":{"datatypes":{"backfillFinishedAt":"<TIMESTAMP>","totalBackfillSegments":2,"backfillSegmentProgress":{"0":{"exclusiveStartKey":{},"finishedAt":"<TIMESTAMP>"},"1":{"exclusiveStartKey":{},"finishedAt":"<TIMESTAMP>"}},"shards":{"<SHARD_ID>":{"lastReadSequence":"<SEQUENCE_NUM>"}},"streamArn":"<STREAM_ARN>"}}}
+{"tables":{"datatypes":{"backfillFinishedAt":"<TIMESTAMP>","totalBackfillSegments":2,"backfillSegmentProgress":{"0":{"finishedAt":"<TIMESTAMP>"},"1":{"finishedAt":"<TIMESTAMP>"}},"shards":{"<SHARD_ID>":{"lastReadSequence":"<SEQUENCE_NUM>"}},"streamArn":"<STREAM_ARN>"}}}
 

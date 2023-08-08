@@ -38,7 +38,7 @@ const (
 type table struct {
 	tableName      string
 	bindingIdx     int
-	keyFields      map[string]struct{}
+	keyFields      []string // Ordered as partition key followed by sort key (if there is a sort key)
 	activeSegments chan int
 
 	effectiveRcus       int

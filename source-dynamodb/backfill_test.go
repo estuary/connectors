@@ -1,15 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/bradleyjkemp/cupaloy"
 	"github.com/stretchr/testify/require"
 )
 
-func TestKeyAttributeWrapperRoundTrip(t *testing.T) {
+func TestResumeKeyRoundTrip(t *testing.T) {
 	av := map[string]types.AttributeValue{
 		"string": &types.AttributeValueMemberS{
 			Value: "stringValue",
@@ -25,16 +23,13 @@ func TestKeyAttributeWrapperRoundTrip(t *testing.T) {
 		},
 	}
 
-	wrapper := keyAttributeWrapper{
-		inner: av,
-	}
+	keyFields := []string{"string", "decimal", "integer", "binary"}
 
-	bytes, err := json.MarshalIndent(&wrapper, "", "\t")
+	enc, err := encodeKey(keyFields, av)
 	require.NoError(t, err)
-	cupaloy.SnapshotT(t, string(bytes))
 
-	got := keyAttributeWrapper{}
-	require.NoError(t, json.Unmarshal(bytes, &got))
+	got, err := decodeKey(keyFields, enc)
+	require.NoError(t, err)
 
-	require.Equal(t, av, got.inner)
+	require.Equal(t, av, got)
 }

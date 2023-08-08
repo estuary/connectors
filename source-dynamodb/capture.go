@@ -30,8 +30,8 @@ type tableState struct {
 }
 
 type segmentState struct {
-	ExclusiveStartKey keyAttributeWrapper `json:"exclusiveStartKey,omitempty"`
-	FinishedAt        time.Time           `json:"finishedAt,omitempty"`
+	ExclusiveStartKey []byte    `json:"exclusiveStartKey,omitempty"`
+	FinishedAt        time.Time `json:"finishedAt,omitempty"`
 }
 
 type shardState struct {
@@ -77,14 +77,11 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 		return nil, fmt.Errorf("table %s does not have an enabled stream", tableName)
 	}
 
-	// The key fields for a table must be known for this reason: DynamoDB allows for numeric keys,
-	// but makes no distinction between integers and decimals. Flow does not allow decimal
+	// The key fields for an active table must be known for this reason: DynamoDB allows for numeric
+	// keys, but makes no distinction between integers and decimals. Flow does not allow decimal
 	// collection keys, so numeric DynamoDB keys are converted to string values with number format
 	// in their suggested collection schema.
-	t.keyFields = make(map[string]struct{})
-	for _, k := range d.key {
-		t.keyFields[k.name] = struct{}{}
-	}
+	t.keyFields = d.keyFields
 
 	// If an RCU limit was not configured and the table has a provisioned limit, use the provisioned
 	// limit.
@@ -297,7 +294,7 @@ func (c *capture) emitBackfill(
 	segment int,
 	segmentState segmentState,
 	records []map[string]types.AttributeValue,
-	keyFields map[string]struct{},
+	keyFields []string,
 ) error {
 	docs := make([]json.RawMessage, 0, len(records))
 
@@ -340,7 +337,7 @@ func (c *capture) emitStream(
 	shardId string,
 	shardState shardState,
 	records []streamTypes.Record,
-	keyFields map[string]struct{},
+	keyFields []string,
 ) error {
 	docs := make([]json.RawMessage, 0, len(records))
 
@@ -389,7 +386,7 @@ func (c *capture) emitStream(
 			}
 
 			// Add the key values (only) from the old image to the output document.
-			for key := range keyFields {
+			for _, key := range keyFields {
 				doc[key] = beforeRecord[key]
 			}
 		}
@@ -439,16 +436,16 @@ type userIdentity struct {
 	Type        *string `json:"type,omitempty"`
 }
 
-func decodeStreamRecordAttributes(attrs map[string]streamTypes.AttributeValue, keys map[string]struct{}) (map[string]any, error) {
+func decodeStreamRecordAttributes(attrs map[string]streamTypes.AttributeValue, keyFields []string) (map[string]any, error) {
 	item, err := attributevalue.FromDynamoDBStreamsMap(attrs)
 	if err != nil {
 		return nil, fmt.Errorf("converting from streams attribute value: %w", err)
 	}
 
-	return decodeAttributes(item, keys)
+	return decodeAttributes(item, keyFields)
 }
 
-func decodeAttributes(attrs map[string]types.AttributeValue, keys map[string]struct{}) (map[string]any, error) {
+func decodeAttributes(attrs map[string]types.AttributeValue, keyFields []string) (map[string]any, error) {
 	// Unmarshal the map of field name: types.AttributeValue to a map of field name: `any`.
 	// attributevalue.UnmarshalMap decodes a types.AttributeValue to an `any` by converting the
 	// DyanmoDB value to its corresponding native Go type and value, which works quite well for
@@ -461,7 +458,7 @@ func decodeAttributes(attrs map[string]types.AttributeValue, keys map[string]str
 
 	for key, val := range record {
 		// Convert any key fields that are DynamoDB numeric to strings.
-		if _, ok := keys[key]; ok {
+		if key == keyFields[0] || (len(keyFields) == 2 && key == keyFields[1]) {
 			// attributevalue.UnmarshalMap decodes all N types into a float64.
 			if actual, ok := val.(float64); ok {
 				record[key] = strconv.FormatFloat(actual, 'f', -1, 64)
