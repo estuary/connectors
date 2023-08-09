@@ -233,7 +233,7 @@ func (db *mysqlDatabase) explainQuery(streamID, query string, args []interface{}
 		logrus.WithFields(logrus.Fields{
 			"query": query,
 			"err":   err,
-		}).Error("unable to explain query")
+		}).Warn("unable to explain query")
 		return
 	}
 	defer explainResult.Close()
