@@ -72,7 +72,7 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06 UTC'`, ExpectValue: `"04:05:06Z"`},
 		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06.123 UTC'`, ExpectValue: `"04:05:06.123Z"`},
 		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06.123+0330'`, ExpectValue: `"04:05:06.123+03:30"`},
-		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06.123+033050'`, ExpectValue: `"04:05:06.123+03:30"`},
+		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06.123+03:30:50'`, ExpectValue: `"04:05:06.123+03:30:50"`},
 		{ColumnType: `interval`, ExpectType: `{"type":["string","null"]}`, InputValue: `'2 months 1 day 5 minutes 6 seconds'`, ExpectValue: `"2 mon 1 day 00:05:06.000000"`},
 		{ColumnType: `point`, ExpectType: `{"type":["string","null"]}`, InputValue: `(1, 2)`, ExpectValue: `"(1,2)"`},
 		{ColumnType: `line`, ExpectType: `{"type":["string","null"]}`, InputValue: `{1, 2, 3}`, ExpectValue: `"{1,2,3}"`},

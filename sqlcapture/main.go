@@ -106,10 +106,10 @@ func (e *prerequisitesError) Unwrap() []error {
 	return e.errs
 }
 
-// docsUrlFromEnv looks for an environment variable set as DOCS_URL to use for the spec response
+// docsURLFromEnv looks for an environment variable set as DOCS_URL to use for the spec response
 // documentation URL. It uses that instead of the default documentation URL from the connector if
 // found.
-func docsUrlFromEnv(providedURL string) string {
+func docsURLFromEnv(providedURL string) string {
 	fromEnv := os.Getenv("DOCS_URL")
 	if fromEnv != "" {
 		return fromEnv
@@ -118,7 +118,7 @@ func docsUrlFromEnv(providedURL string) string {
 	return providedURL
 }
 
-// spec returns the specification definition of this driver.
+// Spec returns the specification definition of this driver.
 // Notably this includes its endpoint and resource configuration JSON schema.
 func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
 	var resourceSchema, err = schemagen.GenerateSchema("SQL Database Resource Spec", &Resource{}).MarshalJSON()
@@ -129,7 +129,7 @@ func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_S
 		Protocol:                 3032023,
 		ConfigSchemaJson:         d.ConfigSchema,
 		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:         docsUrlFromEnv(d.DocumentationURL),
+		DocumentationUrl:         docsURLFromEnv(d.DocumentationURL),
 	}, nil
 }
 
