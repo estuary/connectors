@@ -81,13 +81,13 @@ Binding 0:
           },
           "reduce": {
             "strategy": "merge"
-          },
-          "x-infer-schema": true
+          }
         },
         {
           "$ref": "#discoverTable"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/partitionKey"
