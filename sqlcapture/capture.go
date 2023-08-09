@@ -562,15 +562,10 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 		return fmt.Errorf("unknown table %q", streamID)
 	}
 
-	var events, err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState)
-	if err != nil {
-		return fmt.Errorf("error scanning table %q: %w", streamID, err)
-	}
-
-	// Process backfill query results as a stream
+	// Process backfill query results as a callback-driven stream.
 	var lastRowKey = streamState.Scanned
 	var eventCount int
-	for _, event := range events { // TODO(wgd): For streaming event processing this needs to be a channel
+	var err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
 		if compareTuples(lastRowKey, event.RowKey) > 0 {
 			// Sanity check that the DB must always return rows whose serialized
 			// key value is greater than the previous cursor value. This together
@@ -584,6 +579,10 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 			return fmt.Errorf("error emitting %q backfill row: %w", streamID, err)
 		}
 		eventCount++
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error scanning table %q: %w", streamID, err)
 	}
 
 	// Update stream state to reflect backfill results

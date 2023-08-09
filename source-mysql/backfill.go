@@ -25,7 +25,7 @@ func (db *mysqlDatabase) WatermarksTable() string {
 	return db.config.Advanced.WatermarksTable
 }
 
-func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState) ([]*sqlcapture.ChangeEvent, error) {
+func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) error {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -52,10 +52,10 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
-				return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+				return fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
 			}
 			if len(resumeKey) != len(keyColumns) {
-				return nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+				return fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
 
 			logrus.WithFields(logrus.Fields{
@@ -80,7 +80,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
 		}
 	default:
-		return nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
+		return fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
@@ -90,12 +90,11 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 	results, err := db.conn.Execute(query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("unable to execute query %q: %w", query, err)
+		return fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer results.Close()
 
 	// Process the results into `changeEvent` structs and return them
-	var events []*sqlcapture.ChangeEvent
 	var rowOffset = state.BackfilledCount
 	logrus.WithFields(logrus.Fields{
 		"stream": streamID,
@@ -112,15 +111,15 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
-				return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
 		if err := db.translateRecordFields(columnTypes, fields); err != nil {
-			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
+			return fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
 		logrus.WithField("fields", fields).Trace("got row")
-		events = append(events, &sqlcapture.ChangeEvent{
+		var event = &sqlcapture.ChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			RowKey:    rowKey,
 			Source: &mysqlSourceInfo{
@@ -134,10 +133,13 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			},
 			Before: nil,
 			After:  fields,
-		})
+		}
+		if err := callback(event); err != nil {
+			return fmt.Errorf("error processing change event: %w", err)
+		}
 		rowOffset++
 	}
-	return events, nil
+	return nil
 }
 
 // The set of MySQL column types for which we need to specify `BINARY` ordering
