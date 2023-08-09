@@ -560,12 +560,12 @@ func (d *transactor) commit(ctx context.Context) error {
 		} else if !b.store.mustMerge {
 			// We can issue a faster COPY INTO the target table.
 			if _, err = d.store.conn.ExecContext(ctx, b.store.copyInto); err != nil {
-				return fmt.Errorf("copying Store documents: %w", err)
+				return fmt.Errorf("copying Store documents into table %q: %w", b.target.Identifier, err)
 			}
 		} else {
 			// We must MERGE into the target table.
 			if _, err = d.store.conn.ExecContext(ctx, b.store.mergeInto); err != nil {
-				return fmt.Errorf("merging Store documents: %w", err)
+				return fmt.Errorf("merging Store documents into table %q: %w", b.target.Identifier, err)
 			}
 		}
 
