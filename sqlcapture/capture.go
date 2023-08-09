@@ -95,11 +95,8 @@ type Capture struct {
 
 	discovery map[string]*DiscoveryInfo // Cached result of the most recent table discovery request
 
-	emitQueue chan interface{} // A large buffered channel containing messages to be serialized and emitted
-	emitError chan error       // A unit-buffered channel which contains the emitter goroutine's exit status after it terminates
-
-	// A mutex-guarded list of checkpoint cursor values. Values are appended by the
-	// emitter goroutine whenever it outputs a checkpoint and removed whenever the
+	// A mutex-guarded list of checkpoint cursor values. Values are appended by
+	// emitState() whenever it outputs a checkpoint and removed whenever the
 	// acknowledgement-relaying goroutine receives an Acknowledge message.
 	pending struct {
 		sync.Mutex
@@ -113,28 +110,8 @@ const (
 	streamProgressInterval = 60 * time.Second        // After `streamProgressInterval` the replication streaming code may log a progress report.
 )
 
-const emitterBufferSize = 4096 // Assuming change events average ~2kB then 4k * 2kB = 8MB
-
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
-	// Start up the 'message emitter' goroutine and allocate associated channels.
-	// This goroutine exists so that output message serialization can take place
-	// in parallel with ongoing backfill/replication processing. It must terminate
-	// before Run() returns thanks to a deferred receive from its error channel.
-	c.emitQueue = make(chan interface{}, emitterBufferSize)
-	c.emitError = make(chan error, 1)
-	emitterCtx, emitterCancel := context.WithCancel(ctx)
-	go c.emitWorker(emitterCtx, c.Output, c.emitQueue, c.emitError)
-	defer func() {
-		close(c.emitQueue)
-		emitterCancel()
-		for emitErr := range c.emitError {
-			if err == nil && emitErr != nil {
-				err = emitErr
-			}
-		}
-	}()
-
 	// Notify Flow that we're ready and would like to receive acknowledgements.
 	if err := c.Output.Ready(true); err != nil {
 		return err
@@ -495,7 +472,7 @@ func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationS
 			continue
 		}
 		if tableState.Mode == TableModeActive || tableState.Mode == TableModeKeylessBackfill {
-			if err := c.handleChangeEvent(streamID, event); err != nil {
+			if err := c.emitChange(event); err != nil {
 				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 			}
 			continue
@@ -508,7 +485,7 @@ func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationS
 		// will be emitted, while events *after* that point will be patched (or ignored) into
 		// the buffered resultSet.
 		if compareTuples(event.RowKey, tableState.Scanned) <= 0 {
-			if err := c.handleChangeEvent(streamID, event); err != nil {
+			if err := c.emitChange(event); err != nil {
 				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 			}
 		} else if err := results.Patch(streamID, event); err != nil {
@@ -529,7 +506,7 @@ func (c *Capture) emitBuffered(results *resultSet) error {
 	for _, streamID := range results.Streams() {
 		var events = results.Changes(streamID)
 		for _, event := range events {
-			if err := c.handleChangeEvent(streamID, event); err != nil {
+			if err := c.emitChange(event); err != nil {
 				return fmt.Errorf("error handling backfill change: %w", err)
 			}
 		}
@@ -599,8 +576,48 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 	return results, nil
 }
 
-func (c *Capture) handleChangeEvent(streamID string, event *ChangeEvent) error {
-	return c.emit(event)
+func (c *Capture) emitChange(event *ChangeEvent) error {
+	var record map[string]interface{}
+	var meta = struct {
+		Operation ChangeOp               `json:"op"`
+		Source    SourceMetadata         `json:"source"`
+		Before    map[string]interface{} `json:"before,omitempty"`
+	}{
+		Operation: event.Operation,
+		Source:    event.Source,
+		Before:    nil,
+	}
+	switch event.Operation {
+	case InsertOp:
+		record = event.After // Before is never used.
+	case UpdateOp:
+		meta.Before, record = event.Before, event.After
+	case DeleteOp:
+		record = event.Before // After is never used.
+	}
+	if record == nil {
+		logrus.WithField("op", event.Operation).Warn("change event data map is nil")
+		record = make(map[string]interface{})
+	}
+	record["_meta"] = &meta
+
+	var sourceCommon = event.Source.Common()
+	var streamID = JoinStreamID(sourceCommon.Schema, sourceCommon.Table)
+	var binding, ok = c.Bindings[streamID]
+	if !ok {
+		return fmt.Errorf("capture output to invalid stream %q", streamID)
+	}
+
+	var bs, err = json.Marshal(record)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"document": fmt.Sprintf("%#v", record),
+			"stream":   streamID,
+			"err":      err,
+		}).Error("document serialization error")
+		return fmt.Errorf("error serializing document from stream %q: %w", streamID, err)
+	}
+	return c.Output.Documents(int(binding.Index), bs)
 }
 
 func (c *Capture) emitState() error {
@@ -614,102 +631,21 @@ func (c *Capture) emitState() error {
 			streams[streamID] = state
 		}
 	}
-	return c.emit(&PersistentState{
+	var msg = &PersistentState{
 		Cursor:  c.State.Cursor,
 		Streams: streams,
-	})
-}
-
-// Queue a message to be emitted by the worker goroutine, and at the same
-// time check for an error so that message output failures will cleanly
-// shut down the overall capture.
-func (c *Capture) emit(msg interface{}) error {
-	select {
-	case err := <-c.emitError:
-		return err
-	case c.emitQueue <- msg:
-		return nil
 	}
-}
 
-func (c *Capture) emitWorker(ctx context.Context, out *boilerplate.PullOutput, emitQueue <-chan interface{}, emitError chan<- error) {
-	defer close(emitError)
-	for {
-		select {
-		case <-ctx.Done():
-			emitError <- fmt.Errorf("emitter context cancelled: %w", ctx.Err())
-			return
-		case msg, ok := <-emitQueue:
-			if !ok {
-				emitError <- nil
-				return
-			}
-			if err := c.emitMessage(out, msg); err != nil {
-				emitError <- err
-				return
-			}
-		}
+	c.pending.Lock()
+	defer c.pending.Unlock()
+	c.pending.cursors = append(c.pending.cursors, msg.Cursor)
+
+	var bs, err = json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("error serializing state checkpoint: %w", err)
 	}
-}
-
-func (c *Capture) emitMessage(out *boilerplate.PullOutput, msg interface{}) error {
-	switch msg := msg.(type) {
-	case *ChangeEvent:
-		var record map[string]interface{}
-		var meta = struct {
-			Operation ChangeOp               `json:"op"`
-			Source    SourceMetadata         `json:"source"`
-			Before    map[string]interface{} `json:"before,omitempty"`
-		}{
-			Operation: msg.Operation,
-			Source:    msg.Source,
-			Before:    nil,
-		}
-		switch msg.Operation {
-		case InsertOp:
-			record = msg.After // Before is never used.
-		case UpdateOp:
-			meta.Before, record = msg.Before, msg.After
-		case DeleteOp:
-			record = msg.Before // After is never used.
-		}
-		if record == nil {
-			logrus.WithField("op", msg.Operation).Warn("change event data map is nil")
-			record = make(map[string]interface{})
-		}
-		record["_meta"] = &meta
-
-		var sourceCommon = msg.Source.Common()
-		var streamID = JoinStreamID(sourceCommon.Schema, sourceCommon.Table)
-		var binding, ok = c.Bindings[streamID]
-		if !ok {
-			return fmt.Errorf("capture output to invalid stream %q", streamID)
-		}
-
-		var bs, err = json.Marshal(record)
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"document": fmt.Sprintf("%#v", record),
-				"stream":   streamID,
-				"err":      err,
-			}).Error("document serialization error")
-			return fmt.Errorf("error serializing document from stream %q: %w", streamID, err)
-		}
-		return out.Documents(int(binding.Index), bs)
-	case *PersistentState:
-		c.pending.Lock()
-		defer c.pending.Unlock()
-		c.pending.cursors = append(c.pending.cursors, msg.Cursor)
-
-		var bs, err = json.Marshal(msg)
-		if err != nil {
-			return fmt.Errorf("error serializing state checkpoint: %w", err)
-		}
-		logrus.WithField("state", string(bs)).Trace("emitting state update")
-		return out.Checkpoint(bs, true)
-	default:
-		return fmt.Errorf("invalid message to emit: %#v", msg)
-	}
+	logrus.WithField("state", string(bs)).Trace("emitting state update")
+	return c.Output.Checkpoint(bs, true)
 }
 
 func (c *Capture) acknowledgeWorker(ctx context.Context, stream *boilerplate.PullOutput, replStream ReplicationStream) error {
