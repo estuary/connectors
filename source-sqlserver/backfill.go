@@ -26,7 +26,7 @@ func (db *sqlserverDatabase) ShouldBackfill(streamID string) bool {
 }
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
-func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState) ([]*sqlcapture.ChangeEvent, error) {
+func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) error {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -52,10 +52,10 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
-				return nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+				return fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
 			}
 			if len(resumeKey) != len(keyColumns) {
-				return nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+				return fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
 			log.WithFields(log.Fields{
 				"stream":     streamID,
@@ -72,20 +72,20 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
 		}
 	default:
-		return nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
+		return fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
 	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("unable to execute query %q: %w", query, err)
+		return fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
 
 	// Set up the necessary slices for generic scanning over query rows
 	cnames, err := rows.Columns()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	var vals = make([]any, len(cnames))
 	var vptrs = make([]any, len(vals))
@@ -94,11 +94,10 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	}
 
 	// Iterate over the result set appending change events to the list
-	var events []*sqlcapture.ChangeEvent
 	var rowOffset = state.BackfilledCount
 	for rows.Next() {
 		if err := rows.Scan(vptrs...); err != nil {
-			return nil, fmt.Errorf("error scanning result row: %w", err)
+			return fmt.Errorf("error scanning result row: %w", err)
 		}
 		var fields = make(map[string]interface{})
 		for idx, name := range cnames {
@@ -111,17 +110,17 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
-				return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
 		if err := db.translateRecordFields(columnTypes, fields); err != nil {
-			return nil, fmt.Errorf("error backfilling table %q: %w", table, err)
+			return fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
 		log.WithField("fields", fields).Trace("got row")
 		var seqval = make([]byte, 10)
 		binary.BigEndian.PutUint64(seqval[2:], uint64(rowOffset))
-		events = append(events, &sqlcapture.ChangeEvent{
+		var event = &sqlcapture.ChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			RowKey:    rowKey,
 			Source: &sqlserverSourceInfo{
@@ -135,10 +134,13 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			},
 			Before: nil,
 			After:  fields,
-		})
+		}
+		if err := callback(event); err != nil {
+			return fmt.Errorf("error processing change event: %w", err)
+		}
 		rowOffset++
 	}
-	return events, nil
+	return nil
 }
 
 // The set of column types for which we need to specify a text collation to
