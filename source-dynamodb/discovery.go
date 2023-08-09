@@ -166,12 +166,12 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 						"reduce": map[string]interface{}{
 							"strategy": "merge",
 						},
-						"x-infer-schema": true,
 					},
 					Required: []string{"_meta"},
 				},
 				{Ref: "#" + anchor},
 			},
+			Extras: map[string]interface{}{"x-infer-schema": true},
 		}
 
 		rawSchema, err := schema.MarshalJSON()
