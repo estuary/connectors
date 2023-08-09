@@ -54,6 +54,11 @@ type SourceCommon struct {
 	// and are available through logs. They seem noisy and low-signal here.
 }
 
+// StreamID combines the Schema and Table properties using JoinStreamID()
+func (sc SourceCommon) StreamID() string {
+	return JoinStreamID(sc.Schema, sc.Table)
+}
+
 // SourceMetadata is source-specific metadata about data capture events.
 type SourceMetadata interface {
 	Common() SourceCommon
