@@ -48,6 +48,8 @@ const (
 	// in the COPY command, and in the `flow_document` column by setting
 	// `json_parse_truncate_strings=ON` in the session that performs the Store to the target table.
 	redshiftVarcharMaxLength = 65535
+
+	redshiftTextColumnLength = 255
 )
 
 type sshForwarding struct {
@@ -495,7 +497,7 @@ type binding struct {
 	varcharColumnMetas           []varcharColumnMeta
 	loadFile                     *stagedFile
 	storeFile                    *stagedFile
-	createLoadTableSQL           string
+	createLoadTableTemplate      *template.Template
 	createStoreTableSQL          string
 	storeUpdateDeleteExistingSQL string
 	storeUpdateSQL               string
@@ -528,7 +530,6 @@ func (t *transactor) addBinding(
 		sql *string
 		tpl *template.Template
 	}{
-		{&b.createLoadTableSQL, tplCreateLoadTable},
 		{&b.createStoreTableSQL, tplCreateStoreTable},
 		{&b.storeUpdateDeleteExistingSQL, tplStoreUpdateDeleteExisting},
 		{&b.storeUpdateSQL, tplStoreUpdate},
@@ -540,9 +541,14 @@ func (t *transactor) addBinding(
 		}
 	}
 
-	// Retain column metadata information for this binding as a snapshot of the table configuration
-	// when the connector started, indexed in the same order as values will be received from the
-	// runtime for Store requests. Only VARCHAR columns will have non-zero-valued varcharColumnMeta.
+	// The load table template is re-evaluted every transaction to account for the specific string
+	// lengths observed for string keys in the load key set.
+	b.createLoadTableTemplate = tplCreateLoadTable
+
+	// Retain column metadata information for this binding as a snapshot of the target table
+	// configuration when the connector started, indexed in the same order as values will be
+	// received from the runtime for Store requests. Only VARCHAR columns will have non-zero-valued
+	// varcharColumnMeta.
 	allColumns := target.Columns()
 	columnMetas := make([]varcharColumnMeta, len(allColumns))
 	if varchars != nil { // There may not be any varchar columns for this binding
@@ -574,6 +580,11 @@ func (t *transactor) addBinding(
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 	gotLoads := false
+
+	// Keep track of the maximum length of any string values encountered so the temporary load table
+	// can be created with long enough string columns.
+	maxStringLengths := make([]int, len(d.bindings))
+
 	for it.Next() {
 		gotLoads = true
 
@@ -583,6 +594,25 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		converted, err := b.target.ConvertKey(it.Key)
 		if err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
+		}
+
+		for _, c := range converted {
+			if s, ok := c.(string); ok {
+				l := len(s)
+
+				if l > redshiftVarcharMaxLength {
+					return fmt.Errorf(
+						"cannot load string keys with byte lengths longer than %d: collection for table %s had a string key with length %d",
+						redshiftVarcharMaxLength,
+						b.target.Identifier,
+						l,
+					)
+				}
+
+				if l > redshiftTextColumnLength && l > maxStringLengths[it.Binding] {
+					maxStringLengths[it.Binding] = l
+				}
+			}
 		}
 
 		if err := b.loadFile.encodeRow(converted); err != nil {
@@ -618,7 +648,14 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		// The temporary load table for each binding always needs to be created because it is used
 		// in the UNION ALL load query. This may be an opportunity for a (minor) future
 		// optimization.
-		batch.Queue(b.createLoadTableSQL)
+		var createLoadTableSQL strings.Builder
+		if err := b.createLoadTableTemplate.Execute(&createLoadTableSQL, loadTableParams{
+			Target:        b.target,
+			VarCharLength: maxStringLengths[idx],
+		}); err != nil {
+			return fmt.Errorf("evaluating create load table template: %w", err)
+		}
+		batch.Queue(createLoadTableSQL.String())
 
 		if !b.loadFile.started {
 			// No loads for this binding.
@@ -633,9 +670,10 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 		var copySql strings.Builder
 		if err := tplCopyFromS3.Execute(&copySql, copyFromS3Params{
-			Destination:    fmt.Sprintf("flow_temp_table_%d", idx),
-			ObjectLocation: objectLocation,
-			Config:         *d.cfg,
+			Destination:     fmt.Sprintf("flow_temp_table_%d", idx),
+			ObjectLocation:  objectLocation,
+			Config:          *d.cfg,
+			TruncateColumns: false,
 		}); err != nil {
 			return fmt.Errorf("evaluating copy from s3 template: %w", err)
 		}
@@ -850,9 +888,10 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 
 		var copySql strings.Builder
 		if err := tplCopyFromS3.Execute(&copySql, copyFromS3Params{
-			Destination:    dest,
-			ObjectLocation: objectLocation,
-			Config:         *d.cfg,
+			Destination:     dest,
+			ObjectLocation:  objectLocation,
+			Config:          *d.cfg,
+			TruncateColumns: true,
 		}); err != nil {
 			return fmt.Errorf("evaluating copy from s3 template: %w", err)
 		}

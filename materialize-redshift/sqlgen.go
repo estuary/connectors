@@ -99,9 +99,15 @@ var rsDialect = func() sql.Dialect {
 }()
 
 type copyFromS3Params struct {
-	Destination    string
-	ObjectLocation string
-	Config         config
+	Destination     string
+	ObjectLocation  string
+	Config          config
+	TruncateColumns bool
+}
+
+type loadTableParams struct {
+	Target        sql.Table
+	VarCharLength int
 }
 
 var (
@@ -131,10 +137,14 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 -- Idempotent creation of the load table for staging load keys.
 
 {{ define "createLoadTable" }}
-CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
-{{- range $ind, $key := $.Keys }}
+CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
+{{- range $ind, $key := $.Target.Keys }}
 	{{- if $ind }},{{ end }}
-	{{ $key.Identifier }} {{ $key.DDL }}
+	{{ $key.Identifier }} {{ if and (eq $key.DDL "TEXT") (not (eq $.VarCharLength 0)) -}}
+		VARCHAR({{ $.VarCharLength }})
+	{{- else }}
+		{{- $key.DDL }}
+	{{- end }}
 {{- end }}
 );
 {{ end }}
@@ -200,7 +210,7 @@ UPDATE {{ Identifier $.TablePath }}
 {{ end }}
 
 -- Templated command to copy data from an S3 file into the destination table. Note the 'ignorecase'
--- JSON option: This is necessary since be default Redshift lowercases all identifiers.
+-- JSON option: This is necessary since by default Redshift lowercases all identifiers.
 
 {{ define "copyFromS3" }}
 COPY {{ $.Destination }}
@@ -210,7 +220,11 @@ REGION '{{ $.Config.Region }}'
 JSON 'auto ignorecase'
 DATEFORMAT 'auto'
 TIMEFORMAT 'auto'
+{{- if $.TruncateColumns }}
 TRUNCATECOLUMNS;
+{{- else -}}
+;
+{{- end }}
 {{ end }}
 `)
 	tplCreateTargetTable         = tplAll.Lookup("createTargetTable")
