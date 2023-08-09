@@ -201,7 +201,16 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 				return val, nil
 			case "json":
 				if len(val) == 0 {
+					// The empty string is technically invalid JSON but null should be
+					// a reasonable translation.
 					return nil, nil
+				}
+				if !json.Valid(val) {
+					// If the contents of a JSON column are malformed and non-empty we
+					// don't really have any option other than stringifying it. But we
+					// can wrap it in an object with an 'invalidJSON' property so that
+					// there's at least some hope of identifying such values later on.
+					return map[string]any{"invalidJSON": string(val)}, nil
 				}
 				return json.RawMessage(val), nil
 			case "timestamp":
