@@ -81,13 +81,13 @@ Binding 0:
           },
           "reduce": {
             "strategy": "merge"
-          },
-          "x-infer-schema": true
+          }
         },
         {
           "$ref": "#discoverTable"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/partitionKey"
@@ -181,13 +181,13 @@ Binding 1:
           },
           "reduce": {
             "strategy": "merge"
-          },
-          "x-infer-schema": true
+          }
         },
         {
           "$ref": "#secondTable"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/partitionKeyString",
@@ -283,13 +283,13 @@ Binding 2:
           },
           "reduce": {
             "strategy": "merge"
-          },
-          "x-infer-schema": true
+          }
         },
         {
           "$ref": "#thirdTable"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/partitionKeyBinary",
