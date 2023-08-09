@@ -174,7 +174,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
 		return fmt.Errorf("error writing next watermark: %w", err)
 	}
-	if err := c.streamToWatermark(ctx, replStream, watermark, nil); err != nil {
+	if err := c.streamCatchup(ctx, replStream, watermark); err != nil {
 		return fmt.Errorf("error streaming until watermark: %w", err)
 	}
 	for _, streamID := range c.State.StreamsInState(TableModePending) {
@@ -237,19 +237,15 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	}
 
 	// Backfill any tables which require it
-	var results *resultSet
 	for c.State.StreamsInState(TableModeBackfill, TableModeKeylessBackfill) != nil {
 		var watermark = uuid.New().String()
 		if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
 			return fmt.Errorf("error writing next watermark: %w", err)
-		}
-		if err := c.streamToWatermark(ctx, replStream, watermark, results); err != nil {
+		} else if err := c.streamToWatermark(ctx, replStream, watermark); err != nil {
 			return fmt.Errorf("error streaming until watermark: %w", err)
-		} else if err := c.emitBuffered(results); err != nil {
-			return fmt.Errorf("error emitting buffered results: %w", err)
-		}
-		results, err = c.backfillStreams(ctx, c.State.StreamsInState(TableModeBackfill, TableModeKeylessBackfill))
-		if err != nil {
+		} else if err := c.emitState(); err != nil {
+			return err
+		} else if err := c.backfillStreams(ctx); err != nil {
 			return fmt.Errorf("error performing backfill: %w", err)
 		}
 	}
@@ -265,8 +261,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 
 	// Once there is no more backfilling to do, just stream changes forever and emit
 	// state updates on every transaction commit.
-	var targetWatermark = nonexistentWatermark
-	if err := c.streamToWatermark(ctx, replStream, targetWatermark, nil); err != nil {
+	if err := c.streamForever(ctx, replStream); err != nil {
 		return err
 	}
 	return nil
@@ -366,61 +361,95 @@ func (c *Capture) updateState(ctx context.Context) error {
 	return c.emitState()
 }
 
-func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationStream, watermark string, results *resultSet) error {
+// This code is all about logging enough information to give insight into
+// connector replication progress without being unusably spammy. These logs
+// take two forms:
+//
+//   - A warning/info message when the stream has been sitting idle
+//     for a while since the last replication event. This is a warning
+//     when we expect to catch up to a watermark, and informational when
+//     that watermark is "nonexistent-watermark".
+//   - Periodic progress updates, just to show that streaming is ongoing.
+//
+// Neither of these can occur more frequently than their respective timeout
+// values, so the impact of the additional logging should be minimal.
+type streamProgressReport struct {
+	eventCount   int
+	nextProgress time.Time
+	idleTimeout  *time.Timer
+}
+
+func startProgressReport(idleIsBad bool) *streamProgressReport {
+	return &streamProgressReport{
+		nextProgress: time.Now().Add(streamProgressInterval),
+		idleTimeout: time.AfterFunc(streamIdleWarning, func() {
+			if idleIsBad {
+				logrus.WithField("timeout", streamIdleWarning.String()).Warn("replication stream idle")
+			} else {
+				logrus.WithField("timeout", streamIdleWarning.String()).Info("replication stream idle")
+			}
+		}),
+	}
+}
+
+func (spr *streamProgressReport) Progress() {
+	spr.eventCount++
+	if time.Now().After(spr.nextProgress) {
+		logrus.WithField("count", spr.eventCount).Info("replication stream progress")
+		spr.nextProgress = time.Now().Add(streamProgressInterval)
+	}
+	spr.idleTimeout.Reset(streamIdleWarning)
+}
+
+func (spr *streamProgressReport) Stop() {
+	spr.idleTimeout.Stop()
+}
+
+func (c *Capture) streamCatchup(ctx context.Context, replStream ReplicationStream, watermark string) error {
+	return c.streamToWatermarkWithOptions(ctx, replStream, watermark, true)
+}
+
+func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationStream, watermark string) error {
+	return c.streamToWatermarkWithOptions(ctx, replStream, watermark, false)
+}
+
+func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStream) error {
+	return c.streamToWatermarkWithOptions(ctx, replStream, nonexistentWatermark, true)
+}
+
+// streamToWatermarkWithOptions implements three very similar operations:
+//
+//   - streamCatchup: Processes replication events until the watermark is reached
+//     and then stops. Whenever a database transaction commit is reported, a Flow
+//     state checkpoint update is emitted.
+//   - streamForever: Like streamCatchup but the watermark doesn't actually exist
+//     and so will never be reached.
+//   - streamToWatermark: Like streamCatchup except that no state checkpoints are
+//     emitted during replication processing. This is done during backfills so that
+//     a chunk of backfilled rows plus all relevant replication events will be
+//     committed into the same Flow transaction.
+//
+// All three operations are implemented as a single function here with parameters
+// controlling its behavior because the three operations are so similar.
+func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream ReplicationStream, watermark string, reportFlush bool) error {
 	logrus.WithField("watermark", watermark).Info("streaming to watermark")
 	var watermarksTable = c.Database.WatermarksTable()
 	var watermarkReached = false
 
-	// This part is all about logging enough information to give insight into
-	// connector operation without being unusably spammy. These logs take two forms:
-	//
-	//   + A warning/info message when the stream has been sitting idle
-	//     for a while since the last replication event. This is a warning
-	//     when we expect to catch up to a watermark, and informational when
-	//     that watermark is "nonexistent-watermark".
-	//   + Periodic progress updates, just to show that streaming is ongoing.
-	//
-	// Neither of these can occur more frequently than their respective timeout
-	// values, so the impact of the additional logging should be minimal.
-	//
-	// During backfills no individual `streamToWatermark` call should last long
-	// enough for those timeouts to be hit (and if they are then that's very
-	// useful information). Once we hit the steady state of pure replication
-	// streaming:
-	//
-	//   + If change events are sufficiently infrequent or bursty, each change
-	//     event (or burst of events) will elicit a "progress" log, followed by
-	//     an "idle" log message some time after the event-burst has ended.
-	//   + If a burst of events continues for longer than `streamProgressInterval`
-	//     then additional progress reports will be logged.
-	//   + A consistent high rate of events is just a burst that hasn't ended (so
-	//     far), and will report progress every `streamProgressInterval`.
-	var eventCount int
-	var nextProgress = time.Now().Add(streamProgressInterval)
-	var idleTimeout = time.AfterFunc(streamIdleWarning, func() {
-		if watermark != nonexistentWatermark {
-			logrus.WithField("timeout", streamIdleWarning.String()).Warn("replication stream idle")
-		} else {
-			logrus.WithField("timeout", streamIdleWarning.String()).Info("replication stream idle")
-		}
-	})
-	defer idleTimeout.Stop()
+	var progressReport = startProgressReport(watermark != nonexistentWatermark)
+	defer progressReport.Stop()
 
 	for event := range replStream.Events() {
-		// Progress logging concerns
-		eventCount++
-		if time.Now().After(nextProgress) {
-			logrus.WithField("count", eventCount).Info("replication stream progress")
-			nextProgress = time.Now().Add(streamProgressInterval)
-		}
-		idleTimeout.Reset(streamIdleWarning)
+		progressReport.Progress()
 
 		// Flush events update the checkpointed LSN and trigger a state update.
 		// If this is the commit after the target watermark, it also ends the loop.
 		if event, ok := event.(*FlushEvent); ok {
 			c.State.Cursor = event.Cursor
-			if err := c.emitState(); err != nil {
-				return fmt.Errorf("error emitting state update: %w", err)
+			if reportFlush {
+				if err := c.emitState(); err != nil {
+					return fmt.Errorf("error emitting state update: %w", err)
+				}
 			}
 			if watermarkReached {
 				return nil
@@ -428,68 +457,20 @@ func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationS
 			continue
 		}
 
-		// Metadata events update the per-table metadata and dirty flag.
-		// They have no other effect, the new metadata will only be written
-		// as part of a subsequent state checkpoint.
-		if event, ok := event.(*MetadataEvent); ok {
-			var streamID = event.StreamID
-			if state, ok := c.State.Streams[streamID]; ok {
-				logrus.WithField("stream", streamID).Trace("stream metadata changed")
-				state.Metadata = event.Metadata
-				state.dirty = true
-				c.State.Streams[streamID] = state
-			}
-			continue
-		}
-
-		// Any other events must be ChangeEvents
-		if _, ok := event.(*ChangeEvent); !ok {
-			return fmt.Errorf("unhandled database event %q", event.String())
-		}
-		var event = event.(*ChangeEvent)
-
-		// Note when the expected watermark is finally observed. The subsequent Commit will exit the loop.
-		var sourceCommon = event.Source.Common()
-		var streamID = JoinStreamID(sourceCommon.Schema, sourceCommon.Table)
-		if streamID == watermarksTable && event.Operation != DeleteOp {
-			var actual = event.After["watermark"]
-			logrus.WithFields(logrus.Fields{
-				"expected": watermark,
-				"actual":   actual,
-			}).Debug("watermark change")
-			if actual == watermark {
-				watermarkReached = true
+		// Check for watermark change events and set a flag when the target watermark is reached.
+		// The subsequent FlushEvent will exit the loop.
+		if event, ok := event.(*ChangeEvent); ok {
+			if event.Operation != DeleteOp && event.Source.Common().StreamID() == watermarksTable {
+				var actual = event.After["watermark"]
+				logrus.WithFields(logrus.Fields{"expected": watermark, "actual": actual}).Debug("watermark change")
+				if actual == watermark {
+					watermarkReached = true
+				}
 			}
 		}
 
-		// Handle the easy cases: Events on ignored or fully-active tables.
-		var tableState = c.State.Streams[streamID]
-		if tableState == nil || tableState.Mode == "" || tableState.Mode == TableModeIgnore {
-			logrus.WithFields(logrus.Fields{
-				"stream": streamID,
-				"op":     event.Operation,
-			}).Debug("ignoring stream")
-			continue
-		}
-		if tableState.Mode == TableModeActive || tableState.Mode == TableModeKeylessBackfill {
-			if err := c.emitChange(event); err != nil {
-				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
-			}
-			continue
-		}
-		if tableState.Mode != TableModeBackfill {
-			return fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
-		}
-
-		// While a table is being backfilled, events occurring *before* the current scan point
-		// will be emitted, while events *after* that point will be patched (or ignored) into
-		// the buffered resultSet.
-		if compareTuples(event.RowKey, tableState.Scanned) <= 0 {
-			if err := c.emitChange(event); err != nil {
-				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
-			}
-		} else if err := results.Patch(streamID, event); err != nil {
-			return fmt.Errorf("error patching resultset for %q: %w", streamID, err)
+		if err := c.handleReplicationEvent(event); err != nil {
+			return err
 		}
 	}
 	if err := ctx.Err(); err != nil {
@@ -501,42 +482,60 @@ func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationS
 	return fmt.Errorf("replication stream closed before reaching watermark")
 }
 
-func (c *Capture) emitBuffered(results *resultSet) error {
-	// Emit any buffered results and update table states accordingly.
-	for _, streamID := range results.Streams() {
-		var events = results.Changes(streamID)
-		for _, event := range events {
-			if err := c.emitChange(event); err != nil {
-				return fmt.Errorf("error handling backfill change: %w", err)
-			}
+func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
+	// Metadata events update the per-table metadata and dirty flag.
+	// They have no other effect, the new metadata will only be written
+	// as part of a subsequent state checkpoint.
+	if event, ok := event.(*MetadataEvent); ok {
+		var streamID = event.StreamID
+		if state, ok := c.State.Streams[streamID]; ok {
+			logrus.WithField("stream", streamID).Trace("stream metadata updated")
+			state.Metadata = event.Metadata
+			state.dirty = true
+			c.State.Streams[streamID] = state
 		}
-
-		var state = c.State.Streams[streamID]
-		if results.Complete(streamID) {
-			state.Mode = TableModeActive
-			state.Scanned = nil
-		} else {
-			state.Scanned = results.Scanned(streamID)
-			state.BackfilledCount += len(events)
-		}
-
-		logrus.WithField("stream", streamID).Trace("stream mode/cursor changed")
-		state.dirty = true
-		c.State.Streams[streamID] = state
+		return nil
 	}
 
-	// Emit a new state update. The global `CurrentLSN` has been advanced by the
-	// watermark commit event, and the individual stream `Scanned` tracking for
-	// each stream has been advanced just above.
-	return c.emitState()
+	// Any other events processed here must be ChangeEvents.
+	if _, ok := event.(*ChangeEvent); !ok {
+		return fmt.Errorf("unhandled replication event %q", event.String())
+	}
+	var change = event.(*ChangeEvent)
+	var streamID = change.Source.Common().StreamID()
+
+	// Handle the easy cases: Events on ignored or fully-active tables.
+	var tableState = c.State.Streams[streamID]
+	if tableState == nil || tableState.Mode == "" || tableState.Mode == TableModeIgnore {
+		logrus.WithFields(logrus.Fields{
+			"stream": streamID,
+			"op":     change.Operation,
+		}).Debug("ignoring stream")
+		return nil
+	}
+	if tableState.Mode == TableModeActive || tableState.Mode == TableModeKeylessBackfill {
+		if err := c.emitChange(change); err != nil {
+			return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
+		}
+		return nil
+	}
+	if tableState.Mode != TableModeBackfill {
+		return fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
+	}
+
+	// While a table is being backfilled, events occurring *before* the current scan point
+	// will be emitted, while events *after* that point will be patched (or ignored) into
+	// the buffered resultSet.
+	if compareTuples(change.RowKey, tableState.Scanned) <= 0 {
+		if err := c.emitChange(change); err != nil {
+			return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
+		}
+	}
+	return nil
 }
 
-func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resultSet, error) {
-	var results = newResultSet()
-
-	// TODO(wgd): Add a sanity-check assertion that the current watermark value
-	// in the database matches the one we previously wrote? Maybe that's more effort
-	// than it's worth until we have other evidence of correctness violations though.
+func (c *Capture) backfillStreams(ctx context.Context) error {
+	var streams = c.State.StreamsInState(TableModeBackfill, TableModeKeylessBackfill)
 
 	// Select one stream at random to backfill at a time. On average this works
 	// as well as any other policy, and just doing one at a time means that we
@@ -544,36 +543,61 @@ func (c *Capture) backfillStreams(ctx context.Context, streams []string) (*resul
 	// might be concurrently backfilling.
 	if len(streams) != 0 {
 		var streamID = streams[rand.Intn(len(streams))]
-		var streamState = c.State.Streams[streamID]
-
 		logrus.WithFields(logrus.Fields{
 			"streams":  streams,
 			"selected": streamID,
 		}).Info("backfilling streams")
-
-		discoveryInfo, ok := c.discovery[streamID]
-		if !ok {
-			return nil, fmt.Errorf("unknown table %q", streamID)
+		if err := c.backfillStream(ctx, streamID); err != nil {
+			return err
 		}
+	}
+	return nil
+}
 
-		var events, err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState)
-		if err != nil {
-			return nil, fmt.Errorf("error scanning table %q: %w", streamID, err)
-		}
-		if len(events) > 0 && compareTuples(streamState.Scanned, events[0].RowKey) > 0 {
+func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
+	var streamState = c.State.Streams[streamID]
+
+	discoveryInfo, ok := c.discovery[streamID]
+	if !ok {
+		return fmt.Errorf("unknown table %q", streamID)
+	}
+
+	var events, err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState)
+	if err != nil {
+		return fmt.Errorf("error scanning table %q: %w", streamID, err)
+	}
+
+	// Process backfill query results as a stream
+	var lastRowKey = streamState.Scanned
+	var eventCount int
+	for _, event := range events { // TODO(wgd): For streaming event processing this needs to be a channel
+		if compareTuples(lastRowKey, event.RowKey) > 0 {
 			// Sanity check that the DB must always return rows whose serialized
 			// key value is greater than the previous cursor value. This together
 			// with the check in resultset.go ensures that the scan key always
 			// increases (or else the capture will fail).
-			return nil, fmt.Errorf("scan key ordering failure: last=%q, next=%q", streamState.Scanned, events[0].RowKey)
+			return fmt.Errorf("scan key ordering failure: last=%q, next=%q", lastRowKey, event.RowKey)
 		}
+		lastRowKey = event.RowKey
 
-		// Translate the resulting list of entries into a backfillChunk
-		if err := results.Buffer(streamID, events); err != nil {
-			return nil, fmt.Errorf("error buffering scan results for %q: %w", streamID, err)
+		if err := c.emitChange(event); err != nil {
+			return fmt.Errorf("error emitting %q backfill row: %w", streamID, err)
 		}
+		eventCount++
 	}
-	return results, nil
+
+	// Update stream state to reflect backfill results
+	var state = c.State.Streams[streamID]
+	if eventCount == 0 {
+		state.Mode = TableModeActive
+		state.Scanned = nil
+	} else {
+		state.Scanned = lastRowKey
+		state.BackfilledCount += eventCount
+	}
+	state.dirty = true
+	c.State.Streams[streamID] = state
+	return nil
 }
 
 func (c *Capture) emitChange(event *ChangeEvent) error {
