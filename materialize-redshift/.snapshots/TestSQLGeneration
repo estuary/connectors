@@ -36,19 +36,6 @@ COMMENT ON COLUMN "Delta Updates".aValue IS 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]';
 --- End "Delta Updates" createTargetTable ---
 
---- Begin "a-schema".target_table createLoadTable ---
-CREATE TEMPORARY TABLE flow_temp_table_0 (
-	key1 BIGINT,
-	"key!2" BOOLEAN
-);
---- End "a-schema".target_table createLoadTable ---
-
---- Begin "Delta Updates" createLoadTable ---
-CREATE TEMPORARY TABLE flow_temp_table_1 (
-	theKey TEXT
-);
---- End "Delta Updates" createLoadTable ---
-
 --- Begin "a-schema".target_table createStoreTable ---
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 	LIKE "a-schema".target_table
@@ -95,6 +82,32 @@ SELECT 0, r.flow_document
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 --- End "Delta Updates" loadQuery ---
 
+--- Begin "a-schema".target_table createLoadTable (no varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_0 (
+	key1 BIGINT,
+	"key!2" BOOLEAN
+);
+--- End "a-schema".target_table createLoadTable (no varchar length) ---
+
+--- Begin "Delta Updates" createLoadTable (no varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_1 (
+	theKey TEXT
+);
+--- End "Delta Updates" createLoadTable (no varchar length) ---
+
+--- Begin "a-schema".target_table createLoadTable (with varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_0 (
+	key1 BIGINT,
+	"key!2" BOOLEAN
+);
+--- End "a-schema".target_table createLoadTable (with varchar length) ---
+
+--- Begin "Delta Updates" createLoadTable (with varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_1 (
+	theKey VARCHAR(400)
+);
+--- End "Delta Updates" createLoadTable (with varchar length) ---
+
 --- Begin Fence Update ---
 UPDATE path."To".checkpoints
 	SET   checkpoint = 'AAECAwQFBgcICQ=='
@@ -104,7 +117,7 @@ UPDATE path."To".checkpoints
 	AND   fence     = 123;
 --- End Fence Update ---
 
---- Begin Copy From S3 ---
+--- Begin Copy From S3 With Truncation---
 COPY my_temp_table
 FROM 's3://some_bucket'
 CREDENTIALS 'aws_access_key_id=accessKeyID;aws_secret_access_key=secretKey'
@@ -113,6 +126,14 @@ JSON 'auto ignorecase'
 DATEFORMAT 'auto'
 TIMEFORMAT 'auto'
 TRUNCATECOLUMNS;
---- End Copy From S3 ---
+--- End Copy From S3 With Truncation ---
 
-
+--- Begin Copy From S3 Without Truncation---
+COPY my_temp_table
+FROM 's3://some_bucket'
+CREDENTIALS 'aws_access_key_id=accessKeyID;aws_secret_access_key=secretKey'
+REGION 'us-somewhere-1'
+JSON 'auto ignorecase'
+DATEFORMAT 'auto'
+TIMEFORMAT 'auto';
+--- End Copy From S3 Without Truncation ---

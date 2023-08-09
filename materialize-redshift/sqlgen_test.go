@@ -40,7 +40,6 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tpl := range []*template.Template{
 		tplCreateTargetTable,
-		tplCreateLoadTable,
 		tplCreateStoreTable,
 		tplStoreUpdateDeleteExisting,
 		tplStoreUpdate,
@@ -53,6 +52,33 @@ func TestSQLGeneration(t *testing.T) {
 			require.NoError(t, tpl.Execute(&snap, &tbl))
 			snap.WriteString("--- End " + testcase + " ---\n\n")
 		}
+	}
+
+	for _, tbl := range []sqlDriver.Table{table1, table2} {
+		tpl := tplCreateLoadTable
+		var testcase = tbl.Identifier + " " + tpl.Name()
+
+		data := loadTableParams{
+			Target: tbl,
+		}
+
+		snap.WriteString("--- Begin " + testcase + " (no varchar length) ---")
+		require.NoError(t, tpl.Execute(&snap, data))
+		snap.WriteString("--- End " + testcase + " (no varchar length) ---\n\n")
+	}
+
+	for _, tbl := range []sqlDriver.Table{table1, table2} {
+		tpl := tplCreateLoadTable
+		var testcase = tbl.Identifier + " " + tpl.Name()
+
+		data := loadTableParams{
+			Target:        tbl,
+			VarCharLength: 400,
+		}
+
+		snap.WriteString("--- Begin " + testcase + " (with varchar length) ---")
+		require.NoError(t, tpl.Execute(&snap, data))
+		snap.WriteString("--- End " + testcase + " (with varchar length) ---\n\n")
 	}
 
 	var fence = sqlDriver.Fence{
@@ -76,11 +102,18 @@ func TestSQLGeneration(t *testing.T) {
 			AWSSecretAccessKey: "secretKey",
 			Region:             "us-somewhere-1",
 		},
+		TruncateColumns: true,
 	}
 
-	snap.WriteString("--- Begin Copy From S3 ---")
+	snap.WriteString("--- Begin Copy From S3 With Truncation---")
 	require.NoError(t, tplCopyFromS3.Execute(&snap, copyParams))
-	snap.WriteString("--- End Copy From S3 ---\n\n")
+	snap.WriteString("--- End Copy From S3 With Truncation ---\n\n")
+
+	copyParams.TruncateColumns = false
+
+	snap.WriteString("--- Begin Copy From S3 Without Truncation---")
+	require.NoError(t, tplCopyFromS3.Execute(&snap, copyParams))
+	snap.WriteString("--- End Copy From S3 Without Truncation ---")
 
 	cupaloy.SnapshotT(t, snap.String())
 }
