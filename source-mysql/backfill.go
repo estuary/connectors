@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/sirupsen/logrus"
 )
 
@@ -88,23 +89,25 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 
 	// Execute the backfill query to fetch rows from the database
 	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
-	results, err := db.conn.Execute(query, args...)
-	if err != nil {
-		return fmt.Errorf("unable to execute query %q: %w", query, err)
-	}
-	defer results.Close()
 
-	// Process the results into `changeEvent` structs and return them
+	// There is no helper function for a streaming select query with arguments,
+	// so we have to drop down a level and prepare the statement ourselves here.
+	var stmt, err = db.conn.Prepare(query)
+	if err != nil {
+		return fmt.Errorf("error preparing query %q: %w", query, err)
+	}
+	defer stmt.Close()
+
+	var result mysql.Result
+	defer result.Close() // Ensure the resultset allocated during ExecuteSelectStreaming is returned to the pool when done
+
 	var rowOffset = state.BackfilledCount
-	logrus.WithFields(logrus.Fields{
-		"stream": streamID,
-		"rows":   len(results.Values),
-	}).Debug("translating query rows to change events")
-	for _, row := range results.Values {
-		var fields = make(map[string]interface{})
+	if err := stmt.ExecuteSelectStreaming(&result, func(row []mysql.FieldValue) error {
+		var fields = make(map[string]any)
 		for idx, val := range row {
-			fields[string(results.Fields[idx].Name)] = val.Value()
+			fields[string(result.Fields[idx].Name)] = val.Value()
 		}
+
 		var rowKey []byte
 		if state.Mode == sqlcapture.TableModeKeylessBackfill {
 			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset)) // A 19 digit decimal number is sufficient to hold any 63-bit integer
@@ -138,6 +141,9 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			return fmt.Errorf("error processing change event: %w", err)
 		}
 		rowOffset++
+		return nil
+	}, nil, args...); err != nil {
+		return fmt.Errorf("error executing backfill: %w", err)
 	}
 	return nil
 }
