@@ -491,7 +491,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		if err = rows.Scan(&binding, &document); err != nil {
 			return fmt.Errorf("scanning Load document: %w", err)
 		} else if err = loaded(binding, json.RawMessage(document)); err != nil {
-			return err
+			return fmt.Errorf("sending loaded document for table %q: %w", d.bindings[binding].target.Identifier, err)
 		}
 	}
 	if err = rows.Err(); err != nil {
