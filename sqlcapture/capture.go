@@ -688,8 +688,12 @@ func (c *Capture) emitMessage(out *boilerplate.PullOutput, msg interface{}) erro
 
 		var bs, err = json.Marshal(record)
 		if err != nil {
-			return fmt.Errorf("error serializing table %s.%s record data: %w",
-				sourceCommon.Schema, sourceCommon.Table, err)
+			logrus.WithFields(logrus.Fields{
+				"document": fmt.Sprintf("%#v", record),
+				"stream":   streamID,
+				"err":      err,
+			}).Error("document serialization error")
+			return fmt.Errorf("error serializing document from stream %q: %w", streamID, err)
 		}
 		return out.Documents(int(binding.Index), bs)
 	case *PersistentState:
