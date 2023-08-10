@@ -51,6 +51,7 @@ func TestDatatypes(t *testing.T) {
 
 		// Floating-Point Types
 		{ColumnType: "float", ExpectType: `{"type":["number","null"]}`, InputValue: 123.456, ExpectValue: `123.456`},
+		{ColumnType: "float(53)", ExpectType: `{"type":["number","null"]}`, InputValue: 0.1234567891234, ExpectValue: `0.1234567891234`},
 		{ColumnType: "double precision", ExpectType: `{"type":["number","null"]}`, InputValue: 123.456, ExpectValue: `123.456`},
 		{ColumnType: "real", ExpectType: `{"type":["number","null"]}`, InputValue: 123.456, ExpectValue: `123.456`},
 
@@ -165,6 +166,9 @@ func TestDatetimes(t *testing.T) {
 
 func TestScanKeyDatetimes(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
+	tb.Query(ctx, t, "SET GLOBAL time_zone = 'America/Chicago';")
+	tb.Query(ctx, t, "SET SESSION time_zone = 'America/Chicago';")
+
 	var uniqueID = "42322082"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(ts DATETIME(3) PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableName, [][]interface{}{
