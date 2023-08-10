@@ -1,0 +1,21 @@
+version: '3.7'
+
+services:
+  db:
+    image: "docker.elastic.co/elasticsearch/elasticsearch:7.15.2"
+    # Uncomment the lines below (and comment out the one above) to force running an arm64 version of
+    # the container if you are on an arm64 system. The linux/amd64 container basically
+    # non-functional on darwin/arm64.
+    # image: "docker.elastic.co/elasticsearch/elasticsearch:7.15.2-arm64"
+    # platform: linux/arm64
+    environment:
+      - "discovery.type=single-node"
+    ports:
+      - "9200:9200"
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

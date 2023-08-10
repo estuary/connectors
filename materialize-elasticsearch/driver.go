@@ -8,14 +8,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"github.com/elastic/go-elasticsearch/v7/esutil"
+	"github.com/elastic/go-elasticsearch/v8/esutil"
+	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	log "github.com/sirupsen/logrus"
 )
 
 // credentials is a union representing either an api key or a username/password.
@@ -176,37 +175,53 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	}
 
 	var out []*pm.Response_Validated_Binding
-	for i, binding := range req.Bindings {
+	for _, binding := range req.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		// Make sure the specified resource is valid to build
-		if desc, err := elasticSearch.ApplyIndex(res.Index, res.NumOfShards, res.NumOfReplicas, true); err != nil {
-			// Dry run the index creation to make sure the specifications of the index are consistent with the existing one, if any.
+		// Make sure the specified resource is valid to build.
+		// TODO: Do more comprehensive connection verifications?
+		if _, err := elasticSearch.validateIndex(res.Index, res.NumOfShards); err != nil {
 			return nil, fmt.Errorf("validate elastic search index: %w", err)
-		} else {
-			log.WithFields(log.Fields{
-				"binding":    i,
-				"collection": binding.Collection,
-			}).Info(desc)
 		}
+
+		// TODO: Handle incompatible migrations.
 
 		var constraints = make(map[string]*pm.Response_Validated_Constraint)
 
 		for _, projection := range binding.Collection.Projections {
+			// Types like ["string", "integer"] with "format: integer" have multiple types which we
+			// cannot support, but the string value can be coerced to a isNumeric value, which we can
+			// support.
+			_, isNumeric := isFormattedNumeric(projection)
+
 			var constraint = &pm.Response_Validated_Constraint{}
 			switch {
-			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = "The root document is required."
 			case projection.IsPrimaryKey:
 				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = "Primary key locations are required."
+				constraint.Reason = "Primary key locations are required"
+			case projection.IsRootDocumentProjection() && !res.DeltaUpdates:
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+				constraint.Reason = "The root document is required for a standard materialization"
+			case projection.IsRootDocumentProjection():
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+				constraint.Reason = "The root document should usually be materialized"
+			case projection.Inference.IsSingleScalarType() || isNumeric:
+				constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+				constraint.Reason = "The projection has a single scalar type"
+			case projection.Inference.IsSingleType() && !slices.Contains(projection.Inference.Types, "array"):
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+				constraint.Reason = "This field is able to be materialized"
+
 			default:
-				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-				constraint.Reason = "Non-root document fields and non-primary key locations cannot be used."
+				// Anything else is either multiple different types, a single 'null' type, or an
+				// array type which we currently don't support. We could potentially support array
+				// types if they made the "elements" configuration avaiable and that was a single
+				// type.
+				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+				constraint.Reason = "Cannot materialize this field"
 			}
 			constraints[projection.Field] = constraint
 		}
@@ -235,21 +250,18 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	}
 
 	var actionDesc = strings.Builder{}
-	var indices []string
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		if desc, err := elasticSearch.ApplyIndex(res.Index, res.NumOfShards, res.NumOfReplicas, false); err != nil {
+		if desc, err := elasticSearch.ApplyIndex(res.Index, res.NumOfShards, res.NumOfReplicas, buildIndexProperties(binding), false); err != nil {
 			return nil, fmt.Errorf("creating elastic search index: %w", err)
 		} else {
 			actionDesc.WriteString(desc)
 			actionDesc.WriteRune('\n')
 		}
-
-		indices = append(indices, res.Index)
 	}
 
 	return &pm.Response_Applied{ActionDescription: actionDesc.String()}, nil
@@ -266,17 +278,18 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		return nil, nil, fmt.Errorf("creating elastic search client: %w", err)
 	}
 
-	var bindings []*binding
+	var bindings []binding
 	for _, b := range open.Materialization.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
 			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
 		}
-		bindings = append(bindings,
-			&binding{
-				index:        res.Index,
-				deltaUpdates: res.DeltaUpdates,
-			})
+		bindings = append(bindings, binding{
+			index:        res.Index,
+			deltaUpdates: res.DeltaUpdates,
+			fields:       append(b.FieldSelection.Keys, b.FieldSelection.Values...),
+			docField:     b.FieldSelection.Document,
+		})
 	}
 
 	var transactor = &transactor{
@@ -290,11 +303,13 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 type binding struct {
 	index        string
 	deltaUpdates bool
+	fields       []string
+	docField     string
 }
 
 type transactor struct {
 	elasticSearch *ElasticSearch
-	bindings      []*binding
+	bindings      []binding
 }
 
 const loadByIdBatchSize = 1000
@@ -316,7 +331,7 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 				stop = len(ids)
 			}
 
-			var docs, err = t.elasticSearch.SearchByIds(b.index, ids[start:stop])
+			var docs, err = t.elasticSearch.SearchByIds(b.index, ids[start:stop], b.docField)
 			if err != nil {
 				return fmt.Errorf("Load docs by ids: %w", err)
 			}
@@ -344,11 +359,30 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			action, docId = "index", documentId(it.Key)
 		}
 
+		doc := make(map[string]any)
+
+		for idx, v := range append(it.Key, it.Values...) {
+			if b, ok := v.([]byte); ok {
+				// An object or array field as raw JSON bytes. We currently only support objects.
+				v = json.RawMessage(b)
+			}
+
+			doc[b.fields[idx]] = v
+		}
+		if b.docField != "" {
+			doc[b.docField] = it.RawJSON
+		}
+
+		body, err := json.Marshal(doc)
+		if err != nil {
+			return nil, err
+		}
+
 		var item = &esutil.BulkIndexerItem{
 			Index:      t.bindings[it.Binding].index,
 			Action:     action,
 			DocumentID: docId,
-			Body:       bytes.NewReader(it.RawJSON),
+			Body:       bytes.NewReader(body),
 		}
 		items = append(items, item)
 	}
@@ -358,24 +392,19 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}
 
 	// Refresh to make segments available for search, and flush to disk.
-
-	var refreshes []func(*esapi.IndicesRefreshRequest)
-	var flushes []func(*esapi.IndicesFlushRequest)
 	for _, b := range t.bindings {
-		refreshes = append(refreshes, t.elasticSearch.client.Indices.Refresh.WithIndex(b.index))
-		flushes = append(flushes, t.elasticSearch.client.Indices.Flush.WithIndex(b.index))
-	}
+		refreshResp, err := t.elasticSearch.client.Indices.Refresh(t.elasticSearch.client.Indices.Refresh.WithIndex(b.index))
+		defer closeResponse(refreshResp)
+		if err = t.elasticSearch.parseErrorResp(err, refreshResp); err != nil {
+			return nil, fmt.Errorf("failed to refresh: %w", err)
+		}
 
-	refreshResp, err := t.elasticSearch.client.Indices.Refresh(refreshes...)
-	defer closeResponse(refreshResp)
-	if err = t.elasticSearch.parseErrorResp(err, refreshResp); err != nil {
-		return nil, fmt.Errorf("failed to refresh: %w", err)
-	}
-
-	flushResp, err := t.elasticSearch.client.Indices.Flush(flushes...)
-	defer closeResponse(flushResp)
-	if err = t.elasticSearch.parseErrorResp(err, flushResp); err != nil {
-		return nil, fmt.Errorf("failed to flush: %w", err)
+		// TODO(whb): Is this necessary?
+		flushResp, err := t.elasticSearch.client.Indices.Flush(t.elasticSearch.client.Indices.Flush.WithIndex(b.index))
+		defer closeResponse(flushResp)
+		if err = t.elasticSearch.parseErrorResp(err, flushResp); err != nil {
+			return nil, fmt.Errorf("failed to flush: %w", err)
+		}
 	}
 
 	return nil, nil
