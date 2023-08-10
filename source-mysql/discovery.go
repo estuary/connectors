@@ -186,6 +186,16 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 		return columnType.translateRecordField(val)
 	}
 	switch val := val.(type) {
+	case float64:
+		switch columnType {
+		case "float":
+			// Converting floats to strings requires accurate knowledge of the float
+			// precision to not be like `123.45600128173828` so a 'float' column must
+			// be truncated back down to float32 here. Note that MySQL translates a
+			// column type like FLOAT(53) where N>23 into a 'double' column type, so
+			// we can trust that the type name here reflects the desired precision.
+			return float32(val), nil
+		}
 	case []byte:
 		// Make a solely-owned copy of any byte data. The MySQL client library does
 		// some dirty memory-reuse hackery which is only safe so long as byte data
@@ -210,6 +220,15 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 				return val, nil
 			case "blob", "tinyblob", "mediumblob", "longblob":
 				return val, nil
+			case "time":
+				// The MySQL client library parsing logic for TIME columns is
+				// kind of dumb and inserts either '-' or '\x00' as the first
+				// byte of a time value. We want to strip off a leading null
+				// if present.
+				if len(val) > 0 && val[0] == 0 {
+					val = val[1:]
+				}
+				return string(val), nil
 			case "json":
 				if len(val) == 0 {
 					// The empty string is technically invalid JSON but null should be

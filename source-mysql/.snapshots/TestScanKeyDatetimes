@@ -8,11 +8,11 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes_42322082":{"backfilled":1,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMDAwAA=="}}}
+{"cursor":"binlog.000123:56789","streams":{"test.scankeydatetimes_42322082":{"backfilled":1,"key_columns":["ts"],"metadata":{"schema":{"columns":["ts","data"],"types":{"data":"text","ts":"datetime"}}},"mode":"Backfill","scanned":"ATE5OTEtMDgtMzEgMTI6MzQ6NTYA"}}}
 
 
 ####################################
-### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYuMDAwAA=="
+### Capture from Key "ATE5OTEtMDgtMzEgMTI6MzQ6NTYA"
 ####################################
 # ================================
 # Collection "acmeCo/test/test_scankeydatetimes_42322082": 1 Documents
