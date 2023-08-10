@@ -4,41 +4,27 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-# Elastic index names.
-export TEST_ES_INDEX_DUPLICATED_KEYS_DELTA="index-duplicated-keys-delta"
-export TEST_ES_INDEX_DUPLICATED_KEYS_NON_DELTA="index-duplicated-keys-non-delta"
-export TEST_ES_INDEX_MULTIPLE_DATA_TYPES="index-multiple-data-types"
-
-# local elasticsearch container name.
-export TEST_ES_CONTAINER_NAME=test-elastic-search
-
 # Endpoint to access elastic search.
-export TEST_ES_ENDPOINT=http://${TEST_ES_CONTAINER_NAME}.flow-test:9200
+export TEST_ES_ENDPOINT=http://materialize-elasticsearch-db-1.flow-test:9200
 export TEST_ES_LOCAL_ENDPOINT=http://localhost:9200
+
+docker compose -f materialize-elasticsearch/docker-compose.yaml up --detach
 
 # start local elasticsearch.
 function startElasticsearch() {
-    docker run -d \
-      --rm \
-      --name "${TEST_ES_CONTAINER_NAME}" \
-      --env "discovery.type=single-node" \
-      --publish 9200:9200 \
-      --network=flow-test \
-      docker.elastic.co/elasticsearch/elasticsearch:7.15.2
-    for i in {1..20}; do
-        # Wait until the elastic search is ready for serving.
-        if curl -o /dev/null -s -I -f "${TEST_ES_LOCAL_ENDPOINT}";  then
-            echo "elastic server started successfully."
-            return 0
-        fi
-        echo "Not ready, retrying ${i}."
-        sleep 3
-    done
-    return 1
+  for i in {1..20}; do
+    # Wait until the elastic search is ready for serving.
+    if curl -o /dev/null -s -I -f "${TEST_ES_LOCAL_ENDPOINT}"; then
+      echo "elastic server started successfully."
+      return 0
+    fi
+    echo "Not ready, retrying ${i}."
+    sleep 3
+  done
+  return 1
 }
 
 startElasticsearch || bail "failed to start the elastic search service after 60s."
-
 
 config_json_template='{
     "endpoint": "${TEST_ES_ENDPOINT}"
@@ -47,15 +33,14 @@ config_json_template='{
 resources_json_template='[
   {
     "resource": {
-      "index": "${TEST_ES_INDEX_DUPLICATED_KEYS_DELTA}",
-      "number_of_shards": 1,
-      "delta_updates": true
+      "index": "index-simple",
+      "number_of_shards": 1
     },
-    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
+    "source": "${TEST_COLLECTION_SIMPLE}"
   },
   {
     "resource": {
-      "index": "${TEST_ES_INDEX_DUPLICATED_KEYS_NON_DELTA}",
+      "index": "index-duplicated-keys-standard",
       "number_of_shards": 1,
       "delta_updates": false
     },
@@ -63,11 +48,47 @@ resources_json_template='[
   },
   {
     "resource": {
-      "index": "${TEST_ES_INDEX_MULTIPLE_DATA_TYPES}",
+      "index": "index-duplicated-keys-delta",
+      "number_of_shards": 1,
+      "delta_updates": true
+    },
+    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
+  },
+  {
+    "resource": {
+      "index": "index-duplicated-keys-delta-exclude-flow-doc",
+      "number_of_shards": 1,
+      "delta_updates": true
+    },
+    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}",
+    "fields": {
+      "recommended": true,
+      "exclude": [
+        "flow_document"
+      ]
+    }
+  },
+  {
+    "resource": {
+      "index": "index-multiple-data-types",
       "number_of_shards": 1,
       "delta_updates":false
     },
-    "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}"
+    "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
+    "fields": {
+      "recommended": true,
+      "exclude": ["nested/id"],
+      "include": {
+        "nested": {}
+      }
+    }
+  },
+  {
+    "resource": {
+      "index": "index-formatted-strings",
+      "number_of_shards": 1
+    },
+    "source": "${TEST_COLLECTION_FORMATTED_STRINGS}"
   }
 ]'
 
