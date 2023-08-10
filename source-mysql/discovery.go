@@ -187,6 +187,17 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 	}
 	switch val := val.(type) {
 	case []byte:
+		// Make a solely-owned copy of any byte data. The MySQL client library does
+		// some dirty memory-reuse hackery which is only safe so long as byte data
+		// returned from a query is fully consumed before `results.Close()` is called.
+		//
+		// We don't currently guarantee that, so this copy is necessary to avoid any
+		// chance of memory corruption.
+		//
+		// This can be removed after the backfill buffering changes of August 2023
+		// are complete, since once that's done results should be fully processed
+		// as soon as they're received.
+		val = append([]byte(nil), val...)
 		if typeName, ok := columnType.(string); ok {
 			switch typeName {
 			case "bit":
