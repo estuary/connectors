@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	elasticsearch "github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"github.com/elastic/go-elasticsearch/v7/esutil"
+	elasticsearch "github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v8/esutil"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,13 +21,27 @@ type ElasticSearch struct {
 	client *elasticsearch.Client
 }
 
-// IndexSettings is used only for deserializing the settings from elasticsearch responses.
+// indexResponse is used only for deserializing the settings from elasticsearch responses.
 // They only return integers as strings, though the API will accept actual integers.
-type IndexSettings struct {
+type indexResponse struct {
 	Index struct {
 		NumOfShards   string `json:"number_of_shards"`
 		NumOfReplicas string `json:"number_of_replicas"`
 	} `json:"index"`
+}
+
+type createIndexParams struct {
+	Settings createIndexSettings `json:"settings"`
+	Mappings indexMappings       `json:"mappings"`
+}
+
+type createIndexSettings struct {
+	Shards   int `json:"number_of_shards"`
+	Replicas int `json:"number_of_replicas"`
+}
+
+type indexMappings struct {
+	Properties map[string]property `json:"properties"`
 }
 
 func newElasticsearchClient(cfg config) (*ElasticSearch, error) {
@@ -80,55 +94,78 @@ func (es *ElasticSearch) indexExists(index string) (bool, error) {
 	}
 }
 
-// ApplyIndex creates a new es index and sets its mappings to be schemaJSON,
-// if the index does not exist. Otherwise,
-//  1. if the new index has a different mapping (or num_of_shards spec) from the existing index,
-//     the API stops with an error, because the mapping and num_of_shards cannot be changed after creation.
-//  2. if the new index has a different num_of_replica spec from the existing index,
-//     the API resets the setting to match the new.
-func (es *ElasticSearch) ApplyIndex(index string, numOfShards int, numOfReplicas int, dryRun bool) (string, error) {
-	var indexExists, err = es.indexExists(index)
+func (es *ElasticSearch) validateIndex(index string, shards int) (*indexResponse, error) {
+	indexExists, err := es.indexExists(index)
+	if err != nil || !indexExists {
+		return nil, err
+	}
+
+	res, err := es.getIndexSettings(index)
+	if err != nil {
+		return nil, fmt.Errorf("get index setting: %w", err)
+	}
+
+	if res.Index.NumOfShards != strconv.Itoa(shards) {
+		return nil, fmt.Errorf(
+			"%s: the number of shards cannot be changed after index creation. The number of shards in the resource "+
+				"configuration (%d) is inconsistent with the current number of shards (%s). To fix this, you can either change "+
+				"the number of shards back to %s, or change the name of the index to create a new one",
+			index, shards, res.Index.NumOfShards, res.Index.NumOfShards,
+		)
+	}
+
+	return res, nil
+}
+
+// ApplyIndex creates a new es index and sets its mappings per indexProps if it doesn't exist.
+// Otherwise:
+//  1. If the new index has a different number of shards than the existing index, the API stops with
+//     an error, because the number of shards cannot be changed after creation.
+//  2. If the new index has a different number of replicas than the existing index, the existing
+//     index is updated.
+func (es *ElasticSearch) ApplyIndex(index string, shards int, replicas int, indexProps map[string]property, dryRun bool) (string, error) {
+	settings, err := es.validateIndex(index, shards)
 	if err != nil {
 		return "", err
-	} else if indexExists {
-		// The index exists, make sure it is compatible to the requested.
-		if settings, settingErr := es.getIndexSettings(index); settingErr != nil {
-			return "", fmt.Errorf("get index setting: %w", settingErr)
-		} else if settings.Index.NumOfShards != strconv.Itoa(numOfShards) {
-			// The number of shards cannot be changed after creation.
-			return "", fmt.Errorf(
-				"%s: the number of shards cannot be changed after index creation. The number of shards in the resource "+
-					"configuration (%d) is inconsistent with the current number of shards (%s). To fix this, you can either change "+
-					"the number of shards back to %s, or change the name of the index to create a new one",
-				index, numOfShards, settings.Index.NumOfShards, settings.Index.NumOfShards,
-			)
-		} else if settings.Index.NumOfReplicas != strconv.Itoa(numOfReplicas) {
-			var actionDesc = fmt.Sprintf("update index '%s' number_of_replicas from %s to %d", index, settings.Index.NumOfReplicas, numOfReplicas)
+	}
+
+	if settings != nil {
+		// Index already exists. Does it need updated?
+		if settings.Index.NumOfReplicas != strconv.Itoa(replicas) {
+			var actionDesc = fmt.Sprintf("update index '%s' replicas from %s to %d", index, settings.Index.NumOfReplicas, replicas)
 			if dryRun {
 				return actionDesc + " (skipping due to dry-run)", nil
 			}
-			return actionDesc, es.updateIndexReplicas(index, numOfReplicas)
+			return actionDesc, es.updateIndexReplicas(index, replicas)
 		}
+
 		return fmt.Sprintf("using existing Elasticsearch index '%s'", index), nil
 	}
 
-	// The index does not exist, create a new one.
+	// Index does not exist, create a new one.
 	var actionDesc = fmt.Sprintf("create Elasticsearch index '%s'", index)
 	if dryRun {
 		return actionDesc + " (skipping due to dry-run)", nil
 	}
 
-	// We always use [dynamic runtime mappings](https://www.elastic.co/guide/en/elasticsearch/reference/current/runtime.html),
-	// which allows users to query all fields without actually indexing them. Typically, users will want to create one or more
-	// explicit mappings (it's kinda the whole point of elasticsearch). But it's not possible for us to programatically determine
-	// a reasonable mappings configuration, and creating mappings for all fields is wasteful and error prone.
-	var body = fmt.Sprintf(
-		`{"mappings": {"dynamic": "runtime"}, "settings": {"index": {"number_of_shards": %d, "number_of_replicas": %d }}}`,
-		numOfShards, numOfReplicas,
-	)
+	params := createIndexParams{
+		Settings: createIndexSettings{
+			Shards:   shards,
+			Replicas: replicas,
+		},
+		Mappings: indexMappings{
+			Properties: indexProps,
+		},
+	}
+
+	b, err := json.Marshal(params)
+	if err != nil {
+		return "", err
+	}
+
 	createResp, err := es.client.Indices.Create(
 		index,
-		es.client.Indices.Create.WithBody(bytes.NewReader([]byte(body))),
+		es.client.Indices.Create.WithBody(bytes.NewReader(b)),
 		es.client.Indices.Create.WithWaitForActiveShards("all"),
 	)
 	defer closeResponse(createResp)
@@ -191,14 +228,14 @@ func (es *ElasticSearch) Commit(ctx context.Context, items []*esutil.BulkIndexer
 	return nil
 }
 
-func (es *ElasticSearch) SearchByIds(index string, ids []string) ([]json.RawMessage, error) {
+func (es *ElasticSearch) SearchByIds(index string, ids []string, docField string) ([]json.RawMessage, error) {
 	if len(ids) == 0 {
 		return []json.RawMessage{}, nil
 	}
 
 	var resp, err = es.client.Search(
 		es.client.Search.WithIndex(index),
-		es.client.Search.WithBody(es.buildIDQuery(ids)),
+		es.client.Search.WithBody(es.buildIDQuery(ids, docField)),
 		es.client.Search.WithSize(len(ids)),
 	)
 	defer closeResponse(resp)
@@ -209,8 +246,8 @@ func (es *ElasticSearch) SearchByIds(index string, ids []string) ([]json.RawMess
 	var r = struct {
 		Hits struct {
 			Hits []struct {
-				ID     string          `json:"_id"`
-				Source json.RawMessage `json:"_source"`
+				ID     string                     `json:"_id"`
+				Source map[string]json.RawMessage `json:"_source"`
 			} `json:"hits"`
 		} `json:"hits"`
 	}{}
@@ -221,7 +258,7 @@ func (es *ElasticSearch) SearchByIds(index string, ids []string) ([]json.RawMess
 
 	var results = make([]json.RawMessage, 0, len(r.Hits.Hits))
 	for _, hit := range r.Hits.Hits {
-		results = append(results, hit.Source)
+		results = append(results, hit.Source[docField])
 	}
 	return results, nil
 }
@@ -239,7 +276,7 @@ func (es *ElasticSearch) updateIndexReplicas(index string, new_number_of_replica
 	return nil
 }
 
-func (es *ElasticSearch) getIndexSettings(index string) (*IndexSettings, error) {
+func (es *ElasticSearch) getIndexSettings(index string) (*indexResponse, error) {
 	var resp, err = es.client.Indices.GetSettings(
 		es.client.Indices.GetSettings.WithIndex(index),
 	)
@@ -249,7 +286,7 @@ func (es *ElasticSearch) getIndexSettings(index string) (*IndexSettings, error) 
 	}
 
 	var r = map[string]struct {
-		Settings *IndexSettings `json:"settings"`
+		Settings *indexResponse `json:"settings"`
 	}{}
 	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
 		return nil, fmt.Errorf("get index setting decode: %w", err)
@@ -275,19 +312,23 @@ func (es *ElasticSearch) parseErrorResp(err error, resp *esapi.Response) error {
 	return nil
 }
 
-func (es *ElasticSearch) buildIDQuery(ids []string) io.Reader {
+func (es *ElasticSearch) buildIDQuery(ids []string, docField string) io.Reader {
 	var quotedIds = make([]string, len(ids))
 	for i, id := range ids {
 		quotedIds[i] = fmt.Sprintf("%q", id)
 	}
 
 	var queryBody = fmt.Sprintf(`{
+		"_source": %q, 
 		"query": {
 			"ids" : {
 			  "values" : [%s]
 			}
 		  }
-	}`, strings.Join(quotedIds, ","))
+	}`,
+		docField,
+		strings.Join(quotedIds, ","),
+	)
 
 	return strings.NewReader(queryBody)
 }
