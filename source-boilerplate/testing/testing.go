@@ -299,6 +299,7 @@ func (a *pullAdapter) Send(m *pc.Response) error {
 		}
 		a.transaction = nil
 
+		a.validator.Checkpoint(a.checkpoint)
 		if a.callback != nil {
 			a.callback(a.checkpoint)
 		}
@@ -317,6 +318,7 @@ func (a *pullAdapter) SetTrailer(metadata.MD)       { panic("SetTrailer is not s
 // documents and summarize the results upon request. The type of summarization performed
 // can vary depending on the needs of a particular test.
 type CaptureValidator interface {
+	Checkpoint(data json.RawMessage)
 	Output(collection string, data json.RawMessage)
 	Summarize(w io.Writer) error
 	Reset()
@@ -327,6 +329,9 @@ type CaptureValidator interface {
 type SortedCaptureValidator struct {
 	documents map[string][]json.RawMessage // Map from collection name to list of documents
 }
+
+// Checkpoint ignores checkpoint events.
+func (v *SortedCaptureValidator) Checkpoint(data json.RawMessage) {}
 
 // Output feeds a new document into the CaptureValidator.
 func (v *SortedCaptureValidator) Output(collection string, data json.RawMessage) {
@@ -379,6 +384,9 @@ type OrderedCaptureValidator struct {
 	documents map[string][]json.RawMessage // Map from collection name to list of documents
 }
 
+// Checkpoint ignores checkpoint events.
+func (v *OrderedCaptureValidator) Checkpoint(data json.RawMessage) {}
+
 // Output feeds a new document into the CaptureValidator.
 func (v *OrderedCaptureValidator) Output(collection string, data json.RawMessage) {
 	if v.documents == nil {
@@ -421,6 +429,9 @@ type checksumValidatorState struct {
 	count    int
 	checksum [32]byte
 }
+
+// Checkpoint ignores checkpoint events.
+func (v *ChecksumValidator) Checkpoint(data json.RawMessage) {}
 
 func (v *ChecksumValidator) Output(collection string, data json.RawMessage) {
 	if v.collections == nil {
@@ -471,6 +482,9 @@ type WatchdogValidator struct {
 	WatchdogTimer *time.Timer
 	ResetPeriod   time.Duration
 }
+
+// Checkpoint ignores checkpoint events.
+func (v *WatchdogValidator) Checkpoint(data json.RawMessage) {}
 
 func (v *WatchdogValidator) Output(collection string, data json.RawMessage) {
 	v.WatchdogTimer.Reset(v.ResetPeriod)

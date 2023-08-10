@@ -351,18 +351,26 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 type correctnessInvariantsCaptureValidator struct {
 	NumExpectedIDs int
 
+	currentTransaction map[int]string
+
 	states     map[int]string
 	violations *strings.Builder
 }
 
 var correctnessInvariantsStateTransitions = map[string]string{
-	"New:Create(1)":     "1",
-	"New:Create(2)":     "2",
-	"New:Create(3)":     "3",
-	"New:Create(4)":     "4",
-	"New:Create(6)":     "6",
-	"New:Create(7)":     "7",
-	"New:Create(8)":     "Finished",
+	"New:Create(1)":     "1",        // A row may first be observed at any point
+	"New:Create(2)":     "2",        // A row may first be observed at any point
+	"New:Create(3)":     "3",        // A row may first be observed at any point
+	"New:Create(4)":     "4",        // A row may first be observed at any point
+	"New:Create(6)":     "6",        // A row may first be observed at any point
+	"New:Create(7)":     "7",        // A row may first be observed at any point
+	"New:Create(8)":     "Finished", // A row may first be observed at any point
+	"New:Update(2)":     "2",        // This first observation may also be an update
+	"New:Update(3)":     "3",        // This first observation may also be an update
+	"New:Update(4)":     "4",        // This first observation may also be an update
+	"New:Delete()":      "Deleted",  // This first observation could theoretically also be a deletion
+	"New:Update(7)":     "7",        // This first observation may also be an update
+	"New:Update(8)":     "Finished", // This first observation may also be an update
 	"1:Update(2)":       "2",
 	"2:Update(3)":       "3",
 	"3:Update(4)":       "4",
@@ -385,33 +393,47 @@ func (v *correctnessInvariantsCaptureValidator) Output(collection string, data j
 		return
 	}
 
-	// Get the previous state for this ID.
-	var prevState = v.states[event.ID]
-	if prevState == "" {
-		prevState = "New"
-	}
-
-	// Compute a string representing the state machine edge corresponding to this change event.
-	var edge string
+	// Compute a string representing the change event and store it as part of the
+	// current pending transaction. Overwriting any previous change for this ID
+	// emulates the default last-write-wins reduction semantics of /_meta/op and
+	// the main document payload properties.
+	var change string
 	switch event.Meta.Operation {
 	case "c":
-		edge = fmt.Sprintf("%s:Create(%d)", prevState, event.Counter)
+		change = fmt.Sprintf("Create(%d)", event.Counter)
 	case "u":
-		edge = fmt.Sprintf("%s:Update(%d)", prevState, event.Counter)
+		change = fmt.Sprintf("Update(%d)", event.Counter)
 	case "d":
-		edge = fmt.Sprintf("%s:Delete()", prevState)
+		change = fmt.Sprintf("Delete()")
 	default:
-		edge = fmt.Sprintf("%s:UnknownOperation(%q)", prevState, event.Meta.Operation)
+		change = fmt.Sprintf("UnknownOperation(%q)", event.Meta.Operation)
 	}
-	log.WithField("id", event.ID).WithField("event", edge).Trace("change event")
+	log.WithField("id", event.ID).WithField("change", change).Trace("change event")
+	if v.currentTransaction == nil {
+		v.currentTransaction = make(map[int]string)
+	}
+	v.currentTransaction[event.ID] = change
+}
 
-	// This is the complete set of allowable state transitions in the dataset.
-	if nextState, ok := correctnessInvariantsStateTransitions[edge]; ok {
-		v.states[event.ID] = nextState
-	} else {
-		fmt.Fprintf(v.violations, "id %d: invalid state transition %q\n", event.ID, edge)
-		v.states[event.ID] = "Error"
+func (v *correctnessInvariantsCaptureValidator) Checkpoint(data json.RawMessage) {
+	for id, change := range v.currentTransaction {
+		// Get the previous state for this ID and put together a string describing
+		// the state machine edge corresponding to this change.
+		var prevState = v.states[id]
+		if prevState == "" {
+			prevState = "New"
+		}
+		var edge = prevState + ":" + change
+
+		// This is the complete set of allowable state transitions in the dataset.
+		if nextState, ok := correctnessInvariantsStateTransitions[edge]; ok {
+			v.states[id] = nextState
+		} else {
+			fmt.Fprintf(v.violations, "id %d: invalid state transition %q\n", id, edge)
+			v.states[id] = "Error"
+		}
 	}
+	v.currentTransaction = nil
 }
 
 func (v *correctnessInvariantsCaptureValidator) Reset() {
