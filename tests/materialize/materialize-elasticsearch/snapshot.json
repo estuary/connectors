@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "create Elasticsearch index 'index-simple'\ncreate Elasticsearch index 'index-duplicated-keys-standard'\ncreate Elasticsearch index 'index-duplicated-keys-delta'\ncreate Elasticsearch index 'index-duplicated-keys-delta-exclude-flow-doc'\ncreate Elasticsearch index 'index-multiple-data-types'\ncreate Elasticsearch index 'index-formatted-strings'\n"
+    "actionDescription": "- create index 'flow_materializations_v2'\n- create index 'index-simple'\n- create index 'index-duplicated-keys-standard'\n- create index 'index-duplicated-keys-delta'\n- create index 'index-duplicated-keys-delta-exclude-flow-doc'\n- create index 'index-multiple-data-types'\n- create index 'index-formatted-strings'\n- update stored materialize spec"
   }
 }
 {
@@ -1016,7 +1016,9 @@
   ]
 }
 {
-  "applied": {}
+  "applied": {
+    "actionDescription": "- update stored materialize spec"
+  }
 }
 {
   "opened": {}

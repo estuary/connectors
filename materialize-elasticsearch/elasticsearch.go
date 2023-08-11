@@ -3,31 +3,25 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
-	"strconv"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 )
 
 // ElasticSearch provides APIs for interacting with ElasticSearch service.
 type ElasticSearch struct {
 	client *elasticsearch.Client
-}
-
-// indexResponse is used only for deserializing the settings from elasticsearch responses.
-// They only return integers as strings, though the API will accept actual integers.
-type indexResponse struct {
-	Index struct {
-		NumOfShards   string `json:"number_of_shards"`
-		NumOfReplicas string `json:"number_of_replicas"`
-	} `json:"index"`
 }
 
 type createIndexParams struct {
@@ -94,56 +88,16 @@ func (es *ElasticSearch) indexExists(index string) (bool, error) {
 	}
 }
 
-func (es *ElasticSearch) validateIndex(index string, shards int) (*indexResponse, error) {
-	indexExists, err := es.indexExists(index)
-	if err != nil || !indexExists {
-		return nil, err
-	}
-
-	res, err := es.getIndexSettings(index)
-	if err != nil {
-		return nil, fmt.Errorf("get index setting: %w", err)
-	}
-
-	if res.Index.NumOfShards != strconv.Itoa(shards) {
-		return nil, fmt.Errorf(
-			"%s: the number of shards cannot be changed after index creation. The number of shards in the resource "+
-				"configuration (%d) is inconsistent with the current number of shards (%s). To fix this, you can either change "+
-				"the number of shards back to %s, or change the name of the index to create a new one",
-			index, shards, res.Index.NumOfShards, res.Index.NumOfShards,
-		)
-	}
-
-	return res, nil
-}
-
-// ApplyIndex creates a new es index and sets its mappings per indexProps if it doesn't exist.
-// Otherwise:
-//  1. If the new index has a different number of shards than the existing index, the API stops with
-//     an error, because the number of shards cannot be changed after creation.
-//  2. If the new index has a different number of replicas than the existing index, the existing
-//     index is updated.
+// ApplyIndex creates a new index and sets its mappings per indexProps if it doesn't already exist.
 func (es *ElasticSearch) ApplyIndex(index string, shards int, replicas int, indexProps map[string]property, dryRun bool) (string, error) {
-	settings, err := es.validateIndex(index, shards)
-	if err != nil {
+	if indexExists, err := es.indexExists(index); err != nil {
 		return "", err
-	}
-
-	if settings != nil {
-		// Index already exists. Does it need updated?
-		if settings.Index.NumOfReplicas != strconv.Itoa(replicas) {
-			var actionDesc = fmt.Sprintf("update index '%s' replicas from %s to %d", index, settings.Index.NumOfReplicas, replicas)
-			if dryRun {
-				return actionDesc + " (skipping due to dry-run)", nil
-			}
-			return actionDesc, es.updateIndexReplicas(index, replicas)
-		}
-
-		return fmt.Sprintf("using existing Elasticsearch index '%s'", index), nil
+	} else if indexExists {
+		return "", nil
 	}
 
 	// Index does not exist, create a new one.
-	var actionDesc = fmt.Sprintf("create Elasticsearch index '%s'", index)
+	var actionDesc = fmt.Sprintf("create index '%s'", index)
 	if dryRun {
 		return actionDesc + " (skipping due to dry-run)", nil
 	}
@@ -171,6 +125,29 @@ func (es *ElasticSearch) ApplyIndex(index string, shards int, replicas int, inde
 	defer closeResponse(createResp)
 	if err = es.parseErrorResp(err, createResp); err != nil {
 		return "", fmt.Errorf("create indices: %w", err)
+	}
+
+	return actionDesc, nil
+}
+
+func (es *ElasticSearch) addMappingToIndex(index string, field string, prop property, dryRun bool) (string, error) {
+	body := make(map[string]map[string]property)
+	body["properties"] = map[string]property{field: prop}
+
+	b, err := json.Marshal(body)
+	if err != nil {
+		return "", fmt.Errorf("marshalling body: %w", err)
+	}
+
+	var actionDesc = fmt.Sprintf("add field '%s' to index '%s' with type '%s'", field, index, prop.Type)
+	if dryRun {
+		return actionDesc + " (skipping due to dry-run)", nil
+	}
+
+	res, err := es.client.Indices.PutMapping([]string{index}, bytes.NewReader(b))
+	defer closeResponse(res)
+	if err = es.parseErrorResp(err, res); err != nil {
+		return "", err
 	}
 
 	return actionDesc, nil
@@ -263,40 +240,6 @@ func (es *ElasticSearch) SearchByIds(index string, ids []string, docField string
 	return results, nil
 }
 
-func (es *ElasticSearch) updateIndexReplicas(index string, new_number_of_replicas int) error {
-	var body = fmt.Sprintf(`{"index": {"number_of_replicas": %d}}`, new_number_of_replicas)
-	resp, err := es.client.Indices.PutSettings(
-		bytes.NewReader([]byte(body)),
-		es.client.Indices.PutSettings.WithIndex(index),
-	)
-	defer closeResponse(resp)
-	if err = es.parseErrorResp(err, resp); err != nil {
-		return fmt.Errorf("update index setting: %w", err)
-	}
-	return nil
-}
-
-func (es *ElasticSearch) getIndexSettings(index string) (*indexResponse, error) {
-	var resp, err = es.client.Indices.GetSettings(
-		es.client.Indices.GetSettings.WithIndex(index),
-	)
-	defer closeResponse(resp)
-	if err = es.parseErrorResp(err, resp); err != nil {
-		return nil, fmt.Errorf("get index settings: %w", err)
-	}
-
-	var r = map[string]struct {
-		Settings *indexResponse `json:"settings"`
-	}{}
-	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
-		return nil, fmt.Errorf("get index setting decode: %w", err)
-	}
-	if m, exist := r[index]; exist {
-		return m.Settings, nil
-	}
-	return nil, fmt.Errorf("missing index settings: %s", index)
-}
-
 func (es *ElasticSearch) parseErrorResp(err error, resp *esapi.Response) error {
 	if err != nil {
 		return fmt.Errorf("response err: %w", err)
@@ -337,4 +280,81 @@ func closeResponse(response *esapi.Response) {
 	if response != nil && response.Body != nil {
 		response.Body.Close()
 	}
+}
+
+const (
+	defaultFlowMaterializations = "flow_materializations_v2"
+)
+
+func (es *ElasticSearch) createMetaIndex(ctx context.Context) (string, error) {
+	props := map[string]property{
+		"specBytes": {Type: elasticTypeBinary},
+	}
+
+	return es.ApplyIndex(defaultFlowMaterializations, 1, 0, props, false)
+}
+
+func (es *ElasticSearch) putSpec(ctx context.Context, spec *pf.MaterializationSpec) error {
+	specBytes, err := spec.Marshal()
+	if err != nil {
+		return fmt.Errorf("marshalling spec: %w", err)
+	}
+
+	ss := struct {
+		SpecBytes string `json:"specBytes"`
+	}{
+		SpecBytes: base64.StdEncoding.EncodeToString(specBytes),
+	}
+
+	b, err := json.Marshal(ss)
+	if err != nil {
+		return fmt.Errorf("marshalling storedSpec: %w", err)
+	}
+
+	res, err := es.client.Index(
+		defaultFlowMaterializations,
+		bytes.NewReader(b),
+		es.client.Index.WithRefresh("true"),
+		es.client.Index.WithDocumentID(url.PathEscape(spec.Name.String())),
+	)
+	defer closeResponse(res)
+	if err = es.parseErrorResp(err, res); err != nil {
+		return fmt.Errorf("updating stored materialization spec: %w", err)
+	}
+
+	return nil
+}
+
+func (es *ElasticSearch) getSpec(ctx context.Context, materialization pf.Materialization) (*pf.MaterializationSpec, error) {
+	res, err := es.client.Get(
+		defaultFlowMaterializations,
+		url.PathEscape(string(materialization)),
+	)
+	defer closeResponse(res)
+	if res.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if err = es.parseErrorResp(err, res); err != nil {
+		return nil, err
+	}
+
+	spec := new(pf.MaterializationSpec)
+
+	got := struct {
+		Source struct {
+			SpecBytes string `json:"specBytes"`
+		} `json:"_source"`
+	}{}
+
+	if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
+		return nil, fmt.Errorf("decoding response body: %w", err)
+	} else if specBytes, err := base64.StdEncoding.DecodeString(got.Source.SpecBytes); err != nil {
+		return nil, fmt.Errorf("base64.Decode: %w", err)
+	} else if err := spec.Unmarshal(specBytes); err != nil {
+		return nil, fmt.Errorf("spec.Unmarshal: %w", err)
+	} else if err := spec.Validate(); err != nil {
+		return nil, fmt.Errorf("validating spec: %w", err)
+	}
+
+	return spec, nil
 }

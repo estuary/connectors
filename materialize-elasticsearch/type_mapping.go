@@ -26,8 +26,14 @@ type property struct {
 	Coerce bool                `json:"coerce,omitempty"`
 }
 
-func buildIndexProperties(b *pf.MaterializationSpec_Binding) map[string]property {
-	props := make(map[string]property)
+func propForField(field string, binding *pf.MaterializationSpec_Binding) property {
+	return propForProjection(binding.Collection.GetProjection(field))
+}
+
+func propForProjection(p *pf.Projection) property {
+	if t, ok := isFormattedNumeric(p); ok {
+		return property{Type: t, Coerce: true}
+	}
 
 	typesWithoutNull := func(ts []string) []string {
 		out := []string{}
@@ -39,49 +45,47 @@ func buildIndexProperties(b *pf.MaterializationSpec_Binding) map[string]property
 		return out
 	}
 
-	for _, v := range append(b.FieldSelection.Keys, b.FieldSelection.Values...) {
-		p := *b.Collection.GetProjection(v)
-
-		if t, ok := isFormattedNumeric(p); ok {
-			props[v] = property{Type: t, Coerce: true}
-			continue
+	switch t := typesWithoutNull(p.Inference.Types)[0]; t {
+	case pf.JsonTypeBoolean:
+		return property{Type: elasticTypeBoolean}
+	case pf.JsonTypeInteger:
+		return property{Type: elasticTypeLong}
+	case pf.JsonTypeString:
+		if p.Inference.String_.ContentEncoding == "base64" {
+			return property{Type: elasticTypeBinary}
 		}
 
-		switch t := typesWithoutNull(p.Inference.Types)[0]; t {
-		case pf.JsonTypeBoolean:
-			props[v] = property{Type: elasticTypeBoolean}
-		case pf.JsonTypeInteger:
-			props[v] = property{Type: elasticTypeLong}
-		case pf.JsonTypeString:
-			if p.Inference.String_.ContentEncoding == "base64" {
-				props[v] = property{Type: elasticTypeBinary}
-				continue
-			}
-
-			switch f := p.Inference.String_.Format; f {
-			// Formats for "integer" and "number" are handle above.
-			case "date":
-				props[v] = property{Type: elasticTypeDate}
-			case "date-time":
-				props[v] = property{Type: elasticTypeDate}
-			case "ipv4":
-				props[v] = property{Type: elasticTypeIp}
-			case "ipv6":
-				props[v] = property{Type: elasticTypeIp}
-			default:
-				if p.IsPrimaryKey {
-					props[v] = property{Type: elasticTypeKeyword}
-				} else {
-					props[v] = property{Type: elasticTypeText}
-				}
-			}
-		case pf.JsonTypeObject:
-			props[v] = property{Type: elasticTypeFlattened}
-		case pf.JsonTypeNumber:
-			props[v] = property{Type: elasticTypeDouble}
+		switch f := p.Inference.String_.Format; f {
+		// Formats for "integer" and "number" are handle above.
+		case "date":
+			return property{Type: elasticTypeDate}
+		case "date-time":
+			return property{Type: elasticTypeDate}
+		case "ipv4":
+			return property{Type: elasticTypeIp}
+		case "ipv6":
+			return property{Type: elasticTypeIp}
 		default:
-			panic(fmt.Sprintf("unsupported type %T (%#v)", t, t))
+			if p.IsPrimaryKey {
+				return property{Type: elasticTypeKeyword}
+			} else {
+				return property{Type: elasticTypeText}
+			}
 		}
+	case pf.JsonTypeObject:
+		return property{Type: elasticTypeFlattened}
+	case pf.JsonTypeNumber:
+		return property{Type: elasticTypeDouble}
+	default:
+		panic(fmt.Sprintf("unsupported type %T (%#v)", t, t))
+	}
+}
+
+func buildIndexProperties(b *pf.MaterializationSpec_Binding) map[string]property {
+	props := make(map[string]property)
+
+	for _, v := range append(b.FieldSelection.Keys, b.FieldSelection.Values...) {
+		props[v] = propForField(v, b)
 	}
 
 	if d := b.FieldSelection.Document; d != "" {
@@ -91,7 +95,7 @@ func buildIndexProperties(b *pf.MaterializationSpec_Binding) map[string]property
 	return props
 }
 
-func isFormattedNumeric(projection pf.Projection) (elasticPropertyType, bool) {
+func isFormattedNumeric(projection *pf.Projection) (elasticPropertyType, bool) {
 	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
 		switch {
 		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"integer", "null", "string"}):
