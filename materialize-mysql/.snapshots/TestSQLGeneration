@@ -31,6 +31,8 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]'
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 		key1 BIGINT NOT NULL,
 		`key!2` BOOLEAN NOT NULL
+	,
+		PRIMARY KEY (key1, `key!2`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
 --- End target_table createLoadTable ---
 
@@ -38,6 +40,8 @@ CREATE TEMPORARY TABLE flow_temp_table_0 (
 
 CREATE TEMPORARY TABLE flow_temp_table_1 (
 		`theKey` VARCHAR(256) NOT NULL
+	,
+		PRIMARY KEY (`theKey`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
 --- End `Delta Updates` createLoadTable ---
 
