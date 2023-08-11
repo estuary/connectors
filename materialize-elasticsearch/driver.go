@@ -1,18 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/elastic/go-elasticsearch/v8/esutil"
 	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
@@ -169,9 +165,16 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = newElasticsearchClient(cfg)
+	elasticSearch, err := newElasticsearchClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("creating elasticSearch: %w", err)
+	}
+
+	// TODO(whb): Do more comprehensive connection verifications.
+
+	storedSpec, err := elasticSearch.getSpec(ctx, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("getting spec: %w", err)
 	}
 
 	var out []*pm.Response_Validated_Binding
@@ -181,50 +184,11 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		// Make sure the specified resource is valid to build.
-		// TODO: Do more comprehensive connection verifications?
-		if _, err := elasticSearch.validateIndex(res.Index, res.NumOfShards); err != nil {
-			return nil, fmt.Errorf("validate elastic search index: %w", err)
+		constraints, err := validateBinding(res, binding.Collection, storedSpec)
+		if err != nil {
+			return nil, fmt.Errorf("validating binding: %w", err)
 		}
 
-		// TODO: Handle incompatible migrations.
-
-		var constraints = make(map[string]*pm.Response_Validated_Constraint)
-
-		for _, projection := range binding.Collection.Projections {
-			// Types like ["string", "integer"] with "format: integer" have multiple types which we
-			// cannot support, but the string value can be coerced to a isNumeric value, which we can
-			// support.
-			_, isNumeric := isFormattedNumeric(projection)
-
-			var constraint = &pm.Response_Validated_Constraint{}
-			switch {
-			case projection.IsPrimaryKey:
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = "Primary key locations are required"
-			case projection.IsRootDocumentProjection() && !res.DeltaUpdates:
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = "The root document is required for a standard materialization"
-			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-				constraint.Reason = "The root document should usually be materialized"
-			case projection.Inference.IsSingleScalarType() || isNumeric:
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-				constraint.Reason = "The projection has a single scalar type"
-			case projection.Inference.IsSingleType() && !slices.Contains(projection.Inference.Types, "array"):
-				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
-				constraint.Reason = "This field is able to be materialized"
-
-			default:
-				// Anything else is either multiple different types, a single 'null' type, or an
-				// array type which we currently don't support. We could potentially support array
-				// types if they made the "elements" configuration avaiable and that was a single
-				// type.
-				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
-				constraint.Reason = "Cannot materialize this field"
-			}
-			constraints[projection.Field] = constraint
-		}
 		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: res.DeltaUpdates,
@@ -249,22 +213,70 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		return nil, fmt.Errorf("creating elasticSearch: %w", err)
 	}
 
-	var actionDesc = strings.Builder{}
+	actions := []string{}
+	addAction := func(a string) {
+		if a != "" {
+			actions = append(actions, "- "+a)
+		}
+	}
+
+	desc, err := elasticSearch.createMetaIndex(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("creating metadata index")
+	}
+	addAction(desc)
+
+	storedSpec, err := elasticSearch.getSpec(ctx, req.Materialization.Name)
+	if err != nil {
+		return nil, fmt.Errorf("getting spec: %w", err)
+	}
+
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		if desc, err := elasticSearch.ApplyIndex(res.Index, res.NumOfShards, res.NumOfReplicas, buildIndexProperties(binding), false); err != nil {
-			return nil, fmt.Errorf("creating elastic search index: %w", err)
+		if err := validateSelectedFields(res, binding, storedSpec); err != nil {
+			return nil, fmt.Errorf("validating selected fields: %w", err)
+		}
+
+		found, err := findExistingBinding(res.Index, binding.Collection.Name, storedSpec)
+		if err != nil {
+			return nil, err
+		}
+
+		if found == nil {
+			desc, err := elasticSearch.ApplyIndex(res.Index, res.NumOfShards, res.NumOfReplicas, buildIndexProperties(binding), false)
+			if err != nil {
+				return nil, fmt.Errorf("creating elastic search index: %w", err)
+			}
+			addAction(desc)
 		} else {
-			actionDesc.WriteString(desc)
-			actionDesc.WriteRune('\n')
+			// Map any new fields in the index.
+			existingFields := found.FieldSelection.AllFields()
+			for _, newField := range binding.FieldSelection.AllFields() {
+				if slices.Contains(existingFields, newField) {
+					continue
+				}
+
+				desc, err := elasticSearch.addMappingToIndex(res.Index, newField, propForField(newField, binding), req.DryRun)
+				if err != nil {
+					return nil, fmt.Errorf("adding mapping for field %q to index %q: %w", newField, res.Index, err)
+				}
+				addAction(desc)
+			}
 		}
 	}
 
-	return &pm.Response_Applied{ActionDescription: actionDesc.String()}, nil
+	if !req.DryRun {
+		if err := elasticSearch.putSpec(ctx, req.Materialization); err != nil {
+			return nil, fmt.Errorf("updating stored materialization spec: %w", err)
+		}
+		addAction("update stored materialize spec")
+	}
+
+	return &pm.Response_Applied{ActionDescription: strings.Join(actions, "\n")}, nil
 }
 
 func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
@@ -299,121 +311,5 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 	return transactor, &pm.Response_Opened{}, nil
 
 }
-
-type binding struct {
-	index        string
-	deltaUpdates bool
-	fields       []string
-	docField     string
-}
-
-type transactor struct {
-	elasticSearch *ElasticSearch
-	bindings      []binding
-}
-
-const loadByIdBatchSize = 1000
-
-func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	var loadingIdsByBinding = map[int][]string{}
-
-	// TODO(johnny): We should be executing these in chunks along the way,
-	// rather than queuing all until the end.
-	for it.Next() {
-		loadingIdsByBinding[it.Binding] = append(loadingIdsByBinding[it.Binding], documentId(it.Key))
-	}
-
-	for binding, ids := range loadingIdsByBinding {
-		var b = t.bindings[binding]
-		for start := 0; start < len(ids); start += loadByIdBatchSize {
-			var stop = start + loadByIdBatchSize
-			if stop > len(ids) {
-				stop = len(ids)
-			}
-
-			var docs, err = t.elasticSearch.SearchByIds(b.index, ids[start:stop], b.docField)
-			if err != nil {
-				return fmt.Errorf("Load docs by ids: %w", err)
-			}
-
-			for _, doc := range docs {
-				if err = loaded(binding, doc); err != nil {
-					return fmt.Errorf("callback: %w", err)
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
-	var items []*esutil.BulkIndexerItem
-
-	// TODO(johnny): store chunks of items along the way rather queuing
-	// them all to apply at the very end.
-	for it.Next() {
-		var b = t.bindings[it.Binding]
-		var action, docId = "create", ""
-		if !b.deltaUpdates {
-			action, docId = "index", documentId(it.Key)
-		}
-
-		doc := make(map[string]any)
-
-		for idx, v := range append(it.Key, it.Values...) {
-			if b, ok := v.([]byte); ok {
-				// An object or array field as raw JSON bytes. We currently only support objects.
-				v = json.RawMessage(b)
-			}
-
-			doc[b.fields[idx]] = v
-		}
-		if b.docField != "" {
-			doc[b.docField] = it.RawJSON
-		}
-
-		body, err := json.Marshal(doc)
-		if err != nil {
-			return nil, err
-		}
-
-		var item = &esutil.BulkIndexerItem{
-			Index:      t.bindings[it.Binding].index,
-			Action:     action,
-			DocumentID: docId,
-			Body:       bytes.NewReader(body),
-		}
-		items = append(items, item)
-	}
-
-	if err := t.elasticSearch.Commit(it.Context(), items); err != nil {
-		return nil, err
-	}
-
-	// Refresh to make segments available for search, and flush to disk.
-	for _, b := range t.bindings {
-		refreshResp, err := t.elasticSearch.client.Indices.Refresh(t.elasticSearch.client.Indices.Refresh.WithIndex(b.index))
-		defer closeResponse(refreshResp)
-		if err = t.elasticSearch.parseErrorResp(err, refreshResp); err != nil {
-			return nil, fmt.Errorf("failed to refresh: %w", err)
-		}
-
-		// TODO(whb): Is this necessary?
-		flushResp, err := t.elasticSearch.client.Indices.Flush(t.elasticSearch.client.Indices.Flush.WithIndex(b.index))
-		defer closeResponse(flushResp)
-		if err = t.elasticSearch.parseErrorResp(err, flushResp); err != nil {
-			return nil, fmt.Errorf("failed to flush: %w", err)
-		}
-	}
-
-	return nil, nil
-}
-
-func documentId(tuple tuple.Tuple) string {
-	return base64.RawStdEncoding.EncodeToString(tuple.Pack())
-}
-
-func (t *transactor) Destroy() {}
 
 func main() { boilerplate.RunMain(new(driver)) }
