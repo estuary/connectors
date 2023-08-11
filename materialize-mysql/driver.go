@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	storeBatchSize = 4096                    // Assuming store records average ~2kB then 4k * 2kB = 8MB
+	storeBatchSize = 1024               // Assuming store records average ~2kB then 4k * 2kB = 8MB
 	loadBatchSize  = storeBatchSize * 5 // Load records are keys-only so allow for more in a batch
 )
 
@@ -537,7 +537,6 @@ func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch []batch
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-  log.Info("starting load phase")
 	// Use a read-only "load" transaction, which will automatically
 	// truncate the temporary key staging tables on commit.
   var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{ReadOnly: true})
@@ -629,6 +628,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			return err
 		}
 	}
+
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("querying Loads: %w", err)
 	}
@@ -643,7 +643,6 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		return fmt.Errorf("commiting Load transaction: %w", err)
 	}
 
-  log.Info("load phase done")
 	return nil
 }
 
@@ -660,6 +659,12 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 	}()
 
   log.Info("starting store phase")
+  if _, err := txn.ExecContext(ctx, "SET unique_checks=0"); err != nil {
+    return nil, err
+  }
+  if _, err := txn.ExecContext(ctx, "SET autocommit=0"); err != nil {
+    return nil, err
+  }
 
 	var batches = map[string][]batchRequest{}
 	for it.Next() {
@@ -714,9 +719,11 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 				});
 
 				if len(batches[b.target.Identifier]) >= storeBatchSize {
+          log.Info("store: draining a batch")
 					if err := drainBatch(ctx, txn, b.storeInsertBatchSQL, batches[b.target.Identifier]); err != nil {
 						return nil, fmt.Errorf("store insert: %w", err)
 					}
+          log.Info("store: drained a batch")
 					batches[b.target.Identifier] = nil
 				}
 			}
@@ -732,6 +739,10 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			}
 		}
 	}
+
+  if _, err := txn.ExecContext(ctx, "SET unique_checks=1"); err != nil {
+    return nil, err
+  }
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
 		return nil, pf.RunAsyncOperation(func() error {

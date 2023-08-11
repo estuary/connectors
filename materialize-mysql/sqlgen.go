@@ -163,7 +163,7 @@ INSERT INTO {{ template "temp_name" . }} (
 	{{- end -}}
 	)
 	VALUES 
-	{{- range $it, $x := (Repeat 20480) }}
+	{{- range $it, $x := (Repeat 5120) }}
 	{{- if $it}}, {{ end -}}
 	(
 		{{- range $ind, $key := $.Keys }}
@@ -217,7 +217,7 @@ INSERT INTO {{ $.Identifier }} (
 		{{$col.Identifier}}
 	{{- end }}
 ) VALUES
-	{{- range $it, $x := (Repeat 4096) }}
+	{{- range $it, $x := (Repeat 1024) }}
 	{{- if $it}}, {{ end -}}
 	(
 		{{- range $ind, $col := $.Columns }}
