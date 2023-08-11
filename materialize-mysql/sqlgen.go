@@ -120,6 +120,13 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
 	{{- end }}
+	,
+		PRIMARY KEY (
+		{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{end -}}
+		{{$key.Identifier}}
+		{{- end -}}
+	)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
 {{ end }}
 
