@@ -10,7 +10,7 @@ services:
     networks:
       - flow-test
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "--silent" ]
+      test: [ "CMD", "mysql", "-h", "127.0.0.1", "-u", "$MYSQL_USER", "--password=$MYSQL_PASSWORD", "--port", "3306", "--execute", "SHOW DATABASES;"]
       interval: 1s
       retries: 30
     ports:
