@@ -626,7 +626,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 			if len(batches[it.Binding]) >= loadBatchSize * argCount[it.Binding] {
 				if err := drainBatch(ctx, txn, b.loadLoadSQL, batches[it.Binding], argCount[it.Binding], "load"); err != nil {
-					return fmt.Errorf("load batch insert: %w", err)
+					return fmt.Errorf("load batch insert on %q: %w", b.target.Identifier, err)
 				}
 				batches[it.Binding] = nil
 			}
@@ -640,7 +640,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 		var b = d.bindings[bindingIndex]
 		if err := drainBatch(ctx, txn, b.loadLoadSQL, batch, argCount[bindingIndex], "load"); err != nil {
-			return fmt.Errorf("load batch insert: %w", err)
+			return fmt.Errorf("load batch insert on %q: %w", b.target.Identifier, err)
 		}
 	}
 
@@ -750,7 +750,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 			if len(batches[it.Binding]) >= storeBatchSize * argCount[it.Binding] {
 				if err := drainBatch(ctx, txn, b.storeLoadSQL, batches[it.Binding], argCount[it.Binding], "store"); err != nil {
-					return nil, fmt.Errorf("store batch insert: %w", err)
+					return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
 				}
 				batches[it.Binding] = nil
 			}
@@ -764,7 +764,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 		var b = d.bindings[bindingIndex]
 		if err := drainBatch(ctx, txn, b.storeLoadSQL, batch, argCount[bindingIndex], "store"); err != nil {
-			return nil, fmt.Errorf("store batch insert: %w", err)
+			return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
 		}
 	}
 
