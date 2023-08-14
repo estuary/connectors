@@ -1,0 +1,30 @@
+{
+	"bool": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"flow_document": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	},
+	"intKey": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"null": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"object": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"strFormatInt": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"stringKey": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	}
+}

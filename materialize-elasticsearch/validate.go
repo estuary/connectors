@@ -15,6 +15,7 @@ func validateSelectedFields(
 	binding *pf.MaterializationSpec_Binding,
 	storedSpec *pf.MaterializationSpec,
 ) error {
+	// Calculated constraints for the fields of this binding.
 	constraints, err := validateBinding(res, binding.Collection, storedSpec)
 	if err != nil {
 		return err
@@ -47,8 +48,19 @@ func validateSelectedFields(
 			}
 		case pm.Response_Validated_Constraint_LOCATION_REQUIRED:
 			var projection = binding.Collection.GetProjection(field)
+			locDescription := fmt.Sprintf("location '%s'", projection.Ptr)
+			if projection.IsRootDocumentProjection() {
+				// The pointer is "" for the root document, which doesn't make much sense if
+				// included directly in the error message.
+				locDescription = "the root document"
+			}
+
 			if !includedPointers[projection.Ptr] {
-				return fmt.Errorf("the materialization must include a projections of location '%s', but no such projection is included. It is required because: %s", projection.Ptr, constraint.Reason)
+				return fmt.Errorf(
+					"the materialization must include a projection of %s, but no such projection is included. It is required because: %s",
+					locDescription,
+					constraint.Reason,
+				)
 			}
 		}
 	}
@@ -75,7 +87,7 @@ func validateBinding(
 			// We allow a binding to switch from standard => delta updates but not the other
 			// way. This is because a standard materialization is trivially a valid
 			// delta-updates materialization.
-			return nil, fmt.Errorf("cannot disable delta-updates binding of collection %s", existingBinding.Collection.Name.String())
+			return nil, fmt.Errorf("changing binding of collection %s from delta updates to standard updates is not allowed", existingBinding.Collection.Name.String())
 		}
 		constraints = validateMatchesExistingBinding(existingBinding, boundCollection, res.DeltaUpdates)
 	}
@@ -116,6 +128,14 @@ func validateMatchesExistingBinding(
 			continue
 		}
 
+		// Is the proposed type completely disallowed by the materialization? This differs from
+		// being UNSATISFIABLE, which implies that re-creating the materialization could resolve the
+		// difference.
+		if c := validateNewProjection(*proposedProjection, deltaUpdates); c.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN {
+			constraints[field] = c
+			continue
+		}
+
 		existingType := propForProjection(existingProjection).Type
 		proposedType := propForProjection(proposedProjection).Type
 
@@ -144,7 +164,7 @@ func validateMatchesExistingBinding(
 		// projection.
 		constraints[existing.FieldSelection.Document] = &pm.Response_Validated_Constraint{
 			Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
-			Reason: "The root document is required for a standard updates materialization",
+			Reason: "The root document must continue to be materialized as the same projected field",
 		}
 	}
 
