@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"bytes"
+	"io"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"net"
@@ -25,7 +28,7 @@ import (
 )
 
 const (
-	storeBatchSize = 1024               // Assuming store records average ~2kB then 4k * 2kB = 8MB
+	storeBatchSize = 32768               // Assuming store records average ~2kB then 4k * 2kB = 8MB
 	loadBatchSize  = storeBatchSize * 5 // Load records are keys-only so allow for more in a batch
 )
 
@@ -94,11 +97,9 @@ func (c *config) ToURI() string {
 
 	var uri = url.URL{
 		Scheme: "mysql",
+		Path: "/" + c.Database,
 		Host:   fmt.Sprintf("tcp(%s)", address),
 		User:   url.UserPassword(c.User, c.Password),
-	}
-	if c.Database != "" {
-		uri.Path = "/" + c.Database
 	}
 	var params = make(url.Values)
 	if c.Advanced.SSLMode != "" {
@@ -225,7 +226,7 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 			switch mysqlErr.Number {
 			case 1045:
 				err = fmt.Errorf("incorrect username or password (%d): %s", mysqlErr.Number, mysqlErr.Message)
-      case 1049:
+			case 1049:
 				err = fmt.Errorf("database %q cannot be accessed, it might not exist or you do not have permission to access it (%d): %s", cfg.Database, mysqlErr.Number, mysqlErr.Message)
 			case 1044:
 				err = fmt.Errorf("database %q cannot be accessed, it might not exist or you do not have permission to access it (%d): %s", cfg.Database, mysqlErr.Number, mysqlErr.Message)
@@ -396,7 +397,7 @@ func newTransactor(
 		return nil, fmt.Errorf("newTransactor db.Conn: %w", err)
 	}
 	defer conn.Close()
-	
+
 	tableVarchars, err := getVarcharDetails(ctx, cfg.Database, conn)
 	if err != nil {
 		return nil, fmt.Errorf("getting existing varchar column lengths: %w", err)
@@ -434,6 +435,8 @@ type binding struct {
 	createLoadTableSQL  string
 	loadInsertSQL       string
 	loadInsertBatchSQL  string
+	loadLoadSQL         string
+	storeLoadSQL        string
 	storeUpdateSQL      string
 	storeInsertSQL      string
 	storeInsertBatchSQL string
@@ -449,9 +452,9 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 	}{
 		{&b.createLoadTableSQL, tplCreateLoadTable},
 		{&b.loadInsertSQL, tplLoadInsert},
-		{&b.loadInsertBatchSQL, tplLoadInsertBatch},
+		{&b.loadLoadSQL, tplLoadLoad},
 		{&b.storeInsertSQL, tplStoreInsert},
-		{&b.storeInsertBatchSQL, tplStoreInsertBatch},
+		{&b.storeLoadSQL, tplStoreLoad},
 		{&b.storeUpdateSQL, tplStoreUpdate},
 		{&b.loadQuerySQL, tplLoadQuery},
 		{&b.tempTableName, tplTempTableName},
@@ -461,6 +464,15 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
 			return err
 		}
+	}
+
+	var err error
+	if b.loadInsertBatchSQL, err = RenderBatchTemplate(BatchSpec { BatchSize: loadBatchSize, Table: target }, tplLoadInsertBatch); err != nil {
+		return err
+	}
+
+	if b.storeInsertBatchSQL, err = RenderBatchTemplate(BatchSpec { BatchSize: storeBatchSize, Table: target }, tplStoreInsertBatch); err != nil {
+		return err
 	}
 
 	// Retain column metadata information for this binding as a snapshot of the table configuration
@@ -502,7 +514,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 		if err != nil {
 			return fmt.Errorf("temp column metas: %w", err)
 		}
-		
+
 		if strings.Contains(columnType.DDL, "VARCHAR(256)") {
 			tempColumnMetas[idx] = varcharColumnMeta{
 				identifier: key.Identifier,
@@ -521,31 +533,79 @@ type batchRequest struct {
 	query string
 }
 
-func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch []batchRequest) error {
-	var flatArgs = []any{}
-	for _, b := range batch {
-		flatArgs = append(flatArgs, b.args...)
+func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch []any, argCount int, readerSuffix string) error {
+	var buff bytes.Buffer
+	var writer = csv.NewWriter(&buff)
+
+	log.WithField("type", readerSuffix).WithField("size", len(batch) / argCount).Info("draining a batch")
+	t := time.Now()
+	var stringBatch = make([]string, len(batch))
+	for i, v := range batch {
+		switch value := v.(type) {
+			case []byte:
+				stringBatch[i] = string(value)
+			case string:
+				stringBatch[i] = value
+			case nil:
+				// See https://dev.mysql.com/doc/refman/8.0/en/problems-with-null.html
+				stringBatch[i] = "NULL"
+			case bool:
+				if value == false {
+					stringBatch[i] = "0"
+				} else {
+					stringBatch[i] = "1"
+				}
+			default:
+				b, err := json.Marshal(value)
+				if err != nil {
+					return fmt.Errorf("encoding value as json: %w", err)
+				}
+				stringBatch[i] = string(b)
+		}
 	}
 
-	if _, err := txn.ExecContext(ctx, query, flatArgs...); err != nil {
-		return err
+	for i := 0; i < len(stringBatch); i += argCount {
+		if err := writer.Write(stringBatch[i:(i+argCount)]); err != nil {
+			return fmt.Errorf("writing csv record: %w", err)
+		}
 	}
 
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return fmt.Errorf("flush writing csv: %w", err)
+	}
+
+	var readerName = fmt.Sprintf("batch_data_%s", readerSuffix)
+
+	mysql.RegisterReaderHandler(readerName,
+		func() io.Reader {
+			return &buff
+		},
+	)
+	defer mysql.DeregisterReaderHandler(readerName)
+
+	if _, err := txn.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("load data: %w", err)
+	}
+
+	log.WithField("time", time.Since(t)).WithField("type", readerSuffix).WithField("size", len(batch)/argCount).Info("drained a batch")
 	return nil
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
+	log.Info("starting load phase")
 
 	// Use a read-only "load" transaction, which will automatically
 	// truncate the temporary key staging tables on commit.
-  var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{ReadOnly: true})
+	var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return fmt.Errorf("DB.BeginTx: %w", err)
 	}
 	defer txn.Rollback()
 
-	var batches = make(map[string][]batchRequest)
+	var batches = make(map[int][]any)
+	var argCount = make(map[int]int)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -575,36 +635,33 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 				}
 			}
 
-			if batch, ok := batches[b.target.Identifier]; !ok {
-				batches[b.target.Identifier] = []batchRequest{batchRequest{
-					query: b.loadInsertSQL,
-					args: converted,
-				}}
-			} else {
-				batches[b.target.Identifier] = append(batch, batchRequest{
-					query: b.loadInsertSQL,
-					args: converted,
-				});
+			if _, ok := argCount[it.Binding]; !ok {
+				argCount[it.Binding] = len(converted)
+			}
 
-				if len(batches[b.target.Identifier]) >= loadBatchSize {
-					if err := drainBatch(ctx, txn, b.loadInsertBatchSQL, batches[b.target.Identifier]); err != nil {
-						return err
-					}
-					batches[b.target.Identifier] = nil
+			batches[it.Binding] = append(batches[it.Binding], converted...)
+
+			if len(batches[it.Binding]) >= loadBatchSize * argCount[it.Binding] {
+				if err := drainBatch(ctx, txn, b.loadLoadSQL, batches[it.Binding], argCount[it.Binding], "load"); err != nil {
+					return fmt.Errorf("load batch insert: %w", err)
 				}
+				batches[it.Binding] = nil
 			}
 		}
 	}
 
-	for _, batch := range batches {
-		if len(batch) > 0 {
-			for _, b := range batch {
-				if _, err := txn.ExecContext(ctx, b.query, b.args...); err != nil {
-					return err
-				}
-			}
+	for bindingIndex, batch := range batches {
+		if len(batch) < 1 {
+			continue
+		}
+
+		var b = d.bindings[bindingIndex]
+		if err := drainBatch(ctx, txn, b.loadLoadSQL, batch, argCount[it.Binding], "load"); err != nil {
+			return fmt.Errorf("load batch insert: %w", err)
 		}
 	}
+
+	log.Info("load insertions done")
 
 	if it.Err() != nil {
 		return it.Err()
@@ -617,6 +674,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
 	defer rows.Close()
+
+	log.Info("load union done")
 
 	for rows.Next() {
 		var binding int
@@ -658,21 +717,22 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 	}()
 
-  log.Info("starting store phase")
-  if _, err := txn.ExecContext(ctx, "SET unique_checks=0"); err != nil {
-    return nil, err
-  }
-  if _, err := txn.ExecContext(ctx, "SET autocommit=0"); err != nil {
-    return nil, err
-  }
+	log.Info("starting store phase")
 
-	var batches = map[string][]batchRequest{}
+	// map of binding to flat argument list
+	var batches = make(map[int][]any)
+	// map of binding to number of arguments, used when draining leftovers
+	var argCount = make(map[int]int)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON);
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
+		}
+
+		if _, ok := argCount[it.Binding]; !ok {
+			argCount[it.Binding] = len(converted)
 		}
 
 		// See if we need to increase any VARCHAR column lengths
@@ -698,51 +758,36 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 
 		if it.Exists {
-      // MySQL does not support indexed placeholders, and in case of the update
-      // query, the WHERE statement which includes the key comes last in the
-      // query, and as such we need to put the key as the last argument to the
-      // query
-      converted = append(converted[1:], converted[0])
+			// MySQL does not support indexed placeholders, and in case of the update
+			// query, the WHERE statement which includes the key comes last in the
+			// query, and as such we need to put the key as the last argument to the
+			// query
+			converted = append(converted[1:], converted[0])
 			if _, err := txn.ExecContext(ctx, b.storeUpdateSQL, converted...); err != nil {
-        return nil, fmt.Errorf("store update: %w", err)
-      }
+				return nil, fmt.Errorf("store update: %w", err)
+			}
 		} else {
-			if batch, ok := batches[b.target.Identifier]; !ok {
-				batches[b.target.Identifier] = []batchRequest{batchRequest{
-					query: b.storeInsertSQL,
-					args: converted,
-				}}
-			} else {
-				batches[b.target.Identifier] = append(batch, batchRequest{
-					query: b.storeInsertSQL,
-					args: converted,
-				});
+			batches[it.Binding] = append(batches[it.Binding], converted...)
 
-				if len(batches[b.target.Identifier]) >= storeBatchSize {
-          log.Info("store: draining a batch")
-					if err := drainBatch(ctx, txn, b.storeInsertBatchSQL, batches[b.target.Identifier]); err != nil {
-						return nil, fmt.Errorf("store insert: %w", err)
-					}
-          log.Info("store: drained a batch")
-					batches[b.target.Identifier] = nil
+			if len(batches[it.Binding]) >= storeBatchSize * argCount[it.Binding] {
+				if err := drainBatch(ctx, txn, b.storeLoadSQL, batches[it.Binding], argCount[it.Binding], "store"); err != nil {
+					return nil, fmt.Errorf("store batch insert: %w", err)
 				}
+				batches[it.Binding] = nil
 			}
 		}
 	}
 
-	for _, batch := range batches {
-		if len(batch) > 0 {
-			for _, b := range batch {
-				if _, err := txn.ExecContext(ctx, b.query, b.args...); err != nil {
-					return nil, fmt.Errorf("store insert: %w", err)
-				}
-			}
+	for bindingIndex, batch := range batches {
+		if len(batch) < 1 {
+			continue
+		}
+
+		var b = d.bindings[bindingIndex]
+		if err := drainBatch(ctx, txn, b.storeLoadSQL, batch, argCount[it.Binding], "store"); err != nil {
+			return nil, fmt.Errorf("store batch insert: %w", err)
 		}
 	}
-
-  if _, err := txn.ExecContext(ctx, "SET unique_checks=1"); err != nil {
-    return nil, err
-  }
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
 		return nil, pf.RunAsyncOperation(func() error {
@@ -770,7 +815,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 				return fmt.Errorf("committing Store transaction: %w", err)
 			}
 
-      log.Info("store phase done")
+			log.Info("store phase done")
 
 			return nil
 		})

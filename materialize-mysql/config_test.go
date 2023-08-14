@@ -39,6 +39,10 @@ func TestMySQLConfig(t *testing.T) {
 	var noPass = validConfig
 	noPass.Password = ""
 	require.Error(t, noPass.Validate(), "expected validation error")
+
+	var noDatabase = validConfig
+	noDatabase.Database = ""
+	require.Error(t, noDatabase.Validate(), "expected validation error")
 }
 
 func TestSpecification(t *testing.T) {
