@@ -28,7 +28,7 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]'
 
 --- Begin target_table createLoadTable ---
 
-CREATE TEMPORARY TABLE flow_temp_table_0 (
+CREATE TEMPORARY TABLE flow_temp_load_table_0 (
 		key1 BIGINT NOT NULL,
 		`key!2` BOOLEAN NOT NULL
 	,
@@ -38,16 +38,26 @@ CREATE TEMPORARY TABLE flow_temp_table_0 (
 
 --- Begin `Delta Updates` createLoadTable ---
 
-CREATE TEMPORARY TABLE flow_temp_table_1 (
+CREATE TEMPORARY TABLE flow_temp_load_table_1 (
 		`theKey` VARCHAR(256) NOT NULL
 	,
 		PRIMARY KEY (`theKey`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
 --- End `Delta Updates` createLoadTable ---
 
+--- Begin target_table truncateTempTable ---
+
+TRUNCATE flow_temp_load_table_0;
+--- End target_table truncateTempTable ---
+
+--- Begin `Delta Updates` truncateTempTable ---
+
+TRUNCATE flow_temp_load_table_1;
+--- End `Delta Updates` truncateTempTable ---
+
 --- Begin target_table loadLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_table_0
+LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_load_table_0
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -62,7 +72,7 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_table_0
 
 --- Begin `Delta Updates` loadLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_table_1
+LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_load_table_1
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -77,7 +87,7 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_table_1
 --- Begin target_table loadQuery ---
 
 SELECT 0, r.flow_document
-	FROM flow_temp_table_0 AS l
+	FROM flow_temp_load_table_0 AS l
 	JOIN target_table AS r
 		 ON  l.key1 = r.key1
 		 AND l.`key!2` = r.`key!2`
@@ -126,33 +136,63 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE `Delta Updates`
 );
 --- End `Delta Updates` storeLoad ---
 
---- Begin target_table storeUpdate ---
+--- Begin target_table updateLoad ---
 
-UPDATE target_table SET
-		`Camel_Case` = ?,
-		`a Time` = ?,
-		`array` = ?,
-		lower_case = ?,
-		`value` = ?,
-		flow_document = ?
-	 WHERE key1 = ?
-	 AND   `key!2` = ?;
---- End target_table storeUpdate ---
+LOAD DATA LOCAL INFILE 'Reader::batch_data_update' INTO TABLE flow_temp_update_table_0
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+		key1,
+		`key!2`,
+		`Camel_Case`,
+		`a Time`,
+		`array`,
+		lower_case,
+		`value`,
+		flow_document
+);
+--- End target_table updateLoad ---
 
---- Begin `Delta Updates` storeUpdate ---
+--- Begin `Delta Updates` updateLoad ---
 
-UPDATE `Delta Updates` SET
-		`aValue` = ?
-	 WHERE `theKey` = ?;
---- End `Delta Updates` storeUpdate ---
+LOAD DATA LOCAL INFILE 'Reader::batch_data_update' INTO TABLE flow_temp_update_table_1
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+		`theKey`,
+		`aValue`
+);
+--- End `Delta Updates` updateLoad ---
 
---- Begin target_table_no_values_materialized storeUpdate ---
+--- Begin target_table updateReplace ---
 
-UPDATE target_table_no_values_materialized SET
-		flow_document = ?
-	 WHERE key1 = ?
-	 AND   key2 = ?;
---- End target_table_no_values_materialized storeUpdate ---
+REPLACE INTO target_table
+	SELECT * FROM flow_temp_update_table_0;
+--- End target_table updateReplace ---
+
+--- Begin `Delta Updates` updateReplace ---
+
+REPLACE INTO `Delta Updates`
+	SELECT * FROM flow_temp_update_table_1;
+--- End `Delta Updates` updateReplace ---
+
+--- Begin target_table truncateUpdateTable ---
+
+TRUNCATE flow_temp_update_table_0;
+--- End target_table truncateUpdateTable ---
+
+--- Begin `Delta Updates` truncateUpdateTable ---
+
+TRUNCATE flow_temp_update_table_1;
+--- End `Delta Updates` truncateUpdateTable ---
 
 --- Begin Fence Install ---
 

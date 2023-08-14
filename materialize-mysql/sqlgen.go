@@ -90,8 +90,12 @@ func rfc3339TimeToUTC() sql.ElementConverter {
 
 var (
 	tplAll = sql.MustParseTemplate(mysqlDialect, "root", `
-{{ define "temp_name" -}}
-flow_temp_table_{{ $.Binding }}
+{{ define "temp_load_name" -}}
+flow_temp_load_table_{{ $.Binding }}
+{{- end }}
+
+{{ define "temp_update_name" -}}
+flow_temp_update_table_{{ $.Binding }}
 {{- end }}
 
 -- Templated creation of a materialized table definition and comments:
@@ -117,7 +121,7 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 -- Templated creation of a temporary load table:
 
 {{ define "createLoadTable" }}
-CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
+CREATE TEMPORARY TABLE {{ template "temp_load_name" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
@@ -135,13 +139,13 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 -- Templated truncation of the temporary load table:
 
 {{ define "truncateTempTable" }}
-TRUNCATE {{ template "temp_name" . }};
+TRUNCATE {{ template "temp_load_name" . }};
 {{ end }}
 
 -- Templated load into the temporary load table:
 
 {{ define "loadLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE {{ template "temp_name" . }}
+LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE {{ template "temp_load_name" . }}
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -162,7 +166,7 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE {{ template "temp_na
 {{ define "loadQuery" }}
 {{ if $.Document -}}
 SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
-	FROM {{ template "temp_name" . }} AS l
+	FROM {{ template "temp_load_name" . }} AS l
 	JOIN {{ $.Identifier}} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON  {{ end -}}
@@ -191,23 +195,46 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE {{ $.Identifier }}
 );
 {{ end }}
 
--- Templated query which updates an existing row in the target table:
-
-{{ define "storeUpdate" }}
-UPDATE {{$.Identifier}} SET
-	{{- range $ind, $val := $.Values }}
+{{ define "createUpdateTable" }}
+CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
+	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{ $val.Identifier}} = {{ $val.Placeholder }}
+		{{$col.Identifier}} {{$col.DDL}}
 	{{- end }}
-	{{- if $.Document -}}
-		{{ if $.Values }},{{ end }}
-		{{ $.Document.Identifier }} = {{ $.Document.Placeholder }}
+	,
+	PRIMARY KEY (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{end -}}
+		{{$key.Identifier}}
 	{{- end -}}
-	{{ range $ind, $key := $.Keys }}
-	{{ if $ind }} AND   {{ else }} WHERE {{ end -}}
-	{{ $key.Identifier }} = {{ $key.Placeholder }}
-	{{- end -}}
-	;
+	)
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
+{{ end }}
+
+{{ define "updateLoad" }}
+LOAD DATA LOCAL INFILE 'Reader::batch_data_update' INTO TABLE {{ template "temp_update_name" . }}
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}
+	{{- end }}
+);
+{{ end }}
+
+{{ define "updateReplace" }}
+REPLACE INTO {{ $.Identifier }}
+	SELECT * FROM {{ template "temp_update_name" . }};
+{{ end }}
+
+
+{{ define "truncateUpdateTable" }}
+TRUNCATE {{ template "temp_update_name" . }};
 {{ end }}
 
 {{ define "installFence" }}
@@ -258,12 +285,15 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
-	tplTempTableName     = tplAll.Lookup("temp_name")
+	tplTempTableName     = tplAll.Lookup("temp_load_name")
 	tplTempTruncate      = tplAll.Lookup("truncateTempTable")
 	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
+	tplCreateUpdateTable = tplAll.Lookup("createUpdateTable")
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
+	tplUpdateLoad        = tplAll.Lookup("updateLoad")
+	tplUpdateReplace     = tplAll.Lookup("updateReplace")
+	tplUpdateTruncate    = tplAll.Lookup("truncateUpdateTable")
 	tplStoreLoad         = tplAll.Lookup("storeLoad")
-	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
 	tplLoadQuery         = tplAll.Lookup("loadQuery")
 	tplLoadLoad          = tplAll.Lookup("loadLoad")
 	tplInstallFence      = tplAll.Lookup("installFence")
