@@ -138,45 +138,7 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 TRUNCATE {{ template "temp_name" . }};
 {{ end }}
 
--- Templated insertion into the temporary load table:
-
-{{ define "loadInsert" }}
-INSERT INTO {{ template "temp_name" . }} (
-	{{- range $ind, $key := $.Keys }}
-		{{- if $ind }}, {{ end -}}
-		{{ $key.Identifier }}
-	{{- end -}}
-	)
-	VALUES (
-	{{- range $ind, $key := $.Keys }}
-		{{- if $ind }}, {{ end -}}
-		{{ $key.Placeholder }}
-	{{- end -}}
-);
-{{ end }}
-
--- Templated insertion into the temporary load table:
-
-{{ define "loadInsertBatch" }}
-INSERT INTO {{ template "temp_name" $.Table }} (
-	{{- range $ind, $key := $.Table.Keys }}
-		{{- if $ind }}, {{ end -}}
-		{{ $key.Identifier }}
-	{{- end -}}
-	)
-	VALUES 
-	{{- range $it, $x := (Repeat $.BatchSize) }}
-	{{- if $it}}, {{ end -}}
-	(
-		{{- range $ind, $key := $.Table.Keys }}
-			{{- if $ind }}, {{ end -}}
-			{{ $key.Placeholder }}
-		{{- end -}}
-	)
-	{{- end -}}
-;
-{{ end }}
-
+-- Templated load into the temporary load table:
 
 {{ define "loadLoad" }}
 LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE {{ template "temp_name" . }}
@@ -211,43 +173,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 
--- Templated query which inserts a new, complete row to the target table:
-
-{{ define "storeInsert" }}
-INSERT INTO {{ $.Identifier }} (
-	{{- range $ind, $col := $.Columns }}
-		{{- if $ind }},{{ end }}
-		{{$col.Identifier}}
-	{{- end }}
-) VALUES (
-	{{- range $ind, $col := $.Columns }}
-		{{- if $ind}}, {{ end -}}
-		{{ $col.Placeholder }}
-	{{- end -}}
-);
-{{ end }}
-
--- Templated query which inserts a new, complete row to the target table:
-
-{{ define "storeInsertBatch" }}
-INSERT INTO {{ $.Table.Identifier }} (
-	{{- range $ind, $col := $.Table.Columns }}
-		{{- if $ind }},{{ end }}
-		{{$col.Identifier}}
-	{{- end }}
-) VALUES
-	{{- range $it, $x := (Repeat $.BatchSize) }}
-	{{- if $it}}, {{ end -}}
-	(
-		{{- range $ind, $col := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			{{ $col.Placeholder }}
-		{{- end -}}
-	)
-	{{- end -}}
-;
-{{ end }}
-
+-- Template to load data into target table
 
 {{ define "storeLoad" }}
 LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE {{ $.Identifier }}
@@ -336,10 +262,6 @@ UPDATE {{ Identifier $.TablePath }}
 	tplTempTruncate      = tplAll.Lookup("truncateTempTable")
 	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplLoadInsert        = tplAll.Lookup("loadInsert")
-	tplLoadInsertBatch   = tplAll.Lookup("loadInsertBatch")
-	tplStoreInsert       = tplAll.Lookup("storeInsert")
-	tplStoreInsertBatch  = tplAll.Lookup("storeInsertBatch")
 	tplStoreLoad         = tplAll.Lookup("storeLoad")
 	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
 	tplLoadQuery         = tplAll.Lookup("loadQuery")

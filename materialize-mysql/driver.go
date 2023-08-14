@@ -29,7 +29,7 @@ import (
 
 const (
 	storeBatchSize = 32768               // Assuming store records average ~2kB then 4k * 2kB = 8MB
-	loadBatchSize  = storeBatchSize * 5 // Load records are keys-only so allow for more in a batch
+	loadBatchSize  = storeBatchSize * 2  // Load records are keys-only so allow for more in a batch
 )
 
 type sshForwarding struct {
@@ -433,13 +433,9 @@ type binding struct {
 	tempTableName       string
 	tempTruncate        string
 	createLoadTableSQL  string
-	loadInsertSQL       string
-	loadInsertBatchSQL  string
 	loadLoadSQL         string
 	storeLoadSQL        string
 	storeUpdateSQL      string
-	storeInsertSQL      string
-	storeInsertBatchSQL string
 	loadQuerySQL        string
 }
 
@@ -451,9 +447,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 		tpl *template.Template
 	}{
 		{&b.createLoadTableSQL, tplCreateLoadTable},
-		{&b.loadInsertSQL, tplLoadInsert},
 		{&b.loadLoadSQL, tplLoadLoad},
-		{&b.storeInsertSQL, tplStoreInsert},
 		{&b.storeLoadSQL, tplStoreLoad},
 		{&b.storeUpdateSQL, tplStoreUpdate},
 		{&b.loadQuerySQL, tplLoadQuery},
@@ -464,15 +458,6 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
 			return err
 		}
-	}
-
-	var err error
-	if b.loadInsertBatchSQL, err = RenderBatchTemplate(BatchSpec { BatchSize: loadBatchSize, Table: target }, tplLoadInsertBatch); err != nil {
-		return err
-	}
-
-	if b.storeInsertBatchSQL, err = RenderBatchTemplate(BatchSpec { BatchSize: storeBatchSize, Table: target }, tplStoreInsertBatch); err != nil {
-		return err
 	}
 
 	// Retain column metadata information for this binding as a snapshot of the table configuration
@@ -537,7 +522,6 @@ func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch []any, 
 	var buff bytes.Buffer
 	var writer = csv.NewWriter(&buff)
 
-	log.WithField("type", readerSuffix).WithField("size", len(batch) / argCount).Info("draining a batch")
 	t := time.Now()
 	var stringBatch = make([]string, len(batch))
 	for i, v := range batch {
@@ -588,13 +572,12 @@ func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch []any, 
 		return fmt.Errorf("load data: %w", err)
 	}
 
-	log.WithField("time", time.Since(t)).WithField("type", readerSuffix).WithField("size", len(batch)/argCount).Info("drained a batch")
+	log.WithField("time", time.Since(t)).WithField("type", readerSuffix).WithField("size", len(batch)/argCount).Debug("drained a batch")
 	return nil
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
-	log.Info("starting load phase")
 
 	// Use a read-only "load" transaction, which will automatically
 	// truncate the temporary key staging tables on commit.
@@ -656,12 +639,10 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		}
 
 		var b = d.bindings[bindingIndex]
-		if err := drainBatch(ctx, txn, b.loadLoadSQL, batch, argCount[it.Binding], "load"); err != nil {
+		if err := drainBatch(ctx, txn, b.loadLoadSQL, batch, argCount[bindingIndex], "load"); err != nil {
 			return fmt.Errorf("load batch insert: %w", err)
 		}
 	}
-
-	log.Info("load insertions done")
 
 	if it.Err() != nil {
 		return it.Err()
@@ -674,8 +655,6 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
 	defer rows.Close()
-
-	log.Info("load union done")
 
 	for rows.Next() {
 		var binding int
@@ -717,8 +696,6 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 	}()
 
-	log.Info("starting store phase")
-
 	// map of binding to flat argument list
 	var batches = make(map[int][]any)
 	// map of binding to number of arguments, used when draining leftovers
@@ -747,7 +724,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 						"column":              varcharMeta.identifier,
 						"currentColumnLength": varcharMeta.maxLength,
 						"stringValueLength":   l,
-					}).Info("column will be altered to VARCHAR(MAX) to accommodate large string value")
+					}).Info("column will be altered to VARCHAR(stringLength) to accommodate large string value")
 					b.varcharColumnMetas[idx].maxLength = l
 
 					if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf(varcharTableAlter, b.target.Identifier, varcharMeta.identifier, l)); err != nil {
@@ -763,6 +740,8 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			// query, and as such we need to put the key as the last argument to the
 			// query
 			converted = append(converted[1:], converted[0])
+			// FIXME: use a temporary table to load the updates to, and then use
+			// `REPLACE` to move the data into the destination
 			if _, err := txn.ExecContext(ctx, b.storeUpdateSQL, converted...); err != nil {
 				return nil, fmt.Errorf("store update: %w", err)
 			}
@@ -784,7 +763,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 
 		var b = d.bindings[bindingIndex]
-		if err := drainBatch(ctx, txn, b.storeLoadSQL, batch, argCount[it.Binding], "store"); err != nil {
+		if err := drainBatch(ctx, txn, b.storeLoadSQL, batch, argCount[bindingIndex], "store"); err != nil {
 			return nil, fmt.Errorf("store batch insert: %w", err)
 		}
 	}
@@ -814,8 +793,6 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			if err := txn.Commit(); err != nil {
 				return fmt.Errorf("committing Store transaction: %w", err)
 			}
-
-			log.Info("store phase done")
 
 			return nil
 		})
