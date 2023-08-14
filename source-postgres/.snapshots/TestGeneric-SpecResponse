@@ -54,7 +54,7 @@
             "type": "integer",
             "title": "Backfill Chunk Size",
             "description": "The number of rows which should be fetched from the database in a single backfill query.",
-            "default": 32768
+            "default": 50000
           },
           "sslmode": {
             "type": "string",
