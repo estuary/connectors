@@ -48,7 +48,7 @@ type Config struct {
 type advancedConfig struct {
 	WatermarksTable   string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 	SkipBackfills     string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=4096,description=The number of rows which should be fetched from the database in a single backfill query."`
+	BackfillChunkSize int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
 }
 
 type tunnelConfig struct {
@@ -101,7 +101,7 @@ func (c *Config) SetDefaults() {
 		c.Advanced.WatermarksTable = "dbo.flow_watermarks"
 	}
 	if c.Advanced.BackfillChunkSize <= 0 {
-		c.Advanced.BackfillChunkSize = 32768
+		c.Advanced.BackfillChunkSize = 50000
 	}
 	if c.Timezone == "" {
 		c.Timezone = "UTC"
