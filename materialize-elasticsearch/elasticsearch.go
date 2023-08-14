@@ -6,10 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
@@ -205,41 +203,6 @@ func (es *ElasticSearch) Commit(ctx context.Context, items []*esutil.BulkIndexer
 	return nil
 }
 
-func (es *ElasticSearch) SearchByIds(index string, ids []string, docField string) ([]json.RawMessage, error) {
-	if len(ids) == 0 {
-		return []json.RawMessage{}, nil
-	}
-
-	var resp, err = es.client.Search(
-		es.client.Search.WithIndex(index),
-		es.client.Search.WithBody(es.buildIDQuery(ids, docField)),
-		es.client.Search.WithSize(len(ids)),
-	)
-	defer closeResponse(resp)
-	if err = es.parseErrorResp(err, resp); err != nil {
-		return nil, fmt.Errorf("search by ids: %w", err)
-	}
-
-	var r = struct {
-		Hits struct {
-			Hits []struct {
-				ID     string                     `json:"_id"`
-				Source map[string]json.RawMessage `json:"_source"`
-			} `json:"hits"`
-		} `json:"hits"`
-	}{}
-
-	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-
-	var results = make([]json.RawMessage, 0, len(r.Hits.Hits))
-	for _, hit := range r.Hits.Hits {
-		results = append(results, hit.Source[docField])
-	}
-	return results, nil
-}
-
 func (es *ElasticSearch) parseErrorResp(err error, resp *esapi.Response) error {
 	if err != nil {
 		return fmt.Errorf("response err: %w", err)
@@ -253,27 +216,6 @@ func (es *ElasticSearch) parseErrorResp(err error, resp *esapi.Response) error {
 		return fmt.Errorf("error response [%s] %s", resp.Status(), resp.String())
 	}
 	return nil
-}
-
-func (es *ElasticSearch) buildIDQuery(ids []string, docField string) io.Reader {
-	var quotedIds = make([]string, len(ids))
-	for i, id := range ids {
-		quotedIds[i] = fmt.Sprintf("%q", id)
-	}
-
-	var queryBody = fmt.Sprintf(`{
-		"_source": %q, 
-		"query": {
-			"ids" : {
-			  "values" : [%s]
-			}
-		  }
-	}`,
-		docField,
-		strings.Join(quotedIds, ","),
-	)
-
-	return strings.NewReader(queryBody)
 }
 
 func closeResponse(response *esapi.Response) {

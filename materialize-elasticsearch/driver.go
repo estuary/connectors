@@ -290,12 +290,15 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		return nil, nil, fmt.Errorf("creating elastic search client: %w", err)
 	}
 
+	indexToBinding := make(map[string]int)
 	var bindings []binding
-	for _, b := range open.Materialization.Bindings {
+	for idx, b := range open.Materialization.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
 			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
 		}
+
+		indexToBinding[res.Index] = idx
 		bindings = append(bindings, binding{
 			index:        res.Index,
 			deltaUpdates: res.DeltaUpdates,
@@ -305,8 +308,9 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 	}
 
 	var transactor = &transactor{
-		elasticSearch: elasticSearch,
-		bindings:      bindings,
+		elasticSearch:  elasticSearch,
+		bindings:       bindings,
+		indexToBinding: indexToBinding,
 	}
 	return transactor, &pm.Response_Opened{}, nil
 
