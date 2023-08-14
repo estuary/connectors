@@ -1,0 +1,14 @@
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "The root document must continue to be materialized as the same projected field"
+	},
+	"intKey": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"stringKey": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	}
+}
