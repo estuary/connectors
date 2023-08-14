@@ -427,16 +427,23 @@ type varcharColumnMeta struct {
 }
 
 type binding struct {
-	target              sql.Table
-	varcharColumnMetas  []varcharColumnMeta
-	tempVarcharMetas    []varcharColumnMeta
-	tempTableName       string
-	tempTruncate        string
-	createLoadTableSQL  string
-	loadLoadSQL         string
-	storeLoadSQL        string
-	storeUpdateSQL      string
-	loadQuerySQL        string
+	target               sql.Table
+
+	varcharColumnMetas   []varcharColumnMeta
+	tempVarcharMetas     []varcharColumnMeta
+
+	tempTableName        string
+	tempTruncate         string
+
+	createLoadTableSQL   string
+	createUpdateTableSQL string
+	loadLoadSQL          string
+	storeLoadSQL         string
+	loadQuerySQL         string
+
+	updateLoadSQL        string
+	updateReplaceSQL     string
+	updateTruncateSQL    string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars map[string]int) error {
@@ -447,10 +454,13 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 		tpl *template.Template
 	}{
 		{&b.createLoadTableSQL, tplCreateLoadTable},
+		{&b.createUpdateTableSQL, tplCreateUpdateTable},
 		{&b.loadLoadSQL, tplLoadLoad},
-		{&b.storeLoadSQL, tplStoreLoad},
-		{&b.storeUpdateSQL, tplStoreUpdate},
 		{&b.loadQuerySQL, tplLoadQuery},
+		{&b.storeLoadSQL, tplStoreLoad},
+		{&b.updateLoadSQL, tplUpdateLoad},
+		{&b.updateReplaceSQL, tplUpdateReplace},
+		{&b.updateTruncateSQL, tplUpdateTruncate},
 		{&b.tempTableName, tplTempTableName},
 		{&b.tempTruncate, tplTempTruncate},
 	} {
@@ -491,6 +501,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 	// Create a binding-scoped temporary table for staged keys to load.
 	if _, err := t.load.conn.ExecContext(ctx, b.createLoadTableSQL); err != nil {
 		return fmt.Errorf("Exec(%s): %w", b.createLoadTableSQL, err)
+	}
+
+	if _, err := t.store.conn.ExecContext(ctx, b.createUpdateTableSQL); err != nil {
+		return fmt.Errorf("Exec(%s): %w", b.createUpdateTableSQL, err)
 	}
 
 	tempColumnMetas := make([]varcharColumnMeta, len(allColumns))
@@ -698,6 +712,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 	// map of binding to flat argument list
 	var batches = make(map[int][]any)
+	var updates = make(map[int][]any)
 	// map of binding to number of arguments, used when draining leftovers
 	var argCount = make(map[int]int)
 	for it.Next() {
@@ -735,15 +750,21 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 
 		if it.Exists {
-			// MySQL does not support indexed placeholders, and in case of the update
-			// query, the WHERE statement which includes the key comes last in the
-			// query, and as such we need to put the key as the last argument to the
-			// query
-			converted = append(converted[1:], converted[0])
-			// FIXME: use a temporary table to load the updates to, and then use
-			// `REPLACE` to move the data into the destination
-			if _, err := txn.ExecContext(ctx, b.storeUpdateSQL, converted...); err != nil {
-				return nil, fmt.Errorf("store update: %w", err)
+			updates[it.Binding] = append(updates[it.Binding], converted...)
+			if len(updates[it.Binding]) >= storeBatchSize * argCount[it.Binding] {
+				if err := drainBatch(ctx, txn, b.updateLoadSQL, updates[it.Binding], argCount[it.Binding], "update"); err != nil {
+					return nil, fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
+				}
+
+				if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
+					return nil, fmt.Errorf("store batch update replace on %q: %w", b.target.Identifier, err)
+				}
+
+				if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
+					return nil, fmt.Errorf("store batch update truncate on %q: %w", b.target.Identifier, err)
+				}
+
+				batches[it.Binding] = nil
 			}
 		} else {
 			batches[it.Binding] = append(batches[it.Binding], converted...)
@@ -765,6 +786,25 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		var b = d.bindings[bindingIndex]
 		if err := drainBatch(ctx, txn, b.storeLoadSQL, batch, argCount[bindingIndex], "store"); err != nil {
 			return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
+		}
+	}
+
+	for bindingIndex, batch := range updates {
+		if len(batch) < 1 {
+			continue
+		}
+
+		var b = d.bindings[bindingIndex]
+		if err := drainBatch(ctx, txn, b.updateLoadSQL, batch, argCount[bindingIndex], "update"); err != nil {
+			return nil, fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
+		}
+
+		if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
+			return nil, fmt.Errorf("store batch update replace on %q: %w", b.target.Identifier, err)
+		}
+
+		if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
+			return nil, fmt.Errorf("store batch update truncate on %q: %w", b.target.Identifier, err)
 		}
 	}
 

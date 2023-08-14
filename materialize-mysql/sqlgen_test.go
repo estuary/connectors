@@ -39,10 +39,13 @@ func TestSQLGeneration(t *testing.T) {
 	for _, tpl := range []*template.Template{
 		tplCreateTargetTable,
 		tplCreateLoadTable,
+		tplTempTruncate,
 		tplLoadLoad,
 		tplLoadQuery,
 		tplStoreLoad,
-		tplStoreUpdate,
+		tplUpdateLoad,
+		tplUpdateReplace,
+		tplUpdateTruncate,
 	} {
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
@@ -52,17 +55,6 @@ func TestSQLGeneration(t *testing.T) {
 			snap.WriteString("--- End " + testcase + " ---\n\n")
 		}
 	}
-
-	var shapeNoValues = sqlDriver.BuildTableShape(spec, 2, tableConfig{
-		Table:  "target_table_no_values_materialized",
-		Delta:  false,
-	})
-	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, mysqlDialect)
-	require.NoError(t, err)
-
-	snap.WriteString("--- Begin " + "target_table_no_values_materialized storeUpdate" + " ---\n")
-	require.NoError(t, tplStoreUpdate.Execute(&snap, &tableNoValues))
-	snap.WriteString("--- End " + "target_table_no_values_materialized storeUpdate" + " ---\n\n")
 
 	var fence = sqlDriver.Fence{
 		TablePath:       sqlDriver.TablePath{"path", "To", "checkpoints"},
