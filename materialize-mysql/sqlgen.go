@@ -4,7 +4,9 @@ import (
 	"strings"
   "time"
   "fmt"
+	"text/template"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/estuary/connectors/go/pkg/slices"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
@@ -156,23 +158,40 @@ INSERT INTO {{ template "temp_name" . }} (
 -- Templated insertion into the temporary load table:
 
 {{ define "loadInsertBatch" }}
-INSERT INTO {{ template "temp_name" . }} (
-	{{- range $ind, $key := $.Keys }}
+INSERT INTO {{ template "temp_name" $.Table }} (
+	{{- range $ind, $key := $.Table.Keys }}
 		{{- if $ind }}, {{ end -}}
 		{{ $key.Identifier }}
 	{{- end -}}
 	)
 	VALUES 
-	{{- range $it, $x := (Repeat 5120) }}
+	{{- range $it, $x := (Repeat $.BatchSize) }}
 	{{- if $it}}, {{ end -}}
 	(
-		{{- range $ind, $key := $.Keys }}
+		{{- range $ind, $key := $.Table.Keys }}
 			{{- if $ind }}, {{ end -}}
 			{{ $key.Placeholder }}
 		{{- end -}}
 	)
 	{{- end -}}
 ;
+{{ end }}
+
+
+{{ define "loadLoad" }}
+LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE {{ template "temp_name" . }}
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+	{{- range $ind, $col := $.Keys }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}
+	{{- end }}
+);
 {{ end }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values. It
@@ -211,22 +230,39 @@ INSERT INTO {{ $.Identifier }} (
 -- Templated query which inserts a new, complete row to the target table:
 
 {{ define "storeInsertBatch" }}
-INSERT INTO {{ $.Identifier }} (
-	{{- range $ind, $col := $.Columns }}
+INSERT INTO {{ $.Table.Identifier }} (
+	{{- range $ind, $col := $.Table.Columns }}
 		{{- if $ind }},{{ end }}
 		{{$col.Identifier}}
 	{{- end }}
 ) VALUES
-	{{- range $it, $x := (Repeat 1024) }}
+	{{- range $it, $x := (Repeat $.BatchSize) }}
 	{{- if $it}}, {{ end -}}
 	(
-		{{- range $ind, $col := $.Columns }}
+		{{- range $ind, $col := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
 			{{ $col.Placeholder }}
 		{{- end -}}
 	)
 	{{- end -}}
 ;
+{{ end }}
+
+
+{{ define "storeLoad" }}
+LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE {{ $.Identifier }}
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}
+	{{- end }}
+);
 {{ end }}
 
 -- Templated query which updates an existing row in the target table:
@@ -304,10 +340,29 @@ UPDATE {{ Identifier $.TablePath }}
 	tplLoadInsertBatch   = tplAll.Lookup("loadInsertBatch")
 	tplStoreInsert       = tplAll.Lookup("storeInsert")
 	tplStoreInsertBatch  = tplAll.Lookup("storeInsertBatch")
+	tplStoreLoad         = tplAll.Lookup("storeLoad")
 	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
 	tplLoadQuery         = tplAll.Lookup("loadQuery")
+	tplLoadLoad          = tplAll.Lookup("loadLoad")
 	tplInstallFence      = tplAll.Lookup("installFence")
 	tplUpdateFence       = tplAll.Lookup("updateFence")
 )
 
 const varcharTableAlter = "ALTER TABLE %s MODIFY COLUMN %s VARCHAR(%d);"
+
+type BatchSpec struct {
+	BatchSize int
+	Table sql.Table
+}
+
+// RenderBatchTemplate is a simple implementation of rendering a template with a
+// BatchSpec as its context.
+func RenderBatchTemplate(batchSpec BatchSpec, tpl *template.Template) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &batchSpec); err != nil {
+		return "", err
+	}
+	var s = w.String()
+	log.WithField("rendered", s).WithField("batchSpec", batchSpec).Debug("rendered template")
+	return s, nil
+}
