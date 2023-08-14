@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodbstreams"
 	streamTypes "github.com/aws/aws-sdk-go-v2/service/dynamodbstreams/types"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
@@ -47,6 +48,11 @@ func (s columnSchema) toType() *jsonschema.Schema {
 	return out
 }
 
+const noDiscoveredTablesMsg = `Could not discover any tables to capture; no data will be captured. Possible causes:
+  - No tables with DynamoDB streams enabled. DynamoDB streams must be enabled with "View type" set to "New and old images" for each table to capture.
+  - Insufficient access to list tables. The IAM user configured for the capture must have ListTables permissions.
+  - There are no tables to capture in the AWS region configured for the capture.`
+
 var dynamodbTypeToJSON = map[types.ScalarAttributeType]columnSchema{
 	types.ScalarAttributeTypeS: {jsonType: "string"},
 	// DynamoDB makes no distinction between integer and decimal numbers. A decimal number can be
@@ -70,6 +76,9 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 	tables, err := discoverTables(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("discovering tables: %w", err)
+	}
+	if len(tables) == 0 {
+		return nil, cerrors.NewUserError(nil, noDiscoveredTablesMsg)
 	}
 
 	bindings := make([]*pc.Response_Discovered_Binding, 0, len(tables))
