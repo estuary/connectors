@@ -45,17 +45,34 @@ CREATE TEMPORARY TABLE flow_temp_table_1 (
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
 --- End `Delta Updates` createLoadTable ---
 
---- Begin target_table loadInsert ---
+--- Begin target_table loadLoad ---
 
-INSERT INTO flow_temp_table_0 (key1, `key!2`)
-	VALUES (?, ?);
---- End target_table loadInsert ---
+LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_table_0
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+		key1,
+		`key!2`
+);
+--- End target_table loadLoad ---
 
---- Begin `Delta Updates` loadInsert ---
+--- Begin `Delta Updates` loadLoad ---
 
-INSERT INTO flow_temp_table_1 (`theKey`)
-	VALUES (?);
---- End `Delta Updates` loadInsert ---
+LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_table_1
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+		`theKey`
+);
+--- End `Delta Updates` loadLoad ---
 
 --- Begin target_table loadQuery ---
 
@@ -73,9 +90,16 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 
 --- End `Delta Updates` loadQuery ---
 
---- Begin target_table storeInsert ---
+--- Begin target_table storeLoad ---
 
-INSERT INTO target_table (
+LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE target_table
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
 		key1,
 		`key!2`,
 		`Camel_Case`,
@@ -84,16 +108,23 @@ INSERT INTO target_table (
 		lower_case,
 		`value`,
 		flow_document
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
---- End target_table storeInsert ---
+);
+--- End target_table storeLoad ---
 
---- Begin `Delta Updates` storeInsert ---
+--- Begin `Delta Updates` storeLoad ---
 
-INSERT INTO `Delta Updates` (
+LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE `Delta Updates`
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
 		`theKey`,
 		`aValue`
-) VALUES (?, ?);
---- End `Delta Updates` storeInsert ---
+);
+--- End `Delta Updates` storeLoad ---
 
 --- Begin target_table storeUpdate ---
 

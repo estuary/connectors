@@ -39,9 +39,9 @@ func TestSQLGeneration(t *testing.T) {
 	for _, tpl := range []*template.Template{
 		tplCreateTargetTable,
 		tplCreateLoadTable,
-		tplLoadInsert,
+		tplLoadLoad,
 		tplLoadQuery,
-		tplStoreInsert,
+		tplStoreLoad,
 		tplStoreUpdate,
 	} {
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
