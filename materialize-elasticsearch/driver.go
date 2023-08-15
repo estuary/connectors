@@ -2,10 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -93,16 +98,43 @@ func configSchema() json.RawMessage {
 }
 
 func (c *credentials) Validate() error {
-	if (c.Username == "") != (c.Password == "") {
-		return fmt.Errorf("username and password must both be present if one of them is")
+	if c.ApiKey == "" && c.Username == "" && c.Password == "" {
+		return fmt.Errorf("missing credentials: must provide an API Key or a username/password")
 	}
+
+	if c.ApiKey != "" {
+		if c.Username != "" || c.Password != "" {
+			return fmt.Errorf("cannot set both API key and username/password")
+		}
+
+		dec, err := base64.StdEncoding.DecodeString(c.ApiKey)
+		if err != nil {
+			return fmt.Errorf("API key must be base64 encoded: %w", err)
+		}
+
+		if len(strings.Split(string(dec), ":")) != 2 {
+			return fmt.Errorf("invalid API key: encoded value must be in the form of 'id:api_key'")
+		}
+
+		return nil
+	}
+
+	if c.Username == "" {
+		return fmt.Errorf("missing username")
+	} else if c.Password == "" {
+		return fmt.Errorf("missing password")
+	}
+
 	return nil
 }
 
 func (c config) Validate() error {
 	if c.Endpoint == "" {
 		return fmt.Errorf("missing Endpoint")
+	} else if !strings.HasPrefix(c.Endpoint, "http://") && !strings.HasPrefix(c.Endpoint, "https://") {
+		return fmt.Errorf("endpoint '%s' is invalid: must start with either http:// or https://", c.Endpoint)
 	}
+
 	return c.Credentials.Validate()
 }
 
@@ -170,7 +202,24 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, fmt.Errorf("creating elasticSearch: %w", err)
 	}
 
-	// TODO(whb): Do more comprehensive connection verifications.
+	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	if p, err := elasticSearch.client.Ping(elasticSearch.client.Ping.WithContext(pingCtx)); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to endpoint '%s': double check your configuration, and make sure Estuary's IP is allowed to connect to your cluster", cfg.Endpoint))
+		}
+
+		return nil, fmt.Errorf("pinging ElasticSearch: %w", err)
+	} else if p.StatusCode == http.StatusUnauthorized {
+		return nil, cerrors.NewUserError(nil, "invalid credentials: received an unauthorized response (401) when trying to connect")
+	} else if p.StatusCode == http.StatusNotFound {
+		return nil, cerrors.NewUserError(nil, "could not connect to endpoint: endpoint URL not found")
+	} else if p.StatusCode == http.StatusForbidden {
+		return nil, cerrors.NewUserError(nil, "could not check cluster status: credentials must have 'monitor' privilege for cluster")
+	} else if p.StatusCode != http.StatusOK {
+		return nil, cerrors.NewUserError(nil, fmt.Sprintf("could not connect to endpoint: received status code %d", p.StatusCode))
+	}
 
 	storedSpec, err := elasticSearch.getSpec(ctx, req.Name)
 	if err != nil {
