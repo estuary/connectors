@@ -3,92 +3,87 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	pf "github.com/estuary/flow/go/protocols/flow"
+	boilerplate_tests "github.com/estuary/connectors/materialize-boilerplate/testing"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
-func TestConfigUnmarshalling(t *testing.T) {
-	var input = `{
-		"endpoint": "http://foo.test", 
-		"credentials": {
-			"username": "user",
-			"password": "pass"
-		}
-	}`
-	var out config
-	require.NoError(t, pf.UnmarshalStrict(json.RawMessage([]byte(input)), &out))
-	require.Equal(t, "http://foo.test", out.Endpoint)
-	require.Equal(t, "user", out.Credentials.Username)
-	require.Equal(t, "pass", out.Credentials.Password)
+var (
+	username = flag.String("username", "", "Username to use with the elasticsearch API")
+	password = flag.String("password", "", "Password for the user")
+	apiKey   = flag.String("apiKey", "", "API key for authenticating with the elasticsearch API")
+	endpoint = flag.String("endpoint", "http://localhost:9200", "Endpoint host or URL. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT")
+)
 
-	//
-	input = `{"endpoint": "http://foo.test"}`
-	out = config{}
-	require.NoError(t, pf.UnmarshalStrict(json.RawMessage([]byte(input)), &out))
-	require.Equal(t, "http://foo.test", out.Endpoint)
-}
+func TestApply(t *testing.T) {
+	flag.Parse()
 
-func TestConfigValidation(t *testing.T) {
-	var validConfig = config{
-		Endpoint: "testEndpoint",
+	cfg := config{
+		Endpoint: *endpoint,
 		Credentials: credentials{
-			Username: "testUsername",
-			Password: "testPassword",
+			Username: *username,
+			Password: *password,
+			ApiKey:   *apiKey,
 		},
 	}
 
-	require.NoError(t, validConfig.Validate())
+	configJson, err := json.Marshal(cfg)
+	require.NoError(t, err)
 
-	var missingEndpoint = validConfig
-	missingEndpoint.Endpoint = ""
-	require.Error(t, missingEndpoint.Validate(), "expected validation error")
+	testIndexName := "some-index"
 
-	var userWithoutPassword = validConfig
-	userWithoutPassword.Credentials.Password = ""
+	baseResource := resource{
+		Index:         testIndexName,
+		DeltaUpdates:  false,
+		NumOfShards:   1,
+		NumOfReplicas: 0,
+	}
+	resourceJson, err := json.Marshal(baseResource)
+	require.NoError(t, err)
 
-	require.Error(t, userWithoutPassword.Validate(), "expected validation error")
-}
+	es, err := newElasticsearchClient(cfg)
+	require.NoError(t, err)
 
-func TestResource(t *testing.T) {
-	var validResourceA resource
-	pf.UnmarshalStrict(json.RawMessage(`{
-		"index":        "testIndex",
-		"delta_updates": true,
-		"number_of_shards": 1
-	}`), &validResourceA)
-	require.NoError(t, validResourceA.Validate())
-	require.Equal(t, 1, validResourceA.NumOfShards)
-	require.Equal(t, 0, validResourceA.NumOfReplicas)
+	boilerplate_tests.RunApplyTestCases(
+		t,
+		driver{},
+		configJson,
+		resourceJson,
+		[]string{testIndexName},
+		func(t *testing.T) string {
+			t.Helper()
 
-	var missingIndex = validResourceA
-	missingIndex.Index = ""
-	require.Error(t, missingIndex.Validate(), "expected validation error")
+			resp, err := es.client.Indices.Get([]string{testIndexName})
+			require.NoError(t, err)
+			defer resp.Body.Close()
 
-	var invalidShards = validResourceA
-	invalidShards.NumOfShards = 0
-	require.Error(t, invalidShards.Validate(), "expected validation error")
+			bb, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
 
-	var validResourceB resource
-	pf.UnmarshalStrict(json.RawMessage(`{
-		"index":        "testIndex",
-		"delta_updates": true,
-		"number_of_shards": 3,
-		"number_of_replicas": 4
-	}`), &validResourceB)
-	require.NoError(t, validResourceB.Validate())
-	require.Equal(t, 3, validResourceB.NumOfShards)
-	require.Equal(t, 4, validResourceB.NumOfReplicas)
+			return gjson.GetBytes(bb, fmt.Sprintf("%s.mappings.properties", testIndexName)).String()
+		},
+		func(t *testing.T) {
+			t.Helper()
+
+			_, err := es.client.Indices.Delete([]string{defaultFlowMaterializations, testIndexName})
+			require.NoError(t, err)
+		},
+	)
 }
 
 func TestDriverSpec(t *testing.T) {
-	var drv = driver{}
-	var resp, err1 = drv.Spec(context.Background(), &pm.Request_Spec{})
-	require.NoError(t, err1)
-	var formatted, err2 = json.MarshalIndent(resp, "", "  ")
-	require.NoError(t, err2)
-	cupaloy.SnapshotT(t, formatted)
+	driver := driver{}
+	response, err := driver.Spec(context.Background(), &pm.Request_Spec{})
+	require.NoError(t, err)
+
+	formatted, err := json.MarshalIndent(response, "", "  ")
+	require.NoError(t, err)
+	cupaloy.SnapshotT(t, string(formatted))
 }
