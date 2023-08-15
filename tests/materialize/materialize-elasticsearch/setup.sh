@@ -27,7 +27,11 @@ function startElasticsearch() {
 startElasticsearch || bail "failed to start the elastic search service after 60s."
 
 config_json_template='{
-    "endpoint": "${TEST_ES_ENDPOINT}"
+    "endpoint": "${TEST_ES_ENDPOINT}",
+    "credentials": {
+      "username": "user",
+      "password": "password"
+    }
 }'
 
 resources_json_template='[
