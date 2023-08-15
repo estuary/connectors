@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	username = flag.String("username", "", "Username to use with the elasticsearch API")
-	password = flag.String("password", "", "Password for the user")
+	username = flag.String("username", "user", "Username to use with the elasticsearch API")
+	password = flag.String("password", "password", "Password for the user")
 	apiKey   = flag.String("apiKey", "", "API key for authenticating with the elasticsearch API")
 	endpoint = flag.String("endpoint", "http://localhost:9200", "Endpoint host or URL. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT")
 )
