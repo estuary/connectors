@@ -40,10 +40,8 @@ func TestApply(t *testing.T) {
 	testIndexName := "some-index"
 
 	baseResource := resource{
-		Index:         testIndexName,
-		DeltaUpdates:  false,
-		NumOfShards:   1,
-		NumOfReplicas: 0,
+		Index:        testIndexName,
+		DeltaUpdates: false,
 	}
 	resourceJson, err := json.Marshal(baseResource)
 	require.NoError(t, err)

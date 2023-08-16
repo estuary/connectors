@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "- create index '.flow_materializations_v2'\n- create index 'index-simple'\n- create index 'index-duplicated-keys-standard'\n- create index 'index-duplicated-keys-delta'\n- create index 'index-duplicated-keys-delta-exclude-flow-doc'\n- create index 'index-multiple-data-types'\n- create index 'index-formatted-strings'\n- update stored materialize spec and set version = test"
+    "actionDescription": "- create index 'flow_materializations_v2'\n- create index 'index-simple'\n- create index 'index-duplicated-keys-standard'\n- create index 'index-duplicated-keys-delta'\n- create index 'index-duplicated-keys-delta-exclude-flow-doc'\n- create index 'index-multiple-data-types'\n- create index 'index-formatted-strings'\n- update stored materialization spec and set version = test"
   }
 }
 {
@@ -1017,7 +1017,7 @@
 }
 {
   "applied": {
-    "actionDescription": "- create index '.flow_materializations_v2'\n- update stored materialize spec and set version = test"
+    "actionDescription": "- create index 'flow_materializations_v2'\n- update stored materialization spec and set version = test"
   }
 }
 {

@@ -43,7 +43,7 @@ func configSchema() json.RawMessage {
     "endpoint": {
       "type": "string",
       "title": "Endpoint",
-      "description": "Endpoint host or URL. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
+      "description": "Endpoint host or URL. Must start with http:// or https://. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
       "order": 0
     },
     "credentials": {
@@ -56,13 +56,13 @@ func configSchema() json.RawMessage {
             "username": {
               "type": "string",
               "title": "Username",
-              "description": "Username to use with the elasticsearch API"
+              "description": "Username to use with the Elasticsearch API."
             },
             "password": {
               "type": "string",
               "secret": true,
               "title": "Password",
-              "description": "Password for the user"
+              "description": "Password for the user."
             }
           },
           "required": [
@@ -77,8 +77,8 @@ func configSchema() json.RawMessage {
             "apiKey": {
               "type": "string",
               "secret": true,
-              "title": "API key",
-              "description": "API key for authenticating with the elasticsearch API"
+              "title": "API Key",
+              "description": "API key for authenticating with the Elasticsearch API. Must be the 'encoded' API key credentials, which is the Base64-encoding of the UTF-8 representation of the id and api_key joined by a colon (:)."
             }
           },
           "required": [
@@ -139,20 +139,21 @@ func (c config) Validate() error {
 }
 
 type resource struct {
-	Index         string `json:"index" jsonschema_extras:"x-collection-name=true"`
-	DeltaUpdates  bool   `json:"delta_updates" jsonschema:"default=false"`
-	NumOfShards   int    `json:"number_of_shards,omitempty" jsonschema:"default=1"`
-	NumOfReplicas int    `json:"number_of_replicas,omitempty" jsonschema:"default=0"`
+	Index        string `json:"index" jsonschema_extras:"x-collection-name=true"`
+	DeltaUpdates bool   `json:"delta_updates" jsonschema:"default=false"`
+	Shards       *int   `json:"number_of_shards,omitempty"`
+	Replicas     *int   `json:"number_of_replicas,omitempty"`
 }
 
 func (r resource) Validate() error {
 	if r.Index == "" {
 		return fmt.Errorf("missing Index")
+	} else if r.Shards != nil && *r.Shards < 1 {
+		return fmt.Errorf("number_of_shards must be greater than 0")
+	} else if r.Replicas != nil && *r.Replicas < 0 {
+		return fmt.Errorf("number_of_replicas cannot be negative")
 	}
 
-	if r.NumOfShards <= 0 {
-		return fmt.Errorf("number_of_shards is missing or non-positive")
-	}
 	return nil
 }
 
@@ -160,14 +161,13 @@ func (r resource) Validate() error {
 func (resource) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Index":
-		return "Name of the ElasticSearch index to store the materialization results."
+		return "Name of the Elasticsearch index to store the materialization results."
 	case "DeltaUpdates":
 		return "Should updates to this table be done via delta updates. Default is false."
-	case "NumOfShards":
-		return "The number of shards in ElasticSearch index. Must be greater than 0."
-	case "NumOfReplicas":
-		return "The number of replicas in ElasticSearch index. If not set, default to be 0. " +
-			"For single-node clusters, this must be 0. For production systems, a value of 1 or more is recommended"
+	case "Shards":
+		return "The number of shards to create the index with. Leave blank to use the cluster default."
+	case "Replicas":
+		return "The number of replicas to create the index with. Leave blank to use the cluster default."
 	default:
 		return ""
 	}
@@ -210,7 +210,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to endpoint '%s': double check your configuration, and make sure Estuary's IP is allowed to connect to your cluster", cfg.Endpoint))
 		}
 
-		return nil, fmt.Errorf("pinging ElasticSearch: %w", err)
+		return nil, fmt.Errorf("pinging Elasticsearch: %w", err)
 	} else if p.StatusCode == http.StatusUnauthorized {
 		return nil, cerrors.NewUserError(nil, "invalid credentials: received an unauthorized response (401) when trying to connect")
 	} else if p.StatusCode == http.StatusNotFound {
@@ -301,9 +301,9 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 
 		if found == nil {
 			if err := doAction(fmt.Sprintf("create index '%s'", res.Index), func() error {
-				return client.createIndex(ctx, res.Index, res.NumOfShards, res.NumOfReplicas, buildIndexProperties(binding))
+				return client.createIndex(ctx, res.Index, res.Shards, res.Replicas, buildIndexProperties(binding))
 			}); err != nil {
-				return nil, fmt.Errorf("creating elastic search index: %w", err)
+				return nil, fmt.Errorf("creating index '%s': %w", res.Index, err)
 			}
 		} else {
 			// Map any new fields in the index.
@@ -323,7 +323,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		}
 	}
 
-	if err := doAction(fmt.Sprintf("update stored materialize spec and set version = %s", req.Version), func() error {
+	if err := doAction(fmt.Sprintf("update stored materialization spec and set version = %s", req.Version), func() error {
 		return client.putSpec(ctx, req.Materialization, req.Version)
 	}); err != nil {
 		return nil, fmt.Errorf("updating stored materialization spec: %w", err)

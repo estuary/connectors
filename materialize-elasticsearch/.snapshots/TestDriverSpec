@@ -6,7 +6,7 @@
       "endpoint": {
         "type": "string",
         "title": "Endpoint",
-        "description": "Endpoint host or URL. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
+        "description": "Endpoint host or URL. Must start with http:// or https://. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
         "order": 0
       },
       "credentials": {
@@ -19,13 +19,13 @@
               "username": {
                 "type": "string",
                 "title": "Username",
-                "description": "Username to use with the elasticsearch API"
+                "description": "Username to use with the Elasticsearch API."
               },
               "password": {
                 "type": "string",
                 "secret": true,
                 "title": "Password",
-                "description": "Password for the user"
+                "description": "Password for the user."
               }
             },
             "required": [
@@ -40,8 +40,8 @@
               "apiKey": {
                 "type": "string",
                 "secret": true,
-                "title": "API key",
-                "description": "API key for authenticating with the elasticsearch API"
+                "title": "API Key",
+                "description": "API key for authenticating with the Elasticsearch API. Must be the 'encoded' API key credentials, which is the Base64-encoding of the UTF-8 representation of the id and api_key joined by a colon (:)."
               }
             },
             "required": [
@@ -63,7 +63,7 @@
     "properties": {
       "index": {
         "type": "string",
-        "description": "Name of the ElasticSearch index to store the materialization results.",
+        "description": "Name of the Elasticsearch index to store the materialization results.",
         "x-collection-name": true
       },
       "delta_updates": {
@@ -73,13 +73,11 @@
       },
       "number_of_shards": {
         "type": "integer",
-        "description": "The number of shards in ElasticSearch index. Must be greater than 0.",
-        "default": 1
+        "description": "The number of shards to create the index with. Leave blank to use the cluster default."
       },
       "number_of_replicas": {
         "type": "integer",
-        "description": "The number of replicas in ElasticSearch index. If not set, default to be 0. For single-node clusters, this must be 0. For production systems, a value of 1 or more is recommended",
-        "default": 0
+        "description": "The number of replicas to create the index with. Leave blank to use the cluster default."
       }
     },
     "type": "object",
