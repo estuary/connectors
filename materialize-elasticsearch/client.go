@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultFlowMaterializations = ".flow_materializations_v2"
+	defaultFlowMaterializations = "flow_materializations_v2"
 )
 
 type client struct {
@@ -44,7 +44,8 @@ func (c *client) createMetaIndex(ctx context.Context) error {
 		"specBytes": {Type: elasticTypeBinary},
 	}
 
-	return c.createIndex(ctx, defaultFlowMaterializations, 1, 0, props)
+	numShards := 1
+	return c.createIndex(ctx, defaultFlowMaterializations, &numShards, nil, props)
 }
 
 func (c *client) putSpec(ctx context.Context, spec *pf.MaterializationSpec, version string) error {
@@ -60,7 +61,6 @@ func (c *client) putSpec(ctx context.Context, spec *pf.MaterializationSpec, vers
 			"version":   version,
 		}),
 		c.es.Index.WithContext(ctx),
-		c.es.Index.WithRefresh("true"),
 		c.es.Index.WithDocumentID(url.PathEscape(spec.Name.String())),
 	)
 	if err != nil {
@@ -109,13 +109,13 @@ func (c *client) getSpec(ctx context.Context, materialization pf.Materialization
 }
 
 type createIndexParams struct {
-	Settings createIndexSettings `json:"settings"`
-	Mappings indexMappings       `json:"mappings"`
+	Settings indexSettings `json:"settings,omitempty"`
+	Mappings indexMappings `json:"mappings"`
 }
 
-type createIndexSettings struct {
-	Shards   int `json:"number_of_shards"`
-	Replicas int `json:"number_of_replicas"`
+type indexSettings struct {
+	Shards   *int `json:"number_of_shards,omitempty"`
+	Replicas *int `json:"number_of_replicas,omitempty"`
 }
 
 type indexMappings struct {
@@ -123,7 +123,7 @@ type indexMappings struct {
 }
 
 // createIndex creates a new index and sets its mappings per indexProps if it doesn't already exist.
-func (c *client) createIndex(ctx context.Context, index string, shards int, replicas int, indexProps map[string]property) error {
+func (c *client) createIndex(ctx context.Context, index string, shards *int, replicas *int, indexProps map[string]property) error {
 	existResp, err := c.es.Indices.Exists(
 		[]string{index},
 		c.es.Indices.Exists.WithContext(ctx),
@@ -141,7 +141,7 @@ func (c *client) createIndex(ctx context.Context, index string, shards int, repl
 
 	// Index does not exist, create a new one.
 	params := createIndexParams{
-		Settings: createIndexSettings{
+		Settings: indexSettings{
 			Shards:   shards,
 			Replicas: replicas,
 		},
@@ -154,7 +154,6 @@ func (c *client) createIndex(ctx context.Context, index string, shards int, repl
 		index,
 		c.es.Indices.Create.WithContext(ctx),
 		c.es.Indices.Create.WithBody(esutil.NewJSONReader(params)),
-		c.es.Indices.Create.WithWaitForActiveShards("all"),
 	)
 	if err != nil {
 		return fmt.Errorf("createIndex: %w", err)

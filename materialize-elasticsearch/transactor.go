@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8/esutil"
@@ -18,7 +19,7 @@ type binding struct {
 	deltaUpdates bool
 
 	// Ordered list of field names included in the field selection for the binding, which are used
-	// to build the JSON document to be stored ElasticSearch.
+	// to build the JSON document to be stored Elasticsearch.
 	fields []string
 
 	// Present if the binding includes the root document, empty if not. This is usually the default
@@ -30,7 +31,7 @@ type transactor struct {
 	client   *client
 	bindings []binding
 
-	// Used to correlate the binding number for loaded documents from ElasticSearch.
+	// Used to correlate the binding number for loaded documents from Elasticsearch.
 	indexToBinding map[string]int
 }
 
@@ -112,7 +113,7 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	ctx := it.Context()
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
 
 	// Note: The BulkIndexer has a default flush size of 5MB, which should work pretty well for
 	// keeping memory usage reasonable. The default number of workers is equal to runtime.NumCPU(),
@@ -129,7 +130,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		},
 		// Makes sure the changes are propagated to all replica shards.
 		// TODO(whb): I'm totally convinced we need to always be requiring this. It may only really
-		// be applicable to case where there is a single replica shard and ElasticSearch considers a
+		// be applicable to case where there is a single replica shard and Elasticsearch considers a
 		// quorum to be possible by writing only to the primary shard, which could result in data
 		// loss if there is then a hardware failure on that single primary shard. At the very least
 		// we could consider making this and advanced configuration option in the future if it is
@@ -140,16 +141,15 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		return nil, fmt.Errorf("creating bulk indexer: %w", err)
 	}
 
+	// If a single item fails from a batch, it's common for _all_ of the items to fail from that
+	// batch. We'll get the first item failure error we see via errCh and report that as the
+	// connector failure error.
 	onItemFailure := func(_ context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
-		log.WithFields(log.Fields{
-			"error":       err.Error(),
-			"index":       item.Index,
-			"action":      item.Action,
-			"docId":       item.DocumentID,
-			"result":      res.Result,
-			"errorType":   res.Error.Type,
-			"errorReason": res.Error.Reason,
-		}).Error("bulk indexer item error")
+		if err == nil {
+			// The err itself may be `nil` of the request was successful, but a failure is still
+			// indicated by the error from the response body.
+			err = errors.New(res.Error.Reason)
+		}
 
 		select {
 		case errCh <- err:
