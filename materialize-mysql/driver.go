@@ -247,8 +247,19 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 		}
 
 		errs.Err(err)
+	} else if conn, err := db.Conn(ctx); err != nil {
+		errs.Err(fmt.Errorf("could not create a connection to database %q at %q: %w", cfg.Database, cfg.Address, err))
 	} else {
-		db.Close()
+		var row = conn.QueryRowContext(ctx, "SELECT @@GLOBAL.local_infile;")
+		var localInFileEnabled bool
+
+		if err := row.Scan(&localInFileEnabled); err != nil {
+			errs.Err(fmt.Errorf("could not read `local_infile` global variable: %w", err))
+		} else if !localInFileEnabled {
+			errs.Err(fmt.Errorf("`local_infile` global variable must be enabled on your mysql server. You can enable this using `SET GLOBAL local_infile = true`."))
+		} else {
+			db.Close()
+		}
 	}
 
 	return errs
