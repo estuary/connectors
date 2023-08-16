@@ -34,9 +34,13 @@ type transactor struct {
 	indexToBinding map[string]int
 }
 
-// ElasticSearch does not allow keys longer than 512 bytes, so a batch size of 10,000 keys will have
-// a maximum memory size on the order of 5 MB.
-const loadBatchSize = 10_000
+// Elasticsearch does not allow keys longer than 512 bytes, so a 5MB batch will allow for at least
+// ~10,000 keys. It would theoretically be possible to use a streaming JSON encoder and write
+// directly to the bulk GET request body to avoid buffering anything in memory, but there is a hard
+// limit of 100MB on request body sizes so it would need some extra handling anyway, and it might
+// actually be more efficient to pipeline requests to Elastic with reading the store iterator since
+// we aren't working with a system capable with read committed semantics.
+const loadBatchSize = 5 * 1024 * 1024
 
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
@@ -75,21 +79,25 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 
 	var batch []getDoc
+	batchSize := 0
 
 	for it.Next() {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
 		default:
+			id := base64.RawStdEncoding.EncodeToString(it.PackedKey)
 			batch = append(batch, getDoc{
-				Id:     base64.RawStdEncoding.EncodeToString(it.PackedKey),
+				Id:     id,
 				Index:  t.bindings[it.Binding].index,
 				Source: t.bindings[it.Binding].docField,
 			})
+			batchSize += len(id)
 
-			if len(batch) > loadBatchSize {
+			if batchSize > loadBatchSize {
 				sendBatch(batch)
 				batch = nil
+				batchSize = 0
 			}
 		}
 	}
@@ -106,6 +114,9 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	ctx := it.Context()
 	errCh := make(chan error)
 
+	// Note: The BulkIndexer has a default flush size of 5MB, which should work pretty well for
+	// keeping memory usage reasonable. The default number of workers is equal to runtime.NumCPU(),
+	// which should also work well, but may be something to adjust in the future.
 	indexer, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Client: t.client.es,
 		OnError: func(_ context.Context, err error) {
@@ -116,7 +127,6 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			default:
 			}
 		},
-		NumWorkers: 3,
 		// Makes sure the changes are propagated to all replica shards.
 		// TODO(whb): I'm totally convinced we need to always be requiring this. It may only really
 		// be applicable to case where there is a single replica shard and ElasticSearch considers a
