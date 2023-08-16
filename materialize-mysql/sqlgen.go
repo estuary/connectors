@@ -4,9 +4,7 @@ import (
 	"strings"
   "time"
   "fmt"
-	"text/template"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/estuary/connectors/go/pkg/slices"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
@@ -301,20 +299,3 @@ UPDATE {{ Identifier $.TablePath }}
 )
 
 const varcharTableAlter = "ALTER TABLE %s MODIFY COLUMN %s VARCHAR(%d);"
-
-type BatchSpec struct {
-	BatchSize int
-	Table sql.Table
-}
-
-// RenderBatchTemplate is a simple implementation of rendering a template with a
-// BatchSpec as its context.
-func RenderBatchTemplate(batchSpec BatchSpec, tpl *template.Template) (string, error) {
-	var w strings.Builder
-	if err := tpl.Execute(&w, &batchSpec); err != nil {
-		return "", err
-	}
-	var s = w.String()
-	log.WithField("rendered", s).WithField("batchSpec", batchSpec).Debug("rendered template")
-	return s, nil
-}
