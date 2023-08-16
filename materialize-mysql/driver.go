@@ -600,6 +600,23 @@ func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch []any, 
 	return nil
 }
 
+func drainUpdateBatch(ctx context.Context, txn *stdsql.Tx, b *binding, batch []any, argCount int) error {
+		if err := drainBatch(ctx, txn, b.updateLoadSQL, batch, argCount, "update"); err != nil {
+			return fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
+		}
+
+		if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
+			return fmt.Errorf("store batch update replace on %q: %w", b.target.Identifier, err)
+		}
+
+		if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
+			return fmt.Errorf("store batch update truncate on %q: %w", b.target.Identifier, err)
+		}
+
+		return nil
+}
+
+
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
@@ -730,7 +747,45 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 	var updateSize = 0
 	// map of binding to number of arguments, used when draining leftovers
 	var argCount = make(map[int]int)
+
+	// The StoreIterator iterates over documents ordered by their binding, so we
+	// can keep track of the last binding that we have seen, and if we have moved
+	// on from a binding, we can drain its leftover batches to avoid unnecessary
+	// memory use
+	var lastBinding = -1
+
 	for it.Next() {
+		if lastBinding == -1 {
+			lastBinding = it.Binding
+		}
+
+		// The last binding is fully processed for this RPC now, we can drain its
+		// remaining batches
+		if lastBinding != it.Binding {
+			var batch = batches[lastBinding]
+			var b = d.bindings[lastBinding]
+			if len(batch) > 0 {
+				if err := drainBatch(ctx, txn, b.storeLoadSQL, batch, argCount[lastBinding], "store"); err != nil {
+					return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
+				}
+
+				batches[lastBinding] = nil
+				batchSize = 0
+			}
+
+			var update = updates[lastBinding]
+			if len(update) > 0 {
+				if err := drainUpdateBatch(ctx, txn, b, updates[lastBinding], argCount[lastBinding]); err != nil {
+					return nil, fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
+				}
+
+				updates[lastBinding] = nil
+				updateSize = 0
+			}
+
+			lastBinding = it.Binding
+		}
+
 		var b = d.bindings[it.Binding]
 
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON);
@@ -769,16 +824,8 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			updateSize += size.Of(converted)
 
 			if updateSize > batchSizeThreshold {
-				if err := drainBatch(ctx, txn, b.updateLoadSQL, updates[it.Binding], argCount[it.Binding], "update"); err != nil {
+				if err := drainUpdateBatch(ctx, txn, b, updates[it.Binding], argCount[it.Binding]); err != nil {
 					return nil, fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
-				}
-
-				if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
-					return nil, fmt.Errorf("store batch update replace on %q: %w", b.target.Identifier, err)
-				}
-
-				if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
-					return nil, fmt.Errorf("store batch update truncate on %q: %w", b.target.Identifier, err)
 				}
 
 				updates[it.Binding] = nil
@@ -815,16 +862,8 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 
 		var b = d.bindings[bindingIndex]
-		if err := drainBatch(ctx, txn, b.updateLoadSQL, batch, argCount[bindingIndex], "update"); err != nil {
+		if err := drainUpdateBatch(ctx, txn, b, updates[it.Binding], argCount[it.Binding]); err != nil {
 			return nil, fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
-		}
-
-		if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
-			return nil, fmt.Errorf("store batch update replace on %q: %w", b.target.Identifier, err)
-		}
-
-		if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
-			return nil, fmt.Errorf("store batch update truncate on %q: %w", b.target.Identifier, err)
 		}
 	}
 
