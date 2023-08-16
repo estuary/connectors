@@ -182,7 +182,7 @@ func validateNewProjection(projection pf.Projection, deltaUpdates bool) *pm.Resp
 	// Types like ["string", "integer"] with "format: integer" have multiple types which we
 	// cannot support, but the string value can be coerced to a isNumeric value, which we can
 	// support.
-	_, isNumeric := isFormattedNumeric(&projection)
+	_, isNumeric := asFormattedNumeric(&projection)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {

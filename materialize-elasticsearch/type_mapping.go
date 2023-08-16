@@ -31,7 +31,7 @@ func propForField(field string, binding *pf.MaterializationSpec_Binding) propert
 }
 
 func propForProjection(p *pf.Projection) property {
-	if t, ok := isFormattedNumeric(p); ok {
+	if t, ok := asFormattedNumeric(p); ok {
 		return property{Type: t, Coerce: true}
 	}
 
@@ -95,7 +95,7 @@ func buildIndexProperties(b *pf.MaterializationSpec_Binding) map[string]property
 	return props
 }
 
-func isFormattedNumeric(projection *pf.Projection) (elasticPropertyType, bool) {
+func asFormattedNumeric(projection *pf.Projection) (elasticPropertyType, bool) {
 	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
 		switch {
 		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"integer", "null", "string"}):
@@ -115,9 +115,10 @@ func isFormattedNumeric(projection *pf.Projection) (elasticPropertyType, bool) {
 		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
 			return elasticTypeDouble, true
 		default:
-			// Fallthrough, not a formatted numeric field.
+			// Fallthrough.
 		}
 	}
 
+	// Not a formatted numeric field.
 	return "", false
 }

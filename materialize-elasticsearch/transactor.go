@@ -27,8 +27,8 @@ type binding struct {
 }
 
 type transactor struct {
-	elasticSearch *ElasticSearch
-	bindings      []binding
+	client   *client
+	bindings []binding
 
 	// Used to correlate the binding number for loaded documents from ElasticSearch.
 	indexToBinding map[string]int
@@ -39,11 +39,13 @@ type transactor struct {
 const loadBatchSize = 10_000
 
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+	ctx := it.Context()
+
 	// Pipeline reading load requests with query execution. In the future we might want to
 	// investigate increasing the concurrency of the loadBatch workers as a potential throughput
 	// optimization.
 	batchCh := make(chan []getDoc)
-	group, groupCtx := errgroup.WithContext(it.Context())
+	group, groupCtx := errgroup.WithContext(ctx)
 	group.Go(func() error {
 		for {
 			select {
@@ -54,16 +56,23 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 					return nil
 				}
 
-				if err := t.loadDocs(batch, loaded); err != nil {
+				if err := t.loadDocs(ctx, batch, loaded); err != nil {
 					return err
 				}
 			}
 		}
 	})
 
-	// We are evaluating loads as they come, so we must wait for the runtime's ack of the previous
-	// commit.
-	it.WaitForAcknowledged()
+	gotAck := false
+	sendBatch := func(b []getDoc) {
+		if !gotAck {
+			// We are evaluating loads as they come, so we must wait for the runtime's ack of the previous
+			// commit.
+			it.WaitForAcknowledged()
+			gotAck = true
+		}
+		batchCh <- b
+	}
 
 	var batch []getDoc
 
@@ -79,14 +88,14 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			})
 
 			if len(batch) > loadBatchSize {
-				batchCh <- batch
+				sendBatch(batch)
 				batch = nil
 			}
 		}
 	}
 
 	if len(batch) > 0 {
-		batchCh <- batch
+		sendBatch(batch)
 	}
 
 	close(batchCh)
@@ -98,7 +107,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	errCh := make(chan error)
 
 	indexer, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
-		Client: t.elasticSearch.client,
+		Client: t.client.es,
 		OnError: func(_ context.Context, err error) {
 			log.WithField("error", err.Error()).Error("bulk indexer error")
 
@@ -163,11 +172,6 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			doc[b.docField] = it.RawJSON
 		}
 
-		body, err := json.Marshal(doc)
-		if err != nil {
-			return nil, err
-		}
-
 		var id string
 		if !b.deltaUpdates {
 			// Leave ID blank for delta updates so that ES will automatically generate one.
@@ -181,6 +185,13 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		action := "create"
 		if it.Exists {
 			action = "index"
+		}
+
+		// This needs to be a ReadSeeker - a streaming reader can't be used in
+		// esutil.BulkIndexerItem.
+		body, err := json.Marshal(doc)
+		if err != nil {
+			return nil, err
 		}
 
 		if err := indexer.Add(it.Context(), esutil.BulkIndexerItem{
@@ -204,8 +215,8 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	default:
 	}
 
+	// Sanity checks that everything went as expected.
 	stats := indexer.Stats()
-
 	if stats.NumFailed != 0 || stats.NumAdded != uint64(it.Total) || stats.NumIndexed+stats.NumCreated != uint64(it.Total) {
 		log.WithFields(log.Fields{
 			"stored":     it.Total,
@@ -242,15 +253,21 @@ type docError struct {
 	Reason string `json:"reason"`
 }
 
-func (t *transactor) loadDocs(getDocs []getDoc, loaded func(int, json.RawMessage) error) error {
-	resp, err := t.elasticSearch.client.Mget(esutil.NewJSONReader(map[string][]getDoc{"docs": getDocs}))
-	if err = t.elasticSearch.parseErrorResp(err, resp); err != nil {
-		return fmt.Errorf("loadDocs response error: %w", err)
+func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func(int, json.RawMessage) error) error {
+	res, err := t.client.es.Mget(
+		esutil.NewJSONReader(map[string][]getDoc{"docs": getDocs}),
+		t.client.es.Mget.WithContext(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("loadDocs mGet: %w", err)
 	}
-	defer resp.Body.Close()
+	defer res.Body.Close()
+	if res.IsError() {
+		return fmt.Errorf("loadDocs mGet error response [%s] %s", res.Status(), res.String())
+	}
 
 	// Stream the results of the request directly into the loaded callback from the response body.
-	dec := json.NewDecoder(resp.Body)
+	dec := json.NewDecoder(res.Body)
 
 	// Read until the start of the response items array.
 	for {
