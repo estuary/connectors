@@ -503,7 +503,7 @@ func TestValidateBinding(t *testing.T) {
 				DeltaUpdates: tt.deltaUpdates,
 			}
 
-			c, err := validateBinding(res, tt.boundCollection, tt.storedSpec(storedSpec()))
+			c, err := validateBinding(res, []string{res.Index}, tt.boundCollection, tt.storedSpec(storedSpec()))
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 				formatted, err := json.MarshalIndent(c, "", "\t")
