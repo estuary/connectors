@@ -16,7 +16,7 @@ func validateSelectedFields(
 	storedSpec *pf.MaterializationSpec,
 ) error {
 	// Calculated constraints for the fields of this binding.
-	constraints, err := validateBinding(res, binding.Collection, storedSpec)
+	constraints, err := validateBinding(res, binding.ResourcePath, binding.Collection, storedSpec)
 	if err != nil {
 		return err
 	}
@@ -71,10 +71,11 @@ func validateSelectedFields(
 // validateBinding calculates the constraints for a new binding or a change to an existing binding.
 func validateBinding(
 	res resource,
+	path []string,
 	boundCollection pf.CollectionSpec,
 	storedSpec *pf.MaterializationSpec,
 ) (map[string]*pm.Response_Validated_Constraint, error) {
-	existingBinding, err := findExistingBinding(res.Index, boundCollection.Name, storedSpec)
+	existingBinding, err := findExistingBinding(path, boundCollection.Name, storedSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +216,7 @@ func validateNewProjection(projection pf.Projection, deltaUpdates bool) *pm.Resp
 }
 
 func findExistingBinding(
-	index string,
+	resourcePath []string,
 	proposedCollection pf.Collection,
 	storedSpec *pf.MaterializationSpec,
 ) (*pf.MaterializationSpec_Binding, error) {
@@ -223,21 +224,35 @@ func findExistingBinding(
 		return nil, nil // Binding is trivially not found
 	}
 	for _, existingBinding := range storedSpec.Bindings {
-		if existingBinding.Collection.Name == proposedCollection && index == existingBinding.ResourcePath[0] {
+		if existingBinding.Collection.Name == proposedCollection && pathEquals(resourcePath, existingBinding.ResourcePath) {
 			// The binding already exists for this collection and is being materialized to the
 			// index.
 			return existingBinding, nil
-		} else if index == existingBinding.ResourcePath[0] {
+		} else if pathEquals(resourcePath, existingBinding.ResourcePath) {
 			// There is a binding already materializing to the index, but for a different
 			// collection.
 			return nil, fmt.Errorf(
 				"cannot add a new binding to materialize collection '%s' to index '%s' because an existing binding for collection '%s' is already materializing to index '%s'",
 				proposedCollection.String(),
-				index,
+				resourcePath,
 				existingBinding.Collection.Name,
-				index,
+				resourcePath,
 			)
 		}
 	}
 	return nil, nil
+}
+
+func pathEquals(p1 []string, p2 []string) bool {
+	if len(p1) != len(p2) {
+		return false
+	}
+
+	for idx := range p1 {
+		if p1[idx] != p2[idx] {
+			return false
+		}
+	}
+
+	return true
 }

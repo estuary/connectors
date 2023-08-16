@@ -173,6 +173,40 @@ func (resource) GetFieldDocString(fieldName string) string {
 	}
 }
 
+const (
+	maxByteLength = 255
+)
+
+// For index naming requirements, see
+// https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-create-index.html#indices-create-api-path-params
+func normalizeIndexName(index string, truncateLimit int) string {
+	afterPrefix := false
+	var b strings.Builder
+	for _, r := range index {
+		// Replace disallowed characters with underscore. Of the various problematic characters in
+		// an Elasticsearch index name, a "." is the only one that Flow allows in a collection name.
+		if r == '.' {
+			r = '_'
+		}
+
+		// Strip disallowed prefixes that may be present in a Flow collection name. A '.' is also a
+		// bad prefix, but those were already replaced with '_' above.
+		if !afterPrefix && (r == '-' || r == '_') {
+			continue
+		}
+		afterPrefix = true
+
+		char := strings.ToLower(string(r))
+		if b.Len()+len(char) > truncateLimit {
+			// Truncate extremely long names. These must be less than 255 bytes.
+			break
+		}
+		b.WriteString(char)
+	}
+
+	return b.String()
+}
+
 // driver implements the DriverServer interface.
 type driver struct{}
 
@@ -233,7 +267,12 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		constraints, err := validateBinding(res, binding.Collection, storedSpec)
+		indexName := normalizeIndexName(res.Index, maxByteLength)
+		if len(indexName) == 0 {
+			return nil, fmt.Errorf("index name '%s' is invalid: must contain at least 1 character that is not '.', '-', or '-'", res.Index)
+		}
+
+		constraints, err := validateBinding(res, []string{indexName}, binding.Collection, storedSpec)
 		if err != nil {
 			return nil, fmt.Errorf("validating binding: %w", err)
 		}
@@ -241,7 +280,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: res.DeltaUpdates,
-			ResourcePath: []string{res.Index},
+			ResourcePath: []string{indexName},
 		})
 	}
 
@@ -294,16 +333,16 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 			return nil, fmt.Errorf("validating selected fields: %w", err)
 		}
 
-		found, err := findExistingBinding(res.Index, binding.Collection.Name, storedSpec)
+		found, err := findExistingBinding(binding.ResourcePath, binding.Collection.Name, storedSpec)
 		if err != nil {
 			return nil, err
 		}
 
 		if found == nil {
-			if err := doAction(fmt.Sprintf("create index '%s'", res.Index), func() error {
-				return client.createIndex(ctx, res.Index, res.Shards, res.Replicas, buildIndexProperties(binding))
+			if err := doAction(fmt.Sprintf("create index '%s'", binding.ResourcePath[0]), func() error {
+				return client.createIndex(ctx, binding.ResourcePath[0], res.Shards, res.Replicas, buildIndexProperties(binding))
 			}); err != nil {
-				return nil, fmt.Errorf("creating index '%s': %w", res.Index, err)
+				return nil, fmt.Errorf("creating index '%s': %w", binding.ResourcePath[0], err)
 			}
 		} else {
 			// Map any new fields in the index.
@@ -314,10 +353,10 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 				}
 
 				prop := propForField(newField, binding)
-				if err := doAction(fmt.Sprintf("add mapping '%s' to index '%s' with type '%s'", newField, res.Index, prop.Type), func() error {
-					return client.addMappingToIndex(ctx, res.Index, newField, prop)
+				if err := doAction(fmt.Sprintf("add mapping '%s' to index '%s' with type '%s'", newField, binding.ResourcePath[0], prop.Type), func() error {
+					return client.addMappingToIndex(ctx, binding.ResourcePath[0], newField, prop)
 				}); err != nil {
-					return nil, fmt.Errorf("adding mapping for field %q to index %q: %w", newField, res.Index, err)
+					return nil, fmt.Errorf("adding mapping for field %q to index %q: %w", newField, binding.ResourcePath[0], err)
 				}
 			}
 		}
@@ -351,9 +390,9 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		indexToBinding[res.Index] = idx
+		indexToBinding[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
-			index:        res.Index,
+			index:        b.ResourcePath[0],
 			deltaUpdates: res.DeltaUpdates,
 			fields:       append(b.FieldSelection.Keys, b.FieldSelection.Values...),
 			docField:     b.FieldSelection.Document,
@@ -366,7 +405,6 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		indexToBinding: indexToBinding,
 	}
 	return transactor, &pm.Response_Opened{}, nil
-
 }
 
 func main() { boilerplate.RunMain(new(driver)) }
