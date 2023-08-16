@@ -38,7 +38,8 @@ resources_json_template='[
   {
     "resource": {
       "index": "index-simple",
-      "number_of_shards": 1
+      "number_of_shards": 1,
+      "number_of_replicas": 0
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
   },
@@ -46,6 +47,7 @@ resources_json_template='[
     "resource": {
       "index": "index-duplicated-keys-standard",
       "number_of_shards": 1,
+      "number_of_replicas": 0,
       "delta_updates": false
     },
     "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
@@ -54,6 +56,7 @@ resources_json_template='[
     "resource": {
       "index": "index-duplicated-keys-delta",
       "number_of_shards": 1,
+      "number_of_replicas": 0,
       "delta_updates": true
     },
     "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
@@ -62,6 +65,7 @@ resources_json_template='[
     "resource": {
       "index": "index-duplicated-keys-delta-exclude-flow-doc",
       "number_of_shards": 1,
+      "number_of_replicas": 0,
       "delta_updates": true
     },
     "source": "${TEST_COLLECTION_DUPLICATED_KEYS}",
@@ -76,6 +80,7 @@ resources_json_template='[
     "resource": {
       "index": "index-multiple-data-types",
       "number_of_shards": 1,
+      "number_of_replicas": 0,
       "delta_updates":false
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
@@ -90,7 +95,8 @@ resources_json_template='[
   {
     "resource": {
       "index": "index-formatted-strings",
-      "number_of_shards": 1
+      "number_of_shards": 1,
+      "number_of_replicas": 0
     },
     "source": "${TEST_COLLECTION_FORMATTED_STRINGS}"
   }
