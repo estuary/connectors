@@ -16,6 +16,7 @@ import (
 	"text/template"
 	"time"
 
+	size "github.com/DmitriyVTitov/size"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/pkg/slices"
 	mysql "github.com/go-sql-driver/mysql"
@@ -28,8 +29,12 @@ import (
 )
 
 const (
-	storeBatchSize = 32768               // Assuming store records average ~2kB then 4k * 2kB = 8MB
-	loadBatchSize  = storeBatchSize * 2  // Load records are keys-only so allow for more in a batch
+	// we try to keep the size of the batch up to 2^25 bytes (32MiB), however this is an
+	// approximate. we need to allow for documents up to ~50MiB, and the
+	// implementation adds rows to a batch until the threshold is reached, and the batch is
+	// drained after that. so the actual memory usage of a batch can potentially
+	// grow to 32MiB + 50MiB = 82 MiB in worst case scenario
+	batchSizeThreshold = 33554432
 )
 
 type sshForwarding struct {
@@ -586,7 +591,12 @@ func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch []any, 
 		return fmt.Errorf("load data: %w", err)
 	}
 
-	log.WithField("time", time.Since(t)).WithField("type", readerSuffix).WithField("size", len(batch)/argCount).Debug("drained a batch")
+	log.WithFields(log.Fields{
+		"time": time.Since(t),
+		"type": readerSuffix,
+		"count": len(batch)/argCount,
+		"size": size.Of(batch),
+	}).Debug("drained a batch")
 	return nil
 }
 
@@ -602,6 +612,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	defer txn.Rollback()
 
 	var batches = make(map[int][]any)
+	var batchSize = 0
 	var argCount = make(map[int]int)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
@@ -637,12 +648,14 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			}
 
 			batches[it.Binding] = append(batches[it.Binding], converted...)
+			batchSize += size.Of(converted)
 
-			if len(batches[it.Binding]) >= loadBatchSize * argCount[it.Binding] {
+			if batchSize > batchSizeThreshold {
 				if err := drainBatch(ctx, txn, b.loadLoadSQL, batches[it.Binding], argCount[it.Binding], "load"); err != nil {
 					return fmt.Errorf("load batch insert on %q: %w", b.target.Identifier, err)
 				}
 				batches[it.Binding] = nil
+				batchSize = 0
 			}
 		}
 	}
@@ -712,7 +725,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 	// map of binding to flat argument list
 	var batches = make(map[int][]any)
+	var batchSize = 0
 	var updates = make(map[int][]any)
+	var updateSize = 0
 	// map of binding to number of arguments, used when draining leftovers
 	var argCount = make(map[int]int)
 	for it.Next() {
@@ -751,7 +766,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 		if it.Exists {
 			updates[it.Binding] = append(updates[it.Binding], converted...)
-			if len(updates[it.Binding]) >= storeBatchSize * argCount[it.Binding] {
+			updateSize += size.Of(converted)
+
+			if updateSize > batchSizeThreshold {
 				if err := drainBatch(ctx, txn, b.updateLoadSQL, updates[it.Binding], argCount[it.Binding], "update"); err != nil {
 					return nil, fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
 				}
@@ -764,16 +781,19 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 					return nil, fmt.Errorf("store batch update truncate on %q: %w", b.target.Identifier, err)
 				}
 
-				batches[it.Binding] = nil
+				updates[it.Binding] = nil
+				updateSize = 0
 			}
 		} else {
 			batches[it.Binding] = append(batches[it.Binding], converted...)
+			batchSize += size.Of(converted)
 
-			if len(batches[it.Binding]) >= storeBatchSize * argCount[it.Binding] {
+			if batchSize > batchSizeThreshold {
 				if err := drainBatch(ctx, txn, b.storeLoadSQL, batches[it.Binding], argCount[it.Binding], "store"); err != nil {
 					return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
 				}
 				batches[it.Binding] = nil
+				batchSize = 0
 			}
 		}
 	}
