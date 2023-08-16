@@ -48,7 +48,7 @@ func TestApply(t *testing.T) {
 	resourceJson, err := json.Marshal(baseResource)
 	require.NoError(t, err)
 
-	es, err := newElasticsearchClient(cfg)
+	client, err := cfg.toClient()
 	require.NoError(t, err)
 
 	boilerplate_tests.RunApplyTestCases(
@@ -60,7 +60,7 @@ func TestApply(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
-			resp, err := es.client.Indices.Get([]string{testIndexName})
+			resp, err := client.es.Indices.Get([]string{testIndexName})
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
@@ -72,7 +72,7 @@ func TestApply(t *testing.T) {
 		func(t *testing.T) {
 			t.Helper()
 
-			_, err := es.client.Indices.Delete([]string{defaultFlowMaterializations, testIndexName})
+			_, err := client.es.Indices.Delete([]string{defaultFlowMaterializations, testIndexName})
 			require.NoError(t, err)
 		},
 	)

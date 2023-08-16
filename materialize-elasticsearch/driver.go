@@ -197,15 +197,15 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	elasticSearch, err := newElasticsearchClient(cfg)
+	client, err := cfg.toClient()
 	if err != nil {
-		return nil, fmt.Errorf("creating elasticSearch: %w", err)
+		return nil, fmt.Errorf("creating client: %w", err)
 	}
 
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if p, err := elasticSearch.client.Ping(elasticSearch.client.Ping.WithContext(pingCtx)); err != nil {
+	if p, err := client.es.Ping(client.es.Ping.WithContext(pingCtx)); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to endpoint '%s': double check your configuration, and make sure Estuary's IP is allowed to connect to your cluster", cfg.Endpoint))
 		}
@@ -221,7 +221,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, cerrors.NewUserError(nil, fmt.Sprintf("could not connect to endpoint: received status code %d", p.StatusCode))
 	}
 
-	storedSpec, err := elasticSearch.getSpec(ctx, req.Name)
+	storedSpec, err := client.getSpec(ctx, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("getting spec: %w", err)
 	}
@@ -257,25 +257,29 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = newElasticsearchClient(cfg)
+	client, err := cfg.toClient()
 	if err != nil {
-		return nil, fmt.Errorf("creating elasticSearch: %w", err)
+		return nil, fmt.Errorf("creating client: %w", err)
 	}
 
 	actions := []string{}
-	addAction := func(a string) {
-		if a != "" {
-			actions = append(actions, "- "+a)
+	doAction := func(desc string, fn func() error) error {
+		if !req.DryRun {
+			actions = append(actions, "- "+desc)
+			return fn()
 		}
+		actions = append(actions, "- "+desc+" (skipping due to dry-run)")
+		return nil
 	}
 
-	desc, err := elasticSearch.createMetaIndex(ctx)
-	if err != nil {
+	if err := doAction(fmt.Sprintf("create index '%s'", defaultFlowMaterializations), func() error {
+		return client.createMetaIndex(ctx)
+	},
+	); err != nil {
 		return nil, fmt.Errorf("creating metadata index")
 	}
-	addAction(desc)
 
-	storedSpec, err := elasticSearch.getSpec(ctx, req.Materialization.Name)
+	storedSpec, err := client.getSpec(ctx, req.Materialization.Name)
 	if err != nil {
 		return nil, fmt.Errorf("getting spec: %w", err)
 	}
@@ -296,11 +300,11 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		}
 
 		if found == nil {
-			desc, err := elasticSearch.ApplyIndex(res.Index, res.NumOfShards, res.NumOfReplicas, buildIndexProperties(binding), false)
-			if err != nil {
+			if err := doAction(fmt.Sprintf("create index '%s'", res.Index), func() error {
+				return client.createIndex(ctx, res.Index, res.NumOfShards, res.NumOfReplicas, buildIndexProperties(binding))
+			}); err != nil {
 				return nil, fmt.Errorf("creating elastic search index: %w", err)
 			}
-			addAction(desc)
 		} else {
 			// Map any new fields in the index.
 			existingFields := found.FieldSelection.AllFields()
@@ -309,20 +313,20 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 					continue
 				}
 
-				desc, err := elasticSearch.addMappingToIndex(res.Index, newField, propForField(newField, binding), req.DryRun)
-				if err != nil {
+				prop := propForField(newField, binding)
+				if err := doAction(fmt.Sprintf("add mapping '%s' to index '%s' with type '%s'", newField, res.Index, prop.Type), func() error {
+					return client.addMappingToIndex(ctx, res.Index, newField, prop)
+				}); err != nil {
 					return nil, fmt.Errorf("adding mapping for field %q to index %q: %w", newField, res.Index, err)
 				}
-				addAction(desc)
 			}
 		}
 	}
 
-	if !req.DryRun {
-		if err := elasticSearch.putSpec(ctx, req.Materialization); err != nil {
-			return nil, fmt.Errorf("updating stored materialization spec: %w", err)
-		}
-		addAction("update stored materialize spec")
+	if err := doAction(fmt.Sprintf("update stored materialize spec and set version = %s", req.Version), func() error {
+		return client.putSpec(ctx, req.Materialization, req.Version)
+	}); err != nil {
+		return nil, fmt.Errorf("updating stored materialization spec: %w", err)
 	}
 
 	return &pm.Response_Applied{ActionDescription: strings.Join(actions, "\n")}, nil
@@ -334,9 +338,9 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var elasticSearch, err = newElasticsearchClient(cfg)
+	client, err := cfg.toClient()
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating elastic search client: %w", err)
+		return nil, nil, fmt.Errorf("creating client: %w", err)
 	}
 
 	indexToBinding := make(map[string]int)
@@ -357,7 +361,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 	}
 
 	var transactor = &transactor{
-		elasticSearch:  elasticSearch,
+		client:         client,
 		bindings:       bindings,
 		indexToBinding: indexToBinding,
 	}
