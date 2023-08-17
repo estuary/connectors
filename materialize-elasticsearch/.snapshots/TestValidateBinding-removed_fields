@@ -1,7 +1,7 @@
 {
 	"flow_document": {
-		"type": 1,
-		"reason": "The root document must continue to be materialized as the same projected field"
+		"type": 2,
+		"reason": "The root document is required for a standard updates materialization"
 	},
 	"intKey": {
 		"type": 1,
