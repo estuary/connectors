@@ -45,6 +45,11 @@ func (ps *PersistentState) StreamsInState(modes ...string) []string {
 	return streams
 }
 
+// StreamsCurrentlyBackfilling returns the IDs of all streams undergoing some sort of backfill.
+func (ps *PersistentState) StreamsCurrentlyBackfilling() []string {
+	return ps.StreamsInState(TableModeStandardBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill)
+}
+
 // TableState represents the serializable/resumable state of a particular table's capture.
 // It is mostly concerned with the "backfill" scanning process and the transition from that
 // to logical replication.
@@ -73,15 +78,17 @@ type TableState struct {
 //
 //	Ignore: The table is being deliberately ignored.
 //	Pending: The table is new, and will start being backfilled soon.
-//	Backfill: The table's rows are being backfilled and replication events will only be emitted for the already-backfilled portion.
+//	StandardBackfill: The table's rows are being backfilled and replication events will only be emitted for the already-backfilled portion.
+//	UnfilteredBackfill: The table's rows are being backfilled as normal but all replication events will be emitted.
 //	KeylessBackfill: The table's rows are being backfilled with a non-primary-key based strategy and all replication events will be emitted.
 //	Active: The table finished backfilling and replication events are emitted for the entire table.
 const (
-	TableModeIgnore          = "Ignore"
-	TableModePending         = "Pending"
-	TableModeBackfill        = "Backfill"
-	TableModeKeylessBackfill = "KeylessBackfill"
-	TableModeActive          = "Active"
+	TableModeIgnore             = "Ignore"
+	TableModePending            = "Pending"
+	TableModeStandardBackfill   = "Backfill" // Short name for historical reasons, this used to be the only backfill mode
+	TableModeUnfilteredBackfill = "UnfilteredBackfill"
+	TableModeKeylessBackfill    = "KeylessBackfill"
+	TableModeActive             = "Active"
 )
 
 // Capture encapsulates the generic process of capturing data from a SQL database
@@ -135,11 +142,10 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("error creating replication stream: %w", err)
 	}
-	for streamID, state := range c.State.Streams {
-		if state.Mode == TableModeBackfill || state.Mode == TableModeActive {
-			if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
-				return fmt.Errorf("error activating table %q: %w", streamID, err)
-			}
+	for _, streamID := range c.State.StreamsCurrentlyBackfilling() {
+		var state = c.State.Streams[streamID]
+		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
+			return fmt.Errorf("error activating table %q: %w", streamID, err)
 		}
 	}
 	var watermarks = c.Database.WatermarksTable()
@@ -188,7 +194,13 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		var state = c.State.Streams[streamID]
 		switch binding.Resource.Mode {
 		case BackfillModeNormal:
-			state.Mode = TableModeBackfill
+			var discoveryInfo = c.discovery[streamID]
+			if discoveryInfo != nil && discoveryInfo.UnpredictableKeyOrdering {
+				logrus.WithField("stream", streamID).Info("unable to accurately reproduce database key ordering, replication events during backfill will be unfiltered")
+				state.Mode = TableModeUnfilteredBackfill
+			} else {
+				state.Mode = TableModeStandardBackfill
+			}
 		case BackfillModeOnlyChanges:
 			state.Mode = TableModeActive
 		case BackfillModeWithoutKey:
@@ -218,7 +230,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// configuration logic, but that would make that logic more complex and I would like
 	// to deprecate the whole 'SkipBackfills' configuration property in the near future
 	// so I have left this little blob of logic nicely self-contained here.
-	for _, streamID := range c.State.StreamsInState(TableModeBackfill) {
+	for _, streamID := range c.State.StreamsCurrentlyBackfilling() {
 		if !c.Database.ShouldBackfill(streamID) {
 			var state = c.State.Streams[streamID]
 			if state.Scanned == nil {
@@ -237,7 +249,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	}
 
 	// Backfill any tables which require it
-	for c.State.StreamsInState(TableModeBackfill, TableModeKeylessBackfill) != nil {
+	for c.State.StreamsCurrentlyBackfilling() != nil {
 		var watermark = uuid.New().String()
 		if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
 			return fmt.Errorf("error writing next watermark: %w", err)
@@ -541,29 +553,29 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 		}).Debug("ignoring stream")
 		return nil
 	}
-	if tableState.Mode == TableModeActive || tableState.Mode == TableModeKeylessBackfill {
+	if tableState.Mode == TableModeActive || tableState.Mode == TableModeKeylessBackfill || tableState.Mode == TableModeUnfilteredBackfill {
 		if err := c.emitChange(change); err != nil {
 			return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 		}
 		return nil
 	}
-	if tableState.Mode != TableModeBackfill {
-		return fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
+	if tableState.Mode == TableModeStandardBackfill {
+		// While a table is being backfilled, events occurring *before* the current scan point
+		// will be emitted, while events *after* that point will be patched (or ignored) into
+		// the buffered resultSet.
+		if compareTuples(change.RowKey, tableState.Scanned) <= 0 {
+			if err := c.emitChange(change); err != nil {
+				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
+			}
+		}
+		return nil
 	}
 
-	// While a table is being backfilled, events occurring *before* the current scan point
-	// will be emitted, while events *after* that point will be patched (or ignored) into
-	// the buffered resultSet.
-	if compareTuples(change.RowKey, tableState.Scanned) <= 0 {
-		if err := c.emitChange(change); err != nil {
-			return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
-		}
-	}
-	return nil
+	return fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
 }
 
 func (c *Capture) backfillStreams(ctx context.Context) error {
-	var streams = c.State.StreamsInState(TableModeBackfill, TableModeKeylessBackfill)
+	var streams = c.State.StreamsCurrentlyBackfilling()
 
 	// Select one stream at random to backfill at a time. On average this works
 	// as well as any other policy, and just doing one at a time means that we
@@ -594,11 +606,21 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	var lastRowKey = streamState.Scanned
 	var eventCount int
 	var err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
-		if compareTuples(lastRowKey, event.RowKey) > 0 {
-			// Sanity check that the DB must always return rows whose serialized
-			// key value is greater than the previous cursor value. This together
-			// with the check in resultset.go ensures that the scan key always
-			// increases (or else the capture will fail).
+		if streamState.Mode == TableModeStandardBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
+			// Sanity check that when performing a "standard" backfill the DB's ordering of
+			// result rows must match our own bytewise lexicographic ordering of serialized
+			// row keys.
+			//
+			// This ordering property must always be true for every possible key, because if it's
+			// violated the filtering logic (applied based on row keys in handleReplicationEvent)
+			// could miscategorize a replication event, which could result in incorrect data. But
+			// we can't verify that for _every_ possible key, so instead we opportunistically check
+			// ourselves here.
+			//
+			// If this property cannot be guaranteed for a particular table then the discovery logic
+			// should have set `UnpredictableKeyOrdering` to true, which should have resulted in a
+			// backfill using the "UnfilteredBackfill" mode instead, which would not perform that
+			// filtering or this sanity check.
 			return fmt.Errorf("scan key ordering failure: last=%q, next=%q", lastRowKey, event.RowKey)
 		}
 		lastRowKey = event.RowKey
