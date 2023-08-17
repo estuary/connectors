@@ -420,3 +420,8 @@ func splitStreamID(streamID string) (string, string) {
 	var bits = strings.SplitN(streamID, ".", 2)
 	return bits[0], bits[1]
 }
+
+func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {
+	// TODO: Run some useful diagnostics queries for SQL Server replication and log the results
+	return nil
+}
