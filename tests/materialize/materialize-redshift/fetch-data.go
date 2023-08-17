@@ -51,7 +51,7 @@ func main() {
 	}
 	defer db.Close()
 
-	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s ORDER BY ID", tables[0]))
+	rows, err := db.Query(fmt.Sprintf(`SELECT * FROM "%s" ORDER BY ID`, tables[0]))
 	if err != nil {
 		log.Fatal(fmt.Errorf("running query: %w", err))
 	}

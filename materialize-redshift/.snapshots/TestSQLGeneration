@@ -48,27 +48,27 @@ CREATE TEMPORARY TABLE flow_temp_table_1 (
 );
 --- End "Delta Updates" createStoreTable ---
 
---- Begin "a-schema".target_table storeUpdateDeleteExisting ---
-DELETE FROM "a-schema".target_table
-USING flow_temp_table_0
-WHERE "a-schema".target_table.key1 = flow_temp_table_0.key1 AND "a-schema".target_table."key!2" = flow_temp_table_0."key!2";
---- End "a-schema".target_table storeUpdateDeleteExisting ---
+--- Begin "a-schema".target_table mergeInto ---
+MERGE INTO "a-schema".target_table
+USING flow_temp_table_0 AS r
+ON "a-schema".target_table.key1 = r.key1 AND "a-schema".target_table."key!2" = r."key!2"
+WHEN MATCHED THEN
+	UPDATE SET Camel_Case = r.Camel_Case, "a Time" = r."a Time", "array" = r."array", lower_case = r.lower_case, value = r.value, flow_document = r.flow_document
+WHEN NOT MATCHED THEN
+	INSERT (key1, "key!2", Camel_Case, "a Time", "array", lower_case, value, flow_document)
+	VALUES (r.key1, r."key!2", r.Camel_Case, r."a Time", r."array", r.lower_case, r.value, r.flow_document);
+--- End "a-schema".target_table mergeInto ---
 
---- Begin "Delta Updates" storeUpdateDeleteExisting ---
-DELETE FROM "Delta Updates"
-USING flow_temp_table_1
-WHERE "Delta Updates".theKey = flow_temp_table_1.theKey;
---- End "Delta Updates" storeUpdateDeleteExisting ---
-
---- Begin "a-schema".target_table storeUpdate ---
-INSERT INTO "a-schema".target_table  
-SELECT * FROM flow_temp_table_0;
---- End "a-schema".target_table storeUpdate ---
-
---- Begin "Delta Updates" storeUpdate ---
-INSERT INTO "Delta Updates"  
-SELECT * FROM flow_temp_table_1;
---- End "Delta Updates" storeUpdate ---
+--- Begin "Delta Updates" mergeInto ---
+MERGE INTO "Delta Updates"
+USING flow_temp_table_1 AS r
+ON "Delta Updates".theKey = r.theKey
+WHEN MATCHED THEN
+	UPDATE SET aValue = r.aValue
+WHEN NOT MATCHED THEN
+	INSERT (theKey, aValue)
+	VALUES (r.theKey, r.aValue);
+--- End "Delta Updates" mergeInto ---
 
 --- Begin "a-schema".target_table loadQuery ---
 SELECT 0, r.flow_document

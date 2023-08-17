@@ -49,7 +49,14 @@ const (
 	// `json_parse_truncate_strings=ON` in the session that performs the Store to the target table.
 	redshiftVarcharMaxLength = 65535
 
-	redshiftTextColumnLength = 255
+	// The default TEXT column is an alias for VARCHAR(256).
+	redshiftTextColumnLength = 256
+
+	// If no schema is configured for a table, assume it's in the "public" schema, which is the
+	// default for Redshift. This is needed for correlating queried column lengths (which always
+	// include a schema) with actual resources, which may omit the schema to use "public" by
+	// default.
+	defaultSchema = "public"
 )
 
 type sshForwarding struct {
@@ -470,13 +477,22 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
+		p := binding.Path
+		if len(p) == 1 {
+			// No explicit schema set. Assume the default for identifying the table with respect to
+			// the VARCHAR lengths introspection query, which always include a schema.
+			p = []string{defaultSchema, p[0]}
+		}
+
+		// Redshift lowercases all table identifiers.
+		identifier := strings.ToLower(rsDialect.Identifier(p...))
 		if err = d.addBinding(
 			ctx,
 			binding,
 			d.cfg.Bucket,
 			d.cfg.BucketPath,
 			s3client,
-			tableVarchars[strings.ToLower(binding.Identifier)], // Redshift lowercases all table identifiers
+			tableVarchars[identifier],
 		); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
@@ -493,15 +509,14 @@ func newTransactor(
 }
 
 type binding struct {
-	target                       sql.Table
-	varcharColumnMetas           []varcharColumnMeta
-	loadFile                     *stagedFile
-	storeFile                    *stagedFile
-	createLoadTableTemplate      *template.Template
-	createStoreTableSQL          string
-	storeUpdateDeleteExistingSQL string
-	storeUpdateSQL               string
-	loadQuerySQL                 string
+	target                  sql.Table
+	varcharColumnMetas      []varcharColumnMeta
+	loadFile                *stagedFile
+	storeFile               *stagedFile
+	createLoadTableTemplate *template.Template
+	createStoreTableSQL     string
+	mergeIntoSQL            string
+	loadQuerySQL            string
 }
 
 // varcharColumnMeta contains metadata about Redshift varchar columns. Currently this is just the
@@ -531,8 +546,7 @@ func (t *transactor) addBinding(
 		tpl *template.Template
 	}{
 		{&b.createStoreTableSQL, tplCreateStoreTable},
-		{&b.storeUpdateDeleteExistingSQL, tplStoreUpdateDeleteExisting},
-		{&b.storeUpdateSQL, tplStoreUpdate},
+		{&b.mergeIntoSQL, tplMergeInto},
 		{&b.loadQuerySQL, tplLoadQuery},
 	} {
 		var err error
@@ -863,8 +877,6 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
 	}
 
-	var batch pgx.Batch
-
 	for idx, b := range d.bindings {
 		if !b.storeFile.started {
 			// No loads for this binding.
@@ -877,60 +889,49 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		}
 		defer delete(ctx)
 
-		var dest string
-		if hasUpdates[idx] {
-			// Must merge from the staging table.
-			dest = fmt.Sprintf("flow_temp_table_%d", idx)
-		} else {
-			// Can copy directly into the target table.
-			dest = b.target.Identifier
+		copySql := func(dest string) (string, error) {
+			var out strings.Builder
+			if err := tplCopyFromS3.Execute(&out, copyFromS3Params{
+				Destination:     dest,
+				ObjectLocation:  objectLocation,
+				Config:          *d.cfg,
+				TruncateColumns: true,
+			}); err != nil {
+				return "", fmt.Errorf("evaluating copy from s3 template: %w", err)
+			}
+			return out.String(), nil
 		}
 
-		var copySql strings.Builder
-		if err := tplCopyFromS3.Execute(&copySql, copyFromS3Params{
-			Destination:     dest,
-			ObjectLocation:  objectLocation,
-			Config:          *d.cfg,
-			TruncateColumns: true,
-		}); err != nil {
-			return fmt.Errorf("evaluating copy from s3 template: %w", err)
-		}
-
-		batch.Queue(copySql.String())
-
 		if hasUpdates[idx] {
-			// This command must be executed separately so that the table is "visible" for the batch
-			// commands.
+			// Create the temporary table for staging values to merge into the target table.
+			// Redshift actually supports transactional DDL for creating tables, so this can be
+			// executed within the transaction.
 			if _, err := txn.Exec(ctx, b.createStoreTableSQL); err != nil {
 				return fmt.Errorf("creating store table: %w", err)
 			}
-			batch.Queue(b.storeUpdateDeleteExistingSQL)
-			batch.Queue(b.storeUpdateSQL)
+
+			if copy, err := copySql(fmt.Sprintf("flow_temp_table_%d", idx)); err != nil {
+				return err
+			} else if _, err := txn.Exec(ctx, copy); err != nil {
+				return fmt.Errorf("executing COPY command for table '%s': %w", b.target.Identifier, err)
+			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
+				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
+			}
+		} else {
+			// Can copy directly into the target table since all values are new.
+			if copy, err := copySql(b.target.Identifier); err != nil {
+				return err
+			} else if _, err := txn.Exec(ctx, copy); err != nil {
+				return fmt.Errorf("executing COPY command for table '%s': %w", b.target.Identifier, err)
+			}
 		}
 	}
 
-	// The fence update is always the last query in the batch.
-	batch.Queue(fenceUpdate)
-
-	res := txn.SendBatch(ctx, &batch)
-
-	for idx := 0; idx < batch.Len()-1; idx++ {
-		if _, err := res.Exec(); err != nil {
-			return fmt.Errorf("exec store batch index %d: %w", idx, err)
-		}
-	}
-
-	fenceRes, err := res.Exec()
-	if err != nil {
+	if fenceRes, err := txn.Exec(ctx, fenceUpdate); err != nil {
 		return fmt.Errorf("fetching fence update rows: %w", err)
 	} else if fenceRes.RowsAffected() != 1 {
 		return errors.New("this instance was fenced off by another")
-	}
-	if err := res.Close(); err != nil {
-		return fmt.Errorf("closing store batch: %w", err)
-	}
-
-	if err := txn.Commit(ctx); err != nil {
+	} else if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing store transaction: %w", err)
 	}
 

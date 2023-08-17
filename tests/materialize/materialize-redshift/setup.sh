@@ -89,7 +89,7 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "long-string"
+      "table": "long_string"
     },
     "source": "${TEST_COLLECTION_LONG_STRING}"
   }
