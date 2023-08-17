@@ -19,7 +19,7 @@ func EncodeRowKey(key []string, fields map[string]interface{}, fieldTypes map[st
 	var err error
 	for i, elem := range key {
 		if xs[i], err = translate(fields[elem], fieldTypes[elem]); err != nil {
-			return nil, fmt.Errorf("encode row key: %w", err)
+			return nil, fmt.Errorf("error encoding column %q: %w", elem, err)
 		}
 	}
 	return packTuple(xs)
