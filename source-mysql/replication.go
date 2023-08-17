@@ -762,5 +762,6 @@ func (db *mysqlDatabase) ReplicationDiagnostics(ctx context.Context) error {
 	query("SHOW MASTER STATUS;")
 	query("SHOW SLAVE HOSTS;")
 	query("SHOW PROCESSLIST;")
+	query("SHOW BINARY LOGS;")
 	return nil
 }
