@@ -163,7 +163,7 @@ func getTables(ctx context.Context, conn *sql.DB) ([]*sqlcapture.DiscoveryInfo, 
 }
 
 const queryDiscoverColumns = `
-  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, collation_name
+  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, collation_name, character_maximum_length
   FROM information_schema.columns
   ORDER BY table_schema, table_name, ordinal_position;`
 
@@ -179,7 +179,8 @@ func getColumns(ctx context.Context, conn *sql.DB) ([]sqlcapture.ColumnInfo, err
 		var ci sqlcapture.ColumnInfo
 		var isNullable, typeName string
 		var collationName *string
-		if err := rows.Scan(&ci.TableSchema, &ci.TableName, &ci.Index, &ci.Name, &isNullable, &typeName, &collationName); err != nil {
+		var maxCharLength *int
+		if err := rows.Scan(&ci.TableSchema, &ci.TableName, &ci.Index, &ci.Name, &isNullable, &typeName, &collationName, &maxCharLength); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 		ci.IsNullable = isNullable != "NO"
@@ -190,7 +191,23 @@ func getColumns(ctx context.Context, conn *sql.DB) ([]sqlcapture.ColumnInfo, err
 			if collationName != nil {
 				collation = *collationName
 			}
-			ci.DataType = &sqlserverTextColumnType{Type: typeName, Collation: collation}
+			var fullType = typeName
+			if slices.Contains([]string{"char", "varchar", "nchar", "nvarchar"}, typeName) {
+				// We arbitrarily use max(64, <database maximum>) here just to be extra conservative
+				// and provide a sane default in the event of NULL or zero values. The size here only
+				// matters for the 'declared parameter' hack used in backfill queries, so overestimating
+				// is very benign.
+				var columnSize int = 64
+				if maxCharLength != nil && *maxCharLength >= columnSize {
+					columnSize = *maxCharLength
+				}
+				fullType = fmt.Sprintf("%s(%d)", typeName, columnSize)
+			}
+			ci.DataType = &sqlserverTextColumnType{
+				Type:      typeName,
+				Collation: collation,
+				FullType:  fullType,
+			}
 		} else {
 			ci.DataType = typeName
 		}
@@ -202,6 +219,7 @@ func getColumns(ctx context.Context, conn *sql.DB) ([]sqlcapture.ColumnInfo, err
 type sqlserverTextColumnType struct {
 	Type      string // The basic type of the column (char / varchar / nchar / nvarchar / text / ntext)
 	Collation string // The collation used by the column
+	FullType  string // The full type of the column, such as `varchar(32)` for example
 }
 
 // Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
