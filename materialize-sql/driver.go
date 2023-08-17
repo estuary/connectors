@@ -174,7 +174,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 
 					addAction, err := endpoint.Client.AddColumnToTable(ctx, req.DryRun, newTable.Identifier, newCol.Identifier, mapped.DDL)
 					if err != nil {
-						return nil, fmt.Errorf("adding column '%s %s' to table '%s': %w", newTable.Identifier, mapped.DDL, newCol.Identifier, err)
+						return nil, fmt.Errorf("adding column '%s %s' to table '%s': %w", newCol.Identifier, mapped.DDL, newTable.Identifier, err)
 					}
 
 					if addAction != "" {
