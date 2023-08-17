@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+// predictableCollation returns true if and only if the connector's logic for
+// "encodeCollationSortKey" will be able to accurately reproduce the database
+// key ordering behavior.
+func predictableCollation(info *sqlserverTextColumnType) bool {
+	var collationID = strings.ToLower(info.Type) + "/" + info.Collation
+	var _, ok = supportedTextCollations[collationID]
+	return ok
+}
+
 // encodeCollationSortKey receives a UTF-8 string and a description of the SQL Server
 // column type and the collation name by which it is ordered, and returns a sequence
 // of encoded bytes with the property that the *bytewise lexicographic* ordering of
