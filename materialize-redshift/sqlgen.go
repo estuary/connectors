@@ -157,28 +157,38 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 );
 {{ end }}
 
--- The load and store tables will be truncated on each transaction round.
+-- Templated query which updates an existing row in the target table. Redshift does not support
+-- "WHEN MATCHED AND", so if/when deletion is implemented using a NULL document, a separate delete
+-- statement will be needed in addition to this merge statement.
 
-{{ define "truncateTempTable" }}
-TRUNCATE {{ template "temp_name" . }};
-{{ end }}
-
--- Merging data from a source table to a target table in redshift is accomplished
--- by first deleting common records from the target table then copying all records
--- from the source into the target.
-
-{{ define "storeUpdateDeleteExisting" }}
-DELETE FROM {{$.Identifier}}
-USING {{ template "temp_name" . }}
-WHERE {{ range $ind, $key := $.Keys }}
+{{ define "mergeInto" }}
+MERGE INTO {{ $.Identifier }}
+USING {{ template "temp_name" . }} AS r
+ON {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
-	{{$.Identifier}}.{{$key.Identifier}} = {{ template "temp_name" $ }}.{{$key.Identifier}}
-{{- end}};
-{{ end }}
-
-{{ define "storeUpdate" }}
-INSERT INTO {{$.Identifier}}  
-SELECT * FROM {{ template "temp_name" . }};
+	{{$.Identifier}}.{{$key.Identifier}} = r.{{$key.Identifier}}
+{{- end}}
+WHEN MATCHED THEN
+	UPDATE SET {{ range $ind, $val := $.Values }}
+	{{- if $ind }}, {{end -}}
+		{{$val.Identifier}} = r.{{$val.Identifier}}
+	{{- end}} 
+	{{- if $.Document -}}
+		{{ if $.Values  }}, {{ end }}{{$.Document.Identifier}} = r.{{$.Document.Identifier}}
+	{{- end }}
+WHEN NOT MATCHED THEN
+	INSERT (
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }}, {{ end -}}
+		{{$col.Identifier}}
+	{{- end -}}
+	)
+	VALUES (
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }}, {{ end -}}
+		r.{{$col.Identifier}}
+	{{- end -}}
+	);
 {{ end }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values. It
@@ -227,14 +237,13 @@ TRUNCATECOLUMNS;
 {{- end }}
 {{ end }}
 `)
-	tplCreateTargetTable         = tplAll.Lookup("createTargetTable")
-	tplCreateLoadTable           = tplAll.Lookup("createLoadTable")
-	tplCreateStoreTable          = tplAll.Lookup("createStoreTable")
-	tplStoreUpdateDeleteExisting = tplAll.Lookup("storeUpdateDeleteExisting")
-	tplStoreUpdate               = tplAll.Lookup("storeUpdate")
-	tplLoadQuery                 = tplAll.Lookup("loadQuery")
-	tplUpdateFence               = tplAll.Lookup("updateFence")
-	tplCopyFromS3                = tplAll.Lookup("copyFromS3")
+	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
+	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
+	tplCreateStoreTable  = tplAll.Lookup("createStoreTable")
+	tplMergeInto         = tplAll.Lookup("mergeInto")
+	tplLoadQuery         = tplAll.Lookup("loadQuery")
+	tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCopyFromS3        = tplAll.Lookup("copyFromS3")
 )
 
 const varcharTableAlter = "ALTER TABLE %s ALTER COLUMN %s TYPE VARCHAR(MAX);"
