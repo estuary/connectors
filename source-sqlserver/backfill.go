@@ -143,17 +143,6 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	return nil
 }
 
-// The set of column types for which we need to specify a text collation to
-// get sane ordering and comparison of row keys. Represented as a map[string]bool
-// so that it can be combined with the "is the column typename a string" check
-// into one if statement.
-var columnTypeCollatedText = map[string]bool{
-	"char":     true,
-	"varchar":  true,
-	"nchar":    true,
-	"nvarchar": true,
-}
-
 func (db *sqlserverDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
@@ -168,16 +157,7 @@ func (db *sqlserverDatabase) buildScanQuery(start bool, keyColumns []string, col
 	for idx, colName := range keyColumns {
 		var quotedName = quoteColumnName(colName)
 		args = append(args, fmt.Sprintf("@p%d", idx+1))
-		//
-		if colType, ok := columnTypes[colName].(string); ok && columnTypeCollatedText[colType] {
-			// The Latin1_General_100_BIN2_UTF8 collation basically means "just shut up
-			// and order lexicographically by Unicode code point". And UTF-8 is designed
-			// such that bytewise lexicographic ordering matches Unicode code-point ordering,
-			// so this should hopefully match the internal scan key ordering in all cases.
-			pkey = append(pkey, quotedName+` COLLATE Latin1_General_100_BIN2_UTF8`)
-		} else {
-			pkey = append(pkey, quotedName)
-		}
+		pkey = append(pkey, quotedName)
 	}
 
 	var query = new(strings.Builder)
