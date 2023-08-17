@@ -156,11 +156,23 @@ func (db *sqlserverDatabase) buildScanQuery(start bool, keyColumns []string, col
 	var args []string
 	for idx, colName := range keyColumns {
 		var quotedName = quoteColumnName(colName)
-		args = append(args, fmt.Sprintf("@p%d", idx+1))
+		if _, ok := columnTypes[colName].(*sqlserverTextColumnType); ok {
+			args = append(args, fmt.Sprintf("@KeyColumn%d", idx+1))
+		} else {
+			args = append(args, fmt.Sprintf("@p%d", idx+1))
+		}
 		pkey = append(pkey, quotedName)
 	}
 
 	var query = new(strings.Builder)
+	fmt.Fprintf(query, "BEGIN ")
+	if !start {
+		for idx, colName := range keyColumns {
+			if textInfo, ok := columnTypes[colName].(*sqlserverTextColumnType); ok {
+				fmt.Fprintf(query, "DECLARE @KeyColumn%[1]d AS %[2]s = @p%[1]d; ", idx+1, textInfo.FullType)
+			}
+		}
+	}
 	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
 	if !start {
 		for i := range pkey {
@@ -179,6 +191,7 @@ func (db *sqlserverDatabase) buildScanQuery(start bool, keyColumns []string, col
 	}
 	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " OFFSET 0 ROWS FETCH FIRST %d ROWS ONLY;", db.config.Advanced.BackfillChunkSize)
+	fmt.Fprintf(query, " END")
 	return query.String()
 }
 
