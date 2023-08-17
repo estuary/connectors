@@ -379,16 +379,10 @@ type streamProgressReport struct {
 	idleTimeout  *time.Timer
 }
 
-func startProgressReport(idleIsBad bool) *streamProgressReport {
+func startProgressReport(onIdle func()) *streamProgressReport {
 	return &streamProgressReport{
 		nextProgress: time.Now().Add(streamProgressInterval),
-		idleTimeout: time.AfterFunc(streamIdleWarning, func() {
-			if idleIsBad {
-				logrus.WithField("timeout", streamIdleWarning.String()).Warn("replication stream idle")
-			} else {
-				logrus.WithField("timeout", streamIdleWarning.String()).Info("replication stream idle")
-			}
-		}),
+		idleTimeout:  time.AfterFunc(streamIdleWarning, onIdle),
 	}
 }
 
@@ -436,7 +430,17 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 	var watermarksTable = c.Database.WatermarksTable()
 	var watermarkReached = false
 
-	var progressReport = startProgressReport(watermark != nonexistentWatermark)
+	var idleIsBad = watermark != nonexistentWatermark
+	var progressReport = startProgressReport(func() {
+		if idleIsBad {
+			logrus.WithField("timeout", streamIdleWarning.String()).Warn("replication stream idle")
+			if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
+				logrus.WithField("err", err).Error("replication diagnostics error")
+			}
+		} else {
+			logrus.WithField("timeout", streamIdleWarning.String()).Info("replication stream idle")
+		}
+	})
 	defer progressReport.Stop()
 
 	for event := range replStream.Events() {

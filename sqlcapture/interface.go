@@ -153,6 +153,11 @@ type Database interface {
 	// SetupTablePrerequisites is like SetupPrerequisites but for any table-specific
 	// verification or setup that needs to be performed.
 	SetupTablePrerequisites(ctx context.Context, schema, table string) error
+
+	// Called when replication appears to not be progressing as it should, this
+	// function provides a hook for database-specific diagnostic information to
+	// be logged.
+	ReplicationDiagnostics(ctx context.Context) error
 }
 
 // ReplicationStream represents the process of receiving change events
