@@ -175,13 +175,39 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_update' INTO TABLE flow_temp_update_t
 --- Begin target_table updateReplace ---
 
 REPLACE INTO target_table
-	SELECT * FROM flow_temp_update_table_0;
+(
+		key1,
+		`key!2`,
+		`Camel_Case`,
+		`a Time`,
+		`array`,
+		lower_case,
+		`value`,
+		flow_document
+)
+SELECT
+		key1,
+		`key!2`,
+		`Camel_Case`,
+		`a Time`,
+		`array`,
+		lower_case,
+		`value`,
+		flow_document
+FROM flow_temp_update_table_0;
 --- End target_table updateReplace ---
 
 --- Begin `Delta Updates` updateReplace ---
 
 REPLACE INTO `Delta Updates`
-	SELECT * FROM flow_temp_update_table_1;
+(
+		`theKey`,
+		`aValue`
+)
+SELECT
+		`theKey`,
+		`aValue`
+FROM flow_temp_update_table_1;
 --- End `Delta Updates` updateReplace ---
 
 --- Begin target_table truncateUpdateTable ---
