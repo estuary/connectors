@@ -57,7 +57,7 @@ TRUNCATE flow_temp_load_table_1;
 
 --- Begin target_table loadLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_load_table_0
+LOAD DATA LOCAL INFILE 'Reader::batch_data_load_0' INTO TABLE flow_temp_load_table_0
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -72,7 +72,7 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_load_table
 
 --- Begin `Delta Updates` loadLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE flow_temp_load_table_1
+LOAD DATA LOCAL INFILE 'Reader::batch_data_load_1' INTO TABLE flow_temp_load_table_1
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -102,7 +102,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 
 --- Begin target_table storeLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE target_table
+LOAD DATA LOCAL INFILE 'Reader::batch_data_store_0' INTO TABLE target_table
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -123,7 +123,7 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE target_table
 
 --- Begin `Delta Updates` storeLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE `Delta Updates`
+LOAD DATA LOCAL INFILE 'Reader::batch_data_store_1' INTO TABLE `Delta Updates`
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -138,7 +138,7 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE `Delta Updates`
 
 --- Begin target_table updateLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::batch_data_update' INTO TABLE flow_temp_update_table_0
+LOAD DATA LOCAL INFILE 'Reader::batch_data_update_0' INTO TABLE flow_temp_update_table_0
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -159,7 +159,7 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_update' INTO TABLE flow_temp_update_t
 
 --- Begin `Delta Updates` updateLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::batch_data_update' INTO TABLE flow_temp_update_table_1
+LOAD DATA LOCAL INFILE 'Reader::batch_data_update_1' INTO TABLE flow_temp_update_table_1
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
