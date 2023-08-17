@@ -185,6 +185,18 @@ type DiscoveryInfo struct {
 	PrimaryKey  []string              // An ordered list of the column names which together form the table's primary key.
 	ColumnNames []string              // The names of all columns, in the table's natural order.
 	BaseTable   bool                  // True if the table type is 'BASE TABLE' and false for views or other not-physical-table entities.
+
+	// UnpredictableKeyOrdering will be true when the connector is unable to guarantee
+	// (for a particular table) that serialized RowKey values will accurately reproduce
+	// (when compared bytewise lexicographically) the database sort ordering of the same
+	// rows. This might happen, for instance, if the database is applying a text collation
+	// whose ordering rules are undocumented and incomprehensible in their edge cases.
+	//
+	// In such circumstances, the connector must avoid the standard "filtering" behavior
+	// (in which replication events are omitted for portions of the table which haven't
+	// been reached yet) because we can't actually answer the question of whether some
+	// arbitrary key lies before or after the current backfill cursor.
+	UnpredictableKeyOrdering bool
 }
 
 // ColumnInfo holds metadata about a specific column of some table in the
