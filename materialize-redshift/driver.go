@@ -657,7 +657,6 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 	defer txn.Rollback(ctx)
 
-	var batch pgx.Batch
 	for idx, b := range d.bindings {
 		// The temporary load table for each binding always needs to be created because it is used
 		// in the UNION ALL load query. This may be an opportunity for a (minor) future
@@ -668,8 +667,9 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			VarCharLength: maxStringLengths[idx],
 		}); err != nil {
 			return fmt.Errorf("evaluating create load table template: %w", err)
+		} else if _, err := txn.Exec(ctx, createLoadTableSQL.String()); err != nil {
+			return fmt.Errorf("creating load table for target table '%s': %w", b.target.Identifier, err)
 		}
-		batch.Queue(createLoadTableSQL.String())
 
 		if !b.loadFile.started {
 			// No loads for this binding.
@@ -690,19 +690,9 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			TruncateColumns: false,
 		}); err != nil {
 			return fmt.Errorf("evaluating copy from s3 template: %w", err)
+		} else if _, err := txn.Exec(ctx, copySql.String()); err != nil {
+			return handleCopyIntoErr(ctx, txn, objectLocation, b.target.Identifier, err)
 		}
-
-		batch.Queue(copySql.String())
-	}
-
-	res := txn.SendBatch(ctx, &batch)
-	for idx := 0; idx < batch.Len(); idx++ {
-		if _, err := res.Exec(); err != nil {
-			return fmt.Errorf("exec load batch index %d: %w", idx, err)
-		}
-	}
-	if err := res.Close(); err != nil {
-		return fmt.Errorf("closing load batch: %w", err)
 	}
 
 	// Issue a union join of the target tables and their (now staged) load keys,
@@ -913,7 +903,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 			if copy, err := copySql(fmt.Sprintf("flow_temp_table_%d", idx)); err != nil {
 				return err
 			} else if _, err := txn.Exec(ctx, copy); err != nil {
-				return fmt.Errorf("executing COPY command for table '%s': %w", b.target.Identifier, err)
+				return handleCopyIntoErr(ctx, txn, objectLocation, b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
 				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
 			}
@@ -922,7 +912,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 			if copy, err := copySql(b.target.Identifier); err != nil {
 				return err
 			} else if _, err := txn.Exec(ctx, copy); err != nil {
-				return fmt.Errorf("executing COPY command for table '%s': %w", b.target.Identifier, err)
+				return handleCopyIntoErr(ctx, txn, objectLocation, b.target.Identifier, err)
 			}
 		}
 	}
@@ -936,6 +926,89 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 	}
 
 	return nil
+}
+
+// handleCopyIntoErr queries the `sys_load_error_detail` table for relevant COPY INTO error details
+// and returns a more useful error than the opaque error returned by Redshift. This function will
+// always return an error. `sys_load_error_detail` is queried instead of `stl_load_errors` since it
+// is available to both serverless and provisioned versions of Redshift, whereas `stl_load_errors`
+// is only available on provisioned Redshift.
+func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, objectLocation string, table string, copyIntoErr error) error {
+	// The transaction has failed. It must be finish being rolled back before using its underlying
+	// connection again.
+	txn.Rollback(ctx)
+	conn := txn.Conn()
+
+	log.WithFields(log.Fields{
+		"table": table,
+		"err":   copyIntoErr.Error(),
+	}).Warn("COPY INTO error")
+
+	loadErrInfo, err := getLoadErrorInfo(ctx, conn, objectLocation)
+	if err != nil {
+		return fmt.Errorf("COPY INTO error for table '%s' but could not query sys_load_error_detail: %w", table, err)
+	}
+
+	log.WithFields(log.Fields{
+		"errMsg":    loadErrInfo.errMsg,
+		"errCode":   loadErrInfo.errCode,
+		"colName":   loadErrInfo.colName,
+		"colType":   loadErrInfo.colType,
+		"colLength": loadErrInfo.colLength,
+	}).Warn("loadErrInfo")
+
+	// See https://docs.aws.amazon.com/redshift/latest/dg/r_Load_Error_Reference.html for load error
+	// codes.
+	switch code := loadErrInfo.errCode; code {
+	case 1204:
+		// Input data exceeded the acceptable range for the data type. This is a case where the
+		// column has some kind of length limit (like a VARCHAR(X)), but the input to the column is too
+		// long.
+		return fmt.Errorf(
+			"cannot COPY INTO table '%s' column '%s' having type '%s' and allowable length '%s': %s (code %d)",
+			table,
+			loadErrInfo.colName,
+			loadErrInfo.colType,
+			loadErrInfo.colLength,
+			loadErrInfo.errMsg,
+			loadErrInfo.errCode,
+		)
+	case 1216:
+		// General "Input line is not valid" error. This is almost always going to be because a very
+		// large document is in the collection being materialized, and Redshift cannot parse single
+		// JSON lines larger than 4MB.
+		return fmt.Errorf(
+			"cannot COPY INTO table '%s': %s (code %d)",
+			table,
+			loadErrInfo.errMsg,
+			loadErrInfo.errCode,
+		)
+	case 1224:
+		// A problem copying into a SUPER column. The most common cause is field of the root
+		// document being excessively large (ex: an object field larger than 1MB, or having too many
+		// attributes). May also happen for an individual selected field that is mapped as a SUPER
+		// column type.
+		return fmt.Errorf(
+			"cannot COPY INTO table '%s' SUPER column '%s': %s (code %d)",
+			table,
+			loadErrInfo.colName,
+			loadErrInfo.errMsg,
+			loadErrInfo.errCode,
+		)
+	default:
+		// Catch-all: Return general information from sys_load_error_detail. This will be pretty
+		// helpful on its own. We'll want to specifically handle any other cases as we see them come
+		// up frequently.
+		return fmt.Errorf(
+			"COPY INTO table `%s` failed with details from sys_load_error_detail: column_name: '%s', column_type: '%s', column_length: '%s', error_code: %d: error_message: %s",
+			table,
+			loadErrInfo.colName,
+			loadErrInfo.colType,
+			loadErrInfo.colLength,
+			loadErrInfo.errCode,
+			loadErrInfo.errMsg,
+		)
+	}
 }
 
 func (d *transactor) Destroy() {}
