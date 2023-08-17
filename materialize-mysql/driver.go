@@ -274,30 +274,28 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 	var query string
 
 	err := c.withDB(func(db *stdsql.DB) error {
-		var conn, err = db.Conn(ctx)
-		if err != nil {
-			return err
-		}
+		query = fmt.Sprintf(
+			"ALTER TABLE %s ADD COLUMN %s %s;",
+			tableIdentifier,
+			columnIdentifier,
+			columnDDL,
+		)
 
-		rows, err := conn.QueryContext(ctx, "SELECT * FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name=?", tableIdentifier, columnIdentifier)
-		if err != nil {
-			return err
-		}
+		if !dryRun {
+			if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
+				var mysqlErr *mysql.MySQLError
 
-		var exists = rows.Next()
-
-		if !exists {
-			query = fmt.Sprintf(
-				"ALTER TABLE %s ADD COLUMN %s %s;",
-				tableIdentifier,
-				columnIdentifier,
-				columnDDL,
-			)
-
-			if !dryRun {
-				if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-					return err
+				if errors.As(err, &mysqlErr) {
+					// See MySQL error reference: https://dev.mysql.com/doc/mysql-errors/5.7/en/error-reference-introduction.html
+					switch mysqlErr.Number {
+					case 1060:
+						// 1060: Duplicate column name, means the column already exists, we
+						// just skip
+						return nil
+					}
 				}
+
+				return err
 			}
 		}
 
