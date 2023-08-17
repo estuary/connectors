@@ -192,19 +192,31 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		logrus.WithFields(logrus.Fields{"stream": streamID, "mode": binding.Resource.Mode}).Info("activating replication for stream")
 
 		var state = c.State.Streams[streamID]
+		var discoveryInfo = c.discovery[streamID]
 		switch binding.Resource.Mode {
-		case BackfillModeNormal:
-			var discoveryInfo = c.discovery[streamID]
-			if discoveryInfo != nil && discoveryInfo.UnpredictableKeyOrdering {
-				logrus.WithField("stream", streamID).Info("unable to accurately reproduce database key ordering, replication events during backfill will be unfiltered")
+		case BackfillModeAutomatic:
+			if len(state.KeyColumns) == 0 {
+				logrus.WithField("stream", streamID).Info("autoselected keyless backfill mode (table has no primary key)")
+				state.Mode = TableModeKeylessBackfill
+			} else if discoveryInfo != nil && discoveryInfo.UnpredictableKeyOrdering {
+				logrus.WithField("stream", streamID).Info("autoselected unfiltered backfill mode (database key ordering is unpredictable)")
 				state.Mode = TableModeUnfilteredBackfill
 			} else {
+				logrus.WithField("stream", streamID).Info("autoselected standard backfill mode")
 				state.Mode = TableModeStandardBackfill
 			}
-		case BackfillModeOnlyChanges:
-			state.Mode = TableModeActive
+		case BackfillModeNormal:
+			logrus.WithField("stream", streamID).Info("user selected standard backfill mode")
+			state.Mode = TableModeStandardBackfill
+		case BackfillModeUnfiltered:
+			logrus.WithField("stream", streamID).Info("user selected unfiltered backfill mode")
+			state.Mode = TableModeUnfilteredBackfill
 		case BackfillModeWithoutKey:
+			logrus.WithField("stream", streamID).Info("user selected keyless backfill mode")
 			state.Mode = TableModeKeylessBackfill
+		case BackfillModeOnlyChanges:
+			logrus.WithField("stream", streamID).Info("user selected only changes, skipping backfill")
+			state.Mode = TableModeActive
 		default:
 			return fmt.Errorf("invalid backfill mode %q for stream %q", binding.Resource.Mode, streamID)
 		}
@@ -377,9 +389,9 @@ func (c *Capture) updateState(ctx context.Context) error {
 
 	// Likewise streams may be removed from the catalog, and we need to forget
 	// the corresponding state information.
-	for streamID := range c.State.Streams {
+	for streamID, state := range c.State.Streams {
 		var _, streamExistsInCatalog = c.Bindings[streamID]
-		if !streamExistsInCatalog {
+		if !streamExistsInCatalog && state.Mode != TableModeIgnore {
 			logrus.WithField("stream", streamID).Info("stream removed from catalog")
 			c.State.Streams[streamID] = &TableState{Mode: TableModeIgnore, dirty: true}
 		}

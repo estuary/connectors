@@ -36,10 +36,17 @@ type Resource struct {
 type BackfillMode string
 
 const (
-	// BackfillModeNormal backfills chunks of the table and merges them by
-	// primary key with the replication stream in a way that produces exactly
-	// correct data.
+	// BackfillModeAutomatic means "use your best judgement at runtime".
+	BackfillModeAutomatic = BackfillMode("")
+
+	// BackfillModeNormal backfills chunks of the table and filters replication
+	// events in portions of the table which haven't yet been reached.
 	BackfillModeNormal = BackfillMode("Normal")
+
+	// BackfillModeUnfiltered backfills chunks of the table and emits all
+	// replication events regardless of whether they occur within a not-
+	// yet-backfilled portion of the table.
+	BackfillModeUnfiltered = BackfillMode("Unfiltered")
 
 	// BackfillModeOnlyChanges skips backfilling the table entirely and jumps
 	// directly to replication streaming for the entire dataset.
@@ -53,7 +60,7 @@ const (
 
 // Validate checks to make sure a resource appears usable.
 func (r Resource) Validate() error {
-	if r.Mode != "" && r.Mode != BackfillModeNormal && r.Mode != BackfillModeOnlyChanges && r.Mode != BackfillModeWithoutKey {
+	if r.Mode != BackfillModeAutomatic && r.Mode != BackfillModeNormal && r.Mode != BackfillModeOnlyChanges && r.Mode != BackfillModeWithoutKey {
 		return fmt.Errorf("invalid backfill mode %q", r.Mode)
 	}
 	if r.Namespace == "" {
@@ -66,11 +73,7 @@ func (r Resource) Validate() error {
 }
 
 // SetDefaults fills in the default values for unset optional parameters.
-func (r *Resource) SetDefaults() {
-	if r.Mode == "" {
-		r.Mode = BackfillModeNormal
-	}
-}
+func (r *Resource) SetDefaults() {}
 
 // Binding represents a capture binding, and includes a Resource config and a binding index.
 type Binding struct {
