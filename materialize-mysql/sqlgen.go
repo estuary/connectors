@@ -143,7 +143,7 @@ TRUNCATE {{ template "temp_load_name" . }};
 -- Templated load into the temporary load table:
 
 {{ define "loadLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::batch_data_load' INTO TABLE {{ template "temp_load_name" . }}
+LOAD DATA LOCAL INFILE 'Reader::batch_data_load_{{ $.Binding }}' INTO TABLE {{ template "temp_load_name" . }}
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -178,7 +178,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 -- Template to load data into target table
 
 {{ define "storeLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::batch_data_store' INTO TABLE {{ $.Identifier }}
+LOAD DATA LOCAL INFILE 'Reader::batch_data_store_{{ $.Binding }}' INTO TABLE {{ $.Identifier }}
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -210,7 +210,7 @@ CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
 {{ end }}
 
 {{ define "updateLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::batch_data_update' INTO TABLE {{ template "temp_update_name" . }}
+LOAD DATA LOCAL INFILE 'Reader::batch_data_update_{{ $.Binding }}' INTO TABLE {{ template "temp_update_name" . }}
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
