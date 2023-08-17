@@ -19,6 +19,17 @@ const (
 	// so we have to reshuffle the underlying bytes pretty hard to produce a row key
 	// whose bytewise lexicographic ordering matches SQL Server sorting rules.
 	uniqueIdentifierTag = "uuid"
+
+	// It is important that we be able to match the sort ordering that SQL Server
+	// applies to text/character primary keys. To do this, we translate the values
+	// of these columns into a tuple ("ctext", <sorting key>, "original string").
+	//
+	// The sorting key is a sequence of bytes which exists solely so that the
+	// bytewise lexicographic ordering of these values will match the SQL Server
+	// collation ordering of the same values. When decoding a key the sort-key
+	// field is ignored and we just use the original input string, since that
+	// way the collation-sortable encoding doesn't have to be reversible.
+	collatedTextTag = "ctext"
 )
 
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
@@ -40,6 +51,14 @@ func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 			copy(enc[12:16], key[0:4])
 			return tuple.Tuple{uniqueIdentifierTag, enc}, nil
 		}
+	case string:
+		if textInfo, ok := ktype.(*sqlserverTextColumnType); ok {
+			var textSortingKey, err = encodeCollationSortKey(textInfo, key)
+			if err != nil {
+				return nil, fmt.Errorf("error serializing collated text in key: %w", err)
+			}
+			return tuple.Tuple{collatedTextTag, textSortingKey, key}, nil
+		}
 	}
 	return key, nil
 }
@@ -60,6 +79,8 @@ func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
 			copy(key[4:6], enc[10:12])
 			copy(key[0:4], enc[12:16])
 			return key, nil
+		case collatedTextTag:
+			return t[2], nil
 		default:
 			return nil, fmt.Errorf("internal error: unknown tuple tag %q", t[0])
 		}
