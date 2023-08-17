@@ -726,3 +726,41 @@ func (rs *mysqlReplicationStream) Close(ctx context.Context) error {
 	rs.cancel()
 	return <-rs.errCh
 }
+
+func (db *mysqlDatabase) ReplicationDiagnostics(ctx context.Context) error {
+	var query = func(q string) {
+		logrus.WithField("query", q).Info("running diagnostics query")
+		var result, err = db.conn.Execute(q)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"query": q,
+				"err":   err,
+			}).Error("unable to execute diagnostics query")
+			return
+		}
+		defer result.Close()
+
+		if len(result.Values) == 0 {
+			logrus.WithField("query", q).Info("no results")
+		}
+		for _, row := range result.Values {
+			var logFields = logrus.Fields{}
+			for idx, column := range row {
+				var key = string(result.Fields[idx].Name)
+				var val = column.Value()
+				if bs, ok := val.([]byte); ok {
+					val = string(bs)
+				}
+				logFields[key] = val
+			}
+			logrus.WithFields(logFields).Info("got row")
+		}
+	}
+
+	query("SELECT @@GLOBAL.log_bin;")
+	query("SELECT @@GLOBAL.binlog_format;")
+	query("SHOW MASTER STATUS;")
+	query("SHOW SLAVE HOSTS;")
+	query("SHOW PROCESSLIST;")
+	return nil
+}

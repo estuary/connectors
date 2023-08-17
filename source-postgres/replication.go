@@ -644,3 +644,8 @@ func (s *replicationStream) Close(ctx context.Context) error {
 	s.cancel()
 	return <-s.errCh
 }
+
+func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
+	// TODO: Run some useful diagnostics queries for Postgres replication and log the results
+	return nil
+}
