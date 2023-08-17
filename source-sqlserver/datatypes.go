@@ -52,7 +52,7 @@ func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 			return tuple.Tuple{uniqueIdentifierTag, enc}, nil
 		}
 	case string:
-		if textInfo, ok := ktype.(*sqlserverTextColumnType); ok {
+		if textInfo, ok := ktype.(*sqlserverTextColumnType); ok && predictableCollation(textInfo) {
 			var textSortingKey, err = encodeCollationSortKey(textInfo, key)
 			if err != nil {
 				return nil, fmt.Errorf("error serializing collated text in key: %w", err)
