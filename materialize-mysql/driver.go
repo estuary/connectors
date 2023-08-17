@@ -697,12 +697,13 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 
 	for bindingIndex, batch := range batches {
-		if batch.buff.Len() > 0 {
-			var b = d.bindings[bindingIndex]
+		if batch.buff.Len() < 1 {
+			continue
+		}
+		var b = d.bindings[bindingIndex]
 
-			if err := drainBatch(ctx, txn, b.loadLoadSQL, batches[it.Binding]); err != nil {
-				return fmt.Errorf("load batch insert on %q: %w", b.target.Identifier, err)
-			}
+		if err := drainBatch(ctx, txn, b.loadLoadSQL, batches[it.Binding]); err != nil {
+			return fmt.Errorf("load batch insert on %q: %w", b.target.Identifier, err)
 		}
 	}
 
