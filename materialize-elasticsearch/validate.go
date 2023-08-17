@@ -35,7 +35,7 @@ func validateSelectedFields(
 		includedPointers[projection.Ptr] = true
 		constraint := constraints[field]
 		if constraints[field].Type.IsForbidden() {
-			return fmt.Errorf("the field '%s' may not be materialize because it has constraint: %s with reason: %s", field, constraint.Type, constraint.Reason)
+			return fmt.Errorf("the field '%s' may not be materialized because it has constraint: %s with reason: %s", field, constraint.Type, constraint.Reason)
 		}
 	}
 
@@ -160,17 +160,23 @@ func validateMatchesExistingBinding(
 		constraints[field] = constraint
 	}
 
-	if !deltaUpdates {
-		// Standard updates must continue to include the document and cannot change the name of the
-		// projection.
-		constraints[existing.FieldSelection.Document] = &pm.Response_Validated_Constraint{
-			Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
-			Reason: "The root document must continue to be materialized as the same projected field",
-		}
-	}
-
-	// Build constraints for new projections of the binding.
 	for _, proj := range boundCollection.Projections {
+		if !deltaUpdates && proj.IsRootDocumentProjection() {
+			// Standard updates materializations cannot change the projection field of the root
+			// document after the initial publication.
+			if proj.Field != existing.FieldSelection.Document {
+				constraints[proj.Field] = &pm.Response_Validated_Constraint{
+					Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
+					Reason: fmt.Sprintf(
+						"The root document was previously projected as field '%s' and cannot be changed to projection with field '%s'",
+						existing.FieldSelection.Document,
+						proj.Field,
+					),
+				}
+			}
+		}
+
+		// Build constraints for new projections of the binding.
 		if _, ok := constraints[proj.Field]; !ok {
 			constraints[proj.Field] = validateNewProjection(proj, deltaUpdates)
 		}

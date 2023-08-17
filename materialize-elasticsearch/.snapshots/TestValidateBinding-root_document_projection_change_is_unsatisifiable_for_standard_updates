@@ -3,9 +3,9 @@
 		"type": 3,
 		"reason": "This location is part of the current materialization"
 	},
-	"flow_document": {
-		"type": 2,
-		"reason": "The root document is required for a standard updates materialization"
+	"changed_flow_document": {
+		"type": 6,
+		"reason": "The root document was previously projected as field 'flow_document' and cannot be changed to projection with field 'changed_flow_document'"
 	},
 	"intKey": {
 		"type": 1,
@@ -14,10 +14,6 @@
 	"null": {
 		"type": 5,
 		"reason": "Cannot materialize this field"
-	},
-	"object": {
-		"type": 4,
-		"reason": "This field is able to be materialized"
 	},
 	"strFormatInt": {
 		"type": 3,
