@@ -227,7 +227,18 @@ LOAD DATA LOCAL INFILE 'Reader::batch_data_update' INTO TABLE {{ template "temp_
 
 {{ define "updateReplace" }}
 REPLACE INTO {{ $.Identifier }}
-	SELECT * FROM {{ template "temp_update_name" . }};
+(
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}
+	{{- end }}
+)
+SELECT
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}
+	{{- end }}
+FROM {{ template "temp_update_name" . }};
 {{ end }}
 
 
