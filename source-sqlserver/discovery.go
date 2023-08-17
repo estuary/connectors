@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/estuary/connectors/go/pkg/slices"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
@@ -148,7 +149,7 @@ func getTables(ctx context.Context, conn *sql.DB) ([]*sqlcapture.DiscoveryInfo, 
 }
 
 const queryDiscoverColumns = `
-  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type
+  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, collation_name
   FROM information_schema.columns
   ORDER BY table_schema, table_name, ordinal_position;`
 
@@ -162,15 +163,31 @@ func getColumns(ctx context.Context, conn *sql.DB) ([]sqlcapture.ColumnInfo, err
 	var columns []sqlcapture.ColumnInfo
 	for rows.Next() {
 		var ci sqlcapture.ColumnInfo
-		var isNullable, dataType string
-		if err := rows.Scan(&ci.TableSchema, &ci.TableName, &ci.Index, &ci.Name, &isNullable, &dataType); err != nil {
+		var isNullable, typeName string
+		var collationName *string
+		if err := rows.Scan(&ci.TableSchema, &ci.TableName, &ci.Index, &ci.Name, &isNullable, &typeName, &collationName); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 		ci.IsNullable = isNullable != "NO"
-		ci.DataType = dataType
+		if slices.Contains([]string{"char", "varchar", "nchar", "nvarchar", "text", "ntext"}, typeName) {
+			// The collation name should never be null for a text column type, but if it
+			// is we'll just default to the string 'NULL' so it's clear what the error is.
+			var collation = "NULL"
+			if collationName != nil {
+				collation = *collationName
+			}
+			ci.DataType = &sqlserverTextColumnType{Type: typeName, Collation: collation}
+		} else {
+			ci.DataType = typeName
+		}
 		columns = append(columns, ci)
 	}
 	return columns, nil
+}
+
+type sqlserverTextColumnType struct {
+	Type      string // The basic type of the column (char / varchar / nchar / nvarchar / text / ntext)
+	Collation string // The collation used by the column
 }
 
 // Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
@@ -256,17 +273,20 @@ func getSecondaryIndexes(ctx context.Context, conn *sql.DB) (map[string]map[stri
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
 func (db *sqlserverDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
 	var schema columnSchema
-	if typeName, ok := column.DataType.(string); ok {
-		schema, ok = sqlserverTypeToJSON[typeName]
-		if !ok {
+	if typeInfo, ok := column.DataType.(*sqlserverTextColumnType); ok {
+		if schema, ok = sqlserverTypeToJSON[typeInfo.Type]; !ok {
+			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeInfo.Type, column.Name, column.TableName)
+		}
+	} else if typeName, ok := column.DataType.(string); ok {
+		if schema, ok = sqlserverTypeToJSON[typeName]; !ok {
 			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeName, column.Name, column.TableName)
 		}
-		schema.nullable = column.IsNullable
 	} else {
 		return nil, fmt.Errorf("unhandled SQL Server type %#v (found on column %q of table %q)", column.DataType, column.Name, column.TableName)
 	}
 
-	// Pass-through the column description.
+	// Pass-through the column nullability and description.
+	schema.nullable = column.IsNullable
 	if column.Description != nil {
 		schema.description = *column.Description
 	}
