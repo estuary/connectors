@@ -5,12 +5,20 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/stretchr/testify/require"
 )
+
+func TestVarcharKeyDiscovery(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "42325208"
+	tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(id VARCHAR(32) PRIMARY KEY, data TEXT)"))
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+}
 
 // TestCollatedCapture runs a complete capture from a table with a `VARCHAR
 // COLLATE SQL_Latin1_General_CP1_CI_AS` primary key, with key values which
@@ -107,16 +115,19 @@ func TestColumnCollations(t *testing.T) {
 			require.NoError(t, err)
 			defer resultRows.Close()
 
+			// Simulate what we'd end up with after all the discovery->backfill plumbing.
+			var keyColumns = []string{"id"}
+			var columnTypes = map[string]any{
+				"id":   &sqlserverTextColumnType{strings.ToLower(tc.ColumnType), tc.CollationName},
+				"data": &sqlserverTextColumnType{"text", "SQL_Latin1_General_CP1_CI_AS"},
+			}
+
 			var prevID string
 			var prevKey []byte
 			for resultRows.Next() {
 				var id, data string
 				require.NoError(t, resultRows.Scan(&id, &data))
-				var rowKey, err = sqlcapture.EncodeRowKey(
-					[]string{"id"},
-					map[string]any{"id": id, "data": data},
-					map[string]any{},
-					encodeKeyFDB)
+				var rowKey, err = sqlcapture.EncodeRowKey(keyColumns, map[string]any{"id": id, "data": data}, columnTypes, encodeKeyFDB)
 				require.NoError(t, err)
 
 				if bytes.Compare(prevKey, rowKey) >= 0 {
