@@ -549,6 +549,11 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 			listenClient = nil
 			numDocuments = 0
 			time.Sleep(retryInterval)
+
+			isCurrent = false
+			catchupStreaming = true
+			catchupStarted = time.Now()
+			c.streamsInCatchup.Add(1)
 			continue
 		} else if err != nil {
 			return fmt.Errorf("error streaming %q changes: %w", collectionID, err)
@@ -569,8 +574,15 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 						"readTime": ts,
 						"docs":     numDocuments,
 					}).Debug("consistent point reached")
-					catchupStreaming = false
-					c.streamsInCatchup.Done()
+					if catchupStreaming {
+						logEntry.WithFields(log.Fields{
+							"readTime": ts,
+							"docs":     numDocuments,
+						}).Info("stream caught up")
+						catchupStreaming = false
+						c.streamsInCatchup.Done()
+					}
+					target.ResumeType = &firestore_pb.Target_ReadTime{ReadTime: tc.ReadTime}
 					if checkpointJSON, err := c.State.UpdateReadTimes(collectionID, tc.ReadTime.AsTime()); err != nil {
 						return err
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
