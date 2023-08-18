@@ -83,6 +83,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		Output: stream,
 
 		backfillSemaphore: semaphore.NewWeighted(concurrentBackfills),
+		streamsInCatchup:  new(sync.WaitGroup),
 	}
 	return capture.Run(stream.Context())
 }
@@ -93,6 +94,7 @@ type capture struct {
 	Output *boilerplate.PullOutput
 
 	backfillSemaphore *semaphore.Weighted
+	streamsInCatchup  *sync.WaitGroup
 }
 
 type captureState struct {
@@ -314,6 +316,7 @@ func (c *capture) Run(ctx context.Context) error {
 	for collectionID, startTime := range watchCollections {
 		var collectionID, startTime = collectionID, startTime // Copy the loop variables for each closure
 		log.WithField("collection", collectionID).Debug("starting worker")
+		c.streamsInCatchup.Add(1)
 		eg.Go(func() error {
 			return c.StreamChanges(ctx, rpcClient, collectionID, startTime)
 		})
@@ -387,6 +390,13 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 		if err := c.backfillSemaphore.Acquire(ctx, 1); err != nil {
 			return err
 		}
+
+		// Block any further backfill work so long as any StreamChanges workers are
+		// not fully caught up. Async backfills are not time-critical -- while it's
+		// nice for them to finish as quickly as they can, nothing major will break
+		// if a backfill takes a bit longer. Change streaming however *must* always
+		// remain fully caught up or Very Bad Things happen.
+		c.streamsInCatchup.Wait()
 
 		var query firestore.Query = client.CollectionGroup(collectionID).Query
 		if cursor != nil {
@@ -560,6 +570,7 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 						"docs":     numDocuments,
 					}).Debug("consistent point reached")
 					catchupStreaming = false
+					c.streamsInCatchup.Done()
 					if checkpointJSON, err := c.State.UpdateReadTimes(collectionID, tc.ReadTime.AsTime()); err != nil {
 						return err
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
