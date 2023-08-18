@@ -36,7 +36,7 @@ const watchTargetID = 1245678
 
 // Non-permanent failures like Unavailable or ResourceExhausted can be retried
 // after a little while.
-const retryInterval = 300 * time.Second
+const retryInterval = 60 * time.Second
 
 // Log progress messages after every N documents on a particular stream
 const progressLogInterval = 10000
