@@ -280,7 +280,12 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 			}
 		} else if errors.As(err, &netOpErr) {
 			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
+				errStr := `connection to host at address %q timed out, possible causes:
+	* Redshift endpoint is not set to be publicly accessible
+	* there is no inbound rule allowing Estuary's IP address to connect through the Redshift VPC security group
+	* the configured address is incorrect, possibly with an incorrect host or port
+	* if connecting through an SSH tunnel, the SSH bastion server may not be operational, or the connection details are incorrect`
+				err = fmt.Errorf(errStr, cfg.Address)
 			}
 		}
 
