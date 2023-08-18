@@ -18,6 +18,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 	firestore_pb "google.golang.org/genproto/googleapis/firestore/v1"
@@ -81,7 +82,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		},
 		Output: stream,
 
-		backfillSemaphore: make(chan struct{}, concurrentBackfills),
+		backfillSemaphore: semaphore.NewWeighted(concurrentBackfills),
 	}
 	return capture.Run(stream.Context())
 }
@@ -91,7 +92,7 @@ type capture struct {
 	State  *captureState
 	Output *boilerplate.PullOutput
 
-	backfillSemaphore chan struct{}
+	backfillSemaphore *semaphore.Weighted
 }
 
 type captureState struct {
@@ -373,15 +374,19 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 	// will correctly release it. Then before each query we *release and
 	// reacquire* the semaphore to give other backfills a chance to make
 	// progress.
-	c.backfillSemaphore <- struct{}{}
-	defer func() { <-c.backfillSemaphore }()
+	if err := c.backfillSemaphore.Acquire(ctx, 1); err != nil {
+		return err
+	}
+	defer c.backfillSemaphore.Release(1)
 
 	var numDocuments int
 	for {
 		// Give other backfills a chance to acquire the semaphore, then take
 		// it back for ourselves.
-		<-c.backfillSemaphore
-		c.backfillSemaphore <- struct{}{}
+		c.backfillSemaphore.Release(1)
+		if err := c.backfillSemaphore.Acquire(ctx, 1); err != nil {
+			return err
+		}
 
 		var query firestore.Query = client.CollectionGroup(collectionID).Query
 		if cursor != nil {
