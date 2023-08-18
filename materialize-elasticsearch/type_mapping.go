@@ -56,7 +56,7 @@ func propForProjection(p *pf.Projection) property {
 		}
 
 		switch f := p.Inference.String_.Format; f {
-		// Formats for "integer" and "number" are handle above.
+		// Formats for "integer" and "number" are handled above.
 		case "date":
 			return property{Type: elasticTypeDate}
 		case "date-time":

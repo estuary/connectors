@@ -7,11 +7,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	// Elasticsearch does not allow keys longer than 512 bytes, so a 1MB batch will allow for at least
+	// ~2,000 keys.
+	loadBatchSize = 1 * 1024 * 1024 // Bytes
+	loadWorkers   = 5
+
+	// These parameters are used for the BulkIndexer that the Elasticsearch SDK provides.
+	storeBatchSize = 512 * 1024 // Bytes
+	storeWorkers   = 5
 )
 
 type binding struct {
@@ -35,38 +47,36 @@ type transactor struct {
 	indexToBinding map[string]int
 }
 
-// Elasticsearch does not allow keys longer than 512 bytes, so a 5MB batch will allow for at least
-// ~10,000 keys. It would theoretically be possible to use a streaming JSON encoder and write
-// directly to the bulk GET request body to avoid buffering anything in memory, but there is a hard
-// limit of 100MB on request body sizes so it would need some extra handling anyway, and it might
-// actually be more efficient to pipeline requests to Elastic with reading the store iterator since
-// we aren't working with a system capable with read committed semantics.
-const loadBatchSize = 5 * 1024 * 1024
-
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
 
-	// Pipeline reading load requests with query execution. In the future we might want to
-	// investigate increasing the concurrency of the loadBatch workers as a potential throughput
-	// optimization.
+	var mu sync.Mutex
+	loadFn := func(b int, d json.RawMessage) error {
+		mu.Lock()
+		defer mu.Unlock()
+		return loaded(b, d)
+	}
+
 	batchCh := make(chan []getDoc)
 	group, groupCtx := errgroup.WithContext(ctx)
-	group.Go(func() error {
-		for {
-			select {
-			case <-groupCtx.Done():
-				return groupCtx.Err()
-			case batch := <-batchCh:
-				if batch == nil { // Channel was closed
-					return nil
-				}
+	for idx := 0; idx < loadWorkers; idx++ {
+		group.Go(func() error {
+			for {
+				select {
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				case batch := <-batchCh:
+					if batch == nil { // Channel was closed
+						return nil
+					}
 
-				if err := t.loadDocs(ctx, batch, loaded); err != nil {
-					return err
+					if err := t.loadDocs(ctx, batch, loadFn); err != nil {
+						return err
+					}
 				}
 			}
-		}
-	})
+		})
+	}
 
 	gotAck := false
 	sendBatch := func(b []getDoc) {
@@ -80,8 +90,6 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 
 	var batch []getDoc
-	batchSize := 0
-
 	for it.Next() {
 		select {
 		case <-groupCtx.Done():
@@ -93,12 +101,10 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 				Index:  t.bindings[it.Binding].index,
 				Source: t.bindings[it.Binding].docField,
 			})
-			batchSize += len(id)
 
-			if batchSize > loadBatchSize {
+			if len(batch) > loadBatchSize {
 				sendBatch(batch)
 				batch = nil
-				batchSize = 0
 			}
 		}
 	}
@@ -115,11 +121,10 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	ctx := it.Context()
 	errCh := make(chan error, 1)
 
-	// Note: The BulkIndexer has a default flush size of 5MB, which should work pretty well for
-	// keeping memory usage reasonable. The default number of workers is equal to runtime.NumCPU(),
-	// which should also work well, but may be something to adjust in the future.
 	indexer, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
-		Client: t.client.es,
+		NumWorkers: storeWorkers,
+		FlushBytes: storeBatchSize,
+		Client:     t.client.es,
 		OnError: func(_ context.Context, err error) {
 			log.WithField("error", err.Error()).Error("bulk indexer error")
 
@@ -188,7 +193,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			id = base64.RawStdEncoding.EncodeToString(it.PackedKey)
 		}
 
-		// The "create" action will fail if and item by the provided ID already exists, and "index"
+		// The "create" action will fail if an item by the provided ID already exists, and "index"
 		// is like a PUT where it will create or replace. We could just use "index" all the time,
 		// but using "create" when we believe the item does not already exist provides a bit of
 		// extra consistency checking.
