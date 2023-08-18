@@ -18,6 +18,7 @@ import (
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/api/option"
 )
 
@@ -141,8 +142,8 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 
 type discoveryState struct {
 	client        *firestore.Client
-	scanners      *errgroup.Group // Contains all scanner goroutines launched during discovery.
-	scanSemaphore chan struct{}   // Semaphore channel used to limit number of concurrent scanners
+	scanners      *errgroup.Group     // Contains all scanner goroutines launched during discovery.
+	scanSemaphore *semaphore.Weighted // Semaphore used to limit number of concurrent scanners
 
 	// Mutex-guarded state which may be modified from within worker goroutines.
 	shared struct {
@@ -158,7 +159,7 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.R
 	var state = &discoveryState{
 		client:        client,
 		scanners:      scanners,
-		scanSemaphore: make(chan struct{}, discoverConcurrentScanners),
+		scanSemaphore: semaphore.NewWeighted(discoverConcurrentScanners),
 	}
 	state.shared.counts = make(map[resourcePath]int)
 	state.shared.resources = make(map[resourcePath]struct{})
@@ -219,8 +220,10 @@ func (ds *discoveryState) discoverCollection(ctx context.Context, coll *firestor
 	})
 
 	// Acquire one of the scanner semaphores before doing any further work
-	ds.scanSemaphore <- struct{}{}
-	defer func() { <-ds.scanSemaphore }()
+	if err := ds.scanSemaphore.Acquire(ctx, 1); err != nil {
+		return err
+	}
+	defer ds.scanSemaphore.Release(1)
 
 	// Note the existence of this resource.
 	ds.shared.Lock()
