@@ -449,7 +449,6 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 }
 
 type transactor struct {
-	unionSQL string
 	fence    sql.Fence
 	bindings []*binding
 	cfg      *config
@@ -502,13 +501,6 @@ func newTransactor(
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
-
-	// Build a query which unions the results of each load subquery.
-	var subqueries []string
-	for _, b := range d.bindings {
-		subqueries = append(subqueries, b.loadQuerySQL)
-	}
-	d.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 
 	return d, nil
 }
@@ -662,10 +654,15 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 	defer txn.Rollback(ctx)
 
+	var subqueries []string
 	for idx, b := range d.bindings {
-		// The temporary load table for each binding always needs to be created because it is used
-		// in the UNION ALL load query. This may be an opportunity for a (minor) future
-		// optimization.
+		if !b.loadFile.started {
+			// No loads for this binding.
+			continue
+		}
+
+		subqueries = append(subqueries, b.loadQuerySQL)
+
 		var createLoadTableSQL strings.Builder
 		if err := b.createLoadTableTemplate.Execute(&createLoadTableSQL, loadTableParams{
 			Target:        b.target,
@@ -674,11 +671,6 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			return fmt.Errorf("evaluating create load table template: %w", err)
 		} else if _, err := txn.Exec(ctx, createLoadTableSQL.String()); err != nil {
 			return fmt.Errorf("creating load table for target table '%s': %w", b.target.Identifier, err)
-		}
-
-		if !b.loadFile.started {
-			// No loads for this binding.
-			continue
 		}
 
 		objectLocation, delete, err := b.loadFile.flush()
@@ -702,7 +694,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
-	rows, err := txn.Query(ctx, d.unionSQL)
+	loadAllSQL := strings.Join(subqueries, "\nUNION ALL\n") + ";"
+	rows, err := txn.Query(ctx, loadAllSQL)
 	if err != nil {
 		return fmt.Errorf("querying load documents: %w", err)
 	}
