@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"crypto/x509"
+	"crypto/tls"
 	"bytes"
 	"io"
 	"encoding/base64"
@@ -58,6 +60,10 @@ type config struct {
 
 type advancedConfig struct {
 	SSLMode string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disabled,enum=preferred,enum=required,enum=verify_ca,enum=verify_identity"`
+
+	SSLServerCA string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=Optional server certificate authority to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
+	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional client certificate to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
+	SSLClientKey string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=Optional client key to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 }
 
 // Validate the configuration.
@@ -79,6 +85,67 @@ func (c *config) Validate() error {
 			return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", c.Advanced.SSLMode)
 		}
 	}
+
+	if (c.Advanced.SSLMode == "verify_ca" || c.Advanced.SSLMode == "verify_identity") && c.Advanced.SSLServerCA == "" {
+		return fmt.Errorf("ssl_server_ca is required when using `verify_ca` and `verify_identity` modes.")
+	}
+
+	return nil
+}
+
+const customSSLConfigName = "custom"
+func registerCustomSSL(c *config) error {
+	// Use the provided Server CA to create a root cert pool
+	var rootCertPool = x509.NewCertPool();
+	var rawServerCert = []byte(c.Advanced.SSLServerCA)
+	if ok := rootCertPool.AppendCertsFromPEM(rawServerCert); !ok {
+		return fmt.Errorf("failed to append PEM, this usually means the PEM is not correctly formatted.")
+	}
+
+	// By default, Go's tls implementation verifies both the validity of the
+	// server certificate against the CA, and the hostname
+
+	// In case of `verify_ca`, we want to verify the server certificate
+	// against the given Server CA, but we do not want to verify the identity of
+	// the server (the hostname). This is useful when connecting to an IP address
+	// So we mark the request as `insecure`, and provide our own implementation
+	// for verifying the server cert against the provided server CA
+	var insecure = c.Advanced.SSLMode == "verify_ca"
+	var customVerify func (rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
+
+	if c.Advanced.SSLMode == "verify_ca" {
+		customVerify = func (rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+			opts := x509.VerifyOptions{
+					Roots: rootCertPool,
+			}
+			for _, rawCert := range rawCerts {
+					cert, _ := x509.ParseCertificate(rawCert)
+					if _, err := cert.Verify(opts); err != nil {
+						return err
+					}
+			}
+			return nil
+		}
+	}
+
+	var customClientCerts []tls.Certificate
+	if c.Advanced.SSLClientCert != "" {
+		var rawClientCert = []byte(c.Advanced.SSLClientCert)
+		var rawClientKey = []byte(c.Advanced.SSLClientKey)
+		certs, err := tls.X509KeyPair(rawClientCert, rawClientKey)
+		if err != nil {
+			return fmt.Errorf("creating certificate from provided input: %w", err)
+		}
+
+		customClientCerts = []tls.Certificate{certs}
+	}
+
+	mysql.RegisterTLSConfig(customSSLConfigName, &tls.Config{
+		RootCAs: rootCertPool,
+		Certificates: customClientCerts,
+		InsecureSkipVerify: insecure,
+		VerifyPeerCertificate: customVerify,
+	})
 
 	return nil
 }
@@ -107,7 +174,18 @@ func (c *config) ToURI() string {
 	}
 	var params = make(url.Values)
 	if c.Advanced.SSLMode != "" {
-		params.Set("sslmode", c.Advanced.SSLMode)
+		// see https://pkg.go.dev/github.com/go-sql-driver/mysql#section-readme
+		var tlsConfigMap = map[string]string{
+			"required": "skip-verify",
+			"disabled": "false",
+			"preferred": "preferred",
+			"verify_ca": "custom",
+			"verify_identity": "custom",
+		}
+
+		var tlsMode = tlsConfigMap[c.Advanced.SSLMode]
+
+		params.Set("tls", tlsMode)
 	}
 	params.Set("time_zone", "'+00:00'")
 	if len(params) > 0 {
@@ -188,6 +266,13 @@ func newMysqlDriver() *sql.Driver {
 				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
 				if err := tunnel.Start(); err != nil {
 					return nil, fmt.Errorf("error starting network tunnel: %w", err)
+				}
+			}
+
+
+			if cfg.Advanced.SSLMode == "verify_ca" || cfg.Advanced.SSLMode == "verify_identity" {
+				if err := registerCustomSSL(cfg); err != nil {
+					return nil, fmt.Errorf("error registering custom ssl: %w", err)
 				}
 			}
 

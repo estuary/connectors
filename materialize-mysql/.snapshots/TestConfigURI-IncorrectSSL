@@ -1,2 +1,2 @@
-will:secret1234@tcp(example.com:3306)/somedb?sslmode=whoops-this-isnt-right&time_zone=%27%2B00%3A00%27
+will:secret1234@tcp(example.com:3306)/somedb?time_zone=%27%2B00%3A00%27&tls=
 invalid 'sslmode' configuration: unknown setting "whoops-this-isnt-right"

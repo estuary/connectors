@@ -41,6 +41,27 @@
             ],
             "title": "SSL Mode",
             "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
+          },
+          "ssl_server_ca": {
+            "type": "string",
+            "title": "SSL Server CA",
+            "description": "Optional server certificate authority to use when connecting with custom SSL mode.",
+            "multiline": true,
+            "secret": true
+          },
+          "ssl_client_cert": {
+            "type": "string",
+            "title": "SSL Client Certificate",
+            "description": "Optional client certificate to use when connecting with custom SSL mode.",
+            "multiline": true,
+            "secret": true
+          },
+          "ssl_client_key": {
+            "type": "string",
+            "title": "SSL Client Key",
+            "description": "Optional client key to use when connecting with custom SSL mode.",
+            "multiline": true,
+            "secret": true
           }
         },
         "additionalProperties": false,
