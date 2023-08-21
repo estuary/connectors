@@ -158,6 +158,7 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: |
           contains(fromJson('[
+            "materialize-elasticsearch",
             "source-dynamodb",
             "source-mysql",
             "source-postgres",
