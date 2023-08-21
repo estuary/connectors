@@ -15,8 +15,13 @@ COPY go                        ./go
 COPY materialize-boilerplate   ./materialize-boilerplate
 COPY materialize-elasticsearch ./materialize-elasticsearch
 
-# Test and build the connector.
-RUN go test  -tags nozstd -v ./materialize-elasticsearch/...
+# Run automated tests. To skip tests which interact with an external database,
+# specify `--build-arg TEST_DATABASE=no` in the Docker command line.
+ARG TEST_DATABASE=yes
+ENV TEST_DATABASE=$TEST_DATABASE
+RUN go test -tags nozstd -v ./materialize-elasticsearch/...
+
+# Build the connector.
 RUN go build -tags nozstd -v -o ./connector ./materialize-elasticsearch
 
 # Runtime Stage
