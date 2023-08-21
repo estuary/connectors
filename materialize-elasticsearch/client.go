@@ -22,30 +22,14 @@ type client struct {
 	es *elasticsearch.Client
 }
 
-func (c config) toClient() (*client, error) {
-	es, err := elasticsearch.NewClient(
-		elasticsearch.Config{
-			Addresses: []string{c.Endpoint},
-			Username:  c.Credentials.Username,
-			Password:  c.Credentials.Password,
-			APIKey:    c.Credentials.ApiKey,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("creating client: %w", err)
-	}
-
-	return &client{es: es}, nil
-}
-
-func (c *client) createMetaIndex(ctx context.Context) error {
+func (c *client) createMetaIndex(ctx context.Context, replicas *int) error {
 	props := map[string]property{
 		"version":   {Type: elasticTypeKeyword},
 		"specBytes": {Type: elasticTypeBinary},
 	}
 
 	numShards := 1
-	return c.createIndex(ctx, defaultFlowMaterializations, &numShards, nil, props)
+	return c.createIndex(ctx, defaultFlowMaterializations, &numShards, replicas, props)
 }
 
 func (c *client) putSpec(ctx context.Context, spec *pf.MaterializationSpec, version string) error {

@@ -28,7 +28,7 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector /connector/materialize-elasticsearch
-COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
+COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
