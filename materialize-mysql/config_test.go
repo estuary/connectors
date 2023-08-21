@@ -43,6 +43,18 @@ func TestMySQLConfig(t *testing.T) {
 	var noDatabase = validConfig
 	noDatabase.Database = ""
 	require.Error(t, noDatabase.Validate(), "expected validation error")
+
+	var sslVerifyCA = validConfig
+	sslVerifyCA.Advanced.SSLMode = "verify_ca"
+	require.Error(t, sslVerifyCA.Validate(), "expected validation error")
+	sslVerifyCA.Advanced.SSLServerCA = "some_value"
+	require.NoError(t, sslVerifyCA.Validate())
+
+	var sslVerifyIdentity = validConfig
+	sslVerifyIdentity.Advanced.SSLMode = "verify_identity"
+	require.Error(t, sslVerifyIdentity.Validate(), "expected validation error")
+	sslVerifyIdentity.Advanced.SSLServerCA = "some_value"
+	require.NoError(t, sslVerifyIdentity.Validate())
 }
 
 func TestSpecification(t *testing.T) {
@@ -70,7 +82,7 @@ func TestConfigURI(t *testing.T) {
 			Password: "secret1234",
 			Database: "somedb",
 			Advanced: advancedConfig{
-				SSLMode: "verify_identity",
+				SSLMode: "preferred",
 			},
 		},
 		"IncorrectSSL": {
