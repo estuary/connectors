@@ -596,7 +596,7 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 				}
 			case firestore_pb.TargetChange_REMOVE:
 				if catchupStreaming && time.Since(catchupStarted) > 5*time.Minute {
-					logEntry.Warn("replication failed to catch up in time, collection suspended until restart (go.estuary.dev/YRDsKd)")
+					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up in time, collection suspended until restart (go.estuary.dev/YRDsKd)")
 					return nil
 				}
 				if tc.Cause != nil {
