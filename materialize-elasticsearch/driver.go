@@ -7,16 +7,28 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	elasticsearch "github.com/elastic/go-elasticsearch/v8"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
+
+type sshForwarding struct {
+	SshEndpoint string `json:"sshEndpoint"`
+	PrivateKey  string `json:"privateKey"`
+}
+
+type tunnelConfig struct {
+	SshForwarding *sshForwarding `json:"sshForwarding,omitempty"`
+}
 
 // credentials is a union representing either an api key or a username/password.
 // It's allowed for all credentials to be missing, which is used for connecting to servers
@@ -28,8 +40,15 @@ type credentials struct {
 }
 
 type config struct {
-	Credentials credentials `json:"credentials"`
-	Endpoint    string      `json:"endpoint"`
+	Credentials credentials    `json:"credentials"`
+	Endpoint    string         `json:"endpoint"`
+	Advanced    advancedConfig `json:"advanced,omitempty"`
+
+	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty"`
+}
+
+type advancedConfig struct {
+	Replicas *int `json:"number_of_replicas,omitempty"`
 }
 
 // The `go-schema-gen` package doesn't have a good way of dealing with oneOf, and I couldn't get it
@@ -37,63 +56,110 @@ type config struct {
 // instead of being generated from the structs.
 func configSchema() json.RawMessage {
 	var schemaStr = `{
-  "$schema": "http://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/estuary/connectors/materialize-elasticsearch/config",
-  "properties": {
-    "endpoint": {
-      "type": "string",
-      "title": "Endpoint",
-      "description": "Endpoint host or URL. Must start with http:// or https://. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
-      "order": 0
-    },
-    "credentials": {
-      "type": "object",
-      "oneOf": [
-        {
-          "type": "object",
-          "title": "Username and Password",
-          "properties": {
-            "username": {
-              "type": "string",
-              "title": "Username",
-              "description": "Username to use with the Elasticsearch API."
-            },
-            "password": {
-              "type": "string",
-              "secret": true,
-              "title": "Password",
-              "description": "Password for the user."
-            }
-          },
-          "required": [
-            "username",
-            "password"
-          ]
-        },
-        {
-          "type": "object",
-          "title": "API Key",
-          "properties": {
-            "apiKey": {
-              "type": "string",
-              "secret": true,
-              "title": "API Key",
-              "description": "API key for authenticating with the Elasticsearch API. Must be the 'encoded' API key credentials, which is the Base64-encoding of the UTF-8 representation of the id and api_key joined by a colon (:)."
-            }
-          },
-          "required": [
-            "apiKey"
-          ]
-        }
-      ]
-    }
-  },
-  "type": "object",
-  "required": [
-    "endpoint"
-  ],
-  "title": "Elasticsearch Connection"
-}`
+		"$schema": "http://json-schema.org/draft/2020-12/schema",
+		"$id": "https://github.com/estuary/connectors/materialize-elasticsearch/config",
+		"properties": {
+		  "endpoint": {
+			"type": "string",
+			"title": "Endpoint",
+			"description": "Endpoint host or URL. Must start with http:// or https://. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
+			"pattern": "^(http://|https://).+$",
+			"order": 0
+		  },
+		  "credentials": {
+			"type": "object",
+			"order": 1,
+			"oneOf": [
+			  {
+				"type": "object",
+				"title": "Username and Password",
+				"properties": {
+				  "username": {
+					"type": "string",
+					"title": "Username",
+					"description": "Username to use with the Elasticsearch API."
+				  },
+				  "password": {
+					"type": "string",
+					"secret": true,
+					"title": "Password",
+					"description": "Password for the user."
+				  }
+				},
+				"required": [
+				  "username",
+				  "password"
+				]
+			  },
+			  {
+				"type": "object",
+				"title": "API Key",
+				"properties": {
+				  "apiKey": {
+					"type": "string",
+					"secret": true,
+					"title": "API Key",
+					"description": "API key for authenticating with the Elasticsearch API. Must be the 'encoded' API key credentials, which is the Base64-encoding of the UTF-8 representation of the id and api_key joined by a colon (:)."
+				  }
+				},
+				"required": [
+				  "apiKey"
+				]
+			  }
+			]
+		  },
+		  "advanced": {
+			"properties": {
+			  "number_of_replicas": {
+				"type": "integer",
+				"title": "Index Replicas",
+				"description": "The number of replicas to create new indexes with. Leave blank to use the cluster default."
+			  }
+			},
+			"type": "object",
+			"title": "Advanced Options",
+			"description": "Options for advanced users. You should not typically need to modify these.",
+			"advanced": true
+		  },
+		  "networkTunnel": {
+			"properties": {
+			  "sshForwarding": {
+				"properties": {
+				  "sshEndpoint": {
+					"type": "string",
+					"title": "SSH Endpoint",
+					"description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+					"pattern": "^ssh://.+@.+$"
+				  },
+				  "privateKey": {
+					"type": "string",
+					"title": "SSH Private Key",
+					"description": "Private key to connect to the remote SSH server.",
+					"multiline": true,
+					"secret": true
+				  }
+				},
+				"additionalProperties": false,
+				"type": "object",
+				"required": [
+				  "sshEndpoint",
+				  "privateKey"
+				],
+				"title": "SSH Forwarding"
+			  }
+			},
+			"additionalProperties": false,
+			"type": "object",
+			"title": "Network Tunnel",
+			"description": "Connect to your system through an SSH server that acts as a bastion host for your network."
+		  }
+		},
+		"type": "object",
+		"required": [
+		  "endpoint"
+		],
+		"title": "Elasticsearch Connection"
+	  }`
 	return json.RawMessage([]byte(schemaStr))
 }
 
@@ -133,16 +199,62 @@ func (c config) Validate() error {
 		return fmt.Errorf("missing Endpoint")
 	} else if !strings.HasPrefix(c.Endpoint, "http://") && !strings.HasPrefix(c.Endpoint, "https://") {
 		return fmt.Errorf("endpoint '%s' is invalid: must start with either http:// or https://", c.Endpoint)
+	} else if c.Advanced.Replicas != nil && *c.Advanced.Replicas < 0 {
+		return fmt.Errorf("number_of_replicas cannot be negative")
 	}
 
 	return c.Credentials.Validate()
+}
+
+// toClient initializes a client for connecting to Elasticsearch, starting the network tunnel if
+// configured.
+func (c config) toClient() (*client, error) {
+	endpoint := c.Endpoint
+
+	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
+	if c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "" {
+		u, err := url.Parse(c.Endpoint)
+		if err != nil {
+			return nil, fmt.Errorf("parsing endpoint URL: %w", err)
+		}
+
+		var sshConfig = &networkTunnel.SshConfig{
+			SshEndpoint: c.NetworkTunnel.SshForwarding.SshEndpoint,
+			PrivateKey:  []byte(c.NetworkTunnel.SshForwarding.PrivateKey),
+			ForwardHost: u.Hostname(),
+			ForwardPort: u.Port(),
+			LocalPort:   "9200",
+		}
+		var tunnel = sshConfig.CreateTunnel()
+
+		if err := tunnel.Start(); err != nil {
+			return nil, fmt.Errorf("error starting network tunnel: %w", err)
+		}
+
+		// If SSH Tunnel is configured, we are going to create a tunnel from localhost:9200 to
+		// address through the bastion server, so we use the tunnel's address.
+		endpoint = "http://localhost:9200"
+	}
+
+	es, err := elasticsearch.NewClient(
+		elasticsearch.Config{
+			Addresses: []string{endpoint},
+			Username:  c.Credentials.Username,
+			Password:  c.Credentials.Password,
+			APIKey:    c.Credentials.ApiKey,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating client: %w", err)
+	}
+
+	return &client{es: es}, nil
 }
 
 type resource struct {
 	Index        string `json:"index" jsonschema_extras:"x-collection-name=true"`
 	DeltaUpdates bool   `json:"delta_updates" jsonschema:"default=false"`
 	Shards       *int   `json:"number_of_shards,omitempty"`
-	Replicas     *int   `json:"number_of_replicas,omitempty"`
 }
 
 func (r resource) Validate() error {
@@ -150,8 +262,6 @@ func (r resource) Validate() error {
 		return fmt.Errorf("missing Index")
 	} else if r.Shards != nil && *r.Shards < 1 {
 		return fmt.Errorf("number_of_shards must be greater than 0")
-	} else if r.Replicas != nil && *r.Replicas < 0 {
-		return fmt.Errorf("number_of_replicas cannot be negative")
 	}
 
 	return nil
@@ -166,8 +276,6 @@ func (resource) GetFieldDocString(fieldName string) string {
 		return "Should updates to this table be done via delta updates. Default is false."
 	case "Shards":
 		return "The number of shards to create the index with. Leave blank to use the cluster default."
-	case "Replicas":
-		return "The number of replicas to create the index with. Leave blank to use the cluster default."
 	default:
 		return ""
 	}
@@ -312,7 +420,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	}
 
 	if err := doAction(fmt.Sprintf("create index '%s'", defaultFlowMaterializations), func() error {
-		return client.createMetaIndex(ctx)
+		return client.createMetaIndex(ctx, cfg.Advanced.Replicas)
 	},
 	); err != nil {
 		return nil, fmt.Errorf("creating metadata index")
@@ -340,7 +448,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 
 		if found == nil {
 			if err := doAction(fmt.Sprintf("create index '%s'", binding.ResourcePath[0]), func() error {
-				return client.createIndex(ctx, binding.ResourcePath[0], res.Shards, res.Replicas, buildIndexProperties(binding))
+				return client.createIndex(ctx, binding.ResourcePath[0], res.Shards, cfg.Advanced.Replicas, buildIndexProperties(binding))
 			}); err != nil {
 				return nil, fmt.Errorf("creating index '%s': %w", binding.ResourcePath[0], err)
 			}

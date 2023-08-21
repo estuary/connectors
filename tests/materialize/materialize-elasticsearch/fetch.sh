@@ -5,9 +5,9 @@ set -e
 function exportIndexToJsonl() {
     local index="$1"
 
-    curl -o /dev/null -s "${TEST_ES_LOCAL_ENDPOINT}/${index}/_refresh"
+    curl -u "${TEST_ES_USERNAME}":"${TEST_ES_PASSWORD}" -o /dev/null -s "${TEST_ES_LOCAL_ENDPOINT}/${index}/_refresh"
 
-    curl -s "${TEST_ES_LOCAL_ENDPOINT}/${index}/_search" |
+    curl -u "${TEST_ES_USERNAME}":"${TEST_ES_PASSWORD}" -s "${TEST_ES_LOCAL_ENDPOINT}/${index}/_search" |
         jq "[.hits | .hits[] | ._source ] | sort_by(.id, .flow_published_at) | { index: \"$index\", rows: . }"
 }
 

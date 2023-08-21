@@ -2,14 +2,24 @@ version: '3.7'
 
 services:
   db:
-    image: "docker.elastic.co/elasticsearch/elasticsearch:7.15.2"
+    image: "docker.elastic.co/elasticsearch/elasticsearch:8.9.0"
     # Uncomment the lines below (and comment out the one above) to force running an arm64 version of
     # the container if you are on an arm64 system. The linux/amd64 container basically
     # non-functional on darwin/arm64.
-    # image: "docker.elastic.co/elasticsearch/elasticsearch:7.15.2-arm64"
+    # image: "docker.elastic.co/elasticsearch/elasticsearch:8.9.0-arm64"
     # platform: linux/arm64
     environment:
       - "discovery.type=single-node"
+      - "ELASTIC_PASSWORD=elastic"
+      # The default security settings include generating a self-signed TLS certificate that clients
+      # must use for connecting over https. This is disabled here for ease of testing, and because
+      # production clusters should probably not be using self-signed certificates.
+      - "xpack.security.http.ssl.enabled=false"
+    healthcheck:
+      test: curl -u elastic:elastic -s http://localhost:9200 >/dev/null || exit 1
+      interval: 1s
+      timeout: 1s
+      retries: 60
     ports:
       - "9200:9200"
     networks:

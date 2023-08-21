@@ -7,10 +7,12 @@
         "type": "string",
         "title": "Endpoint",
         "description": "Endpoint host or URL. Must start with http:// or https://. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
+        "pattern": "^(http://|https://).+$",
         "order": 0
       },
       "credentials": {
         "type": "object",
+        "order": 1,
         "oneOf": [
           {
             "type": "object",
@@ -49,6 +51,51 @@
             ]
           }
         ]
+      },
+      "advanced": {
+        "properties": {
+          "number_of_replicas": {
+            "type": "integer",
+            "title": "Index Replicas",
+            "description": "The number of replicas to create new indexes with. Leave blank to use the cluster default."
+          }
+        },
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      },
+      "networkTunnel": {
+        "properties": {
+          "sshForwarding": {
+            "properties": {
+              "sshEndpoint": {
+                "type": "string",
+                "title": "SSH Endpoint",
+                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                "pattern": "^ssh://.+@.+$"
+              },
+              "privateKey": {
+                "type": "string",
+                "title": "SSH Private Key",
+                "description": "Private key to connect to the remote SSH server.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sshEndpoint",
+              "privateKey"
+            ],
+            "title": "SSH Forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Network Tunnel",
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
       }
     },
     "type": "object",
@@ -74,10 +121,6 @@
       "number_of_shards": {
         "type": "integer",
         "description": "The number of shards to create the index with. Leave blank to use the cluster default."
-      },
-      "number_of_replicas": {
-        "type": "integer",
-        "description": "The number of replicas to create the index with. Leave blank to use the cluster default."
       }
     },
     "type": "object",
