@@ -37,10 +37,25 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 
 	var catalog []*pc.Response_Discovered_Binding
 	for _, table := range tables {
+		// Filter out views and other entities whose type is not `BASE TABLE` from
+		// discovery output. This is part of a bugfix in August 2023 and should be
+		// removed once the database-specific discovery code in MySQL and SQL Server
+		// connectors can safely filter these out at the source.
+		if !table.BaseTable {
+			logrus.WithFields(logrus.Fields{
+				"table":      table.Name,
+				"namespace":  table.Schema,
+				"primaryKey": table.PrimaryKey,
+				"baseTable":  table.BaseTable,
+			}).Warn("ignoring view or other non-BASE TABLE entity in discovery")
+			continue
+		}
+
 		logrus.WithFields(logrus.Fields{
 			"table":      table.Name,
 			"namespace":  table.Schema,
 			"primaryKey": table.PrimaryKey,
+			"baseTable":  table.BaseTable,
 		}).Debug("discovered table")
 
 		// The anchor by which we'll reference the table schema.

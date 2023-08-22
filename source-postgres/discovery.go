@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"time"
 	"fmt"
 	"net"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
@@ -53,7 +53,11 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
 		var info, ok = tableMap[streamID]
 		if !ok {
-			info = &sqlcapture.DiscoveryInfo{Schema: column.TableSchema, Name: column.TableName}
+			info = &sqlcapture.DiscoveryInfo{
+				Schema:    column.TableSchema,
+				Name:      column.TableName,
+				BaseTable: true, // PostgreSQL discovery queries only ever list 'BASE TABLE' entities
+			}
 		}
 
 		if info.Columns == nil {
