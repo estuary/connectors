@@ -16,19 +16,28 @@ import (
 )
 
 func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
+	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
+	var tables, err = getTables(ctx, db.conn)
+	if err != nil {
+		return nil, fmt.Errorf("error discovering tables: %w", err)
+	}
+	for _, table := range tables {
+		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+		tableMap[streamID] = table
+	}
+
 	// Enumerate every column of every table, and then aggregate into a
 	// map from StreamID to TableInfo structs.
-	var columns, err = getColumns(ctx, db.conn)
+	columns, err := getColumns(ctx, db.conn)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering columns: %w", err)
 	}
-	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
 	for _, column := range columns {
 		// Create or look up the appropriate TableInfo struct for a given schema+name
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
 		var info, ok = tableMap[streamID]
 		if !ok {
-			info = &sqlcapture.DiscoveryInfo{Schema: column.TableSchema, Name: column.TableName}
+			continue // Ignore information about excluded tables
 		}
 
 		// The 'Stream IDs' used for table info lookup are case insensitive, so we
@@ -56,11 +65,9 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcap
 		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
 	}
 	for id, key := range primaryKeys {
-		// The `getColumns()` query implements the "exclude system schemas" logic,
-		// so here we ignore primary key information for tables we don't care about.
 		var info, ok = tableMap[id]
 		if !ok {
-			continue
+			continue // Ignore information about excluded tables
 		}
 		info.PrimaryKey = key
 		tableMap[id] = info
@@ -287,11 +294,33 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 	return val, nil
 }
 
+const queryDiscoverTables = `
+  SELECT table_schema, table_name, table_type
+  FROM information_schema.tables
+  WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
+    AND table_schema != 'mysql' AND table_schema != 'sys';`
+
+func getTables(ctx context.Context, conn *client.Conn) ([]*sqlcapture.DiscoveryInfo, error) {
+	var results, err = conn.Execute(queryDiscoverTables)
+	if err != nil {
+		return nil, fmt.Errorf("error listing tables: %w", err)
+	}
+	defer results.Close()
+
+	var tables []*sqlcapture.DiscoveryInfo
+	for _, row := range results.Values {
+		tables = append(tables, &sqlcapture.DiscoveryInfo{
+			Schema:    string(row[0].AsString()),
+			Name:      string(row[1].AsString()),
+			BaseTable: strings.EqualFold(string(row[2].AsString()), "BASE TABLE"),
+		})
+	}
+	return tables, nil
+}
+
 const queryDiscoverColumns = `
   SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type
   FROM information_schema.columns
-  WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
-    AND table_schema != 'mysql' AND table_schema != 'sys'
   ORDER BY table_schema, table_name, ordinal_position;`
 
 func getColumns(ctx context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, error) {

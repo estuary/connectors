@@ -184,6 +184,7 @@ type DiscoveryInfo struct {
 	Columns     map[string]ColumnInfo // Information about each column of the table.
 	PrimaryKey  []string              // An ordered list of the column names which together form the table's primary key.
 	ColumnNames []string              // The names of all columns, in the table's natural order.
+	BaseTable   bool                  // True if the table type is 'BASE TABLE' and false for views or other not-physical-table entities.
 }
 
 // ColumnInfo holds metadata about a specific column of some table in the
