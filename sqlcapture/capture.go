@@ -282,6 +282,22 @@ func (c *Capture) updateState(ctx context.Context) error {
 			return fmt.Errorf("table %q is a configured binding of this capture, but doesn't exist or isn't visible with current permissions", streamID)
 		}
 
+		// Only real tables with table_type = 'BASE TABLE' can be captured via replication.
+		// Discovery should not suggest capturing from views, but there are an unknown
+		// number of preexisting captures which may have views in their bindings, and we
+		// would rather silently start ignoring these rather than making them immediately
+		// be errors.
+		//
+		// This bit of logic is part of a bugfix in August 2023 and we would like to
+		// remove it in the future once it will not break any otherwise-successful
+		// captures.
+		if !discoveryInfo.BaseTable {
+			logrus.WithField("stream", streamID).Warn("automatically ignoring a binding whose type is not `BASE TABLE`")
+			if _, ok := c.State.Streams[streamID]; ok {
+				c.State.Streams[streamID] = &TableState{Mode: TableModeIgnore, dirty: true}
+			}
+		}
+
 		// Select the primary key from the first available source. In order of priority:
 		//   - If the resource config specifies a primary key override then we'll use that.
 		//   - Normally we'll use the primary key from the collection spec.
