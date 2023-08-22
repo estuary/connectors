@@ -433,7 +433,7 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 	var idleIsBad = watermark != nonexistentWatermark
 	var diagnosticsTimeout = time.AfterFunc(5*time.Minute, func() {
 		if idleIsBad {
-			logrus.WithField("timeout", streamIdleWarning.String()).Warn("replication streaming has been ongoing for an atypically long amount of time, running replication diagnostics")
+			logrus.Warn("replication streaming has been ongoing for an atypically long amount of time, running replication diagnostics")
 			if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
 				logrus.WithField("err", err).Error("replication diagnostics error")
 			}
