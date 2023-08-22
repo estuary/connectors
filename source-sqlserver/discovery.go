@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
@@ -12,8 +13,12 @@ import (
 
 // DiscoverTables queries the database for information about tables available for capture.
 func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
-	// Get lists of all columns and primary keys in the database
-	var columns, err = getColumns(ctx, db.conn)
+	// Get lists of all tables, columns and primary keys in the database
+	var tables, err = getTables(ctx, db.conn)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database tables: %w", err)
+	}
+	columns, err := getColumns(ctx, db.conn)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database columns: %w", err)
 	}
@@ -29,11 +34,15 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[string]*sq
 	// Aggregate column information into DiscoveryInfo structs using a map
 	// from fully-qualified table names to the corresponding info.
 	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
+	for _, table := range tables {
+		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+		tableMap[streamID] = table
+	}
 	for _, column := range columns {
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
 		var info, ok = tableMap[streamID]
 		if !ok {
-			info = &sqlcapture.DiscoveryInfo{Schema: column.TableSchema, Name: column.TableName}
+			continue
 		}
 
 		// The 'Stream IDs' used for table info lookup are case insensitive, so we
@@ -109,12 +118,38 @@ func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnName
 	return true
 }
 
+const queryDiscoverTables = `
+  SELECT table_schema, table_name, table_type
+  FROM information_schema.tables
+  WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
+    AND table_schema != 'sys' AND table_schema != 'cdc'
+	AND table_name != 'systranschemas';`
+
+func getTables(ctx context.Context, conn *sql.DB) ([]*sqlcapture.DiscoveryInfo, error) {
+	rows, err := conn.QueryContext(ctx, queryDiscoverTables)
+	if err != nil {
+		return nil, fmt.Errorf("error listing tables: %w", err)
+	}
+	defer rows.Close()
+
+	var tables []*sqlcapture.DiscoveryInfo
+	for rows.Next() {
+		var tableSchema, tableName, tableType string
+		if err := rows.Scan(&tableSchema, &tableName, &tableType); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+		tables = append(tables, &sqlcapture.DiscoveryInfo{
+			Schema:    tableSchema,
+			Name:      tableName,
+			BaseTable: strings.EqualFold(tableType, "BASE TABLE"),
+		})
+	}
+	return tables, nil
+}
+
 const queryDiscoverColumns = `
   SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type
   FROM information_schema.columns
-  WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
-    AND table_schema != 'sys' AND table_schema != 'cdc'
-	AND table_name != 'systranschemas'
   ORDER BY table_schema, table_name, ordinal_position;`
 
 func getColumns(ctx context.Context, conn *sql.DB) ([]sqlcapture.ColumnInfo, error) {
