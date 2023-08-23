@@ -932,6 +932,13 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 // is available to both serverless and provisioned versions of Redshift, whereas `stl_load_errors`
 // is only available on provisioned Redshift.
 func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, objectLocation string, table string, copyIntoErr error) error {
+	if strings.Contains(copyIntoErr.Error(), "Cannot COPY into nonexistent table") {
+		// If the target table does not exist, there will be no information in
+		// `sys_load_error_detail`, and the error message from Redshift is good enough as-is to
+		// spell out the reason and table involved in the error.
+		return copyIntoErr
+	}
+
 	// The transaction has failed. It must be finish being rolled back before using its underlying
 	// connection again.
 	txn.Rollback(ctx)
