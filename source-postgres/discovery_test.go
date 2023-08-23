@@ -87,3 +87,29 @@ func TestSecondaryIndexDiscovery(t *testing.T) {
 		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
 	})
 }
+
+func TestDiscoveryExcludesSystemSchemas(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(`(information_schema|pg_catalog)`))
+}
+
+func TestPartitionedTableDiscovery(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "27339326"
+	var rootName = tb.CreateTable(ctx, t, uniqueID, "(logdate DATE PRIMARY KEY, value TEXT) PARTITION BY RANGE (logdate)")
+
+	var cleanup = func() {
+		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s_2023q1;`, rootName))
+		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s_2023q2;`, rootName))
+		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s_2023q3;`, rootName))
+		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s_2023q4;`, rootName))
+	}
+	cleanup()
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_2023q1 PARTITION OF %[1]s FOR VALUES FROM ('2023-01-01') TO ('2023-04-01');`, rootName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_2023q2 PARTITION OF %[1]s FOR VALUES FROM ('2023-04-01') TO ('2023-07-01');`, rootName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_2023q3 PARTITION OF %[1]s FOR VALUES FROM ('2023-07-01') TO ('2023-10-01');`, rootName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_2023q4 PARTITION OF %[1]s FOR VALUES FROM ('2023-10-01') TO ('2024-01-01');`, rootName))
+	t.Cleanup(cleanup)
+
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+}
