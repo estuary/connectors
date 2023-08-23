@@ -468,6 +468,12 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	switch stmt := stmt.(type) {
 	case *sqlparser.CreateDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
 		logrus.WithField("query", query).Debug("ignoring benign query")
+	case *sqlparser.DropDatabase:
+		// Remember that In MySQL land "database" is a synonym for the usual SQL concept "schema"
+		if rs.schemaActive(stmt.GetDatabaseName()) {
+			return fmt.Errorf("cannot handle query %q: schema %q is actively being captured", query, stmt.GetDatabaseName())
+		}
+		logrus.WithField("query", query).Debug("ignorable dropped schema (not being captured from)")
 	case *sqlparser.AlterTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
 			logrus.WithFields(logrus.Fields{
@@ -646,6 +652,27 @@ func (rs *mysqlReplicationStream) tableActive(streamID string) bool {
 	defer rs.tables.RUnlock()
 	var _, ok = rs.tables.active[streamID]
 	return ok
+}
+
+func (rs *mysqlReplicationStream) schemaActive(schema string) bool {
+	rs.tables.RLock()
+	defer rs.tables.RUnlock()
+	for streamID := range rs.tables.active {
+		var schemaName, _ = splitStreamID(streamID)
+		if strings.EqualFold(schemaName, schema) {
+			return true
+		}
+	}
+	return false
+}
+
+// splitStreamID is the inverse of JoinStreamID and splits a stream name back into
+// separate schema and table name components. Its use is generally kind of a hack
+// and suggests that the surrounding plumbing is probably subtly wrong, because the
+// normalization from schema+table to stream IDs is supposed to go one way only.
+func splitStreamID(streamID string) (string, string) {
+	var bits = strings.SplitN(streamID, ".", 2)
+	return bits[0], bits[1]
 }
 
 func (rs *mysqlReplicationStream) keyColumns(streamID string) ([]string, bool) {
