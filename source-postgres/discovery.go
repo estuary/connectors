@@ -24,8 +24,12 @@ const (
 
 // DiscoverTables queries the database for information about tables available for capture.
 func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
-	// Get lists of all columns and primary keys in the database
-	var columns, err = getColumns(ctx, db.conn)
+	// Get lists of all tables, columns and primary keys in the database
+	var tables, err = getTables(ctx, db.conn)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database tables: %w", err)
+	}
+	columns, err := getColumns(ctx, db.conn)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database columns: %w", err)
 	}
@@ -49,15 +53,15 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sql
 	// using a map from fully-qualified "<schema>.<name>" table names to
 	// the corresponding DiscoveryInfo.
 	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
+	for _, table := range tables {
+		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+		tableMap[streamID] = table
+	}
 	for _, column := range columns {
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
 		var info, ok = tableMap[streamID]
 		if !ok {
-			info = &sqlcapture.DiscoveryInfo{
-				Schema:    column.TableSchema,
-				Name:      column.TableName,
-				BaseTable: true, // PostgreSQL discovery queries only ever list 'BASE TABLE' entities
-			}
+			continue
 		}
 
 		if info.Columns == nil {
@@ -416,6 +420,29 @@ var postgresTypeToJSON = map[string]columnSchema{
 	"uuid":        {jsonType: "string", format: "uuid"},
 }
 
+const queryDiscoverTables = `
+  SELECT n.nspname, c.relname
+  FROM pg_catalog.pg_class c
+  JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)
+  WHERE n.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')
+    AND NOT c.relispartition
+    AND c.relkind IN ('r', 'p');` // 'r' means "Ordinary Table" and 'p' means "Partitioned Table"
+
+func getTables(ctx context.Context, conn *pgx.Conn) ([]*sqlcapture.DiscoveryInfo, error) {
+	logrus.Debug("listing all tables in the database")
+	var tables []*sqlcapture.DiscoveryInfo
+	var tableSchema, tableName string
+	var _, err = conn.QueryFunc(ctx, queryDiscoverTables, nil, []any{&tableSchema, &tableName}, func(pgx.QueryFuncRow) error {
+		tables = append(tables, &sqlcapture.DiscoveryInfo{
+			Schema:    tableSchema,
+			Name:      tableName,
+			BaseTable: true, // PostgreSQL discovery queries only ever list 'BASE TABLE' entities
+		})
+		return nil
+	})
+	return tables, err
+}
+
 const queryDiscoverColumns = `
   SELECT
 		c.table_schema,
@@ -426,15 +453,7 @@ const queryDiscoverColumns = `
 		c.udt_name,
 		p.typtype::text
   FROM information_schema.columns c
-  JOIN information_schema.tables t ON (c.table_schema = t.table_schema AND c.table_name = t.table_name)
   JOIN pg_type p ON (c.udt_name = p.typname)
-  WHERE
-		c.table_schema != 'pg_catalog' AND
-		c.table_schema != 'information_schema' AND
-		c.table_schema != 'pg_internal' AND
-		c.table_schema != 'catalog_history' AND
-		c.table_schema != 'cron' AND
-		t.table_type = 'BASE TABLE'
   ORDER BY
 		c.table_schema,
 		c.table_name,
@@ -442,7 +461,7 @@ const queryDiscoverColumns = `
 	;`
 
 func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, error) {
-	logrus.Debug("listing all tables/columns in the database")
+	logrus.Debug("listing all columns in the database")
 	var columns []sqlcapture.ColumnInfo
 	var sc sqlcapture.ColumnInfo
 	var typtype string
