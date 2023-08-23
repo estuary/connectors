@@ -86,6 +86,9 @@ func (cs *CaptureSpec) VerifyDiscover(ctx context.Context, t testing.TB, matcher
 		io.Copy(summary, bytes.NewReader(bs))
 		fmt.Fprintf(summary, "\n")
 	}
+	if len(bindings) == 0 {
+		fmt.Fprintf(summary, "(no output)")
+	}
 
 	cupaloy.SnapshotT(t, summary.String())
 }
