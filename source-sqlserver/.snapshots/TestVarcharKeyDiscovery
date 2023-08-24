@@ -2,7 +2,7 @@ Binding 0:
 {
     "recommended_name": "test_varcharkeydiscovery_42325208",
     "resource_config_json": {
-      "mode": "Normal",
+      "mode": "",
       "namespace": "dbo",
       "stream": "test_VarcharKeyDiscovery_42325208"
     },
@@ -88,7 +88,6 @@ Binding 0:
                       "description": "A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"
                     }
                   },
-                  "additionalProperties": false,
                   "type": "object",
                   "required": [
                     "schema",
