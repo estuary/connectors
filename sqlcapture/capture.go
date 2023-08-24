@@ -47,12 +47,12 @@ func (ps *PersistentState) StreamsInState(modes ...string) []string {
 
 // StreamsCurrentlyActive returns the IDs of all streams currently being captured.
 func (ps *PersistentState) StreamsCurrentlyActive() []string {
-	return ps.StreamsInState(TableModeStandardBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill, TableModeActive)
+	return ps.StreamsInState(TableModePreciseBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill, TableModeActive)
 }
 
 // StreamsCurrentlyBackfilling returns the IDs of all streams undergoing some sort of backfill.
 func (ps *PersistentState) StreamsCurrentlyBackfilling() []string {
-	return ps.StreamsInState(TableModeStandardBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill)
+	return ps.StreamsInState(TableModePreciseBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill)
 }
 
 // TableState represents the serializable/resumable state of a particular table's capture.
@@ -83,14 +83,14 @@ type TableState struct {
 //
 //	Ignore: The table is being deliberately ignored.
 //	Pending: The table is new, and will start being backfilled soon.
-//	StandardBackfill: The table's rows are being backfilled and replication events will only be emitted for the already-backfilled portion.
+//	PreciseBackfill: The table's rows are being backfilled and replication events will only be emitted for the already-backfilled portion.
 //	UnfilteredBackfill: The table's rows are being backfilled as normal but all replication events will be emitted.
 //	KeylessBackfill: The table's rows are being backfilled with a non-primary-key based strategy and all replication events will be emitted.
 //	Active: The table finished backfilling and replication events are emitted for the entire table.
 const (
 	TableModeIgnore             = "Ignore"
 	TableModePending            = "Pending"
-	TableModeStandardBackfill   = "Backfill" // Short name for historical reasons, this used to be the only backfill mode
+	TableModePreciseBackfill    = "Backfill" // Short name for historical reasons, this used to be the only backfill mode
 	TableModeUnfilteredBackfill = "UnfilteredBackfill"
 	TableModeKeylessBackfill    = "KeylessBackfill"
 	TableModeActive             = "Active"
@@ -204,17 +204,17 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 				logrus.WithField("stream", streamID).Info("autoselected keyless backfill mode (table has no primary key)")
 				state.Mode = TableModeKeylessBackfill
 			} else if discoveryInfo != nil && discoveryInfo.UnpredictableKeyOrdering {
-				logrus.WithField("stream", streamID).Info("autoselected unfiltered backfill mode (database key ordering is unpredictable)")
+				logrus.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (database key ordering is unpredictable)")
 				state.Mode = TableModeUnfilteredBackfill
 			} else {
-				logrus.WithField("stream", streamID).Info("autoselected standard backfill mode")
-				state.Mode = TableModeStandardBackfill
+				logrus.WithField("stream", streamID).Info("autoselected precise backfill mode")
+				state.Mode = TableModePreciseBackfill
 			}
+		case BackfillModePrecise:
+			logrus.WithField("stream", streamID).Info("user selected precise backfill mode")
+			state.Mode = TableModePreciseBackfill
 		case BackfillModeNormal:
-			logrus.WithField("stream", streamID).Info("user selected standard backfill mode")
-			state.Mode = TableModeStandardBackfill
-		case BackfillModeUnfiltered:
-			logrus.WithField("stream", streamID).Info("user selected unfiltered backfill mode")
+			logrus.WithField("stream", streamID).Info("user selected unfiltered (normal) backfill mode")
 			state.Mode = TableModeUnfilteredBackfill
 		case BackfillModeWithoutKey:
 			logrus.WithField("stream", streamID).Info("user selected keyless backfill mode")
@@ -576,7 +576,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 		}
 		return nil
 	}
-	if tableState.Mode == TableModeStandardBackfill {
+	if tableState.Mode == TableModePreciseBackfill {
 		// While a table is being backfilled, events occurring *before* the current scan point
 		// will be emitted, while events *after* that point will be patched (or ignored) into
 		// the buffered resultSet.
@@ -623,7 +623,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	var lastRowKey = streamState.Scanned
 	var eventCount int
 	var err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
-		if streamState.Mode == TableModeStandardBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
+		if streamState.Mode == TableModePreciseBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
 			// Sanity check that when performing a "standard" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
 			// row keys.

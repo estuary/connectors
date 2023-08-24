@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -17,7 +18,7 @@ import (
 
 // Resource represents the capture configuration of a single table.
 type Resource struct {
-	Mode BackfillMode `json:"mode" jsonschema:"title=Backfill Mode,description=How the preexisting contents of the table should be backfilled. This should generally not be changed.,enum=Normal,enum=Only Changes,enum=Without Primary Key,default=Normal"`
+	Mode BackfillMode `json:"mode,omitempty" jsonschema:"title=Backfill Mode,description=How the preexisting contents of the table should be backfilled. This should generally not be changed.,default=,enum=,enum=Normal,enum=Precise,enum=Only Changes,enum=Without Primary Key"`
 
 	Namespace string `json:"namespace" jsonschema:"title=Schema,description=The schema (namespace) in which the table resides."`
 	Stream    string `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured."`
@@ -39,14 +40,14 @@ const (
 	// BackfillModeAutomatic means "use your best judgement at runtime".
 	BackfillModeAutomatic = BackfillMode("")
 
-	// BackfillModeNormal backfills chunks of the table and filters replication
-	// events in portions of the table which haven't yet been reached.
+	// BackfillModeNormal backfills chunks of the table and emits all
+	// replication events regardless of whether they occur within the
+	// backfilled portion of the table or not.
 	BackfillModeNormal = BackfillMode("Normal")
 
-	// BackfillModeUnfiltered backfills chunks of the table and emits all
-	// replication events regardless of whether they occur within a not-
-	// yet-backfilled portion of the table.
-	BackfillModeUnfiltered = BackfillMode("Unfiltered")
+	// BackfillModePrecise backfills chunks of the table and filters replication
+	// events in portions of the table which haven't yet been reached.
+	BackfillModePrecise = BackfillMode("Precise")
 
 	// BackfillModeOnlyChanges skips backfilling the table entirely and jumps
 	// directly to replication streaming for the entire dataset.
@@ -60,7 +61,7 @@ const (
 
 // Validate checks to make sure a resource appears usable.
 func (r Resource) Validate() error {
-	if r.Mode != BackfillModeAutomatic && r.Mode != BackfillModeNormal && r.Mode != BackfillModeOnlyChanges && r.Mode != BackfillModeWithoutKey {
+	if !slices.Contains([]BackfillMode{BackfillModeAutomatic, BackfillModeNormal, BackfillModePrecise, BackfillModeOnlyChanges, BackfillModeWithoutKey}, r.Mode) {
 		return fmt.Errorf("invalid backfill mode %q", r.Mode)
 	}
 	if r.Namespace == "" {

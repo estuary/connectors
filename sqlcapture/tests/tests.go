@@ -183,10 +183,10 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 	LoadCSV(ctx, t, tb, tableName, "statepop.csv", 100)
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
-	// Override capture mode to 'Normal' and primary key to [fullname year]
+	// Override capture mode to automatic and primary key to [fullname year]
 	var res sqlcapture.Resource
 	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
-	res.Mode = sqlcapture.BackfillModeNormal
+	res.Mode = sqlcapture.BackfillModeAutomatic
 	res.PrimaryKey = []string{"fullname", "year"}
 	resourceJSON, err := json.Marshal(res)
 	require.NoError(t, err)
@@ -210,10 +210,10 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 	LoadCSV(ctx, t, tb, tableName, "statepop.csv", 100)
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
-	// Override capture mode to 'Normal' and primary key to [fullname year]
+	// Override capture mode to automatic and primary key to [fullname year]
 	var res sqlcapture.Resource
 	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
-	res.Mode = sqlcapture.BackfillModeNormal
+	res.Mode = sqlcapture.BackfillModeAutomatic
 	res.PrimaryKey = []string{"fullname", "year"}
 	resourceJSON, err := json.Marshal(res)
 	require.NoError(t, err)

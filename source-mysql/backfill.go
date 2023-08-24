@@ -49,7 +49,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		}).Debug("scanning keyless table chunk")
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{state.BackfilledCount}
-	case sqlcapture.TableModeStandardBackfill, sqlcapture.TableModeUnfilteredBackfill:
+	case sqlcapture.TableModePreciseBackfill, sqlcapture.TableModeUnfilteredBackfill:
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
