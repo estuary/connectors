@@ -2,7 +2,6 @@ Binding 0:
 {
     "recommended_name": "test_trickycolumnnames_14055203",
     "resource_config_json": {
-      "mode": "Normal",
       "namespace": "test",
       "stream": "TrickyColumnNames_14055203"
     },
@@ -113,7 +112,6 @@ Binding 1:
 {
     "recommended_name": "test_trickycolumnnames_28395292",
     "resource_config_json": {
-      "mode": "Normal",
       "namespace": "test",
       "stream": "TrickyColumnNames_28395292"
     },
