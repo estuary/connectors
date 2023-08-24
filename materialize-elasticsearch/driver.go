@@ -19,6 +19,7 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 )
 
 type sshForwarding struct {
@@ -239,10 +240,20 @@ func (c config) toClient() (*client, error) {
 
 	es, err := elasticsearch.NewClient(
 		elasticsearch.Config{
-			Addresses: []string{endpoint},
-			Username:  c.Credentials.Username,
-			Password:  c.Credentials.Password,
-			APIKey:    c.Credentials.ApiKey,
+			Addresses:     []string{endpoint},
+			Username:      c.Credentials.Username,
+			Password:      c.Credentials.Password,
+			APIKey:        c.Credentials.ApiKey,
+			RetryOnStatus: []int{429, 502, 503, 504},
+			RetryBackoff: func(i int) time.Duration {
+				d := time.Duration(1<<i) * time.Second
+				log.WithFields(log.Fields{
+					"attempt": i,
+					"delay":   d.String(),
+				}).Info("waiting to retry request on retryable error")
+				return d
+			},
+			MaxRetries: 10,
 		},
 	)
 	if err != nil {
