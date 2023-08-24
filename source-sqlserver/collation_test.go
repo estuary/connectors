@@ -54,6 +54,26 @@ func TestCollatedCapture(t *testing.T) {
 	}
 }
 
+// TestCaptureWithCompoundTextAndIntegerKey verifies that a table with a
+// compound primary key which mixes text and integers still works.
+func TestCaptureWithCompoundTextAndIntegerKey(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "50810729"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(k1 VARCHAR(32), k2 INTEGER, k3 VARCHAR(8), k4 INTEGER, data TEXT, PRIMARY KEY (k1, k2, k3, k4))")
+	for i := 0; i < 50; i++ { // Needs to be enough rows to require several 'subsequent' backfill queries
+		tb.Insert(ctx, t, tableName, [][]any{
+			{"aaa", 100, "b", i, "data"}, {"aaa", 100, "c", i, "data"},
+			{"aaa", 200, "b", i, "data"}, {"aaa", 200, "c", i, "data"},
+			{"zzz", 100, "b", i, "data"}, {"zzz", 100, "c", i, "data"},
+			{"zzz", 200, "b", i, "data"}, {"zzz", 200, "c", i, "data"},
+		})
+	}
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	tests.VerifiedCapture(ctx, t, cs)
+}
+
 // TestColumnCollations verifies that our encoding of text column keys can
 // be round-tripped through FDB serialization/deserialization without loss,
 // and that for collations which are considered "predictable" the serialized
