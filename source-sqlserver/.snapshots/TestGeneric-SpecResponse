@@ -107,13 +107,15 @@
       "mode": {
         "type": "string",
         "enum": [
+          "",
           "Normal",
+          "Precise",
           "Only Changes",
           "Without Primary Key"
         ],
         "title": "Backfill Mode",
         "description": "How the preexisting contents of the table should be backfilled. This should generally not be changed.",
-        "default": "Normal"
+        "default": ""
       },
       "namespace": {
         "type": "string",
@@ -128,7 +130,6 @@
     },
     "type": "object",
     "required": [
-      "mode",
       "namespace",
       "stream"
     ],
