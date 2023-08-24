@@ -156,7 +156,8 @@ func configSchema() json.RawMessage {
 		},
 		"type": "object",
 		"required": [
-		  "endpoint"
+		  "endpoint",
+		  "credentials"
 		],
 		"title": "Elasticsearch Connection"
 	  }`
@@ -423,7 +424,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		return client.createMetaIndex(ctx, cfg.Advanced.Replicas)
 	},
 	); err != nil {
-		return nil, fmt.Errorf("creating metadata index")
+		return nil, fmt.Errorf("creating metadata index: %w", err)
 	}
 
 	storedSpec, err := client.getSpec(ctx, req.Materialization.Name)

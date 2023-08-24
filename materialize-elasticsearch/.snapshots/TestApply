@@ -1,37 +1,37 @@
 --- Begin base ---
-{"flow_document":{"type":"flattened"},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
 --- End base ---
 
 --- Begin remove original required field ---
-{"flow_document":{"type":"flattened"},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
 --- End remove original required field ---
 
 --- Begin re-add removed original required field ---
-{"flow_document":{"type":"flattened"},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
 --- End re-add removed original required field ---
 
 --- Begin remove original optional field ---
-{"flow_document":{"type":"flattened"},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
 --- End remove original optional field ---
 
 --- Begin re-add removed original optional field ---
-{"flow_document":{"type":"flattened"},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
 --- End re-add removed original optional field ---
 
 --- Begin add new required field ---
-{"flow_document":{"type":"flattened"},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
 --- End add new required field ---
 
 --- Begin remove new required field ---
-{"flow_document":{"type":"flattened"},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
 --- End remove new required field ---
 
 --- Begin add new optional field ---
-{"flow_document":{"type":"flattened"},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"optionalVal2":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"optionalVal2":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
 --- End add new optional field ---
 
 --- Begin remove new optional field ---
-{"flow_document":{"type":"flattened"},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"optionalVal2":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"optionalVal2":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
 --- End remove new optional field ---
 
 
