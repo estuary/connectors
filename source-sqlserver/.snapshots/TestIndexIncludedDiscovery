@@ -2,7 +2,6 @@ Binding 0:
 {
     "recommended_name": "test_indexincludeddiscovery_98476798",
     "resource_config_json": {
-      "mode": "Normal",
       "namespace": "dbo",
       "stream": "test_IndexIncludedDiscovery_98476798"
     },

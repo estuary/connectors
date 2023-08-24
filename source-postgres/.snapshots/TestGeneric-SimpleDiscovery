@@ -2,7 +2,6 @@ Binding 0:
 {
     "recommended_name": "test_generic_simplediscovery_49210954",
     "resource_config_json": {
-      "mode": "Normal",
       "namespace": "test",
       "stream": "generic_simplediscovery_49210954"
     },

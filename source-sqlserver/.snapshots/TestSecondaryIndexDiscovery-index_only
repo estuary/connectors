@@ -2,7 +2,6 @@ Binding 0:
 {
     "recommended_name": "test_secondaryindexdiscovery_index_only_g26313",
     "resource_config_json": {
-      "mode": "Normal",
       "namespace": "dbo",
       "stream": "test_SecondaryIndexDiscovery_index_only_g26313"
     },
