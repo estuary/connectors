@@ -45,6 +45,11 @@ func (ps *PersistentState) StreamsInState(modes ...string) []string {
 	return streams
 }
 
+// StreamsCurrentlyActive returns the IDs of all streams currently being captured.
+func (ps *PersistentState) StreamsCurrentlyActive() []string {
+	return ps.StreamsInState(TableModeStandardBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill, TableModeActive)
+}
+
 // StreamsCurrentlyBackfilling returns the IDs of all streams undergoing some sort of backfill.
 func (ps *PersistentState) StreamsCurrentlyBackfilling() []string {
 	return ps.StreamsInState(TableModeStandardBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill)
@@ -142,7 +147,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("error creating replication stream: %w", err)
 	}
-	for _, streamID := range c.State.StreamsCurrentlyBackfilling() {
+	for _, streamID := range c.State.StreamsCurrentlyActive() {
 		var state = c.State.Streams[streamID]
 		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
 			return fmt.Errorf("error activating table %q: %w", streamID, err)
