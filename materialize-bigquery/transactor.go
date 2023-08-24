@@ -67,6 +67,12 @@ func newTransactor(
 			return nil, fmt.Errorf("getting table metadata: %w", err)
 		}
 
+		log.WithFields(log.Fields{
+			"table":      table,
+			"collection": binding.Source.String(),
+			"schemaJson": meta.Schema,
+		}).Debug("bigquery schema for table")
+
 		fieldSchemas := make(map[string]*bigquery.FieldSchema)
 		for _, f := range meta.Schema {
 			fieldSchemas[f.Name] = f
