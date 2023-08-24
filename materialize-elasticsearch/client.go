@@ -24,7 +24,9 @@ type client struct {
 
 func (c *client) createMetaIndex(ctx context.Context, replicas *int) error {
 	props := map[string]property{
-		"version":   {Type: elasticTypeKeyword},
+		"version": {Type: elasticTypeKeyword, Index: boolPtr(false)},
+		// Binary mappings are never indexed, and to specify index: false on such a mapping
+		// resultings in an error.
 		"specBytes": {Type: elasticTypeBinary},
 	}
 
