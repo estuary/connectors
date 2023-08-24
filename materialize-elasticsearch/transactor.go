@@ -90,6 +90,7 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 
 	var batch []getDoc
+	batchSize := 0
 	for it.Next() {
 		select {
 		case <-groupCtx.Done():
@@ -101,10 +102,12 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 				Index:  t.bindings[it.Binding].index,
 				Source: t.bindings[it.Binding].docField,
 			})
+			batchSize += len(id)
 
-			if len(batch) > loadBatchSize {
+			if batchSize > loadBatchSize {
 				sendBatch(batch)
 				batch = nil
+				batchSize = 0
 			}
 		}
 	}
@@ -138,7 +141,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		// be applicable to case where there is a single replica shard and Elasticsearch considers a
 		// quorum to be possible by writing only to the primary shard, which could result in data
 		// loss if there is then a hardware failure on that single primary shard. At the very least
-		// we could consider making this and advanced configuration option in the future if it is
+		// we could consider making this an advanced configuration option in the future if it is
 		// problematic.
 		WaitForActiveShards: "all",
 	})
