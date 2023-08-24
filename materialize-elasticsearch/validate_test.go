@@ -163,7 +163,7 @@ func TestValdiateSelectedFields(t *testing.T) {
 				Values:   []string{"strFormatInt", "bool"},
 				Document: "changed_flow_document",
 			},
-			wantErr: "The root document was previously projected as field 'flow_document' and cannot be changed to projection with field 'changed_flow_document'",
+			wantErr: "The root document must be materialized as field 'flow_document'",
 		},
 		{
 			name:            "no root document selected for delta updates",
@@ -495,7 +495,7 @@ func TestValidateBinding(t *testing.T) {
 			wantErr: "",
 		},
 		{
-			name:         "root document projection change is unsatisifiable for standard updates",
+			name:         "root document projection change is unsatisfiable for standard updates",
 			deltaUpdates: false,
 			storedSpec:   func(s *pf.MaterializationSpec) *pf.MaterializationSpec { return s },
 			boundCollection: testCollection("some/collection",

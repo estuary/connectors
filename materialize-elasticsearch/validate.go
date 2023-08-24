@@ -25,12 +25,22 @@ func validateSelectedFields(
 	// LOCATION_REQUIRED constraints are met.
 	includedPointers := make(map[string]bool)
 
+	// For standard updates materializations, only a single projection if the root document is
+	// allowed in the field selection.
+	rootDocFields := 0
+
 	// Does each field in the materialization have an allowable constraint?
 	allFields := binding.FieldSelection.AllFields()
 	for _, field := range allFields {
 		var projection = binding.Collection.GetProjection(field)
 		if projection == nil {
 			return fmt.Errorf("no such projection for field '%s'", field)
+		}
+		if projection.IsRootDocumentProjection() {
+			rootDocFields += 1
+			if !res.DeltaUpdates && rootDocFields > 1 {
+				return fmt.Errorf("only a single root document projection can be included in the field selection for a standard updates materialization")
+			}
 		}
 		includedPointers[projection.Ptr] = true
 		constraint := constraints[field]
@@ -160,17 +170,24 @@ func validateMatchesExistingBinding(
 		constraints[field] = constraint
 	}
 
+	docFields := []string{}
 	for _, proj := range boundCollection.Projections {
 		if !deltaUpdates && proj.IsRootDocumentProjection() {
-			// Standard updates materializations cannot change the projection field of the root
-			// document after the initial publication.
-			if proj.Field != existing.FieldSelection.Document {
+			docFields = append(docFields, proj.Field)
+			// Only the originally selected root document projection is allowed to be selected for
+			// changes to a standard updates materialization.
+			if proj.Field == existing.FieldSelection.Document {
 				constraints[proj.Field] = &pm.Response_Validated_Constraint{
-					Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
+					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
+					Reason: "This field is the document in the current materialization",
+				}
+			} else {
+				constraints[proj.Field] = &pm.Response_Validated_Constraint{
+					Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
 					Reason: fmt.Sprintf(
-						"The root document was previously projected as field '%s' and cannot be changed to projection with field '%s'",
-						existing.FieldSelection.Document,
+						"Cannot materialize root document projection '%s' because field '%s' is already being materialized as the document",
 						proj.Field,
+						existing.FieldSelection.Document,
 					),
 				}
 			}
@@ -179,6 +196,19 @@ func validateMatchesExistingBinding(
 		// Build constraints for new projections of the binding.
 		if _, ok := constraints[proj.Field]; !ok {
 			constraints[proj.Field] = validateNewProjection(proj, deltaUpdates)
+		}
+	}
+
+	if !deltaUpdates && !slices.Contains(docFields, existing.FieldSelection.Document) {
+		// For standard updates, the proposed binding must still have the original document field.
+		// If it doesn't, make sure to fail the build with a constraint on a root document
+		// projection that it does have.
+		constraints[docFields[0]] = &pm.Response_Validated_Constraint{
+			Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
+			Reason: fmt.Sprintf(
+				"The root document must be materialized as field '%s'",
+				existing.FieldSelection.Document,
+			),
 		}
 	}
 
