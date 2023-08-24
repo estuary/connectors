@@ -31,10 +31,10 @@ import (
 
 const (
 	// we try to keep the size of the batch up to 2^25 bytes (32MiB), however this is an
-	// approximate. we need to allow for documents up to ~50MiB, and the
+	// approximate. we need to allow for documents up to 64MiB, and the
 	// implementation adds rows to a batch until the threshold is reached, and the batch is
 	// drained after that. so the actual memory usage of a batch can potentially
-	// grow to 32MiB + 50MiB = 82 MiB in worst case scenario
+	// grow to 32MiB + 64MiB = 96 MiB in worst case scenario
 	batchSizeThreshold = 33554432
 )
 
@@ -727,8 +727,6 @@ func drainUpdateBatch(ctx context.Context, txn *stdsql.Tx, b *binding, batch bat
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	// Use a read-only "load" transaction, which will automatically
-	// truncate the temporary key staging tables on commit.
 	var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return fmt.Errorf("DB.BeginTx: %w", err)
