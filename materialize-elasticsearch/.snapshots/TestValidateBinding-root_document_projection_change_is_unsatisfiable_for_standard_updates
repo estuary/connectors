@@ -5,7 +5,7 @@
 	},
 	"changed_flow_document": {
 		"type": 6,
-		"reason": "The root document was previously projected as field 'flow_document' and cannot be changed to projection with field 'changed_flow_document'"
+		"reason": "The root document must be materialized as field 'flow_document'"
 	},
 	"intKey": {
 		"type": 1,

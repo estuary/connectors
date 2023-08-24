@@ -4,8 +4,8 @@
 		"reason": "Field 'bool' is already being materialized as type 'boolean' and cannot be changed to type 'text'"
 	},
 	"flow_document": {
-		"type": 2,
-		"reason": "The root document is required for a standard updates materialization"
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
 	},
 	"intKey": {
 		"type": 1,
