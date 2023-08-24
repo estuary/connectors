@@ -100,7 +100,8 @@
     },
     "type": "object",
     "required": [
-      "endpoint"
+      "endpoint",
+      "credentials"
     ],
     "title": "Elasticsearch Connection"
   },

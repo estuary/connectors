@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"reflect"
 
+	"github.com/estuary/connectors/go/pkg/slices"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
@@ -24,6 +24,7 @@ const (
 type property struct {
 	Type   elasticPropertyType `json:"type"`
 	Coerce bool                `json:"coerce,omitempty"`
+	Index  *bool               `json:"index,omitempty"`
 }
 
 func propForField(field string, binding *pf.MaterializationSpec_Binding) property {
@@ -89,30 +90,29 @@ func buildIndexProperties(b *pf.MaterializationSpec_Binding) map[string]property
 	}
 
 	if d := b.FieldSelection.Document; d != "" {
-		props[d] = property{Type: elasticTypeFlattened}
+		// Do not index the root document projection, since this would be less useful than other
+		// selected fields and potentially costly.
+		props[d] = property{Type: elasticTypeFlattened, Index: boolPtr(false)}
 	}
 
 	return props
 }
 
 func asFormattedNumeric(projection *pf.Projection) (elasticPropertyType, bool) {
+	typesMatch := func(actual, allowed []string) bool {
+		for _, t := range actual {
+			if !slices.Contains(allowed, t) {
+				return false
+			}
+		}
+		return true
+	}
+
 	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
 		switch {
-		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"integer", "null", "string"}):
+		case projection.Inference.String_.Format == "integer" && typesMatch(projection.Inference.Types, []string{"integer", "null", "string"}):
 			return elasticTypeLong, true
-		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"null", "number", "string"}):
-			return elasticTypeDouble, true
-		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"integer", "string"}):
-			return elasticTypeLong, true
-		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"number", "string"}):
-			return elasticTypeDouble, true
-		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"null", "string"}):
-			return elasticTypeLong, true
-		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"null", "string"}):
-			return elasticTypeDouble, true
-		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
-			return elasticTypeLong, true
-		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
+		case projection.Inference.String_.Format == "number" && typesMatch(projection.Inference.Types, []string{"null", "number", "string"}):
 			return elasticTypeDouble, true
 		default:
 			// Fallthrough.
@@ -121,4 +121,8 @@ func asFormattedNumeric(projection *pf.Projection) (elasticPropertyType, bool) {
 
 	// Not a formatted numeric field.
 	return "", false
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
