@@ -1,3 +1,4 @@
+connector
 .docker-cache/*
 !.docker-cache/.keep
 /.build/

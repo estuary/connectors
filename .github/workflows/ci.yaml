@@ -105,6 +105,7 @@ jobs:
           - materialize-snowflake
           - materialize-webhook
           - materialize-mysql
+          - materialize-sqlserver
 
     steps:
       - uses: actions/checkout@v2
@@ -221,6 +222,7 @@ jobs:
               "materialize-postgres",
               "materialize-mysql",
               "materialize-s3-parquet",
+              "materialize-sqlserver",
               "materialize-mongodb"
             ]'), matrix.connector)
         env:
