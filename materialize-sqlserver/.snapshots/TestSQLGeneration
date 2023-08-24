@@ -1,0 +1,195 @@
+--- Begin target_table temp_load_name ---
+#flow_temp_load_0--- End target_table temp_load_name ---
+
+--- Begin "Delta Updates" temp_load_name ---
+#flow_temp_load_1--- End "Delta Updates" temp_load_name ---
+
+--- Begin target_table temp_store_name ---
+#flow_temp_store_0--- End target_table temp_store_name ---
+
+--- Begin "Delta Updates" temp_store_name ---
+#flow_temp_store_1--- End "Delta Updates" temp_store_name ---
+
+--- Begin target_table truncateTempLoadTable ---
+
+TRUNCATE TABLE #flow_temp_load_0;
+--- End target_table truncateTempLoadTable ---
+
+--- Begin "Delta Updates" truncateTempLoadTable ---
+
+TRUNCATE TABLE #flow_temp_load_1;
+--- End "Delta Updates" truncateTempLoadTable ---
+
+--- Begin target_table truncateTempStoreTable ---
+
+TRUNCATE TABLE #flow_temp_store_0;
+--- End target_table truncateTempStoreTable ---
+
+--- Begin "Delta Updates" truncateTempStoreTable ---
+
+TRUNCATE TABLE #flow_temp_store_1;
+--- End "Delta Updates" truncateTempStoreTable ---
+
+--- Begin target_table createLoadTable ---
+
+CREATE TABLE #flow_temp_load_0 (
+		key1 BIGINT NOT NULL,
+		"key!2" BIT NOT NULL
+	,
+		PRIMARY KEY (key1, "key!2")
+);
+--- End target_table createLoadTable ---
+
+--- Begin "Delta Updates" createLoadTable ---
+
+CREATE TABLE #flow_temp_load_1 (
+		"theKey" VARCHAR(900) NOT NULL
+	,
+		PRIMARY KEY ("theKey")
+);
+--- End "Delta Updates" createLoadTable ---
+
+--- Begin target_table createStoreTable ---
+
+CREATE TABLE #flow_temp_store_0 (
+		key1 BIGINT NOT NULL,
+		"key!2" BIT NOT NULL,
+		"Camel_Case" BIGINT,
+		"a Time" DATETIME2,
+		"array" VARCHAR(MAX),
+		lower_case BIGINT,
+		"value" VARCHAR(MAX),
+		flow_document VARCHAR(MAX) NOT NULL,
+
+		PRIMARY KEY (key1, "key!2")
+);
+--- End target_table createStoreTable ---
+
+--- Begin "Delta Updates" createStoreTable ---
+
+CREATE TABLE #flow_temp_store_1 (
+		"theKey" VARCHAR(900) NOT NULL,
+		"aValue" BIGINT
+);
+--- End "Delta Updates" createStoreTable ---
+
+--- Begin target_table createTargetTable ---
+
+IF OBJECT_ID(N'target_table', 'U') IS NULL BEGIN
+CREATE TABLE target_table (
+		key1 BIGINT NOT NULL,
+		"key!2" BIT NOT NULL,
+		"Camel_Case" BIGINT,
+		"a Time" DATETIME2,
+		"array" VARCHAR(MAX),
+		lower_case BIGINT,
+		"value" VARCHAR(MAX),
+		flow_document VARCHAR(MAX) NOT NULL,
+
+		PRIMARY KEY (key1, "key!2")
+);
+END;
+--- End target_table createTargetTable ---
+
+--- Begin "Delta Updates" createTargetTable ---
+
+IF OBJECT_ID(N'Delta Updates', 'U') IS NULL BEGIN
+CREATE TABLE "Delta Updates" (
+		"theKey" VARCHAR(900) NOT NULL,
+		"aValue" BIGINT
+);
+END;
+--- End "Delta Updates" createTargetTable ---
+
+--- Begin target_table directCopy ---
+
+	INSERT INTO target_table 
+		(
+			key1, "key!2", "Camel_Case", "a Time", "array", lower_case, "value", flow_document
+		)
+	SELECT
+			key1, "key!2", "Camel_Case", "a Time", "array", lower_case, "value", flow_document
+	FROM #flow_temp_store_0
+--- End target_table directCopy ---
+
+--- Begin "Delta Updates" directCopy ---
+
+	INSERT INTO "Delta Updates" 
+		(
+			"theKey", "aValue"
+		)
+	SELECT
+			"theKey", "aValue"
+	FROM #flow_temp_store_1
+--- End "Delta Updates" directCopy ---
+
+--- Begin target_table mergeInto ---
+
+	MERGE INTO target_table
+	USING (
+		SELECT key1, "key!2", "Camel_Case", "a Time", "array", lower_case, "value", flow_document
+		FROM #flow_temp_store_0
+	) AS r
+	ON target_table.key1 = r.key1 AND target_table."key!2" = r."key!2"
+	WHEN MATCHED AND r.flow_document=NULL THEN
+		DELETE
+	WHEN MATCHED THEN
+		UPDATE SET target_table."Camel_Case" = r."Camel_Case", target_table."a Time" = r."a Time", target_table."array" = r."array", target_table.lower_case = r.lower_case, target_table."value" = r."value", target_table.flow_document = r.flow_document
+	WHEN NOT MATCHED THEN
+		INSERT (key1, "key!2", "Camel_Case", "a Time", "array", lower_case, "value", flow_document)
+		VALUES (r.key1, r."key!2", r."Camel_Case", r."a Time", r."array", r.lower_case, r."value", r.flow_document);
+--- End target_table mergeInto ---
+
+--- Begin "Delta Updates" mergeInto ---
+
+	MERGE INTO "Delta Updates"
+	USING (
+		SELECT "theKey", "aValue"
+		FROM #flow_temp_store_1
+	) AS r
+	ON "Delta Updates"."theKey" = r."theKey"
+	WHEN MATCHED THEN
+		UPDATE SET "Delta Updates"."aValue" = r."aValue"
+	WHEN NOT MATCHED THEN
+		INSERT ("theKey", "aValue")
+		VALUES (r."theKey", r."aValue");
+--- End "Delta Updates" mergeInto ---
+
+--- Begin target_table loadInsert ---
+
+INSERT INTO #flow_temp_load_0 (key1, "key!2")
+	VALUES (@p1, @p2);
+--- End target_table loadInsert ---
+
+--- Begin "Delta Updates" loadInsert ---
+
+INSERT INTO #flow_temp_load_1 ("theKey")
+	VALUES (@p1);
+--- End "Delta Updates" loadInsert ---
+
+--- Begin target_table loadQuery ---
+
+SELECT 0, r.flow_document
+	FROM #flow_temp_load_0 AS l
+	JOIN target_table AS r
+		 ON  l.key1 = r.key1
+		 AND l."key!2" = r."key!2"
+
+--- End target_table loadQuery ---
+
+--- Begin "Delta Updates" loadQuery ---
+
+SELECT TOP 0 -1, NULL
+
+--- End "Delta Updates" loadQuery ---
+
+--- Begin Fence Update ---
+
+UPDATE "path"."To".checkpoints
+	SET   "checkpoint" = 'AAECAwQFBgcICQ=='
+	WHERE materialization = 'some/Materialization'
+	AND   key_begin = 1122867
+	AND   key_end   = 4293844428
+	AND   fence     = 123;
+--- End Fence Update ---
+

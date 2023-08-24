@@ -1,0 +1,2 @@
+sqlserver://will:secret1234@example.com:1433?TrustServerCertificate=true&app+name=Flow+CDC+Connector&database=somedb&encrypt=true
+config valid
