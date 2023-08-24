@@ -1,0 +1,27 @@
+version: "3.7"
+
+services:
+  sqlserver:
+    image: 'mcr.microsoft.com/mssql/server:2017-latest'
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: 'Y'
+      MSSQL_SA_PASSWORD: '!Flow1234'
+    volumes:
+      - sqlserver_data:/var/opt/mssql/data
+    networks:
+      - flow-test
+    healthcheck:
+      test: [ "CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "!Flow1234", "-Q", "SELECT DB_NAME()"]
+      interval: 1s
+      retries: 30
+    ports:
+      - "1433:1433"
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+
+volumes:
+  sqlserver_data: {}
