@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strings"
 
-	"github.com/estuary/connectors/go/pkg/slices"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
