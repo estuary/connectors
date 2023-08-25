@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	stdsql "database/sql"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	stdsql "database/sql"
 )
 
 // getVarcharDetails queries the database for VARCHAR type columns to determine their actual maximum
@@ -57,7 +57,7 @@ func getVarcharDetails(ctx context.Context, dbName string, conn *stdsql.Conn) (m
 	log.WithFields(log.Fields{
 		"tables":  len(out),
 		"columns": n,
-		"result": out,
+		"result":  out,
 	}).Info("queried VARCHAR column lengths")
 
 	return out, nil

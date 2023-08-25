@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"math/big"
 
-	pf "github.com/estuary/flow/go/protocols/flow"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 // Applies the same hash operation that kinesis uses to determine which shard a given record should

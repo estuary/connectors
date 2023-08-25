@@ -757,4 +757,3 @@ var MYSQL_RESERVED_WORDS = []string{
 	"zerofill",
 	"zone",
 }
-

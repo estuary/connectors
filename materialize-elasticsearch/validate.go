@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"slices"
 
-	"github.com/estuary/connectors/go/pkg/slices"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )

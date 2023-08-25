@@ -3,9 +3,9 @@ package sql
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
-	"github.com/estuary/connectors/go/pkg/slices"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
