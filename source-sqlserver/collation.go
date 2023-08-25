@@ -25,15 +25,14 @@ func predictableCollation(info *sqlserverTextColumnType) bool {
 // using a UTF8-esque multibyte varint encoding which preserves *integer* lexicographic
 // ordering.
 //
-// If a particular collation is not currently implemented as a data table, an error
-// will be returned instead. TODO(wgd): Document where the tool lives for autogenerating
-// new collation data tables.
+// If a particular collation is not available as a data table it's an error, but this
+// function is only called when predictableCollation() is true.
 func encodeCollationSortKey(info *sqlserverTextColumnType, text string) ([]byte, error) {
 	var collationID = strings.ToLower(info.Type) + "/" + info.Collation
 	if collationTable, ok := supportedTextCollations[collationID]; ok {
 		return encodeCollationSortKeyUsingTable(collationTable, text), nil
 	}
-	return nil, fmt.Errorf("collation %q is not currently supported, please file a bug report", collationID)
+	return nil, fmt.Errorf("collation %q precise sorting is unsupported", collationID)
 }
 
 func encodeCollationSortKeyUsingTable(collation collationMapping, text string) []byte {
