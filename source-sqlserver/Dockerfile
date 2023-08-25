@@ -20,7 +20,7 @@ COPY source-sqlserver    ./source-sqlserver
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
 ENV CI_BUILD=yes
-RUN go test -short -v ./source-sqlserver/... -timeout=60m
+RUN go test -short -failfast -v ./source-sqlserver/... -timeout=60m
 
 # Build the connector.
 RUN go build -o ./connector -v ./source-sqlserver/...
