@@ -561,7 +561,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 	var change = event.(*ChangeEvent)
 	var streamID = change.Source.Common().StreamID()
 
-	// Handle the easy cases: Events on ignored or fully-active tables.
+	// Decide what to do with the change event based on the state of the table.
 	var tableState = c.State.Streams[streamID]
 	if tableState == nil || tableState.Mode == "" || tableState.Mode == TableModeIgnore {
 		logrus.WithFields(logrus.Fields{
@@ -577,9 +577,9 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 		return nil
 	}
 	if tableState.Mode == TableModePreciseBackfill {
-		// While a table is being backfilled, events occurring *before* the current scan point
-		// will be emitted, while events *after* that point will be patched (or ignored) into
-		// the buffered resultSet.
+		// When a table is being backfilled precisely, replication events lying within the
+		// already-backfilled portion of the table should be emitted, while replication events
+		// beyond that point should be ignored (since we'll reach that row later in the backfill).
 		if compareTuples(change.RowKey, tableState.Scanned) <= 0 {
 			if err := c.emitChange(change); err != nil {
 				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
@@ -624,7 +624,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	var eventCount int
 	var err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
 		if streamState.Mode == TableModePreciseBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
-			// Sanity check that when performing a "standard" backfill the DB's ordering of
+			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
 			// row keys.
 			//
