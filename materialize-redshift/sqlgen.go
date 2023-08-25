@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/estuary/connectors/go/pkg/slices"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )

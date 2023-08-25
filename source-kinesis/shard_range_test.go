@@ -4,9 +4,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/stretchr/testify/require"
 )
 
 // max u128

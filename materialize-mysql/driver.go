@@ -1,30 +1,30 @@
 package main
 
 import (
-	"context"
-	stdsql "database/sql"
-	"crypto/x509"
-	"crypto/tls"
 	"bytes"
-	"io"
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	stdsql "database/sql"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
-	"github.com/estuary/connectors/go/pkg/slices"
-	mysql "github.com/go-sql-driver/mysql"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	mysql "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 )
@@ -61,9 +61,9 @@ type config struct {
 type advancedConfig struct {
 	SSLMode string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disabled,enum=preferred,enum=required,enum=verify_ca,enum=verify_identity"`
 
-	SSLServerCA string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=Optional server certificate authority to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
+	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=Optional server certificate authority to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional client certificate to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
-	SSLClientKey string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=Optional client key to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
+	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=Optional client key to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 }
 
 // Validate the configuration.
@@ -94,9 +94,10 @@ func (c *config) Validate() error {
 }
 
 const customSSLConfigName = "custom"
+
 func registerCustomSSL(c *config) error {
 	// Use the provided Server CA to create a root cert pool
-	var rootCertPool = x509.NewCertPool();
+	var rootCertPool = x509.NewCertPool()
 	var rawServerCert = []byte(c.Advanced.SSLServerCA)
 	if ok := rootCertPool.AppendCertsFromPEM(rawServerCert); !ok {
 		return fmt.Errorf("failed to append PEM, this usually means the PEM is not correctly formatted.")
@@ -111,18 +112,18 @@ func registerCustomSSL(c *config) error {
 	// So we mark the request as `insecure`, and provide our own implementation
 	// for verifying the server cert against the provided server CA
 	var insecure = c.Advanced.SSLMode == "verify_ca"
-	var customVerify func (rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
+	var customVerify func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error
 
 	if c.Advanced.SSLMode == "verify_ca" {
-		customVerify = func (rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		customVerify = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 			opts := x509.VerifyOptions{
-					Roots: rootCertPool,
+				Roots: rootCertPool,
 			}
 			for _, rawCert := range rawCerts {
-					cert, _ := x509.ParseCertificate(rawCert)
-					if _, err := cert.Verify(opts); err != nil {
-						return err
-					}
+				cert, _ := x509.ParseCertificate(rawCert)
+				if _, err := cert.Verify(opts); err != nil {
+					return err
+				}
 			}
 			return nil
 		}
@@ -141,9 +142,9 @@ func registerCustomSSL(c *config) error {
 	}
 
 	mysql.RegisterTLSConfig(customSSLConfigName, &tls.Config{
-		RootCAs: rootCertPool,
-		Certificates: customClientCerts,
-		InsecureSkipVerify: insecure,
+		RootCAs:               rootCertPool,
+		Certificates:          customClientCerts,
+		InsecureSkipVerify:    insecure,
 		VerifyPeerCertificate: customVerify,
 	})
 
@@ -168,7 +169,7 @@ func (c *config) ToURI() string {
 
 	var uri = url.URL{
 		Scheme: "mysql",
-		Path: "/" + c.Database,
+		Path:   "/" + c.Database,
 		Host:   fmt.Sprintf("tcp(%s)", address),
 		User:   url.UserPassword(c.User, c.Password),
 	}
@@ -176,10 +177,10 @@ func (c *config) ToURI() string {
 	if c.Advanced.SSLMode != "" {
 		// see https://pkg.go.dev/github.com/go-sql-driver/mysql#section-readme
 		var tlsConfigMap = map[string]string{
-			"required": "skip-verify",
-			"disabled": "false",
-			"preferred": "preferred",
-			"verify_ca": "custom",
+			"required":        "skip-verify",
+			"disabled":        "false",
+			"preferred":       "preferred",
+			"verify_ca":       "custom",
 			"verify_identity": "custom",
 		}
 
@@ -268,7 +269,6 @@ func newMysqlDriver() *sql.Driver {
 					return nil, fmt.Errorf("error starting network tunnel: %w", err)
 				}
 			}
-
 
 			if cfg.Advanced.SSLMode == "verify_ca" || cfg.Advanced.SSLMode == "verify_identity" {
 				if err := registerCustomSSL(cfg); err != nil {
@@ -384,7 +384,7 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 		}
 
 		return nil
-	});
+	})
 
 	if err != nil {
 		return "", err
@@ -521,17 +521,17 @@ func newTransactor(
 // maximum length of the field as reported from the database, populated upon connector startup.
 type varcharColumnMeta struct {
 	identifier string
-	maxLength int
+	maxLength  int
 }
 
 type binding struct {
-	target               sql.Table
+	target sql.Table
 
-	varcharColumnMetas   []varcharColumnMeta
-	tempVarcharMetas     []varcharColumnMeta
+	varcharColumnMetas []varcharColumnMeta
+	tempVarcharMetas   []varcharColumnMeta
 
-	tempTableName        string
-	tempTruncate         string
+	tempTableName string
+	tempTruncate  string
 
 	createLoadTableSQL   string
 	createUpdateTableSQL string
@@ -539,9 +539,9 @@ type binding struct {
 	storeLoadSQL         string
 	loadQuerySQL         string
 
-	updateLoadSQL        string
-	updateReplaceSQL     string
-	updateTruncateSQL    string
+	updateLoadSQL     string
+	updateReplaceSQL  string
+	updateTruncateSQL string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars map[string]int) error {
@@ -615,7 +615,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 		if strings.Contains(columnType.DDL, "VARCHAR(256)") {
 			tempColumnMetas[idx] = varcharColumnMeta{
 				identifier: key.Identifier,
-				maxLength: 256,
+				maxLength:  256,
 			}
 		}
 	}
@@ -629,25 +629,25 @@ func rowToCSVRecord(row []any) ([]string, error) {
 	var record = make([]string, len(row))
 	for i, v := range row {
 		switch value := v.(type) {
-			case []byte:
-				record[i] = string(value)
-			case string:
-				record[i] = value
-			case nil:
-				// See https://dev.mysql.com/doc/refman/8.0/en/problems-with-null.html
-				record[i] = "NULL"
-			case bool:
-				if value == false {
-					record[i] = "0"
-				} else {
-					record[i] = "1"
-				}
-			default:
-				b, err := json.Marshal(value)
-				if err != nil {
-					return nil, fmt.Errorf("encoding value as json: %w", err)
-				}
-				record[i] = string(b)
+		case []byte:
+			record[i] = string(value)
+		case string:
+			record[i] = value
+		case nil:
+			// See https://dev.mysql.com/doc/refman/8.0/en/problems-with-null.html
+			record[i] = "NULL"
+		case bool:
+			if value == false {
+				record[i] = "0"
+			} else {
+				record[i] = "1"
+			}
+		default:
+			b, err := json.Marshal(value)
+			if err != nil {
+				return nil, fmt.Errorf("encoding value as json: %w", err)
+			}
+			record[i] = string(b)
 		}
 	}
 
@@ -689,7 +689,7 @@ func setupBatch(ctx context.Context, readerSuffix string) batchMeta {
 	)
 
 	return batchMeta{
-		w: writer,
+		w:    writer,
 		buff: &buff,
 	}
 }
@@ -709,19 +709,19 @@ func drainBatch(ctx context.Context, txn *stdsql.Tx, query string, batch batchMe
 }
 
 func drainUpdateBatch(ctx context.Context, txn *stdsql.Tx, b *binding, batch batchMeta) error {
-		if err := drainBatch(ctx, txn, b.updateLoadSQL, batch); err != nil {
-			return fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
-		}
+	if err := drainBatch(ctx, txn, b.updateLoadSQL, batch); err != nil {
+		return fmt.Errorf("store batch update on %q: %w", b.target.Identifier, err)
+	}
 
-		if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
-			return fmt.Errorf("store batch update replace on %q: %w", b.target.Identifier, err)
-		}
+	if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
+		return fmt.Errorf("store batch update replace on %q: %w", b.target.Identifier, err)
+	}
 
-		if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
-			return fmt.Errorf("store batch update truncate on %q: %w", b.target.Identifier, err)
-		}
+	if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
+		return fmt.Errorf("store batch update truncate on %q: %w", b.target.Identifier, err)
+	}
 
-		return nil
+	return nil
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
@@ -754,7 +754,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 							"column":              varcharMeta.identifier,
 							"currentColumnLength": varcharMeta.maxLength,
 							"stringValueLength":   l,
-							"query": fmt.Sprintf(varcharTableAlter, b.tempTableName, varcharMeta.identifier, l),
+							"query":               fmt.Sprintf(varcharTableAlter, b.tempTableName, varcharMeta.identifier, l),
 						}).Info("column will be altered to VARCHAR(stringLength) to accommodate large string value")
 						b.tempVarcharMetas[idx].maxLength = l
 
@@ -881,7 +881,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 		var b = d.bindings[it.Binding]
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON);
+		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}

@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
-	"github.com/estuary/connectors/go/pkg/slices"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 

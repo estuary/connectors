@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.20-buster as builder
+FROM golang:1.21-bullseye as builder
 
 RUN apt-get update \
     && apt-get install -y curl ca-certificates pkg-config cmake g++ protobuf-compiler \
