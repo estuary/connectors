@@ -9,8 +9,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
@@ -43,7 +43,7 @@ func readStream(ctx context.Context, shardRange *pf.RangeSpec, client *kinesis.K
 		case resultsCh <- readResult{
 			source: &recordSource{
 				bindingIndex: bindingIndex,
-				stream: stream,
+				stream:       stream,
 			},
 			err: err,
 		}:
@@ -73,9 +73,9 @@ type streamReader struct {
 }
 
 type recordSource struct {
-	bindingIndex   int
-	stream         string
-	shardID        string
+	bindingIndex int
+	stream       string
+	shardID      string
 }
 
 // readResult is the message that's sent on the channel to the main thread. It will either contain

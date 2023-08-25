@@ -1,3 +1,4 @@
+//go:build kinesistest
 // +build kinesistest
 
 package main
@@ -25,10 +26,10 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/stretchr/testify/require"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pc "github.com/estuary/flow/go/protocols/capture"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsRecordWithinRange(t *testing.T) {
@@ -62,11 +63,11 @@ func TestIsRecordWithinRange(t *testing.T) {
 
 func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 	var conf = Config{
-    Region: "local",
-    Endpoint: "http://localhost:4566",
-    AWSAccessKeyID: "x",
-    AWSSecretAccessKey: "x",
-  }
+		Region:             "local",
+		Endpoint:           "http://localhost:4566",
+		AWSAccessKeyID:     "x",
+		AWSSecretAccessKey: "x",
+	}
 
 	client, err := connect(&conf)
 	require.NoError(t, err)
@@ -160,11 +161,11 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 
 func TestKinesisCapture(t *testing.T) {
 	var conf = Config{
-    Region: "local",
-    Endpoint: "http://localhost:4566",
-    AWSAccessKeyID: "x",
-    AWSSecretAccessKey: "x",
-  }
+		Region:             "local",
+		Endpoint:           "http://localhost:4566",
+		AWSAccessKeyID:     "x",
+		AWSSecretAccessKey: "x",
+	}
 	client, err := connect(&conf)
 	require.NoError(t, err)
 
@@ -201,8 +202,8 @@ func TestKinesisCapture(t *testing.T) {
 	var ctx, cancelFunc = context.WithCancel(context.Background())
 	defer cancelFunc()
 	// Test the discover command and assert that it returns the stream we just created
-	streamNames, err := listAllStreams(ctx, client);
-  require.NoError(t, err)
+	streamNames, err := listAllStreams(ctx, client)
+	require.NoError(t, err)
 
 	bindings := discoverStreams(ctx, client, streamNames)
 
@@ -211,7 +212,7 @@ func TestKinesisCapture(t *testing.T) {
 	for _, s := range bindings {
 		var res resource
 		err := pf.UnmarshalStrict(s.ResourceConfigJson, &res)
-    require.NoError(t, err);
+		require.NoError(t, err)
 
 		if res.Stream == stream {
 			discoveredStream = &s
@@ -224,17 +225,16 @@ func TestKinesisCapture(t *testing.T) {
 	end, err := time.Parse(time.RFC3339Nano, "2022-12-19T14:10:00Z")
 	require.NoError(t, err)
 
-
-  capture := &st.CaptureSpec{
+	capture := &st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: conf,
 		Bindings:     bindings,
-		Validator:    &st.WatchdogValidator{
+		Validator: &st.WatchdogValidator{
 			Inner:         &st.ChecksumValidator{},
 			WatchdogTimer: wdt,
 			ResetPeriod:   quiescentTimeout,
 		},
-		Sanitizers:   make(map[string]*regexp.Regexp),
+		Sanitizers: make(map[string]*regexp.Regexp),
 	}
 
 	// We need to use a relatively long shutdown delay, since the backfill can potentially cover

@@ -1,11 +1,11 @@
 package main
 
 import (
+	"fmt"
+	"slices"
 	"strings"
-  "time"
-  "fmt"
+	"time"
 
-	"github.com/estuary/connectors/go/pkg/slices"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
@@ -17,7 +17,7 @@ var mysqlDialect = func() sql.Dialect {
 		sql.OBJECT:  sql.NewStaticMapper("JSON"),
 		sql.ARRAY:   sql.NewStaticMapper("JSON"),
 		sql.BINARY:  sql.NewStaticMapper("LONGBLOB"),
-		sql.STRING:  sql.PrimaryKeyMapper {
+		sql.STRING: sql.PrimaryKeyMapper{
 			PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
 			Delegate: sql.StringTypeMapper{
 				Fallback: sql.NewStaticMapper("LONGTEXT"),

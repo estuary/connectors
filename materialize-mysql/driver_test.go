@@ -99,14 +99,14 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-      var actual = prereqs(context.Background(), &sql.Endpoint{
+			var actual = prereqs(context.Background(), &sql.Endpoint{
 				Config: tt.cfg(cfg),
 				Tenant: "tenant",
 			}).Unwrap()
 
-      for i := 0; i < len(tt.want); i++ {
-        require.ErrorContains(t, actual[i], tt.want[i])
-      }
+			for i := 0; i < len(tt.want); i++ {
+				require.ErrorContains(t, actual[i], tt.want[i])
+			}
 		})
 	}
 }

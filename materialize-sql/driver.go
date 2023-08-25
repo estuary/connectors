@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
-	"github.com/estuary/connectors/go/pkg/slices"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -211,7 +211,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 
 				var col = Column{
 					Identifier: endpoint.Identifier(field),
-					Projection: Projection{ Projection: *loadedBinding.Collection.GetProjection(field) },
+					Projection: Projection{Projection: *loadedBinding.Collection.GetProjection(field)},
 				}
 				alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, req.DryRun, newTable, col)
 				if err != nil {

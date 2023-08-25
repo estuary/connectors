@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/filesource"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/estuary/flow/go/parser"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/pkg/sftp"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -381,13 +381,13 @@ func (f *sftpFile) Close() error {
 
 func main() {
 	var src = filesource.Source{
-    NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
-      var cfg config
-      if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
-        return nil, fmt.Errorf("parsing config json: %w", err)
-      }
-      return cfg, nil
-    },
+		NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
+			var cfg config
+			if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
+				return nil, fmt.Errorf("parsing config json: %w", err)
+			}
+			return cfg, nil
+		},
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
 			return newSftpSource(ctx, cfg.(config))
 		},

@@ -20,12 +20,12 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, json.Unmarshal(specJson, &spec))
 
 	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
-		Table:  "target_table",
-		Delta:  false,
+		Table: "target_table",
+		Delta: false,
 	})
 	var shape2 = sqlDriver.BuildTableShape(spec, 1, tableConfig{
-		Table:  "Delta Updates",
-		Delta:  true,
+		Table: "Delta Updates",
+		Delta: true,
 	})
 	shape2.Document = nil // TODO(johnny): this is a bit gross.
 

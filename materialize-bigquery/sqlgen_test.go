@@ -1,10 +1,10 @@
 package connector
 
 import (
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
-	"os"
-	"encoding/json"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -16,7 +16,7 @@ import (
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
 	var specJson, err = os.ReadFile("testdata/spec.json")
-  require.NoError(t, err)
+	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(specJson, &spec))
 
 	var shape = sqlDriver.BuildTableShape(spec, 0, tableConfig{

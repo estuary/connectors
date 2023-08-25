@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -18,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/estuary/connectors/filesource"
 	"github.com/estuary/flow/go/parser"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 )
 
@@ -248,13 +248,13 @@ func (l *s3Listing) poll() error {
 func main() {
 
 	var src = filesource.Source{
-    NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
-      var cfg config
-      if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
-        return nil, fmt.Errorf("parsing config json: %w", err)
-      }
-      return cfg, nil
-    },
+		NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
+			var cfg config
+			if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
+				return nil, fmt.Errorf("parsing config json: %w", err)
+			}
+			return cfg, nil
+		},
 		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
 			return newS3Store(ctx, cfg.(config))
 		},
