@@ -1,0 +1,342 @@
+--- Begin new binding - standard updates ---
+{
+	"flow_document": {
+		"type": 2,
+		"reason": "The root document is required for a standard updates materialization"
+	},
+	"flow_published_at": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"key": {
+		"type": 2,
+		"reason": "Primary key locations are required"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"numericString": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	}
+}
+--- End new binding - standard updates ---
+
+--- Begin new binding - delta updates ---
+{
+	"flow_document": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	},
+	"flow_published_at": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"key": {
+		"type": 2,
+		"reason": "Primary key locations are required"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"numericString": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	}
+}
+--- End new binding - delta updates ---
+
+--- Begin with existing binding - standard updates ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End with existing binding - standard updates ---
+
+--- Begin with existing binding - delta updates ---
+{
+	"flow_document": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	},
+	"flow_published_at": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End with existing binding - delta updates ---
+
+--- Begin numeric string format change ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End numeric string format change ---
+
+--- Begin unsatisfiable type change ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"key": {
+		"type": 6,
+		"reason": "Field 'key' is already being materialized as type 'string' and cannot be changed to type 'numeric'"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End unsatisfiable type change ---
+
+--- Begin forbidden type change ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End forbidden type change ---
+
+--- Begin root document projection change - standard updates ---
+{
+	"alternate_root": {
+		"type": 6,
+		"reason": "The root document must be materialized as field 'flow_document'"
+	},
+	"flow_published_at": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"some_other_root": {
+		"type": 5,
+		"reason": "Cannot materialize root document projection 'some_other_root' because field 'flow_document' is already being materialized as the document"
+	}
+}
+--- End root document projection change - standard updates ---
+
+--- Begin root document projection change - delta updates ---
+{
+	"alternate_root": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	},
+	"flow_published_at": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"some_other_root": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	}
+}
+--- End root document projection change - delta updates ---
+
+
