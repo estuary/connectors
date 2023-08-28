@@ -90,6 +90,7 @@ jobs:
           - source-sqlserver
           - source-test
           - materialize-bigquery
+          - materialize-dynamodb
           - materialize-redshift
           - materialize-elasticsearch
           - materialize-firebolt
@@ -158,6 +159,7 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: |
           contains(fromJson('[
+            "materialize-dynamodb",
             "materialize-elasticsearch",
             "source-dynamodb",
             "source-mysql",
@@ -212,6 +214,7 @@ jobs:
       - name: Materialization connector ${{ matrix.connector }} integration tests
         if: |
           contains(fromJson('[
+              "materialize-dynamodb",
               "materialize-elasticsearch",
               "materialize-google-sheets",
               "materialize-pinecone",
