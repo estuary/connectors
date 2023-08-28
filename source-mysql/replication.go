@@ -468,6 +468,9 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	switch stmt := stmt.(type) {
 	case *sqlparser.CreateDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
 		logrus.WithField("query", query).Debug("ignoring benign query")
+	case *sqlparser.CreateView, *sqlparser.AlterView, *sqlparser.DropView:
+		// All view creation/deletion/alterations should be fine to ignore since we don't capture from views.
+		logrus.WithField("query", query).Debug("ignoring benign query")
 	case *sqlparser.DropDatabase:
 		// Remember that In MySQL land "database" is a synonym for the usual SQL concept "schema"
 		if rs.schemaActive(stmt.GetDatabaseName()) {
