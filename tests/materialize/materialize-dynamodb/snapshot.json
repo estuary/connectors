@@ -1,0 +1,1922 @@
+{
+  "applied": {
+    "actionDescription": "- create table 'flow_materializations_v2\n- create table 'simple'\n- create table 'duplicated-keys-standard'\n- create table 'duplicated-keys-delta'\n- create table 'duplicated-keys-delta-exclude-flow-doc'\n- create table 'multiple-types'\n- create table 'formatted-strings'\n- update stored materialization spec and set version = test"
+  }
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_meta": {
+        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
+      },
+      "id": 1,
+      "int": 1,
+      "str": "str 1"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_meta": {
+        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
+      },
+      "id": 2,
+      "int": 2,
+      "str": "str 2"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_meta": {
+        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
+      },
+      "id": 3,
+      "int": 3,
+      "str": "str 3"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_meta": {
+        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
+      },
+      "id": 4,
+      "int": 4,
+      "str": "str 4"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_meta": {
+        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
+      },
+      "id": 5,
+      "int": 5,
+      "str": "str 5"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "5fc54530-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        61,
+        62
+      ],
+      "bool_field": true,
+      "float_field": 6.6,
+      "id": 6,
+      "multiple": [
+        "one",
+        2,
+        true
+      ],
+      "nested": {
+        "id": "i6"
+      },
+      "nullable_int": 6,
+      "str_field": "str6"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        71,
+        72
+      ],
+      "bool_field": false,
+      "float_field": 7.7,
+      "id": 7,
+      "multiple": {
+        "object": "seven"
+      },
+      "nested": {
+        "id": "i7"
+      },
+      "nullable_int": null,
+      "str_field": "str7"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        81,
+        82
+      ],
+      "bool_field": true,
+      "float_field": 8.8,
+      "id": 8,
+      "multiple": null,
+      "nested": {
+        "id": "i8"
+      },
+      "nullable_int": 8,
+      "str_field": "str8"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        91,
+        92
+      ],
+      "bool_field": false,
+      "float_field": 9.9,
+      "id": 9,
+      "nested": {
+        "id": "i9"
+      },
+      "nullable_int": null,
+      "str_field": "str9"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        1,
+        2
+      ],
+      "bool_field": true,
+      "float_field": 10.1,
+      "id": 10,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10"
+    }
+  }
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "_table": "simple",
+  "rows": [
+    {
+      "canary": {
+        "S": "armament's"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "canary": {
+            "S": "armament's"
+          },
+          "id": {
+            "N": "2"
+          }
+        }
+      },
+      "id": {
+        "N": "2"
+      }
+    },
+    {
+      "canary": {
+        "S": "devilish"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "7e2df422-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "canary": {
+            "S": "devilish"
+          },
+          "id": {
+            "N": "9"
+          }
+        }
+      },
+      "id": {
+        "N": "9"
+      }
+    },
+    {
+      "canary": {
+        "S": "amputation's"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "canary": {
+            "S": "amputation's"
+          },
+          "id": {
+            "N": "1"
+          }
+        }
+      },
+      "id": {
+        "N": "1"
+      }
+    },
+    {
+      "canary": {
+        "S": "splatters"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "canary": {
+            "S": "splatters"
+          },
+          "id": {
+            "N": "3"
+          }
+        }
+      },
+      "id": {
+        "N": "3"
+      }
+    },
+    {
+      "canary": {
+        "S": "Kringle's"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "b4b60968-20e0-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "canary": {
+            "S": "Kringle's"
+          },
+          "id": {
+            "N": "5"
+          }
+        }
+      },
+      "id": {
+        "N": "5"
+      }
+    },
+    {
+      "canary": {
+        "S": "roaches"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "1b953992-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "canary": {
+            "S": "roaches"
+          },
+          "id": {
+            "N": "8"
+          }
+        }
+      },
+      "id": {
+        "N": "8"
+      }
+    },
+    {
+      "canary": {
+        "S": "glucose's"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "8458b580-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "canary": {
+            "S": "glucose's"
+          },
+          "id": {
+            "N": "10"
+          }
+        }
+      },
+      "id": {
+        "N": "10"
+      }
+    },
+    {
+      "canary": {
+        "S": "pieced"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "134a1456-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "canary": {
+            "S": "pieced"
+          },
+          "id": {
+            "N": "7"
+          }
+        }
+      },
+      "id": {
+        "N": "7"
+      }
+    },
+    {
+      "canary": {
+        "S": "grosbeak's"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "canary": {
+            "S": "grosbeak's"
+          },
+          "id": {
+            "N": "6"
+          }
+        }
+      },
+      "id": {
+        "N": "6"
+      }
+    },
+    {
+      "canary": {
+        "S": "strengthen"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "canary": {
+            "S": "strengthen"
+          },
+          "id": {
+            "N": "4"
+          }
+        }
+      },
+      "id": {
+        "N": "4"
+      }
+    }
+  ]
+}
+{
+  "_table": "duplicated-keys-standard",
+  "rows": [
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "957348bc-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "2"
+          },
+          "int": {
+            "N": "7"
+          },
+          "str": {
+            "S": "str 7"
+          }
+        }
+      },
+      "id": {
+        "N": "2"
+      },
+      "int": {
+        "N": "7"
+      },
+      "str": {
+        "S": "str 7"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "8de85150-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "1"
+          },
+          "int": {
+            "N": "6"
+          },
+          "str": {
+            "S": "str 6"
+          }
+        }
+      },
+      "id": {
+        "N": "1"
+      },
+      "int": {
+        "N": "6"
+      },
+      "str": {
+        "S": "str 6"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "9afb3ff6-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "3"
+          },
+          "int": {
+            "N": "8"
+          },
+          "str": {
+            "S": "str 8"
+          }
+        }
+      },
+      "id": {
+        "N": "3"
+      },
+      "int": {
+        "N": "8"
+      },
+      "str": {
+        "S": "str 8"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "a65203a8-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "5"
+          },
+          "int": {
+            "N": "10"
+          },
+          "str": {
+            "S": "str 10"
+          }
+        }
+      },
+      "id": {
+        "N": "5"
+      },
+      "int": {
+        "N": "10"
+      },
+      "str": {
+        "S": "str 10"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "a1100a70-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "4"
+          },
+          "int": {
+            "N": "9"
+          },
+          "str": {
+            "S": "str 9"
+          }
+        }
+      },
+      "id": {
+        "N": "4"
+      },
+      "int": {
+        "N": "9"
+      },
+      "str": {
+        "S": "str 9"
+      }
+    }
+  ]
+}
+{
+  "_table": "duplicated-keys-delta",
+  "rows": [
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "957348bc-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "2"
+          },
+          "int": {
+            "N": "7"
+          },
+          "str": {
+            "S": "str 7"
+          }
+        }
+      },
+      "id": {
+        "N": "2"
+      },
+      "int": {
+        "N": "7"
+      },
+      "str": {
+        "S": "str 7"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "8de85150-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "1"
+          },
+          "int": {
+            "N": "6"
+          },
+          "str": {
+            "S": "str 6"
+          }
+        }
+      },
+      "id": {
+        "N": "1"
+      },
+      "int": {
+        "N": "6"
+      },
+      "str": {
+        "S": "str 6"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "9afb3ff6-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "3"
+          },
+          "int": {
+            "N": "8"
+          },
+          "str": {
+            "S": "str 8"
+          }
+        }
+      },
+      "id": {
+        "N": "3"
+      },
+      "int": {
+        "N": "8"
+      },
+      "str": {
+        "S": "str 8"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "a65203a8-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "5"
+          },
+          "int": {
+            "N": "10"
+          },
+          "str": {
+            "S": "str 10"
+          }
+        }
+      },
+      "id": {
+        "N": "5"
+      },
+      "int": {
+        "N": "10"
+      },
+      "str": {
+        "S": "str 10"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "a1100a70-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "4"
+          },
+          "int": {
+            "N": "9"
+          },
+          "str": {
+            "S": "str 9"
+          }
+        }
+      },
+      "id": {
+        "N": "4"
+      },
+      "int": {
+        "N": "9"
+      },
+      "str": {
+        "S": "str 9"
+      }
+    }
+  ]
+}
+{
+  "_table": "duplicated-keys-delta-exclude-flow-doc",
+  "rows": [
+    {
+      "id": {
+        "N": "2"
+      },
+      "int": {
+        "N": "7"
+      },
+      "str": {
+        "S": "str 7"
+      }
+    },
+    {
+      "id": {
+        "N": "1"
+      },
+      "int": {
+        "N": "6"
+      },
+      "str": {
+        "S": "str 6"
+      }
+    },
+    {
+      "id": {
+        "N": "3"
+      },
+      "int": {
+        "N": "8"
+      },
+      "str": {
+        "S": "str 8"
+      }
+    },
+    {
+      "id": {
+        "N": "5"
+      },
+      "int": {
+        "N": "10"
+      },
+      "str": {
+        "S": "str 10"
+      }
+    },
+    {
+      "id": {
+        "N": "4"
+      },
+      "int": {
+        "N": "9"
+      },
+      "str": {
+        "S": "str 9"
+      }
+    }
+  ]
+}
+{
+  "_table": "multiple-types",
+  "rows": [
+    {
+      "array_int": {
+        "L": [
+          {
+            "N": "21"
+          },
+          {
+            "N": "22"
+          }
+        ]
+      },
+      "bool_field": {
+        "BOOL": true
+      },
+      "float_field": {
+        "N": "2.2"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "4b37f0b8-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "array_int": {
+            "L": [
+              {
+                "N": "21"
+              },
+              {
+                "N": "22"
+              }
+            ]
+          },
+          "bool_field": {
+            "BOOL": true
+          },
+          "float_field": {
+            "N": "2.2"
+          },
+          "id": {
+            "N": "2"
+          },
+          "multiple": {
+            "N": "2.2"
+          },
+          "nested": {
+            "M": {
+              "id": {
+                "S": "i2"
+              }
+            }
+          },
+          "nullable_int": {
+            "N": "2"
+          },
+          "str_field": {
+            "S": "str2"
+          }
+        }
+      },
+      "id": {
+        "N": "2"
+      },
+      "multiple": {
+        "N": "2.2"
+      },
+      "nested": {
+        "M": {
+          "id": {
+            "S": "i2"
+          }
+        }
+      },
+      "nullable_int": {
+        "N": "2"
+      },
+      "str_field": {
+        "S": "str2"
+      }
+    },
+    {
+      "array_int": {
+        "L": [
+          {
+            "N": "91"
+          },
+          {
+            "N": "92"
+          }
+        ]
+      },
+      "bool_field": {
+        "BOOL": false
+      },
+      "float_field": {
+        "N": "99.99"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "f5b064a8-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "array_int": {
+            "L": [
+              {
+                "N": "91"
+              },
+              {
+                "N": "92"
+              }
+            ]
+          },
+          "bool_field": {
+            "BOOL": false
+          },
+          "float_field": {
+            "N": "99.99"
+          },
+          "id": {
+            "N": "9"
+          },
+          "nested": {
+            "M": {
+              "id": {
+                "S": "i9"
+              }
+            }
+          },
+          "nullable_int": {
+            "NULL": true
+          },
+          "str_field": {
+            "S": "str9 v2"
+          }
+        }
+      },
+      "id": {
+        "N": "9"
+      },
+      "multiple": {
+        "NULL": true
+      },
+      "nested": {
+        "M": {
+          "id": {
+            "S": "i9"
+          }
+        }
+      },
+      "nullable_int": {
+        "NULL": true
+      },
+      "str_field": {
+        "S": "str9 v2"
+      }
+    },
+    {
+      "array_int": {
+        "L": [
+          {
+            "N": "11"
+          },
+          {
+            "N": "12"
+          }
+        ]
+      },
+      "bool_field": {
+        "BOOL": false
+      },
+      "float_field": {
+        "N": "1.1"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "3fd2ec78-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "array_int": {
+            "L": [
+              {
+                "N": "11"
+              },
+              {
+                "N": "12"
+              }
+            ]
+          },
+          "bool_field": {
+            "BOOL": false
+          },
+          "float_field": {
+            "N": "1.1"
+          },
+          "id": {
+            "N": "1"
+          },
+          "multiple": {
+            "N": "1"
+          },
+          "nested": {
+            "M": {
+              "id": {
+                "S": "i1"
+              }
+            }
+          },
+          "nullable_int": {
+            "NULL": true
+          },
+          "str_field": {
+            "S": "str1"
+          }
+        }
+      },
+      "id": {
+        "N": "1"
+      },
+      "multiple": {
+        "N": "1"
+      },
+      "nested": {
+        "M": {
+          "id": {
+            "S": "i1"
+          }
+        }
+      },
+      "nullable_int": {
+        "NULL": true
+      },
+      "str_field": {
+        "S": "str1"
+      }
+    },
+    {
+      "array_int": {
+        "L": [
+          {
+            "N": "31"
+          },
+          {
+            "N": "32"
+          }
+        ]
+      },
+      "bool_field": {
+        "BOOL": false
+      },
+      "float_field": {
+        "N": "3.3"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "51016380-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "array_int": {
+            "L": [
+              {
+                "N": "31"
+              },
+              {
+                "N": "32"
+              }
+            ]
+          },
+          "bool_field": {
+            "BOOL": false
+          },
+          "float_field": {
+            "N": "3.3"
+          },
+          "id": {
+            "N": "3"
+          },
+          "multiple": {
+            "BOOL": true
+          },
+          "nested": {
+            "M": {
+              "id": {
+                "S": "i3"
+              }
+            }
+          },
+          "nullable_int": {
+            "NULL": true
+          },
+          "str_field": {
+            "S": "str3"
+          }
+        }
+      },
+      "id": {
+        "N": "3"
+      },
+      "multiple": {
+        "BOOL": true
+      },
+      "nested": {
+        "M": {
+          "id": {
+            "S": "i3"
+          }
+        }
+      },
+      "nullable_int": {
+        "NULL": true
+      },
+      "str_field": {
+        "S": "str3"
+      }
+    },
+    {
+      "array_int": {
+        "L": [
+          {
+            "N": "51"
+          },
+          {
+            "N": "52"
+          }
+        ]
+      },
+      "bool_field": {
+        "BOOL": false
+      },
+      "float_field": {
+        "N": "5.5"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "5af9e236-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "array_int": {
+            "L": [
+              {
+                "N": "51"
+              },
+              {
+                "N": "52"
+              }
+            ]
+          },
+          "bool_field": {
+            "BOOL": false
+          },
+          "float_field": {
+            "N": "5.5"
+          },
+          "id": {
+            "N": "5"
+          },
+          "multiple": {
+            "S": "string five"
+          },
+          "nested": {
+            "M": {
+              "id": {
+                "S": "i5"
+              }
+            }
+          },
+          "nullable_int": {
+            "NULL": true
+          },
+          "str_field": {
+            "S": "str5"
+          }
+        }
+      },
+      "id": {
+        "N": "5"
+      },
+      "multiple": {
+        "S": "string five"
+      },
+      "nested": {
+        "M": {
+          "id": {
+            "S": "i5"
+          }
+        }
+      },
+      "nullable_int": {
+        "NULL": true
+      },
+      "str_field": {
+        "S": "str5"
+      }
+    },
+    {
+      "array_int": {
+        "L": [
+          {
+            "N": "81"
+          },
+          {
+            "N": "82"
+          }
+        ]
+      },
+      "bool_field": {
+        "BOOL": true
+      },
+      "float_field": {
+        "N": "88.88"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "f163eef6-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "array_int": {
+            "L": [
+              {
+                "N": "81"
+              },
+              {
+                "N": "82"
+              }
+            ]
+          },
+          "bool_field": {
+            "BOOL": true
+          },
+          "float_field": {
+            "N": "88.88"
+          },
+          "id": {
+            "N": "8"
+          },
+          "multiple": {
+            "NULL": true
+          },
+          "nested": {
+            "M": {
+              "id": {
+                "S": "i8"
+              }
+            }
+          },
+          "nullable_int": {
+            "N": "8"
+          },
+          "str_field": {
+            "S": "str8 v2"
+          }
+        }
+      },
+      "id": {
+        "N": "8"
+      },
+      "multiple": {
+        "NULL": true
+      },
+      "nested": {
+        "M": {
+          "id": {
+            "S": "i8"
+          }
+        }
+      },
+      "nullable_int": {
+        "N": "8"
+      },
+      "str_field": {
+        "S": "str8 v2"
+      }
+    },
+    {
+      "array_int": {
+        "L": [
+          {
+            "N": "1"
+          },
+          {
+            "N": "2"
+          }
+        ]
+      },
+      "bool_field": {
+        "BOOL": true
+      },
+      "float_field": {
+        "N": "1010.101"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "array_int": {
+            "L": [
+              {
+                "N": "1"
+              },
+              {
+                "N": "2"
+              }
+            ]
+          },
+          "bool_field": {
+            "BOOL": true
+          },
+          "float_field": {
+            "N": "1010.101"
+          },
+          "id": {
+            "N": "10"
+          },
+          "nested": {
+            "M": {
+              "id": {
+                "S": "i10"
+              }
+            }
+          },
+          "nullable_int": {
+            "N": "10"
+          },
+          "str_field": {
+            "S": "str10 v2"
+          }
+        }
+      },
+      "id": {
+        "N": "10"
+      },
+      "multiple": {
+        "NULL": true
+      },
+      "nested": {
+        "M": {
+          "id": {
+            "S": "i10"
+          }
+        }
+      },
+      "nullable_int": {
+        "N": "10"
+      },
+      "str_field": {
+        "S": "str10 v2"
+      }
+    },
+    {
+      "array_int": {
+        "L": [
+          {
+            "N": "71"
+          },
+          {
+            "N": "72"
+          }
+        ]
+      },
+      "bool_field": {
+        "BOOL": false
+      },
+      "float_field": {
+        "N": "77.77"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "eb40dafc-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "array_int": {
+            "L": [
+              {
+                "N": "71"
+              },
+              {
+                "N": "72"
+              }
+            ]
+          },
+          "bool_field": {
+            "BOOL": false
+          },
+          "float_field": {
+            "N": "77.77"
+          },
+          "id": {
+            "N": "7"
+          },
+          "multiple": {
+            "M": {
+              "object": {
+                "S": "seven"
+              }
+            }
+          },
+          "nested": {
+            "M": {
+              "id": {
+                "S": "i7"
+              }
+            }
+          },
+          "nullable_int": {
+            "NULL": true
+          },
+          "str_field": {
+            "S": "str7 v2"
+          }
+        }
+      },
+      "id": {
+        "N": "7"
+      },
+      "multiple": {
+        "B": "eyJvYmplY3QiOiJzZXZlbiJ9"
+      },
+      "nested": {
+        "M": {
+          "id": {
+            "S": "i7"
+          }
+        }
+      },
+      "nullable_int": {
+        "NULL": true
+      },
+      "str_field": {
+        "S": "str7 v2"
+      }
+    },
+    {
+      "array_int": {
+        "L": [
+          {
+            "N": "61"
+          },
+          {
+            "N": "62"
+          }
+        ]
+      },
+      "bool_field": {
+        "BOOL": true
+      },
+      "float_field": {
+        "N": "66.66"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "e4b646c2-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "array_int": {
+            "L": [
+              {
+                "N": "61"
+              },
+              {
+                "N": "62"
+              }
+            ]
+          },
+          "bool_field": {
+            "BOOL": true
+          },
+          "float_field": {
+            "N": "66.66"
+          },
+          "id": {
+            "N": "6"
+          },
+          "multiple": {
+            "L": [
+              {
+                "S": "one"
+              },
+              {
+                "N": "2"
+              },
+              {
+                "BOOL": true
+              }
+            ]
+          },
+          "nested": {
+            "M": {
+              "id": {
+                "S": "i6"
+              }
+            }
+          },
+          "nullable_int": {
+            "N": "6"
+          },
+          "str_field": {
+            "S": "str6 v2"
+          }
+        }
+      },
+      "id": {
+        "N": "6"
+      },
+      "multiple": {
+        "B": "WyJvbmUiLDIsdHJ1ZV0="
+      },
+      "nested": {
+        "M": {
+          "id": {
+            "S": "i6"
+          }
+        }
+      },
+      "nullable_int": {
+        "N": "6"
+      },
+      "str_field": {
+        "S": "str6 v2"
+      }
+    },
+    {
+      "array_int": {
+        "L": [
+          {
+            "N": "41"
+          },
+          {
+            "N": "42"
+          }
+        ]
+      },
+      "bool_field": {
+        "BOOL": true
+      },
+      "float_field": {
+        "N": "4.4"
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "5660aaca-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "array_int": {
+            "L": [
+              {
+                "N": "41"
+              },
+              {
+                "N": "42"
+              }
+            ]
+          },
+          "bool_field": {
+            "BOOL": true
+          },
+          "float_field": {
+            "N": "4.4"
+          },
+          "id": {
+            "N": "4"
+          },
+          "multiple": {
+            "BOOL": false
+          },
+          "nested": {
+            "M": {
+              "id": {
+                "S": "i4"
+              }
+            }
+          },
+          "nullable_int": {
+            "N": "4"
+          },
+          "str_field": {
+            "S": "str4"
+          }
+        }
+      },
+      "id": {
+        "N": "4"
+      },
+      "multiple": {
+        "BOOL": false
+      },
+      "nested": {
+        "M": {
+          "id": {
+            "S": "i4"
+          }
+        }
+      },
+      "nullable_int": {
+        "N": "4"
+      },
+      "str_field": {
+        "S": "str4"
+      }
+    }
+  ]
+}
+{
+  "_table": "formatted-strings",
+  "rows": [
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "b81a9bf4-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "2"
+          },
+          "int_and_str": {
+            "N": "2"
+          },
+          "int_str": {
+            "S": "20"
+          },
+          "num_and_str": {
+            "N": "2.1"
+          },
+          "num_str": {
+            "S": "20.1"
+          }
+        }
+      },
+      "id": {
+        "N": "2"
+      },
+      "int_and_str": {
+        "N": "2"
+      },
+      "int_str": {
+        "N": "20"
+      },
+      "num_and_str": {
+        "N": "2.1"
+      },
+      "num_str": {
+        "N": "20.1"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "b1e13a0e-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "1"
+          },
+          "int_and_str": {
+            "N": "1"
+          },
+          "int_str": {
+            "S": "10"
+          },
+          "num_and_str": {
+            "N": "1.1"
+          },
+          "num_str": {
+            "S": "10.1"
+          }
+        }
+      },
+      "id": {
+        "N": "1"
+      },
+      "int_and_str": {
+        "N": "1"
+      },
+      "int_str": {
+        "N": "10"
+      },
+      "num_and_str": {
+        "N": "1.1"
+      },
+      "num_str": {
+        "N": "10.1"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "3"
+          },
+          "int_and_str": {
+            "N": "3"
+          },
+          "int_str": {
+            "S": "30"
+          },
+          "num_and_str": {
+            "N": "3.1"
+          },
+          "num_str": {
+            "S": "30.1"
+          }
+        }
+      },
+      "id": {
+        "N": "3"
+      },
+      "int_and_str": {
+        "N": "3"
+      },
+      "int_str": {
+        "N": "30"
+      },
+      "num_and_str": {
+        "N": "3.1"
+      },
+      "num_str": {
+        "N": "30.1"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "5"
+          },
+          "int_and_str": {
+            "S": "5"
+          },
+          "int_str": {
+            "S": "50"
+          },
+          "num_and_str": {
+            "S": "5.1"
+          },
+          "num_str": {
+            "S": "50.1"
+          }
+        }
+      },
+      "id": {
+        "N": "5"
+      },
+      "int_and_str": {
+        "N": "5"
+      },
+      "int_str": {
+        "N": "50"
+      },
+      "num_and_str": {
+        "N": "5.1"
+      },
+      "num_str": {
+        "N": "50.1"
+      }
+    },
+    {
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "4"
+          },
+          "int_and_str": {
+            "S": "4"
+          },
+          "int_str": {
+            "S": "40"
+          },
+          "num_and_str": {
+            "S": "4.1"
+          },
+          "num_str": {
+            "S": "40.1"
+          }
+        }
+      },
+      "id": {
+        "N": "4"
+      },
+      "int_and_str": {
+        "N": "4"
+      },
+      "int_str": {
+        "N": "40"
+      },
+      "num_and_str": {
+        "N": "4.1"
+      },
+      "num_str": {
+        "N": "40.1"
+      }
+    }
+  ]
+}
+{
+  "applied": {
+    "actionDescription": "- update stored materialization spec and set version = test"
+  }
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
