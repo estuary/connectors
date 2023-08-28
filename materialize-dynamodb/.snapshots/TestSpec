@@ -1,0 +1,70 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-dynamodb/config",
+    "properties": {
+      "awsAccessKeyId": {
+        "type": "string",
+        "title": "Access Key ID",
+        "description": "AWS Access Key ID for materializing to DynamoDB.",
+        "order": 1
+      },
+      "awsSecretAccessKey": {
+        "type": "string",
+        "title": "Secret Access Key",
+        "description": "AWS Secret Access Key for materializing to DynamoDB.",
+        "order": 2,
+        "secret": true
+      },
+      "region": {
+        "type": "string",
+        "title": "Region",
+        "description": "Region of the materialized tables.",
+        "order": 3
+      },
+      "advanced": {
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "title": "AWS Endpoint",
+            "description": "The AWS endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
+      }
+    },
+    "type": "object",
+    "required": [
+      "awsAccessKeyId",
+      "awsSecretAccessKey",
+      "region"
+    ],
+    "title": "Materialize DynamoDB Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-dynamodb/resource",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table Name",
+        "description": "The name of the table to be materialized to.",
+        "x-collection-name": true
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta updates",
+        "default": false
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "DynamoDB Table"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-dynamodb"
+}
