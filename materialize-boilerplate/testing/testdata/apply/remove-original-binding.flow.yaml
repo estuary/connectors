@@ -1,0 +1,10 @@
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings: []
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }

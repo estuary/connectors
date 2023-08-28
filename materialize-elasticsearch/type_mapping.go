@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/estuary/connectors/materialize-boilerplate/validate"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 )
 
 type elasticPropertyType string
@@ -31,9 +33,14 @@ func propForField(field string, binding *pf.MaterializationSpec_Binding) propert
 	return propForProjection(binding.Collection.GetProjection(field))
 }
 
+var numericStringTypes = map[validate.StringWithNumericFormat]elasticPropertyType{
+	validate.StringFormatInteger: elasticTypeLong,
+	validate.StringFormatNumber:  elasticTypeDouble,
+}
+
 func propForProjection(p *pf.Projection) property {
-	if t, ok := asFormattedNumeric(p); ok {
-		return property{Type: t, Coerce: true}
+	if numericString, ok := validate.AsFormattedNumeric(p); ok {
+		return property{Type: numericStringTypes[numericString], Coerce: true}
 	}
 
 	typesWithoutNull := func(ts []string) []string {
@@ -98,31 +105,51 @@ func buildIndexProperties(b *pf.MaterializationSpec_Binding) map[string]property
 	return props
 }
 
-func asFormattedNumeric(projection *pf.Projection) (elasticPropertyType, bool) {
-	typesMatch := func(actual, allowed []string) bool {
-		for _, t := range actual {
-			if !slices.Contains(allowed, t) {
-				return false
-			}
-		}
-		return true
-	}
-
-	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
-		switch {
-		case projection.Inference.String_.Format == "integer" && typesMatch(projection.Inference.Types, []string{"integer", "null", "string"}):
-			return elasticTypeLong, true
-		case projection.Inference.String_.Format == "number" && typesMatch(projection.Inference.Types, []string{"null", "number", "string"}):
-			return elasticTypeDouble, true
-		default:
-			// Fallthrough.
-		}
-	}
-
-	// Not a formatted numeric field.
-	return "", false
-}
-
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+var elasticValidator = validate.NewValidator(constrainter{})
+
+type constrainter struct{}
+
+func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
+	_, isNumeric := validate.AsFormattedNumeric(p)
+
+	var constraint = pm.Response_Validated_Constraint{}
+	switch {
+	case p.IsPrimaryKey:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "Primary key locations are required"
+	case p.IsRootDocumentProjection() && !deltaUpdates:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "The root document is required for a standard updates materialization"
+	case p.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The root document should usually be materialized"
+	case p.Inference.IsSingleScalarType() || isNumeric:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The projection has a single scalar type"
+	case p.Inference.IsSingleType() && !slices.Contains(p.Inference.Types, "array"):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "This field is able to be materialized"
+
+	default:
+		// Anything else is either multiple different types, a single 'null' type, or an
+		// array type which we currently don't support. We could potentially support array
+		// types if they made the "elements" configuration avaiable and that was a single
+		// type.
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize this field"
+	}
+
+	return &constraint
+}
+
+func (constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection) bool {
+	return propForProjection(existing).Type == propForProjection(proposed).Type
+}
+
+func (constrainter) DescriptionForType(p *pf.Projection) string {
+	return string(propForProjection(p).Type)
 }
