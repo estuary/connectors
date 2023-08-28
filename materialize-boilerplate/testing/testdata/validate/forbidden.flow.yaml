@@ -1,0 +1,36 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        key: { type: string }
+        # This field is now a "null" instead of an integer (see base.flow.yaml), which will
+        # typically result in an "foridden" constraint, unless the connector does not forbid fields
+        # where the only type is "null".
+        scalarValue: { type: "null" }
+        numericString: { type: [integer, string], format: integer }
+        nonScalarValue: { type: object }
+        multiple: { type: [integer, string, boolean] }
+        nullValue: { type: "null" }
+      required: [key]
+    key: [/key]
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: false
+          include:
+            key: {}
+            numericString: {}
+            # Note: scalarValue not included, since the materialize-sqlite stand-in connector
+            # forbids it.
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }

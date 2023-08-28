@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	boilerplate_tests "github.com/estuary/connectors/materialize-boilerplate/testing"
+	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -37,43 +37,73 @@ func TestApply(t *testing.T) {
 	configJson, err := json.Marshal(cfg)
 	require.NoError(t, err)
 
-	testIndexName := "some-index"
+	firstIndex := "first-index"
+	secondIndex := "second-index"
 
-	baseResource := resource{
-		Index:        testIndexName,
+	firstResource := resource{
+		Index:        firstIndex,
 		DeltaUpdates: false,
 	}
-	resourceJson, err := json.Marshal(baseResource)
+	firstResourceJson, err := json.Marshal(firstResource)
+	require.NoError(t, err)
+
+	secondResource := resource{
+		Index:        secondIndex,
+		DeltaUpdates: false,
+	}
+	secondResourceJson, err := json.Marshal(secondResource)
 	require.NoError(t, err)
 
 	client, err := cfg.toClient()
 	require.NoError(t, err)
 
-	boilerplate_tests.RunApplyTestCases(
+	bp_test.RunApplyTestCases(
 		t,
 		driver{},
 		configJson,
-		resourceJson,
-		[]string{testIndexName},
-		func(t *testing.T) string {
-			t.Helper()
-
-			resp, err := client.es.Indices.Get([]string{testIndexName})
+		[2]json.RawMessage{firstResourceJson, secondResourceJson},
+		[2][]string{{firstIndex}, {secondIndex}},
+		func(t *testing.T) []string {
+			resp, err := client.es.Cat.Indices(client.es.Cat.Indices.WithFormat("json"))
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			bb, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 
-			return gjson.GetBytes(bb, fmt.Sprintf("%s.mappings.properties", testIndexName)).String()
+			var got []map[string]string
+			require.NoError(t, json.Unmarshal(bb, &got))
+
+			indices := []string{}
+			for _, i := range got {
+				indices = append(indices, i["index"])
+			}
+
+			return indices
+		},
+		func(t *testing.T, resourcePath []string) string {
+			t.Helper()
+
+			resp, err := client.es.Indices.Get([]string{resourcePath[0]})
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			bb, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			return gjson.GetBytes(bb, fmt.Sprintf("%s.mappings.properties", resourcePath[0])).String()
 		},
 		func(t *testing.T) {
 			t.Helper()
 
-			_, err := client.es.Indices.Delete([]string{defaultFlowMaterializations, testIndexName})
+			_, err := client.es.Indices.Delete([]string{defaultFlowMaterializations, firstIndex, secondIndex})
 			require.NoError(t, err)
 		},
 	)
+}
+
+func TestValidate(t *testing.T) {
+	bp_test.RunValidateTestCases(t, elasticValidator)
 }
 
 func TestDriverSpec(t *testing.T) {

@@ -19,6 +19,7 @@ COPY materialize-elasticsearch ./materialize-elasticsearch
 # specify `--build-arg TEST_DATABASE=no` in the Docker command line.
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
+RUN go test -tags nozstd -v ./materialize-boilerplate/...
 RUN go test -tags nozstd -v ./materialize-elasticsearch/...
 
 # Build the connector.

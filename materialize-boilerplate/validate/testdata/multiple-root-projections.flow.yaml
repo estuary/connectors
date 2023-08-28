@@ -1,0 +1,31 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        stringKey: { type: string }
+        intKey: { type: integer }
+        stringFormatIntVal: { type: string, format: integer }
+        boolVal: { type: boolean }
+        nullVal: { type: "null" }
+        locRequiredVal: { type: "string" }
+      required: [stringKey, intKey]
+    key: [/stringKey, /intKey]
+    projections:
+      first_root: ""
+      second_root: ""
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: true
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }
