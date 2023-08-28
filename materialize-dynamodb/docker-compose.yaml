@@ -1,0 +1,15 @@
+version: '3.7'
+
+services:
+  db:
+    image: "amazon/dynamodb-local:latest"
+    command: "-jar DynamoDBLocal.jar -sharedDb"
+    ports:
+      - "8000:8000"
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
