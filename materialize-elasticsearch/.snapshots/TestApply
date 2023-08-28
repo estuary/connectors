@@ -1,37 +1,73 @@
 --- Begin base ---
+* Table list: [first-index flow_materializations_v2]:
+* Schema for [first-index]:
 {"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
 --- End base ---
 
 --- Begin remove original required field ---
+* Table list: [first-index flow_materializations_v2]:
+* Schema for [first-index]:
 {"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
 --- End remove original required field ---
 
 --- Begin re-add removed original required field ---
+* Table list: [first-index flow_materializations_v2]:
+* Schema for [first-index]:
 {"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
 --- End re-add removed original required field ---
 
 --- Begin remove original optional field ---
+* Table list: [first-index flow_materializations_v2]:
+* Schema for [first-index]:
 {"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
 --- End remove original optional field ---
 
 --- Begin re-add removed original optional field ---
+* Table list: [first-index flow_materializations_v2]:
+* Schema for [first-index]:
 {"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"}}
 --- End re-add removed original optional field ---
 
 --- Begin add new required field ---
+* Table list: [first-index flow_materializations_v2]:
+* Schema for [first-index]:
 {"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
 --- End add new required field ---
 
 --- Begin remove new required field ---
+* Table list: [first-index flow_materializations_v2]:
+* Schema for [first-index]:
 {"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
 --- End remove new required field ---
 
 --- Begin add new optional field ---
+* Table list: [first-index flow_materializations_v2]:
+* Schema for [first-index]:
 {"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"optionalVal2":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
 --- End add new optional field ---
 
 --- Begin remove new optional field ---
+* Table list: [first-index flow_materializations_v2]:
+* Schema for [first-index]:
 {"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"optionalVal2":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
 --- End remove new optional field ---
+
+--- Begin add new binding ---
+* Table list: [first-index second-index flow_materializations_v2]:
+* Schema for [first-index]:
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"optionalVal2":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
+* Schema for [second-index]:
+{"flow_document":{"type":"flattened","index":false},"flow_published_at":{"type":"date"},"int":{"type":"long"},"secondKey":{"type":"keyword"},"str":{"type":"text"}}
+--- End add new binding ---
+
+--- Begin remove new binding ---
+* Table list: [first-index second-index flow_materializations_v2]:
+* Schema for [first-index]:
+{"flow_document":{"type":"flattened","index":false},"key":{"type":"keyword"},"optionalVal1":{"type":"long"},"optionalVal2":{"type":"long"},"requiredVal1":{"type":"text"},"requiredVal2":{"type":"text"}}
+--- End remove new binding ---
+
+--- Begin remove original binding ---
+* Table list: [first-index second-index flow_materializations_v2]:
+--- End remove original binding ---
 
 

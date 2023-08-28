@@ -17,6 +17,7 @@ import (
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	"github.com/estuary/connectors/materialize-boilerplate/validate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
@@ -392,7 +393,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			return nil, fmt.Errorf("index name '%s' is invalid: must contain at least 1 character that is not '.', '-', or '-'", res.Index)
 		}
 
-		constraints, err := validateBinding(res, []string{indexName}, binding.Collection, storedSpec)
+		constraints, err := elasticValidator.ValidateBinding([]string{indexName}, res.DeltaUpdates, binding.Collection, storedSpec)
 		if err != nil {
 			return nil, fmt.Errorf("validating binding: %w", err)
 		}
@@ -449,11 +450,11 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		if err := validateSelectedFields(res, binding, storedSpec); err != nil {
+		if err := elasticValidator.ValidateSelectedFields(binding, storedSpec); err != nil {
 			return nil, fmt.Errorf("validating selected fields: %w", err)
 		}
 
-		found, err := findExistingBinding(binding.ResourcePath, binding.Collection.Name, storedSpec)
+		found, err := validate.FindExistingBinding(binding.ResourcePath, binding.Collection.Name, storedSpec)
 		if err != nil {
 			return nil, err
 		}
