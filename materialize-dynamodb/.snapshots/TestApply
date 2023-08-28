@@ -1,0 +1,133 @@
+--- Begin base ---
+* Table list: [first-table flow_materializations_v2]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End base ---
+
+--- Begin remove original required field ---
+* Table list: [first-table flow_materializations_v2]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End remove original required field ---
+
+--- Begin re-add removed original required field ---
+* Table list: [first-table flow_materializations_v2]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End re-add removed original required field ---
+
+--- Begin remove original optional field ---
+* Table list: [first-table flow_materializations_v2]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End remove original optional field ---
+
+--- Begin re-add removed original optional field ---
+* Table list: [first-table flow_materializations_v2]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End re-add removed original optional field ---
+
+--- Begin add new required field ---
+* Table list: [first-table flow_materializations_v2]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End add new required field ---
+
+--- Begin remove new required field ---
+* Table list: [first-table flow_materializations_v2]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End remove new required field ---
+
+--- Begin add new optional field ---
+* Table list: [first-table flow_materializations_v2]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End add new optional field ---
+
+--- Begin remove new optional field ---
+* Table list: [first-table flow_materializations_v2]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End remove new optional field ---
+
+--- Begin add new binding ---
+* Table list: [first-table flow_materializations_v2 second-table]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+* Schema for [second-table]:
+[
+  {
+    "AttributeName": "secondKey",
+    "AttributeType": "S"
+  }
+]
+--- End add new binding ---
+
+--- Begin remove new binding ---
+* Table list: [first-table flow_materializations_v2 second-table]:
+* Schema for [first-table]:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End remove new binding ---
+
+--- Begin remove original binding ---
+* Table list: [first-table flow_materializations_v2 second-table]:
+--- End remove original binding ---
+
+
