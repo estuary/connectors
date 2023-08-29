@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INT64 NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INT64,\n\t\tstr STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INT64 NOT NULL,\n\t\tarray_int STRING,\n\t\tbool_field BOOL,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested STRING,\n\t\tnullable_int INT64,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str INT64,\n\t\tint_str INT64,\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nINSERT INTO `estuary-theatre`.testing.flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-bigquery/materialize');"
+    "actionDescription": "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_materializations_v2 (\n\t\tmaterialization STRING NOT NULL,\n\t\tversion STRING NOT NULL,\n\t\tspec STRING NOT NULL\n)\nCLUSTER BY materialization;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.flow_checkpoints_v1 (\n\t\tmaterialization STRING NOT NULL,\n\t\tkey_begin INT64 NOT NULL,\n\t\tkey_end INT64 NOT NULL,\n\t\tfence INT64 NOT NULL,\n\t\tcheckpoint STRING NOT NULL\n)\nCLUSTER BY materialization, key_begin, key_end;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INT64 NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INT64 NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INT64,\n\t\tstr STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INT64 NOT NULL,\n\t\tarray_int STRING,\n\t\tbool_field BOOL,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested STRING,\n\t\tnullable_int INT64,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INT64 NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str INT64,\n\t\tint_str INT64,\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING,\n\t\tflow_document STRING NOT NULL\n)\nCLUSTER BY id;\n\nINSERT INTO `estuary-theatre`.testing.flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-bigquery/materialize');"
   }
 }
 {
@@ -430,48 +430,63 @@
 ]
 [
   1,
+  "0001-01-01",
+  "0001-01-01T00:00:00Z",
   "2023-07-12T18:27:01.912219Z",
   1,
   10,
   1.1,
   10.1,
-  "{\"_meta\":{\"uuid\":\"b1e13a0e-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int_and_str\":1,\"int_str\":\"10\",\"num_and_str\":1.1,\"num_str\":\"10.1\"}"
+  "00:00:00Z",
+  "{\"_meta\":{\"uuid\":\"b1e13a0e-20e1-11ee-990b-ffd12dfcd47f\"},\"date\":\"0000-01-01\",\"datetime\":\"0000-01-01T00:00:00Z\",\"id\":1,\"int_and_str\":1,\"int_str\":\"10\",\"num_and_str\":1.1,\"num_str\":\"10.1\",\"time\":\"00:00:00Z\"}"
 ]
 [
   2,
+  "1999-02-02",
+  "1999-02-02T14:20:12.33Z",
   "2023-07-12T18:27:12.35461Z",
   2,
   20,
   2.1,
   20.1,
-  "{\"_meta\":{\"uuid\":\"b81a9bf4-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":2,\"int_and_str\":2,\"int_str\":\"20\",\"num_and_str\":2.1,\"num_str\":\"20.1\"}"
+  "14:20:12.33Z",
+  "{\"_meta\":{\"uuid\":\"b81a9bf4-20e1-11ee-990b-ffd12dfcd47f\"},\"date\":\"1999-02-02\",\"datetime\":\"1999-02-02T14:20:12.33Z\",\"id\":2,\"int_and_str\":2,\"int_str\":\"20\",\"num_and_str\":2.1,\"num_str\":\"20.1\",\"time\":\"14:20:12.33Z\"}"
 ]
 [
   3,
+  "1000-03-03",
+  "1000-03-03T23:59:38.099999Z",
   "2023-07-12T18:18:11.537199Z",
   3,
   30,
   3.1,
   30.1,
-  "{\"_meta\":{\"uuid\":\"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":3,\"int_and_str\":3,\"int_str\":\"30\",\"num_and_str\":3.1,\"num_str\":\"30.1\"}"
+  "23:59:38.10Z",
+  "{\"_meta\":{\"uuid\":\"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"},\"date\":\"1000-03-03\",\"datetime\":\"1000-03-03T23:59:38.10Z\",\"id\":3,\"int_and_str\":3,\"int_str\":\"30\",\"num_and_str\":3.1,\"num_str\":\"30.1\",\"time\":\"23:59:38.10Z\"}"
 ]
 [
   4,
+  "2023-08-29",
+  "2023-08-29T23:59:38Z",
   "2023-07-12T18:18:48.441281Z",
   4,
   40,
   4.1,
   40.1,
-  "{\"_meta\":{\"uuid\":\"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":4,\"int_and_str\":\"4\",\"int_str\":\"40\",\"num_and_str\":\"4.1\",\"num_str\":\"40.1\"}"
+  "23:59:38Z",
+  "{\"_meta\":{\"uuid\":\"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"},\"date\":\"2023-08-29\",\"datetime\":\"2023-08-29T23:59:38Z\",\"id\":4,\"int_and_str\":\"4\",\"int_str\":\"40\",\"num_and_str\":\"4.1\",\"num_str\":\"40.1\",\"time\":\"23:59:38Z\"}"
 ]
 [
   5,
+  "9999-12-31",
+  "9999-12-31T23:59:59Z",
   "2023-07-12T18:27:25.889321Z",
   5,
   50,
   5.1,
   50.1,
-  "{\"_meta\":{\"uuid\":\"c02bd79a-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":5,\"int_and_str\":\"5\",\"int_str\":\"50\",\"num_and_str\":\"5.1\",\"num_str\":\"50.1\"}"
+  "23:59:59Z",
+  "{\"_meta\":{\"uuid\":\"c02bd79a-20e1-11ee-990b-ffd12dfcd47f\"},\"date\":\"9999-12-31\",\"datetime\":\"9999-12-31T23:59:59Z\",\"id\":5,\"int_and_str\":\"5\",\"int_str\":\"50\",\"num_and_str\":\"5.1\",\"num_str\":\"50.1\",\"time\":\"23:59:59Z\"}"
 ]
 {
   "applied": {

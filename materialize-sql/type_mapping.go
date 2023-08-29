@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -269,6 +270,36 @@ func StdStrToFloat() ElementConverter {
 		}
 
 		return out, nil
+	})
+}
+
+const (
+	minimumTimestamp = "0001-01-01T00:00:00Z"
+	minimumDate      = "0001-01-01"
+)
+
+// ClampDatetime provides handling for endpoints that do not accept "0000" as a year by replacing
+// these datetimes with minimumTimestamp.
+func ClampDatetime() ElementConverter {
+	return StringCastConverter(func(str string) (interface{}, error) {
+		if parsed, err := time.Parse(time.RFC3339Nano, str); err != nil {
+			return nil, err
+		} else if parsed.Year() == 0 {
+			return minimumTimestamp, nil
+		}
+		return str, nil
+	})
+}
+
+// ClampDate is like ClampDatetime but just for dates.
+func ClampDate() ElementConverter {
+	return StringCastConverter(func(str string) (interface{}, error) {
+		if parsed, err := time.Parse(time.DateOnly, str); err != nil {
+			return nil, err
+		} else if parsed.Year() == 0 {
+			return minimumDate, nil
+		}
+		return str, nil
 	})
 }
 
