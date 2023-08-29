@@ -59,29 +59,21 @@ var sqlServerDialect = func() sql.Dialect {
 
 func rfc3339ToUTC() sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
-		var err error
-		var t time.Time
-		if t, err = time.Parse(time.RFC3339Nano, str); err == nil {
-			return t.UTC(), nil
-		} else if t, err = time.Parse(time.RFC3339, str); err == nil {
+		if t, err := time.Parse(time.RFC3339Nano, str); err != nil {
+			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
+		} else {
 			return t.UTC(), nil
 		}
-
-		return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
 	})
 }
 
 func rfc3339TimeToUTC() sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
-		var err error
-		var t time.Time
-		if t, err = time.Parse("15:04:05.999999999Z07:00", str); err == nil {
-			return t.UTC(), nil
-		} else if t, err = time.Parse("15:04:05Z07:00", str); err == nil {
+		if t, err := time.Parse("15:04:05.999999999Z07:00", str); err != nil {
+			return nil, fmt.Errorf("could not parse %q as RFC3339 time: %w", str, err)
+		} else {
 			return t.UTC(), nil
 		}
-
-		return nil, fmt.Errorf("could not parse %q as RFC3339 time: %w", str, err)
 	})
 }
 
