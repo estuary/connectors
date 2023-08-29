@@ -161,8 +161,7 @@ func (c *config) ToURI() string {
 	}
 
 	// If the user did not specify a port (or no network tunnel is being used), default to port
-	// 3306. mysql ends up doing this anyway, but we do it here to make it more explicit and stable in
-	// case that underlying behavior changes in the future.
+	// 3306
 	if !strings.Contains(address, ":") {
 		address = address + ":3306"
 	}
