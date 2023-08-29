@@ -118,13 +118,6 @@ CREATE TABLE {{ template "temp_load_name" . }} (
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
 	{{- end -}}
-	,
-		PRIMARY KEY (
-		{{- range $ind, $key := $.Keys }}
-		{{- if $ind }}, {{end -}}
-		{{$key.Identifier}}
-		{{- end -}}
-	)
 );
 {{ end }}
 
