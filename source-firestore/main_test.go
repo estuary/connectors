@@ -267,6 +267,7 @@ func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
 	for _, name := range names {
 		var path = "flow_source_tests/*/" + name
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
+			Collection:         flow.CollectionSpec{Name: flow.Collection(path)},
 			ResourceConfigJson: json.RawMessage(fmt.Sprintf(`{"path": %q, "backfillMode": "async"}`, path)),
 			ResourcePath:       []string{path},
 		})
