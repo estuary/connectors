@@ -677,6 +677,9 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 						return err
 					}
+					time.AfterFunc(backfillRestartDelay+time.Hour, func() {
+						logEntry.Fatal("forcing connector restart to establish consistency")
+					})
 					target.ResumeType = &firestore_pb.Target_ReadTime{ReadTime: timestamppb.New(time.Now())}
 					listenClient = nil
 				}
