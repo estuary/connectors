@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"path"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
@@ -35,7 +34,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce compute time by increasing the delay between updates.,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
+	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce compute time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
 }
 
 func (c *config) Validate() error {
@@ -65,15 +64,8 @@ func (c *config) Validate() error {
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
 	}
 
-	if c.Advanced.UpdateDelay != "" {
-		parsed, err := time.ParseDuration(c.Advanced.UpdateDelay)
-		if err != nil {
-			return fmt.Errorf("could not parse Update Delay '%s': must be a valid Go duration string", c.Advanced.UpdateDelay)
-		}
-
-		if parsed < 0 {
-			return fmt.Errorf("update delay '%s' must not be negative", c.Advanced.UpdateDelay)
-		}
+	if _, err := sql.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+		return err
 	}
 
 	return nil
