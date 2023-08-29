@@ -316,7 +316,6 @@ func (c *capture) Run(ctx context.Context) error {
 	for collectionID, startTime := range watchCollections {
 		var collectionID, startTime = collectionID, startTime // Copy the loop variables for each closure
 		log.WithField("collection", collectionID).Debug("starting worker")
-		c.streamsInCatchup.Add(1)
 		eg.Go(func() error {
 			return c.StreamChanges(ctx, rpcClient, collectionID, startTime)
 		})
@@ -517,10 +516,9 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 	}
 
 	var listenClient firestore_pb.Firestore_ListenClient
-	var numDocuments int
-	var isCurrent = false
-	var catchupStreaming = true
-	var catchupStarted = time.Now()
+	var numRestarts, numDocuments int
+	var isCurrent, catchupStreaming bool
+	var catchupStarted time.Time
 	for {
 		if listenClient == nil {
 			var err error
@@ -530,7 +528,22 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 			} else if err := listenClient.Send(req); err != nil {
 				return fmt.Errorf("error sending Listen RPC: %w", err)
 			}
+
+			logEntry.WithFields(log.Fields{
+				"restarts":             numRestarts,
+				"docsSinceLastRestart": numDocuments,
+			}).Debug("opened listen stream")
+
+			numRestarts++
+			numDocuments = 0
+			isCurrent = false
+			if !catchupStreaming {
+				catchupStreaming = true
+				c.streamsInCatchup.Add(1)
+			}
+			catchupStarted = time.Now()
 		}
+
 		resp, err := listenClient.Recv()
 		if err == io.EOF {
 			logEntry.Debug("listen stream closed, shutting down")
@@ -542,18 +555,12 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 			logEntry.WithFields(log.Fields{
 				"err":  err,
 				"docs": numDocuments,
-			}).Errorf("retryable failure, will restart in %s", retryInterval)
+			}).Errorf("retryable failure, will retry in %s", retryInterval)
 			if err := listenClient.CloseSend(); err != nil {
 				logEntry.WithField("err", err).Warn("error closing listen client")
 			}
-			listenClient = nil
-			numDocuments = 0
 			time.Sleep(retryInterval)
-
-			isCurrent = false
-			catchupStreaming = true
-			catchupStarted = time.Now()
-			c.streamsInCatchup.Add(1)
+			listenClient = nil
 			continue
 		} else if err != nil {
 			return fmt.Errorf("error streaming %q changes: %w", collectionID, err)
