@@ -34,8 +34,7 @@ TRUNCATE TABLE #flow_temp_store_1;
 
 CREATE TABLE #flow_temp_load_0 (
 		key1 BIGINT NOT NULL,
-		"key!2" BIT NOT NULL
-	,
+		"key!2" BIT NOT NULL,
 		PRIMARY KEY (key1, "key!2")
 );
 --- End target_table createLoadTable ---
@@ -43,8 +42,7 @@ CREATE TABLE #flow_temp_load_0 (
 --- Begin "Delta Updates" createLoadTable ---
 
 CREATE TABLE #flow_temp_load_1 (
-		"theKey" VARCHAR(900) NOT NULL
-	,
+		"theKey" VARCHAR(900) NOT NULL,
 		PRIMARY KEY ("theKey")
 );
 --- End "Delta Updates" createLoadTable ---
