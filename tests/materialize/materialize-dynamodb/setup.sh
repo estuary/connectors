@@ -105,7 +105,10 @@ resources_json_template='[
         "int_and_str": {},
         "num_and_str": {},
         "int_str": {},
-        "num_str": {}
+        "num_str": {},
+        "datetime": {},
+        "date": {},
+        "time": {}
       }
     }
   }
