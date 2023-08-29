@@ -6,12 +6,14 @@
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/3/docs/7","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":7}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/groups/3/docs/8","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":8}
 # ================================
-# Collection "flow_source_tests/*/users/*/docs": 2 Documents
+# Collection "flow_source_tests/*/users/*/docs": 4 Documents
 # ================================
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":1}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":2}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":3}
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestAddedBindingSameGroup/users/1/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":4}
 # ================================
 # Final State Checkpoint
 # ================================
-{"Resources":{"flow_source_tests/*/groups/*/docs":{"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/docs":{"ReadTime":"<TIMESTAMP>"}}}
+{"Resources":{"flow_source_tests/*/groups/*/docs":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/docs":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"}}}
 

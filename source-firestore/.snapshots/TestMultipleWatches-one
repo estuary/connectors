@@ -85,5 +85,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"Resources":{"flow_source_tests/*/users/*/docs":{"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/notes":{"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/tasks":{"ReadTime":"<TIMESTAMP>"}}}
+{"Resources":{"flow_source_tests/*/users/*/docs":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/notes":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/tasks":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"}}}
 

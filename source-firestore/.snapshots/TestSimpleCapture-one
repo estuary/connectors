@@ -10,5 +10,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"Resources":{"flow_source_tests/*/docs":{"ReadTime":"<TIMESTAMP>"}}}
+{"Resources":{"flow_source_tests/*/docs":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"}}}
 
