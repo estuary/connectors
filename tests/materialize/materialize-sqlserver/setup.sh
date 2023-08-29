@@ -13,13 +13,8 @@ export SQLSERVER_USER="${SQLSERVER_USER:=sa}"
 
 docker compose -f materialize-sqlserver/docker-compose.yaml up --wait
 
-docker build -t sqlserver-test-query:local -f tests/materialize/materialize-sqlserver/Dockerfile tests/materialize/materialize-sqlserver/
-
 function query() {
-  echo "$1" | docker run -e SQLSERVER_HOST -e SQLSERVER_PORT \
-		-e SQLSERVER_DATABASE -e SQLSERVER_USER \
-		-e SQLSERVER_PASSWORD --network flow-test \
-		-i sqlserver-test-query:local
+  echo "$1" | SQLSERVER_HOST=localhost go run tests/materialize/materialize-sqlserver/query.go
 }
 
 SQLSERVER_DATABASE=master query "IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = '$SQLSERVER_DATABASE')
