@@ -48,7 +48,10 @@
            "int_and_str": {"type": ["integer", "string"], "format": "integer"},
            "num_and_str": {"type": ["number", "string"], "format": "number"},
            "int_str": {"type": "string", "format": "integer"},
-           "num_str": {"type": "string", "format": "number"}
+           "num_str": {"type": "string", "format": "number"},
+           "datetime": {"type": "string", "format": "date-time"},
+           "date": {"type": "string", "format": "date"},
+           "time": {"type": "string", "format": "time"}
           },
           "required": ["id"],
           "type": "object"
