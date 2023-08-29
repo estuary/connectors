@@ -103,8 +103,15 @@ type captureState struct {
 }
 
 type resourceState struct {
-	ReadTime     time.Time
-	Backfill     *backfillState
+	ReadTime time.Time
+	Backfill *backfillState
+
+	// The 'Inconsistent' flag is set when catchup failure forces the connector
+	// to "skip ahead" to the latest changes for some collection(s), and indicates
+	// that at some point in the future a new backfill of that collection(s) needs
+	// to be performed to re-establish consistency.
+	Inconsistent bool `json:"Inconsistent,omitempty"`
+
 	bindingIndex int
 }
 
@@ -134,9 +141,23 @@ func initResourceStates(prevStates map[string]*resourceState, resourceBindings [
 	var states = make(map[string]*resourceState)
 	for idx, resource := range resourceBindings {
 		var state = &resourceState{bindingIndex: idx}
-		if prevState, ok := prevStates[resource.Path]; ok {
+		if prevState, ok := prevStates[resource.Path]; ok && !prevState.Inconsistent {
 			state.ReadTime = prevState.ReadTime
 			state.Backfill = prevState.Backfill
+		} else if ok && prevState.Inconsistent {
+			// Since we entered an inconsistent state previously, we know that some amount of
+			// change data has been skipped. To get back into a consistent state, we will have
+			// to restart from the current moment (to maximize our changes of staying caught
+			// up going forward) and start a new backfill of the entire collection.
+			//
+			// TODO(wgd): Repeated backfills can get pretty expensive, so this really needs
+			// some sort of explicit rate-limit so the user can say "backfill the dataset
+			// at most once per (hour/day/week)".
+			state.ReadTime = now
+			state.Backfill = &backfillState{}
+			if resource.BackfillMode == backfillModeNone {
+				state.Backfill = nil
+			}
 		} else {
 			switch resource.BackfillMode {
 			case backfillModeNone:
@@ -220,6 +241,24 @@ func (s *captureState) UpdateBackfillState(collectionID string, state *backfillS
 	for resourcePath, resourceState := range s.Resources {
 		if getLastCollectionGroupID(resourcePath) == collectionID && resourceState.Backfill != nil {
 			resourceState.Backfill = state
+			updated[resourcePath] = resourceState
+		}
+	}
+	s.Unlock()
+
+	var checkpointJSON, err = json.Marshal(&captureState{Resources: updated})
+	if err != nil {
+		return nil, fmt.Errorf("error serializing state checkpoint: %w", err)
+	}
+	return checkpointJSON, nil
+}
+
+func (s *captureState) MarkInconsistent(collectionID string) (json.RawMessage, error) {
+	s.Lock()
+	var updated = make(map[string]*resourceState)
+	for resourcePath, resourceState := range s.Resources {
+		if getLastCollectionGroupID(resourcePath) == collectionID {
+			resourceState.Inconsistent = true
 			updated[resourcePath] = resourceState
 		}
 	}
@@ -603,8 +642,14 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 				}
 			case firestore_pb.TargetChange_REMOVE:
 				if catchupStreaming && time.Since(catchupStarted) > 5*time.Minute {
-					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up in time, collection suspended until restart (go.estuary.dev/YRDsKd)")
-					return nil
+					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up in time, skipping to latest changes (go.estuary.dev/YRDsKd)")
+					if checkpointJSON, err := c.State.MarkInconsistent(collectionID); err != nil {
+						return err
+					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
+						return err
+					}
+					target.ResumeType = &firestore_pb.Target_ReadTime{ReadTime: timestamppb.New(time.Now())}
+					listenClient = nil
 				}
 				if tc.Cause != nil {
 					return fmt.Errorf("unexpected TargetChange.REMOVE: %v", tc.Cause.Message)
