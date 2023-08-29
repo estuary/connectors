@@ -59,9 +59,11 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `date`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
 		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
 		{ColumnType: `timestamp without time zone`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
-		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'infinity'`, ExpectValue: fmt.Sprintf(`%q`, infinityTimestamp)},
-		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'-infinity'`, ExpectValue: fmt.Sprintf(`%q`, negativeInfinityTimestamp)},
+		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'infinity'`, ExpectValue: `"9999-12-31T23:59:59Z"`},
+		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'-infinity'`, ExpectValue: `"0000-01-01T00:00:00Z"`},
 		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'epoch'`, ExpectValue: `"1970-01-01T00:00:00Z"`},
+		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'20222-08-31T00:00:00Z'`, ExpectValue: `"0000-01-01T00:00:00Z"`},
+		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 99 BC'`, ExpectValue: `"0000-01-01T00:00:00Z"`},
 
 		// TODO(wgd): The 'timestamp with time zone' type produces inconsistent results between
 		// table scanning and replication events. They're both valid timestamps, but they differ.
