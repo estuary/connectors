@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
@@ -29,23 +30,26 @@ type config struct {
 	Bucket           string `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery." jsonschema_extras:"order=4"`
 	BucketPath       string `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket." jsonschema_extras:"order=5"`
 	BillingProjectID string `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. Defaults to Project ID if not specified." jsonschema_extras:"order=6"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+}
+
+type advancedConfig struct {
+	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce compute time by increasing the delay between updates.,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
 }
 
 func (c *config) Validate() error {
-	if c.ProjectID == "" {
-		return fmt.Errorf("expected project_id")
+	var requiredProperties = [][]string{
+		{"project_id", c.ProjectID},
+		{"credentials_json", c.CredentialsJSON},
+		{"dataset", c.Dataset},
+		{"region", c.Region},
+		{"bucket", c.Bucket},
 	}
-	if c.CredentialsJSON == "" {
-		return fmt.Errorf("expected credentials_json")
-	}
-	if c.Dataset == "" {
-		return fmt.Errorf("expected dataset")
-	}
-	if c.Region == "" {
-		return fmt.Errorf("expected region")
-	}
-	if c.Bucket == "" {
-		return fmt.Errorf("expected bucket")
+	for _, req := range requiredProperties {
+		if req[1] == "" {
+			return fmt.Errorf("missing '%s'", req[0])
+		}
 	}
 
 	// Sanity check: Are the provided credentials valid JSON? A common error is to upload
@@ -59,6 +63,17 @@ func (c *config) Validate() error {
 		// If BucketPath starts with a / trim the leading / so that we don't end up with repeated /
 		// chars in the URI and so that the object key does not start with a /.
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
+	}
+
+	if c.Advanced.UpdateDelay != "" {
+		parsed, err := time.ParseDuration(c.Advanced.UpdateDelay)
+		if err != nil {
+			return fmt.Errorf("could not parse Update Delay '%s': must be a valid Go duration string", c.Advanced.UpdateDelay)
+		}
+
+		if parsed < 0 {
+			return fmt.Errorf("update delay '%s' must not be negative", c.Advanced.UpdateDelay)
+		}
 	}
 
 	return nil
