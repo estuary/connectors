@@ -232,7 +232,7 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 
 	err := c.withDB(func(db *stdsql.DB) error {
 		query = fmt.Sprintf(
-			"ALTER TABLE %s ADD COLUMN %s %s;",
+			"ALTER TABLE %s ADD %s %s;",
 			tableIdentifier,
 			columnIdentifier,
 			columnDDL,
