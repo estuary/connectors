@@ -569,6 +569,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
+		// Skip the delay on the first round of transactions, which is often an artificially small
+		// transaction, caused by the reading of loads stalling out prematurely when the connector
+		// first starts up.
 		return nil, sql.CommitWithDelay(ctx, d.store.round == 1, d.updateDelay, it.Total, d.commit)
 	}, nil
 }
