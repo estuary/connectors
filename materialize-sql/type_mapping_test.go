@@ -226,3 +226,67 @@ func TestStdStrToInt(t *testing.T) {
 		})
 	}
 }
+
+func TestClampDatetime(t *testing.T) {
+	for _, tt := range []struct {
+		input string
+		want  string
+	}{
+		{
+			input: "0000-01-01T00:00:00Z",
+			want:  "0001-01-01T00:00:00Z",
+		},
+		{
+			input: "0000-12-31T23:59:59Z",
+			want:  "0001-01-01T00:00:00Z",
+		},
+		{
+			input: "0001-01-01T00:00:00Z",
+			want:  "0001-01-01T00:00:00Z",
+		},
+		{
+			input: "0001-01-01T00:00:01Z",
+			want:  "0001-01-01T00:00:01Z",
+		},
+		{
+			input: "2023-08-29T16:17:18Z",
+			want:  "2023-08-29T16:17:18Z",
+		},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := ClampDatetime()(tt.input)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestClampDate(t *testing.T) {
+	for _, tt := range []struct {
+		input string
+		want  string
+	}{
+		{
+			input: "0000-01-01",
+			want:  "0001-01-01",
+		},
+		{
+			input: "0000-12-31",
+			want:  "0001-01-01",
+		},
+		{
+			input: "0001-01-01",
+			want:  "0001-01-01",
+		},
+		{
+			input: "2023-08-29",
+			want:  "2023-08-29",
+		},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := ClampDate()(tt.input)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}

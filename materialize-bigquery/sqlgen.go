@@ -75,8 +75,8 @@ var bqTypeMapper = sql.ProjectionTypeMapper{
 	sql.STRING: sql.StringTypeMapper{
 		Fallback: sql.NewStaticMapper("STRING"),
 		WithFormat: map[string]sql.TypeMapper{
-			"date":      sql.NewStaticMapper("DATE"),
-			"date-time": sql.NewStaticMapper("TIMESTAMP"),
+			"date":      sql.NewStaticMapper("DATE", sql.WithElementConverter(sql.ClampDate())),
+			"date-time": sql.NewStaticMapper("TIMESTAMP", sql.WithElementConverter(sql.ClampDatetime())),
 		},
 	},
 }

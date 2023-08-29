@@ -55,13 +55,7 @@ resources_json_template='[
     },
     "source": "${TEST_COLLECTION_FORMATTED_STRINGS}",
     "fields": {
-      "recommended": true,
-      "include": {
-        "int_and_str": {},
-        "num_and_str": {},
-        "int_str": {},
-        "num_str": {}
-      }
+      "recommended": true
     }
   }
 ]'
