@@ -103,18 +103,22 @@ func main() {
 		ptrs[i] = &data[i]
 	}
 
-	queriedRows := [][]interface{}{}
+	queriedRows := []map[string]any{}
 
 	for rows.Next() {
 		if err = rows.Scan(ptrs...); err != nil {
 			log.Fatal("scanning row: %w", err)
 		}
-		queriedRows = append(queriedRows, append([]interface{}{}, data...))
+		row := make(map[string]any)
+		for idx := range data {
+			row[cols[idx]] = data[idx]
+		}
+
+		queriedRows = append(queriedRows, row)
 	}
 	rows.Close()
 
-	var enc = json.NewEncoder(os.Stdout)
-	for _, row := range queriedRows {
-		enc.Encode(row)
+	if err := json.NewEncoder(os.Stdout).Encode(queriedRows); err != nil {
+		log.Fatal(fmt.Errorf("writing output: %w", err))
 	}
 }

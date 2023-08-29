@@ -25,7 +25,7 @@ config_json_template='{
 resources_json_template='[
   {
     "resource": {
-      "table": "Simple"
+      "table": "simple"
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
   },
@@ -57,7 +57,7 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "Multiple Types"
+      "table": "multiple_types"
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
     "fields": {
@@ -72,17 +72,11 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "Formatted Strings"
+      "table": "formatted_strings"
     },
     "source": "${TEST_COLLECTION_FORMATTED_STRINGS}",
     "fields": {
-      "recommended": true,
-      "include": {
-        "int_and_str": {},
-        "num_and_str": {},
-        "int_str": {},
-        "num_str": {}
-      }
+      "recommended": true
     }
   }
 ]'
