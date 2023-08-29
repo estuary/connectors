@@ -278,11 +278,11 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 			return negativeInfinityTimestamp, nil
 		}
 	case pgtype.Timestamptz:
-		return x.Time.Format(time.RFC3339Nano), nil
+		return formatRFC3339(x.Time)
 	case pgtype.Timestamp:
-		return x.Time.Format(time.RFC3339Nano), nil
+		return formatRFC3339(x.Time)
 	case time.Time:
-		return x.Format(time.RFC3339Nano), nil
+		return formatRFC3339(x)
 	}
 	switch dataType {
 	case "timetz":
@@ -308,6 +308,16 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		return string(bs), err
 	}
 	return val, nil
+}
+
+func formatRFC3339(t time.Time) (any, error) {
+	if t.Year() < 0 || t.Year() > 9999 {
+		// We could in theory clamp excessively large years to positive infinity, but this
+		// is of limited usefulness since these are never real dates, they're mostly just
+		// dumb typos like `20221` and so we might as well normalize errors consistently.
+		return negativeInfinityTimestamp, nil
+	}
+	return t.Format(time.RFC3339Nano), nil
 }
 
 func translateArray(column *sqlcapture.ColumnInfo, x interface{}) (interface{}, error) {
