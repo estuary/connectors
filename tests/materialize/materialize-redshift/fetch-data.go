@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"time"
 
 	stdsql "database/sql"
 
@@ -61,28 +62,34 @@ func main() {
 	if err != nil {
 		log.Fatal(fmt.Errorf("reading columns: %w", err))
 	}
-	row := make([]interface{}, len(cols))
 
-	out := json.NewEncoder(os.Stdout)
-	for rows.Next() {
-		for idx := range row {
-			row[idx] = &row[idx]
-		}
-
-		if err := rows.Scan(row...); err != nil {
-			log.Fatal(fmt.Errorf("scanning query result: %w", err))
-		}
-
-		jsonlRow := make(map[string]interface{})
-		for idx, col := range cols {
-			jsonlRow[col] = row[idx]
-		}
-
-		if err := out.Encode(jsonlRow); err != nil {
-			log.Fatal(fmt.Errorf("encoding row result: %w", err))
-		}
+	data := make([]interface{}, len(cols))
+	ptrs := make([]interface{}, len(cols))
+	for i := range data {
+		ptrs[i] = &data[i]
 	}
-	if err := rows.Err(); err != nil {
-		log.Fatal(fmt.Errorf("error from returned rows: %w", err))
+
+	queriedRows := []map[string]any{}
+
+	for rows.Next() {
+		if err = rows.Scan(ptrs...); err != nil {
+			log.Fatal("scanning row: %w", err)
+		}
+		row := make(map[string]any)
+		for idx := range data {
+			d := data[idx]
+			if t, ok := d.(time.Time); ok {
+				// Go JSON encoding apparently doesn't like timestamps with years 9999.
+				d = t.UTC().String()
+			}
+			row[cols[idx]] = d
+		}
+
+		queriedRows = append(queriedRows, row)
+	}
+	rows.Close()
+
+	if err := json.NewEncoder(os.Stdout).Encode(queriedRows); err != nil {
+		log.Fatal(fmt.Errorf("writing output: %w", err))
 	}
 }
