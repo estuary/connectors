@@ -66,6 +66,27 @@
         "description": "A prefix that will be used to store objects in S3.",
         "order": 9
       },
+      "advanced": {
+        "properties": {
+          "updateDelay": {
+            "type": "string",
+            "enum": [
+              "15m",
+              "30m",
+              "1h",
+              "2h",
+              "4h"
+            ],
+            "title": "Update Delay",
+            "description": "Potentially reduce active cluster time by increasing the delay between updates."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      },
       "networkTunnel": {
         "properties": {
           "sshForwarding": {

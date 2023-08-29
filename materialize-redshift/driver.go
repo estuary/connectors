@@ -81,7 +81,13 @@ type config struct {
 	Region             string `json:"region" jsonschema:"title=Region,description=Region of the S3 staging bucket. For optimal performance this should be in the same region as the Redshift database cluster." jsonschema_extras:"order=8"`
 	BucketPath         string `json:"bucketPath,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
 
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
+}
+
+type advancedConfig struct {
+	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active cluster time by increasing the delay between updates.,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
 }
 
 func (c *config) Validate() error {
@@ -104,6 +110,17 @@ func (c *config) Validate() error {
 		// If BucketPath starts with a / trim the leading / so that we don't end up with repeated /
 		// chars in the URI and so that the object key does not start with a /.
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
+	}
+
+	if c.Advanced.UpdateDelay != "" {
+		parsed, err := time.ParseDuration(c.Advanced.UpdateDelay)
+		if err != nil {
+			return fmt.Errorf("could not parse Update Delay '%s': must be a valid Go duration string", c.Advanced.UpdateDelay)
+		}
+
+		if parsed < 0 {
+			return fmt.Errorf("update delay '%s' must not be negative", c.Advanced.UpdateDelay)
+		}
 	}
 
 	return nil
@@ -452,6 +469,9 @@ type transactor struct {
 	fence    sql.Fence
 	bindings []*binding
 	cfg      *config
+
+	round       int
+	updateDelay time.Duration
 }
 
 func newTransactor(
@@ -460,9 +480,21 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 ) (_ pm.Transactor, err error) {
-	var d = &transactor{}
-	d.fence = fence
-	d.cfg = ep.Config.(*config)
+	var cfg = ep.Config.(*config)
+
+	var d = &transactor{
+		fence: fence,
+		cfg:   cfg,
+	}
+
+	if cfg.Advanced.UpdateDelay != "" {
+		// UpdateDelay has already been validated in (*config).Validate. This parsing is not
+		// expected to fail.
+		d.updateDelay, err = time.ParseDuration(cfg.Advanced.UpdateDelay)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse UpdateDelay '%s'", cfg.Advanced.UpdateDelay)
+		}
+	}
 
 	s3client, err := d.cfg.toS3Client(ctx)
 	if err != nil {
@@ -798,7 +830,18 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates) })
+		return nil, sql.CommitWithDelay(
+			ctx,
+			// Skip the delay on the first round of transactions, which is often an artificially small
+			// transaction, caused by the reading of loads stalling out prematurely when the connector
+			// first starts up.
+			d.round == 1,
+			d.updateDelay,
+			it.Total,
+			func(ctx context.Context) error {
+				return d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates)
+			},
+		)
 	}, nil
 }
 
