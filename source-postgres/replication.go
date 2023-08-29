@@ -532,6 +532,14 @@ func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (
 		decoder = &pgtype.GenericText{}
 	}
 	if err := decoder.DecodeText(s.connInfo, data); err != nil {
+		if _, ok := err.(*time.ParseError); ok {
+			// The only known situations where a valid Postgres timestamp may fail to parse
+			// are when the year is greater than 9999 or less than 0. We don't support years
+			// outside of that range because timestamps are serialized to RFC3339, but generally
+			// years >9999 aren't deliberate, they're dumb typos like `20221`, so normalizing
+			// these all to the same error value is as good as any other option.
+			return negativeInfinityTimestamp, nil
+		}
 		return nil, err
 	}
 	return decoder.(pgtype.Value).Get(), nil
