@@ -20,13 +20,13 @@ func TestMySQLConfig(t *testing.T) {
 	}
 	require.NoError(t, validConfig.Validate())
 	var uri = validConfig.ToURI()
-	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1234?TrustServerCertificate=true&app+name=Flow+CDC+Connector&database=namegame&encrypt=true", uri)
+	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1234?TrustServerCertificate=true&app+name=Flow+Materialization+Connector&database=namegame&encrypt=true", uri)
 
 	var noPort = validConfig
 	noPort.Address = "post.toast"
 	require.NoError(t, noPort.Validate())
 	uri = noPort.ToURI()
-	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1433?TrustServerCertificate=true&app+name=Flow+CDC+Connector&database=namegame&encrypt=true", uri)
+	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1433?TrustServerCertificate=true&app+name=Flow+Materialization+Connector&database=namegame&encrypt=true", uri)
 
 	var noAddress = validConfig
 	noAddress.Address = ""
@@ -46,7 +46,7 @@ func TestMySQLConfig(t *testing.T) {
 }
 
 func TestSpecification(t *testing.T) {
-	var resp, err = newMysqlDriver().
+	var resp, err = newSqlServerDriver().
 		Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
@@ -59,18 +59,6 @@ func TestSpecification(t *testing.T) {
 func TestConfigURI(t *testing.T) {
 	for name, cfg := range map[string]config{
 		"Basic": {
-			Address:  "example.com",
-			User:     "will",
-			Password: "secret1234",
-			Database: "somedb",
-		},
-		"RequireSSL": {
-			Address:  "example.com",
-			User:     "will",
-			Password: "secret1234",
-			Database: "somedb",
-		},
-		"IncorrectSSL": {
 			Address:  "example.com",
 			User:     "will",
 			Password: "secret1234",

@@ -71,14 +71,13 @@ func (c *config) ToURI() string {
 	}
 
 	// If the user did not specify a port (or no network tunnel is being used), default to port
-	// 1433. mysql ends up doing this anyway, but we do it here to make it more explicit and stable in
-	// case that underlying behavior changes in the future.
+	// 1433
 	if !strings.Contains(address, ":") {
 		address = address + ":" + defaultPort
 	}
 
 	var params = make(url.Values)
-	params.Add("app name", "Flow CDC Connector")
+	params.Add("app name", "Flow Materialization Connector")
 	params.Add("encrypt", "true")
 	params.Add("TrustServerCertificate", "true")
 	params.Add("database", c.Database)
@@ -123,7 +122,7 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-func newMysqlDriver() *sql.Driver {
+func newSqlServerDriver() *sql.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-sqlserver",
 		EndpointSpecType: new(config),
@@ -300,7 +299,7 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 }
 
 // ExecStatements is used for the DDL statements of ApplyUpsert and ApplyDelete.
-// Mysql does not support transactional DDL statements
+// SQLServer does not support transactional DDL statements
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
 	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
 }
@@ -358,17 +357,6 @@ func newTransactor(
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("store db.Conn: %w", err)
 	}
-
-	db, err := stdsql.Open("sqlserver", cfg.ToURI())
-	if err != nil {
-		return nil, fmt.Errorf("newTransactor sql.Open: %w", err)
-	}
-	defer db.Close()
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("newTransactor db.Conn: %w", err)
-	}
-	defer conn.Close()
 
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding); err != nil {
@@ -527,6 +515,11 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 	}()
 
+	// The mssql driver uses prepared statements to drive bulk inserts. A bulk
+	// insert is initiated by preparing a `mssqldb.CopyIn` statement. Afterwards,
+	// executions of this prepared statement that have arguments, are considered rows
+	// to be added as part of the bulk insert, whereas executions without
+	// arguments mark the end of a bulk insert operation
 	var batches = make(map[int]*stdsql.Stmt)
 
 	// The StoreIterator iterates over documents ordered by their binding, so we
@@ -563,9 +556,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		if _, ok := batches[it.Binding]; !ok {
 			var colNames = []string{}
 			for _, col := range b.target.Columns() {
-				// Column names passed here must not be quoted, so we strip down the
-				// quotes
-				colNames = append(colNames, strings.Trim(col.Identifier, "\""))
+				// Column names passed here must not be quoted, so we use Field instead
+				// of Identifier
+				colNames = append(colNames, col.Field)
 			}
 
 			var err error
@@ -588,25 +581,25 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		return nil, fmt.Errorf("store batch insert on %q: %w", d.bindings[lastBinding].tempStoreTableName, err)
 	}
 
-	for _, b := range d.bindings {
-		if b.needsMerge {
-			if _, err := txn.ExecContext(ctx, b.mergeInto); err != nil {
-				return nil, fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
-			}
-		} else {
-			if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
-				return nil, fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
-			}
-		}
-
-		if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
-			return nil, fmt.Errorf("truncating load table: %w", err)
-		}
-	}
-
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
 		return nil, pf.RunAsyncOperation(func() error {
 			defer txn.Rollback()
+
+			for _, b := range d.bindings {
+				if b.needsMerge {
+					if _, err := txn.ExecContext(ctx, b.mergeInto); err != nil {
+						return fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
+					}
+				} else {
+					if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
+						return  fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
+					}
+				}
+
+				if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
+					return fmt.Errorf("truncating load table: %w", err)
+				}
+			}
 
 			var err error
 			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
@@ -641,5 +634,5 @@ func (d *transactor) Destroy() {
 }
 
 func main() {
-	boilerplate.RunMain(newMysqlDriver())
+	boilerplate.RunMain(newSqlServerDriver())
 }

@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-# Ensure canonical mysql environment variables are set.
+# sql server environment variables
 export SQLSERVER_HOST="${SQLSERVER_HOST:=materialize-sqlserver-sqlserver-1}"
 export SQLSERVER_PORT="${SQLSERVER_PORT:=1433}"
 export SQLSERVER_DATABASE="${SQLSERVER_DATABASE:=flow}"

@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	sql "github.com/estuary/connectors/materialize-sql"
-	log "github.com/sirupsen/logrus"
 )
 
 // installFence is a modified version of StdInstallFence, adopted to SQLServer's
@@ -119,21 +118,6 @@ func installFence(ctx context.Context, db *stdsql.DB, checkpoints sql.Table, fen
 		fence.Fence,
 		base64.StdEncoding.EncodeToString(fence.Checkpoint),
 	); err != nil {
-		log.WithField("q", 
-		fmt.Sprintf(
-			"INSERT INTO %s (%s, %s, %s, %s, %s) VALUES (%s, %s, %s, %s, %s);",
-			checkpoints.Identifier,
-			materializationId,
-			keyBeginId,
-			keyEndId,
-			fenceId,
-			checkpointId,
-			checkpoints.Keys[0].Placeholder,
-			checkpoints.Keys[1].Placeholder,
-			checkpoints.Keys[2].Placeholder,
-			checkpoints.Values[0].Placeholder,
-			checkpoints.Values[1].Placeholder,
-		)).Error("insertin fence")
 		return sql.Fence{}, fmt.Errorf("inserting fence: %w", err)
 	}
 
