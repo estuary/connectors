@@ -166,7 +166,6 @@ func newMysqlDriver() *sql.Driver {
 				}
 			}
 
-
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             sqlServerDialect,
@@ -277,7 +276,7 @@ func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql
 	}
 
 	query := fmt.Sprintf(
-		"ALTER TABLE %s MODIFY %s %s;",
+		"ALTER TABLE %s ALTER COLUMN %s %s;",
 		table.Identifier,
 		column.Identifier,
 		mapped.DDL,
