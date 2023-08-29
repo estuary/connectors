@@ -21,7 +21,10 @@ config_json_template='{
    "bucket":              "$REDSHIFT_BUCKET",
    "awsAccessKeyId":      "$AWS_ACCESS_KEY_ID",
    "awsSecretAccessKey":  "$AWS_SECRET_ACCESS_KEY",
-   "region":              "$AWS_REGION"
+   "region":              "$AWS_REGION",
+   "advanced": {
+      "updateDelay": "0s"
+    }
 }'
 
 resources_json_template='[

@@ -39,7 +39,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active warehouse time by increasing the delay between updates.,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
+	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active warehouse time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
 }
 
 // ToURI converts the Config to a DSN string.
@@ -117,15 +117,8 @@ func (c *config) Validate() error {
 		}
 	}
 
-	if c.Advanced.UpdateDelay != "" {
-		parsed, err := time.ParseDuration(c.Advanced.UpdateDelay)
-		if err != nil {
-			return fmt.Errorf("could not parse Update Delay '%s': must be a valid Go duration string", c.Advanced.UpdateDelay)
-		}
-
-		if parsed < 0 {
-			return fmt.Errorf("update delay '%s' must not be negative", c.Advanced.UpdateDelay)
-		}
+	if _, err := sql.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+		return err
 	}
 
 	return validHost(c.Host)
@@ -405,13 +398,8 @@ func newTransactor(
 		cfg: cfg,
 	}
 
-	if cfg.Advanced.UpdateDelay != "" {
-		// UpdateDelay has already been validated in (*config).Validate. This parsing is not
-		// expected to fail.
-		d.updateDelay, err = time.ParseDuration(cfg.Advanced.UpdateDelay)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse UpdateDelay '%s'", cfg.Advanced.UpdateDelay)
-		}
+	if d.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+		return nil, err
 	}
 
 	d.store.fence = &fence
@@ -569,10 +557,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		// Skip the delay on the first round of transactions, which is often an artificially small
-		// transaction, caused by the reading of loads stalling out prematurely when the connector
-		// first starts up.
-		return nil, sql.CommitWithDelay(ctx, d.store.round == 1, d.updateDelay, it.Total, d.commit)
+		return nil, sql.CommitWithDelay(ctx, d.store.round, d.updateDelay, it.Total, d.commit)
 	}, nil
 }
 

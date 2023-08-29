@@ -17,12 +17,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-const (
-	// BigQuery imposes a limit of 1500 table operations per day, so the delay should never be less
-	// than 2 minutes.
-	defaultUpdateDelay = 2 * time.Minute
-)
-
 type transactor struct {
 	fence *sql.Fence
 
@@ -55,15 +49,8 @@ func newTransactor(
 		bucket:     cfg.Bucket,
 	}
 
-	if cfg.Advanced.UpdateDelay != "" {
-		// UpdateDelay has already been validated in (*config).Validate. This parsing is not
-		// expected to fail.
-		t.updateDelay, err = time.ParseDuration(cfg.Advanced.UpdateDelay)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse UpdateDelay '%s'", cfg.Advanced.UpdateDelay)
-		}
-	} else {
-		t.updateDelay = defaultUpdateDelay
+	if t.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+		return nil, err
 	}
 
 	for _, binding := range bindings {
@@ -289,10 +276,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		// Skip the delay on the first round of transactions, which is often an artificially small
-		// transaction, caused by the reading of loads stalling out prematurely when the connector
-		// first starts up.
-		return nil, sql.CommitWithDelay(ctx, t.round == 1, t.updateDelay, it.Total, t.commit)
+		return nil, sql.CommitWithDelay(ctx, t.round, t.updateDelay, it.Total, t.commit)
 	}, nil
 }
 

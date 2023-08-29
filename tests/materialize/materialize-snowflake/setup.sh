@@ -19,7 +19,10 @@ config_json_template='{
    "password":  "$SNOWFLAKE_PASSWORD",
    "database":  "$SNOWFLAKE_DATABASE",
    "schema":    "$SNOWFLAKE_SCHEMA",
-   "warehouse": "$SNOWFLAKE_WAREHOUSE"
+   "warehouse": "$SNOWFLAKE_WAREHOUSE",
+   "advanced": {
+      "updateDelay": "0s"
+    }
 }'
 
 resources_json_template='[
