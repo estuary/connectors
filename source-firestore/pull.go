@@ -41,6 +41,12 @@ const retryInterval = 60 * time.Second
 // Log progress messages after every N documents on a particular stream
 const progressLogInterval = 10000
 
+// A new backfill of a collection may only occur after at least this much time has
+// elapsed since the previous backfill was started.
+//
+// TODO(wgd): Consider making this user-configurable?
+const backfillRestartDelay = 6 * time.Hour
+
 const (
 	backfillChunkSize   = 256
 	concurrentBackfills = 2
@@ -116,6 +122,13 @@ type resourceState struct {
 }
 
 type backfillState struct {
+	// The time after which a backfill of this resource may begin processing
+	// documents. Used for rate-limiting of retry attempts.
+	StartAfter time.Time
+
+	// True if the backfill is completed.
+	Completed bool
+
 	Cursor string    // The last document backfilled
 	MTime  time.Time // The UpdateTime of that document when we backfilled it
 }
@@ -149,14 +162,15 @@ func initResourceStates(prevStates map[string]*resourceState, resourceBindings [
 			// change data has been skipped. To get back into a consistent state, we will have
 			// to restart from the current moment (to maximize our changes of staying caught
 			// up going forward) and start a new backfill of the entire collection.
-			//
-			// TODO(wgd): Repeated backfills can get pretty expensive, so this really needs
-			// some sort of explicit rate-limit so the user can say "backfill the dataset
-			// at most once per (hour/day/week)".
+			var startTime = prevState.Backfill.StartAfter.Add(backfillRestartDelay)
+			if time.Now().After(startTime) {
+				startTime = time.Now()
+			}
 			state.ReadTime = now
-			state.Backfill = &backfillState{}
 			if resource.BackfillMode == backfillModeNone {
 				state.Backfill = nil
+			} else {
+				state.Backfill = &backfillState{StartAfter: startTime}
 			}
 		} else {
 			switch resource.BackfillMode {
@@ -165,7 +179,7 @@ func initResourceStates(prevStates map[string]*resourceState, resourceBindings [
 				state.Backfill = nil
 			case backfillModeAsync:
 				state.ReadTime = now
-				state.Backfill = &backfillState{}
+				state.Backfill = &backfillState{StartAfter: time.Now()}
 			case backfillModeSync:
 				state.ReadTime = time.Time{}
 				state.Backfill = nil
@@ -285,16 +299,12 @@ func (c *capture) Run(ctx context.Context) error {
 		if startTime, ok := watchCollections[collectionID]; !ok || resourceState.ReadTime.Before(startTime) {
 			watchCollections[collectionID] = resourceState.ReadTime
 		}
-		if resourceState.Backfill == nil {
-			// Do nothing
+		if resourceState.Backfill == nil || resourceState.Backfill.Completed {
+			// Do nothing when no backfill is required
 		} else if resumeState, ok := backfillCollections[collectionID]; !ok {
 			backfillCollections[collectionID] = resourceState.Backfill
 		} else if !resumeState.Equal(resourceState.Backfill) {
-			log.WithFields(log.Fields{
-				"a": resumeState.String(),
-				"b": resourceState.Backfill.String(),
-			}).Warn("async backfill state mismatch -- impacted backfills will restart from the beginning")
-			backfillCollections[collectionID] = &backfillState{}
+			return fmt.Errorf("internal error: backfill state mismatch for resource %q with collection ID %q", resourcePath, collectionID)
 		}
 	}
 
@@ -377,18 +387,35 @@ func (c *capture) Run(ctx context.Context) error {
 func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, collectionID string, resumeState *backfillState) error {
 	var logEntry = log.WithFields(log.Fields{"collection": collectionID})
 
-	var cursor *firestore.DocumentSnapshot
-	if resumeState == nil {
-		// This should never happen since we only run BackfillAsync when there's a backfill to perform, but seemed safe enough to check anyway
+	// This should never happen since we only run BackfillAsync when there's a
+	// backfill to perform, but seemed safe enough to check anyway.
+	if resumeState == nil || resumeState.Completed {
+		logEntry.Warn("internal error: no backfill necessary")
 		return nil
-	} else if resumeState.Cursor == "" {
+	}
+
+	// If the StartAfter time is in the future then we need to wait until it's
+	// the appropriate time.
+	if dt := time.Until(resumeState.StartAfter); dt > 0 {
+		logEntry.WithField("wait", dt.String()).Info("waiting to start backfill")
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(dt):
+			// proceed to the rest of the function
+		}
+	}
+
+	var cursor *firestore.DocumentSnapshot
+	if resumeState.Cursor == "" {
 		// If the cursor path is empty then we just leave the cursor document pointer nil
 		logEntry.Info("starting async backfill")
 	} else if resumeDocument, err := client.Doc(resumeState.Cursor).Get(ctx); err != nil {
 		// If we fail to fetch the resume document, we clear the relevant backfill cursor and error out.
 		// This will cause the backfill to restart from the beginning after the capture gets restarted,
 		// and in the meantime it will show up as an error in the UI in case there's a persistent issue.
-		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, &backfillState{}); err != nil {
+		resumeState.Cursor = ""
+		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, resumeState); err != nil {
 			return err
 		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 			return err
@@ -398,7 +425,8 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 		// Just like if the resume document fetch fails, mtime mismatches cause us to error out, so
 		// we'll restart from the beginning when the connector gets restarted and in the meantime
 		// it'll show up red in the UI.
-		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, &backfillState{}); err != nil {
+		resumeState.Cursor = ""
+		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, resumeState); err != nil {
 			return err
 		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 			return err
@@ -495,16 +523,14 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 			numDocuments++
 		}
 
-		var state = &backfillState{
-			Cursor: trimDatabasePath(cursor.Ref.Path),
-			MTime:  cursor.UpdateTime,
-		}
+		resumeState.Cursor = trimDatabasePath(cursor.Ref.Path)
+		resumeState.MTime = cursor.UpdateTime
 		logEntry.WithFields(log.Fields{
 			"total":  numDocuments,
-			"cursor": state.Cursor,
-			"mtime":  state.MTime,
+			"cursor": resumeState.Cursor,
+			"mtime":  resumeState.MTime,
 		}).Debug("updating backfill cursor")
-		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, state); err != nil {
+		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, resumeState); err != nil {
 			return err
 		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 			return err
@@ -512,7 +538,10 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 	}
 
 	logEntry.WithField("docs", numDocuments).Info("backfill complete")
-	if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, nil); err != nil {
+	resumeState.Completed = true
+	resumeState.Cursor = ""
+	resumeState.MTime = time.Time{}
+	if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, resumeState); err != nil {
 		return err
 	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 		return err
