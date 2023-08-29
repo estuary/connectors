@@ -87,7 +87,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active cluster time by increasing the delay between updates.,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
+	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active cluster time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
 }
 
 func (c *config) Validate() error {
@@ -112,15 +112,8 @@ func (c *config) Validate() error {
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
 	}
 
-	if c.Advanced.UpdateDelay != "" {
-		parsed, err := time.ParseDuration(c.Advanced.UpdateDelay)
-		if err != nil {
-			return fmt.Errorf("could not parse Update Delay '%s': must be a valid Go duration string", c.Advanced.UpdateDelay)
-		}
-
-		if parsed < 0 {
-			return fmt.Errorf("update delay '%s' must not be negative", c.Advanced.UpdateDelay)
-		}
+	if _, err := sql.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+		return err
 	}
 
 	return nil
@@ -487,13 +480,8 @@ func newTransactor(
 		cfg:   cfg,
 	}
 
-	if cfg.Advanced.UpdateDelay != "" {
-		// UpdateDelay has already been validated in (*config).Validate. This parsing is not
-		// expected to fail.
-		d.updateDelay, err = time.ParseDuration(cfg.Advanced.UpdateDelay)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse UpdateDelay '%s'", cfg.Advanced.UpdateDelay)
-		}
+	if d.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+		return nil, err
 	}
 
 	s3client, err := d.cfg.toS3Client(ctx)
@@ -756,6 +744,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	ctx := it.Context()
+	d.round++
 
 	// hasUpdates is used to track if a given binding includes only insertions for this store round
 	// or if it includes any updates. If it is only insertions a more efficient direct copy from S3
@@ -832,10 +821,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		return nil, sql.CommitWithDelay(
 			ctx,
-			// Skip the delay on the first round of transactions, which is often an artificially small
-			// transaction, caused by the reading of loads stalling out prematurely when the connector
-			// first starts up.
-			d.round == 1,
+			d.round,
 			d.updateDelay,
 			it.Total,
 			func(ctx context.Context) error {
