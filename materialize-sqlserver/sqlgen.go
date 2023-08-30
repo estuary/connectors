@@ -24,7 +24,7 @@ var sqlServerDialect = func() sql.Dialect {
 				// stored in the column, not the character length.
 				// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
 				// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
-				PrimaryKey: sql.NewStaticMapper("VARCHAR(900)"),
+				PrimaryKey: sql.NewStaticMapper("VARCHAR(900) COLLATE Latin1_General_100_BIN2"),
 				Delegate: sql.NewStaticMapper("VARCHAR(MAX)"),
 			},
 			WithFormat: map[string]sql.TypeMapper{
