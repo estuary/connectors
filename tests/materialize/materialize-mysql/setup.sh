@@ -19,13 +19,6 @@ function query() {
 }
 
 query "GRANT ALL PRIVILEGES ON *.* TO 'flow'@'%' WITH GRANT OPTION"
-# Older version of MySQL handle tables with multiple timestamp columns in a very strange way with
-# respect to nullability and default values, and this causes issues when materializing a table with
-# more than one date-time format field. Setting this flag allows tables with multiple timestamp
-# columns to be created. It may be worth addressing this at a more hollistic level in the
-# connector's table generation templating. See:
-# https://dba.stackexchange.com/questions/314898/why-mysql-5-7-timestamp-not-null-requires-default-value
-query "SET GLOBAL explicit_defaults_for_timestamp = 1;"
 
 config_json_template='{
    "address":  "$MYSQL_HOST:$MYSQL_PORT",
