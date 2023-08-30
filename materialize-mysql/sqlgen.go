@@ -24,8 +24,8 @@ var mysqlDialect = func() sql.Dialect {
 			},
 			WithFormat: map[string]sql.TypeMapper{
 				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("DATETIME", sql.WithElementConverter(rfc3339ToUTC())),
-				"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
+				"date-time": sql.NewStaticMapper("DATETIME(6)", sql.WithElementConverter(rfc3339ToUTC())),
+				"time":      sql.NewStaticMapper("TIME(6)", sql.WithElementConverter(rfc3339TimeToUTC())),
 			},
 			WithContentType: map[string]sql.TypeMapper{
 				// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
