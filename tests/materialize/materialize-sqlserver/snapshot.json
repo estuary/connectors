@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "\nIF OBJECT_ID(N'flow_materializations_v2', 'U') IS NULL BEGIN\nCREATE TABLE flow_materializations_v2 (\n\t\tmaterialization VARCHAR(900) NOT NULL,\n\t\tversion VARCHAR(MAX) NOT NULL,\n\t\tspec VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\nEND;\n\n\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization VARCHAR(900) NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\n\nIF OBJECT_ID(N'Simple', 'U') IS NULL BEGIN\nCREATE TABLE \"Simple\" (\n\t\tid BIGINT NOT NULL,\n\t\tcanary VARCHAR(MAX) NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tflow_document VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_standard', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_standard (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr VARCHAR(MAX) NOT NULL,\n\t\tflow_document VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr VARCHAR(MAX) NOT NULL,\n\t\tflow_document VARCHAR(MAX) NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta_exclude_flow_doc', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr VARCHAR(MAX) NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'Multiple Types', 'U') IS NULL BEGIN\nCREATE TABLE \"Multiple Types\" (\n\t\tid BIGINT NOT NULL,\n\t\tarray_int VARCHAR(MAX),\n\t\tbool_field BIT,\n\t\tfloat_field DOUBLE PRECISION,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tmultiple VARCHAR(MAX),\n\t\tnested VARCHAR(MAX),\n\t\tnullable_int BIGINT,\n\t\tstr_field VARCHAR(MAX) NOT NULL,\n\t\tflow_document VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'Formatted Strings', 'U') IS NULL BEGIN\nCREATE TABLE \"Formatted Strings\" (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tint_and_str BIGINT,\n\t\tint_str BIGINT,\n\t\tnum_and_str DOUBLE PRECISION,\n\t\tnum_str DOUBLE PRECISION,\n\t\tflow_document VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-sqlserver/materialize');"
+    "actionDescription": "\nIF OBJECT_ID(N'flow_materializations_v2', 'U') IS NULL BEGIN\nCREATE TABLE flow_materializations_v2 (\n\t\tmaterialization VARCHAR(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tversion VARCHAR(MAX) NOT NULL,\n\t\tspec VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\nEND;\n\n\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization VARCHAR(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\n\nIF OBJECT_ID(N'Simple', 'U') IS NULL BEGIN\nCREATE TABLE \"Simple\" (\n\t\tid BIGINT NOT NULL,\n\t\tcanary VARCHAR(MAX) NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tflow_document VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_standard', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_standard (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr VARCHAR(MAX) NOT NULL,\n\t\tflow_document VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr VARCHAR(MAX) NOT NULL,\n\t\tflow_document VARCHAR(MAX) NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta_exclude_flow_doc', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr VARCHAR(MAX) NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'Multiple Types', 'U') IS NULL BEGIN\nCREATE TABLE \"Multiple Types\" (\n\t\tid BIGINT NOT NULL,\n\t\tarray_int VARCHAR(MAX),\n\t\tbool_field BIT,\n\t\tfloat_field DOUBLE PRECISION,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tmultiple VARCHAR(MAX),\n\t\tnested VARCHAR(MAX),\n\t\tnullable_int BIGINT,\n\t\tstr_field VARCHAR(MAX) NOT NULL,\n\t\tflow_document VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'Formatted Strings', 'U') IS NULL BEGIN\nCREATE TABLE \"Formatted Strings\" (\n\t\tid BIGINT NOT NULL,\n\t\t\"date\" DATE,\n\t\tdatetime DATETIME2,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tint_and_str BIGINT,\n\t\tint_str BIGINT,\n\t\tnum_and_str DOUBLE PRECISION,\n\t\tnum_str DOUBLE PRECISION,\n\t\t\"time\" TIME,\n\t\tflow_document VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-sqlserver/materialize');"
   }
 }
 {
@@ -660,62 +660,77 @@
 }
 {
   "row": {
+    "date": "0001-01-01T00:00:00Z",
+    "datetime": "0001-01-01T00:00:00Z",
     "flow_published_at": "2023-07-12T18:27:01.912219Z",
     "id": 1,
     "int_and_str": 1,
     "int_str": 10,
     "num_and_str": 1.1,
-    "num_str": 10.1
+    "num_str": 10.1,
+    "time": "0001-01-01T00:00:00Z"
   },
   "table": "Formatted Strings"
 }
 {
   "row": {
+    "date": "1999-02-02T00:00:00Z",
+    "datetime": "1999-02-02T14:20:12.33Z",
     "flow_published_at": "2023-07-12T18:27:12.35461Z",
     "id": 2,
     "int_and_str": 2,
     "int_str": 20,
     "num_and_str": 2.1,
-    "num_str": 20.1
+    "num_str": 20.1,
+    "time": "0001-01-01T14:20:12.33Z"
   },
   "table": "Formatted Strings"
 }
 {
   "row": {
+    "date": "1000-03-03T00:00:00Z",
+    "datetime": "1000-03-03T23:59:38.1Z",
     "flow_published_at": "2023-07-12T18:18:11.537199Z",
     "id": 3,
     "int_and_str": 3,
     "int_str": 30,
     "num_and_str": 3.1,
-    "num_str": 30.1
+    "num_str": 30.1,
+    "time": "0001-01-01T23:59:38.1Z"
   },
   "table": "Formatted Strings"
 }
 {
   "row": {
+    "date": "2023-08-29T00:00:00Z",
+    "datetime": "2023-08-29T23:59:38Z",
     "flow_published_at": "2023-07-12T18:18:48.441281Z",
     "id": 4,
     "int_and_str": 4,
     "int_str": 40,
     "num_and_str": 4.1,
-    "num_str": 40.1
+    "num_str": 40.1,
+    "time": "0001-01-01T23:59:38Z"
   },
   "table": "Formatted Strings"
 }
 {
   "row": {
+    "date": "9999-12-31T00:00:00Z",
+    "datetime": "9999-12-31T23:59:59Z",
     "flow_published_at": "2023-07-12T18:27:25.889321Z",
     "id": 5,
     "int_and_str": 5,
     "int_str": 50,
     "num_and_str": 5.1,
-    "num_str": 50.1
+    "num_str": 50.1,
+    "time": "0001-01-01T23:59:59Z"
   },
   "table": "Formatted Strings"
 }
 {
   "applied": {
-    "actionDescription": "\nIF OBJECT_ID(N'flow_materializations_v2', 'U') IS NULL BEGIN\nCREATE TABLE flow_materializations_v2 (\n\t\tmaterialization VARCHAR(900) NOT NULL,\n\t\tversion VARCHAR(MAX) NOT NULL,\n\t\tspec VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\nEND;\n\n\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization VARCHAR(900) NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\nUPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-sqlserver/materialize';"
+    "actionDescription": "\nIF OBJECT_ID(N'flow_materializations_v2', 'U') IS NULL BEGIN\nCREATE TABLE flow_materializations_v2 (\n\t\tmaterialization VARCHAR(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tversion VARCHAR(MAX) NOT NULL,\n\t\tspec VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\nEND;\n\n\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization VARCHAR(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" VARCHAR(MAX) NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\nUPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-sqlserver/materialize';"
   }
 }
 {
