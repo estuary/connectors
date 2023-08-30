@@ -11,6 +11,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
+	"github.com/estuary/connectors/go/util"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -53,6 +54,10 @@ func (c *config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if err := util.CheckEndpointSpaces("address", c.Address); err != nil {
+		return err
 	}
 
 	var uri, err = url.Parse(c.Address)

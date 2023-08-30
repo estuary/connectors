@@ -15,6 +15,7 @@ import (
 	"time"
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/util"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -71,6 +72,10 @@ func (c *config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if err := util.CheckEndpointSpaces("address", c.Address); err != nil {
+		return err
 	}
 
 	if c.Advanced.SSLMode != "" {

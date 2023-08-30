@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"net/url"
+
+	"github.com/estuary/connectors/go/util"
 )
 
 type config struct {
@@ -24,6 +26,10 @@ func (c *config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if err := util.CheckEndpointSpaces("address", c.Address); err != nil {
+		return err
 	}
 
 	var uri, err = url.Parse(c.Address)

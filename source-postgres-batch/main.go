@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	schemagen "github.com/estuary/connectors/go/schema-gen"
+	"github.com/estuary/connectors/go/util"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -41,6 +42,9 @@ func (c *Config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+	if err := util.CheckEndpointSpaces("address", c.Address); err != nil {
+		return err
 	}
 	return nil
 }

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/estuary/connectors/go/util"
 )
 
 type config struct {
@@ -32,6 +34,9 @@ func (c config) Validate() error {
 	}
 	if c.S3Bucket == "" {
 		return fmt.Errorf("missing required bucket")
+	}
+	if err := util.CheckEndpointSpaces("engine_url", c.EngineURL); err != nil {
+		return err
 	}
 	return nil
 }

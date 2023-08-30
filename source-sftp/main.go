@@ -16,6 +16,7 @@ import (
 
 	"github.com/estuary/connectors/filesource"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
+	"github.com/estuary/connectors/go/util"
 	"github.com/estuary/flow/go/parser"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/pkg/sftp"
@@ -73,6 +74,7 @@ func (advancedConfig) GetFieldDocString(fieldName string) string {
 
 func (c config) Validate() error {
 	var requiredProperties = [][]string{
+		{"address", c.Address},
 		{"username", c.Username},
 		{"password", c.Password},
 		{"directory", c.Directory},
@@ -81,6 +83,10 @@ func (c config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if err := util.CheckEndpointSpaces("address", c.Address); err != nil {
+		return err
 	}
 
 	if c.Directory != path.Clean(c.Directory) {

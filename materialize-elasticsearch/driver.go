@@ -16,6 +16,7 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
+	"github.com/estuary/connectors/go/util"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-boilerplate/validate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -199,11 +200,13 @@ func (c *credentials) Validate() error {
 
 func (c config) Validate() error {
 	if c.Endpoint == "" {
-		return fmt.Errorf("missing Endpoint")
+		return fmt.Errorf("missing endpoint")
 	} else if !strings.HasPrefix(c.Endpoint, "http://") && !strings.HasPrefix(c.Endpoint, "https://") {
 		return fmt.Errorf("endpoint '%s' is invalid: must start with either http:// or https://", c.Endpoint)
 	} else if c.Advanced.Replicas != nil && *c.Advanced.Replicas < 0 {
 		return fmt.Errorf("number_of_replicas cannot be negative")
+	} else if err := util.CheckEndpointSpaces("endpoint", c.Endpoint); err != nil {
+		return err
 	}
 
 	return c.Credentials.Validate()

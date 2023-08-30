@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/util"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -104,6 +105,10 @@ func (c *config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if err := util.CheckEndpointSpaces("address", c.Address); err != nil {
+		return err
 	}
 
 	if c.BucketPath != "" {

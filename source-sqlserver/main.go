@@ -14,6 +14,7 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
+	"github.com/estuary/connectors/go/util"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -74,6 +75,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if err := util.CheckEndpointSpaces("address", c.Address); err != nil {
+		return err
+	}
 	if c.Timezone != "" {
 		if _, err := sqlcapture.ParseTimezone(c.Timezone); err != nil {
 			return err

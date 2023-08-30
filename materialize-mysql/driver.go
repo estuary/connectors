@@ -20,6 +20,7 @@ import (
 	"time"
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/util"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -80,6 +81,10 @@ func (c *config) Validate() error {
 		}
 	}
 
+	if err := util.CheckEndpointSpaces("address", c.Address); err != nil {
+		return err
+	}
+
 	if c.Advanced.SSLMode != "" {
 		if !slices.Contains([]string{"disabled", "preferred", "required", "verify_ca", "verify_identity"}, c.Advanced.SSLMode) {
 			return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", c.Advanced.SSLMode)
@@ -87,7 +92,7 @@ func (c *config) Validate() error {
 	}
 
 	if (c.Advanced.SSLMode == "verify_ca" || c.Advanced.SSLMode == "verify_identity") && c.Advanced.SSLServerCA == "" {
-		return fmt.Errorf("ssl_server_ca is required when using `verify_ca` and `verify_identity` modes.")
+		return fmt.Errorf("ssl_server_ca is required when using `verify_ca` and `verify_identity` modes")
 	}
 
 	return nil
@@ -100,7 +105,7 @@ func registerCustomSSL(c *config) error {
 	var rootCertPool = x509.NewCertPool()
 	var rawServerCert = []byte(c.Advanced.SSLServerCA)
 	if ok := rootCertPool.AppendCertsFromPEM(rawServerCert); !ok {
-		return fmt.Errorf("failed to append PEM, this usually means the PEM is not correctly formatted.")
+		return fmt.Errorf("failed to append PEM, this usually means the PEM is not correctly formatted")
 	}
 
 	// By default, Go's tls implementation verifies both the validity of the
@@ -340,7 +345,7 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 		if err := row.Scan(&localInFileEnabled); err != nil {
 			errs.Err(fmt.Errorf("could not read `local_infile` global variable: %w", err))
 		} else if !localInFileEnabled {
-			errs.Err(fmt.Errorf("`local_infile` global variable must be enabled on your mysql server. You can enable this using `SET GLOBAL local_infile = true`."))
+			errs.Err(fmt.Errorf("`local_infile` global variable must be enabled on your mysql server. You can enable this using `SET GLOBAL local_infile = true`"))
 		} else {
 			db.Close()
 		}
@@ -637,7 +642,7 @@ func rowToCSVRecord(row []any) ([]string, error) {
 			// See https://dev.mysql.com/doc/refman/8.0/en/problems-with-null.html
 			record[i] = "NULL"
 		case bool:
-			if value == false {
+			if !value {
 				record[i] = "0"
 			} else {
 				record[i] = "1"
@@ -977,7 +982,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			} else if rowsAffected, err := results.RowsAffected(); err != nil {
 				return fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
 			} else if rowsAffected < 1 {
-				return fmt.Errorf("This instance was fenced off by another")
+				return fmt.Errorf("this instance was fenced off by another")
 			}
 
 			if err := txn.Commit(); err != nil {
