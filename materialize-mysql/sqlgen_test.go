@@ -86,7 +86,7 @@ func TestDateTimeColumn(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, "DATETIME NOT NULL", mapped.DDL)
+	require.Equal(t, "DATETIME(6) NOT NULL", mapped.DDL)
 
 	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, "2022-04-04T10:09:08.234567", parsed)
@@ -105,7 +105,7 @@ func TestDateTimePKColumn(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, "DATETIME NOT NULL", mapped.DDL)
+	require.Equal(t, "DATETIME(6) NOT NULL", mapped.DDL)
 }
 
 func TestTimeColumn(t *testing.T) {
@@ -119,7 +119,7 @@ func TestTimeColumn(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, "TIME NOT NULL", mapped.DDL)
+	require.Equal(t, "TIME(6) NOT NULL", mapped.DDL)
 
 	parsed, err := mapped.Converter("10:09:08.234567Z")
 	require.Equal(t, "10:09:08.234567", parsed)
