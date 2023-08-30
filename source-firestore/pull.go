@@ -162,7 +162,11 @@ func initResourceStates(prevStates map[string]*resourceState, resourceBindings [
 			// change data has been skipped. To get back into a consistent state, we will have
 			// to restart from the current moment (to maximize our changes of staying caught
 			// up going forward) and start a new backfill of the entire collection.
-			var startTime = prevState.Backfill.StartAfter.Add(backfillRestartDelay)
+			var prevStartTime time.Time
+			if prevState.Backfill != nil {
+				prevStartTime = prevState.Backfill.StartAfter
+			}
+			var startTime = prevStartTime.Add(backfillRestartDelay)
 			if time.Now().After(startTime) {
 				startTime = time.Now()
 			}
@@ -682,11 +686,11 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					})
 					target.ResumeType = &firestore_pb.Target_ReadTime{ReadTime: timestamppb.New(time.Now())}
 					listenClient = nil
-				}
-				if tc.Cause != nil {
+				} else if tc.Cause != nil {
 					return fmt.Errorf("unexpected TargetChange.REMOVE: %v", tc.Cause.Message)
+				} else {
+					return fmt.Errorf("unexpected TargetChange.REMOVE")
 				}
-				return fmt.Errorf("unexpected TargetChange.REMOVE")
 			case firestore_pb.TargetChange_CURRENT:
 				if log.IsLevelEnabled(log.TraceLevel) {
 					var ts = resp.TargetChange.ReadTime.AsTime().Format(time.RFC3339Nano)
