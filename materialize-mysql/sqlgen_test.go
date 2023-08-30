@@ -86,11 +86,26 @@ func TestDateTimeColumn(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, "TIMESTAMP NOT NULL", mapped.DDL)
+	require.Equal(t, "DATETIME NOT NULL", mapped.DDL)
 
 	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, "2022-04-04T10:09:08.234567", parsed)
 	require.NoError(t, err)
+}
+
+func TestDateTimePKColumn(t *testing.T) {
+	var mapped, err = mysqlDialect.MapType(&sqlDriver.Projection{
+		Projection: pf.Projection{
+			Inference: pf.Inference{
+				Types:   []string{"string"},
+				String_: &pf.Inference_String{Format: "date-time"},
+				Exists:  pf.Inference_MUST,
+			},
+			IsPrimaryKey: true,
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "DATETIME NOT NULL", mapped.DDL)
 }
 
 func TestTimeColumn(t *testing.T) {
