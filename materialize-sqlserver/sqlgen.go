@@ -17,20 +17,20 @@ var sqlServerDialect = func() sql.Dialect {
 		sql.OBJECT:  sql.NewStaticMapper("VARCHAR(MAX)", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.ARRAY:   sql.NewStaticMapper("VARCHAR(MAX)", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.BINARY:  sql.NewStaticMapper("VARBINARY(MAX)"),
-		sql.STRING:  sql.PrimaryKeyMapper {
-			// sqlserver cannot do varchar primary keys larger than 900 bytes, and in
-			// sqlserver, the number N passed to varchar(N), denotes the maximum bytes
-			// stored in the column, not the character length.
-			// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
-			// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
-			PrimaryKey: sql.NewStaticMapper("VARCHAR(900)"),
-			Delegate: sql.StringTypeMapper{
-				Fallback: sql.NewStaticMapper("VARCHAR(MAX)"),
-				WithFormat: map[string]sql.TypeMapper{
-					"date":      sql.NewStaticMapper("DATE"),
-					"date-time": sql.NewStaticMapper("DATETIME2", sql.WithElementConverter(rfc3339ToUTC())),
-					"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
-				},
+		sql.STRING:  sql.StringTypeMapper{
+			Fallback: sql.PrimaryKeyMapper {
+				// sqlserver cannot do varchar primary keys larger than 900 bytes, and in
+				// sqlserver, the number N passed to varchar(N), denotes the maximum bytes
+				// stored in the column, not the character length.
+				// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
+				// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
+				PrimaryKey: sql.NewStaticMapper("VARCHAR(900)"),
+				Delegate: sql.NewStaticMapper("VARCHAR(MAX)"),
+			},
+			WithFormat: map[string]sql.TypeMapper{
+				"date":      sql.NewStaticMapper("DATE"),
+				"date-time": sql.NewStaticMapper("DATETIME2", sql.WithElementConverter(rfc3339ToUTC())),
+				"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
 			},
 		},
 		sql.MULTIPLE: sql.NewStaticMapper("VARCHAR(MAX)", sql.WithElementConverter(sql.JsonBytesConverter)),
