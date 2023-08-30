@@ -6,7 +6,7 @@ Key One Description
 auto-generated projection of JSON at: /key1 with inferred types: [integer]',
 		`key!2` BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key!2 with inferred types: [boolean]',
 		`Camel_Case` BIGINT COMMENT 'auto-generated projection of JSON at: /Camel_Case with inferred types: [integer]',
-		`a Time` TIMESTAMP COMMENT 'auto-generated projection of JSON at: /a Time with inferred types: [string]',
+		`a Time` DATETIME COMMENT 'auto-generated projection of JSON at: /a Time with inferred types: [string]',
 		`array` JSON COMMENT 'This is an array!
 auto-generated projection of JSON at: /array with inferred types: [array]',
 		lower_case BIGINT COMMENT 'auto-generated projection of JSON at: /lower_case with inferred types: [integer]',

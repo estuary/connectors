@@ -17,22 +17,22 @@ var mysqlDialect = func() sql.Dialect {
 		sql.OBJECT:  sql.NewStaticMapper("JSON"),
 		sql.ARRAY:   sql.NewStaticMapper("JSON"),
 		sql.BINARY:  sql.NewStaticMapper("LONGBLOB"),
-		sql.STRING: sql.PrimaryKeyMapper{
-			PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-			Delegate: sql.StringTypeMapper{
-				Fallback: sql.NewStaticMapper("LONGTEXT"),
-				WithFormat: map[string]sql.TypeMapper{
-					"date":      sql.NewStaticMapper("DATE"),
-					"date-time": sql.NewStaticMapper("TIMESTAMP", sql.WithElementConverter(rfc3339ToUTC())),
-					"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
-				},
-				WithContentType: map[string]sql.TypeMapper{
-					// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
-					// checkpoints can be quite long, so we need to use as large of column size as
-					// possible for these tables.
-					"application/x-protobuf; proto=flow.MaterializationSpec": sql.NewStaticMapper("LONGBLOB"),
-					"application/x-protobuf; proto=consumer.Checkpoint":      sql.NewStaticMapper("LONGBLOB"),
-				},
+		sql.STRING:  sql.StringTypeMapper{
+			Fallback: sql.PrimaryKeyMapper{
+				PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
+				Delegate: sql.NewStaticMapper("LONGTEXT"),
+			},
+			WithFormat: map[string]sql.TypeMapper{
+				"date":      sql.NewStaticMapper("DATE"),
+				"date-time": sql.NewStaticMapper("DATETIME", sql.WithElementConverter(rfc3339ToUTC())),
+				"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
+			},
+			WithContentType: map[string]sql.TypeMapper{
+				// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
+				// checkpoints can be quite long, so we need to use as large of column size as
+				// possible for these tables.
+				"application/x-protobuf; proto=flow.MaterializationSpec": sql.NewStaticMapper("LONGBLOB"),
+				"application/x-protobuf; proto=consumer.Checkpoint":      sql.NewStaticMapper("LONGBLOB"),
 			},
 		},
 		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
