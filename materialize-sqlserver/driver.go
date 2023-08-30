@@ -458,7 +458,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			// avoid, specially if we want to support large number of bindings), or do a
 			// normal insert as we are doing here. The performance does not seem bad.
 			if _, err := txn.ExecContext(ctx, b.loadInsertSQL, converted...); err != nil {
-				return fmt.Errorf("load: writing bulk data on %q: %w", b.tempLoadTableName, err)
+				return fmt.Errorf("load: writing keys to %q: %w", b.tempLoadTableName, err)
 			}
 		}
 	}
