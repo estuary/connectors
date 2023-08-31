@@ -170,7 +170,14 @@ func newSqlServerDriver() *sql.Driver {
 				return nil, fmt.Errorf("check collations: %w", err)
 			}
 
-			var dialect = sqlServerDialect(collation)
+			var stringType = "varchar"
+			// If the collation does not support UTF8, we fallback to using nvarchar
+			// for string columns
+			if !strings.Contains(collation, "UTF8") {
+				stringType = "nvarchar"
+			}
+
+			var dialect = sqlServerDialect(stringType, collation)
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{

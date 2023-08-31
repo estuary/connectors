@@ -42,7 +42,7 @@ CREATE TABLE #flow_temp_load_0 (
 --- Begin "Delta Updates" createLoadTable ---
 
 CREATE TABLE #flow_temp_load_1 (
-		"theKey" VARCHAR(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		"theKey" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 		PRIMARY KEY ("theKey")
 );
 --- End "Delta Updates" createLoadTable ---
@@ -54,10 +54,10 @@ CREATE TABLE #flow_temp_store_0 (
 		"key!2" BIT NOT NULL,
 		"Camel_Case" BIGINT,
 		"a Time" DATETIME2,
-		"array" VARCHAR(MAX),
+		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		lower_case BIGINT,
-		"value" VARCHAR(MAX),
-		flow_document VARCHAR(MAX) NOT NULL,
+		"value" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		flow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 
 		PRIMARY KEY (key1, "key!2")
 );
@@ -66,7 +66,7 @@ CREATE TABLE #flow_temp_store_0 (
 --- Begin "Delta Updates" createStoreTable ---
 
 CREATE TABLE #flow_temp_store_1 (
-		"theKey" VARCHAR(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		"theKey" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 		"aValue" BIGINT
 );
 --- End "Delta Updates" createStoreTable ---
@@ -79,10 +79,10 @@ CREATE TABLE target_table (
 		"key!2" BIT NOT NULL,
 		"Camel_Case" BIGINT,
 		"a Time" DATETIME2,
-		"array" VARCHAR(MAX),
+		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		lower_case BIGINT,
-		"value" VARCHAR(MAX),
-		flow_document VARCHAR(MAX) NOT NULL,
+		"value" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		flow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 
 		PRIMARY KEY (key1, "key!2")
 );
@@ -93,7 +93,7 @@ END;
 
 IF OBJECT_ID(N'Delta Updates', 'U') IS NULL BEGIN
 CREATE TABLE "Delta Updates" (
-		"theKey" VARCHAR(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		"theKey" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 		"aValue" BIGINT
 );
 END;

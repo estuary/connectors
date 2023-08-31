@@ -14,7 +14,7 @@ import (
 )
 
 func TestSQLGeneration(t *testing.T) {
-	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var dialect = sqlServerDialect("varchar", "Latin1_General_100_BIN2_UTF8")
 	var templates = renderTemplates(dialect)
 
 	var spec *pf.MaterializationSpec
@@ -80,7 +80,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var dialect = sqlServerDialect("varchar", "Latin1_General_100_BIN2_UTF8")
 	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
@@ -101,7 +101,7 @@ func TestDateTimeColumn(t *testing.T) {
 }
 
 func TestDateTimePKColumn(t *testing.T) {
-	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var dialect = sqlServerDialect("varchar", "Latin1_General_100_BIN2_UTF8")
 	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
@@ -117,7 +117,7 @@ func TestDateTimePKColumn(t *testing.T) {
 }
 
 func TestTimeColumn(t *testing.T) {
-	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var dialect = sqlServerDialect("varchar", "Latin1_General_100_BIN2_UTF8")
 	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{

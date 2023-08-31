@@ -15,7 +15,7 @@ import (
 
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
-	var dialect = sqlServerDialect("Latin1_General_100_BIN2")
+	var dialect = sqlServerDialect("varchar", "Latin1_General_100_BIN2")
 	var templates = renderTemplates(dialect)
 	var client = client{uri: "sqlserver://sa:!Flow1234@localhost:1433/flow", dialect: dialect,}
 	sql.RunFenceTestCases(t,

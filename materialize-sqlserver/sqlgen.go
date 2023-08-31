@@ -10,23 +10,31 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
-var sqlServerDialect = func(collation string) sql.Dialect {
+var sqlServerDialect = func(stringType string, collation string) sql.Dialect {
+	var textType = fmt.Sprintf("%s(MAX) COLLATE %s", stringType, collation)
+	var textPKType = fmt.Sprintf("%s(900) COLLATE %s", stringType, collation)
+
+	// nvarchar and varchar fields require the value to be a string instead of a
+	// bytearray to handle unicode properly, so we convert to str after converting
+	// to json.RawMessage
+	var jsonConverter = sql.WithElementConverter(sql.Compose(sql.StdByteArrayToStr, sql.JsonBytesConverter))
+
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.INTEGER: sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
 		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
 		sql.BOOLEAN: sql.NewStaticMapper("BIT"),
-		sql.OBJECT:  sql.NewStaticMapper("VARCHAR(MAX)", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.ARRAY:   sql.NewStaticMapper("VARCHAR(MAX)", sql.WithElementConverter(sql.JsonBytesConverter)),
+		sql.OBJECT:  sql.NewStaticMapper(textType, jsonConverter),
+		sql.ARRAY:   sql.NewStaticMapper(textType, jsonConverter),
 		sql.BINARY:  sql.NewStaticMapper("VARBINARY(MAX)"),
 		sql.STRING:  sql.StringTypeMapper{
 			Fallback: sql.PrimaryKeyMapper {
-				// sqlserver cannot do varchar primary keys larger than 900 bytes, and in
+				// sqlserver cannot do varchar/nvarchar primary keys larger than 900 bytes, and in
 				// sqlserver, the number N passed to varchar(N), denotes the maximum bytes
-				// stored in the column, not the character length.
+				// stored in the column, not the character count.
 				// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
 				// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
-				PrimaryKey: sql.NewStaticMapper(fmt.Sprintf("VARCHAR(900) COLLATE %s", collation)),
-				Delegate: sql.NewStaticMapper("VARCHAR(MAX)"),
+				PrimaryKey: sql.NewStaticMapper(textPKType),
+				Delegate: sql.NewStaticMapper(textType),
 			},
 			WithFormat: map[string]sql.TypeMapper{
 				"date":      sql.NewStaticMapper("DATE"),
@@ -34,7 +42,7 @@ var sqlServerDialect = func(collation string) sql.Dialect {
 				"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
 			},
 		},
-		sql.MULTIPLE: sql.NewStaticMapper("VARCHAR(MAX)", sql.WithElementConverter(sql.JsonBytesConverter)),
+		sql.MULTIPLE: sql.NewStaticMapper(textType, jsonConverter),
 	}
 	mapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
