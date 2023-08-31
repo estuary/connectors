@@ -18,9 +18,9 @@ import (
 var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
 var rsDialect = func() sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+	var typeMappings sql.TypeMapper = sql.ProjectionTypeMapper{
+		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
+		sql.NUMBER:   sql.NewStaticMapper("DOUBLE PRECISION"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:   sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.ARRAY:    sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
@@ -44,7 +44,9 @@ var rsDialect = func() sql.Dialect {
 					return te, nil
 				})),
 			WithFormat: map[string]sql.TypeMapper{
-				"date": sql.NewStaticMapper("DATE"),
+				"integer": sql.NewStaticMapper("NUMERIC(38,0)", sql.WithElementConverter(sql.StdStrToInt())),
+				"number":  sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+				"date":    sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(
 					func(te tuple.TupleElement) (interface{}, error) {
 						// Redshift supports timestamps with microsecond precision. It will reject
@@ -75,11 +77,6 @@ var rsDialect = func() sql.Dialect {
 		},
 	}
 
-	// NB: We are not using sql.NullableMapper so that all columns are created as nullable. This is
-	// necessary because Redshift does not support dropping a NOT NULL constraint, so we need to
-	// create columns as nullable to preserve the ability to change collection schema fields from
-	// required to not required or remove fields from the materialization.
-
 	return sql.Dialect{
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
@@ -94,7 +91,12 @@ var rsDialect = func() sql.Dialect {
 			// parameters start at $1
 			return fmt.Sprintf("$%d", index+1)
 		}),
-		TypeMapper: mapper,
+		// NB: We are not using sql.NullableMapper so that all columns are created as nullable. This is
+		// necessary because Redshift does not support dropping a NOT NULL constraint, so we need to
+		// create columns as nullable to preserve the ability to change collection schema fields from
+		// required to not required or remove fields from the materialization.
+		TypeMapper:               typeMappings,
+		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
 	}
 }()
 

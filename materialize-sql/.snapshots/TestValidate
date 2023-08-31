@@ -1,0 +1,542 @@
+--- Begin new binding - standard updates ---
+{
+	"flow_document": {
+		"type": 2,
+		"reason": "The root document must be materialized"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 2,
+		"reason": "All Locations that are part of the collections key are required"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	}
+}
+--- End new binding - standard updates ---
+
+--- Begin new binding - delta updates ---
+{
+	"flow_document": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 2,
+		"reason": "All Locations that are part of the collections key are required"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	}
+}
+--- End new binding - delta updates ---
+
+--- Begin with existing binding - standard updates ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End with existing binding - standard updates ---
+
+--- Begin with existing binding - delta updates ---
+{
+	"flow_document": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End with existing binding - delta updates ---
+
+--- Begin [field: numericString] remove numeric string format ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 6,
+		"reason": "Field 'numericString' is already being materialized as type '[integer,string] format: integer' and cannot be changed to type '[integer,string]'"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End [field: numericString] remove numeric string format ---
+
+--- Begin [field: scalarValue and numericString] numeric and numeric format string interactions ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End [field: scalarValue and numericString] numeric and numeric format string interactions ---
+
+--- Begin [field: key] unsatisfiable type change ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 6,
+		"reason": "Field 'key' is already being materialized as type '[string]' and cannot be changed to type '[integer]'"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 6,
+		"reason": "Field 'scalarValue' is already being materialized as type '[integer]' and cannot be changed to type '[string]'"
+	}
+}
+--- End [field: key] unsatisfiable type change ---
+
+--- Begin [field: multiple] add even more types ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End [field: multiple] add even more types ---
+
+--- Begin [field: nonScalarValue] change type from object to array ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End [field: nonScalarValue] change type from object to array ---
+
+--- Begin [field: scalarValue] forbidden type change ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	}
+}
+--- End [field: scalarValue] forbidden type change ---
+
+--- Begin [field: scalarValue] remove from list of required fields ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	}
+}
+--- End [field: scalarValue] remove from list of required fields ---
+
+--- Begin root document projection change - standard updates ---
+{
+	"alternate_root": {
+		"type": 6,
+		"reason": "The root document must be materialized as field 'flow_document'"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"some_other_root": {
+		"type": 5,
+		"reason": "Cannot materialize root document projection 'some_other_root' because field 'flow_document' is already being materialized as the document"
+	}
+}
+--- End root document projection change - standard updates ---
+
+--- Begin root document projection change - delta updates ---
+{
+	"alternate_root": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"some_other_root": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	}
+}
+--- End root document projection change - delta updates ---
+
+

@@ -17,9 +17,8 @@ func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 	var dialect = sqlServerDialect("Latin1_General_100_BIN2")
 	var templates = renderTemplates(dialect)
-	var client = client{uri: "sqlserver://sa:!Flow1234@localhost:1433/flow", dialect: dialect,}
+	var client = client{uri: "sqlserver://sa:!Flow1234@localhost:1433/flow", dialect: dialect}
 	sql.RunFenceTestCases(t,
-		sql.FenceSnapshotPath,
 		client,
 		[]string{"temp_test_fencing_checkpoints"},
 		dialect,
@@ -49,6 +48,10 @@ func TestFencingCases(t *testing.T) {
 			return
 		},
 	)
+}
+
+func TestValidate(t *testing.T) {
+	sql.RunValidateTestCases(t, sqlServerDialect("Latin1_General_100_BIN2"))
 }
 
 func TestPrereqs(t *testing.T) {
@@ -105,14 +108,14 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-      var actual = prereqs(context.Background(), &sql.Endpoint{
+			var actual = prereqs(context.Background(), &sql.Endpoint{
 				Config: tt.cfg(cfg),
 				Tenant: "tenant",
 			}).Unwrap()
 
-      for i := 0; i < len(tt.want); i++ {
-        require.ErrorContains(t, actual[i], tt.want[i])
-      }
+			for i := 0; i < len(tt.want); i++ {
+				require.ErrorContains(t, actual[i], tt.want[i])
+			}
 		})
 	}
 }

@@ -87,7 +87,6 @@ func (c *config) Validate() error {
 		}
 	}
 
-
 	if c.Advanced.SSLMode != "" {
 		if !slices.Contains([]string{"disabled", "preferred", "required", "verify_ca", "verify_identity"}, c.Advanced.SSLMode) {
 			return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", c.Advanced.SSLMode)
@@ -344,6 +343,7 @@ func newMysqlDriver() *sql.Driver {
 }
 
 var errDatabaseTimezoneUnknown = errors.New("system variable 'time_zone' or timezone from capture configuration must contain a valid IANA time zone name or +HH:MM offset")
+
 func queryTimeZone(ctx context.Context, conn *stdsql.Conn) (string, error) {
 	var row = conn.QueryRowContext(ctx, `SELECT @@GLOBAL.time_zone;`)
 	var tzName string
@@ -418,7 +418,7 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 
 // client implements the sql.Client interface.
 type client struct {
-	uri string
+	uri     string
 	dialect sql.Dialect
 }
 
@@ -462,9 +462,7 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 }
 
 func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
-	var projection = column.Projection
-	projection.Inference.Exists = pf.Inference_MAY
-	var mapped, err = c.dialect.TypeMapper.MapType(&projection)
+	var mapped, err = c.dialect.MapTypeNullable(&column.Projection)
 	if err != nil {
 		return "", fmt.Errorf("drop not null: mapping type of %s failed: %w", column.Identifier, err)
 	}
@@ -518,7 +516,7 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 }
 
 type transactor struct {
-	dialect sql.Dialect
+	dialect   sql.Dialect
 	templates map[string]*template.Template
 	// Variables exclusively used by Load.
 	load struct {
@@ -602,7 +600,7 @@ type varcharColumnMeta struct {
 type binding struct {
 	target sql.Table
 
-	dialect sql.Dialect
+	dialect   sql.Dialect
 	templates map[string]*template.Template
 
 	varcharColumnMetas []varcharColumnMeta
@@ -715,7 +713,7 @@ func rowToCSVRecord(row []any) ([]string, error) {
 			// See https://dev.mysql.com/doc/refman/8.0/en/problems-with-null.html
 			record[i] = "NULL"
 		case bool:
-			if value == false {
+			if !value {
 				record[i] = "0"
 			} else {
 				record[i] = "1"

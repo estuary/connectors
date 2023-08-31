@@ -213,6 +213,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			[]string{tableName},
 			res.DeltaUpdates,
 			binding.Collection,
+			binding.FieldConfigJsonMap,
 			storedSpec,
 		)
 		if err != nil {

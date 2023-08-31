@@ -103,7 +103,7 @@ func TestApply(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	bp_test.RunValidateTestCases(t, elasticValidator)
+	bp_test.RunValidateTestCases(t, elasticValidator, ".snapshots")
 }
 
 func TestDriverSpec(t *testing.T) {
