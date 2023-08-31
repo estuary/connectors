@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -135,10 +136,9 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 		constraint.Reason = "This field is able to be materialized"
 
 	default:
-		// Anything else is either multiple different types, a single 'null' type, or an
-		// array type which we currently don't support. We could potentially support array
-		// types if they made the "elements" configuration avaiable and that was a single
-		// type.
+		// Anything else is either multiple different types, a single 'null' type, or an array type
+		// which we currently don't support. We could potentially support array types if they made
+		// the "elements" configuration available and that was a single type.
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Cannot materialize this field"
 	}
@@ -146,8 +146,8 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection) bool {
-	return propForProjection(existing).Type == propForProjection(proposed).Type
+func (constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+	return propForProjection(existing).Type == propForProjection(proposed).Type, nil
 }
 
 func (constrainter) DescriptionForType(p *pf.Projection) string {

@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -18,7 +19,7 @@ type Constrainter interface {
 	// Compatible reports whether two projections are compatible. Generally this would mean they are
 	// the same non-null JSON types(s), but can be more forgiving for endpoints that do not impose
 	// strict requirements on the structure of materialized fields.
-	Compatible(existing *pf.Projection, proposed *pf.Projection) bool
+	Compatible(existing *pf.Projection, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error)
 
 	// DescriptionForType produces a human-readable description for a type, which is used in
 	// constraint descriptions when there is an incompatible type change.
@@ -51,7 +52,13 @@ func (v Validator) ValidateSelectedFields(
 	rootDocFields := 0
 
 	// Calculated constraints for the fields of this binding.
-	bindingConstraints, err := v.ValidateBinding(binding.ResourcePath, binding.DeltaUpdates, binding.Collection, storedSpec)
+	bindingConstraints, err := v.ValidateBinding(
+		binding.ResourcePath,
+		binding.DeltaUpdates,
+		binding.Collection,
+		binding.FieldSelection.FieldConfigJsonMap,
+		storedSpec,
+	)
 	if err != nil {
 		return err
 	}
@@ -120,6 +127,7 @@ func (v Validator) ValidateBinding(
 	path []string,
 	deltaUpdates bool,
 	boundCollection pf.CollectionSpec,
+	fieldConfigJsonMap map[string]json.RawMessage,
 	storedSpec *pf.MaterializationSpec,
 ) (map[string]*pm.Response_Validated_Constraint, error) {
 	existingBinding, err := FindExistingBinding(path, boundCollection.Name, storedSpec)
@@ -137,7 +145,10 @@ func (v Validator) ValidateBinding(
 			// delta-updates materialization.
 			return nil, fmt.Errorf("changing binding of collection %s from delta updates to standard updates is not allowed", existingBinding.Collection.Name.String())
 		}
-		constraints = v.validateMatchesExistingBinding(existingBinding, boundCollection, deltaUpdates)
+		constraints, err = v.validateMatchesExistingBinding(existingBinding, boundCollection, deltaUpdates, fieldConfigJsonMap)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return constraints, nil
@@ -155,7 +166,8 @@ func (v Validator) validateMatchesExistingBinding(
 	existing *pf.MaterializationSpec_Binding,
 	boundCollection pf.CollectionSpec,
 	deltaUpdates bool,
-) map[string]*pm.Response_Validated_Constraint {
+	fieldConfigJsonMap map[string]json.RawMessage,
+) (map[string]*pm.Response_Validated_Constraint, error) {
 	constraints := make(map[string]*pm.Response_Validated_Constraint)
 
 	for _, field := range append(existing.FieldSelection.Keys, existing.FieldSelection.Values...) {
@@ -182,7 +194,9 @@ func (v Validator) validateMatchesExistingBinding(
 		// incompatible changes to string format fields, such as removing a numeric format. This
 		// would imply that the field is no longer a numeric value, which would be incompatible with
 		// the materialized mapping and should trigger an evolution of the materialization.
-		if v.c.Compatible(existingProjection, proposedProjection) {
+		if compatible, err := v.c.Compatible(existingProjection, proposedProjection, fieldConfigJsonMap[field]); err != nil {
+			return nil, fmt.Errorf("validating binding for collection '%s': %w", boundCollection.Name.String(), err)
+		} else if compatible {
 			if existingProjection.IsPrimaryKey {
 				constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
 				constraint.Reason = "This field is a key in the current materialization"
@@ -248,7 +262,7 @@ func (v Validator) validateMatchesExistingBinding(
 		}
 	}
 
-	return constraints
+	return constraints, nil
 }
 
 // FindExistingBinding locates a binding within an existing stored specification, and verifies that

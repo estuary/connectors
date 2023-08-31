@@ -27,7 +27,7 @@ var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 // column names vs. table names to work with this peculiarity of Bigquery perhaps. An even better
 // long-term solution may be to use resource-specific constraints for BigQuery and require column
 // names to have compliant projections and do away with this identifier transforming entirely. But
-// until we have UI capaibilities that would support easily providing a large number of projections,
+// until we have UI capabilities that would support easily providing a large number of projections,
 // I am leaving things as-is and not adding the complexity of a separate table vs. column identifier
 // that would only be applicable to Bigquery. We should revisit this once projection editing is
 // better supported.
@@ -64,27 +64,29 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
-var bqTypeMapper = sql.ProjectionTypeMapper{
-	sql.ARRAY:    sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
-	sql.BINARY:   sql.NewStaticMapper("BYTES"),
-	sql.BOOLEAN:  sql.NewStaticMapper("BOOL"),
-	sql.INTEGER:  sql.NewStaticMapper("INT64", sql.WithElementConverter(sql.StdStrToInt())),
-	sql.NUMBER:   sql.NewStaticMapper("FLOAT64", sql.WithElementConverter(sql.StdStrToFloat())),
-	sql.OBJECT:   sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
-	sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-	sql.STRING: sql.StringTypeMapper{
-		Fallback: sql.NewStaticMapper("STRING"),
-		WithFormat: map[string]sql.TypeMapper{
-			"date":      sql.NewStaticMapper("DATE", sql.WithElementConverter(sql.ClampDate())),
-			"date-time": sql.NewStaticMapper("TIMESTAMP", sql.WithElementConverter(sql.ClampDatetime())),
-		},
-	},
-}
-
 var bqDialect = func() sql.Dialect {
-	typeMapper := sql.NullableMapper{
+	var typeMappings = sql.ProjectionTypeMapper{
+		sql.ARRAY:    sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
+		sql.BINARY:   sql.NewStaticMapper("BYTES"),
+		sql.BOOLEAN:  sql.NewStaticMapper("BOOL"),
+		sql.INTEGER:  sql.NewStaticMapper("INT64"),
+		sql.NUMBER:   sql.NewStaticMapper("FLOAT64"),
+		sql.OBJECT:   sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
+		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
+		sql.STRING: sql.StringTypeMapper{
+			Fallback: sql.NewStaticMapper("STRING"),
+			WithFormat: map[string]sql.TypeMapper{
+				"integer":   sql.NewStaticMapper("BIGNUMERIC(38,0)", sql.WithElementConverter(sql.StdStrToInt())),
+				"number":    sql.NewStaticMapper("FLOAT64", sql.WithElementConverter(sql.StdStrToFloat())),
+				"date":      sql.NewStaticMapper("DATE", sql.WithElementConverter(sql.ClampDate())),
+				"date-time": sql.NewStaticMapper("TIMESTAMP", sql.WithElementConverter(sql.ClampDatetime())),
+			},
+		},
+	}
+
+	var nullable = sql.MaybeNullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    bqTypeMapper,
+		Delegate:    typeMappings,
 	}
 
 	return sql.Dialect{
@@ -101,7 +103,8 @@ var bqDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper: typeMapper,
+		TypeMapper:               nullable,
+		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
 	}
 }()
 
