@@ -29,7 +29,11 @@ import (
 //go:generate ./generate-spec-proto.sh testdata/validate/unsatisfiable.flow.yaml
 //go:generate ./generate-spec-proto.sh testdata/validate/forbidden.flow.yaml
 //go:generate ./generate-spec-proto.sh testdata/validate/alternate-root-projection.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/validate/format-change.flow.yaml
+//go:generate ./generate-spec-proto.sh testdata/validate/remove-format.flow.yaml
+//go:generate ./generate-spec-proto.sh testdata/validate/more-multiple.flow.yaml
+//go:generate ./generate-spec-proto.sh testdata/validate/object-to-array.flow.yaml
+//go:generate ./generate-spec-proto.sh testdata/validate/numeric-string-to-numeric.flow.yaml
+//go:generate ./generate-spec-proto.sh testdata/validate/nullability.flow.yaml
 
 //go:embed testdata/apply/generated_specs
 var applyFs embed.FS
@@ -159,7 +163,7 @@ func RunApplyTestCases(
 	cupaloy.SnapshotT(t, snap.String())
 }
 
-func RunValidateTestCases(t *testing.T, v validate.Validator) {
+func RunValidateTestCases(t *testing.T, v validate.Validator, snapshotPath string) {
 	t.Helper()
 
 	tests := []struct {
@@ -193,21 +197,45 @@ func RunValidateTestCases(t *testing.T, v validate.Validator) {
 			deltaUpdates: true,
 		},
 		{
-			name:         "numeric string format change",
+			name:         "[field: numericString] remove numeric string format",
 			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "format-change.flow.proto"),
+			newSpec:      loadSpec(t, validateFs, "remove-format.flow.proto"),
 			deltaUpdates: false,
 		},
 		{
-			name:         "unsatisfiable type change",
+			name:         "[field: scalarValue and numericString] numeric and numeric format string interactions",
+			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
+			newSpec:      loadSpec(t, validateFs, "numeric-string-to-numeric.flow.proto"),
+			deltaUpdates: false,
+		},
+		{
+			name:         "[field: key] unsatisfiable type change",
 			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
 			newSpec:      loadSpec(t, validateFs, "unsatisfiable.flow.proto"),
 			deltaUpdates: false,
 		},
 		{
-			name:         "forbidden type change",
+			name:         "[field: multiple] add even more types",
+			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
+			newSpec:      loadSpec(t, validateFs, "more-multiple.flow.proto"),
+			deltaUpdates: false,
+		},
+		{
+			name:         "[field: nonScalarValue] change type from object to array",
+			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
+			newSpec:      loadSpec(t, validateFs, "object-to-array.flow.proto"),
+			deltaUpdates: false,
+		},
+		{
+			name:         "[field: scalarValue] forbidden type change",
 			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
 			newSpec:      loadSpec(t, validateFs, "forbidden.flow.proto"),
+			deltaUpdates: false,
+		},
+		{
+			name:         "[field: scalarValue] remove from list of required fields",
+			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
+			newSpec:      loadSpec(t, validateFs, "nullability.flow.proto"),
 			deltaUpdates: false,
 		},
 		{
@@ -227,7 +255,7 @@ func RunValidateTestCases(t *testing.T, v validate.Validator) {
 	var snap strings.Builder
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs, err := v.ValidateBinding([]string{"key_value"}, tt.deltaUpdates, tt.newSpec.Bindings[0].Collection, tt.existingSpec)
+			cs, err := v.ValidateBinding([]string{"key_value"}, tt.deltaUpdates, tt.newSpec.Bindings[0].Collection, nil, tt.existingSpec)
 			require.NoError(t, err)
 
 			j, err := json.MarshalIndent(cs, "", "\t")
@@ -238,5 +266,6 @@ func RunValidateTestCases(t *testing.T, v validate.Validator) {
 			snap.WriteString("\n--- End " + tt.name + " ---\n\n")
 		})
 	}
-	cupaloy.SnapshotT(t, snap.String())
+
+	cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath)).SnapshotT(t, snap.String())
 }

@@ -1,3 +1,6 @@
+import:
+  - _materializations.flow.yaml
+
 collections:
   key/value:
     schema:
@@ -9,24 +12,6 @@ collections:
         nonScalarValue: { type: object }
         multiple: { type: [integer, string, boolean] }
         nullValue: { type: "null" }
-      required: [key]
+        optional: { type: object }
+      required: [key, scalarValue]
     key: [/key]
-
-materializations:
-  test/sqlite:
-    endpoint:
-      connector:
-        image: ghcr.io/estuary/materialize-sqlite:dev
-        config: {}
-    bindings:
-      - source: key/value
-        resource: { table: key_value }
-        fields:
-          recommended: false
-          include:
-            key: {}
-            scalarValue: {}
-            numericString: {}
-
-storageMappings:
-  "": { stores: [{ provider: S3, bucket: a-bucket }] }

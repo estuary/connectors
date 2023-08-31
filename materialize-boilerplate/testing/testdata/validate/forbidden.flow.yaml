@@ -5,14 +5,15 @@ collections:
       properties:
         key: { type: string }
         # This field is now a "null" instead of an integer (see base.flow.yaml), which will
-        # typically result in an "foridden" constraint, unless the connector does not forbid fields
+        # typically result in a "forbidden" constraint, unless the connector does not forbid fields
         # where the only type is "null".
         scalarValue: { type: "null" }
         numericString: { type: [integer, string], format: integer }
         nonScalarValue: { type: object }
         multiple: { type: [integer, string, boolean] }
         nullValue: { type: "null" }
-      required: [key]
+        optional: { type: object }
+      required: [key, scalarValue]
     key: [/key]
 
 materializations:
