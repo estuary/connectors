@@ -6,11 +6,11 @@ collections:
     schema:
       type: object
       properties:
-        # This field is changed to an integer from a string (see base.flow.yaml), which will
-        # typically result in an "unsatisfiable" constraint.
-        key: { type: integer }
-        scalarValue: { type: string }
-        numericString: { type: [integer, string], format: integer }
+        key: { type: string }
+        # Was { type: integer }
+        scalarValue: { type: [integer, string], format: integer }
+        # Was { type: [integer, string], format: integer }
+        numericString: { type: integer }
         nonScalarValue: { type: object }
         multiple: { type: [integer, string, boolean] }
         nullValue: { type: "null" }

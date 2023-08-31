@@ -1,17 +1,4 @@
-collections:
-  key/value:
-    schema:
-      type: object
-      properties:
-        key: { type: string }
-        scalarValue: { type: integer }
-        numericString: { type: [integer, string] }
-        nonScalarValue: { type: object }
-        multiple: { type: [integer, string, boolean] }
-        nullValue: { type: "null" }
-      required: [key]
-    key: [/key]
-
+# Dummy materialization used for generating a protobuf spec.
 materializations:
   test/sqlite:
     endpoint:
@@ -27,6 +14,8 @@ materializations:
             key: {}
             scalarValue: {}
             numericString: {}
+            nonScalarValue: {}
+            multiple: {}
 
 storageMappings:
   "": { stores: [{ provider: S3, bucket: a-bucket }] }
