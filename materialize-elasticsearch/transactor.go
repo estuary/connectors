@@ -50,6 +50,10 @@ type transactor struct {
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
 
+	// We are evaluating loads as they come, so we must wait for the runtime's ack of the previous
+	// commit.
+	it.WaitForAcknowledged()
+
 	var mu sync.Mutex
 	loadFn := func(b int, d json.RawMessage) error {
 		mu.Lock()
@@ -78,42 +82,39 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		})
 	}
 
-	gotAck := false
-	sendBatch := func(b []getDoc) {
-		if !gotAck {
-			// We are evaluating loads as they come, so we must wait for the runtime's ack of the previous
-			// commit.
-			it.WaitForAcknowledged()
-			gotAck = true
+	sendBatch := func(b []getDoc) error {
+		select {
+		case <-groupCtx.Done():
+			return group.Wait()
+		case batchCh <- b:
+			return nil
 		}
-		batchCh <- b
 	}
 
 	var batch []getDoc
 	batchSize := 0
 	for it.Next() {
-		select {
-		case <-groupCtx.Done():
-			return group.Wait()
-		default:
-			id := base64.RawStdEncoding.EncodeToString(it.PackedKey)
-			batch = append(batch, getDoc{
-				Id:     id,
-				Index:  t.bindings[it.Binding].index,
-				Source: t.bindings[it.Binding].docField,
-			})
-			batchSize += len(id)
+		id := base64.RawStdEncoding.EncodeToString(it.PackedKey)
+		batch = append(batch, getDoc{
+			Id:     id,
+			Index:  t.bindings[it.Binding].index,
+			Source: t.bindings[it.Binding].docField,
+		})
+		batchSize += len(id)
 
-			if batchSize > loadBatchSize {
-				sendBatch(batch)
-				batch = nil
-				batchSize = 0
+		if batchSize > loadBatchSize {
+			if err := sendBatch(batch); err != nil {
+				return err
 			}
+			batch = nil
+			batchSize = 0
 		}
 	}
 
 	if len(batch) > 0 {
-		sendBatch(batch)
+		if err := sendBatch(batch); err != nil {
+			return err
+		}
 	}
 
 	close(batchCh)
