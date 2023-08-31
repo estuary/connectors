@@ -11,23 +11,26 @@ import (
 )
 
 func newTestDialect() Dialect {
-	var mapper TypeMapper = ProjectionTypeMapper{
-		INTEGER: NewStaticMapper("BIGINT"),
-		NUMBER:  NewStaticMapper("DOUBLE PRECISION"),
-		BOOLEAN: NewStaticMapper("BOOLEAN"),
-		OBJECT:  NewStaticMapper("JSON"),
-		ARRAY:   NewStaticMapper("JSON"),
-		BINARY:  NewStaticMapper("BYTEA"),
+	var typeMappings TypeMapper = ProjectionTypeMapper{
+		INTEGER:  NewStaticMapper("BIGINT"),
+		NUMBER:   NewStaticMapper("DOUBLE PRECISION"),
+		BOOLEAN:  NewStaticMapper("BOOLEAN"),
+		OBJECT:   NewStaticMapper("JSON"),
+		ARRAY:    NewStaticMapper("JSON"),
+		BINARY:   NewStaticMapper("BYTEA"),
+		MULTIPLE: NewStaticMapper("JSON"),
 		STRING: StringTypeMapper{
 			Fallback: NewStaticMapper("TEXT"),
 			WithFormat: map[string]TypeMapper{
+				"integer":   NewStaticMapper("NUMERIC"),
+				"number":    NewStaticMapper("DECIMAL"),
 				"date-time": NewStaticMapper("TIMESTAMPTZ"),
 			},
 		},
 	}
-	mapper = NullableMapper{
+	var nullable = MaybeNullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    mapper,
+		Delegate:    typeMappings,
 	}
 
 	return Dialect{
@@ -42,7 +45,8 @@ func newTestDialect() Dialect {
 		Placeholderer: PlaceholderFn(func(index int) string {
 			return fmt.Sprintf("$%d", index+1)
 		}),
-		TypeMapper: mapper,
+		TypeMapper:               nullable,
+		AlwaysNullableTypeMapper: AlwaysNullableMapper{Delegate: typeMappings},
 	}
 }
 

@@ -5,10 +5,10 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
-	"time"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,6 @@ func TestFencingCases(t *testing.T) {
 	var templates = renderTemplates(dialect)
 	var client = client{uri: "flow:flow@tcp(localhost:3306)/flow"}
 	sql.RunFenceTestCases(t,
-		sql.FenceSnapshotPath,
 		client,
 		[]string{"temp_test_fencing_checkpoints"},
 		dialect,
@@ -48,6 +47,10 @@ func TestFencingCases(t *testing.T) {
 	)
 }
 
+func TestValidate(t *testing.T) {
+	sql.RunValidateTestCases(t, mysqlDialect(time.FixedZone("UTC", 0)))
+}
+
 func TestPrereqs(t *testing.T) {
 	cfg := config{
 		Address:  "localhost:3306",
@@ -72,7 +75,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.User = "wrong" + cfg.User
 				return &cfg
 			},
-			want: []string{fmt.Sprintf("incorrect username or password (1045): Access denied for user 'wrongflow'")},
+			want: []string{"incorrect username or password (1045): Access denied for user 'wrongflow'"},
 		},
 		{
 			name: "wrong password",
@@ -80,7 +83,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.Password = "wrong" + cfg.Password
 				return &cfg
 			},
-			want: []string{fmt.Sprintf("incorrect username or password (1045): Access denied for user 'flow'")},
+			want: []string{"incorrect username or password (1045): Access denied for user 'flow'"},
 		},
 		{
 			name: "wrong database",
@@ -88,7 +91,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.Database = "wrong" + cfg.Database
 				return &cfg
 			},
-			want: []string{fmt.Sprintf("database \"wrongflow\" cannot be accessed, it might not exist or you do not have permission to access it (")},
+			want: []string{"database \"wrongflow\" cannot be accessed, it might not exist or you do not have permission to access it ("},
 		},
 		{
 			name: "wrong address",

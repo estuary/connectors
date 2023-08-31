@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"regexp"
 	"slices"
 	"strings"
@@ -33,48 +32,28 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
-// Snowflake INTEGER values support up to 38 digits, which is more than an int64.
-func strToSfInt(str string) (interface{}, error) {
-	// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers per
-	// JSON specification so we must handle this possibility here. Anything after the decimal is
-	// discarded on the assumption that Flow has validated the data and verified that the decimal
-	// component is all 0's.
-	if idx := strings.Index(str, "."); idx != -1 {
-		str = str[:idx]
-	}
-
-	var i big.Int
-	out, ok := i.SetString(str, 10)
-	if !ok {
-		return nil, fmt.Errorf("could not convert %q to big.Int", str)
-	}
-
-	return out, nil
-}
-
 // snowflakeDialect returns a representation of the Snowflake SQL dialect.
 var snowflakeDialect = func() sql.Dialect {
 	var variantMapper = sql.NewStaticMapper("VARIANT", sql.WithElementConverter(jsonConverter))
 	var typeMappings = sql.ProjectionTypeMapper{
-		sql.ARRAY:   variantMapper,
-		sql.BINARY:  sql.NewStaticMapper("BINARY"),
-		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
-		sql.INTEGER: sql.NewStaticMapper(
-			"INTEGER",
-			sql.WithElementConverter(sql.StringCastConverter(strToSfInt)),
-		),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat())),
+		sql.ARRAY:    variantMapper,
+		sql.BINARY:   sql.NewStaticMapper("BINARY"),
+		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
+		sql.INTEGER:  sql.NewStaticMapper("INTEGER"),
+		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
 		sql.OBJECT:   variantMapper,
 		sql.MULTIPLE: sql.NewStaticMapper("VARIANT", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("STRING"),
 			WithFormat: map[string]sql.TypeMapper{
+				"integer":   sql.NewStaticMapper("INTEGER", sql.WithElementConverter(sql.StdStrToInt())), // Equivalent to NUMBER(38,0)
+				"number":    sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat())),
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMP"),
 			},
 		},
 	}
-	var nullable sql.TypeMapper = sql.NullableMapper{
+	var nullable sql.TypeMapper = sql.MaybeNullableMapper{
 		NotNullText: "NOT NULL",
 		Delegate:    typeMappings,
 	}
@@ -91,7 +70,8 @@ var snowflakeDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper: nullable,
+		TypeMapper:               nullable,
+		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
 	}
 }()
 

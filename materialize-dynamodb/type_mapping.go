@@ -201,10 +201,10 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection) bool {
+func (constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
 	// Non-key fields have no compatibility restrictions and can be changed in any way at any time.
 	if !existing.IsPrimaryKey && !proposed.IsPrimaryKey {
-		return true
+		return true, nil
 	}
 
 	if existing.IsPrimaryKey != proposed.IsPrimaryKey {
@@ -217,7 +217,7 @@ func (constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection)
 		}).Warn("constrainter asked to compare a collection key with a non-key field")
 	}
 
-	return mapType(existing).ddbScalarType == mapType(proposed).ddbScalarType
+	return mapType(existing).ddbScalarType == mapType(proposed).ddbScalarType, nil
 }
 
 func (constrainter) DescriptionForType(p *pf.Projection) string {

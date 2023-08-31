@@ -59,7 +59,6 @@ func TestFencingCases(t *testing.T) {
 	require.NoError(t, err)
 
 	sql.RunFenceTestCases(t,
-		sql.FenceSnapshotPath,
 		client,
 		tablePath,
 		bqDialect,
@@ -131,6 +130,10 @@ func TestFencingCases(t *testing.T) {
 			return b.String(), nil
 		},
 	)
+}
+
+func TestValidate(t *testing.T) {
+	sql.RunValidateTestCases(t, bqDialect)
 }
 
 func TestPrereqs(t *testing.T) {

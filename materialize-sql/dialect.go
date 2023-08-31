@@ -11,6 +11,7 @@ type Dialect struct {
 	Literaler
 	Placeholderer
 	TypeMapper
+	AlwaysNullableTypeMapper
 }
 
 // Identifierer takes path components and returns a raw SQL identifier for the
@@ -37,6 +38,14 @@ type TypeMapper interface {
 	MapType(*Projection) (MappedType, error)
 }
 
+// AlwaysNullableTypeMapper is like a TypeMapper, but always considers the mapped type to be
+// nullable. This is useful when adding new columns to a table that must be nullable regardless of
+// their JSON schema, or for comparing compatible type changes which do not need to consider
+// nullability.
+type AlwaysNullableTypeMapper interface {
+	MapTypeNullable(*Projection) (MappedType, error)
+}
+
 // IdentifierFn is a function that implements Identifierer.
 type IdentifierFn func(path ...string) string
 
@@ -60,10 +69,11 @@ func (f TypeMapperFn) MapType(p *Projection) (MappedType, error) { return f(p) }
 // Compile-time check that wrapping functions with typed  Fn() implementations
 // can be used to build a Dialect.
 var _ = Dialect{
-	Placeholderer: PlaceholderFn(func(index int) string { return "" }),
-	Literaler:     LiteralFn(func(s string) string { return "" }),
-	Identifierer:  IdentifierFn(func(path ...string) string { return "" }),
-	TypeMapper:    &NullableMapper{},
+	Placeholderer:            PlaceholderFn(func(index int) string { return "" }),
+	Literaler:                LiteralFn(func(s string) string { return "" }),
+	Identifierer:             IdentifierFn(func(path ...string) string { return "" }),
+	TypeMapper:               &MaybeNullableMapper{},
+	AlwaysNullableTypeMapper: &AlwaysNullableMapper{},
 }
 
 // PassThroughTransform returns a function that evaluates `if_` over its input

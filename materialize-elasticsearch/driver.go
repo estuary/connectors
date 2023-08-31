@@ -393,7 +393,13 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			return nil, fmt.Errorf("index name '%s' is invalid: must contain at least 1 character that is not '.', '-', or '-'", res.Index)
 		}
 
-		constraints, err := elasticValidator.ValidateBinding([]string{indexName}, res.DeltaUpdates, binding.Collection, storedSpec)
+		constraints, err := elasticValidator.ValidateBinding(
+			[]string{indexName},
+			res.DeltaUpdates,
+			binding.Collection,
+			binding.FieldConfigJsonMap,
+			storedSpec,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("validating binding: %w", err)
 		}

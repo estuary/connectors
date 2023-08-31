@@ -1,14 +1,39 @@
 package main
 
 import (
-	"strings"
-	"time"
 	"fmt"
+	"strconv"
+	"strings"
 	"text/template"
+	"time"
 
 	"slices"
+
 	sql "github.com/estuary/connectors/materialize-sql"
 )
+
+// strToInt is used for sqlserver specific conversion from an integer-formatted string or integer to
+// an integer. The sqlserver driver doesn't appear to have any way to provide an integer value
+// larger than 8 bytes as a parameter (such as may go in a NUMERIC(38,0) column). The value provided
+// must always be an integer that fits in an int64.
+func strToInt() sql.ElementConverter {
+	return sql.StringCastConverter(func(str string) (interface{}, error) {
+		// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers
+		// per JSON specification so we must handle this possibility here. Anything after the
+		// decimal is discarded on the assumption that Flow has validated the data and verified that
+		// the decimal component is all 0's.
+		if idx := strings.Index(str, "."); idx != -1 {
+			str = str[:idx]
+		}
+
+		out, err := strconv.ParseInt(str, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert %q to int64: %w", str, err)
+		}
+
+		return out, nil
+	})
+}
 
 var sqlServerDialect = func(collation string) sql.Dialect {
 	var stringType = "varchar"
@@ -26,24 +51,26 @@ var sqlServerDialect = func(collation string) sql.Dialect {
 	// to json.RawMessage
 	var jsonConverter = sql.WithElementConverter(sql.Compose(sql.StdByteArrayToStr, sql.JsonBytesConverter))
 
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER: sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
-		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+	var typeMappings sql.TypeMapper = sql.ProjectionTypeMapper{
+		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
+		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
 		sql.BOOLEAN: sql.NewStaticMapper("BIT"),
 		sql.OBJECT:  sql.NewStaticMapper(textType, jsonConverter),
 		sql.ARRAY:   sql.NewStaticMapper(textType, jsonConverter),
 		sql.BINARY:  sql.NewStaticMapper("VARBINARY(MAX)"),
-		sql.STRING:  sql.StringTypeMapper{
-			Fallback: sql.PrimaryKeyMapper {
+		sql.STRING: sql.StringTypeMapper{
+			Fallback: sql.PrimaryKeyMapper{
 				// sqlserver cannot do varchar/nvarchar primary keys larger than 900 bytes, and in
 				// sqlserver, the number N passed to varchar(N), denotes the maximum bytes
 				// stored in the column, not the character count.
 				// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
 				// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
 				PrimaryKey: sql.NewStaticMapper(textPKType),
-				Delegate: sql.NewStaticMapper(textType),
+				Delegate:   sql.NewStaticMapper(textType),
 			},
 			WithFormat: map[string]sql.TypeMapper{
+				"integer":   sql.NewStaticMapper("BIGINT", sql.WithElementConverter(strToInt())),
+				"number":    sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("DATETIME2", sql.WithElementConverter(rfc3339ToUTC())),
 				"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
@@ -51,9 +78,10 @@ var sqlServerDialect = func(collation string) sql.Dialect {
 		},
 		sql.MULTIPLE: sql.NewStaticMapper(textType, jsonConverter),
 	}
-	mapper = sql.NullableMapper{
+
+	var nullable = sql.MaybeNullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    mapper,
+		Delegate:    typeMappings,
 	}
 
 	return sql.Dialect{
@@ -69,7 +97,8 @@ var sqlServerDialect = func(collation string) sql.Dialect {
 			// parameterIndex starts at 0, but sqlserver parameters start at @p1
 			return fmt.Sprintf("@p%d", index+1)
 		}),
-		TypeMapper: mapper,
+		TypeMapper:               nullable,
+		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
 	}
 }
 
@@ -279,17 +308,17 @@ UPDATE {{ Identifier $.TablePath }}
 	`)
 
 	return map[string]*template.Template{
-		"tempLoadTableName": tplAll.Lookup("temp_load_name"),
+		"tempLoadTableName":  tplAll.Lookup("temp_load_name"),
 		"tempStoreTableName": tplAll.Lookup("temp_store_name"),
-		"tempLoadTruncate": tplAll.Lookup("truncateTempLoadTable"),
-		"tempStoreTruncate": tplAll.Lookup("truncateTempStoreTable"),
-		"createLoadTable": tplAll.Lookup("createLoadTable"),
-		"createStoreTable": tplAll.Lookup("createStoreTable"),
-		"createTargetTable": tplAll.Lookup("createTargetTable"),
-		"directCopy": tplAll.Lookup("directCopy"),
-		"mergeInto": tplAll.Lookup("mergeInto"),
-		"loadInsert": tplAll.Lookup("loadInsert"),
-		"loadQuery": tplAll.Lookup("loadQuery"),
-		"updateFence": tplAll.Lookup("updateFence"),
+		"tempLoadTruncate":   tplAll.Lookup("truncateTempLoadTable"),
+		"tempStoreTruncate":  tplAll.Lookup("truncateTempStoreTable"),
+		"createLoadTable":    tplAll.Lookup("createLoadTable"),
+		"createStoreTable":   tplAll.Lookup("createStoreTable"),
+		"createTargetTable":  tplAll.Lookup("createTargetTable"),
+		"directCopy":         tplAll.Lookup("directCopy"),
+		"mergeInto":          tplAll.Lookup("mergeInto"),
+		"loadInsert":         tplAll.Lookup("loadInsert"),
+		"loadQuery":          tplAll.Lookup("loadQuery"),
+		"updateFence":        tplAll.Lookup("updateFence"),
 	}
 }

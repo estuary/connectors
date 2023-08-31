@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"text/template"
@@ -168,56 +167,4 @@ func loadSpec(ctx context.Context, endpoint *Endpoint, materialization pf.Materi
 	}
 
 	return spec, version, nil
-}
-
-// resolveResourceToExistingBinding identifies an existing binding of `loadedSpec`
-// which matches the parsed `resourceSpec`. It further identifies field constraints
-// of the resolved binding, and performs initial validation that the resource is
-// well-formed and is a valid transition for an existing binding (if present).
-func resolveResourceToExistingBinding(
-	endpoint *Endpoint,
-	resourceSpec json.RawMessage,
-	collection *pf.CollectionSpec,
-	loadedSpec *pf.MaterializationSpec,
-) (
-	constraints map[string]*pm.Response_Validated_Constraint,
-	loadedBinding *pf.MaterializationSpec_Binding,
-	resource Resource,
-	err error,
-) {
-	resource = endpoint.NewResource(endpoint)
-
-	if err = pf.UnmarshalStrict(resourceSpec, resource); err != nil {
-		err = fmt.Errorf("resource binding for collection %q: %w", &collection.Name, err)
-	} else if loadedBinding, err = findBinding(resource.Path(), collection.Name, loadedSpec); err != nil {
-	} else if loadedBinding != nil && loadedBinding.DeltaUpdates && !resource.DeltaUpdates() {
-		// We allow a binding to switch from standard => delta updates but not the other way.
-		// This is because a standard materialization is trivially a valid delta-updates
-		// materialization, but a delta-updates table may have multiple instances of a given
-		// key and can no longer be loaded correctly by a standard materialization.
-		err = fmt.Errorf("cannot disable delta-updates binding of collection %s", collection.Name)
-	} else if loadedBinding != nil {
-		constraints = ValidateMatchesExisting(resource, loadedBinding, collection)
-	} else {
-		constraints = ValidateNewSQLProjections(resource, collection)
-	}
-
-	return
-}
-
-func findBinding(path TablePath, collection pf.Collection, spec *pf.MaterializationSpec) (*pf.MaterializationSpec_Binding, error) {
-	if spec == nil {
-		return nil, nil // Binding is trivially not found.
-	}
-	for i := range spec.Bindings {
-		var b = spec.Bindings[i]
-
-		if b.Collection.Name == collection && path.equals(b.ResourcePath) {
-			return b, nil
-		} else if path.equals(b.ResourcePath) {
-			return nil, fmt.Errorf("cannot materialize %s to table %s because the table is already materializing collection %s",
-				path, &b.Collection.Name, collection)
-		}
-	}
-	return nil, nil
 }
