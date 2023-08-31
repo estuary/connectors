@@ -239,6 +239,32 @@ func StringCastConverter(fn func(string) (interface{}, error)) ElementConverter 
 	}
 }
 
+func Compose(upper ElementConverter, lower ElementConverter) ElementConverter {
+	return func(te tuple.TupleElement) (interface{}, error) {
+		var a, err = lower(te)
+		if err != nil {
+			return nil, err
+		}
+
+		return upper(a)
+	}
+}
+
+// StdByteArrayToStr builds an ElementConverter that converts []byte to string.
+func StdByteArrayToStr(te tuple.TupleElement) (interface{}, error) {
+	switch tt := te.(type) {
+	case []byte:
+		return string(tt), nil
+	case json.RawMessage:
+		if tt == nil {
+			return nil, nil
+		}
+		return string(tt), nil
+	default:
+		return te, nil
+	}
+}
+
 // StdStrToInt builds an ElementConverter that attempts to convert a string into an int64 value. It
 // can be used for endpoints that do not require more digits than an int64 can provide.
 func StdStrToInt() ElementConverter {
