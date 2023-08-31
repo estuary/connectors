@@ -121,7 +121,7 @@ func TestApply(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	bp_test.RunValidateTestCases(t, ddbValidator)
+	bp_test.RunValidateTestCases(t, ddbValidator, ".snapshots")
 }
 
 func TestSpec(t *testing.T) {

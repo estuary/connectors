@@ -2,6 +2,7 @@ package validate
 
 import (
 	"embed"
+	"encoding/json"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -459,12 +460,12 @@ func TestAsFormattedNumeric(t *testing.T) {
 
 type testConstrainter struct{}
 
-func (testConstrainter) Compatible(existing *pf.Projection, proposed *pf.Projection) bool {
+func (testConstrainter) Compatible(existing *pf.Projection, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
 	if !reflect.DeepEqual(existing.Inference.Types, proposed.Inference.Types) {
-		return false
+		return false, nil
 	}
 
-	return reflect.DeepEqual(existing.Inference.String_, proposed.Inference.String_)
+	return reflect.DeepEqual(existing.Inference.String_, proposed.Inference.String_), nil
 }
 
 func (testConstrainter) DescriptionForType(p *pf.Projection) string {

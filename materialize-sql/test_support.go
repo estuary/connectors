@@ -9,18 +9,29 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
+	"github.com/estuary/connectors/materialize-boilerplate/validate"
 	"github.com/stretchr/testify/require"
 )
 
-// FenceSnapshotPath is a common set of fence test snapshots that may be used by clients that
-// produce standard table dump outputs.
-var FenceSnapshotPath = "../materialize-sql/.snapshots"
+// snapshotPath is a common set of test snapshots that may be used by SQL materialization connectors
+// that produce standard snapshots, which they currently all do.
+var snapshotPath = "../materialize-sql/.snapshots"
+
+// RunValidateTestsCases uses a SQL materialization dialect to run the standard set of validate
+// cases to ensure consistent constraints are produced.
+func RunValidateTestCases(t *testing.T, dialect Dialect) {
+	t.Helper()
+
+	bp_test.RunValidateTestCases(t, validate.NewValidator(constrainter{
+		dialect: dialect,
+	}), snapshotPath)
+}
 
 // RunFenceTestCases is a generalized form of test cases over fencing behavior,
 // which ought to function with any Client implementation.
 func RunFenceTestCases(
 	t *testing.T,
-	snapshotPath string,
 	client Client,
 	checkpointsPath []string,
 	dialect Dialect,

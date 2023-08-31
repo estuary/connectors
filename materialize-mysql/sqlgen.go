@@ -11,9 +11,9 @@ import (
 )
 
 var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER: sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
-		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+	var typeMappings sql.TypeMapper = sql.ProjectionTypeMapper{
+		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
+		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
 		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:  sql.NewStaticMapper("JSON"),
 		sql.ARRAY:   sql.NewStaticMapper("JSON"),
@@ -24,6 +24,8 @@ var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
 				Delegate:   sql.NewStaticMapper("LONGTEXT"),
 			},
 			WithFormat: map[string]sql.TypeMapper{
+				"integer":   sql.NewStaticMapper("NUMERIC(65,0)", sql.WithElementConverter(sql.StdStrToInt())),
+				"number":    sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("DATETIME(6)", sql.WithElementConverter(rfc3339ToTZ(tzLocation))),
 				"time":      sql.NewStaticMapper("TIME(6)", sql.WithElementConverter(rfc3339TimeToTZ(tzLocation))),
@@ -38,9 +40,10 @@ var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
 		},
 		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
 	}
-	mapper = sql.NullableMapper{
+
+	var nullable = sql.MaybeNullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    mapper,
+		Delegate:    typeMappings,
 	}
 
 	return sql.Dialect{
@@ -55,7 +58,8 @@ var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return "?"
 		}),
-		TypeMapper: mapper,
+		TypeMapper:               nullable,
+		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
 	}
 }
 

@@ -9,9 +9,9 @@ import (
 )
 
 var pgDialect = func() sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+	var typeMappings sql.TypeMapper = sql.ProjectionTypeMapper{
+		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
+		sql.NUMBER:   sql.NewStaticMapper("DOUBLE PRECISION"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
 		sql.OBJECT:   sql.NewStaticMapper("JSON"),
 		sql.ARRAY:    sql.NewStaticMapper("JSON"),
@@ -20,6 +20,8 @@ var pgDialect = func() sql.Dialect {
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("TEXT"),
 			WithFormat: map[string]sql.TypeMapper{
+				"integer":   sql.NewStaticMapper("NUMERIC"),
+				"number":    sql.NewStaticMapper("DECIMAL", sql.WithElementConverter(sql.StdStrToFloat())),
 				"date":      sql.NewStaticMapper("DATE", sql.WithElementConverter(sql.ClampDate())),
 				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(sql.ClampDatetime())),
 				"duration":  sql.NewStaticMapper("INTERVAL"),
@@ -31,9 +33,10 @@ var pgDialect = func() sql.Dialect {
 			},
 		},
 	}
-	mapper = sql.NullableMapper{
+
+	var nullable = sql.MaybeNullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    mapper,
+		Delegate:    typeMappings,
 	}
 
 	return sql.Dialect{
@@ -49,7 +52,8 @@ var pgDialect = func() sql.Dialect {
 			// parameterIndex starts at 0, but postgres parameters start at $1
 			return fmt.Sprintf("$%d", index+1)
 		}),
-		TypeMapper: mapper,
+		TypeMapper:               nullable,
+		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
 	}
 }()
 

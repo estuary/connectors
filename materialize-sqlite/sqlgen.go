@@ -17,9 +17,13 @@ var sqliteDialect = func() sql.Dialect {
 		sql.OBJECT:  sql.NewStaticMapper("TEXT"),
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("TEXT"),
+			WithFormat: map[string]sql.TypeMapper{
+				"integer": sql.NewStaticMapper("INTEGER"),
+				"number":  sql.NewStaticMapper("REAL"),
+			},
 		},
 	}
-	var nullable sql.TypeMapper = sql.NullableMapper{
+	var nullable sql.TypeMapper = sql.MaybeNullableMapper{
 		NotNullText: "NOT NULL",
 		Delegate:    typeMappings,
 	}
@@ -36,7 +40,8 @@ var sqliteDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper: nullable,
+		TypeMapper:               nullable,
+		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
 	}
 }()
 

@@ -3,13 +3,17 @@ package sql
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
+	"math/big"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/materialize-boilerplate/validate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 )
 
 // FlatType is a flattened, database-friendly representation of a document location's type.
@@ -82,9 +86,18 @@ func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Proj
 // AsFlatType returns the Projection's FlatType.
 func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	mustExist = p.Inference.Exists == pf.Inference_MUST
+	if slices.Contains(p.Inference.Types, "null") {
+		mustExist = false
+	}
+
+	// Compatible numeric formatted strings can be materialized as either integers or numbers,
+	// depending on the format string.
+	if _, ok := validate.AsFormattedNumeric(&p.Projection); ok {
+		return STRING, mustExist
+	}
 
 	var types []FlatType
-	for _, ty := range effectiveJsonTypes(&p.Projection) {
+	for _, ty := range p.Inference.Types {
 		switch ty {
 		case "string":
 			types = append(types, STRING)
@@ -98,8 +111,6 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 			types = append(types, OBJECT)
 		case "array":
 			types = append(types, ARRAY)
-		case "null":
-			mustExist = false
 		}
 	}
 
@@ -111,37 +122,6 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	default:
 		return MULTIPLE, mustExist
 	}
-}
-
-// effectiveJsonTypes potentially maps the provided JSON types into alternate types for
-// materialization. It currently supports potentially nullable strings formatted as numeric values,
-// either as stand-alone string types or as a string type formatted as numeric + that numeric type.
-// It does not apply to keyed fields.
-func effectiveJsonTypes(projection *pf.Projection) []string {
-	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
-		switch {
-		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"integer", "null", "string"}):
-			return []string{"integer", "null"}
-		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"null", "number", "string"}):
-			return []string{"null", "number"}
-		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"integer", "string"}):
-			return []string{"integer"}
-		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"number", "string"}):
-			return []string{"number"}
-		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"null", "string"}):
-			return []string{"integer", "null"}
-		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"null", "string"}):
-			return []string{"null", "number"}
-		case projection.Inference.String_.Format == "integer" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
-			return []string{"integer"}
-		case projection.Inference.String_.Format == "number" && reflect.DeepEqual(projection.Inference.Types, []string{"string"}):
-			return []string{"number"}
-		default:
-			// Fallthrough, types are returned as-is.
-		}
-	}
-
-	return projection.Inference.Types
 }
 
 type MappedType struct {
@@ -268,8 +248,10 @@ func StdByteArrayToStr(te tuple.TupleElement) (interface{}, error) {
 	}
 }
 
-// StdStrToInt builds an ElementConverter that attempts to convert a string into an int64 value. It
-// can be used for endpoints that do not require more digits than an int64 can provide.
+// StdStrToInt builds an ElementConverter that attempts to convert a string into a big.Int. Strings
+// formatted as integers are often larger than the maximum that can be represented by an int64. The
+// concrete type of the return value is a big.Int which will be represented correctly as JSON, but
+// may not be directly usable by a SQL driver as a parameter.
 func StdStrToInt() ElementConverter {
 	return StringCastConverter(func(str string) (interface{}, error) {
 		// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers
@@ -280,11 +262,11 @@ func StdStrToInt() ElementConverter {
 			str = str[:idx]
 		}
 
-		out, err := strconv.ParseInt(str, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert %q to int64: %w", str, err)
+		var i big.Int
+		out, ok := i.SetString(str, 10)
+		if !ok {
+			return nil, fmt.Errorf("could not convert %q to big.Int", str)
 		}
-
 		return out, nil
 	})
 }
@@ -332,19 +314,19 @@ func ClampDate() ElementConverter {
 	})
 }
 
-// NullableMapper wraps a ColumnMapper to add "NULL" and/or "NOT NULL" to the generated SQL type
+// MaybeNullableMapper wraps a ColumnMapper to add "NULL" and/or "NOT NULL" to the generated SQL type
 // depending on the nullability of the column. Most databases will assume that a column may contain
 // null as long as it isn't declared with a NOT NULL constraint, but some databases (e.g. ms sql
 // server) make that behavior configurable, requiring the DDL to explicitly declare a column with
 // NULL if it may contain null values. This wrapper will handle either or both cases.
-type NullableMapper struct {
+type MaybeNullableMapper struct {
 	NotNullText, NullableText string
 	Delegate                  TypeMapper
 }
 
-var _ TypeMapper = NullableMapper{}
+var _ TypeMapper = MaybeNullableMapper{}
 
-func (m NullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
+func (m MaybeNullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
 	if mapped, err = m.Delegate.MapType(p); err != nil {
 		return
 	} else if _, notNull := p.AsFlatType(); notNull && m.NotNullText != "" {
@@ -354,6 +336,17 @@ func (m NullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
 	}
 
 	return
+}
+
+// AlwaysNullableMapper wraps a ColumnMapper to always produce DDL for a nullable column.
+type AlwaysNullableMapper struct {
+	Delegate TypeMapper
+}
+
+var _ AlwaysNullableTypeMapper = AlwaysNullableMapper{}
+
+func (m AlwaysNullableMapper) MapTypeNullable(p *Projection) (mapped MappedType, err error) {
+	return m.Delegate.MapType(p)
 }
 
 // PrimaryKeyMapper wraps a ColumnMapper to specify the type of the column in
@@ -387,6 +380,30 @@ type StringTypeMapper struct {
 var _ TypeMapper = StringTypeMapper{}
 
 func (m StringTypeMapper) MapType(p *Projection) (MappedType, error) {
+	// TODO(whb): This bit of hackery is to provide backwards compatibility for materializations
+	// that use numeric-as-string fields with numeric formats which were created before support for
+	// materializing these fields as numeric values was added. It provides an escape hatch via the
+	// field config to ignore the string formatting and continue materializing the fields as a
+	// regular string, which will allow such materializations to continue working. It is not meant
+	// to be user-facing and is configured as-needed by Estuary support staff. We should remove this
+	// when a more comprehensive backwards compatibility layer is added to the materialization
+	// dialects.
+	type fieldConfigOptions struct {
+		IgnoreStringFormat bool `json:"ignoreStringFormat"`
+	}
+	if p.RawFieldConfig != nil {
+		var options fieldConfigOptions
+		if err := json.Unmarshal(p.RawFieldConfig, &options); err != nil {
+			ErrorMapper{}.MapType(p)
+		} else if options.IgnoreStringFormat {
+			log.WithFields(log.Fields{
+				"field":  p.Field,
+				"format": p.Projection.Inference.String_.Format,
+			}).Info("ignoring string format for field")
+			p.Projection.Inference.String_.Format = ""
+		}
+	}
+
 	if flat, _ := p.AsFlatType(); flat != STRING && m.Fallback == nil {
 		return ErrorMapper{}.MapType(p)
 	} else if flat != STRING {
@@ -448,4 +465,112 @@ var _ TypeMapper = ErrorMapper{}
 
 func (m ErrorMapper) MapType(p *Projection) (MappedType, error) {
 	return MappedType{}, fmt.Errorf("unable to map field %s with type %s", p.Field, p.Inference.Types)
+}
+
+type constrainter struct {
+	dialect Dialect
+}
+
+func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
+	_, isNumeric := validate.AsFormattedNumeric(p)
+
+	var constraint = pm.Response_Validated_Constraint{}
+	switch {
+	case p.IsPrimaryKey:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "All Locations that are part of the collections key are required"
+	case p.IsRootDocumentProjection() && deltaUpdates:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The root document should usually be materialized"
+	case p.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "The root document must be materialized"
+	case strings.HasPrefix(p.Field, "_meta/"):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Metadata fields fields are able to be materialized"
+	case p.Inference.IsSingleScalarType() || isNumeric:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The projection has a single scalar type"
+	case slices.Equal(p.Inference.Types, []string{"null"}):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
+
+	default:
+		// Any other case is one where the field has multiple types, which will be materialized as a
+		// JSON (or equivalent) column with the default JSON serialization of the value.
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "This field is able to be materialized"
+	}
+
+	return &constraint
+}
+
+func (c constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+	var numericCompatibilities = map[validate.StringWithNumericFormat][]string{
+		validate.StringFormatInteger: {pf.JsonTypeInteger, pf.JsonTypeNull},
+		validate.StringFormatNumber:  {pf.JsonTypeNumber, pf.JsonTypeNull},
+	}
+
+	typesMatch := func(actual, allowed []string) bool {
+		for _, t := range actual {
+			if !slices.Contains(allowed, t) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Special case: Strings formatted as integers or numbers are compatible with the integer or
+	// number JSON type, even though a string formatted integer or number may result in a different
+	// column type than a pure integer or number. This may result in breakage of the materialization
+	// if, for example, a pure integer field is changed to a string formatted as an integer and the
+	// collection gets a very large integer (formatted as a string) added to it. This is allowed
+	// because it's far more common for a pure integer field to have a string formatted as an
+	// integer show up later on in the collection's life and we don't want to always require
+	// re-versioning/recreating tables when this happens.
+	if format, ok := validate.AsFormattedNumeric(existing); ok {
+		if typesMatch(proposed.Inference.Types, numericCompatibilities[format]) {
+			return true, nil
+		}
+	} else if format, ok := validate.AsFormattedNumeric(proposed); ok {
+		if typesMatch(existing.Inference.Types, numericCompatibilities[format]) {
+			return true, nil
+		}
+	}
+
+	existingMapped, err := c.dialect.MapTypeNullable(&Projection{
+		Projection:     *existing,
+		RawFieldConfig: rawFieldConfig,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	proposedMapped, err := c.dialect.MapTypeNullable(&Projection{
+		Projection:     *proposed,
+		RawFieldConfig: rawFieldConfig,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return existingMapped.DDL == proposedMapped.DDL, nil
+}
+
+func (constrainter) DescriptionForType(p *pf.Projection) string {
+	desc := "[" + strings.Join(p.Inference.Types, ",") + "]"
+
+	if p.Inference.String_ != nil {
+		if p.Inference.String_.Format != "" {
+			desc += " format: " + p.Inference.String_.Format
+		}
+		if p.Inference.String_.ContentType != "" {
+			desc += " content-type: " + p.Inference.String_.ContentType
+		}
+		if p.Inference.String_.ContentEncoding != "" {
+			desc += " content-encoding: " + p.Inference.String_.ContentEncoding
+		}
+	}
+
+	return desc
 }

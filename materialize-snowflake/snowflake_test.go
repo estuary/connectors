@@ -66,7 +66,6 @@ func TestFencingCases(t *testing.T) {
 	ctx := context.Background()
 
 	sql.RunFenceTestCases(t,
-		sql.FenceSnapshotPath,
 		client,
 		[]string{"temp_test_fencing_checkpoints"},
 		snowflakeDialect,
@@ -90,6 +89,10 @@ func TestFencingCases(t *testing.T) {
 			return
 		},
 	)
+}
+
+func TestValidate(t *testing.T) {
+	sql.RunValidateTestCases(t, snowflakeDialect)
 }
 
 func TestPrereqs(t *testing.T) {

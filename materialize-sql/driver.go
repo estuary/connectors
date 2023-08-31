@@ -12,6 +12,7 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	"github.com/estuary/connectors/materialize-boilerplate/validate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"go.gazette.dev/core/consumer/protocol"
@@ -80,12 +81,20 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
 
+	validator := validate.NewValidator(constrainter{dialect: endpoint.Dialect})
+
 	// Produce constraints for each request binding, in turn.
 	for _, bindingSpec := range req.Bindings {
-		var constraints, _, resource, err = resolveResourceToExistingBinding(
-			endpoint,
-			bindingSpec.ResourceConfigJson,
-			&bindingSpec.Collection,
+		res := endpoint.NewResource(endpoint)
+		if err = pf.UnmarshalStrict(bindingSpec.ResourceConfigJson, res); err != nil {
+			return nil, fmt.Errorf("unmarshalling resource binding for collection %q: %w", bindingSpec.Collection.Name.String(), err)
+		}
+
+		constraints, err := validator.ValidateBinding(
+			res.Path(),
+			res.DeltaUpdates(),
+			bindingSpec.Collection,
+			bindingSpec.FieldConfigJsonMap,
 			loadedSpec,
 		)
 		if err != nil {
@@ -95,8 +104,8 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		resp.Bindings = append(resp.Bindings,
 			&pm.Response_Validated_Binding{
 				Constraints:  constraints,
-				DeltaUpdates: resource.DeltaUpdates(),
-				ResourcePath: resource.Path(),
+				DeltaUpdates: res.DeltaUpdates(),
+				ResourcePath: res.Path(),
 			})
 	}
 	return resp, nil
@@ -121,9 +130,9 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		panic(err) // Cannot fail to marshal.
 	}
 
-	// The Materialization specifications meta table is almost always requied.
-	// It is only not required if the database is ephemeral (i.e. sqlite).
-	// The Checkpoints table is optional; include it if set by the Endpoint.
+	// The Materialization specifications meta table is almost always required. It is only not
+	// required if the database is ephemeral (i.e. sqlite). The Checkpoints table is optional;
+	// include it if set by the Endpoint.
 	var tableShapes = []TableShape{}
 	if endpoint.MetaSpecs != nil {
 		tableShapes = append(tableShapes, *endpoint.MetaSpecs)
@@ -134,21 +143,25 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 
 	var executedColumnModifications []string
 
+	validator := validate.NewValidator(constrainter{dialect: endpoint.Dialect})
+
 	for bindingIndex, bindingSpec := range req.Materialization.Bindings {
+		resource := endpoint.NewResource(endpoint)
+		if err = pf.UnmarshalStrict(bindingSpec.ResourceConfigJson, resource); err != nil {
+			return nil, fmt.Errorf("unmarshalling resource binding for collection %q: %w", bindingSpec.Collection.Name.String(), err)
+		}
+
 		var collection = bindingSpec.Collection.Name
-
-		var constraints, loadedBinding, resource, err = resolveResourceToExistingBinding(
-			endpoint,
-			bindingSpec.ResourceConfigJson,
-			&bindingSpec.Collection,
-			loadedSpec,
-		)
-
 		var tableShape = BuildTableShape(req.Materialization, bindingIndex, resource)
+
+		loadedBinding, err := validate.FindExistingBinding(resource.Path(), bindingSpec.Collection.Name, loadedSpec)
+		if err != nil {
+			return nil, err
+		}
 
 		if err != nil {
 			return nil, err
-		} else if err = ValidateSelectedFields(constraints, bindingSpec); err != nil {
+		} else if err = validator.ValidateSelectedFields(bindingSpec, loadedSpec); err != nil {
 			// The applied binding is not a valid solution for its own constraints.
 			return nil, fmt.Errorf("binding for %s: %w", collection, err)
 		} else if loadedBinding != nil {
@@ -160,12 +173,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 			for _, newCol := range newTable.Columns() {
 				// Add any new columns.
 				if !slices.Contains(loadedBinding.FieldSelection.AllFields(), newCol.Field) {
-					// New columns are always created as nullable.
-					nullableProjection := newCol.Projection
-					nullableProjection.Inference.Exists = pf.Inference_MAY
-
-					// Get the dialect-specific DDL for this field, in its nullable form.
-					mapped, err := endpoint.MapType(&nullableProjection)
+					mapped, err := endpoint.MapTypeNullable(&newCol.Projection)
 					if err != nil {
 						return nil, err
 					}
