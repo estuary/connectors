@@ -11,12 +11,12 @@ import (
 
 // installFence is a modified version of StdInstallFence, adopted to SQLServer's
 // syntax
-func installFence(ctx context.Context, db *stdsql.DB, checkpoints sql.Table, fence sql.Fence, decodeFence func(string) ([]byte, error)) (sql.Fence, error) {
-	var fenceId = sqlServerDialect.Identifier("fence")
-	var materializationId = sqlServerDialect.Identifier("materialization")
-	var keyEndId = sqlServerDialect.Identifier("key_end")
-	var keyBeginId = sqlServerDialect.Identifier("key_begin")
-	var checkpointId = sqlServerDialect.Identifier("checkpoint")
+func installFence(ctx context.Context, dialect sql.Dialect, db *stdsql.DB, checkpoints sql.Table, fence sql.Fence, decodeFence func(string) ([]byte, error)) (sql.Fence, error) {
+	var fenceId = dialect.Identifier("fence")
+	var materializationId = dialect.Identifier("materialization")
+	var keyEndId = dialect.Identifier("key_end")
+	var keyBeginId = dialect.Identifier("key_begin")
+	var checkpointId = dialect.Identifier("checkpoint")
 
 	var txn, err = db.BeginTx(ctx, nil)
 	if err != nil {

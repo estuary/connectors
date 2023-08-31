@@ -4,12 +4,13 @@ import (
 	"strings"
 	"time"
 	"fmt"
+	"text/template"
 
 	"slices"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
-var sqlServerDialect = func() sql.Dialect {
+var sqlServerDialect = func(collation string) sql.Dialect {
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.INTEGER: sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
 		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
@@ -24,7 +25,7 @@ var sqlServerDialect = func() sql.Dialect {
 				// stored in the column, not the character length.
 				// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
 				// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
-				PrimaryKey: sql.NewStaticMapper("VARCHAR(900) COLLATE Latin1_General_100_BIN2"),
+				PrimaryKey: sql.NewStaticMapper(fmt.Sprintf("VARCHAR(900) COLLATE %s", collation)),
 				Delegate: sql.NewStaticMapper("VARCHAR(MAX)"),
 			},
 			WithFormat: map[string]sql.TypeMapper{
@@ -55,7 +56,7 @@ var sqlServerDialect = func() sql.Dialect {
 		}),
 		TypeMapper: mapper,
 	}
-}()
+}
 
 func rfc3339ToUTC() sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
@@ -77,8 +78,8 @@ func rfc3339TimeToUTC() sql.ElementConverter {
 	})
 }
 
-var (
-	tplAll = sql.MustParseTemplate(sqlServerDialect, "root", `
+func renderTemplates(dialect sql.Dialect) map[string]*template.Template {
+	var tplAll = sql.MustParseTemplate(dialect, "root", `
 -- Local (session-level) temporary tables are prefixed with a # sign in SQLServer
 {{ define "temp_load_name" -}}
 #flow_temp_load_{{ $.Binding }}
@@ -260,17 +261,20 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   key_end   = {{ $.KeyEnd }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
-`)
-	tplTempLoadTableName  = tplAll.Lookup("temp_load_name")
-	tplTempStoreTableName = tplAll.Lookup("temp_store_name")
-	tplTempLoadTruncate   = tplAll.Lookup("truncateTempLoadTable")
-	tplTempStoreTruncate  = tplAll.Lookup("truncateTempStoreTable")
-	tplCreateLoadTable    = tplAll.Lookup("createLoadTable")
-	tplCreateStoreTable   = tplAll.Lookup("createStoreTable")
-	tplCreateTargetTable  = tplAll.Lookup("createTargetTable")
-	tplDirectCopy         = tplAll.Lookup("directCopy")
-	tplMergeInto          = tplAll.Lookup("mergeInto")
-	tplLoadInsert         = tplAll.Lookup("loadInsert")
-	tplLoadQuery          = tplAll.Lookup("loadQuery")
-	tplUpdateFence        = tplAll.Lookup("updateFence")
-)
+	`)
+
+	return map[string]*template.Template{
+		"tempLoadTableName": tplAll.Lookup("temp_load_name"),
+		"tempStoreTableName": tplAll.Lookup("temp_store_name"),
+		"tempLoadTruncate": tplAll.Lookup("truncateTempLoadTable"),
+		"tempStoreTruncate": tplAll.Lookup("truncateTempStoreTable"),
+		"createLoadTable": tplAll.Lookup("createLoadTable"),
+		"createStoreTable": tplAll.Lookup("createStoreTable"),
+		"createTargetTable": tplAll.Lookup("createTargetTable"),
+		"directCopy": tplAll.Lookup("directCopy"),
+		"mergeInto": tplAll.Lookup("mergeInto"),
+		"loadInsert": tplAll.Lookup("loadInsert"),
+		"loadQuery": tplAll.Lookup("loadQuery"),
+		"updateFence": tplAll.Lookup("updateFence"),
+	}
+}

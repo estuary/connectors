@@ -165,15 +165,23 @@ func newSqlServerDriver() *sql.Driver {
 				}
 			}
 
+			collation, err := getCollation(ctx, cfg)
+			if err != nil {
+				return nil, fmt.Errorf("check collations: %w", err)
+			}
+
+			var dialect = sqlServerDialect(collation)
+			var templates = renderTemplates(dialect)
+
 			return &sql.Endpoint{
 				Config:              cfg,
-				Dialect:             sqlServerDialect,
+				Dialect:             dialect,
 				MetaSpecs:           &metaSpecs,
 				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: cfg.ToURI()},
-				CreateTableTemplate: tplCreateTargetTable,
+				Client:              client{uri: cfg.ToURI(), dialect: dialect},
+				CreateTableTemplate: templates["createTargetTable"],
 				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+				NewTransactor:       prepareNewTransactor(templates),
 				CheckPrerequisites:  prereqs,
 				Tenant:              tenant,
 			}, nil
@@ -224,6 +232,7 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 // client implements the sql.Client interface.
 type client struct {
 	uri string
+	dialect sql.Dialect
 }
 
 func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
@@ -269,7 +278,7 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
 	var projection = column.Projection
 	projection.Inference.Exists = pf.Inference_MAY
-	var mapped, err = sqlServerDialect.TypeMapper.MapType(&projection)
+	var mapped, err = c.dialect.TypeMapper.MapType(&projection)
 	if err != nil {
 		return "", fmt.Errorf("drop not null: mapping type of %s failed: %w", column.Identifier, err)
 	}
@@ -307,7 +316,7 @@ func (c client) ExecStatements(ctx context.Context, statements []string) error {
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	var err = c.withDB(func(db *stdsql.DB) error {
 		var err error
-		fence, err = installFence(ctx, db, checkpoints, fence, base64.StdEncoding.DecodeString)
+		fence, err = installFence(ctx, c.dialect, db, checkpoints, fence, base64.StdEncoding.DecodeString)
 		return err
 	})
 	return fence, err
@@ -323,6 +332,7 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 }
 
 type transactor struct {
+	templates map[string]*template.Template
 	// Variables exclusively used by Load.
 	load struct {
 		conn     *stdsql.Conn
@@ -336,42 +346,46 @@ type transactor struct {
 	bindings []*binding
 }
 
-func newTransactor(
-	ctx context.Context,
-	ep *sql.Endpoint,
-	fence sql.Fence,
-	bindings []sql.Table,
-) (_ pm.Transactor, err error) {
-	var d = &transactor{}
-	d.store.fence = fence
+func prepareNewTransactor(
+	templates map[string]*template.Template,
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table) (pm.Transactor, error) {
+	return func(
+		ctx context.Context,
+		ep *sql.Endpoint,
+		fence sql.Fence,
+		bindings []sql.Table,
+	) (_ pm.Transactor, err error) {
+		var d = &transactor{templates: templates}
+		d.store.fence = fence
 
-	var cfg = ep.Config.(*config)
-	// Establish connections.
-	if db, err := stdsql.Open("sqlserver", cfg.ToURI()); err != nil {
-		return nil, fmt.Errorf("load sql.Open: %w", err)
-	} else if d.load.conn, err = db.Conn(ctx); err != nil {
-		return nil, fmt.Errorf("load db.Conn: %w", err)
-	}
-	if db, err := stdsql.Open("sqlserver", cfg.ToURI()); err != nil {
-		return nil, fmt.Errorf("store sql.Open: %w", err)
-	} else if d.store.conn, err = db.Conn(ctx); err != nil {
-		return nil, fmt.Errorf("store db.Conn: %w", err)
-	}
-
-	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding); err != nil {
-			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+		var cfg = ep.Config.(*config)
+		// Establish connections.
+		if db, err := stdsql.Open("sqlserver", cfg.ToURI()); err != nil {
+			return nil, fmt.Errorf("load sql.Open: %w", err)
+		} else if d.load.conn, err = db.Conn(ctx); err != nil {
+			return nil, fmt.Errorf("load db.Conn: %w", err)
 		}
-	}
+		if db, err := stdsql.Open("sqlserver", cfg.ToURI()); err != nil {
+			return nil, fmt.Errorf("store sql.Open: %w", err)
+		} else if d.store.conn, err = db.Conn(ctx); err != nil {
+			return nil, fmt.Errorf("store db.Conn: %w", err)
+		}
 
-	// Build a query which unions the results of each load subquery.
-	var subqueries []string
-	for _, b := range d.bindings {
-		subqueries = append(subqueries, b.loadQuerySQL)
-	}
-	d.load.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
+		for _, binding := range bindings {
+			if err = d.addBinding(ctx, binding); err != nil {
+				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+			}
+		}
 
-	return d, nil
+		// Build a query which unions the results of each load subquery.
+		var subqueries []string
+		for _, b := range d.bindings {
+			subqueries = append(subqueries, b.loadQuerySQL)
+		}
+		d.load.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
+
+		return d, nil
+	}
 }
 
 type binding struct {
@@ -403,16 +417,16 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		sql *string
 		tpl *template.Template
 	}{
-		{&b.createLoadTableSQL, tplCreateLoadTable},
-		{&b.createStoreTableSQL, tplCreateStoreTable},
-		{&b.loadInsertSQL, tplLoadInsert},
-		{&b.loadQuerySQL, tplLoadQuery},
-		{&b.tempLoadTruncate, tplTempLoadTruncate},
-		{&b.tempLoadTableName, tplTempLoadTableName},
-		{&b.tempStoreTruncate, tplTempStoreTruncate},
-		{&b.tempStoreTableName, tplTempStoreTableName},
-		{&b.mergeInto, tplMergeInto},
-		{&b.directCopy, tplDirectCopy},
+		{&b.createLoadTableSQL, t.templates["createLoadTable"]},
+		{&b.createStoreTableSQL, t.templates["createStoreTable"]},
+		{&b.loadInsertSQL, t.templates["loadInsert"]},
+		{&b.loadQuerySQL, t.templates["loadQuery"]},
+		{&b.tempLoadTruncate, t.templates["tempLoadTruncate"]},
+		{&b.tempStoreTruncate, t.templates["tempStoreTruncate"]},
+		{&b.tempStoreTableName, t.templates["tempStoreTableName"]},
+		{&b.tempLoadTableName, t.templates["tempLoadTableName"]},
+		{&b.mergeInto, t.templates["mergeInto"]},
+		{&b.directCopy, t.templates["directCopy"]},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
@@ -607,7 +621,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			}
 
 			var fenceUpdate strings.Builder
-			if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+			if err := d.templates["updateFence"].Execute(&fenceUpdate, d.store.fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 

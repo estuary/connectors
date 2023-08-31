@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
@@ -15,6 +14,9 @@ import (
 )
 
 func TestSQLGeneration(t *testing.T) {
+	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var templates = renderTemplates(dialect)
+
 	var spec *pf.MaterializationSpec
 	var specJson, err = os.ReadFile("testdata/spec.json")
 	require.NoError(t, err)
@@ -30,26 +32,28 @@ func TestSQLGeneration(t *testing.T) {
 	})
 	shape2.Document = nil // TODO(johnny): this is a bit gross.
 
-	table1, err := sqlDriver.ResolveTable(shape1, sqlServerDialect)
+	table1, err := sqlDriver.ResolveTable(shape1, dialect)
 	require.NoError(t, err)
-	table2, err := sqlDriver.ResolveTable(shape2, sqlServerDialect)
+	table2, err := sqlDriver.ResolveTable(shape2, dialect)
 	require.NoError(t, err)
 
 	var snap strings.Builder
 
-	for _, tpl := range []*template.Template{
-		tplTempLoadTableName,
-		tplTempStoreTableName,
-		tplTempLoadTruncate,
-		tplTempStoreTruncate,
-		tplCreateLoadTable,
-		tplCreateStoreTable,
-		tplCreateTargetTable,
-		tplDirectCopy,
-		tplMergeInto,
-		tplLoadInsert,
-		tplLoadQuery,
-	} {
+	var templateNames = []string{
+		"tempLoadTableName",
+		"tempStoreTableName",
+		"tempLoadTruncate",
+		"tempStoreTruncate",
+		"createLoadTable",
+		"createStoreTable",
+		"createTargetTable",
+		"directCopy",
+		"mergeInto",
+		"loadInsert",
+		"loadQuery",
+	}
+	for _, key := range templateNames {
+		var tpl = templates[key]
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -69,14 +73,15 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	snap.WriteString("--- Begin Fence Update ---\n")
-	require.NoError(t, tplUpdateFence.Execute(&snap, fence))
+	require.NoError(t, templates["updateFence"].Execute(&snap, fence))
 	snap.WriteString("--- End Fence Update ---\n")
 
 	cupaloy.SnapshotT(t, snap.String())
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var mapped, err = sqlServerDialect.MapType(&sqlDriver.Projection{
+	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -96,7 +101,8 @@ func TestDateTimeColumn(t *testing.T) {
 }
 
 func TestDateTimePKColumn(t *testing.T) {
-	var mapped, err = sqlServerDialect.MapType(&sqlDriver.Projection{
+	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -111,7 +117,8 @@ func TestDateTimePKColumn(t *testing.T) {
 }
 
 func TestTimeColumn(t *testing.T) {
-	var mapped, err = sqlServerDialect.MapType(&sqlDriver.Projection{
+	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
