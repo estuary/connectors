@@ -28,6 +28,12 @@
         "description": "Name of the logical database to materialize to.",
         "order": 3
       },
+      "timezone": {
+        "type": "string",
+        "title": "Timezone",
+        "description": "Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be set and columns with type datetime are being materialized. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set.",
+        "order": 3
+      },
       "advanced": {
         "properties": {
           "sslmode": {

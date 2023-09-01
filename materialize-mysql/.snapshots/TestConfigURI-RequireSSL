@@ -1,2 +1,2 @@
-will:secret1234@tcp(example.com:3306)/somedb?time_zone=%27%2B00%3A00%27&tls=preferred
+will:secret1234@tcp(example.com:3306)/somedb?tls=preferred
 config valid

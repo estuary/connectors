@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
@@ -19,6 +20,9 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(specJson, &spec))
 
+	var dialect = mysqlDialect(time.FixedZone("UTC", 0))
+	var templates = renderTemplates(dialect)
+
 	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
 		Table: "target_table",
 		Delta: false,
@@ -29,23 +33,23 @@ func TestSQLGeneration(t *testing.T) {
 	})
 	shape2.Document = nil // TODO(johnny): this is a bit gross.
 
-	table1, err := sqlDriver.ResolveTable(shape1, mysqlDialect)
+	table1, err := sqlDriver.ResolveTable(shape1, dialect)
 	require.NoError(t, err)
-	table2, err := sqlDriver.ResolveTable(shape2, mysqlDialect)
+	table2, err := sqlDriver.ResolveTable(shape2, dialect)
 	require.NoError(t, err)
 
 	var snap strings.Builder
 
 	for _, tpl := range []*template.Template{
-		tplCreateTargetTable,
-		tplCreateLoadTable,
-		tplTempTruncate,
-		tplLoadLoad,
-		tplLoadQuery,
-		tplStoreLoad,
-		tplUpdateLoad,
-		tplUpdateReplace,
-		tplUpdateTruncate,
+		templates["createTargetTable"],
+		templates["createLoadTable"],
+		templates["tempTruncate"],
+		templates["loadLoad"],
+		templates["loadQuery"],
+		templates["storeLoad"],
+		templates["updateLoad"],
+		templates["updateReplace"],
+		templates["updateTruncate"],
 	} {
 		for _, tbl := range []sqlDriver.Table{table1, table2} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
@@ -65,18 +69,20 @@ func TestSQLGeneration(t *testing.T) {
 		KeyEnd:          0xffeeddcc,
 	}
 	snap.WriteString("--- Begin Fence Install ---\n")
-	require.NoError(t, tplInstallFence.Execute(&snap, fence))
+	require.NoError(t, templates["installFence"].Execute(&snap, fence))
 	snap.WriteString("--- End Fence Install ---\n")
 
 	snap.WriteString("--- Begin Fence Update ---\n")
-	require.NoError(t, tplUpdateFence.Execute(&snap, fence))
+	require.NoError(t, templates["updateFence"].Execute(&snap, fence))
 	snap.WriteString("--- End Fence Update ---\n")
 
 	cupaloy.SnapshotT(t, snap.String())
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var mapped, err = mysqlDialect.MapType(&sqlDriver.Projection{
+	var dialect = mysqlDialect(time.FixedZone("UTC", 0))
+
+	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -94,7 +100,9 @@ func TestDateTimeColumn(t *testing.T) {
 }
 
 func TestDateTimePKColumn(t *testing.T) {
-	var mapped, err = mysqlDialect.MapType(&sqlDriver.Projection{
+	var dialect = mysqlDialect(time.FixedZone("UTC", 0))
+
+	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -109,7 +117,9 @@ func TestDateTimePKColumn(t *testing.T) {
 }
 
 func TestTimeColumn(t *testing.T) {
-	var mapped, err = mysqlDialect.MapType(&sqlDriver.Projection{
+	var dialect = mysqlDialect(time.FixedZone("UTC", 0))
+
+	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
