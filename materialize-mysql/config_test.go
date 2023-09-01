@@ -20,13 +20,13 @@ func TestMySQLConfig(t *testing.T) {
 	}
 	require.NoError(t, validConfig.Validate())
 	var uri = validConfig.ToURI()
-	require.Equal(t, "youser:shmassword@tcp(post.toast:1234)/namegame?time_zone=%27%2B00%3A00%27", uri)
+	require.Equal(t, "youser:shmassword@tcp(post.toast:1234)/namegame", uri)
 
 	var noPort = validConfig
 	noPort.Address = "post.toast"
 	require.NoError(t, noPort.Validate())
 	uri = noPort.ToURI()
-	require.Equal(t, "youser:shmassword@tcp(post.toast:3306)/namegame?time_zone=%27%2B00%3A00%27", uri)
+	require.Equal(t, "youser:shmassword@tcp(post.toast:3306)/namegame", uri)
 
 	var noAddress = validConfig
 	noAddress.Address = ""

@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"time"
 	"fmt"
 	"strings"
 	"testing"
@@ -15,18 +16,20 @@ import (
 
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
+	var dialect = mysqlDialect(time.FixedZone("UTC", 0))
+	var templates = renderTemplates(dialect)
 	var client = client{uri: "flow:flow@tcp(localhost:3306)/flow"}
 	sql.RunFenceTestCases(t,
 		sql.FenceSnapshotPath,
 		client,
 		[]string{"temp_test_fencing_checkpoints"},
-		mysqlDialect,
-		tplCreateTargetTable,
+		dialect,
+		templates["createTargetTable"],
 		func(table sql.Table, fence sql.Fence) error {
 			var err = client.withDB(func(db *stdsql.DB) error {
 				// Option 1: Update using template.
 				var fenceUpdate strings.Builder
-				if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+				if err := templates["updateFence"].Execute(&fenceUpdate, fence); err != nil {
 					return fmt.Errorf("evaluating fence template: %w", err)
 				}
 				var _, err = db.Exec(fenceUpdate.String())
