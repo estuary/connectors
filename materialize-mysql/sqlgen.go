@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
-var mysqlDialect = func() sql.Dialect {
+var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
 	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.INTEGER: sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
 		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
@@ -17,15 +18,15 @@ var mysqlDialect = func() sql.Dialect {
 		sql.OBJECT:  sql.NewStaticMapper("JSON"),
 		sql.ARRAY:   sql.NewStaticMapper("JSON"),
 		sql.BINARY:  sql.NewStaticMapper("LONGBLOB"),
-		sql.STRING:  sql.StringTypeMapper{
+		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.PrimaryKeyMapper{
 				PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-				Delegate: sql.NewStaticMapper("LONGTEXT"),
+				Delegate:   sql.NewStaticMapper("LONGTEXT"),
 			},
 			WithFormat: map[string]sql.TypeMapper{
 				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("DATETIME(6)", sql.WithElementConverter(rfc3339ToUTC())),
-				"time":      sql.NewStaticMapper("TIME(6)", sql.WithElementConverter(rfc3339TimeToUTC())),
+				"date-time": sql.NewStaticMapper("DATETIME(6)", sql.WithElementConverter(rfc3339ToTZ(tzLocation))),
+				"time":      sql.NewStaticMapper("TIME(6)", sql.WithElementConverter(rfc3339TimeToTZ(tzLocation))),
 			},
 			WithContentType: map[string]sql.TypeMapper{
 				// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
@@ -56,31 +57,41 @@ var mysqlDialect = func() sql.Dialect {
 		}),
 		TypeMapper: mapper,
 	}
-}()
+}
 
-func rfc3339ToUTC() sql.ElementConverter {
+func rfc3339ToTZ(loc *time.Location) sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
-		if t, err := time.Parse(time.RFC3339Nano, str); err != nil {
-			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
-		} else {
-			return t.UTC().Format("2006-01-02T15:04:05.999999999"), nil
+		if loc == nil {
+			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize date-time field. Consider setting a timezone in your database or in the connector configuration to continue.")
+		}
+		var err error
+		var t time.Time
+		if t, err = time.Parse(time.RFC3339Nano, str); err == nil {
+			return t.In(loc).Format("2006-01-02T15:04:05.999999999"), nil
+		} else if t, err = time.Parse(time.RFC3339, str); err == nil {
+			return t.In(loc).Format("2006-01-02T15:04:05"), nil
 		}
 
 	})
 }
 
-func rfc3339TimeToUTC() sql.ElementConverter {
+func rfc3339TimeToTZ(loc *time.Location) sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
-		if t, err := time.Parse("15:04:05.999999999Z07:00", str); err != nil {
-			return nil, fmt.Errorf("could not parse %q as RFC3339 time: %w", str, err)
-		} else {
-			return t.UTC().Format("15:04:05.999999999"), nil
+		if loc == nil {
+			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize time field: Consider setting a timezone in your database or in the connector configuration to continue.")
+		}
+		var err error
+		var t time.Time
+		if t, err = time.Parse("15:04:05.999999999Z07:00", str); err == nil {
+			return t.In(loc).Format("15:04:05.999999999"), nil
+		} else if t, err = time.Parse("15:04:05Z07:00", str); err == nil {
+			return t.In(loc).Format(time.TimeOnly), nil
 		}
 	})
 }
 
-var (
-	tplAll = sql.MustParseTemplate(mysqlDialect, "root", `
+func renderTemplates(dialect sql.Dialect) map[string]*template.Template {
+	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "temp_load_name" -}}
 flow_temp_load_table_{{ $.Binding }}
 {{- end }}
@@ -287,19 +298,22 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
-	tplTempTableName     = tplAll.Lookup("temp_load_name")
-	tplTempTruncate      = tplAll.Lookup("truncateTempTable")
-	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
-	tplCreateUpdateTable = tplAll.Lookup("createUpdateTable")
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplUpdateLoad        = tplAll.Lookup("updateLoad")
-	tplUpdateReplace     = tplAll.Lookup("updateReplace")
-	tplUpdateTruncate    = tplAll.Lookup("truncateUpdateTable")
-	tplStoreLoad         = tplAll.Lookup("storeLoad")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplLoadLoad          = tplAll.Lookup("loadLoad")
-	tplInstallFence      = tplAll.Lookup("installFence")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
-)
+
+	return map[string]*template.Template{
+		"tempTableName":     tplAll.Lookup("temp_load_name"),
+		"tempTruncate":      tplAll.Lookup("truncateTempTable"),
+		"createLoadTable":   tplAll.Lookup("createLoadTable"),
+		"createUpdateTable": tplAll.Lookup("createUpdateTable"),
+		"createTargetTable": tplAll.Lookup("createTargetTable"),
+		"updateLoad":        tplAll.Lookup("updateLoad"),
+		"updateReplace":     tplAll.Lookup("updateReplace"),
+		"updateTruncate":    tplAll.Lookup("truncateUpdateTable"),
+		"storeLoad":         tplAll.Lookup("storeLoad"),
+		"loadQuery":         tplAll.Lookup("loadQuery"),
+		"loadLoad":          tplAll.Lookup("loadLoad"),
+		"installFence":      tplAll.Lookup("installFence"),
+		"updateFence":       tplAll.Lookup("updateFence"),
+	}
+}
 
 const varcharTableAlter = "ALTER TABLE %s MODIFY COLUMN %s VARCHAR(%d);"

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 )
@@ -10,7 +11,7 @@ import (
 // getVarcharDetails queries the database for VARCHAR type columns to determine their actual maximum
 // lengths and character set. The result map has keys that are table identifiers, and each one of those has a value
 // that is a map of column identifiers to the details of the column.
-func getVarcharDetails(ctx context.Context, dbName string, conn *stdsql.Conn) (map[string]map[string]int, error) {
+func getVarcharDetails(ctx context.Context, dialect sql.Dialect, dbName string, conn *stdsql.Conn) (map[string]map[string]int, error) {
 	out := make(map[string]map[string]int)
 
 	q := `
@@ -38,8 +39,8 @@ func getVarcharDetails(ctx context.Context, dbName string, conn *stdsql.Conn) (m
 			return nil, fmt.Errorf("scanning row: %w", err)
 		}
 
-		tableIdentifer := mysqlDialect.Identifier(tableName)
-		columnIdentifier := mysqlDialect.Identifier(columnName)
+		tableIdentifer := dialect.Identifier(tableName)
+		columnIdentifier := dialect.Identifier(columnName)
 
 		log.WithFields(log.Fields{
 			"table":  tableIdentifer,

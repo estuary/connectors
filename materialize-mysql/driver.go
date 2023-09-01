@@ -53,6 +53,7 @@ type config struct {
 	User     string         `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password string         `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database string         `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Timezone string         `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be set and columns with type datetime are being materialized. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=3"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
@@ -187,7 +188,6 @@ func (c *config) ToURI() string {
 
 		params.Set("tls", tlsMode)
 	}
-	params.Set("time_zone", "'+00:00'")
 	if len(params) > 0 {
 		uri.RawQuery = params.Encode()
 	}
@@ -275,20 +275,81 @@ func newMysqlDriver() *sql.Driver {
 				}
 			}
 
+			db, err := stdsql.Open("mysql", cfg.ToURI())
+			if err != nil {
+				return nil, fmt.Errorf("opening database: %w", err)
+			}
+
+			conn, err := db.Conn(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("could not create a connection to database %q at %q: %w", cfg.Database, cfg.Address, err)
+			}
+
+			var tzLocation *time.Location
+			if cfg.Timezone != "" {
+				// The user-entered timezone value is verified to parse without error in (*Config).Validate,
+				// so this parsing is not expected to fail.
+				var err error
+				tzLocation, err = sql.ParseTimezone(cfg.Timezone)
+				if err != nil {
+					return nil, fmt.Errorf("invalid config timezone: %w", err)
+				}
+				log.WithFields(log.Fields{
+					"tzName": cfg.Timezone,
+					"loc":    tzLocation.String(),
+				}).Debug("using datetime location from config")
+			} else {
+				// Infer the location in which captured DATETIME values will be interpreted from the system
+				// variable 'time_zone' if it is set on the database.
+				var tzName string
+				if tzName, err = queryTimeZone(ctx, conn); err == nil {
+					if tzLocation, err = sql.ParseTimezone(tzName); err == nil {
+						log.WithFields(log.Fields{
+							"tzName": tzName,
+							"loc":    tzLocation.String(),
+						}).Debug("using datetime location queried from database")
+					}
+				}
+
+				if tzLocation == nil {
+					log.WithField("err", err).Warn("unable to determine database timezone and no timezone in capture configuration")
+					log.Warn("materializing DATETIME values will not be permitted")
+				}
+			}
+
+			var dialect = mysqlDialect(tzLocation)
+			var templates = renderTemplates(dialect)
+
 			return &sql.Endpoint{
 				Config:              cfg,
-				Dialect:             mysqlDialect,
+				Dialect:             dialect,
 				MetaSpecs:           &metaSpecs,
 				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: cfg.ToURI()},
-				CreateTableTemplate: tplCreateTargetTable,
+				Client:              client{uri: cfg.ToURI(), dialect: dialect},
+				CreateTableTemplate: templates["createTargetTable"],
 				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+				NewTransactor:       prepareNewTransactor(dialect, templates),
 				CheckPrerequisites:  prereqs,
 				Tenant:              tenant,
 			}, nil
 		},
 	}
+}
+
+var errDatabaseTimezoneUnknown = errors.New("system variable 'time_zone' or timezone from capture configuration must contain a valid IANA time zone name or +HH:MM offset")
+func queryTimeZone(ctx context.Context, conn *stdsql.Conn) (string, error) {
+	var row = conn.QueryRowContext(ctx, `SELECT @@GLOBAL.time_zone;`)
+	var tzName string
+	if err := row.Scan(&tzName); err != nil {
+		return "", fmt.Errorf("error reading 'time_zone' system variable: %w", err)
+	}
+
+	log.WithField("time_zone", tzName).Debug("queried time_zone system variable")
+	if tzName == "SYSTEM" {
+		return "", errDatabaseTimezoneUnknown
+	}
+
+	return tzName, nil
 }
 
 func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
@@ -351,6 +412,7 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 // client implements the sql.Client interface.
 type client struct {
 	uri string
+	dialect sql.Dialect
 }
 
 func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
@@ -395,7 +457,7 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
 	var projection = column.Projection
 	projection.Inference.Exists = pf.Inference_MAY
-	var mapped, err = mysqlDialect.TypeMapper.MapType(&projection)
+	var mapped, err = c.dialect.TypeMapper.MapType(&projection)
 	if err != nil {
 		return "", fmt.Errorf("drop not null: mapping type of %s failed: %w", column.Identifier, err)
 	}
@@ -449,6 +511,8 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 }
 
 type transactor struct {
+	dialect sql.Dialect
+	templates map[string]*template.Template
 	// Variables exclusively used by Load.
 	load struct {
 		conn     *stdsql.Conn
@@ -462,58 +526,63 @@ type transactor struct {
 	bindings []*binding
 }
 
-func newTransactor(
-	ctx context.Context,
-	ep *sql.Endpoint,
-	fence sql.Fence,
-	bindings []sql.Table,
-) (_ pm.Transactor, err error) {
-	var d = &transactor{}
-	d.store.fence = fence
+func prepareNewTransactor(
+	dialect sql.Dialect,
+	templates map[string]*template.Template,
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table) (pm.Transactor, error) {
+	return func(
+		ctx context.Context,
+		ep *sql.Endpoint,
+		fence sql.Fence,
+		bindings []sql.Table,
+	) (_ pm.Transactor, err error) {
+		var d = &transactor{dialect: dialect, templates: templates}
+		d.store.fence = fence
 
-	var cfg = ep.Config.(*config)
-	// Establish connections.
-	if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
-		return nil, fmt.Errorf("load sql.Open: %w", err)
-	} else if d.load.conn, err = db.Conn(ctx); err != nil {
-		return nil, fmt.Errorf("load db.Conn: %w", err)
-	}
-	if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
-		return nil, fmt.Errorf("store sql.Open: %w", err)
-	} else if d.store.conn, err = db.Conn(ctx); err != nil {
-		return nil, fmt.Errorf("store db.Conn: %w", err)
-	}
-
-	db, err := stdsql.Open("mysql", cfg.ToURI())
-	if err != nil {
-		return nil, fmt.Errorf("newTransactor sql.Open: %w", err)
-	}
-	defer db.Close()
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("newTransactor db.Conn: %w", err)
-	}
-	defer conn.Close()
-
-	tableVarchars, err := getVarcharDetails(ctx, cfg.Database, conn)
-	if err != nil {
-		return nil, fmt.Errorf("getting existing varchar column lengths: %w", err)
-	}
-
-	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, tableVarchars[binding.Identifier]); err != nil {
-			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+		var cfg = ep.Config.(*config)
+		// Establish connections.
+		if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
+			return nil, fmt.Errorf("load sql.Open: %w", err)
+		} else if d.load.conn, err = db.Conn(ctx); err != nil {
+			return nil, fmt.Errorf("load db.Conn: %w", err)
 		}
-	}
+		if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
+			return nil, fmt.Errorf("store sql.Open: %w", err)
+		} else if d.store.conn, err = db.Conn(ctx); err != nil {
+			return nil, fmt.Errorf("store db.Conn: %w", err)
+		}
 
-	// Build a query which unions the results of each load subquery.
-	var subqueries []string
-	for _, b := range d.bindings {
-		subqueries = append(subqueries, b.loadQuerySQL)
-	}
-	d.load.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
+		db, err := stdsql.Open("mysql", cfg.ToURI())
+		if err != nil {
+			return nil, fmt.Errorf("newTransactor sql.Open: %w", err)
+		}
+		defer db.Close()
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("newTransactor db.Conn: %w", err)
+		}
+		defer conn.Close()
 
-	return d, nil
+		tableVarchars, err := getVarcharDetails(ctx, dialect, cfg.Database, conn)
+		if err != nil {
+			return nil, fmt.Errorf("getting existing varchar column lengths: %w", err)
+		}
+
+		for _, binding := range bindings {
+			if err = d.addBinding(ctx, binding, tableVarchars[binding.Identifier]); err != nil {
+				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+			}
+		}
+
+		// Build a query which unions the results of each load subquery.
+		var subqueries []string
+		for _, b := range d.bindings {
+			subqueries = append(subqueries, b.loadQuerySQL)
+		}
+		d.load.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
+
+		return d, nil
+	}
 }
 
 // varcharColumnMeta contains metadata about mysql varchar columns. Currently this is just the
@@ -525,6 +594,9 @@ type varcharColumnMeta struct {
 
 type binding struct {
 	target sql.Table
+
+	dialect sql.Dialect
+	templates map[string]*template.Template
 
 	varcharColumnMetas []varcharColumnMeta
 	tempVarcharMetas   []varcharColumnMeta
@@ -550,16 +622,16 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 		sql *string
 		tpl *template.Template
 	}{
-		{&b.createLoadTableSQL, tplCreateLoadTable},
-		{&b.createUpdateTableSQL, tplCreateUpdateTable},
-		{&b.loadLoadSQL, tplLoadLoad},
-		{&b.loadQuerySQL, tplLoadQuery},
-		{&b.storeLoadSQL, tplStoreLoad},
-		{&b.updateLoadSQL, tplUpdateLoad},
-		{&b.updateReplaceSQL, tplUpdateReplace},
-		{&b.updateTruncateSQL, tplUpdateTruncate},
-		{&b.tempTableName, tplTempTableName},
-		{&b.tempTruncate, tplTempTruncate},
+		{&b.createLoadTableSQL, t.templates["createLoadTable"]},
+		{&b.createUpdateTableSQL, t.templates["createUpdateTable"]},
+		{&b.loadLoadSQL, t.templates["loadLoad"]},
+		{&b.loadQuerySQL, t.templates["loadQuery"]},
+		{&b.storeLoadSQL, t.templates["storeLoad"]},
+		{&b.updateLoadSQL, t.templates["updateLoad"]},
+		{&b.updateReplaceSQL, t.templates["updateReplace"]},
+		{&b.updateTruncateSQL, t.templates["updateTruncate"]},
+		{&b.tempTableName, t.templates["tempTableName"]},
+		{&b.tempTruncate, t.templates["tempTruncate"]},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
@@ -606,7 +678,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 
 	tempColumnMetas := make([]varcharColumnMeta, len(allColumns))
 	for idx, key := range target.Keys {
-		columnType, err := mysqlDialect.TypeMapper.MapType(&key.Projection)
+		columnType, err := t.dialect.TypeMapper.MapType(&key.Projection)
 		if err != nil {
 			return fmt.Errorf("temp column metas: %w", err)
 		}
@@ -965,7 +1037,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			}
 
 			var fenceUpdate strings.Builder
-			if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+			if err := d.templates["updateFence"].Execute(&fenceUpdate, d.store.fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 

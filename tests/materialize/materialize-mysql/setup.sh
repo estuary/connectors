@@ -19,6 +19,7 @@ function query() {
 }
 
 query "GRANT ALL PRIVILEGES ON *.* TO 'flow'@'%' WITH GRANT OPTION"
+query "SET @@GLOBAL.time_zone='UTC'"
 
 config_json_template='{
    "address":  "$MYSQL_HOST:$MYSQL_PORT",
