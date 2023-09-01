@@ -61,31 +61,30 @@ var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
 
 func rfc3339ToTZ(loc *time.Location) sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
+		// sanity check, this should not happen
 		if loc == nil {
-			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize date-time field. Consider setting a timezone in your database or in the connector configuration to continue.")
-		}
-		var err error
-		var t time.Time
-		if t, err = time.Parse(time.RFC3339Nano, str); err == nil {
-			return t.In(loc).Format("2006-01-02T15:04:05.999999999"), nil
-		} else if t, err = time.Parse(time.RFC3339, str); err == nil {
-			return t.In(loc).Format("2006-01-02T15:04:05"), nil
+			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize date-time field. Consider setting a timezone in your database or in the connector configuration to continue")
 		}
 
+		if t, err := time.Parse(time.RFC3339Nano, str); err != nil {
+			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
+		} else {
+			return t.In(loc).Format("2006-01-02T15:04:05.999999999"), nil
+		}
 	})
 }
 
 func rfc3339TimeToTZ(loc *time.Location) sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
+		// sanity check, this should not happen
 		if loc == nil {
-			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize time field: Consider setting a timezone in your database or in the connector configuration to continue.")
+			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize time field: Consider setting a timezone in your database or in the connector configuration to continue")
 		}
-		var err error
-		var t time.Time
-		if t, err = time.Parse("15:04:05.999999999Z07:00", str); err == nil {
+
+		if t, err := time.Parse("15:04:05.999999999Z07:00", str); err != nil {
+			return nil, fmt.Errorf("could not parse %q as RFC3339 time: %w", str, err)
+		} else {
 			return t.In(loc).Format("15:04:05.999999999"), nil
-		} else if t, err = time.Parse("15:04:05Z07:00", str); err == nil {
-			return t.In(loc).Format(time.TimeOnly), nil
 		}
 	})
 }

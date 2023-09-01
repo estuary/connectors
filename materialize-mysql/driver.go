@@ -312,8 +312,7 @@ func newMysqlDriver() *sql.Driver {
 				}
 
 				if tzLocation == nil {
-					log.WithField("err", err).Warn("unable to determine database timezone and no timezone in capture configuration")
-					log.Warn("materializing DATETIME values will not be permitted")
+					return nil, fmt.Errorf("unable to determine database timezone and no timezone in materialization configuration. A timezone is required for mysql materializations to avoid ambiguity about date-time and time fields.")
 				}
 			}
 
