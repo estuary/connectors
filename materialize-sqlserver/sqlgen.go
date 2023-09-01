@@ -10,7 +10,14 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
-var sqlServerDialect = func(stringType string, collation string) sql.Dialect {
+var sqlServerDialect = func(collation string) sql.Dialect {
+	var stringType = "varchar"
+	// If the collation does not support UTF8, we fallback to using nvarchar
+	// for string columns
+	if !strings.Contains(collation, "UTF8") {
+		stringType = "nvarchar"
+	}
+
 	var textType = fmt.Sprintf("%s(MAX) COLLATE %s", stringType, collation)
 	var textPKType = fmt.Sprintf("%s(900) COLLATE %s", stringType, collation)
 

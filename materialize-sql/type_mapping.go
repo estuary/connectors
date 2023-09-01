@@ -256,9 +256,6 @@ func StdByteArrayToStr(te tuple.TupleElement) (interface{}, error) {
 	case []byte:
 		return string(tt), nil
 	case json.RawMessage:
-		if tt == nil {
-			return nil, nil
-		}
 		return string(tt), nil
 	default:
 		return te, nil
