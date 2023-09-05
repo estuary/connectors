@@ -254,8 +254,14 @@ func Compose(upper ElementConverter, lower ElementConverter) ElementConverter {
 func StdByteArrayToStr(te tuple.TupleElement) (interface{}, error) {
 	switch tt := te.(type) {
 	case []byte:
+		if tt == nil {
+			return nil, nil
+		}
 		return string(tt), nil
 	case json.RawMessage:
+		if tt == nil {
+			return nil, nil
+		}
 		return string(tt), nil
 	default:
 		return te, nil
