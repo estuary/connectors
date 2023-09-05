@@ -53,7 +53,7 @@ type config struct {
 	User     string         `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password string         `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database string         `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Timezone string         `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be set and columns with type datetime are being materialized. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=3"`
+	Timezone string         `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=4"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
@@ -80,6 +80,13 @@ func (c *config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+
+	if c.Timezone != "" {
+		if _, err := sql.ParseTimezone(c.Timezone); err != nil {
+			return err
+		}
+	}
+
 
 	if c.Advanced.SSLMode != "" {
 		if !slices.Contains([]string{"disabled", "preferred", "required", "verify_ca", "verify_identity"}, c.Advanced.SSLMode) {
@@ -312,6 +319,7 @@ func newMysqlDriver() *sql.Driver {
 				}
 
 				if tzLocation == nil {
+					log.WithField("error", err).Error("could not determine database timzone")
 					return nil, fmt.Errorf("unable to determine database timezone and no timezone in materialization configuration. A timezone is required for mysql materializations to avoid ambiguity about date-time and time fields.")
 				}
 			}
