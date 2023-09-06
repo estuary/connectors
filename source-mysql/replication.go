@@ -524,8 +524,8 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 				return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 			}
 		}
-	case *sqlparser.OtherAdmin:
-		// We ignore queries like REPAIR or OPTIMIZE.
+	case *sqlparser.OtherAdmin, *sqlparser.OtherRead:
+		logrus.WithField("query", query).Debug("ignoring benign query")
 	default:
 		return fmt.Errorf("unhandled query (go.estuary.dev/ceqr74): unhandled type %q: %q", reflect.TypeOf(stmt).String(), query)
 	}
