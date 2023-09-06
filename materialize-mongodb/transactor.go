@@ -19,6 +19,7 @@ type transactor struct {
 	materialization string
 	fenceCollection *mongo.Collection
 	fence           *fenceRecord
+	debugCancelFunc context.CancelFunc
 
 	client   *mongo.Client
 	bindings []*binding
@@ -143,6 +144,9 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 }
 
 func (t *transactor) Destroy() {
+	if t.debugCancelFunc != nil {
+		t.debugCancelFunc()
+	}
 }
 
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {

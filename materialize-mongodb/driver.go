@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -12,6 +14,7 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -158,6 +161,33 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}, nil
 }
 
+// logDatabaseOperations periodically tries to get the current operations that are run
+// for the current session, and logs them, to aid in troubleshooting.
+func logDatabaseOperations(ctx context.Context, client *mongo.Client) {
+	var ticker = time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			var command = bson.D{{Key: "currentOp", Value: true}, {Key: "$ownOps", Value: true}}
+			var resultDoc bson.M // ugh, M is unordered and D is ordered. This is important for $reasons
+			var err = client.Database("admin").RunCommand(ctx, command).Decode(&resultDoc)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"error": resultDoc,
+				}).Warn("failed to execute currentOp command (will stop trying)")
+				return
+			} else {
+				log.WithFields(log.Fields{
+					"currentOps": resultDoc,
+				}).Debug("results of currentOp command")
+			}
+		}
+	}
+}
+
 func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
 	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
@@ -211,12 +241,21 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		return nil, nil, fmt.Errorf("unmarshalling checkpoint, %w", err)
 	}
 
+	var debugCancelFunc context.CancelFunc
+	var logLevel = os.Getenv("LOG_LEVEL")
+	if strings.Contains(logLevel, "debug") || strings.Contains(logLevel, "trace") {
+		var dbgCtx context.Context
+		dbgCtx, debugCancelFunc = context.WithCancel(ctx)
+		go logDatabaseOperations(dbgCtx, client)
+	}
+
 	return &transactor{
 			materialization: materialization,
 			client:          client,
 			bindings:        bindings,
 			fenceCollection: fenceCollection,
 			fence:           &fence,
+			debugCancelFunc: debugCancelFunc,
 		}, &pm.Response_Opened{
 			RuntimeCheckpoint: cp,
 		}, nil
