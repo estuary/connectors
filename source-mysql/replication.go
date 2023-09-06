@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -526,7 +527,7 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	case *sqlparser.OtherAdmin:
 		// We ignore queries like REPAIR or OPTIMIZE.
 	default:
-		return fmt.Errorf("unhandled query (go.estuary.dev/ceqr74): %s", query)
+		return fmt.Errorf("unhandled query (go.estuary.dev/ceqr74): unhandled type %q: %q", reflect.TypeOf(stmt).String(), query)
 	}
 
 	return nil
