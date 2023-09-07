@@ -166,6 +166,7 @@ type PineconeIndexDescribeResponse struct {
 		MetadataConfig struct {
 			Indexed []string `json:"indexed"`
 		} `json:"metadata_config"`
+		PodType string `json:"pod_type"`
 	} `json:"database"`
 }
 

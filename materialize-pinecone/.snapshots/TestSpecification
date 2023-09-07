@@ -66,14 +66,11 @@
       "namespace": {
         "type": "string",
         "title": "Pinecone Namespace",
-        "description": "Name of the Pinecone namespace that this collection will materialize vectors into.",
+        "description": "Name of the Pinecone namespace that this collection will materialize vectors into. For Pinecone starter plans, leave blank to use no namespace. Only a single binding can have a blank namespace, and Pinecone starter plans can only materialize a single binding.",
         "x-collection-name": true
       }
     },
     "type": "object",
-    "required": [
-      "namespace"
-    ],
     "title": "Pinecone Collection"
   },
   "documentation_url": "https://go.estuary.dev/materialize-pinecone"

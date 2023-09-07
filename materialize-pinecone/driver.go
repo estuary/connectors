@@ -15,8 +15,10 @@ import (
 )
 
 const (
-	textEmbeddingAda002             = "text-embedding-ada-002"
-	textEmbeddingAda002VectorLength = 1536
+	textEmbeddingAda002                = "text-embedding-ada-002"
+	textEmbeddingAda002VectorLength    = 1536
+	starterPodType                     = "starter"
+	emptyNamespaceResourcePathSentinel = "FLOW_EMPTY_NAMESPACE"
 )
 
 type config struct {
@@ -90,28 +92,19 @@ func (c *config) openAiClient() *client.OpenAiClient {
 }
 
 type resource struct {
-	Namespace string `json:"namespace" jsonschema:"title=Pinecone Namespace" jsonschema_extras:"x-collection-name=true"`
+	Namespace string `json:"namespace,omitempty" jsonschema:"title=Pinecone Namespace" jsonschema_extras:"x-collection-name=true"`
 }
 
 func (resource) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Namespace":
-		return "Name of the Pinecone namespace that this collection will materialize vectors into."
+		return "Name of the Pinecone namespace that this collection will materialize vectors into. For Pinecone starter plans, leave blank to use no namespace. Only a single binding can have a blank namespace, and Pinecone starter plans can only materialize a single binding."
 	default:
 		return ""
 	}
 }
 
 func (r resource) Validate() error {
-	var requiredProperties = [][]string{
-		{"namespace", r.Namespace},
-	}
-	for _, req := range requiredProperties {
-		if req[1] == "" {
-			return fmt.Errorf("resource config missing required property '%s'", req[0])
-		}
-	}
-
 	return nil
 }
 
@@ -184,6 +177,33 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		entry.Warn("Metadata field 'flow_document' will be indexed. This may not result in optimal memory utilization for the index.")
 	}
 
+	if indexDescribe.Database.PodType == starterPodType {
+		// "Starter" pod types on the free tier cannot use namespaces. Namespaces are required for
+		// differentiating multiple bindings in the same index, so starter pods cannot have more
+		// than 1 binding, and the binding can't have a namespace set.
+		if len(req.Bindings) > 1 {
+			return nil, fmt.Errorf(
+				"Your Pinecone index '%s' is of type '%s', which cannot use Pinecone's namespace feature. This materialization is thus unable to have more than one bound collection. Consider removing bindings, or upgrade your Pinecone plan.",
+				cfg.Index,
+				starterPodType,
+			)
+		}
+
+		if len(req.Bindings) == 1 {
+			res, err := resolveResourceConfig(req.Bindings[0].ResourceConfigJson)
+			if err != nil {
+				return nil, fmt.Errorf("resolving resource config for single starter plan index binding: %w", err)
+			}
+			if res.Namespace != "" {
+				return nil, fmt.Errorf(
+					"Your Pinecone index '%s' is of type '%s', which cannot use Pinecone's namespace feature. You can still proceed by removing the Pinecone Namespace from your bound collection's Resource Configuration, or by upgrading your Pinecone plan.",
+					cfg.Index,
+					starterPodType,
+				)
+			}
+		}
+	}
+
 	var out []*pm.Response_Validated_Binding
 	for _, b := range req.Bindings {
 		res, err := resolveResourceConfig(b.ResourceConfigJson)
@@ -216,10 +236,15 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			constraints[projection.Field] = constraint
 		}
 
+		nsPath := res.Namespace
+		if res.Namespace == "" {
+			nsPath = emptyNamespaceResourcePathSentinel
+		}
+
 		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: true,
-			ResourcePath: []string{res.Namespace},
+			ResourcePath: []string{nsPath},
 		})
 	}
 
