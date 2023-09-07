@@ -109,7 +109,7 @@ func main() {
 	// The vectors themselves are very long and the floating point values of any point in the vector
 	// may vary between invocations, so there's no real way to snapshot the output. The flag
 	// print-vectors can be used to output the vectors instead of masking their values for local
-	// testing. You can get a decent qualitiative idea of if a vector is wrong by how many of its
+	// testing. You can get a decent qualitative idea of if a vector is wrong by how many of its
 	// points are different and how different they are.
 	if !*printVectors {
 		for idx := range out.Matches {
