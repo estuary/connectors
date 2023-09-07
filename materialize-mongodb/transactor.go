@@ -8,6 +8,7 @@ import (
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -41,26 +42,29 @@ var fenceCollectionName = "flow_checkpoints"
 
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	it.WaitForAcknowledged()
-
+	log.Debug("received ack of previous transaction, starting to load from mongodb")
 	for it.Next() {
 		var key = fmt.Sprintf("%x", it.PackedKey) // Hex-encode.
 		var collection = t.bindings[it.Binding].collection
 
 		var ctx = context.Background()
 		var cur, err = collection.Find(ctx, bson.D{{idField, bson.D{{"$eq", key}}}})
-		defer cur.Close(ctx)
 		if err != nil {
+			closeCursor(ctx, cur)
 			return fmt.Errorf("finding document in collection: %w", err)
 		}
 		if !cur.Next(ctx) {
+			closeCursor(ctx, cur)
 			continue
 		}
 
 		var doc bson.M
 
 		if err = cur.Decode(&doc); err != nil {
+			closeCursor(ctx, cur)
 			return fmt.Errorf("decoding document in collection %s: %w", collection.Name(), err)
 		}
+		closeCursor(ctx, cur)
 		doc = sanitizeDocument(doc)
 
 		js, err := json.Marshal(doc)
@@ -74,6 +78,14 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 
 	return it.Err()
+}
+
+func closeCursor(ctx context.Context, cur *mongo.Cursor) {
+	if cur != nil {
+		if err := cur.Close(ctx); err != nil {
+			log.WithField("error", err).Warn("error closing load cursor")
+		}
+	}
 }
 
 func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
@@ -117,6 +129,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			}
 		}
 	}
+	log.WithField("documentCount", it.Total).Debug("finished storing documents, pending commit")
 
 	var filter = bson.D{{"materialization", bson.D{{"$eq", t.fence.Materialization}}}, {"fence", bson.D{{"$eq", t.fence.Fence}}}}
 	var fence fenceRecord
