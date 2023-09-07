@@ -34,5 +34,7 @@ COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 USER nonroot:nonroot
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
+# Temporarily expose the pprof port for debugging
+EXPOSE 6060
 
 ENTRYPOINT ["/connector/materialize-mongodb"]
