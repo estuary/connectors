@@ -44,12 +44,6 @@ config_json_template='{
 resources_json_template='[
   {
     "resource": {
-      "collection": "Simple"
-    },
-    "source": "${TEST_COLLECTION_SIMPLE}"
-  },
-  {
-    "resource": {
       "collection": "duplicate_keys_standard"
     },
     "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
@@ -60,6 +54,12 @@ resources_json_template='[
       "delta_updates": true
     },
     "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
+  },
+  {
+    "resource": {
+      "collection": "Simple"
+    },
+    "source": "${TEST_COLLECTION_SIMPLE}"
   }
 ]'
 
