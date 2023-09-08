@@ -176,8 +176,8 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		var collection = client.Database(cfg.Database).Collection(res.Collection)
 
 		bindings = append(bindings, &binding{
-			collection: collection,
-			res:        res,
+			collection:   collection,
+			deltaUpdates: b.DeltaUpdates,
 		})
 	}
 
