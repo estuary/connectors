@@ -7,7 +7,7 @@ set -o nounset
 docker compose -f materialize-mongodb/docker-compose.yaml create
 docker compose -f materialize-mongodb/docker-compose.yaml up --detach
 
-# Copying and permissining the key after launching the container is a bit of a race
+# Copying and permissioning the key after launching the container is a bit of a race
 # condition but somehow there is no good way to get a key *copied* into a container
 # and editing the copy's permissions/ownership without first running the container,
 # so we're relying on MongoDB taking longer to start up than it takes us to run these
@@ -20,20 +20,19 @@ set +e
 # need to wait some seconds before the replication server is set up
 sleep 5
 docker exec materialize-mongodb-mongo-1 \
-	mongosh \
-	-u flow \
-	-p flow \
-	--eval 'rs.initiate()'
+  mongosh \
+  -u flow \
+  -p flow \
+  --eval 'rs.initiate()'
 
 sleep 1
 
 docker exec materialize-mongodb-mongo-1 \
-	mongosh \
-	-u flow \
-	-p flow \
-	--eval 'db.createUser({ user: "flow", pwd: "flow", roles: [{ role: "readWrite", db: "test" }] })'
+  mongosh \
+  -u flow \
+  -p flow \
+  --eval 'db.createUser({ user: "flow", pwd: "flow", roles: [{ role: "readWrite", db: "test" }] })'
 set -e
-
 
 config_json_template='{
    "address":  "materialize-mongodb-mongo-1",

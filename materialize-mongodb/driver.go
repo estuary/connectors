@@ -12,9 +12,7 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"go.gazette.dev/core/consumer/protocol"
 
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -183,43 +181,10 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		})
 	}
 
-	var fenceCollection = client.Database(cfg.Database).Collection(fenceCollectionName)
-
-	var materialization = string(open.Materialization.Name)
-	var filter = bson.D{{
-		Key: "materialization", Value: bson.D{{Key: "$eq", Value: materialization}},
-	}}
-
-	var fence fenceRecord
-	if err := fenceCollection.FindOne(ctx, filter, options.FindOne()).Decode(&fence); err != nil && err != mongo.ErrNoDocuments {
-		return nil, nil, fmt.Errorf("finding existing fence: %w", err)
-	} else if err == mongo.ErrNoDocuments {
-		fence.Materialization = materialization
-		if _, err = fenceCollection.InsertOne(ctx, fence, options.InsertOne()); err != nil {
-			return nil, nil, fmt.Errorf("inserting new fence: %w", err)
-		}
-	}
-
-	var bump = bson.D{{Key: "$inc", Value: bson.D{{Key: "fence", Value: 1}}}}
-	var updateOpts = options.FindOneAndUpdate().SetReturnDocument(options.After)
-	if err = fenceCollection.FindOneAndUpdate(ctx, filter, bump, updateOpts).Decode(&fence); err != nil {
-		return nil, nil, fmt.Errorf("bumping fence: %w", err)
-	}
-
-	var cp = new(protocol.Checkpoint)
-	if err := cp.Unmarshal(fence.Checkpoint); err != nil {
-		return nil, nil, fmt.Errorf("unmarshalling checkpoint, %w", err)
-	}
-
 	return &transactor{
-			materialization: materialization,
-			client:          client,
-			bindings:        bindings,
-			fenceCollection: fenceCollection,
-			fence:           &fence,
-		}, &pm.Response_Opened{
-			RuntimeCheckpoint: cp,
-		}, nil
+		client:   client,
+		bindings: bindings,
+	}, &pm.Response_Opened{}, nil
 }
 
 func resolveEndpointConfig(specJson json.RawMessage) (config, error) {
