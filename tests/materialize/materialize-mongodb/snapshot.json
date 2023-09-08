@@ -2,9 +2,7 @@
   "applied": {}
 }
 {
-  "opened": {
-    "runtimeCheckpoint": {}
-  }
+  "opened": {}
 }
 {
   "acknowledged": {}
@@ -326,15 +324,7 @@
   "applied": {}
 }
 {
-  "opened": {
-    "runtimeCheckpoint": {
-      "sources": {
-        "a/read/journal;suffix": {
-          "readThrough": "1"
-        }
-      }
-    }
-  }
+  "opened": {}
 }
 {
   "acknowledged": {}
