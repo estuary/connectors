@@ -187,7 +187,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 
 	var materialization = string(open.Materialization.Name)
 	var filter = bson.D{{
-		"materialization", bson.D{{"$eq", materialization}},
+		Key: "materialization", Value: bson.D{{Key: "$eq", Value: materialization}},
 	}}
 
 	var fence fenceRecord
@@ -200,7 +200,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		}
 	}
 
-	var bump = bson.D{{"$inc", bson.D{{"fence", 1}}}}
+	var bump = bson.D{{Key: "$inc", Value: bson.D{{Key: "fence", Value: 1}}}}
 	var updateOpts = options.FindOneAndUpdate().SetReturnDocument(options.After)
 	if err = fenceCollection.FindOneAndUpdate(ctx, filter, bump, updateOpts).Decode(&fence); err != nil {
 		return nil, nil, fmt.Errorf("bumping fence: %w", err)

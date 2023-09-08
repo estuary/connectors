@@ -46,7 +46,7 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		var collection = t.bindings[it.Binding].collection
 
 		var ctx = context.Background()
-		var cur, err = collection.Find(ctx, bson.D{{idField, bson.D{{"$eq", key}}}})
+		var cur, err = collection.Find(ctx, bson.D{{Key: idField, Value: bson.D{{Key: "$eq", Value: key}}}})
 		defer cur.Close(ctx)
 		if err != nil {
 			return fmt.Errorf("finding document in collection: %w", err)
@@ -105,7 +105,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		if it.Exists {
 			var opts = options.Replace()
-			_, err := binding.collection.ReplaceOne(tx, bson.D{{idField, bson.D{{"$eq", key}}}}, doc, opts)
+			_, err := binding.collection.ReplaceOne(tx, bson.D{{Key: idField, Value: bson.D{{Key: "$eq", Value: key}}}}, doc, opts)
 			if err != nil {
 				return nil, fmt.Errorf("upserting document into collection %s: %w", binding.collection.Name(), err)
 			}
@@ -117,7 +117,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 	}
 
-	var filter = bson.D{{"materialization", bson.D{{"$eq", t.fence.Materialization}}}, {"fence", bson.D{{"$eq", t.fence.Fence}}}}
+	var filter = bson.D{{Key: "materialization", Value: bson.D{{Key: "$eq", Value: t.fence.Materialization}}}, {Key: "fence", Value: bson.D{{Key: "$eq", Value: t.fence.Fence}}}}
 	var fence fenceRecord
 	if err = t.fenceCollection.FindOne(tx, filter, options.FindOne()).Decode(&fence); err != nil {
 		return nil, fmt.Errorf("finding fence: %w", err)
@@ -130,7 +130,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 
 		return nil, pf.RunAsyncOperation(func() error {
-			var bump = bson.D{{"$set", bson.D{{"checkpoint", checkpointBytes}}}}
+			var bump = bson.D{{Key: "$set", Value: bson.D{{Key: "checkpoint", Value: checkpointBytes}}}}
 			var updateOpts = options.Update()
 			if _, err = t.fenceCollection.UpdateOne(ctx, filter, bump, updateOpts); err != nil {
 				return fmt.Errorf("updating checkpoint: %w", err)

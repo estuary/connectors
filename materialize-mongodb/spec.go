@@ -30,7 +30,7 @@ func (d driver) LoadSpec(ctx context.Context, cfg config, materialization string
 
 	var s SavedSpec
 
-	err = collection.FindOne(ctx, bson.D{{idField, bson.D{{"$eq", materialization}}}}).Decode(&s)
+	err = collection.FindOne(ctx, bson.D{{Key: idField, Value: bson.D{{Key: "$eq", Value: materialization}}}}).Decode(&s)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
@@ -60,7 +60,7 @@ func (d driver) WriteSpec(ctx context.Context, cfg config, materialization *pf.M
 	}
 
 	opts := options.Replace().SetUpsert(true)
-	_, err = collection.ReplaceOne(ctx, bson.D{{idField, string(materialization.Name)}}, bson.D{{"spec", bs}}, opts)
+	_, err = collection.ReplaceOne(ctx, bson.D{{Key: idField, Value: string(materialization.Name)}}, bson.D{{Key: "spec", Value: bs}}, opts)
 	if err != nil {
 		return fmt.Errorf("upserting spec: %w", err)
 	}
@@ -75,7 +75,7 @@ func (d driver) CleanSpec(ctx context.Context, cfg config, materialization strin
 	}
 	var collection = client.Database(cfg.Database).Collection(specCollection)
 
-	_, err = collection.DeleteOne(ctx, bson.D{{idField, materialization}})
+	_, err = collection.DeleteOne(ctx, bson.D{{Key: idField, Value: materialization}})
 	if err != nil {
 		return fmt.Errorf("cleaning up spec: %w", err)
 	}
