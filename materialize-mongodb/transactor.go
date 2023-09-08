@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"math"
 
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"go.gazette.dev/core/consumer/protocol"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,10 +14,6 @@ import (
 )
 
 type transactor struct {
-	materialization string
-	fenceCollection *mongo.Collection
-	fence           *fenceRecord
-
 	client   *mongo.Client
 	bindings []*binding
 }
@@ -29,14 +23,7 @@ type binding struct {
 	res        resource
 }
 
-type fenceRecord struct {
-	Checkpoint      []byte `bson:"checkpoint"`
-	Materialization string `bson:"materialization"`
-	Fence           int    `bson:"fence"`
-}
-
 var idField = "_id"
-var fenceCollectionName = "flow_checkpoints"
 
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	it.WaitForAcknowledged()
@@ -46,29 +33,35 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		var collection = t.bindings[it.Binding].collection
 
 		var ctx = context.Background()
-		var cur, err = collection.Find(ctx, bson.D{{Key: idField, Value: bson.D{{Key: "$eq", Value: key}}}})
-		defer cur.Close(ctx)
-		if err != nil {
-			return fmt.Errorf("finding document in collection: %w", err)
-		}
-		if !cur.Next(ctx) {
-			continue
-		}
+		if err := func() error { // Closure for the deferred cur.Close()
+			var cur, err = collection.Find(ctx, bson.D{{Key: idField, Value: bson.D{{Key: "$eq", Value: key}}}})
+			if err != nil {
+				return fmt.Errorf("finding document in collection: %w", err)
+			}
+			defer cur.Close(ctx)
+			if !cur.Next(ctx) {
+				return nil
+			}
 
-		var doc bson.M
+			var doc bson.M
 
-		if err = cur.Decode(&doc); err != nil {
-			return fmt.Errorf("decoding document in collection %s: %w", collection.Name(), err)
-		}
-		doc = sanitizeDocument(doc)
+			if err = cur.Decode(&doc); err != nil {
+				return fmt.Errorf("decoding document in collection %s: %w", collection.Name(), err)
+			}
+			doc = sanitizeDocument(doc)
 
-		js, err := json.Marshal(doc)
-		if err != nil {
-			return fmt.Errorf("encoding document in collection %s as json: %w", collection.Name(), err)
-		}
+			js, err := json.Marshal(doc)
+			if err != nil {
+				return fmt.Errorf("encoding document in collection %s as json: %w", collection.Name(), err)
+			}
 
-		if err := loaded(it.Binding, js); err != nil {
-			return fmt.Errorf("sending loaded: %w", err)
+			if err := loaded(it.Binding, js); err != nil {
+				return fmt.Errorf("sending loaded: %w", err)
+			}
+
+			return nil
+		}(); err != nil {
+			return err
 		}
 	}
 
@@ -77,17 +70,6 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	var ctx = it.Context()
-
-	sess, err := t.client.StartSession(options.Session())
-	if err != nil {
-		return nil, fmt.Errorf("starting session: %w", err)
-	}
-
-	tx := mongo.NewSessionContext(ctx, sess)
-
-	if err = sess.StartTransaction(); err != nil {
-		return nil, fmt.Errorf("starting transaction: %w", err)
-	}
 
 	for it.Next() {
 		var key = fmt.Sprintf("%x", it.PackedKey) // Hex-encode.
@@ -105,41 +87,19 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		if it.Exists {
 			var opts = options.Replace()
-			_, err := binding.collection.ReplaceOne(tx, bson.D{{Key: idField, Value: bson.D{{Key: "$eq", Value: key}}}}, doc, opts)
+			_, err := binding.collection.ReplaceOne(ctx, bson.D{{Key: idField, Value: bson.D{{Key: "$eq", Value: key}}}}, doc, opts)
 			if err != nil {
 				return nil, fmt.Errorf("upserting document into collection %s: %w", binding.collection.Name(), err)
 			}
 		} else {
-			_, err := binding.collection.InsertOne(tx, doc, options.InsertOne())
+			_, err := binding.collection.InsertOne(ctx, doc, options.InsertOne())
 			if err != nil {
 				return nil, fmt.Errorf("inserting document into collection %s: %w", binding.collection.Name(), err)
 			}
 		}
 	}
 
-	var filter = bson.D{{Key: "materialization", Value: bson.D{{Key: "$eq", Value: t.fence.Materialization}}}, {Key: "fence", Value: bson.D{{Key: "$eq", Value: t.fence.Fence}}}}
-	var fence fenceRecord
-	if err = t.fenceCollection.FindOne(tx, filter, options.FindOne()).Decode(&fence); err != nil {
-		return nil, fmt.Errorf("finding fence: %w", err)
-	}
-
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		checkpointBytes, err := runtimeCheckpoint.Marshal()
-		if err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
-		}
-
-		return nil, pf.RunAsyncOperation(func() error {
-			var bump = bson.D{{Key: "$set", Value: bson.D{{Key: "checkpoint", Value: checkpointBytes}}}}
-			var updateOpts = options.Update()
-			if _, err = t.fenceCollection.UpdateOne(ctx, filter, bump, updateOpts); err != nil {
-				return fmt.Errorf("updating checkpoint: %w", err)
-			}
-
-			defer sess.EndSession(ctx)
-			return sess.CommitTransaction(context.Background())
-		})
-	}, nil
+	return nil, nil
 }
 
 func (t *transactor) Destroy() {

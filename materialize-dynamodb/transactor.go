@@ -268,7 +268,7 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(i int, doc json
 				}
 
 				// BatchGetItem returns without error if at least one of the requests was successful.
-				// The items that the get request was not succesful for are returned as UnprocessedKeys,
+				// The items that the get request was not successful for are returned as UnprocessedKeys,
 				// and must be retried. Items are unprocessed if getting them would exceed rate limits
 				// for the table.
 				batch = res.UnprocessedKeys
