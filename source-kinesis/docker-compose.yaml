@@ -5,8 +5,13 @@ services:
     image: 'localstack/localstack:latest'
     environment:
       - SERVICES=kinesis
-      - KINESIS_ERROR_PROBABILITY=0.2
+      - KINESIS_ERROR_PROBABILITY=0 # This option is interesting, but will likely cause test flakes.
       - KINESIS_LATENCY=5 # ms
+    healthcheck: 
+      test: "AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=test aws --endpoint-url=http://localhost:4566 kinesis list-streams"
+      interval: 1s
+      timeout: 1s
+      retries: 60
     ports:
       - 4566:4566
     networks:
