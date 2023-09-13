@@ -1,0 +1,18 @@
+version: "3.7"
+
+services:
+  db:
+    image: 'localstack/localstack:latest'
+    environment:
+      - SERVICES=kinesis
+      - KINESIS_ERROR_PROBABILITY=0.2
+      - KINESIS_LATENCY=5 # ms
+    ports:
+      - 4566:4566
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

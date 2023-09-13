@@ -1,0 +1,18 @@
+# ================================
+# Collection "": 10 Documents
+# ================================
+{"_meta":{"partition_key":"partitionKey-0","sequence_number":"<SEQUENCE_NUM>"},"i":"0"}
+{"_meta":{"partition_key":"partitionKey-1","sequence_number":"<SEQUENCE_NUM>"},"i":"1"}
+{"_meta":{"partition_key":"partitionKey-2","sequence_number":"<SEQUENCE_NUM>"},"i":"2"}
+{"_meta":{"partition_key":"partitionKey-3","sequence_number":"<SEQUENCE_NUM>"},"i":"3"}
+{"_meta":{"partition_key":"partitionKey-4","sequence_number":"<SEQUENCE_NUM>"},"i":"4"}
+{"_meta":{"partition_key":"partitionKey-5","sequence_number":"<SEQUENCE_NUM>"},"i":"5"}
+{"_meta":{"partition_key":"partitionKey-6","sequence_number":"<SEQUENCE_NUM>"},"i":"6"}
+{"_meta":{"partition_key":"partitionKey-7","sequence_number":"<SEQUENCE_NUM>"},"i":"7"}
+{"_meta":{"partition_key":"partitionKey-8","sequence_number":"<SEQUENCE_NUM>"},"i":"8"}
+{"_meta":{"partition_key":"partitionKey-9","sequence_number":"<SEQUENCE_NUM>"},"i":"9"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"test-stream-1":{"shardId-000000000000":"<SEQUENCE_NUM>","shardId-000000000001":"<SEQUENCE_NUM>"},"test-stream-2":{"shardId-000000000000":"<SEQUENCE_NUM>","shardId-000000000001":"<SEQUENCE_NUM>"}}
+

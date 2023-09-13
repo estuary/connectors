@@ -163,6 +163,7 @@ jobs:
             "materialize-dynamodb",
             "materialize-elasticsearch",
             "source-dynamodb",
+            "source-kinesis",
             "source-mysql",
             "source-postgres",
             "source-sftp",

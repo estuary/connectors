@@ -1,6 +1,8 @@
 {
-    "region": "local",
-    "endpoint": "http://localhost:4566",
-    "awsAccessKeyId": "x",
-    "awsSecretAccessKey": "x"
+  "region": "local",
+  "awsAccessKeyId": "x",
+  "awsSecretAccessKey": "x",
+  "advanced": {
+    "endpoint": "http://localhost:4566"
+  }
 }

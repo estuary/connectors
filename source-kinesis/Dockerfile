@@ -15,12 +15,14 @@ COPY go                 ./go
 COPY source-boilerplate ./source-boilerplate
 COPY source-kinesis     ./source-kinesis
 
-# Run the unit tests.
+# Run automated tests. To skip tests which interact with an external database (kinesis, in this
+# case), specify `--build-arg TEST_DATABASE=no` in the Docker command line.
+ARG TEST_DATABASE=yes
+ENV TEST_DATABASE=$TEST_DATABASE
 RUN go test -v ./source-kinesis/...
 
 # Build the connector.
 RUN go build -o ./connector -v ./source-kinesis/...
-
 
 # Runtime Stage
 ################################################################################
