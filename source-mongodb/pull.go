@@ -32,7 +32,25 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	var prevState captureState
 	if open.StateJson != nil {
 		if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
-			return fmt.Errorf("parsing state checkpoint: %w", err)
+			// If this is coming from an old version of the connector, parse it and
+			// convert it to the new format
+			var depState deprecatedCaptureState
+			if depErr := pf.UnmarshalStrict(open.StateJson, &depState); depErr == nil {
+				var resources = make(map[string]resourceState)
+				for i, resumeToken := range depState.Resources {
+					resources[i] = resourceState{}
+					var r = resources[i]
+					if resumeToken != nil {
+						r.StreamResumeToken = resumeToken
+						r.Status = StatusStreaming
+					}
+				}
+				prevState = captureState{
+					Resources: resources,
+				}
+			} else {
+				return fmt.Errorf("parsing checkpoint json: %w", err)
+			}
 		}
 	}
 
@@ -96,16 +114,14 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 		var resState, _ = prevState.Resources[resourceId(res)]
 
-		// Only backfill the first time, and we know that when there is no state
-		var backfillFinishedAt *primitive.Timestamp = nil
-		if resState == nil {
-			if backfillFinishedAt, err = c.BackfillCollection(ctx, client, idx, res); err != nil {
+		if resState.Status == StatusBackfill {
+			if err = c.BackfillCollection(ctx, client, idx, res, resState); err != nil {
 				return fmt.Errorf("backfill: %w", err)
 			}
 		}
 
 		eg.Go(func() error {
-			return c.ChangeStream(egCtx, client, idx, res, backfillFinishedAt, resState)
+			return c.ChangeStream(egCtx, client, idx, res, resState)
 		})
 	}
 
@@ -120,12 +136,35 @@ type capture struct {
 	Output *boilerplate.PullOutput
 }
 
-type captureState struct {
+type deprecatedCaptureState struct {
 	Resources map[string]bson.Raw `json:"resources"`
+}
+
+func (s *deprecatedCaptureState) Validate() error {
+	return nil
+}
+
+type captureState struct {
+	Resources map[string]resourceState `json:"resources"`
 }
 
 func (s *captureState) Validate() error {
 	return nil
+}
+
+const (
+	StatusBackfill = 0
+	StatusStreaming = 1
+)
+
+type resourceState struct {
+	// default value is 0, which is StatusBackfill
+	Status int `json:"status,omitempty"`
+
+	BackfillStartedAt time.Time `json:"backfill_started_at,omitempty"`
+	BackfillLastId bson.Raw `json:"backfill_last_id,omitempty"`
+
+	StreamResumeToken bson.Raw `json:"stream_resume_token,omitempty"`
 }
 
 type docKey struct {
@@ -140,7 +179,7 @@ type changeEvent struct {
 const resumePointGoneErrorMessage = "the resume point may no longer be in the oplog"
 const resumeTokenNotFoundErrorMessage = "the resume token was not found"
 
-func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding int, res resource, backfillFinishedAt *primitive.Timestamp, resumeToken bson.Raw) error {
+func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding int, res resource, state resourceState) error {
 	var db = client.Database(res.Database)
 
 	var collection = db.Collection(res.Collection)
@@ -148,22 +187,22 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 	log.WithFields(log.Fields{
 		"database":           res.Database,
 		"collection":         res.Collection,
-		"resumeToken":        resumeToken,
-		"backfillFinishedAt": backfillFinishedAt,
+		"state":              state,
 	}).Info("listening on changes on collection")
 	var eventFilter = bson.D{{"$match", bson.D{{"$or",
-		bson.A{
-			bson.D{{"operationType", "delete"}},
-			bson.D{{"operationType", "insert"}},
-			bson.D{{"operationType", "update"}},
-			bson.D{{"operationType", "replace"}},
-		}}}}}
-	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
-	if resumeToken != nil {
-		opts = opts.SetResumeAfter(resumeToken)
-	} else if backfillFinishedAt != nil {
-		opts = opts.SetStartAtOperationTime(backfillFinishedAt)
+	bson.A{
+		bson.D{{"operationType", "delete"}},
+		bson.D{{"operationType", "insert"}},
+		bson.D{{"operationType", "update"}},
+		bson.D{{"operationType", "replace"}},
+	}}}}}
+
+	var startAt = &primitive.Timestamp{T: uint32(state.BackfillStartedAt.Unix()) - 1, I: 0}
+	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup).SetStartAtOperationTime(startAt)
+	if state.StreamResumeToken != nil {
+		opts = opts.SetResumeAfter(state.StreamResumeToken)
 	}
+
 	cursor, err := collection.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
 	if err != nil {
 		// This error means events from the starting point are no longer available,
@@ -228,9 +267,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 			}
 		}
 
+		state.StreamResumeToken = cursor.ResumeToken()
+
 		var checkpoint = captureState{
-			Resources: map[string]bson.Raw{
-				resourceId(res): cursor.ResumeToken(),
+			Resources: map[string]resourceState{
+				resourceId(res): state,
 			},
 		}
 
@@ -255,15 +296,34 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 
 const CHECKPOINT_EVERY = 100
 
-func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding int, res resource) (*primitive.Timestamp, error) {
-	var db = client.Database(res.Database)
+const (
+	SortAscending = 1
+)
 
+func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding int, res resource, state resourceState) error {
+	var db = client.Database(res.Database)
 	var collection = db.Collection(res.Collection)
 
-	log.Debug("finding documents in collection ", res.Collection)
-	cursor, err := collection.Find(ctx, bson.D{})
+	if state.BackfillStartedAt.IsZero() {
+		// This means we are starting backfill for the first time
+		state.BackfillStartedAt = time.Now()
+	}
+
+	var opts = options.Find().SetSort(bson.D{{idProperty, SortAscending}})
+	var filter = bson.D{}
+	if state.BackfillLastId != nil {
+		filter = bson.D{{idProperty, bson.D{{"$gte", state.BackfillLastId}}}}
+	}
+
+	log.WithFields(log.Fields{
+		"collection": res.Collection,
+		"opts": opts,
+		"filter": filter,
+	}).Debug("finding documents in collection")
+
+	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
-		return nil, fmt.Errorf("could not run find query on collection %s: %w", res.Collection, err)
+		return fmt.Errorf("could not run find query on collection %s: %w", res.Collection, err)
 	}
 
 	defer cursor.Close(ctx)
@@ -271,38 +331,65 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 	var i = 0
 	for cursor.Next(ctx) {
 		i += 1
+
+		var rawDoc map[string]bson.Raw
+		if err = cursor.Decode(&rawDoc); err != nil {
+			return fmt.Errorf("decoding document raw in collection %s: %w", res.Collection, err)
+		}
+		state.BackfillLastId = rawDoc[idProperty]
+
 		var doc bson.M
 		if err = cursor.Decode(&doc); err != nil {
-			return nil, fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
+			return fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
 		}
 		doc = sanitizeDocument(doc)
 
 		js, err := json.Marshal(doc)
 		if err != nil {
-			return nil, fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
+			return fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
 		}
 
 		if err = c.Output.Documents(binding, js); err != nil {
-			return nil, fmt.Errorf("output documents failed: %w", err)
+			return fmt.Errorf("output documents failed: %w", err)
 		}
 
 		if i%CHECKPOINT_EVERY == 0 {
-			if err = c.Output.Checkpoint([]byte("{}"), true); err != nil {
-				return nil, fmt.Errorf("output checkpoint failed: %w", err)
+			var checkpoint = captureState{
+				Resources: map[string]resourceState{
+					resourceId(res): state,
+				},
+			}
+
+			checkpointJson, err := json.Marshal(checkpoint)
+			if err != nil {
+				return fmt.Errorf("encoding checkpoint to json failed: %w", err)
+			}
+
+			if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
+				return fmt.Errorf("output checkpoint failed: %w", err)
 			}
 		}
 	}
 
-	if err = c.Output.Checkpoint([]byte("{}"), true); err != nil {
-		return nil, fmt.Errorf("sending checkpoint failed: %w", err)
+	var checkpoint = captureState{
+		Resources: map[string]resourceState{
+			resourceId(res): state,
+		},
+	}
+
+	checkpointJson, err := json.Marshal(checkpoint)
+	if err != nil {
+		return fmt.Errorf("encoding checkpoint to json failed: %w", err)
+	}
+	if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
+		return fmt.Errorf("sending checkpoint failed: %w", err)
 	}
 
 	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("cursor error for backfill %s: %w", res.Collection, err)
+		return fmt.Errorf("cursor error for backfill %s: %w", res.Collection, err)
 	}
 
-	// minus five seconds for potential error
-	return &primitive.Timestamp{T: uint32(time.Now().Unix()) - 5, I: 0}, nil
+	return nil
 }
 
 func resourceId(res resource) string {
@@ -312,7 +399,7 @@ func resourceId(res resource) string {
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		// Make sure `_id` is always captured as string
-		if key == "_id" {
+		if key == idProperty {
 			doc[key] = idToString(value)
 		} else {
 			switch v := value.(type) {
