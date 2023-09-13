@@ -14,10 +14,10 @@ const maxKinesisHash = "340282366920938463463374607431768211455"
 
 // Ideally, our behavior will match theirs exactly, although technically our results will be correct
 // even if it is different. If our behavior doesn't match, then there could potentially be
-// pathalogical edge cases where records from partially overlapping kinesis shards get hashed
+// pathological edge cases where records from partially overlapping kinesis shards get hashed
 // disproportionately into a flow capture shard. The AWS docs don't document the particulars around
 // hashing partition keys, other than the fact that they use md5. This test exists to verify that
-// the given partition keys hash into the same kinesis shard that kinsis itself determines. Kinesis
+// the given partition keys hash into the same kinesis shard that kinesis itself determines. Kinesis
 // doesn't expose the actual hashed values, only the unhashed partition key and the shard id that it
 // went into. So this was setup by manually creating a kinesis stream with 2 shards, adding records
 // with the given partition keys and seeing which shard they went into. This can, and possibly
