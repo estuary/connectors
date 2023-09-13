@@ -67,34 +67,19 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
-		// the deprecated way of storing checkpoints
 		var resState, _ = prevState.Resources[resourceId(res)]
-
-		// the new way of storing checkpoints
-		var bindingState, _ = prevState.Resources[bindingId(binding, res)]
-
-		// If there is no binding state (new checkpoint), but there is resource
-		// state (old checkpoint), use the old checkpoint
-		if bindingState == nil && resState != nil {
-			bindingState = resState
-		}
 
 		// Only backfill the first time, and we know that when there is no state
 		var backfillFinishedAt *primitive.Timestamp = nil
-		if bindingState == nil {
+		if resState == nil {
 			if backfillFinishedAt, err = c.BackfillCollection(ctx, client, idx, res); err != nil {
 				return fmt.Errorf("backfill: %w", err)
 			}
 		}
 
 		eg.Go(func() error {
-			return c.ChangeStream(egCtx, client, binding, idx, res, backfillFinishedAt, bindingState)
+			return c.ChangeStream(egCtx, client, idx, res, backfillFinishedAt, resState)
 		})
-	}
-
-	// Clean up deprecated checkpoints
-	if err = c.Output.Checkpoint([]byte("{\"resources\": null}"), true); err != nil {
-		return fmt.Errorf("output checkpoint failed: %w", err)
 	}
 
 	if err := eg.Wait(); err != nil && !errors.Is(err, io.EOF) {
@@ -109,13 +94,7 @@ type capture struct {
 }
 
 type captureState struct {
-	// Deprecated: we used to map from resource config identifiers to resume
-	// tokens
 	Resources map[string]bson.Raw `json:"resources"`
-
-	// Now we map from binding identifier (which includes collection name) to
-	// resume tokens so that renaming the collection allows for re-backfilling
-	Bindings map[string]bson.Raw `json:"collections"`
 }
 
 func (s *captureState) Validate() error {
@@ -134,7 +113,7 @@ type changeEvent struct {
 const resumePointGoneErrorMessage = "the resume point may no longer be in the oplog"
 const resumeTokenNotFoundErrorMessage = "the resume token was not found"
 
-func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding *pf.CaptureSpec_Binding, bindingIdx int, res resource, backfillFinishedAt *primitive.Timestamp, resumeToken bson.Raw) error {
+func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding int, res resource, backfillFinishedAt *primitive.Timestamp, resumeToken bson.Raw) error {
 	var db = client.Database(res.Database)
 
 	var collection = db.Collection(res.Collection)
@@ -199,7 +178,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 				return fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
 			}
 
-			if err = c.Output.Documents(bindingIdx, js); err != nil {
+			if err = c.Output.Documents(binding, js); err != nil {
 				return fmt.Errorf("output documents failed: %w", err)
 			}
 		} else if ev.FullDocument != nil {
@@ -217,14 +196,14 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 				return fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
 			}
 
-			if err = c.Output.Documents(bindingIdx, js); err != nil {
+			if err = c.Output.Documents(binding, js); err != nil {
 				return fmt.Errorf("output documents failed: %w", err)
 			}
 		}
 
 		var checkpoint = captureState{
 			Resources: map[string]bson.Raw{
-				bindingId(binding, res): cursor.ResumeToken(),
+				resourceId(res): cursor.ResumeToken(),
 			},
 		}
 
@@ -249,7 +228,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 
 const CHECKPOINT_EVERY = 100
 
-func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, bindingIdx int, res resource) (*primitive.Timestamp, error) {
+func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding int, res resource) (*primitive.Timestamp, error) {
 	var db = client.Database(res.Database)
 
 	var collection = db.Collection(res.Collection)
@@ -276,7 +255,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			return nil, fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
 		}
 
-		if err = c.Output.Documents(bindingIdx, js); err != nil {
+		if err = c.Output.Documents(binding, js); err != nil {
 			return nil, fmt.Errorf("output documents failed: %w", err)
 		}
 
@@ -301,10 +280,6 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 
 func resourceId(res resource) string {
 	return fmt.Sprintf("%s.%s", res.Database, res.Collection)
-}
-
-func bindingId(b *pf.CaptureSpec_Binding, res resource) string {
-	return fmt.Sprintf("%s %s.%s", b.Collection.Name, res.Database, res.Collection)
 }
 
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
