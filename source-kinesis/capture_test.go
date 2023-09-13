@@ -1,6 +1,3 @@
-//go:build kinesistest
-// +build kinesistest
-
 package main
 
 // This integration test requires that kinesis is running and that the configuration in
@@ -15,29 +12,31 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"math"
 	"math/rand"
-	"path"
+	"os"
+	"regexp"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/kinesis"
+	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
 func TestIsRecordWithinRange(t *testing.T) {
-	var flowRange = pf.RangeSpec{
+	var flowRange = &pf.RangeSpec{
 		KeyBegin: 5,
 		KeyEnd:   10,
 	}
-	var kinesisRange = pf.RangeSpec{
+	var kinesisRange = &pf.RangeSpec{
 		KeyBegin: 7,
 		KeyEnd:   15,
 	}
@@ -61,14 +60,26 @@ func TestIsRecordWithinRange(t *testing.T) {
 	require.True(t, isRecordWithinRange(flowRange, kinesisRange, 9999))
 }
 
-func TestKinesisCaptureWithShardOverlap(t *testing.T) {
-	var conf = Config{
-		Region:             "local",
-		Endpoint:           "http://localhost:4566",
-		AWSAccessKeyID:     "x",
-		AWSSecretAccessKey: "x",
+func testConfig(t *testing.T) Config {
+	t.Helper()
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
+	return Config{
+		Region:             "local",
+		AWSAccessKeyID:     "x",
+		AWSSecretAccessKey: "x",
+		Advanced: advancedConfig{
+			Endpoint: "http://localhost:4566",
+		},
+	}
+}
+
+func TestKinesisCaptureWithShardOverlap(t *testing.T) {
+	ctx := context.Background()
+
+	conf := testConfig(t)
 	client, err := connect(&conf)
 	require.NoError(t, err)
 
@@ -88,29 +99,10 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 		var _, err = client.DeleteStream(&deleteStreamReq)
 		require.NoError(t, err, "failed to delete stream")
 	}()
-	awaitStreamActive(t, client, stream)
+	awaitStreamActive(t, ctx, client, stream)
 
-	var dataCh = make(chan readResult)
-	var ctx, cancelFunc = context.WithCancel(context.Background())
-	defer cancelFunc()
-	var waitGroup = new(sync.WaitGroup)
-
-	var shard1Range = pf.RangeSpec{
-		KeyBegin: 0,
-		KeyEnd:   math.MaxUint32 / 2,
-	}
-	waitGroup.Add(1)
-	go readStream(ctx, shard1Range, client, stream, nil, dataCh, nil, waitGroup)
-
-	var shard2Range = pf.RangeSpec{
-		KeyBegin: math.MaxUint32 / 2,
-		KeyEnd:   math.MaxUint32,
-	}
-	waitGroup.Add(1)
-	go readStream(ctx, shard2Range, client, stream, nil, dataCh, nil, waitGroup)
-
-	var partitionKeys = []string{"furst", "sekund", "thuurd", "phorth"}
-	var sequencNumbers = make(map[string]string)
+	var partitionKeys = []string{"canary", "fooo", "daffy", "pancakes"}
+	var sequenceNumbers = make(map[string]string)
 	for i := 0; i < 24; i++ {
 		var partitionKey = partitionKeys[i%(len(partitionKeys)-1)]
 		var input = &kinesis.PutRecordInput{
@@ -118,19 +110,29 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 			PartitionKey: &partitionKey,
 			Data:         []byte(fmt.Sprintf(`{"partitionKey":%q, "counter": %d}`, partitionKey, i)),
 		}
-		if prevSeq, ok := sequencNumbers[partitionKey]; ok {
+		if prevSeq, ok := sequenceNumbers[partitionKey]; ok {
 			input.SequenceNumberForOrdering = &prevSeq
 		}
 
-		var doPut = func() bool {
-			var resp, putErr = client.PutRecord(input)
-			if putErr == nil {
-				sequencNumbers[partitionKey] = *resp.SequenceNumber
-			}
-			return putErr == nil
-		}
-		require.Eventually(t, doPut, time.Second, time.Millisecond*100, "failed to put record")
+		resp, err := client.PutRecord(input)
+		require.NoError(t, err)
+		sequenceNumbers[partitionKey] = *resp.SequenceNumber
 	}
+
+	var dataCh = make(chan readResult)
+	var waitGroup = new(sync.WaitGroup)
+
+	var shard1Range = &pf.RangeSpec{
+		KeyBegin: 0,
+		KeyEnd:   math.MaxUint32 / 2,
+	}
+	var shard2Range = &pf.RangeSpec{
+		KeyBegin: math.MaxUint32 / 2,
+		KeyEnd:   math.MaxUint32,
+	}
+	waitGroup.Add(2)
+	go readStream(ctx, shard1Range, client, 0, stream, nil, dataCh, waitGroup)
+	go readStream(ctx, shard2Range, client, 1, stream, nil, dataCh, waitGroup)
 
 	var countersByPartition = make(map[string]int)
 	var foundRecords = 0
@@ -160,86 +162,84 @@ func TestKinesisCaptureWithShardOverlap(t *testing.T) {
 }
 
 func TestKinesisCapture(t *testing.T) {
-	var conf = Config{
-		Region:             "local",
-		Endpoint:           "http://localhost:4566",
-		AWSAccessKeyID:     "x",
-		AWSSecretAccessKey: "x",
-	}
+	ctx := context.Background()
+
+	conf := testConfig(t)
 	client, err := connect(&conf)
 	require.NoError(t, err)
 
-	var stream = "test-" + randAlpha(6)
-	var testShards int64 = 1
-	var createStreamReq = &kinesis.CreateStreamInput{
-		StreamName: &stream,
-		ShardCount: &testShards,
+	testStreams := []string{"test-stream-1", "test-stream-2"}
+
+	for _, s := range testStreams {
+		s := s
+		_, err = client.CreateStreamWithContext(ctx, &kinesis.CreateStreamInput{
+			StreamName: aws.String(s),
+			ShardCount: aws.Int64(2),
+		})
+		require.NoError(t, err, "failed to create stream")
+
+		awaitStreamActive(t, ctx, client, s)
+
+		defer func() {
+			_, err := client.DeleteStreamWithContext(ctx, &kinesis.DeleteStreamInput{
+				StreamName: aws.String(s),
+			})
+			require.NoError(t, err, "failed to delete stream")
+		}()
 	}
-	_, err = client.CreateStream(createStreamReq)
-	require.NoError(t, err, "failed to create stream")
 
-	defer func() {
-		var deleteStreamReq = kinesis.DeleteStreamInput{
-			StreamName: &stream,
-		}
-		var _, err = client.DeleteStream(&deleteStreamReq)
-		require.NoError(t, err, "failed to delete stream")
-	}()
-	awaitStreamActive(t, client, stream)
-
-	tmpDir, err := ioutil.TempDir("", "kinesis-capture-test-")
+	// Test the discover command and assert that it returns the streams we just created.
+	d := &driver{}
+	configJson, err := json.Marshal(conf)
+	require.NoError(t, err)
+	discovered, err := d.Discover(ctx, &pc.Request_Discover{
+		ConfigJson: json.RawMessage(configJson),
+	})
 	require.NoError(t, err)
 
-	// We'll seed the state with a random value so that we can assert that it gets included in the
-	// final state. This is to ensure that we don't loose state if the connector gets invoked with a
-	// different set of streams.
-	var canaryState = randAlpha(20)
-	var stateFile = path.Join(tmpDir, "state.json")
-	var stateJson = fmt.Sprintf(`{"canary": {"foo": %q}}`, canaryState)
-	err = ioutil.WriteFile(stateFile, []byte(stateJson), 0644)
-	require.NoError(t, err)
+	bindings := []*pf.CaptureSpec_Binding{}
+	for _, s := range testStreams {
+		require.True(t, slices.ContainsFunc(discovered.Bindings, func(b *pc.Response_Discovered_Binding) bool {
+			return b.RecommendedName == s
+		}))
 
-	var ctx, cancelFunc = context.WithCancel(context.Background())
-	defer cancelFunc()
-	// Test the discover command and assert that it returns the stream we just created
-	streamNames, err := listAllStreams(ctx, client)
-	require.NoError(t, err)
-
-	bindings := discoverStreams(ctx, client, streamNames)
-
-	require.GreaterOrEqual(t, len(bindings), 1)
-	var discoveredStream *pc.Response_Discovered_Binding
-	for _, s := range bindings {
-		var res resource
-		err := pf.UnmarshalStrict(s.ResourceConfigJson, &res)
+		resourceJson, err := json.Marshal(resource{
+			Stream: s,
+		})
 		require.NoError(t, err)
+		bindings = append(bindings, &pf.CaptureSpec_Binding{
+			ResourceConfigJson: resourceJson,
+			ResourcePath:       []string{s},
+		})
 
-		if res.Stream == stream {
-			discoveredStream = &s
-			break
-		}
 	}
 
-	start, err := time.Parse(time.RFC3339Nano, "2022-12-19T14:00:00Z")
-	require.NoError(t, err)
-	end, err := time.Parse(time.RFC3339Nano, "2022-12-19T14:10:00Z")
-	require.NoError(t, err)
+	// Add test data to the streams to be captured.
+	var recordCount = 10
+	for i := 0; i < recordCount; i++ {
+		var input = kinesis.PutRecordInput{
+			StreamName:   aws.String(testStreams[i%2]),
+			Data:         []byte(fmt.Sprintf(`{"i":"%d"}`, i)),
+			PartitionKey: aws.String(fmt.Sprintf("partitionKey-%d", i)),
+		}
+		_, err := client.PutRecord(&input)
+		require.NoError(t, err)
+	}
 
-	capture := &st.CaptureSpec{
+	// Run the capture.
+	capture := st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: conf,
 		Bindings:     bindings,
-		Validator: &st.WatchdogValidator{
-			Inner:         &st.ChecksumValidator{},
-			WatchdogTimer: wdt,
-			ResetPeriod:   quiescentTimeout,
+		Validator:    &st.SortedCaptureValidator{},
+		Sanitizers: map[string]*regexp.Regexp{
+			"<SEQUENCE_NUM>": regexp.MustCompile(`\d{56}`),
 		},
-		Sanitizers: make(map[string]*regexp.Regexp),
 	}
 
-	// We need to use a relatively long shutdown delay, since the backfill can potentially cover
-	// periods of time with no historical data.
-	const shutdownDelay = 5000 * time.Millisecond
+	captureCtx, cancelCapture := context.WithCancel(context.Background())
+
+	const shutdownDelay = 100 * time.Millisecond
 	var shutdownWatchdog *time.Timer
 
 	capture.Capture(captureCtx, t, func(data json.RawMessage) {
@@ -251,36 +251,19 @@ func TestKinesisCapture(t *testing.T) {
 		}
 		shutdownWatchdog.Reset(shutdownDelay)
 	})
-	cupaloy.SnapshotT(t, capture.Summary())
-	capture.Reset()
 
-	var recordCount = 3
-	var lastSeq string
-	var shardId string
-	for i := 0; i < recordCount; i++ {
-		var input = kinesis.PutRecordInput{
-			StreamName:   &stream,
-			Data:         []byte(`{"oh":"my"}`),
-			PartitionKey: aws.String("wat"),
-		}
-		require.Eventually(t, func() bool {
-			out, err := client.PutRecord(&input)
-			if err == nil {
-				lastSeq = *out.SequenceNumber
-				shardId = *out.ShardId
-			}
-			return err == nil
-		}, time.Second, time.Millisecond*20, "failed to put record")
-	}
+	cupaloy.SnapshotT(t, capture.Summary())
 }
 
 // The kinesis stream could take a while before it becomes active, so this just polls until the
 // status indicates that it's active.
-func awaitStreamActive(t *testing.T, client *kinesis.Kinesis, stream string) {
+func awaitStreamActive(t *testing.T, ctx context.Context, client *kinesis.Kinesis, stream string) {
+	t.Helper()
+
 	var input = kinesis.DescribeStreamInput{
 		StreamName: &stream,
 	}
-	var err = client.WaitUntilStreamExists(&input)
+	var err = client.WaitUntilStreamExistsWithContext(ctx, &input)
 	require.NoError(t, err, "error waiting for kinesis stream to become active")
 }
 

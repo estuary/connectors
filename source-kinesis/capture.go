@@ -16,10 +16,10 @@ import (
 )
 
 // readStream starts reading the given kinesis stream, delivering both records and errors from all
-// kinsis shards over the given `resultsCh`. This will continue to read indefinitely.
-// The `wg` is expected to have been incremented once _prior_ to calling this function. It will be
-// further incremented and decremented behind the scenes, but will be decremented back down to the
-// prior value when the read is finished.
+// kinesis shards over the given `resultsCh`. This will continue to read indefinitely. The `wg` is
+// expected to have been incremented once _prior_ to calling this function. It will be further
+// incremented and decremented behind the scenes, but will be decremented back down to the prior
+// value when the read is finished.
 func readStream(ctx context.Context, shardRange *pf.RangeSpec, client *kinesis.Kinesis, bindingIndex int, stream string, state map[string]string, resultsCh chan<- readResult, wg *sync.WaitGroup) {
 
 	var kc = &streamReader{
@@ -398,7 +398,7 @@ func (r *shardReader) readShardIterator(iteratorID string) error {
 		} else {
 			// Are we behind the tip of the shard? If so, then we'll make another request as soon as
 			// we can. If we're caught up with the tip of the shard and there's still no data, then
-			// we'll start applying a backoff so that we can releive some pressure on the network
+			// we'll start applying a backoff so that we can relieve some pressure on the network
 			// when a kinesis shard has a lower data volume.
 			if getRecordsResp.MillisBehindLatest != nil && *getRecordsResp.MillisBehindLatest > 0 {
 				r.noDataBackoff.reset()
@@ -503,7 +503,7 @@ var (
 	START_AT_BEGINNING = "TRIM_HORIZON"
 )
 
-// isContextCanceled returns true if the error is due to a context cancelation.
+// isContextCanceled returns true if the error is due to a context cancellation.
 // The AWS SDK will wrap context.Canceled errors, sometimes in multiple layers,
 // which is what this function is meant to deal with.
 func isContextCanceled(err error) bool {

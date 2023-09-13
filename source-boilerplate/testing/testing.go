@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"regexp"
 	"sort"
@@ -158,6 +159,12 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 				Name:       flow.Capture("acmeCo/" + strings.Replace(t.Name(), "/", "-", -1) + "capture"),
 				ConfigJson: endpointSpecJSON,
 				Bindings:   cs.Bindings,
+			},
+			Range: &flow.RangeSpec{
+				KeyBegin:    0,
+				KeyEnd:      math.MaxUint32,
+				RClockBegin: 0,
+				RClockEnd:   math.MaxUint32,
 			},
 		}}
 
