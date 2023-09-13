@@ -60,6 +60,33 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return err
 	}
 
+	// Remove bindings from the checkpoint that are no longer part of the spec.
+	activeBindings := make(map[string]struct{})
+	for _, binding := range open.Capture.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return fmt.Errorf("parsing resource config: %w", err)
+		}
+		activeBindings[resourceId(res)] = struct{}{}
+	}
+	removedBindings := false
+	for res := range prevState.Resources {
+		if _, ok := activeBindings[res]; !ok {
+			log.WithField("resource", res).Info("binding removed from catalog")
+			delete(prevState.Resources, res)
+			removedBindings = true
+		}
+	}
+	if removedBindings {
+		cp, err := json.Marshal(prevState)
+		if err != nil {
+			return fmt.Errorf("marshalling checkpoint for removed bindings: %w", err)
+		} else if err = c.Output.Checkpoint(cp, false); err != nil {
+			return fmt.Errorf("updating checkpoint for removed bindings: %w", err)
+		}
+	}
+
+	// Capture each binding.
 	for idx, binding := range open.Capture.Bindings {
 		idx := idx
 
