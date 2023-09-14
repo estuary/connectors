@@ -32,7 +32,7 @@ type config struct {
 	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=3"`
 	Database  string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=4"`
 	Schema    string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use." jsonschema_extras:"order=5"`
-	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries." jsonschema_extras:"order=6"`
+	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=6"`
 	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=7"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
@@ -226,6 +226,18 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 
 		errs.Err(err)
 	} else {
+		// Check for an active warehouse for the connection. If there is no default warehouse for
+		// the user and the configuration did not set a warehouse, this may be `null`, and the user
+		// needs to configure a specific warehouse to use.
+		var currentWarehouse *string
+		if err := db.QueryRowContext(ctx, "SELECT CURRENT_WAREHOUSE();").Scan(&currentWarehouse); err != nil {
+			errs.Err(fmt.Errorf("checking for active warehouse: %w", err))
+		} else {
+			if currentWarehouse == nil {
+				errs.Err(fmt.Errorf("no warehouse configured and default warehouse not set for user '%s': must set a value for 'Warehouse' in the endpoint configuration", cfg.User))
+			}
+		}
+
 		db.Close()
 	}
 

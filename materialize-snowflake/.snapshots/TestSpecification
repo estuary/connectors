@@ -43,7 +43,7 @@
       "warehouse": {
         "type": "string",
         "title": "Warehouse",
-        "description": "The Snowflake virtual warehouse used to execute queries.",
+        "description": "The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank.",
         "order": 6
       },
       "role": {
