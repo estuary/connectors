@@ -115,13 +115,13 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		var resState, _ = prevState.Resources[resourceId(res)]
 
 		if resState.Status == StatusBackfill {
-			if err = c.BackfillCollection(ctx, client, idx, res, resState); err != nil {
+			if err = c.BackfillCollection(ctx, client, idx, res, &resState); err != nil {
 				return fmt.Errorf("backfill: %w", err)
 			}
 		}
 
 		eg.Go(func() error {
-			return c.ChangeStream(egCtx, client, idx, res, resState)
+			return c.ChangeStream(egCtx, client, idx, res, &resState)
 		})
 	}
 
@@ -179,7 +179,7 @@ type changeEvent struct {
 const resumePointGoneErrorMessage = "the resume point may no longer be in the oplog"
 const resumeTokenNotFoundErrorMessage = "the resume token was not found"
 
-func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding int, res resource, state resourceState) error {
+func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, binding int, res resource, state *resourceState) error {
 	var db = client.Database(res.Database)
 
 	var collection = db.Collection(res.Collection)
@@ -197,8 +197,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 		bson.D{{"operationType", "replace"}},
 	}}}}}
 
-	var startAt = &primitive.Timestamp{T: uint32(state.BackfillStartedAt.Unix()) - 1, I: 0}
-	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup).SetStartAtOperationTime(startAt)
+	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
+	if !state.BackfillStartedAt.IsZero() {
+		var startAt = &primitive.Timestamp{T: uint32(state.BackfillStartedAt.Unix()) - 1, I: 0}
+		opts = opts.SetStartAtOperationTime(startAt)
+	}
 	if state.StreamResumeToken != nil {
 		opts = opts.SetResumeAfter(state.StreamResumeToken)
 	}
@@ -215,10 +218,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 		// connector's checkpoint and backfilling everything
 		if e, ok := err.(mongo.ServerError); ok {
 			if e.HasErrorMessage(resumePointGoneErrorMessage) || e.HasErrorMessage(resumeTokenNotFoundErrorMessage) {
-				if err = c.Output.Checkpoint([]byte("{}"), false); err != nil {
-					return fmt.Errorf("output checkpoint failed: %w", err)
-				}
-				return fmt.Errorf("change stream on collection %s cannot resume capture, the connector will restart and run a backfill: %w", res.Collection, e)
+				return fmt.Errorf("change stream on collection %s cannot resume capture, this is usually due to a small oplog storage available. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. After resizing your uplog, you can remove the binding for this collection add it back to trigger a backfill: %w", res.Collection, e)
 			}
 		}
 
@@ -271,7 +271,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 
 		var checkpoint = captureState{
 			Resources: map[string]resourceState{
-				resourceId(res): state,
+				resourceId(res): *state,
 			},
 		}
 
@@ -298,9 +298,10 @@ const CHECKPOINT_EVERY = 100
 
 const (
 	SortAscending = 1
+	SortDescending = -1
 )
 
-func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding int, res resource, state resourceState) error {
+func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding int, res resource, state *resourceState) error {
 	var db = client.Database(res.Database)
 	var collection = db.Collection(res.Collection)
 
@@ -356,7 +357,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		if i%CHECKPOINT_EVERY == 0 {
 			var checkpoint = captureState{
 				Resources: map[string]resourceState{
-					resourceId(res): state,
+					resourceId(res): *state,
 				},
 			}
 
@@ -368,12 +369,22 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
 				return fmt.Errorf("output checkpoint failed: %w", err)
 			}
+
+			if diff, err := OplogTimeDifference(ctx, client); err != nil {
+				return fmt.Errorf("could not read oplog time difference: %w", err)
+			} else {
+				log.WithField("timediff", diff).Debug("read oplog time difference")
+
+				if diff < minOplogTimediff {
+					log.Warn(fmt.Sprintf("the current time difference between oldest and newest records in your oplog is %d seconds. This is smaller than the minimum of 24 hours. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE", diff))
+				}
+			}
 		}
 	}
 
 	var checkpoint = captureState{
 		Resources: map[string]resourceState{
-			resourceId(res): state,
+			resourceId(res): *state,
 		},
 	}
 
