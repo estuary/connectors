@@ -14,12 +14,17 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	mongoDriver "go.mongodb.org/mongo-driver/x/mongo/driver"
+)
+
+const (
+	minOplogTimediff = 24 * 60 * 60 // 24 hours, in seconds
 )
 
 type resource struct {
@@ -91,6 +96,16 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.ToURI()))
 	if err != nil {
 		return nil, err
+	}
+
+	if diff, err := OplogTimeDifference(ctx, client); err != nil {
+		return nil, fmt.Errorf("could not read oplog time difference: %w", err)
+	} else {
+		log.WithField("timediff", diff).Debug("read oplog time difference")
+
+		if diff < minOplogTimediff {
+			log.Warn(fmt.Sprintf("the current time difference between oldest and newest records in your oplog is %d seconds. This is smaller than the minimum of 24 hours. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE", diff))
+		}
 	}
 
 	// Any error other than an authentication error will result in the call to Ping hanging until it
