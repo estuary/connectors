@@ -18,6 +18,22 @@ import (
 var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
 var rsDialect = func() sql.Dialect {
+	textConverter := func(te tuple.TupleElement) (interface{}, error) {
+		if s, ok := te.(string); ok {
+			// Redshift will terminate values going into VARCHAR columns where the null
+			// escape sequence occurs. This is especially a problem when it is the first
+			// thing in the string and is followed by other characters, as this results
+			// in the load error "Invalid null byte - field longer than 1 byte". Adding
+			// an additional escape to the beginning of the string allows the value to
+			// be loaded with the initial "\u0000" as a regular string
+			if strings.HasPrefix(s, "\u0000") {
+				return `\` + s, nil
+			}
+		}
+
+		return te, nil
+	}
+
 	var typeMappings sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE PRECISION"),
@@ -27,26 +43,17 @@ var rsDialect = func() sql.Dialect {
 		sql.BINARY:   sql.NewStaticMapper("VARBYTE"),
 		sql.MULTIPLE: sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter( // Note: Actually a VARCHAR(256)
-				func(te tuple.TupleElement) (interface{}, error) {
-					if s, ok := te.(string); ok {
-						// Redshift will terminate values going into VARCHAR columns where the null
-						// escape sequence occurs. This is especially a problem when it is the first
-						// thing in the string and is followed by other characters, as this results
-						// in the load error "Invalid null byte - field longer than 1 byte". Adding
-						// an additional escape to the beginning of the string allows the value to
-						// be loaded with the initial "\u0000" as a regular string
-						if strings.HasPrefix(s, "\u0000") {
-							return `\` + s, nil
-						}
-					}
-
-					return te, nil
-				})),
+			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)), // Note: Actually a VARCHAR(256)
 			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.NewStaticMapper("NUMERIC(38,0)", sql.WithElementConverter(sql.StdStrToInt())),
-				"number":  sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
-				"date":    sql.NewStaticMapper("DATE"),
+				"integer": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)),
+					Delegate:   sql.NewStaticMapper("NUMERIC(38,0)", sql.WithElementConverter(sql.StdStrToInt())),
+				},
+				"number": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)),
+					Delegate:   sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+				},
+				"date": sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(
 					func(te tuple.TupleElement) (interface{}, error) {
 						// Redshift supports timestamps with microsecond precision. It will reject

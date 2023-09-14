@@ -69,8 +69,14 @@ var sqlServerDialect = func(collation string) sql.Dialect {
 				Delegate:   sql.NewStaticMapper(textType),
 			},
 			WithFormat: map[string]sql.TypeMapper{
-				"integer":   sql.NewStaticMapper("BIGINT", sql.WithElementConverter(strToInt())),
-				"number":    sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+				"integer": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper(textPKType),
+					Delegate:   sql.NewStaticMapper("BIGINT", sql.WithElementConverter(strToInt())),
+				},
+				"number": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper(textPKType),
+					Delegate:   sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+				},
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("DATETIME2", sql.WithElementConverter(rfc3339ToUTC())),
 				"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
