@@ -24,8 +24,14 @@ var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
 				Delegate:   sql.NewStaticMapper("LONGTEXT"),
 			},
 			WithFormat: map[string]sql.TypeMapper{
-				"integer":   sql.NewStaticMapper("NUMERIC(65,0)", sql.WithElementConverter(sql.StdStrToInt())),
-				"number":    sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+				"integer": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
+					Delegate:   sql.NewStaticMapper("NUMERIC(65,0)", sql.WithElementConverter(sql.StdStrToInt())),
+				},
+				"number": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
+					Delegate:   sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+				},
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("DATETIME(6)", sql.WithElementConverter(rfc3339ToTZ(tzLocation))),
 				"time":      sql.NewStaticMapper("TIME(6)", sql.WithElementConverter(rfc3339TimeToTZ(tzLocation))),

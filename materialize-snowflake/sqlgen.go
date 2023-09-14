@@ -46,8 +46,14 @@ var snowflakeDialect = func() sql.Dialect {
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("STRING"),
 			WithFormat: map[string]sql.TypeMapper{
-				"integer":   sql.NewStaticMapper("INTEGER", sql.WithElementConverter(sql.StdStrToInt())), // Equivalent to NUMBER(38,0)
-				"number":    sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat())),
+				"integer": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("STRING"),
+					Delegate:   sql.NewStaticMapper("INTEGER", sql.WithElementConverter(sql.StdStrToInt())), // Equivalent to NUMBER(38,0)
+				},
+				"number": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("STRING"),
+					Delegate:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat())),
+				},
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMP"),
 			},

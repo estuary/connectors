@@ -20,8 +20,14 @@ var pgDialect = func() sql.Dialect {
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("TEXT"),
 			WithFormat: map[string]sql.TypeMapper{
-				"integer":   sql.NewStaticMapper("NUMERIC"),
-				"number":    sql.NewStaticMapper("DECIMAL"),
+				"integer": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("TEXT"),
+					Delegate:   sql.NewStaticMapper("NUMERIC"),
+				},
+				"number": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("TEXT"),
+					Delegate:   sql.NewStaticMapper("DECIMAL"),
+				},
 				"date":      sql.NewStaticMapper("DATE", sql.WithElementConverter(sql.ClampDate())),
 				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(sql.ClampDatetime())),
 				"duration":  sql.NewStaticMapper("INTERVAL"),
