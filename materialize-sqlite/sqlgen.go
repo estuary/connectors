@@ -18,8 +18,14 @@ var sqliteDialect = func() sql.Dialect {
 		sql.STRING: sql.StringTypeMapper{
 			Fallback: sql.NewStaticMapper("TEXT"),
 			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.NewStaticMapper("INTEGER"),
-				"number":  sql.NewStaticMapper("REAL"),
+				"integer": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("TEXT"),
+					Delegate:   sql.NewStaticMapper("INTEGER"),
+				},
+				"number": sql.PrimaryKeyMapper{
+					PrimaryKey: sql.NewStaticMapper("TEXT"),
+					Delegate:   sql.NewStaticMapper("REAL"),
+				},
 			},
 		},
 	}

@@ -92,7 +92,7 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 
 	// Compatible numeric formatted strings can be materialized as either integers or numbers,
 	// depending on the format string.
-	if _, ok := validate.AsFormattedNumeric(&p.Projection); ok {
+	if _, ok := validate.AsFormattedNumeric(&p.Projection); ok && !p.IsPrimaryKey {
 		return STRING, mustExist
 	}
 
