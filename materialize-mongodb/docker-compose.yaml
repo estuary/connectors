@@ -3,8 +3,17 @@ version: "3.7"
 services:
   mongo:
     image: 'mongo:latest'
-    environment: {"MONGO_INITDB_ROOT_USERNAME": "flow", "MONGO_INITDB_ROOT_PASSWORD": "flow"}
-    command: ["--replSet", "rs0", "--keyFile", "/etc/ssl/sample.key"]
+    environment: 
+      MONGO_INITDB_ROOT_USERNAME: "flow"
+      MONGO_INITDB_ROOT_PASSWORD: "flow"
+      MONGO_INITDB_DATABASE: "test"
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 1s
+      timeout: 1s
+      retries: 60
+    ports:
+      - "27017:27017"
     networks:
       - flow-test
 
