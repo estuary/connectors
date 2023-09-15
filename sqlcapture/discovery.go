@@ -37,26 +37,29 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 
 	var catalog []*pc.Response_Discovered_Binding
 	for _, table := range tables {
+		var logEntry = logrus.WithFields(logrus.Fields{
+			"table":      table.Name,
+			"namespace":  table.Schema,
+			"primaryKey": table.PrimaryKey,
+		})
+		logEntry.Debug("discovered table")
+
 		// Filter out views and other entities whose type is not `BASE TABLE` from
 		// discovery output. This is part of a bugfix in August 2023 and should be
 		// removed once the database-specific discovery code in MySQL and SQL Server
 		// connectors can safely filter these out at the source.
 		if !table.BaseTable {
-			logrus.WithFields(logrus.Fields{
-				"table":      table.Name,
-				"namespace":  table.Schema,
-				"primaryKey": table.PrimaryKey,
-				"baseTable":  table.BaseTable,
-			}).Warn("ignoring view or other non-BASE TABLE entity in discovery")
+			logEntry.Warn("ignoring view or other non-BASE TABLE entity in discovery")
 			continue
 		}
 
-		logrus.WithFields(logrus.Fields{
-			"table":      table.Name,
-			"namespace":  table.Schema,
-			"primaryKey": table.PrimaryKey,
-			"baseTable":  table.BaseTable,
-		}).Debug("discovered table")
+		// Omit catalog entries for tables with 'OmitBinding = true'. This allows some
+		// tables to be filtered out of discovered catalogs while still allowing other
+		// connector-internal uses of the data to see the tables.
+		if table.OmitBinding {
+			logEntry.Warn("ignoring table because OmitBinding is set")
+			continue
+		}
 
 		// The anchor by which we'll reference the table schema.
 		var anchor = strings.Title(table.Schema) + strings.Title(table.Name)
