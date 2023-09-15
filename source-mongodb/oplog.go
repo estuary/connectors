@@ -22,7 +22,7 @@ const tsProperty = "ts"
 // Note that this value can fluctuate depending on the density of oplog
 // records during a period, so continuously monitoring this value is necessary
 // and a single value is not representative
-func OplogTimeDifference(ctx context.Context, client *mongo.Client) (uint32, error) {
+func oplogTimeDifference(ctx context.Context, client *mongo.Client) (uint32, error) {
 	var db = client.Database("local")
 	var oplog = db.Collection("oplog.rs")
 
