@@ -10,6 +10,7 @@ function exportToJsonl() {
 		materialize-mongodb-mongo-1 mongosh test \
 		--username flow \
 		--password flow \
+		--authenticationDatabase admin \
 		--json=canonical \
 		--quiet \
 		--eval="db.$1.find({}, $projections).toArray()" | jq -S "{ index: \"$1\", rows: . }"
