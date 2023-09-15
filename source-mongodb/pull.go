@@ -388,6 +388,11 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		}
 	}
 
+
+	if err := cursor.Err(); err != nil {
+		return fmt.Errorf("cursor error for backfill %s: %w", res.Collection, err)
+	}
+
 	state.Status = StatusStreaming
 	var checkpoint = captureState{
 		Resources: map[string]resourceState{
@@ -401,10 +406,6 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 	}
 	if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
 		return fmt.Errorf("sending checkpoint failed: %w", err)
-	}
-
-	if err := cursor.Err(); err != nil {
-		return fmt.Errorf("cursor error for backfill %s: %w", res.Collection, err)
 	}
 
 	return nil
