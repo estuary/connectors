@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,7 +26,7 @@ const (
 // DiscoverTables queries the database for information about tables available for capture.
 func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[string]*sqlcapture.DiscoveryInfo, error) {
 	// Get lists of all tables, columns and primary keys in the database
-	var tables, err = getTables(ctx, db.conn)
+	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database tables: %w", err)
 	}
@@ -438,11 +439,18 @@ const queryDiscoverTables = `
     AND NOT c.relispartition
     AND c.relkind IN ('r', 'p');` // 'r' means "Ordinary Table" and 'p' means "Partitioned Table"
 
-func getTables(ctx context.Context, conn *pgx.Conn) ([]*sqlcapture.DiscoveryInfo, error) {
+func getTables(ctx context.Context, conn *pgx.Conn, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
 	logrus.Debug("listing all tables in the database")
 	var tables []*sqlcapture.DiscoveryInfo
 	var tableSchema, tableName string
 	var _, err = conn.QueryFunc(ctx, queryDiscoverTables, nil, []any{&tableSchema, &tableName}, func(pgx.QueryFuncRow) error {
+		if len(selectedSchemas) > 0 && !slices.Contains(selectedSchemas, tableSchema) {
+			logrus.WithFields(logrus.Fields{
+				"schema": tableSchema,
+				"table":  tableName,
+			}).Debug("ignoring table due to 'DiscoverSchemas' filtering")
+			return nil
+		}
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
 			Schema:    tableSchema,
 			Name:      tableName,

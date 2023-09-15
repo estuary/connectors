@@ -68,6 +68,14 @@
             ],
             "title": "SSL Mode",
             "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
+          },
+          "discover_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Discovery Schema Selection",
+            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Leave blank to discover tables from all schemas."
           }
         },
         "additionalProperties": false,
