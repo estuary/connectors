@@ -230,6 +230,19 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 			return fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
 		}
 
+		state.StreamResumeToken = cursor.ResumeToken()
+
+		var checkpoint = captureState{
+			Resources: map[string]resourceState{
+				resourceId(res): *state,
+			},
+		}
+
+		checkpointJson, err := json.Marshal(checkpoint)
+		if err != nil {
+			return fmt.Errorf("encoding checkpoint to json failed: %w", err)
+		}
+
 		if ev.OperationType == "delete" {
 			var doc = map[string]interface{}{
 				idProperty: ev.DocumentKey.Id,
@@ -243,7 +256,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 				return fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
 			}
 
-			if err = c.Output.Documents(binding, js); err != nil {
+			if err = c.Output.DocumentsAndCheckpoint(checkpointJson, true, binding, js); err != nil {
 				return fmt.Errorf("output documents failed: %w", err)
 			}
 		} else if ev.FullDocument != nil {
@@ -261,26 +274,9 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 				return fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
 			}
 
-			if err = c.Output.Documents(binding, js); err != nil {
+			if err = c.Output.DocumentsAndCheckpoint(checkpointJson, true, binding, js); err != nil {
 				return fmt.Errorf("output documents failed: %w", err)
 			}
-		}
-
-		state.StreamResumeToken = cursor.ResumeToken()
-
-		var checkpoint = captureState{
-			Resources: map[string]resourceState{
-				resourceId(res): *state,
-			},
-		}
-
-		checkpointJson, err := json.Marshal(checkpoint)
-		if err != nil {
-			return fmt.Errorf("encoding checkpoint to json failed: %w", err)
-		}
-
-		if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
-			return fmt.Errorf("output checkpoint failed: %w", err)
 		}
 	}
 
