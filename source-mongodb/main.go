@@ -100,8 +100,8 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		return nil, err
 	}
 
-	if diff, err := OplogTimeDifference(ctx, client); err != nil {
-		return nil, fmt.Errorf("could not read oplog time difference: %w", err)
+	if diff, err := oplogTimeDifference(ctx, client); err != nil {
+		log.WithField("err", err).Warn("could not read oplog time difference")
 	} else {
 		log.WithField("timediff", diff).Debug("read oplog time difference")
 
