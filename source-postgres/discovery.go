@@ -444,17 +444,19 @@ func getTables(ctx context.Context, conn *pgx.Conn, selectedSchemas []string) ([
 	var tables []*sqlcapture.DiscoveryInfo
 	var tableSchema, tableName string
 	var _, err = conn.QueryFunc(ctx, queryDiscoverTables, nil, []any{&tableSchema, &tableName}, func(pgx.QueryFuncRow) error {
+		var omitBinding = false
 		if len(selectedSchemas) > 0 && !slices.Contains(selectedSchemas, tableSchema) {
 			logrus.WithFields(logrus.Fields{
 				"schema": tableSchema,
 				"table":  tableName,
-			}).Debug("ignoring table due to 'DiscoverSchemas' filtering")
-			return nil
+			}).Debug("table in filtered schema")
+			omitBinding = true
 		}
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
-			Schema:    tableSchema,
-			Name:      tableName,
-			BaseTable: true, // PostgreSQL discovery queries only ever list 'BASE TABLE' entities
+			Schema:      tableSchema,
+			Name:        tableName,
+			BaseTable:   true, // PostgreSQL discovery queries only ever list 'BASE TABLE' entities
+			OmitBinding: omitBinding,
 		})
 		return nil
 	})
