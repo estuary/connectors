@@ -24,6 +24,8 @@ import (
 )
 
 const (
+	// Minimum oplog time difference: see the comment on OplogTimeDifference in
+	// oplog.go
 	minOplogTimediff = 24 * 60 * 60 // 24 hours, in seconds
 )
 
