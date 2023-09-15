@@ -162,7 +162,7 @@ type resourceState struct {
 	Status int `json:"status,omitempty"`
 
 	BackfillStartedAt time.Time `json:"backfill_started_at,omitempty"`
-	BackfillLastId bson.Raw `json:"backfill_last_id,omitempty"`
+	BackfillLastId bson.RawValue `json:"backfill_last_id,omitempty"`
 
 	StreamResumeToken bson.Raw `json:"stream_resume_token,omitempty"`
 }
@@ -198,12 +198,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 	}}}}}
 
 	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
-	if !state.BackfillStartedAt.IsZero() {
-		var startAt = &primitive.Timestamp{T: uint32(state.BackfillStartedAt.Unix()) - 1, I: 0}
-		opts = opts.SetStartAtOperationTime(startAt)
-	}
 	if state.StreamResumeToken != nil {
 		opts = opts.SetResumeAfter(state.StreamResumeToken)
+	} else if !state.BackfillStartedAt.IsZero() {
+		var startAt = &primitive.Timestamp{T: uint32(state.BackfillStartedAt.Unix()) - 1, I: 0}
+		opts = opts.SetStartAtOperationTime(startAt)
 	}
 
 	cursor, err := collection.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
@@ -312,15 +311,19 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 
 	var opts = options.Find().SetSort(bson.D{{idProperty, SortAscending}})
 	var filter = bson.D{}
-	if state.BackfillLastId != nil {
-		filter = bson.D{{idProperty, bson.D{{"$gte", state.BackfillLastId}}}}
+	if state.BackfillLastId.Validate() == nil {
+		var v interface{}
+		if err := state.BackfillLastId.Unmarshal(&v); err != nil {
+			return fmt.Errorf("unmarshalling backfill_last_id: %w", err)
+		}
+		filter = bson.D{{idProperty, bson.D{{"$gt", v}}}}
 	}
 
 	log.WithFields(log.Fields{
 		"collection": res.Collection,
 		"opts": opts,
 		"filter": filter,
-	}).Debug("finding documents in collection")
+	}).Info("backfilling documents in collection")
 
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
@@ -333,7 +336,12 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 	for cursor.Next(ctx) {
 		i += 1
 
-		var rawDoc map[string]bson.Raw
+		// We decode once into a map of RawValues so we can keep the _id as a
+		// RawValue. This allows us to marshal it as an encoded byte array along
+		// with its type code in the checkpoint, and unmarshal it when we want to
+		// use it to resume the backfill, ensuring the type of the _id is consistent
+		// through this process
+		var rawDoc map[string]bson.RawValue
 		if err = cursor.Decode(&rawDoc); err != nil {
 			return fmt.Errorf("decoding document raw in collection %s: %w", res.Collection, err)
 		}
@@ -375,6 +383,8 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			} else {
 				log.WithField("timediff", diff).Debug("read oplog time difference")
 
+				// TODO: This is just spamming logs, but users won't see these logs. Should we
+				// just error after seeing this error for a while?
 				if diff < minOplogTimediff {
 					log.Warn(fmt.Sprintf("the current time difference between oldest and newest records in your oplog is %d seconds. This is smaller than the minimum of 24 hours. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE", diff))
 				}
@@ -382,6 +392,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		}
 	}
 
+	state.Status = StatusStreaming
 	var checkpoint = captureState{
 		Resources: map[string]resourceState{
 			resourceId(res): *state,
