@@ -85,7 +85,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	query := fmt.Sprintf("SELECT * FROM %s ORDER BY id;", tables[0])
+	query := fmt.Sprintf("SELECT * FROM %s ORDER BY id, flow_published_at;", tables[0])
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
