@@ -198,9 +198,13 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 	}}}}}
 
 	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
-	if state.StreamResumeToken != nil {
+	if len(state.StreamResumeToken) > 0 {
 		opts = opts.SetResumeAfter(state.StreamResumeToken)
 	} else if !state.BackfillStartedAt.IsZero() {
+		var oplogSafetyBuffer, _ = time.ParseDuration("-5m")
+		if err := oplogHasTimestamp(ctx, client, state.BackfillStartedAt.Add(oplogSafetyBuffer)); err != nil {
+			return err
+		}
 		var startAt = &primitive.Timestamp{T: uint32(state.BackfillStartedAt.Unix()) - 1, I: 0}
 		opts = opts.SetStartAtOperationTime(startAt)
 	}
