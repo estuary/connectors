@@ -108,9 +108,10 @@ var rsDialect = func() sql.Dialect {
 }()
 
 type copyFromS3Params struct {
-	Destination     string
-	ObjectLocation  string
-	Config          config
+	Target          string
+	Columns         []*sql.Column
+	ManifestURL     string
+	Config          *config
 	TruncateColumns bool
 }
 
@@ -232,11 +233,13 @@ UPDATE {{ Identifier $.TablePath }}
 -- JSON option: This is necessary since by default Redshift lowercases all identifiers.
 
 {{ define "copyFromS3" }}
-COPY {{ $.Destination }}
-FROM '{{ $.ObjectLocation }}'
+COPY {{ $.Target }}
+FROM '{{ $.ManifestURL }}'
+MANIFEST
 CREDENTIALS 'aws_access_key_id={{ $.Config.AWSAccessKeyID }};aws_secret_access_key={{ $.Config.AWSSecretAccessKey }}'
 REGION '{{ $.Config.Region }}'
 JSON 'auto ignorecase'
+GZIP
 DATEFORMAT 'auto'
 TIMEFORMAT 'auto'
 {{- if $.TruncateColumns }}

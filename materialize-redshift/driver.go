@@ -25,6 +25,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -312,53 +313,41 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 		return errs
 	}
 
-	testCol := &sql.Column{}
-	testCol.Field = "test"
-
-	s3file := newStagedFile(s3client, cfg.Bucket, cfg.BucketPath, []*sql.Column{testCol})
-	s3file.start(ctx)
+	// Test creating, reading, and deleting an object from the configured bucket and bucket path.
+	testKey := path.Join(cfg.BucketPath, uuid.NewString())
 
 	var awsErr *awsHttp.ResponseError
-
-	objectDir := path.Join(cfg.Bucket, cfg.BucketPath)
-
-	if err := s3file.encodeRow([]interface{}{[]byte("test")}); err != nil {
-		// This won't err immediately until the file is flushed in the case of having the wrong
-		// bucket or authorization configured, and would most likely be caused by a logic error in
-		// the connector code.
-		errs.Err(err)
-	} else if _, delete, err := s3file.flush(); err != nil {
+	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(cfg.Bucket),
+		Key:    aws.String(testKey),
+		Body:   strings.NewReader("testing"),
+	}); err != nil {
 		if errors.As(err, &awsErr) {
 			// Handling for the two most common cases: The bucket doesn't exist, or the bucket does
 			// exist but the configured credentials aren't authorized to write to it.
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
 				err = fmt.Errorf("bucket %q does not exist", cfg.Bucket)
 			} else if awsErr.Response.Response.StatusCode == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to write to bucket %q", objectDir)
+				err = fmt.Errorf("not authorized to write to %q", path.Join(cfg.Bucket, cfg.BucketPath))
 			}
 		}
-
 		errs.Err(err)
-	} else {
-		// Verify that the created object can be read and deleted. The unauthorized case is handled
-		// & formatted specifically in these checks since the existence of the bucket has already
-		// been verified by creating the temporary test object.
-		if _, err := s3client.GetObject(ctx, &s3.GetObjectInput{
-			Bucket: aws.String(cfg.Bucket),
-			Key:    s3file.uploadOutput.Key,
-		}); err != nil {
-			if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to read from bucket %q", objectDir)
-			}
-			errs.Err(err)
+	} else if _, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(cfg.Bucket),
+		Key:    aws.String(testKey),
+	}); err != nil {
+		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+			err = fmt.Errorf("not authorized to read from %q", path.Join(cfg.Bucket, cfg.BucketPath))
 		}
-
-		if err := delete(ctx); err != nil {
-			if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to delete from bucket %q", objectDir)
-			}
-			errs.Err(err)
+		errs.Err(err)
+	} else if _, err := s3client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(cfg.Bucket),
+		Key:    aws.String(testKey),
+	}); err != nil {
+		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+			err = fmt.Errorf("not authorized to delete from %q", path.Join(cfg.Bucket, cfg.BucketPath))
 		}
+		errs.Err(err)
 	}
 
 	return errs
@@ -500,8 +489,8 @@ func newTransactor(
 		return nil, fmt.Errorf("getting existing varchar column lengths: %w", err)
 	}
 
-	for _, binding := range bindings {
-		p := binding.Path
+	for idx, target := range bindings {
+		p := target.Path
 		if len(p) == 1 {
 			// No explicit schema set. Assume the default for identifying the table with respect to
 			// the VARCHAR lengths introspection query, which always include a schema.
@@ -512,13 +501,12 @@ func newTransactor(
 		identifier := strings.ToLower(rsDialect.Identifier(p...))
 		if err = d.addBinding(
 			ctx,
-			binding,
-			d.cfg.Bucket,
-			d.cfg.BucketPath,
+			idx,
+			target,
 			s3client,
 			tableVarchars[identifier],
 		); err != nil {
-			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 		}
 	}
 
@@ -534,6 +522,9 @@ type binding struct {
 	createStoreTableSQL     string
 	mergeIntoSQL            string
 	loadQuerySQL            string
+	copyIntoLoadTableSQL    string
+	copyIntoMergeTableSQL   string
+	copyIntoTargetTableSQL  string
 }
 
 // varcharColumnMeta contains metadata about Redshift varchar columns. Currently this is just the
@@ -546,18 +537,43 @@ type varcharColumnMeta struct {
 
 func (t *transactor) addBinding(
 	ctx context.Context,
+	bindingIdx int,
 	target sql.Table,
-	bucket string,
-	bucketPath string,
 	client *s3.Client,
 	varchars map[string]int,
 ) error {
 	var b = &binding{
 		target:    target,
-		loadFile:  newStagedFile(client, bucket, bucketPath, target.KeyPtrs()),
-		storeFile: newStagedFile(client, bucket, bucketPath, target.Columns()),
+		loadFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyPtrs()),
+		storeFile: newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.Columns()),
 	}
 
+	// Render templates that require specific S3 "COPY INTO" parameters.
+	for _, m := range []struct {
+		sql             *string
+		target          string
+		columns         []*sql.Column
+		truncateColumns bool
+		stagedFile      *stagedFile
+	}{
+		{&b.copyIntoLoadTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.KeyPtrs(), false, b.loadFile},
+		{&b.copyIntoMergeTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.Columns(), true, b.storeFile},
+		{&b.copyIntoTargetTableSQL, target.Identifier, target.Columns(), true, b.storeFile},
+	} {
+		var sql strings.Builder
+		if err := tplCopyFromS3.Execute(&sql, copyFromS3Params{
+			Target:          m.target,
+			Columns:         m.columns,
+			ManifestURL:     m.stagedFile.fileURI(manifestFile),
+			Config:          t.cfg,
+			TruncateColumns: m.truncateColumns,
+		}); err != nil {
+			return err
+		}
+		*m.sql = sql.String()
+	}
+
+	// Render templates that rely only on the target table.
 	for _, m := range []struct {
 		sql *string
 		tpl *template.Template
@@ -572,7 +588,7 @@ func (t *transactor) addBinding(
 		}
 	}
 
-	// The load table template is re-evaluted every transaction to account for the specific string
+	// The load table template is re-evaluated every transaction to account for the specific string
 	// lengths observed for string keys in the load key set.
 	b.createLoadTableTemplate = tplCreateLoadTable
 
@@ -620,7 +636,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		gotLoads = true
 
 		var b = d.bindings[it.Binding]
-		b.loadFile.start(ctx)
+		b.loadFile.start()
 
 		converted, err := b.target.ConvertKey(it.Key)
 		if err != nil {
@@ -646,7 +662,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			}
 		}
 
-		if err := b.loadFile.encodeRow(converted); err != nil {
+		if err := b.loadFile.encodeRow(ctx, converted); err != nil {
 			return fmt.Errorf("encoding row for load: %w", err)
 		}
 	}
@@ -693,22 +709,14 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			return fmt.Errorf("creating load table for target table '%s': %w", b.target.Identifier, err)
 		}
 
-		objectLocation, delete, err := b.loadFile.flush()
+		delete, err := b.loadFile.flush(ctx)
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
 		defer delete(ctx)
 
-		var copySql strings.Builder
-		if err := tplCopyFromS3.Execute(&copySql, copyFromS3Params{
-			Destination:     fmt.Sprintf("flow_temp_table_%d", idx),
-			ObjectLocation:  objectLocation,
-			Config:          *d.cfg,
-			TruncateColumns: false,
-		}); err != nil {
-			return fmt.Errorf("evaluating copy from s3 template: %w", err)
-		} else if _, err := txn.Exec(ctx, copySql.String()); err != nil {
-			return handleCopyIntoErr(ctx, txn, objectLocation, b.target.Identifier, err)
+		if _, err := txn.Exec(ctx, b.copyIntoLoadTableSQL); err != nil {
+			return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.loadFile.prefix, b.target.Identifier, err)
 		}
 	}
 
@@ -763,7 +771,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 
 		var b = d.bindings[it.Binding]
-		b.storeFile.start(ctx)
+		b.storeFile.start()
 
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
@@ -800,7 +808,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			}
 		}
 
-		if err := b.storeFile.encodeRow(converted); err != nil {
+		if err := b.storeFile.encodeRow(ctx, converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
 		}
 	}
@@ -884,40 +892,27 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 
 	// If there are multiple materializations operating on different tables within the same database
 	// using the same metadata table path, they will need to concurrently update the checkpoints
-	// table. Aquiring a table-level lock prevents "serializable isolation violation" errors in this
-	// case (they still happen even though the queries update different _rows_ in the same table),
-	// although it means each materialization will have to take turns updating the checkpoints
-	// table. For best performance, a single materialization per database should be used, or
-	// separate materializations within the same database should use a different schema for their
-	// metadata.
+	// table. Acquiring a table-level lock prevents "serializable isolation violation" errors in
+	// this case (they still happen even though the queries update different _rows_ in the same
+	// table), although it means each materialization will have to take turns updating the
+	// checkpoints table. For best performance, a single materialization per database should be
+	// used, or separate materializations within the same database should use a different schema for
+	// their metadata.
 	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", rsDialect.Identifier(d.fence.TablePath...))); err != nil {
 		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
 	}
 
 	for idx, b := range d.bindings {
 		if !b.storeFile.started {
-			// No loads for this binding.
+			// No stores for this binding.
 			continue
 		}
 
-		objectLocation, delete, err := b.storeFile.flush()
+		delete, err := b.storeFile.flush(ctx)
 		if err != nil {
 			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
 		defer delete(ctx)
-
-		copySql := func(dest string) (string, error) {
-			var out strings.Builder
-			if err := tplCopyFromS3.Execute(&out, copyFromS3Params{
-				Destination:     dest,
-				ObjectLocation:  objectLocation,
-				Config:          *d.cfg,
-				TruncateColumns: true,
-			}); err != nil {
-				return "", fmt.Errorf("evaluating copy from s3 template: %w", err)
-			}
-			return out.String(), nil
-		}
 
 		if hasUpdates[idx] {
 			// Create the temporary table for staging values to merge into the target table.
@@ -927,19 +922,15 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 				return fmt.Errorf("creating store table: %w", err)
 			}
 
-			if copy, err := copySql(fmt.Sprintf("flow_temp_table_%d", idx)); err != nil {
-				return err
-			} else if _, err := txn.Exec(ctx, copy); err != nil {
-				return handleCopyIntoErr(ctx, txn, objectLocation, b.target.Identifier, err)
+			if _, err := txn.Exec(ctx, b.copyIntoMergeTableSQL); err != nil {
+				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
 				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
 			}
 		} else {
 			// Can copy directly into the target table since all values are new.
-			if copy, err := copySql(b.target.Identifier); err != nil {
-				return err
-			} else if _, err := txn.Exec(ctx, copy); err != nil {
-				return handleCopyIntoErr(ctx, txn, objectLocation, b.target.Identifier, err)
+			if _, err := txn.Exec(ctx, b.copyIntoTargetTableSQL); err != nil {
+				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			}
 		}
 	}
@@ -960,7 +951,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 // always return an error. `sys_load_error_detail` is queried instead of `stl_load_errors` since it
 // is available to both serverless and provisioned versions of Redshift, whereas `stl_load_errors`
 // is only available on provisioned Redshift.
-func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, objectLocation string, table string, copyIntoErr error) error {
+func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, bucket, prefix, table string, copyIntoErr error) error {
 	if strings.Contains(copyIntoErr.Error(), "Cannot COPY into nonexistent table") {
 		// If the target table does not exist, there will be no information in
 		// `sys_load_error_detail`, and the error message from Redshift is good enough as-is to
@@ -978,7 +969,7 @@ func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, objectLocation string, t
 		"err":   copyIntoErr.Error(),
 	}).Warn("COPY INTO error")
 
-	loadErrInfo, err := getLoadErrorInfo(ctx, conn, objectLocation)
+	loadErrInfo, err := getLoadErrorInfo(ctx, conn, bucket, prefix)
 	if err != nil {
 		return fmt.Errorf("COPY INTO error for table '%s' but could not query sys_load_error_detail: %w", table, err)
 	}

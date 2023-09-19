@@ -75,8 +75,8 @@ type loadErrorInfo struct {
 	colLength string // Yes, this is actually a char(10) column in Redshift for some reason
 }
 
-func getLoadErrorInfo(ctx context.Context, conn *pgx.Conn, filename string) (loadErrorInfo, error) {
-	q := `
+func getLoadErrorInfo(ctx context.Context, conn *pgx.Conn, bucket, prefix string) (loadErrorInfo, error) {
+	q := fmt.Sprintf(`
 	SELECT 
 		error_message,
 		error_code, 
@@ -84,11 +84,14 @@ func getLoadErrorInfo(ctx context.Context, conn *pgx.Conn, filename string) (loa
 		column_type,
 		column_length
 	FROM sys_load_error_detail 
-	WHERE file_name=$1;
-	`
+	WHERE file_name LIKE 's3://%s/%s/%%';
+	`,
+		bucket,
+		prefix,
+	)
 
 	var out loadErrorInfo
-	if err := conn.QueryRow(ctx, q, filename).Scan(&out.errMsg, &out.errCode, &out.colName, &out.colType, &out.colLength); err != nil {
+	if err := conn.QueryRow(ctx, q).Scan(&out.errMsg, &out.errCode, &out.colName, &out.colType, &out.colLength); err != nil {
 		return loadErrorInfo{}, err
 	}
 
