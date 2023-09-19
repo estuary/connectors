@@ -4,22 +4,35 @@ import (
 	"bufio"
 	"context"
 	stdsql "database/sql"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	// Per https://docs.snowflake.com/en/sql-reference/sql/put#usage-notes data file sizes are
-	// recommended to be in the 100-250 MB range for compressed data. We aren't currently using
-	// compression, but experimentally 250 MB seems to work well enough with uncompressed JSON.
-	fileSizeLimit = 250 * 1024 * 1024
-)
+// fileBuffer provides Close() for a *bufio.Writer writing to an *os.File. Close() will flush the
+// buffer and close the underlying file.
+type fileBuffer struct {
+	buf  *bufio.Writer
+	file *os.File
+}
+
+func (f *fileBuffer) Write(p []byte) (int, error) {
+	return f.buf.Write(p)
+}
+
+func (f *fileBuffer) Close() error {
+	if err := f.buf.Flush(); err != nil {
+		return err
+	} else if err := f.file.Close(); err != nil {
+		return err
+	}
+	return nil
+}
 
 // stagedFile manages uploading a sequence of local files produced by reading from Load/Store
 // iterators to an internal Snowflake stage. The same stagedFile should not be used concurrently
@@ -27,14 +40,14 @@ const (
 // use them.
 //
 // The data to be staged is split into multiple files for a few reasons:
-//  - To allow for parallel processing within Snowflake
-//  - To enable some amount of concurrency between the network operations for PUTs and the encoding
-//    & writing of JSON data locally
-//  - To prevent any individual file from becoming excessively large, which seems to bog down the
-//    encryption process used within the go-snowflake driver
+//   - To allow for parallel processing within Snowflake
+//   - To enable some amount of concurrency between the network operations for PUTs and the encoding
+//     & writing of JSON data locally
+//   - To prevent any individual file from becoming excessively large, which seems to bog down the
+//     encryption process used within the go-snowflake driver
 //
 // Ideally we would stream directly to the Snowflake internal stage rather than reading from a local
-// disk file, but streaming PUTs do not currently work well and buffer exessive amounts of data
+// disk file, but streaming PUTs do not currently work well and buffer excessive amounts of data
 // in-memory; see https://github.com/estuary/connectors/issues/50.
 //
 // The lifecycle of a staged file for a transaction is as follows:
@@ -49,7 +62,6 @@ const (
 //
 // - flush: Sends the current & final local file to the worker for staging and waits for the worker
 // to complete before returning.
-
 type stagedFile struct {
 	// Random string that will serve as the directory for local files of this binding.
 	uuid string
@@ -66,16 +78,11 @@ type stagedFile struct {
 	fileIdx int
 
 	// References to the current file being written.
-	currentFile *os.File
-	writer      *bufio.Writer
-
-	// Amount of data written to the current file. A new file will be started when
-	// currentFileWritten > fileSizeLimit.
-	currentFileWritten int
+	buf     *fileBuffer
+	encoder *sql.CountingEncoder
 
 	// Per-transaction coordination.
 	putFiles chan string
-	flushed  chan struct{}
 	group    *errgroup.Group
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
@@ -121,14 +128,8 @@ func (f *stagedFile) start(ctx context.Context, conn *stdsql.Conn) error {
 		rows.Close()
 	}
 
-	f.fileIdx = 0
-	if err := f.newFile(); err != nil {
-		return fmt.Errorf("creating first local staged file: %w", err)
-	}
-
 	// Reset values used per-transaction.
-	f.currentFileWritten = 0
-	f.flushed = make(chan struct{})
+	f.fileIdx = 0
 	f.group, f.groupCtx = errgroup.WithContext(ctx)
 	f.putFiles = make(chan string)
 
@@ -141,26 +142,25 @@ func (f *stagedFile) start(ctx context.Context, conn *stdsql.Conn) error {
 }
 
 func (f *stagedFile) encodeRow(row []interface{}) error {
-	jsonBytes, err := json.Marshal(row)
-	if err != nil {
-		return fmt.Errorf("marshaling row to json: %w", err)
-	}
-
-	// Concurrently start the PUT process for this file and start writing to a new file if the
-	// current file has reached fileSizeLimit.
-	if f.currentFileWritten > 0 && f.currentFileWritten+len(jsonBytes) > fileSizeLimit {
-		if err := f.putFile(); err != nil {
-			return fmt.Errorf("encodeRow putFile: %w", err)
-		} else if err := f.newFile(); err != nil {
-			return fmt.Errorf("encodeRow newFile: %w", err)
+	// May not have an encoder set yet if the previous encodeRow() resulted in flushing the current
+	// file, or for the very first call to encodeRow().
+	if f.encoder == nil {
+		if err := f.newFile(); err != nil {
+			return err
 		}
 	}
 
-	written, err := f.writer.Write(jsonBytes)
-	if err != nil {
-		return fmt.Errorf("encodeRow writing bytes: %w", err)
+	if err := f.encoder.Encode(row); err != nil {
+		return fmt.Errorf("encoding row: %w", err)
 	}
-	f.currentFileWritten += written
+
+	// Concurrently start the PUT process for this file if the current file has reached
+	// fileSizeLimit.
+	if f.encoder.Written() >= sql.DefaultFileSizeLimit {
+		if err := f.putFile(); err != nil {
+			return fmt.Errorf("encodeRow putFile: %w", err)
+		}
+	}
 
 	return nil
 }
@@ -170,7 +170,7 @@ func (f *stagedFile) flush() error {
 		return fmt.Errorf("flush putFile: %w", err)
 	}
 
-	close(f.flushed)
+	close(f.putFiles)
 	f.started = false
 
 	// Wait for all outstanding PUT requests to complete.
@@ -184,16 +184,17 @@ func (f *stagedFile) putWorker(ctx context.Context, conn *stdsql.Conn, filePaths
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-f.flushed:
-			return nil
-		case f := <-filePaths:
+		case f, ok := <-filePaths:
+			if !ok {
+				return nil
+			}
 			file = f
 		}
 
 		query := fmt.Sprintf(
 			// OVERWRITE=TRUE is set here not because we intend to overwrite anything, but rather to
 			// avoid an extra LIST query that setting OVERWRITE=FALSE incurs.
-			`PUT file://%s @flow_v1/%s AUTO_COMPRESS=FALSE SOURCE_COMPRESSION=NONE OVERWRITE=TRUE;`,
+			`PUT file://%s @flow_v1/%s AUTO_COMPRESS=FALSE SOURCE_COMPRESSION=GZIP OVERWRITE=TRUE;`,
 			file, f.uuid,
 		)
 		var source, target, sourceSize, targetSize, sourceCompression, targetCompression, status, message string
@@ -219,31 +220,32 @@ func (f *stagedFile) newFile() error {
 		return err
 	}
 
-	f.currentFileWritten = 0
-	f.currentFile = file
-	f.writer = bufio.NewWriter(file)
-
+	f.buf = &fileBuffer{
+		buf:  bufio.NewWriter(file),
+		file: file,
+	}
+	f.encoder = sql.NewCountingEncoder(f.buf)
 	f.fileIdx += 1
 
 	return nil
 }
 
 func (f *stagedFile) putFile() error {
-	if err := f.writer.Flush(); err != nil {
-		return fmt.Errorf("flushing writer: %w", err)
+	if f.encoder == nil {
+		return nil
 	}
 
-	fname := f.currentFile.Name()
-	if err := f.currentFile.Close(); err != nil {
-		return fmt.Errorf("closing local file: %w", err)
+	if err := f.encoder.Close(); err != nil {
+		return fmt.Errorf("closing encoder: %w", err)
 	}
+	f.encoder = nil
 
 	select {
 	case <-f.groupCtx.Done():
 		// If the group worker has returned an error and cancelled the group context, return that
 		// rather than the general "context cancelled" error.
 		return f.group.Wait()
-	case f.putFiles <- fname:
+	case f.putFiles <- f.buf.file.Name():
 		return nil
 	}
 }
