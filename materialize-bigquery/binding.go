@@ -14,11 +14,9 @@ type binding struct {
 	storeInsertSQL string
 	storeUpdateSQL string
 
-	loadExtDataConfig  *bigquery.ExternalDataConfig
-	storeExtDataConfig *bigquery.ExternalDataConfig
-	keysFile           *ExternalDataConnectionFile
-	mergeFile          *ExternalDataConnectionFile
-	tempTableName      string
+	loadFile      *stagedFile
+	storeFile     *stagedFile
+	tempTableName string
 }
 
 // bindingDocument is used by the load operation to fetch binding flow_document values
@@ -30,7 +28,6 @@ type bindingDocument struct {
 // Load implements the bigquery ValueLoader interface for mapping data from the database to this struct
 // It requires 2 values, the first must be the binding and the second must be the flow_document
 func (bd *bindingDocument) Load(v []bigquery.Value, s bigquery.Schema) error {
-
 	if len(v) != 2 {
 		return fmt.Errorf("invalid value count: %d", len(v))
 	}
