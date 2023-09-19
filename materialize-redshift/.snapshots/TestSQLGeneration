@@ -119,10 +119,12 @@ UPDATE path."To".checkpoints
 
 --- Begin Copy From S3 With Truncation---
 COPY my_temp_table
-FROM 's3://some_bucket'
+FROM 's3://some_bucket/files.manifest'
+MANIFEST
 CREDENTIALS 'aws_access_key_id=accessKeyID;aws_secret_access_key=secretKey'
 REGION 'us-somewhere-1'
 JSON 'auto ignorecase'
+GZIP
 DATEFORMAT 'auto'
 TIMEFORMAT 'auto'
 TRUNCATECOLUMNS;
@@ -130,10 +132,12 @@ TRUNCATECOLUMNS;
 
 --- Begin Copy From S3 Without Truncation---
 COPY my_temp_table
-FROM 's3://some_bucket'
+FROM 's3://some_bucket/files.manifest'
+MANIFEST
 CREDENTIALS 'aws_access_key_id=accessKeyID;aws_secret_access_key=secretKey'
 REGION 'us-somewhere-1'
 JSON 'auto ignorecase'
+GZIP
 DATEFORMAT 'auto'
 TIMEFORMAT 'auto';
 --- End Copy From S3 Without Truncation ---

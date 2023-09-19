@@ -94,9 +94,17 @@ func TestSQLGeneration(t *testing.T) {
 	snap.WriteString("--- End Fence Update ---\n\n")
 
 	var copyParams = copyFromS3Params{
-		Destination:    "my_temp_table",
-		ObjectLocation: "s3://some_bucket",
-		Config: config{
+		Target: "my_temp_table",
+		Columns: []*sqlDriver.Column{
+			{
+				Identifier: "firstCol",
+			},
+			{
+				Identifier: "secondCol",
+			},
+		},
+		ManifestURL: "s3://some_bucket/files.manifest",
+		Config: &config{
 			AWSAccessKeyID:     "accessKeyID",
 			AWSSecretAccessKey: "secretKey",
 			Region:             "us-somewhere-1",
