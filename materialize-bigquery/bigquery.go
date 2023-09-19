@@ -15,6 +15,7 @@ import (
 	storage "cloud.google.com/go/storage"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
@@ -229,7 +230,7 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	data := []byte("test")
 
 	objectDir := path.Join(client.config.Bucket, client.config.BucketPath)
-	objectKey := path.Join(objectDir, tmpFileName())
+	objectKey := path.Join(objectDir, uuid.NewString())
 	objectHandle := client.cloudStorageClient.Bucket(client.config.Bucket).Object(objectKey)
 
 	writer := objectHandle.NewWriter(ctx)
