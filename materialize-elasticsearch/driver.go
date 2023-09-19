@@ -211,7 +211,7 @@ func (c config) Validate() error {
 
 // toClient initializes a client for connecting to Elasticsearch, starting the network tunnel if
 // configured.
-func (c config) toClient() (*client, error) {
+func (c config) toClient(disableRetry bool) (*client, error) {
 	endpoint := c.Endpoint
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
@@ -254,7 +254,8 @@ func (c config) toClient() (*client, error) {
 				}).Info("waiting to retry request on retryable error")
 				return d
 			},
-			MaxRetries: 10,
+			MaxRetries:   10,
+			DisableRetry: disableRetry,
 		},
 	)
 	if err != nil {
@@ -352,7 +353,9 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := cfg.toClient()
+	// Disable retries for connectivity checks to avoid getting hung in 5xx errors that actually
+	// indicate a configuration problem.
+	client, err := cfg.toClient(true)
 	if err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
 	}
@@ -423,7 +426,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := cfg.toClient()
+	client, err := cfg.toClient(false)
 	if err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
 	}
@@ -504,7 +507,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := cfg.toClient()
+	client, err := cfg.toClient(false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating client: %w", err)
 	}
