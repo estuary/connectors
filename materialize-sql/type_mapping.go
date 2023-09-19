@@ -485,6 +485,9 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	case p.IsRootDocumentProjection():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "The root document must be materialized"
+	case p.Field == "_meta/op":
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The operation type should usually be materialized"
 	case strings.HasPrefix(p.Field, "_meta/"):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "Metadata fields fields are able to be materialized"
