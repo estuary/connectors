@@ -54,7 +54,7 @@ func TestApply(t *testing.T) {
 	secondResourceJson, err := json.Marshal(secondResource)
 	require.NoError(t, err)
 
-	client, err := cfg.toClient()
+	client, err := cfg.toClient(false)
 	require.NoError(t, err)
 
 	bp_test.RunApplyTestCases(
