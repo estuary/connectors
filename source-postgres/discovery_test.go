@@ -113,3 +113,16 @@ func TestPartitionedTableDiscovery(t *testing.T) {
 
 	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
 }
+
+func TestDiscoveryWithoutPermissions(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+
+	var uniqueID = "117535"
+	var tableName = strings.ToLower(fmt.Sprintf("public.%s_%s", strings.TrimPrefix(t.Name(), "Test"), uniqueID))
+	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT)"
+	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName))
+	t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tableName)) })
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %s %s;`, tableName, tableDef))
+
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+}
