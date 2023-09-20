@@ -1,0 +1,36 @@
+---
+tap_stream_id: assets
+replication_method: FULL_TABLE
+key_properties:
+  - identifier
+stream: assets
+metadata:
+  - breadcrumb:
+      - properties
+      - identifier
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - price
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - currency
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      table-key-properties:
+        - identifier
