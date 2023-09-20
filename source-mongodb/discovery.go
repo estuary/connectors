@@ -24,10 +24,12 @@ const idProperty = "_id"
 const (
 	metaProperty    = "_meta"
 	deletedProperty = "deleted"
+	opProperty      = "op"
 )
 
 type documentMetadata struct {
-	Deleted bool `json:"deleted,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted, unset otherwise."`
+	Deleted bool `json:"deleted,omitempty" jsonschema:"title=Delete Flag (deprecated, use op instead),description=True if the document has been deleted, unset otherwise."`
+	Op bool `json:"op,omitempty" jsonschema:"title=Change Operation,description=Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."`
 }
 
 func generateMinimalSchema() json.RawMessage {
