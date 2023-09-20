@@ -379,10 +379,8 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			}
 
 			if diff, err := oplogTimeDifference(ctx, client); err != nil {
-				log.WithField("err", err).Warn("could not read oplog time difference")
+				return fmt.Errorf("could not read oplog, access to oplog is necessary: %w", err)
 			} else {
-				log.WithField("timediff", diff).Debug("read oplog time difference")
-
 				// TODO: This is just spamming logs, but users won't see these logs. Should we
 				// just error after seeing this error for a while?
 				if diff < minOplogTimediff {

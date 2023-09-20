@@ -101,10 +101,8 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	}
 
 	if diff, err := oplogTimeDifference(ctx, client); err != nil {
-		log.WithField("err", err).Warn("could not read oplog time difference")
+		return nil, fmt.Errorf("could not read oplog, access to oplog is necessary: %w", err)
 	} else {
-		log.WithField("timediff", diff).Debug("read oplog time difference")
-
 		if diff < minOplogTimediff {
 			log.Warn(fmt.Sprintf("the current time difference between oldest and newest records in your oplog is %d seconds. This is smaller than the minimum of 24 hours. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE", diff))
 		}
