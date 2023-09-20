@@ -10,3 +10,11 @@ connector
 
 # top-level directory where we put flow binaries downloaded from the latest flow release
 /flow-bin/
+
+# Python type-checkingr, virtual environment, and cached bytecode.
+/.mypy_cache
+/.venv
+__pycache__
+# Currently-active pyproject, which is overwritten by ./python/activate.sh
+/poetry.lock
+/pyproject.toml
