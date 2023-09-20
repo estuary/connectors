@@ -251,7 +251,6 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 			var doc = map[string]interface{}{
 				idProperty: ev.DocumentKey.Id,
 				metaProperty: map[string]interface{}{
-					deletedProperty: true,
 					opProperty: "d",
 				},
 			}
