@@ -13,7 +13,17 @@ Binding 0:
             "id"
           ],
           "$anchor": "PublicDiscoverywithoutpermissions_117535",
-          "properties": {}
+          "properties": {
+            "data": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "type": "integer"
+            }
+          }
         }
       },
       "allOf": [
