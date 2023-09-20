@@ -1,0 +1,34 @@
+---
+captures:
+  acmeCo/source-pokemon:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-pokemon
+        config:
+          pokemon_name: pikachu
+        env: {}
+    bindings:
+      - resource:
+          stream: pokemon
+          syncMode: full_refresh
+        target: acmeCo/pokemon
+    shards:
+      logLevel: info
+collections:
+  acmeCo/pokemon:
+    schema:
+      type: object
+      x-infer-schema: true
+      properties:
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+    key:
+      - /_meta/row_id

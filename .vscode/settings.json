@@ -1,0 +1,8 @@
+{
+    "python.linting.enabled": true,
+    "python.linting.mypyEnabled": true,
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "python.formatting.provider": "none"
+}

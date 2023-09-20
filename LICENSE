@@ -1,3 +1,9 @@
-This repository uses different licenses for different directories. All licensed work in this
-repository is available under the BSL license in LICENSE-BSL. Given written consent from the Estuary team, the Apache 2.0 license AND MIT LICENSE in LICENSE-APACHE AND LICENSE-MIT 
+This repository uses different licenses for different directories.
+
+Individual connector directories may represent "forks" of open-source connectors,
+and each such directory will include an individual `origin.json` file
+as well as any accompanying LICENSE files.
+
+Where not otherwise noted, all works in this repository are available under the BSL license in LICENSE-BSL.
+Given written consent from the Estuary team, the Apache 2.0 license AND MIT LICENSE in LICENSE-APACHE AND LICENSE-MIT 
 may be used.

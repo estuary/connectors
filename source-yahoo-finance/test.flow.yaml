@@ -1,0 +1,50 @@
+---
+captures:
+  acmeCo/source-investing:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-yahoo-finance
+        config:
+          assets:
+            - name: Apple
+              identifier: AAPL
+            - name: Google
+              identifier: GOOGL
+            - name: Northern Trust World
+              identifier: NL0011225305
+            - name: Northern Trust EM
+              identifier: NL0011515424
+            - name: Northern Trust World Small Cap
+              identifier: NL0013552078
+        env:
+          LOG_LEVEL: debug
+    bindings:
+      - resource: source-investing.resource.0.config.yaml
+        target: acmeCo/assets
+collections:
+  acmeCo/assets:
+    schema:
+      properties:
+        identifier:
+          type:
+            - string
+        name:
+          type:
+            - string
+            - "null"
+        price:
+          type:
+            - number
+            - "null"
+        currency:
+          type:
+            - string
+            - "null"
+      type: object
+      required:
+        - identifier
+    key:
+      - /identifier

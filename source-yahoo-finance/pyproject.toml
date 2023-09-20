@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "source-yahoo-finance"
+version = "0.1.0"
+description = ""
+authors = ["Johnny Graettinger <johnny@estuary.dev>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+jsonlines = "^4.0.0"
+mypy = "^1.5"
+orjson = "^3.9.7"
+python = ">=3.11,<3.12"
+tap-investing = {git = "https://gitlab.com/DouweM/tap-investing.git", rev = "1a12a4d"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
