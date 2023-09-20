@@ -464,21 +464,24 @@ func getTables(ctx context.Context, conn *pgx.Conn, selectedSchemas []string) ([
 }
 
 const queryDiscoverColumns = `
-  SELECT
-		c.table_schema,
-		c.table_name,
-		c.ordinal_position,
-		c.column_name,
-		c.is_nullable::boolean,
-		c.udt_name,
-		p.typtype::text
-  FROM information_schema.columns c
-  JOIN pg_type p ON (c.udt_name = p.typname)
-  ORDER BY
-		c.table_schema,
-		c.table_name,
-		c.ordinal_position
-	;`
+  SELECT nc.nspname as table_schema,
+         c.relname as table_name,
+		 a.attnum as ordinal_position,
+		 a.attname as column_name,
+		 NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,
+		 COALESCE(bt.typname, t.typname) AS udt_name,
+		 t.typtype::text AS typtype
+	FROM pg_catalog.pg_attribute a
+	JOIN pg_catalog.pg_type t ON a.atttypid = t.oid
+	JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
+	JOIN pg_catalog.pg_namespace nc ON c.relnamespace = nc.oid
+	LEFT JOIN (pg_catalog.pg_type bt JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid)
+	       ON t.typtype = 'd'::"char" AND t.typbasetype = bt.oid
+    WHERE NOT pg_is_other_temp_schema(nc.oid)
+	  AND a.attnum > 0
+	  AND NOT a.attisdropped
+	  AND (c.relkind = ANY (ARRAY['r'::"char", 'v'::"char", 'f'::"char", 'p'::"char"]))
+	ORDER BY nc.nspname, c.relname, a.attnum;`
 
 func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, error) {
 	logrus.Debug("listing all columns in the database")
