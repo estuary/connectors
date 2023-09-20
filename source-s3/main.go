@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/estuary/connectors/filesource"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/flow/go/parser"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
@@ -105,8 +106,8 @@ func newS3Store(ctx context.Context, cfg config) (*s3Store, error) {
 // the bucket. This is done in a way that requires only s3:ListBucket and s3:GetObject permissions,
 // since these are the permissions required by the connector.
 func validateBucket(ctx context.Context, cfg config, s3Sess *s3.S3) error {
-	// All we care about is a succesful listing rather than iterating on all objects, so MaxKeys = 1
-	// in this query.
+	// All we care about is a successful listing rather than iterating on all objects, so MaxKeys =
+	// 1 in this query.
 	_, err := s3Sess.ListObjectsV2WithContext(ctx, &s3.ListObjectsV2Input{
 		Bucket:  aws.String(cfg.Bucket),
 		Prefix:  aws.String(cfg.Prefix),
@@ -115,6 +116,19 @@ func validateBucket(ctx context.Context, cfg config, s3Sess *s3.S3) error {
 	if err != nil {
 		// Note that a listing with zero objects does not return an error here, so we don't have to
 		// account for that case.
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case s3.ErrCodeNoSuchBucket:
+				return cerrors.NewUserError(err, fmt.Sprintf("bucket %q does not exist", cfg.Bucket))
+			case "AccessDenied":
+				return cerrors.NewUserError(err, fmt.Sprintf("access denied for listing objects in %q", path.Join(cfg.Bucket, cfg.Prefix)))
+			case "InvalidAccessKeyId":
+				return cerrors.NewUserError(err, "configured AWS Access Key ID does not exist")
+			case "SignatureDoesNotMatch":
+				return cerrors.NewUserError(err, "configured AWS Secret Access Key is not valid")
+			}
+		}
+
 		return fmt.Errorf("unable to list objects in bucket %q: %w", cfg.Bucket, err)
 	}
 
