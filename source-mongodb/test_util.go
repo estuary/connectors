@@ -79,3 +79,41 @@ func addTestTableData(
 		require.NoError(t, err)
 	}
 }
+
+func deleteData(
+	ctx context.Context,
+	t *testing.T,
+	c *mongo.Client,
+	database string,
+	collection string,
+	id any,
+) {
+	var db = c.Database(database)
+	var col = db.Collection(collection)
+
+	_, err := col.DeleteOne(ctx, map[string]any{"_id": id})
+
+	require.NoError(t, err)
+}
+
+func updateData(
+	ctx context.Context,
+	t *testing.T,
+	c *mongo.Client,
+	database string,
+	collection string,
+	id any,
+	cols ...string,
+) {
+	var db = c.Database(database)
+	var col = db.Collection(collection)
+
+	var item = make(map[string]any)
+	for _, col := range cols {
+		item[col] = fmt.Sprintf("%s val %d", col, 0)
+	}
+
+	_, err := col.UpdateOne(ctx, map[string]any{"_id": id}, map[string]any{ "$set": item })
+
+	require.NoError(t, err)
+}

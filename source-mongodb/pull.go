@@ -252,8 +252,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 				idProperty: ev.DocumentKey.Id,
 				metaProperty: map[string]interface{}{
 					deletedProperty: true,
+					opProperty: "d",
 				},
 			}
+
+			doc = sanitizeDocument(doc)
 
 			js, err := json.Marshal(doc)
 			if err != nil {
@@ -272,6 +275,15 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 			// ignore events where fullDocument is null. Another change event of type
 			// delete will eventually come and delete the document (if not already).
 			var doc = sanitizeDocument(ev.FullDocument)
+			var op string
+			if ev.OperationType == "update" || ev.OperationType == "replace" {
+				op = "u"
+			} else if ev.OperationType == "insert" {
+				op = "c"
+			}
+			doc[metaProperty] = map[string]interface{}{
+				opProperty: op,
+			}
 
 			js, err := json.Marshal(doc)
 			if err != nil {
