@@ -86,6 +86,20 @@ func TestCapture(t *testing.T) {
 
 	advanceCapture(ctx, t, cs)
 
+	// Delete some records
+	deleteData(ctx, t, client, database, col1, stringPkVals(0))
+	deleteData(ctx, t, client, database, col2, numberPkVals(0))
+	deleteData(ctx, t, client, database, col3, binaryPkVals(0))
+
+	advanceCapture(ctx, t, cs)
+
+	// Update records
+	updateData(ctx, t, client, database, col1, stringPkVals(1), "onlyColumn_new")
+	updateData(ctx, t, client, database, col2, numberPkVals(1), "thirdColumn_new")
+	updateData(ctx, t, client, database, col3, binaryPkVals(1), "forthColumn_new")
+
+	advanceCapture(ctx, t, cs)
+
 	cupaloy.SnapshotT(t, cs.Summary())
 }
 
@@ -129,7 +143,6 @@ func advanceCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 
 	const shutdownDelay = 100 * time.Millisecond
 	var shutdownWatchdog *time.Timer
-	log.Info("advanceCapture")
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		if shutdownWatchdog == nil {
 			shutdownWatchdog = time.AfterFunc(shutdownDelay, func() {

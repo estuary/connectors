@@ -1,44 +1,65 @@
 # ================================
-# Collection "acmeCo/test/collectionOne": 10 Documents
+# Collection "acmeCo/test/collectionOne": 17 Documents
 # ================================
+{"_id":"pk val 0","_meta":{"deleted":true,"op":"d"}}
+{"_id":"pk val 0","_meta":{"op":"c"},"onlyColumn":"onlyColumn val 0"}
 {"_id":"pk val 0","onlyColumn":"onlyColumn val 0"}
+{"_id":"pk val 1","_meta":{"op":"c"},"onlyColumn":"onlyColumn val 1"}
+{"_id":"pk val 1","_meta":{"op":"u"},"onlyColumn":"onlyColumn val 1","onlyColumn_new":"onlyColumn_new val 0"}
 {"_id":"pk val 1","onlyColumn":"onlyColumn val 1"}
+{"_id":"pk val 2","_meta":{"op":"c"},"onlyColumn":"onlyColumn val 2"}
 {"_id":"pk val 2","onlyColumn":"onlyColumn val 2"}
+{"_id":"pk val 3","_meta":{"op":"c"},"onlyColumn":"onlyColumn val 3"}
 {"_id":"pk val 3","onlyColumn":"onlyColumn val 3"}
+{"_id":"pk val 4","_meta":{"op":"c"},"onlyColumn":"onlyColumn val 4"}
 {"_id":"pk val 4","onlyColumn":"onlyColumn val 4"}
-{"_id":"pk val 5","onlyColumn":"onlyColumn val 5"}
-{"_id":"pk val 6","onlyColumn":"onlyColumn val 6"}
-{"_id":"pk val 7","onlyColumn":"onlyColumn val 7"}
-{"_id":"pk val 8","onlyColumn":"onlyColumn val 8"}
-{"_id":"pk val 9","onlyColumn":"onlyColumn val 9"}
+{"_id":"pk val 5","_meta":{"op":"c"},"onlyColumn":"onlyColumn val 5"}
+{"_id":"pk val 6","_meta":{"op":"c"},"onlyColumn":"onlyColumn val 6"}
+{"_id":"pk val 7","_meta":{"op":"c"},"onlyColumn":"onlyColumn val 7"}
+{"_id":"pk val 8","_meta":{"op":"c"},"onlyColumn":"onlyColumn val 8"}
+{"_id":"pk val 9","_meta":{"op":"c"},"onlyColumn":"onlyColumn val 9"}
 # ================================
-# Collection "acmeCo/test/collectionThree": 10 Documents
+# Collection "acmeCo/test/collectionThree": 17 Documents
 # ================================
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDA=\"}","_meta":{"deleted":true,"op":"d"}}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDA=\"}","_meta":{"op":"c"},"firstColumn":"firstColumn val 0","secondColumn":"secondColumn val 0","thirdColumn":"thirdColumn val 0"}
 {"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDA=\"}","firstColumn":"firstColumn val 0","secondColumn":"secondColumn val 0","thirdColumn":"thirdColumn val 0"}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDE=\"}","_meta":{"op":"c"},"firstColumn":"firstColumn val 1","secondColumn":"secondColumn val 1","thirdColumn":"thirdColumn val 1"}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDE=\"}","_meta":{"op":"u"},"firstColumn":"firstColumn val 1","forthColumn_new":"forthColumn_new val 0","secondColumn":"secondColumn val 1","thirdColumn":"thirdColumn val 1"}
 {"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDE=\"}","firstColumn":"firstColumn val 1","secondColumn":"secondColumn val 1","thirdColumn":"thirdColumn val 1"}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDI=\"}","_meta":{"op":"c"},"firstColumn":"firstColumn val 2","secondColumn":"secondColumn val 2","thirdColumn":"thirdColumn val 2"}
 {"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDI=\"}","firstColumn":"firstColumn val 2","secondColumn":"secondColumn val 2","thirdColumn":"thirdColumn val 2"}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDM=\"}","_meta":{"op":"c"},"firstColumn":"firstColumn val 3","secondColumn":"secondColumn val 3","thirdColumn":"thirdColumn val 3"}
 {"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDM=\"}","firstColumn":"firstColumn val 3","secondColumn":"secondColumn val 3","thirdColumn":"thirdColumn val 3"}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDQ=\"}","_meta":{"op":"c"},"firstColumn":"firstColumn val 4","secondColumn":"secondColumn val 4","thirdColumn":"thirdColumn val 4"}
 {"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDQ=\"}","firstColumn":"firstColumn val 4","secondColumn":"secondColumn val 4","thirdColumn":"thirdColumn val 4"}
-{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDU=\"}","firstColumn":"firstColumn val 5","secondColumn":"secondColumn val 5","thirdColumn":"thirdColumn val 5"}
-{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDY=\"}","firstColumn":"firstColumn val 6","secondColumn":"secondColumn val 6","thirdColumn":"thirdColumn val 6"}
-{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDc=\"}","firstColumn":"firstColumn val 7","secondColumn":"secondColumn val 7","thirdColumn":"thirdColumn val 7"}
-{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDg=\"}","firstColumn":"firstColumn val 8","secondColumn":"secondColumn val 8","thirdColumn":"thirdColumn val 8"}
-{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDk=\"}","firstColumn":"firstColumn val 9","secondColumn":"secondColumn val 9","thirdColumn":"thirdColumn val 9"}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDU=\"}","_meta":{"op":"c"},"firstColumn":"firstColumn val 5","secondColumn":"secondColumn val 5","thirdColumn":"thirdColumn val 5"}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDY=\"}","_meta":{"op":"c"},"firstColumn":"firstColumn val 6","secondColumn":"secondColumn val 6","thirdColumn":"thirdColumn val 6"}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDc=\"}","_meta":{"op":"c"},"firstColumn":"firstColumn val 7","secondColumn":"secondColumn val 7","thirdColumn":"thirdColumn val 7"}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDg=\"}","_meta":{"op":"c"},"firstColumn":"firstColumn val 8","secondColumn":"secondColumn val 8","thirdColumn":"thirdColumn val 8"}
+{"_id":"{\"Subtype\":0,\"Data\":\"cGsgdmFsIDk=\"}","_meta":{"op":"c"},"firstColumn":"firstColumn val 9","secondColumn":"secondColumn val 9","thirdColumn":"thirdColumn val 9"}
 # ================================
-# Collection "acmeCo/test/collectionTwo": 10 Documents
+# Collection "acmeCo/test/collectionTwo": 17 Documents
 # ================================
+{"_id":"0","_meta":{"deleted":true,"op":"d"}}
+{"_id":"0","_meta":{"op":"c"},"firstColumn":"firstColumn val 0","secondColumn":"secondColumn val 0"}
 {"_id":"0","firstColumn":"firstColumn val 0","secondColumn":"secondColumn val 0"}
+{"_id":"1.5","_meta":{"op":"c"},"firstColumn":"firstColumn val 1","secondColumn":"secondColumn val 1"}
+{"_id":"1.5","_meta":{"op":"u"},"firstColumn":"firstColumn val 1","secondColumn":"secondColumn val 1","thirdColumn_new":"thirdColumn_new val 0"}
 {"_id":"1.5","firstColumn":"firstColumn val 1","secondColumn":"secondColumn val 1"}
+{"_id":"2","_meta":{"op":"c"},"firstColumn":"firstColumn val 2","secondColumn":"secondColumn val 2"}
 {"_id":"2","firstColumn":"firstColumn val 2","secondColumn":"secondColumn val 2"}
+{"_id":"3.5","_meta":{"op":"c"},"firstColumn":"firstColumn val 3","secondColumn":"secondColumn val 3"}
 {"_id":"3.5","firstColumn":"firstColumn val 3","secondColumn":"secondColumn val 3"}
+{"_id":"4","_meta":{"op":"c"},"firstColumn":"firstColumn val 4","secondColumn":"secondColumn val 4"}
 {"_id":"4","firstColumn":"firstColumn val 4","secondColumn":"secondColumn val 4"}
-{"_id":"5.5","firstColumn":"firstColumn val 5","secondColumn":"secondColumn val 5"}
-{"_id":"6","firstColumn":"firstColumn val 6","secondColumn":"secondColumn val 6"}
-{"_id":"7.5","firstColumn":"firstColumn val 7","secondColumn":"secondColumn val 7"}
-{"_id":"8","firstColumn":"firstColumn val 8","secondColumn":"secondColumn val 8"}
-{"_id":"9.5","firstColumn":"firstColumn val 9","secondColumn":"secondColumn val 9"}
+{"_id":"5.5","_meta":{"op":"c"},"firstColumn":"firstColumn val 5","secondColumn":"secondColumn val 5"}
+{"_id":"6","_meta":{"op":"c"},"firstColumn":"firstColumn val 6","secondColumn":"secondColumn val 6"}
+{"_id":"7.5","_meta":{"op":"c"},"firstColumn":"firstColumn val 7","secondColumn":"secondColumn val 7"}
+{"_id":"8","_meta":{"op":"c"},"firstColumn":"firstColumn val 8","secondColumn":"secondColumn val 8"}
+{"_id":"9.5","_meta":{"op":"c"},"firstColumn":"firstColumn val 9","secondColumn":"secondColumn val 9"}
 # ================================
 # Final State Checkpoint
 # ================================
-{"resources":{"test.collectionOne":{"backfill_last_id":{"Type":2,"Value":"CQAAAHBrIHZhbCA0AA=="},"backfill_started_at":"2023-09-20T13:39:20.950616+01:00","status":1,"stream_resume_token":"MQAAAAJfZGF0YQAhAAAAODI2NTBBRTdGOTAwMDAwMDBGMkIwNDI5Mjk2RTE0MDQAAA=="},"test.collectionThree":{"backfill_last_id":{"Type":5,"Value":"CAAAAABwayB2YWwgNA=="},"backfill_started_at":"2023-09-20T13:39:20.96171+01:00","status":1,"stream_resume_token":"yQAAAAJfZGF0YQC5AAAAODI2NTBBRTdGOTAwMDAwMDBGMkIwNDJDMDEwMDI5NkU1QTEwMDQwNEFBMUJFRUFEOEE0MTZFQjlBOUE2OUE0QjQ0NzM4NjQ2M0M2RjcwNjU3MjYxNzQ2OTZGNkU1NDc5NzA2NTAwM0M2OTZFNzM2NTcyNzQwMDQ2NjQ2RjYzNzU2RDY1NkU3NDRCNjU3OTAwNDY1QTVGNjk2NDAwNUEwODAwNzA2QjIwNzY2MTZDMjAzOTAwMDAwNAAA"},"test.collectionTwo":{"backfill_last_id":{"Type":16,"Value":"BAAAAA=="},"backfill_started_at":"2023-09-20T13:39:20.95145+01:00","status":1,"stream_resume_token":"MQAAAAJfZGF0YQAhAAAAODI2NTBBRTdGOTAwMDAwMDBGMkIwNDI5Mjk2RTE0MDQAAA=="}}}
+{"resources":{"test.collectionOne":{"backfill_last_id":{"Type":2,"Value":"CQAAAHBrIHZhbCA0AA=="},"backfill_started_at":"2023-09-20T14:04:27.135832+01:00","status":1,"stream_resume_token":"MQAAAAJfZGF0YQAhAAAAODI2NTBBRUREQjAwMDAwMDI3MkIwNDI5Mjk2RTE0MDQAAA=="},"test.collectionThree":{"backfill_last_id":{"Type":5,"Value":"CAAAAABwayB2YWwgNA=="},"backfill_started_at":"2023-09-20T14:04:27.147338+01:00","status":1,"stream_resume_token":"yQAAAAJfZGF0YQC5AAAAODI2NTBBRUREQjAwMDAwMDI3MkIwNDJDMDEwMDI5NkU1QTEwMDRBMjQyMENEM0RDRjM0NzUwOTk3OUFDMEE5QTk3QUE3NTQ2M0M2RjcwNjU3MjYxNzQ2OTZGNkU1NDc5NzA2NTAwM0M3NTcwNjQ2MTc0NjUwMDQ2NjQ2RjYzNzU2RDY1NkU3NDRCNjU3OTAwNDY1QTVGNjk2NDAwNUEwODAwNzA2QjIwNzY2MTZDMjAzMTAwMDAwNAAA"},"test.collectionTwo":{"backfill_last_id":{"Type":16,"Value":"BAAAAA=="},"backfill_started_at":"2023-09-20T14:04:27.13688+01:00","status":1,"stream_resume_token":"MQAAAAJfZGF0YQAhAAAAODI2NTBBRUREQjAwMDAwMDI3MkIwNDI5Mjk2RTE0MDQAAA=="}}}
 
