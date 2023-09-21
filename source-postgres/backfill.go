@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/jackc/pgtype"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,6 +16,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
+	var logEntry = logrus.WithField("stream", streamID)
 
 	var columnTypes = make(map[string]interface{})
 	for name, column := range info.Columns {
@@ -26,12 +28,13 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	var args []any
 	switch state.Mode {
 	case sqlcapture.TableModeKeylessBackfill:
-		logrus.WithFields(logrus.Fields{
-			"stream": streamID,
-			"offset": state.BackfilledCount,
-		}).Debug("scanning keyless table chunk")
+		var afterCTID = "(0,0)"
+		if resumeAfter != nil {
+			afterCTID = string(resumeAfter)
+		}
+		logEntry.WithField("ctid", afterCTID).Debug("scanning keyless table chunk")
 		query = db.keylessScanQuery(info, schema, table)
-		args = []any{state.BackfilledCount}
+		args = []any{afterCTID}
 	case sqlcapture.TableModePreciseBackfill, sqlcapture.TableModeUnfilteredBackfill:
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
@@ -41,18 +44,14 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			if len(resumeKey) != len(keyColumns) {
 				return fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
-			logrus.WithFields(logrus.Fields{
-				"stream":     streamID,
+			logEntry.WithFields(logrus.Fields{
 				"keyColumns": keyColumns,
 				"resumeKey":  resumeKey,
 			}).Debug("scanning subsequent table chunk")
 			query = db.buildScanQuery(false, keyColumns, columnTypes, schema, table)
 			args = resumeKey
 		} else {
-			logrus.WithFields(logrus.Fields{
-				"stream":     streamID,
-				"keyColumns": keyColumns,
-			}).Debug("scanning initial table chunk")
+			logEntry.WithField("keyColumns", keyColumns).Debug("scanning initial table chunk")
 			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
 		}
 	default:
@@ -63,7 +62,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	db.explainQuery(ctx, streamID, query, args)
 
 	// Execute the backfill query to fetch rows from the database
-	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
+	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 	rows, err := db.conn.Query(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("unable to execute query %q: %w", query, err)
@@ -73,7 +72,8 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	// Process the results into `changeEvent` structs and return them
 	var cols = rows.FieldDescriptions()
 	var rowOffset = state.BackfilledCount
-	logrus.WithField("stream", streamID).Debug("translating query rows to change events")
+	var prevTID pgtype.TID // Used when processing keyless backfill results to sanity-check ordering
+	logEntry.Debug("translating query rows to change events")
 	for rows.Next() {
 		// Scan the row values and copy into the equivalent map
 		var vals, err = rows.Values()
@@ -86,7 +86,19 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		}
 		var rowKey []byte
 		if state.Mode == sqlcapture.TableModeKeylessBackfill {
-			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset)) // A 19 digit decimal number is sufficient to hold any 63-bit integer
+			var ctid = fields["ctid"].(pgtype.TID)
+			delete(fields, "ctid")
+
+			rowKey, err = ctid.EncodeText(db.conn.ConnInfo(), nil)
+			if err != nil {
+				return fmt.Errorf("internal error: failed to encode ctid %#v: %w", ctid, err)
+			}
+
+			// Sanity check that rows are returned in ascending CTID order within a given backfill chunk
+			if (ctid.BlockNumber < prevTID.BlockNumber) || ((ctid.BlockNumber == prevTID.BlockNumber) && (ctid.OffsetNumber <= prevTID.OffsetNumber)) {
+				return fmt.Errorf("internal error: ctid ordering sanity check failed: %v <= %v", ctid, prevTID)
+			}
+			prevTID = ctid
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
@@ -148,9 +160,9 @@ var columnBinaryKeyComparison = map[string]bool{
 
 func (db *postgresDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
-	fmt.Fprintf(query, ` LIMIT %d`, db.config.Advanced.BackfillChunkSize)
-	fmt.Fprintf(query, ` OFFSET $1;`)
+	fmt.Fprintf(query, `SELECT ctid, * FROM "%s"."%s"`, schemaName, tableName)
+	fmt.Fprintf(query, ` WHERE ctid > $1`)
+	fmt.Fprintf(query, ` LIMIT %d;`, db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
 
