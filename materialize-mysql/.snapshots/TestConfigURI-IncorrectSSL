@@ -1,2 +1,2 @@
-will:secret1234@tcp(example.com:3306)/somedb?tls=
+will:secret1234@tcp(example.com:3306)/somedb
 invalid 'sslmode' configuration: unknown setting "whoops-this-isnt-right"

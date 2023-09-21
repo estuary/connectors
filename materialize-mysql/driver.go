@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/url"
 	"slices"
 	"strings"
 	"text/template"
@@ -173,13 +172,13 @@ func (c *config) ToURI() string {
 		address = address + ":3306"
 	}
 
-	var uri = url.URL{
-		Scheme: "mysql",
-		Path:   "/" + c.Database,
-		Host:   fmt.Sprintf("tcp(%s)", address),
-		User:   url.UserPassword(c.User, c.Password),
-	}
-	var params = make(url.Values)
+	mysqlCfg := mysql.NewConfig()
+	mysqlCfg.Net = "tcp"
+	mysqlCfg.Addr = address
+	mysqlCfg.User = c.User
+	mysqlCfg.Passwd = c.Password
+	mysqlCfg.DBName = c.Database
+
 	if c.Advanced.SSLMode != "" {
 		// see https://pkg.go.dev/github.com/go-sql-driver/mysql#section-readme
 		var tlsConfigMap = map[string]string{
@@ -190,16 +189,10 @@ func (c *config) ToURI() string {
 			"verify_identity": "custom",
 		}
 
-		var tlsMode = tlsConfigMap[c.Advanced.SSLMode]
-
-		params.Set("tls", tlsMode)
-	}
-	if len(params) > 0 {
-		uri.RawQuery = params.Encode()
+		mysqlCfg.TLSConfig = tlsConfigMap[c.Advanced.SSLMode]
 	}
 
-	// MySQL driver expects a uri without the scheme
-	return strings.TrimPrefix(uri.String(), "mysql://")
+	return mysqlCfg.FormatDSN()
 }
 
 type tableConfig struct {
