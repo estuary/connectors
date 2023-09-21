@@ -149,7 +149,6 @@ var columnBinaryKeyComparison = map[string]bool{
 func (db *postgresDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
-	fmt.Fprintf(query, ` ORDER BY ctid`)
 	fmt.Fprintf(query, ` LIMIT %d`, db.config.Advanced.BackfillChunkSize)
 	fmt.Fprintf(query, ` OFFSET $1;`)
 	return query.String()
