@@ -207,30 +207,25 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 
 	var googleErr *googleapi.Error
 
-	if meta, err := client.bigqueryClient.DatasetInProject(client.config.ProjectID, client.config.Dataset).Metadata(ctx); err != nil {
+	if meta, err := client.bigqueryClient.DatasetInProject(cfg.ProjectID, cfg.Dataset).Metadata(ctx); err != nil {
 		if errors.As(err, &googleErr) {
-			// Not found or forbidden means that either the dataset or project is not found or the
-			// credentials are not authorized for them. In these cases the returned error message
-			// contains the differentiation between "was it the project or dataset" as unstructured
-			// text and we can remove some of the error wrapping to make the message returned to the
-			// user more clear.
-			if googleErr.Message != "" {
-				err = fmt.Errorf("%s (code %v)", googleErr.Message, googleErr.Code)
-			} else if googleErr.Code == http.StatusNotFound {
-				err = fmt.Errorf("the ProjectID or BigQuery Dataset could not be found")
+			// The raw error message returned if the dataset or project can't be found can be pretty
+			// vague, but a 404 code always means that one of those two things couldn't be found.
+			if googleErr.Code == http.StatusNotFound {
+				err = fmt.Errorf("the ProjectID %q or BigQuery Dataset %q could not be found: %s (code %v)", cfg.ProjectID, cfg.Dataset, googleErr.Message, googleErr.Code)
 			}
 		}
 		errs.Err(err)
 	} else if meta.Location != cfg.Region {
-		errs.Err(fmt.Errorf("dataset %q is actually in region %q, which is different than the configured region %q", client.config.Dataset, meta.Location, cfg.Region))
+		errs.Err(fmt.Errorf("dataset %q is actually in region %q, which is different than the configured region %q", cfg.Dataset, meta.Location, cfg.Region))
 	}
 
 	// Verify cloud storage abilities.
 	data := []byte("test")
 
-	objectDir := path.Join(client.config.Bucket, client.config.BucketPath)
+	objectDir := path.Join(cfg.Bucket, cfg.BucketPath)
 	objectKey := path.Join(objectDir, tmpFileName())
-	objectHandle := client.cloudStorageClient.Bucket(client.config.Bucket).Object(objectKey)
+	objectHandle := client.cloudStorageClient.Bucket(cfg.Bucket).Object(objectKey)
 
 	writer := objectHandle.NewWriter(ctx)
 	if _, err := writer.Write(data); err != nil {
