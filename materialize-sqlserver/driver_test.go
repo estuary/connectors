@@ -113,6 +113,7 @@ func TestPrereqs(t *testing.T) {
 				Tenant: "tenant",
 			}).Unwrap()
 
+			require.Equal(t, len(tt.want), len(actual))
 			for i := 0; i < len(tt.want); i++ {
 				require.ErrorContains(t, actual[i], tt.want[i])
 			}
