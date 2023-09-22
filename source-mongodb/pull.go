@@ -328,6 +328,7 @@ const CHECKPOINT_EVERY = 4096
 const BACKFILL_BATCH_SIZE = 4096
 
 const (
+	NaturalSort = "$natural"
 	SortAscending = 1
 	SortDescending = -1
 )
@@ -341,7 +342,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		state.BackfillStartedAt = time.Now()
 	}
 
-	var opts = options.Find().SetSort(bson.D{{idProperty, SortAscending}}).SetBatchSize(BACKFILL_BATCH_SIZE)
+	var opts = options.Find().SetSort(bson.D{{NaturalSort, SortAscending}}).SetBatchSize(BACKFILL_BATCH_SIZE)
 	var filter = bson.D{}
 	if state.BackfillLastId.Validate() == nil {
 		var v interface{}
