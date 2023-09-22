@@ -108,7 +108,8 @@ func commonSanitizers() map[string]*regexp.Regexp {
 	for k, v := range st.DefaultSanitizers {
 		sanitizers[k] = v
 	}
-	sanitizers[`<UUID>`] = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	sanitizers[`"stream_resume_token":"<STREAM_RESUME_TOKEN>"`] = regexp.MustCompile(`"stream_resume_token":"[^"]*"`)
+	sanitizers[`"backfill_started_at:"<TIMESTAMP>"`] = regexp.MustCompile(`"backfill_started_at":"((?:(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2}(?:\.\d+)?))(Z|[\+-]\d{2}:\d{2})?)"`)
 
 	return sanitizers
 }
