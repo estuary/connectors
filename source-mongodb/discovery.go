@@ -27,7 +27,7 @@ const (
 )
 
 type documentMetadata struct {
-	Op string `json:"op,omitempty" jsonschema:"title=Change Operation,description=Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."`
+	Op string `json:"op,omitempty" jsonschema:"title=Change Operation,description=Change operation type: 'c' Create/Insert 'u' Update 'd' Delete.,enum=c,enum=u,enum=d"`
 }
 
 func generateMinimalSchema() json.RawMessage {
