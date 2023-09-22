@@ -385,6 +385,9 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			return fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
 		}
 		doc = sanitizeDocument(doc)
+		doc[metaProperty] = map[string]interface{}{
+			opProperty: "c",
+		}
 
 		js, err := json.Marshal(doc)
 		if err != nil {
