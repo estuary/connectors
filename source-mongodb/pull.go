@@ -28,7 +28,8 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing config json: %w", err)
 	}
-
+	
+	var convertedState = false
 	var prevState captureState
 	if open.StateJson != nil {
 		if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
@@ -37,19 +38,26 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			var depState deprecatedCaptureState
 			if depErr := pf.UnmarshalStrict(open.StateJson, &depState); depErr == nil {
 				var resources = make(map[string]resourceState)
-				for i, resumeToken := range depState.Resources {
-					resources[i] = resourceState{}
-					var r = resources[i]
-					if resumeToken != nil {
-						r.StreamResumeToken = resumeToken
+				for key, resumeToken := range depState.Resources {
+					var r = resourceState{}
+
+					// if we can unmarshal to resourceState, this is a new state value
+					// otherwise we assume it is a resume token from the old state format
+					if err := json.Unmarshal(resumeToken, &r); err != nil {
+						r.StreamResumeToken = bson.Raw(resumeToken)
 						r.Status = StatusStreaming
 					}
+
+					resources[key] = r
 				}
+
 				prevState = captureState{
 					Resources: resources,
 				}
+
+				convertedState = true
 			} else {
-				return fmt.Errorf("parsing checkpoint json: %w", err)
+				return fmt.Errorf("parsing checkpoint json %s: %w", string(open.StateJson), err)
 			}
 		}
 	}
@@ -76,6 +84,18 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	if err := c.Output.Ready(false); err != nil {
 		return err
+	}
+
+	// emit the converted state
+	if convertedState {
+		checkpointJson, err := json.Marshal(prevState)
+		if err != nil {
+			return fmt.Errorf("encoding checkpoint to json failed: %w", err)
+		}
+		log.WithField("checkpoint", string(checkpointJson)).Info("converted")
+		if err = c.Output.Checkpoint(checkpointJson, false); err != nil {
+			return fmt.Errorf("output checkpoint failed: %w", err)
+		}
 	}
 
 	// Remove bindings from the checkpoint that are no longer part of the spec.
@@ -137,7 +157,7 @@ type capture struct {
 }
 
 type deprecatedCaptureState struct {
-	Resources map[string]bson.Raw `json:"resources"`
+	Resources map[string]json.RawMessage `json:"resources"`
 }
 
 func (s *deprecatedCaptureState) Validate() error {
