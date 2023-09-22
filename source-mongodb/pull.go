@@ -28,7 +28,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing config json: %w", err)
 	}
-	
+
 	var convertedState = false
 	var prevState captureState
 	if open.StateJson != nil {
@@ -324,8 +324,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindin
 	return nil
 }
 
-const CHECKPOINT_EVERY = 4096
-const BACKFILL_BATCH_SIZE = 4096
+const BackfillBatchSize = 1024
 
 const (
 	NaturalSort = "$natural"
@@ -342,7 +341,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		state.BackfillStartedAt = time.Now()
 	}
 
-	var opts = options.Find().SetSort(bson.D{{NaturalSort, SortAscending}}).SetBatchSize(BACKFILL_BATCH_SIZE)
+	var opts = options.Find().SetSort(bson.D{{NaturalSort, SortAscending}}).SetBatchSize(BackfillBatchSize)
 	var filter = bson.D{}
 	if state.BackfillLastId.Validate() == nil {
 		var v interface{}
@@ -398,7 +397,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			return fmt.Errorf("output documents failed: %w", err)
 		}
 
-		if i%CHECKPOINT_EVERY == 0 {
+		if i%BackfillBatchSize == 0 {
 			var checkpoint = captureState{
 				Resources: map[string]resourceState{
 					resourceId(res): *state,
