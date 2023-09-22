@@ -15,7 +15,7 @@ type oplogRecord struct {
 	Ts primitive.Timestamp `bson:"ts"`
 }
 
-const tsProperty = "ts"
+const naturalSort = "$natural"
 
 // Oplog time difference: the time difference is measured as the
 // difference between the latest and the oldest record in a MongoDB oplog, and
@@ -28,14 +28,14 @@ func oplogTimeDifference(ctx context.Context, client *mongo.Client) (uint32, err
 	var oplog = db.Collection("oplog.rs")
 
 	// get latest record
-	var opts = options.FindOne().SetSort(bson.D{{tsProperty, SortDescending}})
+	var opts = options.FindOne().SetSort(bson.D{{naturalSort, SortDescending}})
 	var latest oplogRecord
 	if err := oplog.FindOne(ctx, bson.D{}, opts).Decode(&latest); err != nil {
 		return 0, fmt.Errorf("querying latest oplog record: %w", err)
 	}
 
 	// get oldest record
-	opts = options.FindOne().SetSort(bson.D{{tsProperty, SortAscending}})
+	opts = options.FindOne().SetSort(bson.D{{naturalSort, SortAscending}})
 	var oldest oplogRecord
 	if err := oplog.FindOne(ctx, bson.D{}, opts).Decode(&oldest); err != nil {
 		return 0, fmt.Errorf("querying oldest oplog record: %w", err)
@@ -53,7 +53,7 @@ func oplogHasTimestamp(ctx context.Context, client *mongo.Client, ts time.Time) 
 	var oplog = db.Collection("oplog.rs")
 
 	// get oldest record
-	var opts = options.FindOne().SetSort(bson.D{{tsProperty, SortAscending}})
+	var opts = options.FindOne().SetSort(bson.D{{naturalSort, SortAscending}})
 	var oldest oplogRecord
 	if err := oplog.FindOne(ctx, bson.D{}, opts).Decode(&oldest); err != nil {
 		return fmt.Errorf("querying oldest oplog record: %w", err)
