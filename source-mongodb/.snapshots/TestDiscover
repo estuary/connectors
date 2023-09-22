@@ -1,0 +1,83 @@
+Binding 0:
+{
+    "recommended_name": "test/collection1",
+    "resource_config_json": {
+      "database": "test",
+      "collection": "collection1"
+    },
+    "document_schema_json": {
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            }
+          },
+          "type": "object",
+          "reduce": {
+            "strategy": "merge"
+          }
+        }
+      },
+      "reduce": {
+        "strategy": "merge"
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ]
+  }
+Binding 1:
+{
+    "recommended_name": "test/collection2",
+    "resource_config_json": {
+      "database": "test",
+      "collection": "collection2"
+    },
+    "document_schema_json": {
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            }
+          },
+          "type": "object",
+          "reduce": {
+            "strategy": "merge"
+          }
+        }
+      },
+      "reduce": {
+        "strategy": "merge"
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ]
+  }
+
