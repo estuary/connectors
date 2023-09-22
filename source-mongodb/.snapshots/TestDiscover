@@ -20,6 +20,11 @@ Binding 0:
           "properties": {
             "op": {
               "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
               "title": "Change Operation",
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
             }
@@ -61,6 +66,11 @@ Binding 1:
           "properties": {
             "op": {
               "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
               "title": "Change Operation",
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
             }
