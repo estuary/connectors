@@ -1,5 +1,5 @@
---- Begin target_table createTargetTable ---
-  CREATE TABLE IF NOT EXISTS target_table (
+--- Begin "a-schema".target_table createTargetTable ---
+  CREATE TABLE IF NOT EXISTS "a-schema".target_table (
     key1 INTEGER NOT NULL,
     key2 BOOLEAN NOT NULL,
     boolean BOOLEAN,
@@ -11,50 +11,50 @@
     PRIMARY KEY (key1, key2)
   );
 
-  COMMENT ON TABLE target_table IS 'Generated for materialization test/sqlite of collection key/value';
-  COMMENT ON COLUMN target_table.key1 IS 'auto-generated projection of JSON at: /key1 with inferred types: [integer]';
-  COMMENT ON COLUMN target_table.key2 IS 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]';
-  COMMENT ON COLUMN target_table.boolean IS 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]';
-  COMMENT ON COLUMN target_table.integer IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
-  COMMENT ON COLUMN target_table.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
-  COMMENT ON COLUMN target_table.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
-  COMMENT ON COLUMN target_table.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
-  --- End target_table createTargetTable ---
+  COMMENT ON TABLE "a-schema".target_table IS 'Generated for materialization test/sqlite of collection key/value';
+  COMMENT ON COLUMN "a-schema".target_table.key1 IS 'auto-generated projection of JSON at: /key1 with inferred types: [integer]';
+  COMMENT ON COLUMN "a-schema".target_table.key2 IS 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]';
+  COMMENT ON COLUMN "a-schema".target_table.boolean IS 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]';
+  COMMENT ON COLUMN "a-schema".target_table.integer IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
+  COMMENT ON COLUMN "a-schema".target_table.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
+  COMMENT ON COLUMN "a-schema".target_table.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
+  COMMENT ON COLUMN "a-schema".target_table.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
+  --- End "a-schema".target_table createTargetTable ---
 
---- Begin target_table loadQuery ---
-SELECT 0, target_table.flow_document
-	FROM target_table
+--- Begin "a-schema".target_table loadQuery ---
+SELECT 0, "a-schema".target_table.flow_document
+	FROM "a-schema".target_table
 	JOIN (
 		SELECT $1[0] AS key1, $1[1] AS key2
 		FROM @flow_v1/00010203-0405-0607-0809-0a0b0c0d0e0f
 	) AS r
-	ON target_table.key1 = r.key1 AND target_table.key2 = r.key2
---- End target_table loadQuery ---
+	ON "a-schema".target_table.key1 = r.key1 AND "a-schema".target_table.key2 = r.key2
+--- End "a-schema".target_table loadQuery ---
 
---- Begin target_table copyInto ---
-	COPY INTO target_table (
+--- Begin "a-schema".target_table copyInto ---
+	COPY INTO "a-schema".target_table (
 		key1, key2, boolean, integer, number, string, flow_document
 	) FROM (
 		SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS boolean, $1[3] AS integer, $1[4] AS number, $1[5] AS string, $1[6] AS flow_document
 		FROM @flow_v1/00010203-0405-0607-0809-0a0b0c0d0e0f
 	);
---- End target_table copyInto ---
+--- End "a-schema".target_table copyInto ---
 
---- Begin target_table mergeInto ---
-	MERGE INTO target_table
+--- Begin "a-schema".target_table mergeInto ---
+	MERGE INTO "a-schema".target_table AS l
 	USING (
 		SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS boolean, $1[3] AS integer, $1[4] AS number, $1[5] AS string, $1[6] AS flow_document
 		FROM @flow_v1/00010203-0405-0607-0809-0a0b0c0d0e0f
 	) AS r
-	ON target_table.key1 = r.key1 AND target_table.key2 = r.key2
+	ON l.key1 = r.key1 AND l.key2 = r.key2
 	WHEN MATCHED AND IS_NULL_VALUE(r.flow_document) THEN
 		DELETE
 	WHEN MATCHED THEN
-		UPDATE SET target_table.boolean = r.boolean, target_table.integer = r.integer, target_table.number = r.number, target_table.string = r.string, target_table.flow_document = r.flow_document
+		UPDATE SET l.boolean = r.boolean, l.integer = r.integer, l.number = r.number, l.string = r.string, l.flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
 		INSERT (key1, key2, boolean, integer, number, string, flow_document)
 		VALUES (r.key1, r.key2, r.boolean, r.integer, r.number, r.string, r.flow_document);
---- End target_table mergeInto ---
+--- End "a-schema".target_table mergeInto ---
 
 --- Begin "Delta Updates" createTargetTable ---
   CREATE TABLE IF NOT EXISTS "Delta Updates" (
@@ -82,30 +82,30 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 --- End "Delta Updates" copyInto ---
 
 --- Begin "Delta Updates" mergeInto ---
-	MERGE INTO "Delta Updates"
+	MERGE INTO "Delta Updates" AS l
 	USING (
 		SELECT $1[0] AS theKey, $1[1] AS aValue
 		FROM @flow_v1/00010203-0405-0607-0809-0a0b0c0d0e0f
 	) AS r
-	ON "Delta Updates".theKey = r.theKey
+	ON l.theKey = r.theKey
 	WHEN MATCHED THEN
-		UPDATE SET "Delta Updates".aValue = r.aValue
+		UPDATE SET l.aValue = r.aValue
 	WHEN NOT MATCHED THEN
 		INSERT (theKey, aValue)
 		VALUES (r.theKey, r.aValue);
 --- End "Delta Updates" mergeInto ---
 
 --- Begin target_table_no_values_materialized mergeInto ---
-	MERGE INTO target_table_no_values_materialized
+	MERGE INTO target_table_no_values_materialized AS l
 	USING (
 		SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS flow_document
 		FROM @flow_v1/00010203-0405-0607-0809-0a0b0c0d0e0f
 	) AS r
-	ON target_table_no_values_materialized.key1 = r.key1 AND target_table_no_values_materialized.key2 = r.key2
+	ON l.key1 = r.key1 AND l.key2 = r.key2
 	WHEN MATCHED AND IS_NULL_VALUE(r.flow_document) THEN
 		DELETE
 	WHEN MATCHED THEN
-		UPDATE SET target_table_no_values_materialized.flow_document = r.flow_document
+		UPDATE SET l.flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
 		INSERT (key1, key2, flow_document)
 		VALUES (r.key1, r.key2, r.flow_document);
