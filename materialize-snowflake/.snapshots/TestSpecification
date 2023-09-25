@@ -37,7 +37,7 @@
       "schema": {
         "type": "string",
         "title": "Schema",
-        "description": "The SQL schema to use.",
+        "description": "Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables.",
         "order": 5
       },
       "warehouse": {
@@ -93,6 +93,11 @@
       "table": {
         "type": "string",
         "x-collection-name": true
+      },
+      "schema": {
+        "type": "string",
+        "title": "Alternative Schema",
+        "description": "Alternative schema for this table (optional)"
       },
       "delta_updates": {
         "type": "boolean"

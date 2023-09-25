@@ -19,6 +19,10 @@ import (
 // UPPERCASE, making this historical quoting important for backward compatibility.
 var simpleIdentifierRegexp = regexp.MustCompile(`^[_\pL]+[_\pL\pN]*$`)
 
+func isSimpleIdentifier(s string) bool {
+	return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(SF_RESERVED_WORDS, strings.ToLower(s))
+}
+
 var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
 	switch ii := te.(type) {
 	case []byte:
@@ -67,9 +71,7 @@ var snowflakeDialect = func() sql.Dialect {
 	return sql.Dialect{
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
-				func(s string) bool {
-					return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(SF_RESERVED_WORDS, strings.ToLower(s))
-				},
+				isSimpleIdentifier,
 				sql.QuoteTransform("\"", "\\\""),
 			))),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
@@ -152,7 +154,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 
 
 {{ define "mergeInto" }}
-	MERGE INTO {{ $.Table.Identifier }}
+	MERGE INTO {{ $.Table.Identifier }} AS l
 	USING (
 		SELECT {{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
@@ -162,7 +164,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 	) AS r
 	ON {{ range $ind, $key := $.Table.Keys }}
 		{{- if $ind }} AND {{ end -}}
-		{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 	{{- if $.Table.Document }}
 	WHEN MATCHED AND IS_NULL_VALUE(r.{{ $.Table.Document.Identifier }}) THEN
@@ -171,10 +173,10 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Table.Values }}
 		{{- if $ind }}, {{ end -}}
-		{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end -}}
 	{{- if $.Table.Document -}}
-	{{ if $.Table.Values }}, {{ end }}{{ $.Table.Identifier }}.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
+	{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
 	{{- end }}
 	WHEN NOT MATCHED THEN
 		INSERT (

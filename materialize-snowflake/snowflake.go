@@ -31,7 +31,7 @@ type config struct {
 	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=2"`
 	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=3"`
 	Database  string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=4"`
-	Schema    string `json:"schema" jsonschema:"title=Schema,description=The SQL schema to use." jsonschema_extras:"order=5"`
+	Schema    string `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=5"`
 	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=6"`
 	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=7"`
 
@@ -125,12 +125,24 @@ func (c *config) Validate() error {
 }
 
 type tableConfig struct {
-	Table string `json:"table" jsonschema_extras:"x-collection-name=true"`
-	Delta bool   `json:"delta_updates,omitempty"`
+	Table  string `json:"table" jsonschema_extras:"x-collection-name=true"`
+	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)"`
+	Delta  bool   `json:"delta_updates,omitempty"`
+
+	// If the endpoint schema is the same as the resource schema, the resource path will be only the
+	// table name. This is to provide compatibility for materializations that were created prior to
+	// the resource-level schema setting existing, which always had a resource path of only the
+	// table name.
+	endpointSchema string
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{}
+	return &tableConfig{
+		// Default to the explicit endpoint configuration schema. This may be over-written by a
+		// present `schema` property within `raw` for the resource.
+		Schema:         ep.Config.(*config).Schema,
+		endpointSchema: ep.Config.(*config).Schema,
+	}
 }
 
 func (c tableConfig) Validate() error {
@@ -140,8 +152,22 @@ func (c tableConfig) Validate() error {
 	return nil
 }
 
+func schemasEqual(s1 string, s2 string) bool {
+	// Both are unquoted: Do a case insensitive match, since Snowflake uppercases everything that
+	// isn't quoted. For example, "Public" is the same as "public", which is the same as "PUBLIC"
+	// etc.
+	if isSimpleIdentifier(s1) && isSimpleIdentifier(s2) {
+		return strings.EqualFold(s1, s2)
+	}
+
+	return s1 == s2
+}
+
 func (c tableConfig) Path() sql.TablePath {
-	return []string{c.Table}
+	if c.Schema == "" || schemasEqual(c.Schema, c.endpointSchema) {
+		return []string{c.Table}
+	}
+	return []string{c.Schema, c.Table}
 }
 
 func (c tableConfig) DeltaUpdates() bool {
