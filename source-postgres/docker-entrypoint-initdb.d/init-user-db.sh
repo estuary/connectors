@@ -12,4 +12,5 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     GRANT CREATE, USAGE ON SCHEMA public TO flow_capture;
 
     CREATE PUBLICATION flow_publication FOR ALL TABLES;
+    ALTER PUBLICATION flow_publication SET (publish_via_partition_root = true);
 EOSQL
