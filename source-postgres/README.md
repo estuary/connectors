@@ -83,6 +83,7 @@ CREATE USER flow_capture WITH PASSWORD 'secret' REPLICATION;
 GRANT pg_read_all_data TO flow_capture;
 
 CREATE PUBLICATION flow_publication FOR ALL TABLES;
+ALTER PUBLICATION flow_publication SET (publish_via_partition_root = true);
 
 -- Set WAL level to logical. Note that changing this requires a database
 -- restart to take effect.
@@ -143,3 +144,4 @@ performed automatically by `init-user-db.sh` if you use `docker-compose.yaml`):
     > GRANT SELECT ON ALL TABLES IN SCHEMA test TO flow_capture;
 
     > CREATE PUBLICATION flow_publication FOR ALL TABLES;
+    > ALTER PUBLICATION flow_publication SET (publish_via_partition_root = true);
