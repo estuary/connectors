@@ -358,7 +358,7 @@ type sftpFile struct {
 }
 
 func (f *sftpFile) transfer() error {
-	// Pump data to the pipe using WriteTo to utilitize concurrent read workers.
+	// Pump data to the pipe using WriteTo to utilize concurrent read workers.
 	_, err := f.file.WriteTo(f.writer)
 
 	// Errors from WriteTo will be propagated to calls to read. CloseWithError always returns `nil`.

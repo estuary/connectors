@@ -15,8 +15,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// captureState is the persistent state for the entire capture, which consistents of one or more
-// table states.
+// captureState is the persistent state for the entire capture, which consists of one or more table
+// states.
 type captureState struct {
 	Tables map[string]tableState `json:"tables,omitempty"`
 }
@@ -130,7 +130,7 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 		// Mark any shards that are closed before the backfill begins as fully read. Shards that
 		// have been closed prior to the backfill starting by definition will not have any records
 		// added to them while the backfill is on-going. It would not be incorrect to capture the
-		// values from these shards, but is unecessary.
+		// values from these shards, but is unnecessary.
 		shards, err := c.listShards(ctx, tableState.StreamArn)
 		if err != nil {
 			return nil, fmt.Errorf("listing shards: %w", err)
@@ -182,7 +182,7 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 // nor can we do any kind of watermark writes for establishing a consistent point in the table
 // streams.
 //
-// Given these limitatations, we can achieve an eventually consistent capture of the table with
+// Given these limitations, we can achieve an eventually consistent capture of the table with
 // respect to a "last write wins" materialization of the resulting collection. All change events
 // from the table are captured intermingled with backfill records.
 //
@@ -258,7 +258,7 @@ func (c *capture) captureTable(ctx context.Context, t *table) error {
 
 	// TODO(whb): If we were ever going to allow these Flow consumer shards to be split, we would
 	// need to coordinate that ALL Flow task shards were done backfilling prior to starting this
-	// continous stream. This is because of the possible data race described above in the backfill
+	// continuous stream. This is because of the possible data race described above in the backfill
 	// loop.
 	log.WithFields(log.Fields{
 		"table": t.tableName,
@@ -448,7 +448,7 @@ func decodeStreamRecordAttributes(attrs map[string]streamTypes.AttributeValue, k
 func decodeAttributes(attrs map[string]types.AttributeValue, keyFields []string) (map[string]any, error) {
 	// Unmarshal the map of field name: types.AttributeValue to a map of field name: `any`.
 	// attributevalue.UnmarshalMap decodes a types.AttributeValue to an `any` by converting the
-	// DyanmoDB value to its corresponding native Go type and value, which works quite well for
+	// DynamoDB value to its corresponding native Go type and value, which works quite well for
 	// building a JSON document.
 	record := make(map[string]any)
 
