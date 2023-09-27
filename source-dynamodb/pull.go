@@ -19,13 +19,13 @@ const (
 	backfillStreamingHorizon = 1 * time.Hour
 
 	// Default number of items to evaluate for each backfill scan request for tables with relatively
-	// low provisoned read capacity units.
+	// low provisioned read capacity units.
 	lowRcuScanLimit = 100
 
 	// Delay between checks of the shard topology for the streaming process.
 	defaultShardMonitorDelay = 5 * time.Second
 
-	// Number of backfill segements that will be used per table.
+	// Number of backfill segments that will be used per table.
 	defaultBackfillSegments = 100
 
 	// Time to spend for each period of backfilling a table.
