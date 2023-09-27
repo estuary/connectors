@@ -179,7 +179,7 @@ type constrainter struct{}
 
 func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
 	// By default only the collection key and root document fields are materialized, due to
-	// DyanmoDB's 400kb single item size limit. Additional fields are optional and may be selected
+	// DynamoDB's 400kb single item size limit. Additional fields are optional and may be selected
 	// to materialize as top-level properties with the applicable conversion applied, if desired.
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {

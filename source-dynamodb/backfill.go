@@ -57,8 +57,8 @@ func (c *capture) backfill(ctx context.Context, t *table, dur time.Duration) err
 	stopTimer := time.AfterFunc(dur, func() { close(stopCh) })
 	defer stopTimer.Stop()
 
-	// Run the backfill workers. They will continuously pull segements from t.activeSegements and
-	// run backfill scans, returning only if they run out of segments or stopCh is closed.
+	// Run the backfill workers. They will continuously pull segments from t.activeSegments and run
+	// backfill scans, returning only if they run out of segments or stopCh is closed.
 	eg, groupCtx := errgroup.WithContext(ctx)
 	for idx := 0; idx < backfillConcurrency; idx++ {
 		eg.Go(func() error {
