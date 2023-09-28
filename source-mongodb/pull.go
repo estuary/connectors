@@ -323,7 +323,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	return nil
 }
 
-const BackfillBatchSize = 1024
+const BackfillBatchSize = 655360
 
 const (
 	NaturalSort = "$natural"
