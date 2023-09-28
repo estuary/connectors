@@ -12,11 +12,16 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 
+	"golang.org/x/sync/errgroup"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+// Limit the number of backfills running concurrently to avoid
+// too much memory pressure
+const ConcurrentBackfillLimit = 20
 
 // Pull is a very long lived RPC through which the Flow runtime and a
 // Driver cooperatively execute an unbounded number of transactions.
@@ -94,7 +99,13 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 
+	// Run backfills concurrently and wait until they are done before we start
+	// the change stream
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.SetLimit(ConcurrentBackfillLimit)
+
 	var resources = make([]resource, len(open.Capture.Bindings))
+
 	// Capture each binding.
 	for idx, binding := range open.Capture.Bindings {
 		idx := idx
@@ -107,10 +118,14 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		var resState, _ = prevState.Resources[resourceId(res)]
 
 		if resState.Status == StatusBackfill {
-			if err = c.BackfillCollection(ctx, client, idx, res, &resState); err != nil {
-				return fmt.Errorf("backfill: %w", err)
-			}
+			eg.Go(func() error {
+				return c.BackfillCollection(egCtx, client, idx, res, &resState)
+			})
 		}
+	}
+
+	if err = eg.Wait(); err != nil {
+		return fmt.Errorf("backfill: %w", err)
 	}
 
 	return c.ChangeStream(ctx, client, resources, prevState)
