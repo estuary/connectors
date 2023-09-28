@@ -30,32 +30,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	var prevState captureState
 	if open.StateJson != nil {
 		if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
-			// If this is coming from an old version of the connector, parse it and
-			// convert it to the new format
-			var depState deprecatedCaptureState
-			if depErr := pf.UnmarshalStrict(open.StateJson, &depState); depErr == nil {
-				var resources = make(map[string]resourceState)
-				for key, resumeToken := range depState.Resources {
-					var r = resourceState{}
-
-					// if we can unmarshal to resourceState, this is a new state value
-					// otherwise we assume it is a resume token from the old state format
-					if err := json.Unmarshal(resumeToken, &r); err != nil {
-						r.StreamResumeToken = bson.Raw(resumeToken)
-						r.Status = StatusStreaming
-					}
-
-					resources[key] = r
-				}
-
-				prevState = captureState{
-					Resources: resources,
-				}
-
-				convertedState = true
-			} else {
-				return fmt.Errorf("parsing checkpoint json %s: %w", string(open.StateJson), err)
-			}
+			return fmt.Errorf("parsing checkpoint json %s: %w", string(open.StateJson), err)
 		}
 	}
 
@@ -143,14 +118,6 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 type capture struct {
 	Output *boilerplate.PullOutput
-}
-
-type deprecatedCaptureState struct {
-	Resources map[string]json.RawMessage `json:"resources"`
-}
-
-func (s *deprecatedCaptureState) Validate() error {
-	return nil
 }
 
 type captureState struct {
