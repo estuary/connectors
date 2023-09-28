@@ -528,9 +528,6 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		columnPointers[i] = &columnValues[i]
 	}
 
-	if len(cursorValues) != len(cursorNames) {
-		cursorValues = make([]any, len(cursorNames))
-	}
 	var count int
 	for rows.Next() {
 		if err := rows.Scan(columnPointers...); err != nil {
@@ -559,6 +556,9 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 			return nil, fmt.Errorf("error emitting checkpoint: %w", err)
 		}
 
+		if len(cursorValues) != len(cursorNames) {
+			cursorValues = make([]any, len(cursorNames))
+		}
 		for i, name := range columnNames {
 			resultRow[name] = columnValues[i]
 		}
