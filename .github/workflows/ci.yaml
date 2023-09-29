@@ -83,6 +83,7 @@ jobs:
           - source-kinesis
           - source-mongodb
           - source-mysql
+          - source-mysql-batch
           - source-postgres
           - source-postgres-batch
           - source-s3
