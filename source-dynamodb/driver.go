@@ -7,8 +7,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodbstreams"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodbstreams/types"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -55,54 +53,14 @@ func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Respo
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		logEntry := log.WithField("table", res.Table)
-
-		// Sanity-checks: Can we run a scan on the table?
+		// Sanity-check: Can we run a scan on the table?
 		if _, err := client.db.Scan(ctx, &dynamodb.ScanInput{
 			TableName: aws.String(res.Table),
 			Limit:     aws.Int32(1),
 		}); err != nil {
 			return nil, fmt.Errorf("cannot read from table %s: %w", res.Table, err)
 		}
-		logEntry.Debug("validated table scan")
-
-		// Can we read from shards of the table?
-		tableDescribe, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-			TableName: aws.String(res.Table),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("describing table %s: %w", res.Table, err)
-		}
-
-		streamDescribe, err := client.stream.DescribeStream(ctx, &dynamodbstreams.DescribeStreamInput{
-			StreamArn: tableDescribe.Table.LatestStreamArn,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("describing stream for table %s: %w", res.Table, err)
-		}
-
-		if len(streamDescribe.StreamDescription.Shards) > 0 {
-			iter, err := client.stream.GetShardIterator(ctx, &dynamodbstreams.GetShardIteratorInput{
-				ShardId:           streamDescribe.StreamDescription.Shards[0].ShardId,
-				ShardIteratorType: types.ShardIteratorTypeTrimHorizon,
-				StreamArn:         tableDescribe.Table.LatestStreamArn,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("getting shard iterator: %w", err)
-			}
-
-			if _, err := client.stream.GetRecords(ctx, &dynamodbstreams.GetRecordsInput{
-				ShardIterator: iter.ShardIterator,
-				Limit:         aws.Int32(1),
-			}); err != nil {
-				return nil, fmt.Errorf("cannot read from table %s stream: %w", res.Table, err)
-			}
-
-			logEntry.Debug("validated table stream shard read")
-		} else {
-			// If a stream is enabled, there should always be shards for the table stream.
-			log.WithField("table", res.Table).Warn("no shards found for table")
-		}
+		log.WithField("table", res.Table).Debug("validated table scan")
 
 		out = append(out, &pc.Response_Validated_Binding{
 			ResourcePath: []string{res.Table},

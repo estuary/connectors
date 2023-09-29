@@ -4,17 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodbstreams"
-	streamTypes "github.com/aws/aws-sdk-go-v2/service/dynamodbstreams/types"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 type discoveredTable struct {
@@ -227,16 +227,36 @@ func discoverTables(ctx context.Context, c *client) ([]discoveredTable, error) {
 		}
 	}
 
+	// Discover tables with a moderate degree of parallelism, to accommodate large numbers of tables
+	// from the ListTables response. Per
+	// https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-api,
+	// you can send up to 2,500 DescribeTable requests per second, so we are very unlikely to exceed
+	// any API rate limits.
 	out := []discoveredTable{}
-	for _, t := range allTableNames {
-		discovered, include, err := discoverTable(ctx, c, t)
-		if err != nil {
-			return nil, fmt.Errorf("discovering table: %w", err)
-		}
+	var mu sync.Mutex
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(10)
 
-		if include {
-			out = append(out, discovered)
-		}
+	for _, t := range allTableNames {
+		t := t
+		group.Go(func() error {
+			discovered, include, err := discoverTable(groupCtx, c, t)
+			if err != nil {
+				return fmt.Errorf("discovering table: %w", err)
+			}
+
+			if include {
+				mu.Lock()
+				out = append(out, discovered)
+				mu.Unlock()
+			}
+
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 
 	return out, nil
@@ -264,29 +284,11 @@ func discoverTable(ctx context.Context, c *client, table string) (discoveredTabl
 		return discoveredTable{}, false, nil
 	}
 
-	// Make sure the stream is active.
-	streamDescribe, err := c.stream.DescribeStream(ctx, &dynamodbstreams.DescribeStreamInput{
-		StreamArn: tableDescribe.Table.LatestStreamArn,
-		Limit:     aws.Int32(1), // Don't need to list all of the shards right now.
-	})
-	if err != nil {
-		return discoveredTable{}, false, fmt.Errorf("describe stream: %w", err)
-	}
-
-	if streamDescribe.StreamDescription.StreamStatus != streamTypes.StreamStatusEnabled {
-		log.WithFields(log.Fields{
-			"table":     tableDescribe.Table.TableName,
-			"streamArn": tableDescribe.Table.LatestStreamArn,
-			"status":    streamDescribe.StreamDescription.StreamStatus,
-		}).Warn("streaming enabled for table but stream was not active; table will not be captured")
-		return discoveredTable{}, false, nil
-	}
-
-	if streamDescribe.StreamDescription.StreamViewType != streamTypes.StreamViewTypeNewAndOldImages {
+	if tableDescribe.Table.StreamSpecification.StreamViewType != types.StreamViewTypeNewAndOldImages {
 		log.WithFields(log.Fields{
 			"table":          tableDescribe.Table.TableName,
 			"streamArn":      tableDescribe.Table.LatestStreamArn,
-			"streamViewType": streamDescribe.StreamDescription.StreamViewType,
+			"streamViewType": tableDescribe.Table.StreamSpecification.StreamViewType,
 		}).Warn("streamViewType must be NEW_AND_OLD_IMAGES; table will not be captured")
 		return discoveredTable{}, false, nil
 	}
