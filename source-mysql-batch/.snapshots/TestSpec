@@ -51,13 +51,15 @@
       "name": {
         "type": "string",
         "title": "Name",
-        "description": "The unique name of this resource."
+        "description": "The unique name of this resource.",
+        "order": 0
       },
       "template": {
         "type": "string",
         "title": "Query Template",
         "description": "The query template (pkg.go.dev/text/template) which will be rendered and then executed.",
-        "multiline": true
+        "multiline": true,
+        "order": 3
       },
       "cursor": {
         "items": {
@@ -65,19 +67,20 @@
         },
         "type": "array",
         "title": "Cursor Columns",
-        "description": "The names of columns which should be persisted between query executions as a cursor."
+        "description": "The names of columns which should be persisted between query executions as a cursor.",
+        "order": 2
       },
       "poll": {
         "type": "string",
         "title": "Poll Interval",
-        "description": "How often to execute the fetch query. Defaults to 24 hours if unset."
+        "description": "How often to execute the fetch query. Defaults to 24 hours if unset.",
+        "order": 1
       }
     },
     "type": "object",
     "required": [
       "name",
-      "template",
-      "cursor"
+      "template"
     ],
     "title": "Batch SQL Resource Spec"
   },
