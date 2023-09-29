@@ -70,7 +70,7 @@
       "poll": {
         "type": "string",
         "title": "Poll Interval",
-        "description": "How often to execute the fetch query. Defaults to 5 minutes if unset."
+        "description": "How often to execute the fetch query. Defaults to 24 hours if unset."
       }
     },
     "type": "object",

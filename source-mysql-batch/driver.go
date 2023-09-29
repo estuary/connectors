@@ -39,7 +39,7 @@ type Resource struct {
 	Name         string   `json:"name" jsonschema:"title=Name,description=The unique name of this resource."`
 	Template     string   `json:"template" jsonschema:"title=Query Template,description=The query template (pkg.go.dev/text/template) which will be rendered and then executed." jsonschema_extras:"multiline=true"`
 	Cursor       []string `json:"cursor" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor."`
-	PollInterval string   `json:"poll,omitempty" jsonschema:"title=Poll Interval,description=How often to execute the fetch query. Defaults to 5 minutes if unset."`
+	PollInterval string   `json:"poll,omitempty" jsonschema:"title=Poll Interval,description=How often to execute the fetch query. Defaults to 24 hours if unset."`
 }
 
 // Validate checks that the resource spec possesses all required properties.
@@ -143,7 +143,7 @@ func (BatchSQLDriver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Res
 }
 
 // Discover enumerates tables and views from `information_schema.tables` and generates
-// placeholder capture queries for thos tables.
+// placeholder capture queries for those tables.
 func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
 	var db, err = drv.Connect(ctx, req.ConfigJson)
 	if err != nil {
@@ -454,7 +454,7 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 		return fmt.Errorf("error parsing template: %w", err)
 	}
 
-	var pollInterval = 5 * time.Minute
+	var pollInterval = 24 * time.Hour
 	if res.PollInterval != "" {
 		var dt, err = time.ParseDuration(res.PollInterval)
 		if err != nil {

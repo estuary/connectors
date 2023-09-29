@@ -154,9 +154,8 @@ func generateMySQLResource(resourceName, schemaName, tableName, tableType string
 	}
 
 	return &Resource{
-		Name:         resourceName,
-		Template:     queryTemplate,
-		PollInterval: "24h",
+		Name:     resourceName,
+		Template: queryTemplate,
 	}, nil
 }
 
