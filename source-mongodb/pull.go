@@ -338,7 +338,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	return nil
 }
 
-const BackfillBatchSize = 655360
+const BackfillBatchSize = 4096
 
 const (
 	NaturalSort = "$natural"
@@ -393,9 +393,13 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		}
 		state.BackfillLastId = rawDoc[idProperty]
 
-		var doc bson.M
-		if err = cursor.Decode(&doc); err != nil {
-			return fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
+		var doc = make(bson.M)
+		for key, val := range rawDoc {
+			var v interface{}
+			if err = val.Unmarshal(&v); err != nil {
+				return fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
+			}
+			doc[key] = v
 		}
 		doc = sanitizeDocument(doc)
 		doc[metaProperty] = map[string]interface{}{
