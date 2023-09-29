@@ -1,0 +1,12 @@
+Query: SELECT * FROM "test"."foobar" WHERE (ka > ?) OR (ka = ? AND kb > ?) OR (ka = ? AND kb = ? AND kc > ?) OR (x > ?) OR (y > ?);
+
+---
+Argument 0: 1
+Argument 1: 1
+Argument 2: "two"
+Argument 3: 1
+Argument 4: "two"
+Argument 5: 3
+Argument 6: "xval"
+Argument 7: "yval"
+

@@ -1,0 +1,1 @@
+SELECT * FROM `test`.`foobar` WHERE (`ka` > :0) OR (`ka` = :0 AND `kb` > :1) ORDER BY `ka`, `kb`;
