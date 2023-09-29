@@ -128,6 +128,5 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		})
 	}
 
-	// TODO: If we error here, do a catch-up read on all streams?
 	return eg.Wait()
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -76,6 +77,14 @@ func (c *config) toClient(ctx context.Context) (*client, error) {
 			credentials.NewStaticCredentialsProvider(c.AWSAccessKeyID, c.AWSSecretAccessKey, ""),
 		),
 		awsConfig.WithRegion(c.Region),
+		awsConfig.WithRetryer(func() aws.Retryer {
+			// Bump up the number of retry maximum attempts from the default of 3. The maximum retry
+			// duration is 20 seconds, so this gives us around 5 minutes of retrying retryable
+			// errors before giving up and crashing the connector.
+			//
+			// Ref: https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/retries-timeouts/
+			return retry.AddWithMaxAttempts(retry.NewStandard(), 20)
+		}),
 	}
 
 	if c.Advanced.Endpoint != "" {
