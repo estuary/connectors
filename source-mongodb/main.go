@@ -97,7 +97,8 @@ type driver struct{}
 
 func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	// Create a new client and connect to the server
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.ToURI()))
+	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zstd","zlib","snappy"})
+	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
