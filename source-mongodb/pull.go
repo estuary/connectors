@@ -177,6 +177,10 @@ const resumePointGoneErrorMessage = "the resume point may no longer be in the op
 const resumeTokenNotFoundErrorMessage = "the resume token was not found"
 
 func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resources []resource, state captureState) error {
+	if len(resources) < 1 {
+		return nil
+	}
+
 	// If we have a StreamResumeToken, we use that to resume our change stream
 	var streamResumeToken = state.StreamResumeToken
 
@@ -338,7 +342,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	return nil
 }
 
-const BackfillBatchSize = 4096
+const BackfillBatchSize = 65536
 
 const (
 	NaturalSort = "$natural"
