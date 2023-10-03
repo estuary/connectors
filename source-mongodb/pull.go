@@ -359,7 +359,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		state.BackfillStartedAt = time.Now()
 	}
 
-	var opts = options.Find().SetSort(bson.D{{NaturalSort, SortAscending}}).SetBatchSize(BackfillBatchSize)
+	var opts = options.Find().SetBatchSize(BackfillBatchSize).SetHint(bson.M{"_id": 1})
 	var filter = bson.D{}
 	if state.BackfillLastId.Validate() == nil {
 		var v interface{}
