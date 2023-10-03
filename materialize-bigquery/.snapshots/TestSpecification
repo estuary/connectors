@@ -26,7 +26,7 @@
       "dataset": {
         "type": "string",
         "title": "Dataset",
-        "description": "BigQuery dataset that will be used to store the materialization output.",
+        "description": "BigQuery dataset for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables.",
         "order": 3
       },
       "bucket": {
@@ -89,6 +89,11 @@
         "title": "Table",
         "description": "Table in the BigQuery dataset to store materialized result in.",
         "x-collection-name": true
+      },
+      "dataset": {
+        "type": "string",
+        "title": "Alternative Dataset",
+        "description": "Alternative dataset for this table (optional). Must be located in the region set in the endpoint configuration."
       },
       "delta_updates": {
         "type": "boolean",

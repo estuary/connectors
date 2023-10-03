@@ -26,7 +26,7 @@ type config struct {
 	ProjectID        string `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset." jsonschema_extras:"order=0"`
 	CredentialsJSON  string `json:"credentials_json" jsonschema:"title=Service Account JSON,description=The JSON credentials of the service account to use for authorization." jsonschema_extras:"secret=true,multiline=true,order=1"`
 	Region           string `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region." jsonschema_extras:"order=2"`
-	Dataset          string `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset that will be used to store the materialization output." jsonschema_extras:"order=3"`
+	Dataset          string `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=3"`
 	Bucket           string `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery." jsonschema_extras:"order=4"`
 	BucketPath       string `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket." jsonschema_extras:"order=5"`
 	BillingProjectID string `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. Defaults to Project ID if not specified." jsonschema_extras:"order=6"`
@@ -99,22 +99,19 @@ func (c *config) client(ctx context.Context) (*client, error) {
 	}, nil
 }
 
-// DatasetPath returns the sqlDriver.ResourcePath including the dataset.
-func (c *config) DatasetPath(path ...string) sql.TablePath {
-	return append([]string{c.ProjectID, c.Dataset}, path...)
-}
-
 type tableConfig struct {
 	Table     string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in." jsonschema_extras:"x-collection-name=true"`
+	Dataset   string `json:"dataset,omitempty" jsonschema:"title=Alternative Dataset,description=Alternative dataset for this table (optional). Must be located in the region set in the endpoint configuration."`
 	Delta     bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false."`
 	projectID string
-	dataset   string
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
 	return &tableConfig{
+		// Default to the explicit endpoint configuration dataset. This may be over-written by a
+		// present `dataset` property within `raw` for the resource.
+		Dataset:   ep.Config.(*config).Dataset,
 		projectID: ep.Config.(*config).ProjectID,
-		dataset:   ep.Config.(*config).Dataset,
 	}
 }
 
@@ -127,7 +124,7 @@ func (c tableConfig) Validate() error {
 
 // Path returns the sqlDriver.ResourcePath for a table.
 func (c tableConfig) Path() sql.TablePath {
-	return []string{c.projectID, c.dataset, c.Table}
+	return []string{c.projectID, c.Dataset, c.Table}
 }
 
 func (c tableConfig) GetAdditionalSql() string {
@@ -178,7 +175,8 @@ func newBigQueryDriver() *sql.Driver {
 				"bucket_path": cfg.BucketPath,
 			}).Info("creating bigquery endpoint")
 
-			var metaSpecs, metaCheckpoints = sql.MetaTables(cfg.DatasetPath())
+			var metaBase sql.TablePath = []string{cfg.ProjectID, cfg.Dataset}
+			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
 			client, err := cfg.client(ctx)
 			if err != nil {
