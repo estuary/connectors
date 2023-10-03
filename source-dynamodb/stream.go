@@ -33,8 +33,10 @@ func (c *capture) streamTable(ctx context.Context, t *table) error {
 			// On initial startup the workers will have not have been started yet.
 			if workersStop != nil {
 				log.WithFields(log.Fields{
-					"table":  t.tableName,
-					"stream": t.streamArn,
+					"table":            t.tableName,
+					"stream":           t.streamArn,
+					"numInitialShards": len(initialShards),
+					"numCurrentShards": len(currentShards),
 				}).Debug("shard topology changed")
 
 				// Signal the workers to stop.
@@ -130,7 +132,7 @@ func (c *capture) pruneShards(tableName string, activeShards map[string]streamTy
 				log.WithFields(log.Fields{
 					"table":   tableName,
 					"shardId": id,
-				}).Info("pruning fully-read shard from capture state since it no longer exists")
+				}).Debug("pruning fully-read shard from capture state since it no longer exists")
 				prune = append(prune, id)
 			} else {
 				// Shard is gone but we didn't get to completely read it. This is an error since it
