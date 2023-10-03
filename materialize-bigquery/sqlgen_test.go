@@ -23,7 +23,7 @@ func TestSQLGeneration(t *testing.T) {
 		Table:     "target_table",
 		Delta:     false,
 		projectID: "projectID",
-		dataset:   "dataset",
+		Dataset:   "dataset",
 	})
 
 	table, err := sqlDriver.ResolveTable(shape, bqDialect)
@@ -49,7 +49,7 @@ func TestSQLGeneration(t *testing.T) {
 		Table:     "target_table_no_values_materialized",
 		Delta:     false,
 		projectID: "projectID",
-		dataset:   "dataset",
+		Dataset:   "dataset",
 	})
 	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, bqDialect)
 	require.NoError(t, err)
