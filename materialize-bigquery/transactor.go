@@ -57,13 +57,18 @@ func newTransactor(
 		// The name of the table itself is always the last element of the path.
 		table := binding.TableShape.Path[len(binding.TableShape.Path)-1]
 
+		// The dataset for the table is always the second to last element of the path. Dataset names
+		// can only contain letters, numbers, and underscores, so translateFlowIdentifier is not
+		// needed when using this part of the path directly.
+		dataset := binding.TableShape.Path[len(binding.TableShape.Path)-2]
+
 		// Lookup metadata for the table to build the schema for the external file that will be used
 		// for loading data. Schema definitions from the actual table columns are queried instead of
 		// directly using the dialect's output for JSON schema type to provide some degree in
 		// flexibility in changing the dialect and having it still work for existing tables. As long
 		// as the JSON encoding of the values is the same they may be used for columns that would
 		// have been created differently due to evolution of the dialect's column types.
-		meta, err := client.bigqueryClient.DatasetInProject(cfg.ProjectID, cfg.Dataset).Table(translateFlowIdentifier(table)).Metadata(ctx)
+		meta, err := client.bigqueryClient.DatasetInProject(cfg.ProjectID, dataset).Table(translateFlowIdentifier(table)).Metadata(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("getting table metadata: %w", err)
 		}
