@@ -31,7 +31,6 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("parsing config json: %w", err)
 	}
 
-	var convertedState = false
 	var prevState captureState
 	if open.StateJson != nil {
 		if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
@@ -59,18 +58,6 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	if err := c.Output.Ready(false); err != nil {
 		return err
-	}
-
-	// emit the converted state
-	if convertedState {
-		checkpointJson, err := json.Marshal(prevState)
-		if err != nil {
-			return fmt.Errorf("encoding checkpoint to json failed: %w", err)
-		}
-		log.WithField("checkpoint", string(checkpointJson)).Info("converted")
-		if err = c.Output.Checkpoint(checkpointJson, false); err != nil {
-			return fmt.Errorf("output checkpoint failed: %w", err)
-		}
 	}
 
 	// Remove bindings from the checkpoint that are no longer part of the spec.
@@ -117,7 +104,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		resources[idx] = res
 		var resState, _ = prevState.Resources[resourceId(res)]
 
-		if resState.Status == StatusBackfill {
+		if resState.Status != StatusStreaming {
 			eg.Go(func() error {
 				return c.BackfillCollection(egCtx, client, idx, res, &resState)
 			})
@@ -146,7 +133,13 @@ func (s *captureState) Validate() error {
 
 const (
 	StatusBackfill = 0
-	StatusStreaming = 1
+	// Value of "1" was previously used to designate `StatusStreaming`, however
+	// an update in how we process streams meant that we needed to backfill
+	// bindings again to end up with a clean state, so `StatusStreaming` was
+	// updated to "2", and bindings that still had `Status = 1` in their state
+	// were backfilled. All of this is to say: do not re-use the value 1 in this
+	// enum.
+	StatusStreaming = 2
 )
 
 type resourceState struct {
@@ -155,8 +148,6 @@ type resourceState struct {
 
 	BackfillStartedAt time.Time `json:"backfill_started_at,omitempty"`
 	BackfillLastId bson.RawValue `json:"backfill_last_id,omitempty"`
-
-	StreamResumeToken bson.Raw `json:"stream_resume_token,omitempty"`
 }
 
 type docKey struct {
@@ -181,13 +172,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		return nil
 	}
 
-	// If we have a StreamResumeToken, we use that to resume our change stream
-	var streamResumeToken = state.StreamResumeToken
-
+	// If we have a stream resume token, we use that to continue our change stream
 	// otherwise, we look at BackfillStartedAt of all resources and use the
 	// minimum value to start our change stream from
 	var streamStartAt time.Time
-	if len(streamResumeToken) < 1 {
+	if len(state.StreamResumeToken) < 1 {
 		for _, res := range resources {
 			var resState = state.Resources[resourceId(res)]
 
@@ -215,7 +204,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	log.WithFields(log.Fields{
 		"state":             state,
 		"collectionFilters": collectionFilters,
-		"streamResumeToken": streamResumeToken,
+		"streamResumeToken": state.StreamResumeToken,
 		"streamStartAt":     streamStartAt,
 	}).Info("listening on changes")
 
@@ -234,7 +223,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 
 	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
 
-	if len(streamResumeToken) > 0 {
+	if len(stream.StreamResumeToken) > 0 {
 		opts = opts.SetResumeAfter(state.StreamResumeToken)
 	} else if !streamStartAt.IsZero() {
 		var oplogSafetyBuffer, _ = time.ParseDuration("-5m")
@@ -251,17 +240,10 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	if err != nil {
 		// This error means events from the starting point are no longer available,
 		// which means we have hit a gap in between last run of the connector and
-		// this one. We re-set the checkpoint and error out so the next run of the
-		// connector will run a backfill.
-		//
-		// There is potential for optimisation here by only resetting the checkpoint
-		// of the collection which can't resume instead of resetting the whole
-		// connector's checkpoint and backfilling everything
-
-		// TODO: how to restart connector after oplog has been passed?
+		// this one.
 		if e, ok := err.(mongo.ServerError); ok {
 			if e.HasErrorMessage(resumePointGoneErrorMessage) || e.HasErrorMessage(resumeTokenNotFoundErrorMessage) {
-				return fmt.Errorf("change stream cannot resume capture, this is usually due to a small oplog storage available. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. After resizing your uplog, you can remove all bindings for this capture and add them back to trigger a backfill: %w", e)
+				return fmt.Errorf("change stream cannot resume capture, this is usually due to insufficient oplog storage. Please consider resizing your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. After resizing your oplog, you can remove all bindings for this capture and add them back to trigger a backfill: %w", e)
 			}
 		}
 
@@ -342,7 +324,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	return nil
 }
 
-const BackfillBatchSize = 65536
+// We use a very large batch size here, however the go mongo driver will
+// automatically use a smaller batch size that prevents memory usage to blow out
+// of proportion. The large number here basically is a way for us to ask the
+// driver to choose a reasonable batch size for us.
+const BackfillBatchSize = 262144
 
 const (
 	NaturalSort = "$natural"
@@ -359,6 +345,13 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		state.BackfillStartedAt = time.Now()
 	}
 
+	// By not specifying a sort parameter, MongoDB uses natural sort to order
+	// documents. Natural sort is approximately insertion order (but not
+	// guaranteed). We hint to MongoDB to use the _id index (an index that always
+	// exists) to speed up the process. Note that if we specify the sort
+	// explicitly by { $natural: 1 }, then the database will disregard any indices
+	// and do a full collection scan.
+	// See https://www.mongodb.com/docs/manual/reference/method/cursor.hint
 	var opts = options.Find().SetBatchSize(BackfillBatchSize).SetHint(bson.M{"_id": 1})
 	var filter = bson.D{}
 	if state.BackfillLastId.Validate() == nil {
@@ -438,7 +431,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			if diff, err := oplogTimeDifference(ctx, client); err != nil {
 				return fmt.Errorf("could not read oplog, access to oplog is necessary: %w", err)
 			} else {
-				// TODO: This is just spamming logs, but users won't see these logs. Should we
+				// TODO: Users won't see these logs until there is an error. Should we
 				// just error after seeing this error for a while?
 				if diff < minOplogTimediff {
 					log.Warn(fmt.Sprintf("the current time difference between oldest and newest records in your oplog is %d seconds. This is smaller than the minimum of 24 hours. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE", diff))

@@ -88,7 +88,6 @@ func (c *config) ToURI() string {
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
 	}
-	uri.RawQuery = "authSource=admin"
 
 	return uri.String()
 }
