@@ -1,0 +1,54 @@
+---
+captures:
+  acmeCo/source-netsuite:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-netsuite
+        config: config.yaml
+        env:
+          LOG_LEVEL: debug
+    bindings:
+      - resource:
+          tap_stream_id: foo
+          replication_method: FULL_TABLE
+          key_properties:
+            - my_key
+          stream: foo
+          metadata:
+            - breadcrumb:
+                - properties
+                - my_key
+              metadata:
+                inclusion: automatic
+            - breadcrumb:
+                - properties
+                - value
+              metadata:
+                inclusion: available
+                selected: true
+            - breadcrumb: []
+              metadata:
+                inclusion: available
+                selected: true
+                table-key-properties:
+                  - my_key
+        target: acmeCo/foo
+collections:
+  acmeCo/foo:
+    schema:
+      properties:
+        my_key:
+          type:
+            - string
+        value:
+          type:
+            - string
+            - "null"
+      type: object
+      required:
+        - my_key
+    key:
+      - /my_key

@@ -1,0 +1,3 @@
+# TODO(johnny): Run this through sops once we decide on a KMS
+not-secret: ""
+secret: ""
