@@ -26,7 +26,8 @@ import (
 const (
 	// Minimum oplog time difference: see the comment on OplogTimeDifference in
 	// oplog.go
-	minOplogTimediff = 24 * 60 * 60 // 24 hours, in seconds
+	minOplogTimediffHours = 24
+	minOplogTimediffSeconds = minOplogTimediffHours * 60 * 60 // 24 hours, in seconds
 )
 
 type resource struct {
@@ -102,12 +103,18 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		return nil, err
 	}
 
-	if diff, err := oplogTimeDifference(ctx, client); err != nil {
-		return nil, fmt.Errorf("could not read oplog, access to oplog is necessary: %w", err)
-	} else {
-		if diff < minOplogTimediff {
-			log.Warn(fmt.Sprintf("the current time difference between oldest and newest records in your oplog is %d seconds. This is smaller than the minimum of 24 hours. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE", diff))
+	if retention, err := oplogMinRetentionHours(ctx, client); err != nil || retention == 0 {
+		log.WithField("err", err).Warn("checking oplogMinRetentionHours failed, using an alternative method to approximate oplog size, this might not be accurate.")
+
+		if diff, err := oplogTimeDifference(ctx, client); err != nil {
+			return nil, fmt.Errorf("could not read oplog, access to oplog is necessary: %w", err)
+		} else {
+			if diff < minOplogTimediffSeconds {
+				log.Warn(fmt.Sprintf("the current time difference between oldest and newest records in your oplog is %d seconds. This is smaller than the minimum of 24 hours. This is an approximation and might not be representative of your oplog size. Please ensure your oplog is sufficiently large to be able to safely capture data from your database: https://go.estuary.dev/NurkrE", diff))
+			}
 		}
+	} else if retention < minOplogTimediffHours {
+		return nil, fmt.Errorf("oplog retention period is lower than 24 hours, please consider setting your oplog minimum retention period to a minimum of 24 hours, and ideally more: https://go.estuary.dev/NurkrE")
 	}
 
 	// Any error other than an authentication error will result in the call to Ping hanging until it
