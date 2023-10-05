@@ -33,7 +33,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	var prevState captureState
 	if open.StateJson != nil {
-		if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
+		if err := json.Unmarshal(open.StateJson, &prevState); err != nil {
 			return fmt.Errorf("parsing checkpoint json %s: %w", string(open.StateJson), err)
 		}
 	}
@@ -316,9 +316,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 }
 
 // We use a very large batch size here, however the go mongo driver will
-// automatically use a smaller batch size that prevents memory usage to blow out
-// of proportion. The large number here basically is a way for us to ask the
-// driver to choose a reasonable batch size for us.
+// automatically use a smaller batch size capped at 16mb, as BSON documents have
+// a 16mb size limit which restricts the size of a response from mongodb as
+// well. See https://www.mongodb.com/docs/v7.0/tutorial/iterate-a-cursor/#cursor-batches
+// Note that this number also represents how many documents are checkpointed at
+// once
 const BackfillBatchSize = 50000
 
 const (
@@ -368,6 +370,9 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 
 	var i = 0
 	for cursor.Next(ctx) {
+		if i == 0 {
+			log.WithField("remaining batch length", cursor.RemainingBatchLength()).WithField("collection", res.Collection).Info("effective batch size")
+		}
 		i += 1
 
 		// We decode once into a map of RawValues so we can keep the _id as a
@@ -437,7 +442,6 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 	}
 
 	state.BackfillDone = true
-
 	var checkpoint = captureState{
 		Resources: map[string]resourceState{
 			resourceId(res): *state,
