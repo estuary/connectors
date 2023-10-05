@@ -69,15 +69,21 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 		activeBindings[resourceId(res)] = struct{}{}
 	}
-	removedBindings := false
+	emitCheckpoint := false
 	for res := range prevState.Resources {
 		if _, ok := activeBindings[res]; !ok {
 			log.WithField("resource", res).Info("binding removed from catalog")
 			delete(prevState.Resources, res)
-			removedBindings = true
+			emitCheckpoint = true
 		}
 	}
-	if removedBindings {
+
+	// if all bindings are removed, reset the state
+	if len(activeBindings) < 1 {
+		prevState = captureState{}
+		emitCheckpoint = true
+	}
+	if emitCheckpoint {
 		cp, err := json.Marshal(prevState)
 		if err != nil {
 			return fmt.Errorf("marshalling checkpoint for removed bindings: %w", err)
@@ -104,7 +110,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		resources[idx] = res
 		var resState, _ = prevState.Resources[resourceId(res)]
 
-		if resState.Status != StatusStreaming {
+		if !resState.BackfillDone {
 			eg.Go(func() error {
 				return c.BackfillCollection(egCtx, client, idx, res, &resState)
 			})
@@ -131,20 +137,9 @@ func (s *captureState) Validate() error {
 	return nil
 }
 
-const (
-	StatusBackfill = 0
-	// Value of "1" was previously used to designate `StatusStreaming`, however
-	// an update in how we process streams meant that we needed to backfill
-	// bindings again to end up with a clean state, so `StatusStreaming` was
-	// updated to "2", and bindings that still had `Status = 1` in their state
-	// were backfilled. All of this is to say: do not re-use the value 1 in this
-	// enum.
-	StatusStreaming = 2
-)
-
 type resourceState struct {
-	// default value is 0, which is StatusBackfill
-	Status int `json:"status,omitempty"`
+	// default value is false
+	BackfillDone bool `json:"backfill_done,omitempty"`
 
 	BackfillStartedAt time.Time `json:"backfill_started_at,omitempty"`
 	BackfillLastId bson.RawValue `json:"backfill_last_id,omitempty"`
@@ -190,20 +185,13 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		}
 	}
 
-	var collectionFilters = make([]bson.D, len(resources))
 	var collectionBindingIndex = make(map[string]int)
 	for idx, res := range resources {
 		collectionBindingIndex[resourceId(res)] = idx
-
-		collectionFilters[idx] = bson.D{
-			{"ns.db", res.Database},
-			{"ns.coll", res.Collection},
-		}
 	}
 
 	log.WithFields(log.Fields{
 		"state":             state,
-		"collectionFilters": collectionFilters,
 		"streamResumeToken": state.StreamResumeToken,
 		"streamStartAt":     streamStartAt,
 	}).Info("listening on changes")
@@ -218,12 +206,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 					bson.D{{"operationType", "replace"}},
 				},
 			}},
-		  bson.D{{"$or", collectionFilters}},
 		}}}}}
 
 	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
 
-	if len(stream.StreamResumeToken) > 0 {
+	if len(state.StreamResumeToken) > 0 {
 		opts = opts.SetResumeAfter(state.StreamResumeToken)
 	} else if !streamStartAt.IsZero() {
 		var oplogSafetyBuffer, _ = time.ParseDuration("-5m")
@@ -256,7 +243,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 			return fmt.Errorf("decoding document in collection %s.%s: %w", ev.Ns.Database, ev.Ns.Collection, err)
 		}
 		var resId = eventResourceId(ev)
-		var binding = collectionBindingIndex[resId]
+		var binding, ok = collectionBindingIndex[resId]
+		// this event is from a collection that we have no binding for, skip it
+		if !ok {
+			continue
+		}
 
 		var checkpoint = captureState{
 			StreamResumeToken: cursor.ResumeToken(),
@@ -328,7 +319,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 // automatically use a smaller batch size that prevents memory usage to blow out
 // of proportion. The large number here basically is a way for us to ask the
 // driver to choose a reasonable batch size for us.
-const BackfillBatchSize = 262144
+const BackfillBatchSize = 50000
 
 const (
 	NaturalSort = "$natural"
@@ -445,7 +436,8 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		return fmt.Errorf("cursor error for backfill %s: %w", res.Collection, err)
 	}
 
-	state.Status = StatusStreaming
+	state.BackfillDone = true
+
 	var checkpoint = captureState{
 		Resources: map[string]resourceState{
 			resourceId(res): *state,
