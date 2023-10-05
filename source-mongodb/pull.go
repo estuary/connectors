@@ -110,7 +110,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		resources[idx] = res
 		var resState, _ = prevState.Resources[resourceId(res)]
 
-		if !resState.BackfillDone {
+		if !resState.Backfill.Done {
 			eg.Go(func() error {
 				return c.BackfillCollection(egCtx, client, idx, res, &resState)
 			})
@@ -137,12 +137,15 @@ func (s *captureState) Validate() error {
 	return nil
 }
 
-type resourceState struct {
-	// default value is false
-	BackfillDone bool `json:"backfill_done,omitempty"`
+type backfillState struct {
+	Done bool `json:"done,omitempty"`
 
-	BackfillStartedAt time.Time `json:"backfill_started_at,omitempty"`
-	BackfillLastId bson.RawValue `json:"backfill_last_id,omitempty"`
+	StartedAt time.Time `json:"started_at,omitempty"`
+	LastId bson.RawValue `json:"last_id,omitempty"`
+}
+
+type resourceState struct {
+	Backfill backfillState `json:"backfill,omitempty"`
 }
 
 type docKey struct {
@@ -168,18 +171,18 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	}
 
 	// If we have a stream resume token, we use that to continue our change stream
-	// otherwise, we look at BackfillStartedAt of all resources and use the
+	// otherwise, we look at Backfill.StartedAt of all resources and use the
 	// minimum value to start our change stream from
 	var streamStartAt time.Time
 	if len(state.StreamResumeToken) < 1 {
 		for _, res := range resources {
 			var resState = state.Resources[resourceId(res)]
 
-			if !resState.BackfillStartedAt.IsZero() {
+			if !resState.Backfill.StartedAt.IsZero() {
 				if streamStartAt.IsZero() {
-					streamStartAt = resState.BackfillStartedAt
-				} else if resState.BackfillStartedAt.Before(streamStartAt) {
-					streamStartAt = resState.BackfillStartedAt
+					streamStartAt = resState.Backfill.StartedAt
+				} else if resState.Backfill.StartedAt.Before(streamStartAt) {
+					streamStartAt = resState.Backfill.StartedAt
 				}
 			}
 		}
@@ -333,9 +336,9 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 	var db = client.Database(res.Database)
 	var collection = db.Collection(res.Collection)
 
-	if state.BackfillStartedAt.IsZero() {
+	if state.Backfill.StartedAt.IsZero() {
 		// This means we are starting backfill for the first time
-		state.BackfillStartedAt = time.Now()
+		state.Backfill.StartedAt = time.Now()
 	}
 
 	// By not specifying a sort parameter, MongoDB uses natural sort to order
@@ -347,9 +350,9 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 	// See https://www.mongodb.com/docs/manual/reference/method/cursor.hint
 	var opts = options.Find().SetBatchSize(BackfillBatchSize).SetHint(bson.M{"_id": 1})
 	var filter = bson.D{}
-	if state.BackfillLastId.Validate() == nil {
+	if state.Backfill.LastId.Validate() == nil {
 		var v interface{}
-		if err := state.BackfillLastId.Unmarshal(&v); err != nil {
+		if err := state.Backfill.LastId.Unmarshal(&v); err != nil {
 			return fmt.Errorf("unmarshalling backfill_last_id: %w", err)
 		}
 		filter = bson.D{{idProperty, bson.D{{"$gt", v}}}}
@@ -370,9 +373,6 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 
 	var i = 0
 	for cursor.Next(ctx) {
-		if i == 0 {
-			log.WithField("remaining batch length", cursor.RemainingBatchLength()).WithField("collection", res.Collection).Info("effective batch size")
-		}
 		i += 1
 
 		// We decode once into a map of RawValues so we can keep the _id as a
@@ -384,7 +384,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		if err = cursor.Decode(&rawDoc); err != nil {
 			return fmt.Errorf("decoding document raw in collection %s: %w", res.Collection, err)
 		}
-		state.BackfillLastId = rawDoc[idProperty]
+		state.Backfill.LastId = rawDoc[idProperty]
 
 		var doc = make(bson.M)
 		for key, val := range rawDoc {
@@ -430,7 +430,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		return fmt.Errorf("cursor error for backfill %s: %w", res.Collection, err)
 	}
 
-	state.BackfillDone = true
+	state.Backfill.Done = true
 	var checkpoint = captureState{
 		Resources: map[string]resourceState{
 			resourceId(res): *state,
