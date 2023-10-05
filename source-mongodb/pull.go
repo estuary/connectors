@@ -247,10 +247,6 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		}
 		var resId = eventResourceId(ev)
 		var binding, ok = collectionBindingIndex[resId]
-		// this event is from a collection that we have no binding for, skip it
-		if !ok {
-			continue
-		}
 
 		var checkpoint = captureState{
 			StreamResumeToken: cursor.ResumeToken(),
@@ -259,6 +255,14 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		checkpointJson, err := json.Marshal(checkpoint)
 		if err != nil {
 			return fmt.Errorf("encoding checkpoint to json failed: %w", err)
+		}
+
+		// this event is from a collection that we have no binding for, skip it
+		if !ok {
+			if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
+				return fmt.Errorf("output checkpoint failed: %w", err)
+			}
+			continue
 		}
 
 		if ev.OperationType == "delete" {
