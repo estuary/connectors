@@ -11,6 +11,27 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type serverStatus struct {
+	OplogTruncation oplogTruncation `bson:"oplogTruncation"`
+}
+
+type oplogTruncation struct {
+	OplogMinRetentionHours int `bson:"oplogMinRetentionHours"`
+}
+
+func oplogMinRetentionHours(ctx context.Context, client *mongo.Client) (int, error) {
+	var db = client.Database("admin")
+
+	var result = db.RunCommand(ctx, bson.M{"serverStatus": "1"})
+
+	var status serverStatus
+	if err := result.Decode(&status); err != nil {
+		return 0, fmt.Errorf("decoding server status for oplogMinRetentionHours: %w", err)
+	}
+
+	return status.OplogTruncation.OplogMinRetentionHours, nil
+}
+
 type oplogRecord struct {
 	Ts primitive.Timestamp `bson:"ts"`
 }
