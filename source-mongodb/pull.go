@@ -423,19 +423,8 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
 				return fmt.Errorf("output checkpoint failed: %w", err)
 			}
-
-			if diff, err := oplogTimeDifference(ctx, client); err != nil {
-				return fmt.Errorf("could not read oplog, access to oplog is necessary: %w", err)
-			} else {
-				// TODO: Users won't see these logs until there is an error. Should we
-				// just error after seeing this error for a while?
-				if diff < minOplogTimediff {
-					log.Warn(fmt.Sprintf("the current time difference between oldest and newest records in your oplog is %d seconds. This is smaller than the minimum of 24 hours. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE", diff))
-				}
-			}
 		}
 	}
-
 
 	if err := cursor.Err(); err != nil {
 		return fmt.Errorf("cursor error for backfill %s: %w", res.Collection, err)
