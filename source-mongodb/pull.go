@@ -12,6 +12,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/sync/errgroup"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -95,9 +96,10 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	// Run backfills concurrently and wait until they are done before we start
 	// the change stream
 	eg, egCtx := errgroup.WithContext(ctx)
-	eg.SetLimit(ConcurrentBackfillLimit)
 
 	var resources = make([]resource, len(open.Capture.Bindings))
+
+	var backfillSemaphore = semaphore.NewWeighted(ConcurrentBackfillLimit)
 
 	// Capture each binding.
 	for idx, binding := range open.Capture.Bindings {
@@ -112,7 +114,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 		if !resState.Backfill.Done {
 			eg.Go(func() error {
-				return c.BackfillCollection(egCtx, client, idx, res, &resState)
+				return c.BackfillCollection(egCtx, backfillSemaphore, client, idx, res, &resState)
 			})
 		}
 	}
@@ -385,7 +387,7 @@ const (
 	SortDescending = -1
 )
 
-func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding int, res resource, state *resourceState) error {
+func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted, client *mongo.Client, binding int, res resource, state *resourceState) error {
 	var db = client.Database(res.Database)
 	var collection = db.Collection(res.Collection)
 
@@ -424,6 +426,10 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 
 	defer cursor.Close(ctx)
 
+	// Acquire a semaphore position before we start
+	if err := sp.Acquire(ctx, 1); err != nil {
+		return fmt.Errorf("semaphore acquisition ctx cancelled: %w", err)
+	}
 	var i = 0
 	for cursor.Next(ctx) {
 		i += 1
@@ -475,6 +481,17 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 
 			if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
 				return fmt.Errorf("output checkpoint failed: %w", err)
+			}
+		}
+
+		// This means the next call to cursor.Next() will trigger a new network
+		// request. Before we do that, we release our acquired semaphore and try to
+		// acquire a new one, to give chance to other bindings to progress in their
+		// backfill
+		if cursor.RemainingBatchLength() == 0 {
+			sp.Release(1)
+			if err := sp.Acquire(ctx, 1); err != nil {
+				return fmt.Errorf("semaphore acquisition ctx cancelled: %w", err)
 			}
 		}
 	}
