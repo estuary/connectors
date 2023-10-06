@@ -220,6 +220,12 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 
 		var startAtWithSafety = streamStartAt.Add(oplogSafetyBuffer)
 		if err := oplogHasTimestamp(ctx, client, startAtWithSafety); err != nil {
+			cp, err := json.Marshal(captureState{})
+			if err != nil {
+				return fmt.Errorf("marshalling checkpoint for removed bindings: %w", err)
+			} else if err = c.Output.Checkpoint(cp, false); err != nil {
+				return fmt.Errorf("updating checkpoint for removed bindings: %w", err)
+			}
 			return err
 		}
 		var startAt = &primitive.Timestamp{T: uint32(startAtWithSafety.Unix()) - 1, I: 0}
@@ -233,7 +239,13 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		// this one.
 		if e, ok := err.(mongo.ServerError); ok {
 			if e.HasErrorMessage(resumePointGoneErrorMessage) || e.HasErrorMessage(resumeTokenNotFoundErrorMessage) {
-				return fmt.Errorf("change stream cannot resume capture, this is usually due to insufficient oplog storage. Please consider resizing your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. After resizing your oplog, you can remove all bindings for this capture and add them back to trigger a backfill: %w", e)
+				cp, err := json.Marshal(captureState{})
+				if err != nil {
+					return fmt.Errorf("marshalling checkpoint for removed bindings: %w", err)
+				} else if err = c.Output.Checkpoint(cp, false); err != nil {
+					return fmt.Errorf("updating checkpoint for removed bindings: %w", err)
+				}
+				return fmt.Errorf("change stream cannot resume capture, this is usually due to insufficient oplog storage. Please consider resizing your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. The connector will now attempt to backfill all bindings again: %w", e)
 			}
 		}
 
