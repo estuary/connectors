@@ -164,6 +164,7 @@ type changeEvent struct {
 
 const resumePointGoneErrorMessage = "the resume point may no longer be in the oplog"
 const resumeTokenNotFoundErrorMessage = "the resume token was not found"
+const unauthorizedMessage = "not authorized on admin to execute command"
 
 func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resources []resource, state captureState) error {
 	if len(resources) < 1 {
@@ -232,6 +233,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		opts = opts.SetStartAtOperationTime(startAt)
 	}
 
+	// First attempt to do an instance-wide change stream, this is possible if we
+	// have readAnyDatabase access on the instance. If this fails for permission
+	// issues, we then attempt to do a database-level change stream. In the case
+	// of the database-level change stream we expect only a single database to be
+	// provided and do not support multiple databases in this mode.
 	cursor, err := client.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
 	if err != nil {
 		// This error means events from the starting point are no longer available,
@@ -246,10 +252,41 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 					return fmt.Errorf("updating checkpoint for removed bindings: %w", err)
 				}
 				return fmt.Errorf("change stream cannot resume capture, this is usually due to insufficient oplog storage. Please consider resizing your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. The connector will now attempt to backfill all bindings again: %w", e)
+			} else if e.HasErrorMessage(unauthorizedMessage) {
+				log.WithField("err", e).Warn("could not start instance-level change stream, trying database-level change stream.")
+				// Check that there is only one database, if so, we can start a change
+				// stream on this database. If there is more than one database
+				// configured, we error out as we do not support multiple change streams
+				// on different databases. An instance-level change stream must be used
+				// for that scenario
+				var dbName = resources[0].Database
+				for _, res := range resources[1:] {
+					if res.Database != dbName {
+						return fmt.Errorf("We are unable to establish an instance-level change stream on your database due to an error. Please consider granting permission to read all databases to the user: %w", err)
+					}
+				}
+
+				var db = client.Database(dbName)
+				// TODO: what happens if a user switches from readAnyDatabase to
+				// read@<db>?
+				cursor, err = db.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
+				if e, ok := err.(mongo.ServerError); ok {
+					if e.HasErrorMessage(resumePointGoneErrorMessage) || e.HasErrorMessage(resumeTokenNotFoundErrorMessage) {
+						cp, err := json.Marshal(captureState{})
+						if err != nil {
+							return fmt.Errorf("marshalling checkpoint for removed bindings: %w", err)
+						} else if err = c.Output.Checkpoint(cp, false); err != nil {
+							return fmt.Errorf("updating checkpoint for removed bindings: %w", err)
+						}
+						return fmt.Errorf("change stream cannot resume capture, this is usually due to insufficient oplog storage. Please consider resizing your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. The connector will now attempt to backfill all bindings again: %w", e)
+					}
+				}
 			}
 		}
 
-		return fmt.Errorf("change stream: %w", err)
+		if err != nil {
+			return fmt.Errorf("change stream: %w", err)
+		}
 	}
 
 	for cursor.Next(ctx) {
