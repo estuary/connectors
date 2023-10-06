@@ -26,7 +26,7 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	DBName string `json:"dbname,omitempty" jsonschema:"title=Database Name,default=mysql,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
+	DBName string `json:"dbname,omitempty" jsonschema:"title=Database Name,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
 }
 
 // Validate checks that the configuration possesses all required properties.
