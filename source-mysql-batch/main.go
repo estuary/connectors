@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
 
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -56,19 +55,18 @@ func (c *Config) SetDefaults() {
 
 // ToDSN converts the Config to a DSN string.
 func (c *Config) ToDSN() string {
-	// go-mysql dsn format: "user:password@addr?dbname"
-	// For simplicity we use the URL struct and strip the leading 'mysql://'
-	// Ironically, the client library does the exact inverse to parse it.
-	var address = c.Address
-	var uri = url.URL{
-		Scheme: "mysql",
-		User:   url.UserPassword(c.User, c.Password),
-		Host:   address,
-	}
+	// The DSN 'parsing' algorithm used by go-mysql-org/go-mysql@v1.5.0/driver is
+	// very trivial and basically just splits the string "user:password@addr?dbname"
+	// on those special characters.
+	//
+	// Note that this is changed in v1.6.0 and newer to use url.Parse(). I believe
+	// that the newer behavior is backwards-compatible, but we should change this
+	// code to use `url.URL{...}.String()` again when upgrading the version.
+	var dsn = fmt.Sprintf("%s:%s@%s", c.User, c.Password, c.Address)
 	if c.Advanced.DBName != "" {
-		uri.Path = "/" + c.Advanced.DBName
+		dsn += "?" + c.Advanced.DBName
 	}
-	return strings.TrimPrefix(uri.String(), "mysql://")
+	return dsn
 }
 
 func connectMySQL(ctx context.Context, configJSON json.RawMessage) (*sql.DB, error) {
