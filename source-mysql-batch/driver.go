@@ -13,6 +13,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/encrow"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -552,23 +553,47 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	var pollTime = time.Now().UTC()
 	var count int
 
+	var shape *encrow.Shape
+	var cursorIndices []int
+	var rowValues []any
+
 	if err := stmt.ExecuteSelectStreaming(&result, func(row []mysql.FieldValue) error {
-		var fields = make(map[string]any)
-		for idx, val := range row {
-			var columnName = string(result.Fields[idx].Name)
-			var translatedValue, err = translateMySQLValue(val.Value())
-			if err != nil {
-				return fmt.Errorf("error translating column %q value: %w", columnName, err)
+		if shape == nil {
+			// Construct a Shape corresponding to the columns of these result rows
+			var fieldNames = []string{"_meta"}
+			for _, field := range result.Fields {
+				fieldNames = append(fieldNames, string(field.Name))
 			}
-			fields[columnName] = translatedValue
+			shape = encrow.NewShape(fieldNames)
+
+			// Also build a list of column indices which should be used as the cursor
+			var fieldIndices = make(map[string]int)
+			for idx, name := range fieldNames {
+				fieldIndices[name] = idx
+			}
+			for _, cursorName := range cursorNames {
+				cursorIndices = append(cursorIndices, fieldIndices[cursorName])
+			}
 		}
 
-		fields["_meta"] = &documentMetadata{
+		if len(rowValues) != len(row)+1 {
+			// Allocate an array of N+1 elements to hold the translated row values
+			// plus the `_meta` property we add.
+			rowValues = make([]any, len(row)+1)
+		}
+		rowValues[0] = &documentMetadata{
 			Polled: pollTime,
 			Index:  count,
 		}
+		for idx, val := range row {
+			var translatedValue, err = translateMySQLValue(val.Value())
+			if err != nil {
+				return fmt.Errorf("error translating column %q value: %w", string(result.Fields[idx].Name), err)
+			}
+			rowValues[idx+1] = translatedValue
+		}
 
-		var bs, err = json.Marshal(fields)
+		var bs, err = shape.Encode(rowValues)
 		if err != nil {
 			return fmt.Errorf("error serializing document: %w", err)
 		} else if err := c.Output.Documents(bindingIndex, bs); err != nil {
@@ -582,8 +607,8 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 			// an empty result set will be a no-op even when the previous state is nil.
 			cursorValues = make([]any, len(cursorNames))
 		}
-		for i, name := range cursorNames {
-			cursorValues[i] = fields[name]
+		for i, j := range cursorIndices {
+			cursorValues[i] = rowValues[j]
 		}
 		count++
 
