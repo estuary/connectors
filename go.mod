@@ -158,6 +158,8 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rs/zerolog v1.28.0 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.4.0 // indirect
+	github.com/segmentio/asm v1.1.3 // indirect
+	github.com/segmentio/encoding v0.3.6 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
