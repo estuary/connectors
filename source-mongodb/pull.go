@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"time"
+	"slices"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -22,7 +23,7 @@ import (
 
 // Limit the number of backfills running concurrently to avoid
 // too much memory pressure
-const ConcurrentBackfillLimit = 20
+const ConcurrentBackfillLimit = 10
 
 // Pull is a very long lived RPC through which the Flow runtime and a
 // Driver cooperatively execute an unbounded number of transactions.
@@ -87,7 +88,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if emitCheckpoint {
 		cp, err := json.Marshal(prevState)
 		if err != nil {
-			return fmt.Errorf("marshalling checkpoint for removed bindings: %w", err)
+			return fmt.Errorf("marshalling checkpoint for syncing removed bindings: %w", err)
 		} else if err = c.Output.Checkpoint(cp, false); err != nil {
 			return fmt.Errorf("updating checkpoint for removed bindings: %w", err)
 		}
@@ -114,7 +115,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 		if !resState.Backfill.Done {
 			eg.Go(func() error {
-				return c.BackfillCollection(egCtx, backfillSemaphore, client, idx, res, &resState)
+				return c.BackfillCollection(egCtx, backfillSemaphore, client, idx, res, resState)
 			})
 		}
 	}
@@ -131,7 +132,10 @@ type capture struct {
 }
 
 type captureState struct {
-	Resources map[string]resourceState `json:"resources"`
+	Resources map[string]resourceState `json:"resources,omitempty"`
+
+	// Resume token used to continue change stream from where we last left off,
+	// see https://www.mongodb.com/docs/manual/changeStreams/#resume-tokens-from-change-events
 	StreamResumeToken bson.Raw `json:"stream_resume_token,omitempty"`
 }
 
@@ -225,9 +229,9 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		if err := oplogHasTimestamp(ctx, client, startAtWithSafety); err != nil {
 			cp, err := json.Marshal(captureState{})
 			if err != nil {
-				return fmt.Errorf("marshalling checkpoint for removed bindings: %w", err)
+				return fmt.Errorf("marshalling reset checkpoint: %w", err)
 			} else if err = c.Output.Checkpoint(cp, false); err != nil {
-				return fmt.Errorf("updating checkpoint for removed bindings: %w", err)
+				return fmt.Errorf("resetting checkpoint: %w", err)
 			}
 			return err
 		}
@@ -249,13 +253,13 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 			if e.HasErrorMessage(resumePointGoneErrorMessage) || e.HasErrorMessage(resumeTokenNotFoundErrorMessage) {
 				cp, err := json.Marshal(captureState{})
 				if err != nil {
-					return fmt.Errorf("marshalling checkpoint for removed bindings: %w", err)
+					return fmt.Errorf("marshalling reset checkpoint: %w", err)
 				} else if err = c.Output.Checkpoint(cp, false); err != nil {
-					return fmt.Errorf("updating checkpoint for removed bindings: %w", err)
+					return fmt.Errorf("resetting checkpoint: %w", err)
 				}
 				return fmt.Errorf("change stream cannot resume capture, this is usually due to insufficient oplog storage. Please consider resizing your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. The connector will now attempt to backfill all bindings again: %w", e)
 			} else if e.HasErrorMessage(unauthorizedMessage) {
-				log.WithField("err", e).Warn("could not start instance-level change stream, trying database-level change stream.")
+				log.WithField("reason", e).Warn("could not start instance-level change stream, trying database-level change stream.")
 				// Check that there is only one database, if so, we can start a change
 				// stream on this database. If there is more than one database
 				// configured, we error out as we do not support multiple change streams
@@ -269,16 +273,14 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 				}
 
 				var db = client.Database(dbName)
-				// TODO: what happens if a user switches from readAnyDatabase to
-				// read@<db>?
 				cursor, err = db.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
 				if e, ok := err.(mongo.ServerError); ok {
 					if e.HasErrorMessage(resumePointGoneErrorMessage) || e.HasErrorMessage(resumeTokenNotFoundErrorMessage) {
 						cp, err := json.Marshal(captureState{})
 						if err != nil {
-							return fmt.Errorf("marshalling checkpoint for removed bindings: %w", err)
+							return fmt.Errorf("marshalling reset checkpoint: %w", err)
 						} else if err = c.Output.Checkpoint(cp, false); err != nil {
-							return fmt.Errorf("updating checkpoint for removed bindings: %w", err)
+							return fmt.Errorf("resetting checkpoint: %w", err)
 						}
 						return fmt.Errorf("change stream cannot resume capture, this is usually due to insufficient oplog storage. Please consider resizing your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. The connector will now attempt to backfill all bindings again: %w", e)
 					}
@@ -308,7 +310,9 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 			return fmt.Errorf("encoding checkpoint to json failed: %w", err)
 		}
 
-		// this event is from a collection that we have no binding for, skip it
+		// this event is from a collection that we have no binding for, skip it, but
+		// still emit a checkpoint with the resule token updated so that we can stay
+		// on top of oplog events across the whole instance / database
 		if !ok {
 			if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
 				return fmt.Errorf("output checkpoint failed: %w", err)
@@ -316,50 +320,53 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 			continue
 		}
 
-		if ev.OperationType == "delete" {
-			var doc = map[string]interface{}{
-				idProperty: ev.DocumentKey.Id,
-				metaProperty: map[string]interface{}{
-					opProperty: "d",
-				},
-			}
+		// These are the events we support
+		if slices.Contains([]string{"insert", "update", "replace", "delete"}, ev.OperationType) {
+			if ev.OperationType == "delete" {
+				var doc = map[string]interface{}{
+					idProperty: ev.DocumentKey.Id,
+					metaProperty: map[string]interface{}{
+						opProperty: "d",
+					},
+				}
 
-			doc = sanitizeDocument(doc)
+				doc = sanitizeDocument(doc)
 
-			js, err := json.Marshal(doc)
-			if err != nil {
-				return fmt.Errorf("encoding document %v in collection %s.%s as json: %w", doc, ev.Ns.Database, ev.Ns.Collection, err)
-			}
+				js, err := json.Marshal(doc)
+				if err != nil {
+					return fmt.Errorf("encoding document %v in collection %s.%s as json: %w", doc, ev.Ns.Database, ev.Ns.Collection, err)
+				}
 
-			if err = c.Output.DocumentsAndCheckpoint(checkpointJson, true, binding, js); err != nil {
-				return fmt.Errorf("output documents failed: %w", err)
-			}
-		} else if ev.FullDocument != nil {
-			// FullDocument can be "null" if another operation has deleted the
-			// document. This happens because update change events do not hold a copy of the
-			// full document, but rather it is at query time that the full document is
-			// looked up, and in these cases, the FullDocument can end up being null
-			// (if deleted) or different from the deltas in the update event. We
-			// ignore events where fullDocument is null. Another change event of type
-			// delete will eventually come and delete the document (if not already).
-			var doc = sanitizeDocument(ev.FullDocument)
-			var op string
-			if ev.OperationType == "update" || ev.OperationType == "replace" {
-				op = "u"
-			} else if ev.OperationType == "insert" {
-				op = "c"
-			}
-			doc[metaProperty] = map[string]interface{}{
-				opProperty: op,
-			}
+				if err = c.Output.DocumentsAndCheckpoint(checkpointJson, true, binding, js); err != nil {
+					return fmt.Errorf("output documents failed: %w", err)
+				}
+			} else if ev.FullDocument != nil {
+				// FullDocument can be "null" if another operation has deleted the
+				// document. This happens because update change events do not hold a copy of the
+				// full document, but rather it is at query time that the full document is
+				// looked up, and in these cases, the FullDocument can end up being null
+				// (if deleted) or different from the deltas in the update event. We
+				// ignore events where fullDocument is null. Another change event of type
+				// delete will eventually come and delete the document (if not already).
+				var doc = sanitizeDocument(ev.FullDocument)
+				var op string
+				if ev.OperationType == "update" || ev.OperationType == "replace" {
+					op = "u"
+				} else if ev.OperationType == "insert" {
+					op = "c"
+				}
+				doc[metaProperty] = map[string]interface{}{
+					opProperty: op,
+				}
 
-			js, err := json.Marshal(doc)
-			if err != nil {
-				return fmt.Errorf("encoding document %v in collection %s.%s as json: %w", doc, ev.Ns.Database, ev.Ns.Collection, err)
-			}
+				js, err := json.Marshal(doc)
+				if err != nil {
+					return fmt.Errorf("encoding document %v in collection %s.%s as json: %w", doc, ev.Ns.Database, ev.Ns.Collection, err)
+				}
 
-			if err = c.Output.DocumentsAndCheckpoint(checkpointJson, true, binding, js); err != nil {
-				return fmt.Errorf("output documents failed: %w", err)
+				if err = c.Output.DocumentsAndCheckpoint(checkpointJson, true, binding, js); err != nil {
+					return fmt.Errorf("output documents failed: %w", err)
+				}
 			}
 		}
 	}
@@ -387,7 +394,7 @@ const (
 	SortDescending = -1
 )
 
-func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted, client *mongo.Client, binding int, res resource, state *resourceState) error {
+func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted, client *mongo.Client, binding int, res resource, state resourceState) error {
 	var db = client.Database(res.Database)
 	var collection = db.Collection(res.Collection)
 
@@ -467,10 +474,14 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 			return fmt.Errorf("output documents failed: %w", err)
 		}
 
-		if i%BackfillBatchSize == 0 {
+		// This means the next call to cursor.Next() will trigger a new network
+		// request. Before we do that, we checkpoint and release our acquired semaphore and try to
+		// acquire a new one, to give chance to other bindings to progress in their
+		// backfill
+		if cursor.RemainingBatchLength() == 0 {
 			var checkpoint = captureState{
 				Resources: map[string]resourceState{
-					resourceId(res): *state,
+					resourceId(res): state,
 				},
 			}
 
@@ -482,13 +493,7 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 			if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
 				return fmt.Errorf("output checkpoint failed: %w", err)
 			}
-		}
 
-		// This means the next call to cursor.Next() will trigger a new network
-		// request. Before we do that, we release our acquired semaphore and try to
-		// acquire a new one, to give chance to other bindings to progress in their
-		// backfill
-		if cursor.RemainingBatchLength() == 0 {
 			sp.Release(1)
 			if err := sp.Acquire(ctx, 1); err != nil {
 				return fmt.Errorf("semaphore acquisition ctx cancelled: %w", err)
@@ -503,7 +508,7 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 	state.Backfill.Done = true
 	var checkpoint = captureState{
 		Resources: map[string]resourceState{
-			resourceId(res): *state,
+			resourceId(res): state,
 		},
 	}
 
