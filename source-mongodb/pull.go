@@ -177,6 +177,10 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		return nil
 	}
 
+	log.WithFields(log.Fields{
+		"streamResumeTokenLenIsLessThanOne": len(state.StreamResumeToken) < 1,
+	}).Info("debug")
+
 	// If we have a stream resume token, we use that to continue our change stream
 	// otherwise, we look at Backfill.StartedAt of all resources and use the
 	// minimum value to start our change stream from
@@ -184,9 +188,17 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	if len(state.StreamResumeToken) < 1 {
 		for _, res := range resources {
 			var resState = state.Resources[resourceId(res)]
+			log.WithFields(log.Fields{
+				"backfillStartedAt": resState.Backfill.StartedAt,
+				"isZero": resState.Backfill.StartedAt.IsZero(),
+				"streamStateIsZero": streamStartAt.IsZero(),
+			}).Info("debug")
 
 			if !resState.Backfill.StartedAt.IsZero() {
 				if streamStartAt.IsZero() {
+					log.WithFields(log.Fields{
+						"newValue": resState.Backfill.StartedAt,
+					}).Info("setting streamStartAt")
 					streamStartAt = resState.Backfill.StartedAt
 				} else if resState.Backfill.StartedAt.Before(streamStartAt) {
 					streamStartAt = resState.Backfill.StartedAt
@@ -205,18 +217,6 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		"streamResumeToken": state.StreamResumeToken,
 		"streamStartAt":     streamStartAt,
 	}).Info("listening on changes")
-
-	var eventFilter = bson.D{{"$match", bson.D{{
-		"$and", bson.A{
-			bson.D{{"$or",
-				bson.A{
-					bson.D{{"operationType", "delete"}},
-					bson.D{{"operationType", "insert"}},
-					bson.D{{"operationType", "update"}},
-					bson.D{{"operationType", "replace"}},
-				},
-			}},
-		}}}}}
 
 	var opts = options.ChangeStream().SetFullDocument(options.UpdateLookup)
 
@@ -244,7 +244,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	// issues, we then attempt to do a database-level change stream. In the case
 	// of the database-level change stream we expect only a single database to be
 	// provided and do not support multiple databases in this mode.
-	cursor, err := client.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
+	cursor, err := client.Watch(ctx, mongo.Pipeline{}, opts)
 	if err != nil {
 		// This error means events from the starting point are no longer available,
 		// which means we have hit a gap in between last run of the connector and
@@ -273,7 +273,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 				}
 
 				var db = client.Database(dbName)
-				cursor, err = db.Watch(ctx, mongo.Pipeline{eventFilter}, opts)
+				cursor, err = db.Watch(ctx, mongo.Pipeline{}, opts)
 				if e, ok := err.(mongo.ServerError); ok {
 					if e.HasErrorMessage(resumePointGoneErrorMessage) || e.HasErrorMessage(resumeTokenNotFoundErrorMessage) {
 						cp, err := json.Marshal(captureState{})
