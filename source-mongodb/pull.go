@@ -440,13 +440,9 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 		}
 		state.Backfill.LastId = rawDoc[idProperty]
 
-		var doc = make(bson.M)
-		for key, val := range rawDoc {
-			var v interface{}
-			if err = val.Unmarshal(&v); err != nil {
-				return fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
-			}
-			doc[key] = v
+		var doc bson.M
+		if err = cursor.Decode(&doc); err != nil {
+			return fmt.Errorf("decoding document in collection %s: %w", res.Collection, err)
 		}
 		doc = sanitizeDocument(doc)
 		doc[metaProperty] = map[string]interface{}{
