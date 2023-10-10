@@ -2,17 +2,19 @@ package main
 
 import (
 	"context"
-	"database/sql"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"strings"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/go-mysql-org/go-mysql/client"
+	"github.com/go-mysql-org/go-mysql/mysql"
+	perrors "github.com/pingcap/errors"
 	log "github.com/sirupsen/logrus"
-
-	_ "github.com/go-mysql-org/go-mysql/driver"
 )
 
 // Config tells the connector how to connect to and interact with the source database.
@@ -53,23 +55,14 @@ func (c *Config) SetDefaults() {
 	}
 }
 
-// ToDSN converts the Config to a DSN string.
-func (c *Config) ToDSN() string {
-	// The DSN 'parsing' algorithm used by go-mysql-org/go-mysql@v1.5.0/driver is
-	// very trivial and basically just splits the string "user:password@addr?dbname"
-	// on those special characters.
-	//
-	// Note that this is changed in v1.6.0 and newer to use url.Parse(). I believe
-	// that the newer behavior is backwards-compatible, but we should change this
-	// code to use `url.URL{...}.String()` again when upgrading the version.
-	var dsn = fmt.Sprintf("%s:%s@%s", c.User, c.Password, c.Address)
-	if c.Advanced.DBName != "" {
-		dsn += "?" + c.Advanced.DBName
+func translateMySQLValue(val any) (any, error) {
+	if val, ok := val.([]byte); ok {
+		return string(val), nil
 	}
-	return dsn
+	return val, nil
 }
 
-func connectMySQL(ctx context.Context, configJSON json.RawMessage) (*sql.DB, error) {
+func connectMySQL(ctx context.Context, configJSON json.RawMessage) (*client.Conn, error) {
 	var cfg Config
 	if err := pf.UnmarshalStrict(configJSON, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
@@ -81,13 +74,19 @@ func connectMySQL(ctx context.Context, configJSON json.RawMessage) (*sql.DB, err
 		"user":    cfg.User,
 	}).Info("connecting to database")
 
-	var db, err = sql.Open("mysql", cfg.ToDSN())
-	if err != nil {
-		return nil, fmt.Errorf("error opening database connection: %w", err)
-	} else if err := db.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("error pinging database: %w", err)
+	var conn *client.Conn
+	var err error
+	var withTLS = func(c *client.Conn) { c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true}) }
+	if conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName, withTLS); err == nil {
+		log.WithField("addr", cfg.Address).Debug("connected with TLS")
+	} else if conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName); err == nil {
+		log.WithField("addr", cfg.Address).Warn("connected without TLS")
+	} else if err, ok := perrors.Cause(err).(*mysql.MyError); ok && err.Code == mysql.ER_ACCESS_DENIED_ERROR {
+		return nil, cerrors.NewUserError(err, "incorrect username or password")
+	} else {
+		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
-	return db, nil
+	return conn, nil
 }
 
 const tableQueryTemplateTemplate = `{{/***********************************************************
@@ -157,19 +156,11 @@ func generateMySQLResource(resourceName, schemaName, tableName, tableType string
 	}, nil
 }
 
-func translateMySQLValue(val any, databaseTypeName string) (any, error) {
-	if val, ok := val.([]byte); ok {
-		return string(val), nil
-	}
-	return val, nil
-}
-
 var mysqlDriver = &BatchSQLDriver{
 	DocumentationURL: "https://go.estuary.dev/source-mysql-batch",
 	ConfigSchema:     generateConfigSchema(),
 	Connect:          connectMySQL,
 	GenerateResource: generateMySQLResource,
-	TranslateValue:   translateMySQLValue,
 	ExcludedSystemSchemas: []string{
 		"information_schema",
 		"mysql",
