@@ -458,11 +458,8 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 	}
 
 	// Polling interval can be configured per binding. If unset, falls back to the
-	// connector global polling interval. If that's also unset, falls back to 24h.
-	var pollStr = "24h"
-	if c.Config.Advanced.PollInterval != "" {
-		pollStr = c.Config.Advanced.PollInterval
-	}
+	// connector global polling interval.
+	var pollStr = c.Config.Advanced.PollInterval
 	if res.PollInterval != "" {
 		pollStr = res.PollInterval
 	}
