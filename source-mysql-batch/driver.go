@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -423,6 +424,7 @@ type capture struct {
 	DB        *client.Conn
 	Resources []Resource
 	Output    *boilerplate.PullOutput
+	Mutex     sync.Mutex
 }
 
 func (c *capture) Run(ctx context.Context) error {
@@ -433,12 +435,6 @@ func (c *capture) Run(ctx context.Context) error {
 
 	var eg, workerCtx = errgroup.WithContext(ctx)
 	for idx, res := range c.Resources {
-		if idx > 0 {
-			// Slightly stagger worker thread startup. Five seconds should be long
-			// enough for most fast queries to complete their first execution, and
-			// the hope is this reduces peak load on both the database and us.
-			time.Sleep(5 * time.Second)
-		}
 		var idx, res = idx, res // Copy for goroutine closure
 		eg.Go(func() error { return c.worker(workerCtx, idx, &res) })
 	}
@@ -521,6 +517,10 @@ func quoteColumnName(name string) string {
 }
 
 func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Template, cursorNames []string, cursorValues []any) ([]any, error) {
+	// Acquire mutex so that only one worker at a time can be actively executing a query.
+	c.Mutex.Lock()
+	defer c.Mutex.Unlock()
+
 	var quotedCursorNames []string
 	for _, cursorName := range cursorNames {
 		quotedCursorNames = append(quotedCursorNames, quoteColumnName(cursorName))
