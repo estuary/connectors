@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	perrors "github.com/pingcap/errors"
@@ -27,7 +27,8 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	DBName string `json:"dbname,omitempty" jsonschema:"title=Database Name,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
+	PollInterval string `json:"poll,omitempty" jsonschema:"title=Default Poll Interval,description=How often to execute fetch queries. Defaults to 24 hours if unset."`
+	DBName       string `json:"dbname,omitempty" jsonschema:"title=Database Name,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -42,6 +43,11 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+	if c.Advanced.PollInterval != "" {
+		if _, err := time.ParseDuration(c.Advanced.PollInterval); err != nil {
+			return fmt.Errorf("invalid default poll interval %q: %w", c.Advanced.PollInterval, err)
+		}
+	}
 	return nil
 }
 
@@ -53,6 +59,10 @@ func (c *Config) SetDefaults() {
 	if !strings.Contains(c.Address, ":") {
 		c.Address += ":3306"
 	}
+
+	if c.Advanced.PollInterval == "" {
+		c.Advanced.PollInterval = "24h"
+	}
 }
 
 func translateMySQLValue(val any) (any, error) {
@@ -62,13 +72,7 @@ func translateMySQLValue(val any) (any, error) {
 	return val, nil
 }
 
-func connectMySQL(ctx context.Context, configJSON json.RawMessage) (*client.Conn, error) {
-	var cfg Config
-	if err := pf.UnmarshalStrict(configJSON, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
-	}
-	cfg.SetDefaults()
-
+func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	log.WithFields(log.Fields{
 		"address": cfg.Address,
 		"user":    cfg.User,
