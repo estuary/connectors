@@ -177,10 +177,6 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		return nil
 	}
 
-	log.WithFields(log.Fields{
-		"streamResumeTokenLenIsLessThanOne": len(state.StreamResumeToken) < 1,
-	}).Info("debug")
-
 	// If we have a stream resume token, we use that to continue our change stream
 	// otherwise, we look at Backfill.StartedAt of all resources and use the
 	// minimum value to start our change stream from
@@ -188,17 +184,9 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	if len(state.StreamResumeToken) < 1 {
 		for _, res := range resources {
 			var resState = state.Resources[resourceId(res)]
-			log.WithFields(log.Fields{
-				"backfillStartedAt": resState.Backfill.StartedAt,
-				"isZero": resState.Backfill.StartedAt.IsZero(),
-				"streamStateIsZero": streamStartAt.IsZero(),
-			}).Info("debug")
 
 			if !resState.Backfill.StartedAt.IsZero() {
 				if streamStartAt.IsZero() {
-					log.WithFields(log.Fields{
-						"newValue": resState.Backfill.StartedAt,
-					}).Info("setting streamStartAt")
 					streamStartAt = resState.Backfill.StartedAt
 				} else if resState.Backfill.StartedAt.Before(streamStartAt) {
 					streamStartAt = resState.Backfill.StartedAt
@@ -226,14 +214,14 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 		var oplogSafetyBuffer, _ = time.ParseDuration("-5m")
 
 		var startAtWithSafety = streamStartAt.Add(oplogSafetyBuffer)
-		if err := oplogHasTimestamp(ctx, client, startAtWithSafety); err != nil {
+		if e := oplogHasTimestamp(ctx, client, startAtWithSafety); e != nil {
 			cp, err := json.Marshal(captureState{})
 			if err != nil {
 				return fmt.Errorf("marshalling reset checkpoint: %w", err)
 			} else if err = c.Output.Checkpoint(cp, false); err != nil {
 				return fmt.Errorf("resetting checkpoint: %w", err)
 			}
-			return err
+			return e
 		}
 		var startAt = &primitive.Timestamp{T: uint32(startAtWithSafety.Unix()) - 1, I: 0}
 		opts = opts.SetStartAtOperationTime(startAt)
