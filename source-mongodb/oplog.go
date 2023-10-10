@@ -80,7 +80,7 @@ func oplogHasTimestamp(ctx context.Context, client *mongo.Client, ts time.Time) 
 	var oldestTs = time.Unix(int64(oldest.Ts.T), 0)
 
 	if oldestTs.After(ts) {
-		return fmt.Errorf("oplog's oldest record is for %s, but the last checkpoint requires reading changes since %s. This is usually due to a small oplog storage available. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. The connector will attempt to backfill all bindings.", oldestTs.String(), ts.String())
+		return fmt.Errorf("oplog's oldest record is for %s, but the last checkpoint requires reading changes since %s. This is usually due to a small oplog storage available. Please resize your oplog to be able to safely capture data from your database: https://go.estuary.dev/NurkrE. The connector will now attempt to backfill all bindings again.", oldestTs.String(), ts.String())
 	}
 
 	return nil
