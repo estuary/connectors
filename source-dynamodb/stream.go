@@ -86,6 +86,11 @@ func (c *capture) streamTable(ctx context.Context, t *table) error {
 		select {
 		case <-time.After(t.shardMonitorDelay):
 			continue
+		case <-workersCtx.Done():
+			// Fail fast if any shard tree workers encounter an error. workersCtx is guaranteed to
+			// be non-nil here since the first pass of the loop will always create an initial worker
+			// group.
+			return fmt.Errorf("streamTable: %w", workers.Wait())
 		case <-ctx.Done():
 			return ctx.Err()
 		}
