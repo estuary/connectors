@@ -29,7 +29,7 @@ type BatchSQLDriver struct {
 	DocumentationURL string
 	ConfigSchema     json.RawMessage
 
-	Connect               func(ctx context.Context, configJSON json.RawMessage) (*client.Conn, error)
+	Connect               func(ctx context.Context, cfg *Config) (*client.Conn, error)
 	GenerateResource      func(resourceName, schemaName, tableName, tableType string) (*Resource, error)
 	ExcludedSystemSchemas []string
 }
@@ -39,7 +39,7 @@ type Resource struct {
 	Name         string   `json:"name" jsonschema:"title=Name,description=The unique name of this resource." jsonschema_extras:"order=0"`
 	Template     string   `json:"template" jsonschema:"title=Query Template,description=The query template (pkg.go.dev/text/template) which will be rendered and then executed." jsonschema_extras:"multiline=true,order=3"`
 	Cursor       []string `json:"cursor,omitempty" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor." jsonschema_extras:"order=2"`
-	PollInterval string   `json:"poll,omitempty" jsonschema:"title=Poll Interval,description=How often to execute the fetch query. Defaults to 24 hours if unset." jsonschema_extras:"order=1"`
+	PollInterval string   `json:"poll,omitempty" jsonschema:"title=Poll Interval,description=How often to execute the fetch query (overrides the connector default setting)" jsonschema_extras:"order=1"`
 }
 
 // Validate checks that the resource spec possesses all required properties.
@@ -145,7 +145,13 @@ func (BatchSQLDriver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Res
 // Discover enumerates tables and views from `information_schema.tables` and generates
 // placeholder capture queries for those tables.
 func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
-	var db, err = drv.Connect(ctx, req.ConfigJson)
+	var cfg Config
+	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
+		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
+	cfg.SetDefaults()
+
+	var db, err = drv.Connect(ctx, &cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +384,13 @@ func (drv *BatchSQLDriver) Validate(ctx context.Context, req *pc.Request_Validat
 
 // Pull is the heart of a capture connector and outputs a neverending stream of documents.
 func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
-	var db, err = drv.Connect(stream.Context(), open.Capture.ConfigJson)
+	var cfg Config
+	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
+		return fmt.Errorf("parsing endpoint config: %w", err)
+	}
+	cfg.SetDefaults()
+
+	var db, err = drv.Connect(stream.Context(), &cfg)
 	if err != nil {
 		return err
 	}
@@ -398,6 +410,7 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	}
 
 	var capture = &capture{
+		Config:    &cfg,
 		DB:        db,
 		Resources: resources,
 		Output:    stream,
@@ -406,6 +419,7 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 }
 
 type capture struct {
+	Config    *Config
 	DB        *client.Conn
 	Resources []Resource
 	Output    *boilerplate.PullOutput
@@ -447,13 +461,18 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 		return fmt.Errorf("error parsing template: %w", err)
 	}
 
-	var pollInterval = 24 * time.Hour
+	// Polling interval can be configured per binding. If unset, falls back to the
+	// connector global polling interval. If that's also unset, falls back to 24h.
+	var pollStr = "24h"
+	if c.Config.Advanced.PollInterval != "" {
+		pollStr = c.Config.Advanced.PollInterval
+	}
 	if res.PollInterval != "" {
-		var dt, err = time.ParseDuration(res.PollInterval)
-		if err != nil {
-			return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
-		}
-		pollInterval = dt
+		pollStr = res.PollInterval
+	}
+	pollInterval, err := time.ParseDuration(pollStr)
+	if err != nil {
+		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
 	}
 
 	var cursorValues []any
