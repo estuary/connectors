@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -17,6 +16,8 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/go-mysql-org/go-mysql/client"
+	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -28,8 +29,7 @@ type BatchSQLDriver struct {
 	DocumentationURL string
 	ConfigSchema     json.RawMessage
 
-	Connect               func(ctx context.Context, configJSON json.RawMessage) (*sql.DB, error)
-	TranslateValue        func(val any, databaseTypeName string) (any, error)
+	Connect               func(ctx context.Context, configJSON json.RawMessage) (*client.Conn, error)
 	GenerateResource      func(resourceName, schemaName, tableName, tableType string) (*Resource, error)
 	ExcludedSystemSchemas []string
 }
@@ -238,24 +238,19 @@ type discoveredTable struct {
 	Type   string // Usually 'BASE TABLE' or 'VIEW'
 }
 
-func discoverTables(ctx context.Context, db *sql.DB) ([]*discoveredTable, error) {
-	rows, err := db.QueryContext(ctx, queryDiscoverTables)
+func discoverTables(ctx context.Context, db *client.Conn) ([]*discoveredTable, error) {
+	var results, err = db.Execute(queryDiscoverTables)
 	if err != nil {
-		return nil, fmt.Errorf("error executing discovery query: %w", err)
+		return nil, fmt.Errorf("error discovering tables: %w", err)
 	}
-	defer rows.Close()
+	defer results.Close()
 
 	var tables []*discoveredTable
-	for rows.Next() {
-		var tableSchema, tableName, tableType string
-		if err := rows.Scan(&tableSchema, &tableName, &tableType); err != nil {
-			return nil, fmt.Errorf("error scanning result row: %w", err)
-		}
-
+	for _, row := range results.Values {
 		tables = append(tables, &discoveredTable{
-			Schema: tableSchema,
-			Name:   tableName,
-			Type:   tableType,
+			Schema: string(row[0].AsString()),
+			Name:   string(row[1].AsString()),
+			Type:   string(row[2].AsString()),
 		})
 	}
 	return tables, nil
@@ -288,20 +283,20 @@ type discoveredPrimaryKey struct {
 	ColumnTypes map[string]*jsonschema.Schema
 }
 
-func discoverPrimaryKeys(ctx context.Context, db *sql.DB) ([]*discoveredPrimaryKey, error) {
-	rows, err := db.QueryContext(ctx, queryDiscoverPrimaryKeys)
+func discoverPrimaryKeys(ctx context.Context, db *client.Conn) ([]*discoveredPrimaryKey, error) {
+	var results, err = db.Execute(queryDiscoverPrimaryKeys)
 	if err != nil {
-		return nil, fmt.Errorf("error executing discovery query: %w", err)
+		return nil, fmt.Errorf("error discovering primary keys: %w", err)
 	}
-	defer rows.Close()
+	defer results.Close()
 
 	var keysByTable = make(map[string]*discoveredPrimaryKey)
-	for rows.Next() {
-		var tableSchema, tableName, columnName, dataType string
-		var ordinalPosition int
-		if err := rows.Scan(&tableSchema, &tableName, &columnName, &ordinalPosition, &dataType); err != nil {
-			return nil, fmt.Errorf("error scanning result row: %w", err)
-		}
+	for _, row := range results.Values {
+		var tableSchema = string(row[0].AsString())
+		var tableName = string(row[1].AsString())
+		var columnName = string(row[2].AsString())
+		var ordinalPosition = int(row[3].AsInt64())
+		var dataType = string(row[4].AsString())
 
 		var tableID = tableSchema + "." + tableName
 		var keyInfo = keysByTable[tableID]
@@ -403,19 +398,17 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	}
 
 	var capture = &capture{
-		DB:             db,
-		Resources:      resources,
-		Output:         stream,
-		TranslateValue: drv.TranslateValue,
+		DB:        db,
+		Resources: resources,
+		Output:    stream,
 	}
 	return capture.Run(stream.Context())
 }
 
 type capture struct {
-	DB             *sql.DB
-	Resources      []Resource
-	Output         *boilerplate.PullOutput
-	TranslateValue func(val any, databaseTypeName string) (any, error)
+	DB        *client.Conn
+	Resources []Resource
+	Output    *boilerplate.PullOutput
 }
 
 func (c *capture) Run(ctx context.Context) error {
@@ -524,65 +517,45 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	}
 	var query, args = expandQueryPlaceholders(queryBuf.String(), cursorValues)
 
-	var pollTime = time.Now().UTC()
-
 	log.WithFields(log.Fields{"query": query, "args": args}).Info("executing query")
-	var rows, err = c.DB.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("error executing query: %w", err)
-	}
-	defer rows.Close()
 
-	columnNames, err := rows.Columns()
+	// There is no helper function for a streaming select query _with arguments_,
+	// so we have to drop down a level and prepare the statement ourselves here.
+	var stmt, err = c.DB.Prepare(query)
 	if err != nil {
-		return nil, fmt.Errorf("error processing query result: %w", err)
+		return nil, fmt.Errorf("error preparing query %q: %w", query, err)
 	}
-	columnTypes, err := rows.ColumnTypes()
-	if err != nil {
-		return nil, fmt.Errorf("error processing query result: %w", err)
-	}
-	for i, columnType := range columnTypes {
-		log.WithFields(log.Fields{
-			"idx":          i,
-			"name":         columnType.DatabaseTypeName(),
-			"scanTypeName": columnType.ScanType().Name(),
-		}).Debug("column type")
-	}
+	defer stmt.Close()
 
-	var resultRow = make(map[string]any)
-	var translatedRow = make(map[string]any)
-	var columnValues = make([]any, len(columnNames))
-	var columnPointers = make([]any, len(columnValues))
-	for i := range columnPointers {
-		columnPointers[i] = &columnValues[i]
-	}
+	var result mysql.Result
+	defer result.Close() // Ensure the resultset allocated during ExecuteSelectStreaming is returned to the pool when done
 
+	var pollTime = time.Now().UTC()
 	var count int
-	for rows.Next() {
-		if err := rows.Scan(columnPointers...); err != nil {
-			return nil, fmt.Errorf("error scanning result row: %w", err)
-		}
 
-		for i, name := range columnNames {
-			var translatedVal, err = c.TranslateValue(columnValues[i], columnTypes[i].DatabaseTypeName())
+	if err := stmt.ExecuteSelectStreaming(&result, func(row []mysql.FieldValue) error {
+		var fields = make(map[string]any)
+		for idx, val := range row {
+			var columnName = string(result.Fields[idx].Name)
+			var translatedValue, err = translateMySQLValue(val.Value())
 			if err != nil {
-				return nil, fmt.Errorf("error translating column value: %w", err)
+				return fmt.Errorf("error translating column %q value: %w", columnName, err)
 			}
-			translatedRow[name] = translatedVal
+			fields[columnName] = translatedValue
 		}
 
-		translatedRow["_meta"] = &documentMetadata{
+		fields["_meta"] = &documentMetadata{
 			Polled: pollTime,
 			Index:  count,
 		}
 
-		var bs, err = json.Marshal(translatedRow)
+		var bs, err = json.Marshal(fields)
 		if err != nil {
-			return nil, fmt.Errorf("error serializing document: %w", err)
+			return fmt.Errorf("error serializing document: %w", err)
 		} else if err := c.Output.Documents(bindingIndex, bs); err != nil {
-			return nil, fmt.Errorf("error emitting document: %w", err)
+			return fmt.Errorf("error emitting document: %w", err)
 		} else if err := c.Output.Checkpoint(json.RawMessage(`{}`), true); err != nil {
-			return nil, fmt.Errorf("error emitting checkpoint: %w", err)
+			return fmt.Errorf("error emitting checkpoint: %w", err)
 		}
 
 		if len(cursorValues) != len(cursorNames) {
@@ -590,15 +563,16 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 			// an empty result set will be a no-op even when the previous state is nil.
 			cursorValues = make([]any, len(cursorNames))
 		}
-		for i, name := range columnNames {
-			resultRow[name] = columnValues[i]
-		}
 		for i, name := range cursorNames {
-			cursorValues[i] = resultRow[name]
+			cursorValues[i] = fields[name]
 		}
-
 		count++
+
+		return nil
+	}, nil, args...); err != nil {
+		return nil, fmt.Errorf("error executing backfill query: %w", err)
 	}
+
 	log.WithFields(log.Fields{
 		"query": query,
 		"count": count,
