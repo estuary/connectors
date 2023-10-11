@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -96,11 +97,23 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		return nil, fmt.Errorf("listing collections: %w", err)
 	}
 
+	var systemCollections = []string{
+		"system.views",
+		"system.js",
+		"system.profile",
+		"system.indexes",
+		"system.namespaces",
+		"system.buckets",
+	}
+
 	var bindings = []*pc.Response_Discovered_Binding{}
 	for _, collection := range collections {
 		// Views cannot be used with change streams, so we don't support them for
 		// capturing at the moment
 		if collection.Type == "view" {
+			continue
+		}
+		if slices.Contains(systemCollections, collection.Name) {
 			continue
 		}
 		resourceJSON, err := json.Marshal(resource{Database: db.Name(), Collection: collection.Name})
