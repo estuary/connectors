@@ -556,6 +556,7 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	var shape *encrow.Shape
 	var cursorIndices []int
 	var rowValues []any
+	var serializedDocument []byte
 
 	if err := stmt.ExecuteSelectStreaming(&result, func(row []mysql.FieldValue) error {
 		if shape == nil {
@@ -593,10 +594,10 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 			rowValues[idx+1] = translatedValue
 		}
 
-		var bs, err = shape.Encode(rowValues)
+		serializedDocument, err = shape.Encode(serializedDocument, rowValues)
 		if err != nil {
 			return fmt.Errorf("error serializing document: %w", err)
-		} else if err := c.Output.Documents(bindingIndex, bs); err != nil {
+		} else if err := c.Output.Documents(bindingIndex, serializedDocument); err != nil {
 			return fmt.Errorf("error emitting document: %w", err)
 		} else if err := c.Output.Checkpoint(json.RawMessage(`{}`), true); err != nil {
 			return fmt.Errorf("error emitting checkpoint: %w", err)
