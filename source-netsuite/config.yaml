@@ -1,3 +1,16 @@
-# TODO(johnny): Run this through sops once we decide on a KMS
-not-secret: ""
-secret: ""
+username: support@estuary.dev
+password_sops: ENC[AES256_GCM,data:nWAFrQ3EgOdBUbA0WA==,iv:9ojmgkv7+4eWC3/1jLeO3k0fl/z55Pl8R8tu4bJo+p0=,tag:rAE+wCgeBzqd8H92gK9hhw==,type:str]
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-kms/locations/us-central1/keyRings/test-creds/cryptoKeys/netsuite
+          created_at: "2023-10-11T21:11:12Z"
+          enc: CiQA6Fs2EH/kveoZtkuxodz1VLVX49ObWUV99IzIufXBHzWHchUSSQC8X3F2L6oeWDDxlXJu0CnBMenFWLTVkXXf+MZh/T5w5Leb9DmbHesC++ibeINUztaqmaQcNtns+LcJpDMPH38/ESTnvJi3rW0=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2023-10-11T21:11:13Z"
+    mac: ENC[AES256_GCM,data:gWDEJj1IDjZf68xgKXxKnniMIlEst5IZRNL9VSDkyjEkjpOCmyGf9LaEO1gunDaM8SE22vBIOJuIzeEyjL5sW9ahw6iCXXkeXqzex99RYl1cqqZAL34qzuixB0RvUskpvyTgvRhudA1HbJO1/Wg4WMFJxL2oQpFzPDROGSbaJJk=,iv:Va2eSA7mTg5kG1YpCH6HRADoChtqQA5ku0vTec0fkbo=,tag:NdK0FMuscAqKkEvzchHf/A==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3

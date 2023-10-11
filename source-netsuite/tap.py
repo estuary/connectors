@@ -23,17 +23,17 @@ class TapNetSuite(Tap):
     name = "tap-netsuite"
     config_jsonschema = PropertiesList(
         Property(
-            "secret",
+            "username",
+            StringType,
+            required=True,
+            description="Account username.",
+        ),
+        Property(
+            "password",
             StringType,
             required=True,
             secret=True,
-            description="Example secret",
-        ),
-        Property(
-            "not-secret",
-            StringType,
-            required=True,
-            description="Example non-secret",
+            description="Account password.",
         ),
     ).to_dict()
 
