@@ -104,7 +104,7 @@ type advancedConfig struct {
 	SkipBackfills     string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
 	SSLMode           string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
-	DiscoverSchemas   []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Leave blank to discover tables from all schemas."`
+	DiscoverSchemas   []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -133,6 +133,11 @@ func (c *Config) Validate() error {
 	if c.Advanced.SSLMode != "" {
 		if !slices.Contains([]string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}, c.Advanced.SSLMode) {
 			return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", c.Advanced.SSLMode)
+		}
+	}
+	for _, s := range c.Advanced.DiscoverSchemas {
+		if len(s) == 0 {
+			return fmt.Errorf("discovery schema selection must not contain any entries that are blank: To discover tables from all schemas, remove all entries from the discovery schema selection list. To discover tables only from specific schemas, provide their names as non-blank entries")
 		}
 	}
 
