@@ -109,7 +109,7 @@ func commonSanitizers() map[string]*regexp.Regexp {
 		sanitizers[k] = v
 	}
 	sanitizers[`"stream_resume_token":"<STREAM_RESUME_TOKEN>"`] = regexp.MustCompile(`"stream_resume_token":"[^"]*"`)
-	sanitizers[`"backfill_started_at:"<TIMESTAMP>"`] = regexp.MustCompile(`"backfill_started_at":"((?:(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2}(?:\.\d+)?))(Z|[\+-]\d{2}:\d{2})?)"`)
+	sanitizers[`"started_at:"<TIMESTAMP>"`] = regexp.MustCompile(`"started_at":"((?:(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2}(?:\.\d+)?))(Z|[\+-]\d{2}:\d{2})?)"`)
 
 	return sanitizers
 }
