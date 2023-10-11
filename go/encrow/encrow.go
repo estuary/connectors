@@ -55,8 +55,9 @@ func generatePrefixes(fields []string) []string {
 	return prefixes
 }
 
-// Encode serializes a list of values into the specified shape.
-func (s *Shape) Encode(values []any) ([]byte, error) {
+// Encode serializes a list of values into the specified shape. If a buffer slice
+// is provided it will be truncated and reused.
+func (s *Shape) Encode(buf []byte, values []any) ([]byte, error) {
 	var err error
 	if len(values) != s.arity {
 		return nil, fmt.Errorf("incorrect row arity: expected %d but got %d", s.arity, len(values))
@@ -65,14 +66,14 @@ func (s *Shape) Encode(values []any) ([]byte, error) {
 		return []byte("{}"), nil
 	}
 
-	var bs []byte
+	buf = buf[:0]
 	for idx, vidx := range s.swizzle {
-		bs = append(bs, s.prefixes[idx]...)
-		bs, err = json.Append(bs, values[vidx], json.EscapeHTML|json.SortMapKeys)
+		buf = append(buf, s.prefixes[idx]...)
+		buf, err = json.Append(buf, values[vidx], json.EscapeHTML|json.SortMapKeys)
 		if err != nil {
 			return nil, err
 		}
 	}
-	bs = append(bs, '}')
-	return bs, nil
+	buf = append(buf, '}')
+	return buf, nil
 }
