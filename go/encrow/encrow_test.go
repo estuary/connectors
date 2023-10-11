@@ -40,12 +40,14 @@ func BenchmarkShapeSerialization(b *testing.B) {
 		var names, values = benchmarkDataset(benchmarkDatasetSize)
 		b.StartTimer()
 
+		var bs []byte
+		var err error
 		var s *Shape
 		for _, row := range values {
 			if s == nil {
 				s = NewShape(names)
 			}
-			var bs, err = s.Encode(row)
+			bs, err = s.Encode(bs, row)
 			require.NoError(b, err)
 			io.Discard.Write(bs)
 		}
@@ -54,12 +56,11 @@ func BenchmarkShapeSerialization(b *testing.B) {
 
 func TestSerializationEquivalence(t *testing.T) {
 	var names, values = benchmarkDataset(benchmarkDatasetSize)
-	for _, row := range values {
-		checkEquivalence(t, names, row)
-	}
+	checkEquivalence(t, names, values)
 }
 
 func FuzzSerialization(f *testing.F) {
+	f.Add(`{}`)
 	f.Add(`{"id": 123}`)
 	f.Add(`{"data": "foobar", "moredata": "xyzzy"}`)
 	f.Add(`{"boolval": true}`)
@@ -83,24 +84,28 @@ func FuzzSerialization(f *testing.F) {
 			vals = append(vals, val)
 		}
 
-		// Check equivalence of standard JSON serialization and optimized serialization
-		checkEquivalence(t, names, vals)
+		// Check equivalence of standard JSON serialization and optimized serialization.
+		// Repeat the values list three times to exercise buffer reuse behavior.
+		checkEquivalence(t, names, [][]any{vals, vals, vals})
 	})
 }
 
-func checkEquivalence(t *testing.T, names []string, values []any) {
-	var fields = make(map[string]any)
-	for idx, val := range values {
-		fields[names[idx]] = val
-	}
-	standardBytes, err := stdjson.Marshal(fields)
-	require.NoError(t, err)
-
+func checkEquivalence(t *testing.T, names []string, values [][]any) {
 	var shape = NewShape(names)
-	shapeBytes, err := shape.Encode(values)
-	require.NoError(t, err)
+	var shapeBytes []byte
+	for _, row := range values {
+		var fields = make(map[string]any)
+		for idx, val := range row {
+			fields[names[idx]] = val
+		}
+		standardBytes, err := stdjson.Marshal(fields)
+		require.NoError(t, err)
 
-	require.Equal(t, string(standardBytes), string(shapeBytes))
+		shapeBytes, err = shape.Encode(shapeBytes, row)
+		require.NoError(t, err)
+
+		require.Equal(t, string(standardBytes), string(shapeBytes))
+	}
 }
 
 func benchmarkDataset(size int) ([]string, [][]any) {
