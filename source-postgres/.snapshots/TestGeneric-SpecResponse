@@ -75,7 +75,7 @@
             },
             "type": "array",
             "title": "Discovery Schema Selection",
-            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Leave blank to discover tables from all schemas."
+            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."
           }
         },
         "additionalProperties": false,
