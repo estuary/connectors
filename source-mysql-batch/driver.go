@@ -522,14 +522,18 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
 	}
 
-	for ctx.Err() == nil {
+	for {
 		log.WithField("name", res.Name).Info("polling for updates")
 		if err := c.poll(ctx, bindingIndex, queryTemplate, res); err != nil {
 			return fmt.Errorf("error polling table: %w", err)
 		}
-		time.Sleep(pollInterval)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(pollInterval):
+			continue
+		}
 	}
-	return ctx.Err()
 }
 
 var queryPlaceholderRegexp = regexp.MustCompile(`([?]|:[0-9]+)`)
