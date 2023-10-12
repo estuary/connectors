@@ -66,7 +66,7 @@ jobs:
 
   build_connectors:
     runs-on: ubuntu-20.04
-    needs: build_base_image
+    # needs: build_base_image
     strategy:
       fail-fast: false
       matrix:
@@ -160,11 +160,17 @@ jobs:
             "source-mysql",
             "source-postgres",
             "source-sftp",
-            "source-sqlserver"
+            "source-sqlserver",
+            "source-mongodb"
             ]'), matrix.connector)
         run: |
           docker compose --file ${{ matrix.connector }}/docker-compose.yaml up --wait
           docker logs ${{ matrix.connector }}-db-1
+
+      - name: Test setup
+        if: matrix.connector == 'source-mongodb'
+        run: |
+          bash source-mongodb/docker-compose-init.sh
 
       - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v2

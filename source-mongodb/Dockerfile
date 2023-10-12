@@ -14,6 +14,8 @@ COPY source-boilerplate ./source-boilerplate
 COPY source-mongodb     ./source-mongodb
 
 # Run the unit tests.
+ARG TEST_DATABASE=yes
+ENV TEST_DATABASE=$TEST_DATABASE
 RUN go test -v ./source-mongodb/...
 
 # Build the connector.
