@@ -48,6 +48,17 @@ type config struct {
 	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database string `json:"database" jsonschema:"title=Database,description=Name of the database to capture from." jsonschema_extras:"order=3"`
+
+	// We still don't have any exposed advanced configurations
+	Advanced advancedConfig `json:"advanced" jsonschema:"-"`
+}
+
+type advancedConfig struct {
+	// The default value of -5m is useful for production use cases, but when
+	// running our test suite we don't want to wait 5 minutes, so we use this
+	// configuration in our test suite to disable oplog safety buffer. Note that
+	// this is not exposed to users using the `jsonschema:"-"` stanza.
+	OplogSafetyBuffer string `json:"oplogSafetyBuffer" jsonschema:"-"`
 }
 
 func (c *config) Validate() error {
