@@ -272,7 +272,10 @@ func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {
 
 func (a *pullAdapter) Send(m *pc.Response) error {
 	if m.Captured != nil {
-		a.transaction = append(a.transaction, m.Captured)
+		a.transaction = append(a.transaction, &pc.Response_Captured{
+			Binding: m.Captured.Binding,
+			DocJson: append(json.RawMessage(nil), m.Captured.DocJson...),
+		})
 	}
 	if m.Checkpoint != nil {
 		if !m.Checkpoint.State.MergePatch || a.checkpoint == nil {
