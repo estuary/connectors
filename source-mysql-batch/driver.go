@@ -523,7 +523,7 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 	}
 
 	for {
-		log.WithField("name", res.Name).Info("polling for updates")
+		log.WithField("name", res.Name).Info("scheduled to poll")
 		if err := c.poll(ctx, bindingIndex, queryTemplate, res); err != nil {
 			return fmt.Errorf("error polling table: %w", err)
 		}
