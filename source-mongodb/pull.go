@@ -55,6 +55,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}()
 
 	var c = capture{
+		cfg: cfg,
 		Output: stream,
 	}
 
@@ -128,6 +129,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 }
 
 type capture struct {
+	cfg config
 	Output *boilerplate.PullOutput
 }
 
@@ -211,7 +213,11 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	if len(state.StreamResumeToken) > 0 {
 		opts = opts.SetResumeAfter(state.StreamResumeToken)
 	} else if !streamStartAt.IsZero() {
-		var oplogSafetyBuffer, _ = time.ParseDuration("-5m")
+		var safetyBufferConfig = c.cfg.Advanced.OplogSafetyBuffer
+		if len(safetyBufferConfig) < 1 {
+			safetyBufferConfig = "-5m"
+		}
+		var oplogSafetyBuffer, _ = time.ParseDuration(safetyBufferConfig)
 
 		var startAtWithSafety = streamStartAt.Add(oplogSafetyBuffer)
 		if e := oplogHasTimestamp(ctx, client, startAtWithSafety); e != nil {

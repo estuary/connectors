@@ -33,6 +33,9 @@ func testClient(t *testing.T) (*mongo.Client, config) {
 		User: *user,
 		Password: *password,
 		Database: *database,
+		Advanced: advancedConfig{
+			OplogSafetyBuffer: "0",
+		},
 	}
 
 	var d = driver{}
