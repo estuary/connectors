@@ -3,9 +3,10 @@ package sql
 import (
 	"compress/flate"
 	"compress/gzip"
-	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/segmentio/encoding/json"
 )
 
 const (
