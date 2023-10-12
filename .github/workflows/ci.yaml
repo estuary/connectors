@@ -125,7 +125,7 @@ jobs:
 
       - name: Download latest Flow release binaries and add them to $PATH
         run: |
-          ./fetch-flow.sh
+          FLOW_RELEASE=v0.3.7 ./fetch-flow.sh
           echo "${PWD}/flow-bin" >> $GITHUB_PATH
 
       - name: Set up Cloud SDK
