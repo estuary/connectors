@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	address   = flag.String("address", "mongodb://localhost", "MongoDB instance address")
+	address   = flag.String("address", "mongodb://localhost?authSource=admin", "MongoDB instance address")
 	user      = flag.String("user", "flow", "Username")
 	password  = flag.String("password", "flow", "Password")
 	database  = flag.String("database", "test", "Database name")
@@ -71,7 +71,12 @@ func addTestTableData(
 		item["_id"] = pkData(idx)
 
 		for _, col := range cols {
-			item[col] = fmt.Sprintf("%s val %d", col, idx)
+			item[col] = map[string]interface{}{
+				"str": fmt.Sprintf("%s val %d", col, idx),
+				"array": []string{"a", "b", "c"},
+				"int": 1,
+				"float": 1.23,
+			}
 		}
 
 		log.WithField("data", item).WithField("col", collection).Info("inserting data")
