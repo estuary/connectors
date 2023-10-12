@@ -25,6 +25,15 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	// When processing large tables we need to emit checkpoints in between query result
+	// rows, since we don't want a single Flow transaction to have contain millions of
+	// documents. But emitting a checkpoint after every row could be a significant drag
+	// on overall throughput, and isn't really needed anyway. So instead we emit one for
+	// every N rows, plus one when the query results are fully processed.
+	documentsPerCheckpoint = 1000
+)
+
 // BatchSQLDriver represents a generic "batch SQL" capture behavior, parameterized
 // by a config schema, connect function, and value translation logic.
 type BatchSQLDriver struct {
@@ -407,12 +416,20 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 		resources = append(resources, res)
 	}
 
+	var state captureState
 	if open.StateJson != nil {
-		// TODO: Consider implementing persistent state, keyed on the resource name property.
+		if err := pf.UnmarshalStrict(open.StateJson, &state); err != nil {
+			return fmt.Errorf("parsing state checkpoint: %w", err)
+		}
+	}
+	state, err = updateResourceStates(state, resources)
+	if err != nil {
+		return fmt.Errorf("error initializing resource states: %w", err)
 	}
 
 	var capture = &capture{
 		Config:    &cfg,
+		State:     &state,
 		DB:        db,
 		Resources: resources,
 		Output:    stream,
@@ -420,12 +437,48 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	return capture.Run(stream.Context())
 }
 
+func updateResourceStates(prevState captureState, resources []Resource) (captureState, error) {
+	var newState = captureState{
+		Streams: make(map[string]*streamState),
+	}
+	for _, res := range resources {
+		var stream = prevState.Streams[res.Name]
+		if stream != nil && !slices.Equal(stream.CursorNames, res.Cursor) {
+			log.WithFields(log.Fields{
+				"name": res.Name,
+				"prev": stream.CursorNames,
+				"next": res.Cursor,
+			}).Warn("cursor columns changed, resetting stream state")
+			stream = nil
+		}
+		if stream == nil {
+			stream = &streamState{CursorNames: res.Cursor}
+		}
+		newState.Streams[res.Name] = stream
+	}
+	return newState, nil
+}
+
 type capture struct {
 	Config    *Config
+	State     *captureState
 	DB        *client.Conn
 	Resources []Resource
 	Output    *boilerplate.PullOutput
 	Mutex     sync.Mutex
+}
+
+type captureState struct {
+	Streams map[string]*streamState
+}
+
+type streamState struct {
+	CursorNames  []string
+	CursorValues []any
+}
+
+func (s *captureState) Validate() error {
+	return nil
 }
 
 func (c *capture) Run(ctx context.Context) error {
@@ -469,14 +522,11 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
 	}
 
-	var cursorValues []any
 	for ctx.Err() == nil {
 		log.WithField("name", res.Name).Info("polling for updates")
-		var nextCursor, err = c.poll(ctx, bindingIndex, queryTemplate, res.Cursor, cursorValues)
-		if err != nil {
+		if err := c.poll(ctx, bindingIndex, queryTemplate, res); err != nil {
 			return fmt.Errorf("error polling table: %w", err)
 		}
-		cursorValues = nextCursor
 		time.Sleep(pollInterval)
 	}
 	return ctx.Err()
@@ -514,10 +564,17 @@ func quoteColumnName(name string) string {
 	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }
 
-func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Template, cursorNames []string, cursorValues []any) ([]any, error) {
+func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Template, res *Resource) error {
 	// Acquire mutex so that only one worker at a time can be actively executing a query.
 	c.Mutex.Lock()
 	defer c.Mutex.Unlock()
+
+	var state, ok = c.State.Streams[res.Name]
+	if !ok {
+		return fmt.Errorf("internal error: no state for stream %q", res.Name)
+	}
+	var cursorNames = state.CursorNames
+	var cursorValues = state.CursorValues
 
 	var quotedCursorNames []string
 	for _, cursorName := range cursorNames {
@@ -530,7 +587,7 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 
 	var queryBuf = new(strings.Builder)
 	if err := tmpl.Execute(queryBuf, templateArg); err != nil {
-		return nil, fmt.Errorf("error generating query: %w", err)
+		return fmt.Errorf("error generating query: %w", err)
 	}
 	var query, args = expandQueryPlaceholders(queryBuf.String(), cursorValues)
 
@@ -540,7 +597,7 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	// so we have to drop down a level and prepare the statement ourselves here.
 	var stmt, err = c.DB.Prepare(query)
 	if err != nil {
-		return nil, fmt.Errorf("error preparing query %q: %w", query, err)
+		return fmt.Errorf("error preparing query %q: %w", query, err)
 	}
 	defer stmt.Close()
 
@@ -596,8 +653,6 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 			return fmt.Errorf("error serializing document: %w", err)
 		} else if err := c.Output.Documents(bindingIndex, serializedDocument); err != nil {
 			return fmt.Errorf("error emitting document: %w", err)
-		} else if err := c.Output.Checkpoint(json.RawMessage(`{}`), true); err != nil {
-			return fmt.Errorf("error emitting checkpoint: %w", err)
 		}
 
 		if len(cursorValues) != len(cursorNames) {
@@ -608,16 +663,40 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		for i, j := range cursorIndices {
 			cursorValues[i] = rowValues[j]
 		}
-		count++
+		state.CursorValues = cursorValues
 
+		count++
+		if count%documentsPerCheckpoint == 0 {
+			if err := c.streamStateCheckpoint(res.Name, state); err != nil {
+				return err
+			}
+		}
 		return nil
 	}, nil, args...); err != nil {
-		return nil, fmt.Errorf("error executing backfill query: %w", err)
+		return fmt.Errorf("error executing backfill query: %w", err)
+	}
+
+	if count%documentsPerCheckpoint != 0 {
+		if err := c.streamStateCheckpoint(res.Name, state); err != nil {
+			return err
+		}
 	}
 
 	log.WithFields(log.Fields{
 		"query": query,
 		"count": count,
 	}).Info("query complete")
-	return cursorValues, nil
+	return nil
+}
+
+func (c *capture) streamStateCheckpoint(name string, state *streamState) error {
+	var checkpointPatch = captureState{Streams: make(map[string]*streamState)}
+	checkpointPatch.Streams[name] = state
+
+	if checkpointJSON, err := json.Marshal(checkpointPatch); err != nil {
+		return fmt.Errorf("error serializing state checkpoint: %w", err)
+	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
+		return fmt.Errorf("error emitting checkpoint: %w", err)
+	}
+	return nil
 }
