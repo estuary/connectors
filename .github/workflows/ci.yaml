@@ -66,7 +66,7 @@ jobs:
 
   build_connectors:
     runs-on: ubuntu-20.04
-    # needs: build_base_image
+    needs: build_base_image
     strategy:
       fail-fast: false
       matrix:
