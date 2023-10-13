@@ -21,6 +21,11 @@ import (
 	"google.golang.org/api/option"
 )
 
+var (
+	Version string
+	Tag     string
+)
+
 // Config represents the endpoint configuration for BigQuery.
 type config struct {
 	ProjectID        string `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset." jsonschema_extras:"order=0"`
@@ -73,9 +78,16 @@ func (c *config) Validate() error {
 }
 
 func (c *config) client(ctx context.Context) (*client, error) {
+	userAgent := fmt.Sprintf("Estuary/materialize-bigquery-%s-%s (GPN:Estuary Technologies, Inc.;)", Version, Tag)
+	log.WithField("user-agent", userAgent).Debug("setting user-agent header")
+
 	var clientOpts []option.ClientOption
 
-	clientOpts = append(clientOpts, option.WithCredentialsJSON(decodeCredentials(c.CredentialsJSON)))
+	clientOpts = append(
+		clientOpts,
+		option.WithCredentialsJSON(decodeCredentials(c.CredentialsJSON)),
+		option.WithUserAgent(userAgent),
+	)
 
 	// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
 	var billingProjectID = c.BillingProjectID

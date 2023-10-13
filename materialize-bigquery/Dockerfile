@@ -20,10 +20,16 @@ COPY materialize-bigquery    ./materialize-bigquery
 COPY materialize-sql         ./materialize-sql
 COPY testsupport             ./testsupport
 
+# Build parameters for setting the user-agent.
+ARG VERSION="dev"
+ARG TAG="unknown"
+
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-sql/...
 RUN go test  -tags nozstd -v ./materialize-bigquery/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/cmd/connector
+RUN go build \
+    -ldflags="-X github.com/estuary/connectors/materialize-bigquery.Version=$VERSION -X github.com/estuary/connectors/materialize-bigquery.Tag=$TAG" \
+    -tags nozstd -v -o ./connector ./materialize-bigquery/cmd/connector
 
 # Runtime Stage
 ################################################################################
