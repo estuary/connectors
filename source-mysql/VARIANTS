@@ -1,2 +1,3 @@
 source-mariadb
 source-amazon-aurora-mysql
+materialize-google-cloud-sql-mysql
