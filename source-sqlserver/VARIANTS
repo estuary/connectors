@@ -1,2 +1,2 @@
 source-azure-sqlserver
-materialize-google-cloud-sql-sqlserver
+source-google-cloud-sql-sqlserver
