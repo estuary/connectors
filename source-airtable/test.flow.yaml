@@ -1,0 +1,43 @@
+---
+captures:
+  acmeCo/source-airtable:
+    shards:
+      logLevel: debug
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/source-airtable:local
+        config:
+          pokemon_name: pikachu
+      # local:
+      #   command:
+      #     - python
+      #     # - "-m"
+      #     # - "debugpy"
+      #     # - "--listen"
+      #     # - "0.0.0.0:5678"
+      #     # - "--wait-for-client"
+      #     - "-m"
+      #     - source-airtable
+      #   config:
+      #     pokemon_name: pikachu
+
+    bindings:
+      - resource:
+          stream: airtable
+          syncMode: full_refresh
+        target: acmeCo/airtable
+collections:
+  acmeCo/airtable:
+    schema:
+      type: object
+      x-infer-schema: true
+      properties:
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+    key:
+      - /_meta/row_id
