@@ -67,7 +67,9 @@ class Connector(BaseConnector, metaclass=abc.ABCMeta):
             if not (request := requests.get()):
                 return  # EOF.
             elif (spec := request.get("spec")) is not None:
-                self._emit(Response(spec=self.spec(spec)))
+                spec_response = self.spec(spec)
+                spec_response["protocol"] = 3032023
+                self._emit(Response(spec=spec_response))
             elif (discover := request.get("discover")) is not None:
                 self._emit(Response(discovered=self.discover(discover)))
             elif (validate := request.get("validate")) is not None:
