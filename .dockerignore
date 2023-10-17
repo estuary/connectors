@@ -9,3 +9,27 @@ tests
 !parser/target/x86_64-unknown-linux-musl/release/parser
 
 !network-proxy-service/target/x86_64-unknown-linux-musl/release/network-proxy-service
+
+# Python Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+__pycache__/
+.venv/
+.mypy_cache/
+.docker-cache/
+MANIFEST
