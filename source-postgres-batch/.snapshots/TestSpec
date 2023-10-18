@@ -29,6 +29,11 @@
       },
       "advanced": {
         "properties": {
+          "poll": {
+            "type": "string",
+            "title": "Default Poll Interval",
+            "description": "How often to execute fetch queries. Defaults to 5 minutes if unset."
+          },
           "sslmode": {
             "type": "string",
             "enum": [
@@ -65,13 +70,15 @@
       "name": {
         "type": "string",
         "title": "Name",
-        "description": "The unique name of this resource."
+        "description": "The unique name of this resource.",
+        "order": 0
       },
       "template": {
         "type": "string",
         "title": "Query Template",
         "description": "The query template (pkg.go.dev/text/template) which will be rendered and then executed.",
-        "multiline": true
+        "multiline": true,
+        "order": 3
       },
       "cursor": {
         "items": {
@@ -79,12 +86,14 @@
         },
         "type": "array",
         "title": "Cursor Columns",
-        "description": "The names of columns which should be persisted between query executions as a cursor."
+        "description": "The names of columns which should be persisted between query executions as a cursor.",
+        "order": 2
       },
       "poll": {
         "type": "string",
         "title": "Poll Interval",
-        "description": "How often to execute the fetch query. Defaults to 5 minutes if unset."
+        "description": "How often to execute the fetch query (overrides the connector default setting)",
+        "order": 1
       }
     },
     "type": "object",
