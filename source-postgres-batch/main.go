@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -27,7 +27,8 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	SSLMode string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	PollInterval string `json:"poll,omitempty" jsonschema:"title=Default Poll Interval,description=How often to execute fetch queries. Defaults to 5 minutes if unset."`
+	SSLMode      string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -42,6 +43,11 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+	if c.Advanced.PollInterval != "" {
+		if _, err := time.ParseDuration(c.Advanced.PollInterval); err != nil {
+			return fmt.Errorf("invalid default poll interval %q: %w", c.Advanced.PollInterval, err)
+		}
+	}
 	return nil
 }
 
@@ -52,6 +58,10 @@ func (c *Config) SetDefaults() {
 	// default 5432.
 	if !strings.Contains(c.Address, ":") {
 		c.Address += ":5432"
+	}
+
+	if c.Advanced.PollInterval == "" {
+		c.Advanced.PollInterval = "5m"
 	}
 }
 
@@ -76,13 +86,7 @@ func (c *Config) ToURI() string {
 	return uri.String()
 }
 
-func connectPostgres(ctx context.Context, configJSON json.RawMessage) (*sql.DB, error) {
-	var cfg Config
-	if err := pf.UnmarshalStrict(configJSON, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
-	}
-	cfg.SetDefaults()
-
+func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
 	log.WithFields(log.Fields{
 		"address":  cfg.Address,
 		"user":     cfg.User,
