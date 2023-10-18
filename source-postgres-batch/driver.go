@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/encrow"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -19,6 +20,15 @@ import (
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	// When processing large tables we need to emit checkpoints in between query result
+	// rows, since we don't want a single Flow transaction to have contain millions of
+	// documents. But emitting a checkpoint after every row could be a significant drag
+	// on overall throughput, and isn't really needed anyway. So instead we emit one for
+	// every N rows, plus one when the query results are fully processed.
+	documentsPerCheckpoint = 1000
 )
 
 // BatchSQLDriver represents a generic "batch SQL" capture behavior, parameterized
@@ -420,12 +430,20 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 		resources = append(resources, res)
 	}
 
+	var state captureState
 	if open.StateJson != nil {
-		// TODO: Consider implementing persistent state, keyed on the resource name property.
+		if err := pf.UnmarshalStrict(open.StateJson, &state); err != nil {
+			return fmt.Errorf("parsing state checkpoint: %w", err)
+		}
+	}
+	state, err = updateResourceStates(state, resources)
+	if err != nil {
+		return fmt.Errorf("error initializing resource states: %w", err)
 	}
 
 	var capture = &capture{
 		Config:         &cfg,
+		State:          &state,
 		DB:             db,
 		Resources:      resources,
 		Output:         stream,
@@ -434,12 +452,48 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	return capture.Run(stream.Context())
 }
 
+func updateResourceStates(prevState captureState, resources []Resource) (captureState, error) {
+	var newState = captureState{
+		Streams: make(map[string]*streamState),
+	}
+	for _, res := range resources {
+		var stream = prevState.Streams[res.Name]
+		if stream != nil && !slices.Equal(stream.CursorNames, res.Cursor) {
+			log.WithFields(log.Fields{
+				"name": res.Name,
+				"prev": stream.CursorNames,
+				"next": res.Cursor,
+			}).Warn("cursor columns changed, resetting stream state")
+			stream = nil
+		}
+		if stream == nil {
+			stream = &streamState{CursorNames: res.Cursor}
+		}
+		newState.Streams[res.Name] = stream
+	}
+	return newState, nil
+}
+
 type capture struct {
 	Config         *Config
+	State          *captureState
 	DB             *sql.DB
 	Resources      []Resource
 	Output         *boilerplate.PullOutput
 	TranslateValue func(val any, databaseTypeName string) (any, error)
+}
+
+type captureState struct {
+	Streams map[string]*streamState
+}
+
+type streamState struct {
+	CursorNames  []string
+	CursorValues []any
+}
+
+func (s *captureState) Validate() error {
+	return nil
 }
 
 func (c *capture) Run(ctx context.Context) error {
@@ -489,27 +543,41 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
 	}
 
-	var cursorValues []any
-	for ctx.Err() == nil {
+	for {
 		log.WithField("name", res.Name).Info("polling for updates")
-		var nextCursor, err = c.poll(ctx, bindingIndex, queryTemplate, res.Cursor, cursorValues)
-		if err != nil {
+		if err := c.poll(ctx, bindingIndex, queryTemplate, res); err != nil {
 			return fmt.Errorf("error polling table: %w", err)
 		}
-		cursorValues = nextCursor
-		time.Sleep(pollInterval)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(pollInterval):
+			continue
+		}
 	}
-	return ctx.Err()
 }
 
-func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Template, cursorNames []string, cursorValues []any) ([]any, error) {
+func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Template, res *Resource) error {
+	var state, ok = c.State.Streams[res.Name]
+	if !ok {
+		return fmt.Errorf("internal error: no state for stream %q", res.Name)
+	}
+	var cursorNames = state.CursorNames
+	var cursorValues = state.CursorValues
+
+	var quotedCursorNames []string
+	for _, cursorName := range cursorNames {
+		quotedCursorNames = append(quotedCursorNames, quoteColumnName(cursorName))
+	}
+
 	var templateArg = map[string]any{
 		"IsFirstQuery": len(cursorValues) == 0,
+		"CursorFields": quotedCursorNames,
 	}
 
 	var queryBuf = new(strings.Builder)
 	if err := tmpl.Execute(queryBuf, templateArg); err != nil {
-		return nil, fmt.Errorf("error generating query: %w", err)
+		return fmt.Errorf("error generating query: %w", err)
 	}
 	var query = queryBuf.String()
 
@@ -518,17 +586,17 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	log.WithFields(log.Fields{"query": query, "args": cursorValues}).Info("executing query")
 	var rows, err = c.DB.QueryContext(ctx, query, cursorValues...)
 	if err != nil {
-		return nil, fmt.Errorf("error executing query: %w", err)
+		return fmt.Errorf("error executing query: %w", err)
 	}
 	defer rows.Close()
 
 	columnNames, err := rows.Columns()
 	if err != nil {
-		return nil, fmt.Errorf("error processing query result: %w", err)
+		return fmt.Errorf("error processing query result: %w", err)
 	}
 	columnTypes, err := rows.ColumnTypes()
 	if err != nil {
-		return nil, fmt.Errorf("error processing query result: %w", err)
+		return fmt.Errorf("error processing query result: %w", err)
 	}
 	for i, columnType := range columnTypes {
 		log.WithFields(log.Fields{
@@ -538,40 +606,48 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		}).Debug("column type")
 	}
 
-	var resultRow = make(map[string]any)
-	var translatedRow = make(map[string]any)
+	var columnIndices = make(map[string]int)
+	for idx, name := range columnNames {
+		columnIndices[name] = idx
+	}
+	var cursorIndices []int
+	for _, cursorName := range cursorNames {
+		cursorIndices = append(cursorIndices, columnIndices[cursorName])
+	}
+
 	var columnValues = make([]any, len(columnNames))
 	var columnPointers = make([]any, len(columnValues))
 	for i := range columnPointers {
 		columnPointers[i] = &columnValues[i]
 	}
 
+	var shape = encrow.NewShape(append(columnNames, "_meta"))
+	var rowValues = make([]any, len(columnNames)+1)
+	var serializedDocument []byte
+
 	var count int
 	for rows.Next() {
 		if err := rows.Scan(columnPointers...); err != nil {
-			return nil, fmt.Errorf("error scanning result row: %w", err)
+			return fmt.Errorf("error scanning result row: %w", err)
 		}
 
-		for i, name := range columnNames {
-			var translatedVal, err = c.TranslateValue(columnValues[i], columnTypes[i].DatabaseTypeName())
+		for idx, val := range columnValues {
+			var translatedVal, err = c.TranslateValue(val, columnTypes[idx].DatabaseTypeName())
 			if err != nil {
-				return nil, fmt.Errorf("error translating column value: %w", err)
+				return fmt.Errorf("error translating column %q value: %w", columnNames[idx], err)
 			}
-			translatedRow[name] = translatedVal
+			rowValues[idx] = translatedVal
 		}
-
-		translatedRow["_meta"] = &documentMetadata{
+		rowValues[len(rowValues)-1] = &documentMetadata{
 			Polled: pollTime,
 			Index:  count,
 		}
 
-		var bs, err = json.Marshal(translatedRow)
+		serializedDocument, err = shape.Encode(serializedDocument, rowValues)
 		if err != nil {
-			return nil, fmt.Errorf("error serializing document: %w", err)
-		} else if err := c.Output.Documents(bindingIndex, bs); err != nil {
-			return nil, fmt.Errorf("error emitting document: %w", err)
-		} else if err := c.Output.Checkpoint(json.RawMessage(`{}`), true); err != nil {
-			return nil, fmt.Errorf("error emitting checkpoint: %w", err)
+			return fmt.Errorf("error serializing document: %w", err)
+		} else if err := c.Output.Documents(bindingIndex, serializedDocument); err != nil {
+			return fmt.Errorf("error emitting document: %w", err)
 		}
 
 		if len(cursorValues) != len(cursorNames) {
@@ -579,18 +655,48 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 			// an empty result set will be a no-op even when the previous state is nil.
 			cursorValues = make([]any, len(cursorNames))
 		}
-		for i, name := range columnNames {
-			resultRow[name] = columnValues[i]
+		for i, j := range cursorIndices {
+			cursorValues[i] = rowValues[j]
 		}
-		for i, name := range cursorNames {
-			cursorValues[i] = resultRow[name]
-		}
+		state.CursorValues = cursorValues
 
 		count++
+		if count%documentsPerCheckpoint == 0 {
+			if err := c.streamStateCheckpoint(res.Name, state); err != nil {
+				return err
+			}
+		}
 	}
+
+	if count%documentsPerCheckpoint != 0 {
+		if err := c.streamStateCheckpoint(res.Name, state); err != nil {
+			return err
+		}
+	}
+
 	log.WithFields(log.Fields{
 		"query": query,
 		"count": count,
 	}).Info("query complete")
-	return cursorValues, nil
+	return nil
+}
+
+func (c *capture) streamStateCheckpoint(name string, state *streamState) error {
+	var checkpointPatch = captureState{Streams: make(map[string]*streamState)}
+	checkpointPatch.Streams[name] = state
+
+	if checkpointJSON, err := json.Marshal(checkpointPatch); err != nil {
+		return fmt.Errorf("error serializing state checkpoint: %w", err)
+	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
+		return fmt.Errorf("error emitting checkpoint: %w", err)
+	}
+	return nil
+}
+
+func quoteColumnName(name string) string {
+	// From https://www.postgresql.org/docs/14/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS:
+	//
+	//     Quoted identifiers can contain any character, except the character with code zero.
+	//     (To include a double quote, write two double quotes.)
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }

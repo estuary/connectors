@@ -109,6 +109,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	}
 	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
 	sanitizers[`"txid":999999`] = regexp.MustCompile(`"txid":[0-9]+`)
+	sanitizers[`"CursorNames":["txid"],"CursorValues":[999999]`] = regexp.MustCompile(`"CursorNames":\["txid"\],"CursorValues":\[[0-9]+\]`)
 
 	return &st.CaptureSpec{
 		Driver:       postgresDriver,
