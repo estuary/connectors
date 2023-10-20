@@ -634,7 +634,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 					}
 				} else {
 					if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
-						return  fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
+						return  fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err)
 					}
 				}
 
