@@ -27,6 +27,11 @@ transactions:
       - [false, { "id": 8, "str_field": "str8", "float_field": 8.8, "bool_field": true , "nullable_int": 8   , "array_int":[81, 82], "nested": {"id": "i8"}, "multiple": null, "_meta": {"uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [false, { "id": 9, "str_field": "str9", "float_field": 9.9, "bool_field": false, "nullable_int": null, "array_int":[91, 92], "nested": {"id": "i9"}, "_meta": {"uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [false, { "id": 10, "str_field": "str10", "float_field": 10.1, "bool_field": true , "nullable_int": 10   , "array_int":[1,   2], "nested": {"id": "i10"}, "_meta": {"uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"}}]
+    tests/compound-key:
+      - [false, { "yin": "a", "yan": "b", "num": 0, "_meta": {"uuid": "134a1456-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [false, { "yin": "b", "yan": "a", "num": 0, "_meta": {"uuid": "1b953992-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [false, { "yin": "ab", "yan": "", "num": 0, "_meta": {"uuid": "7e2df422-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [false, { "yin": "", "yan": "ab", "num": 0, "_meta": {"uuid": "8458b580-20e1-11ee-990b-ffd12dfcd47f"}}]
 
   - tests/simple:
       - [false, { "id": 7, "canary": "pieced", "_meta": {"uuid": "134a1456-20e1-11ee-990b-ffd12dfcd47f"}}]
@@ -39,6 +44,11 @@ transactions:
       - [true, { "id": 3, "int": 8, "str": "str 8", "_meta": {"uuid": "9afb3ff6-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [true, { "id": 4, "int": 9, "str": "str 9", "_meta": {"uuid": "a1100a70-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [true, { "id": 5, "int": 10, "str": "str 10", "_meta": {"uuid": "a65203a8-20e1-11ee-990b-ffd12dfcd47f"}}]
+    tests/compound-key:
+      - [true, { "yin": "a", "yan": "b", "num": 1, "_meta": {"uuid": "134a1456-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [true, { "yin": "b", "yan": "a", "num": 2, "_meta": {"uuid": "1b953992-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [true, { "yin": "ab", "yan": "", "num": 3, "_meta": {"uuid": "7e2df422-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [true, { "yin": "", "yan": "ab", "num": 4, "_meta": {"uuid": "8458b580-20e1-11ee-990b-ffd12dfcd47f"}}]
     tests/formatted-strings:
       - [false, { "id":1, "int_and_str":1, "num_and_str":1.1, "int_str": "10", "num_str":"10.1", "datetime":"0000-01-01T00:00:00Z", "date":"0000-01-01", "time":"00:00:00Z", "_meta": {"uuid": "b1e13a0e-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [false, { "id":2, "int_and_str":2, "num_and_str":2.1, "int_str": "20", "num_str":"20.1", "datetime":"1999-02-02T14:20:12.33Z", "date":"1999-02-02", "time":"14:20:12.33Z",  "_meta": {"uuid": "b81a9bf4-20e1-11ee-990b-ffd12dfcd47f"}}]

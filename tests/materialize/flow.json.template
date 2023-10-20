@@ -69,6 +69,18 @@
        },
        "key": ["/id"]
     },
+    "tests/compound-key": {
+      "schema": {
+        "properties": {
+          "yin": { "type": "string" },
+          "yan": { "type": "string" },
+          "num": { "type": "integer" }
+        },
+        "required": ["yin", "yan", "num"],
+        "type": "object"
+      },
+      "key": ["/yin", "/yan"]
+    }
   },
 
   "materializations": {
