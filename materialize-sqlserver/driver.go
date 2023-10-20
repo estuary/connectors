@@ -468,27 +468,12 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		// First binding to be processed
-		if lastBinding == -1 {
-			lastBinding = it.Binding
-
-			var colNames = []string{}
-			for _, col := range b.target.Keys {
-				// Column names passed here must not be quoted, so we use Field instead
-				// of Identifier
-				colNames = append(colNames, col.Field)
-			}
-
-			var err error
-			batch, err = txn.PrepareContext(ctx, mssqldb.CopyIn(b.tempLoadTableName, mssqldb.BulkOptions{}, colNames...))
-			if err != nil {
-				return fmt.Errorf("load: preparing bulk insert statement on %q: %w", b.tempLoadTableName, err)
-			}
-		}
-
 		if it.Binding != lastBinding {
-			if _, err := batch.ExecContext(ctx); err != nil {
-				return fmt.Errorf("load: batch insert on %q: %w", b.target.Identifier, err)
+			// Submit previous `batch`
+			if batch != nil {
+				if _, err := batch.ExecContext(ctx); err != nil {
+					return fmt.Errorf("load: batch insert on %q: %w", b.target.Identifier, err)
+				}
 			}
 
 			lastBinding = it.Binding
