@@ -29,6 +29,13 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-sqlserver/...
 ################################################################################
 FROM ${BASE_IMAGE}
 
+RUN apt-get update -y \
+     && apt-get install --no-install-recommends -y \
+     ca-certificates \
+     curl \
+     unzip \
+     && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
