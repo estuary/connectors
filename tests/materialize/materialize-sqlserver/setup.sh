@@ -91,6 +91,12 @@ resources_json_template='[
         "num_str": {}
       }
     }
+  },
+  {
+    "resource": {
+      "table": "compound_key"
+    },
+    "source": "${TEST_COLLECTION_COMPOUND_KEY}"
   }
 ]'
 
