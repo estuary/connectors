@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "\nIF OBJECT_ID(N'flow_materializations_v2', 'U') IS NULL BEGIN\nCREATE TABLE flow_materializations_v2 (\n\t\tmaterialization nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tversion nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tspec nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\nEND;\n\n\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\n\nIF OBJECT_ID(N'Simple', 'U') IS NULL BEGIN\nCREATE TABLE \"Simple\" (\n\t\tid BIGINT NOT NULL,\n\t\tcanary nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_standard', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_standard (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta_exclude_flow_doc', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'Multiple Types', 'U') IS NULL BEGIN\nCREATE TABLE \"Multiple Types\" (\n\t\tid BIGINT NOT NULL,\n\t\tarray_int nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tbool_field BIT,\n\t\tfloat_field DOUBLE PRECISION,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tmultiple nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tnested nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tnullable_int BIGINT,\n\t\tstr_field nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'Formatted Strings', 'U') IS NULL BEGIN\nCREATE TABLE \"Formatted Strings\" (\n\t\tid BIGINT NOT NULL,\n\t\t\"date\" DATE,\n\t\tdatetime DATETIME2,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tint_and_str BIGINT,\n\t\tint_str BIGINT,\n\t\tnum_and_str DOUBLE PRECISION,\n\t\tnum_str DOUBLE PRECISION,\n\t\t\"time\" TIME,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-sqlserver/materialize');"
+    "actionDescription": "\nIF OBJECT_ID(N'flow_materializations_v2', 'U') IS NULL BEGIN\nCREATE TABLE flow_materializations_v2 (\n\t\tmaterialization nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tversion nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tspec nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\nEND;\n\n\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\n\nIF OBJECT_ID(N'Simple', 'U') IS NULL BEGIN\nCREATE TABLE \"Simple\" (\n\t\tid BIGINT NOT NULL,\n\t\tcanary nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_standard', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_standard (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta_exclude_flow_doc', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'Multiple Types', 'U') IS NULL BEGIN\nCREATE TABLE \"Multiple Types\" (\n\t\tid BIGINT NOT NULL,\n\t\tarray_int nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tbool_field BIT,\n\t\tfloat_field DOUBLE PRECISION,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tmultiple nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tnested nvarchar(MAX) COLLATE Latin1_General_100_BIN2,\n\t\tnullable_int BIGINT,\n\t\tstr_field nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'Formatted Strings', 'U') IS NULL BEGIN\nCREATE TABLE \"Formatted Strings\" (\n\t\tid BIGINT NOT NULL,\n\t\t\"date\" DATE,\n\t\tdatetime DATETIME2,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tint_and_str BIGINT,\n\t\tint_str BIGINT,\n\t\tnum_and_str DOUBLE PRECISION,\n\t\tnum_str DOUBLE PRECISION,\n\t\t\"time\" TIME,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'compound_key', 'U') IS NULL BEGIN\nCREATE TABLE compound_key (\n\t\tyin nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tyan nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tnum BIGINT NOT NULL,\n\t\tflow_document nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (yin, yan)\n);\nEND;\n\nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-sqlserver/materialize');"
   }
 }
 {
@@ -201,6 +201,58 @@
       },
       "nullable_int": 10,
       "str_field": "str10"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 6,
+    "doc": {
+      "_meta": {
+        "uuid": "134a1456-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "num": 0,
+      "yan": "b",
+      "yin": "a"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 6,
+    "doc": {
+      "_meta": {
+        "uuid": "1b953992-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "num": 0,
+      "yan": "a",
+      "yin": "b"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 6,
+    "doc": {
+      "_meta": {
+        "uuid": "7e2df422-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "num": 0,
+      "yan": "",
+      "yin": "ab"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 6,
+    "doc": {
+      "_meta": {
+        "uuid": "8458b580-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "num": 0,
+      "yan": "ab",
+      "yin": ""
     }
   }
 }
@@ -727,6 +779,42 @@
     "time": "0001-01-01T23:59:59Z"
   },
   "table": "Formatted Strings"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12T18:25:45.520064Z",
+    "num": 4,
+    "yan": "ab",
+    "yin": ""
+  },
+  "table": "compound_key"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12T18:22:35.841647Z",
+    "num": 1,
+    "yan": "b",
+    "yin": "a"
+  },
+  "table": "compound_key"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12T18:25:35.173533Z",
+    "num": 3,
+    "yan": "",
+    "yin": "ab"
+  },
+  "table": "compound_key"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12T18:22:49.755893Z",
+    "num": 2,
+    "yan": "a",
+    "yin": "b"
+  },
+  "table": "compound_key"
 }
 {
   "applied": {
