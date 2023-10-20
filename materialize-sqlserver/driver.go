@@ -459,21 +459,64 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 	defer txn.Rollback()
 
+	// The LoadIterator iterates over documents in a natural order, the keys are
+	// not ordered by their binding, but naturally keys from the same binding are
+	// usually grouped together. We take advantage of that by inserting these
+	// consecutive keys of the same binding as a bulk insert to minimise roundtrips
+	var lastBinding = -1
+	var batch *stdsql.Stmt
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
+		// First binding to be processed
+		if lastBinding == -1 {
+			lastBinding = it.Binding
+
+			var colNames = []string{}
+			for _, col := range b.target.Keys {
+				// Column names passed here must not be quoted, so we use Field instead
+				// of Identifier
+				colNames = append(colNames, col.Field)
+			}
+
+			var err error
+			batch, err = txn.PrepareContext(ctx, mssqldb.CopyIn(b.tempLoadTableName, mssqldb.BulkOptions{}, colNames...))
+			if err != nil {
+				return fmt.Errorf("load: preparing bulk insert statement on %q: %w", b.tempLoadTableName, err)
+			}
+		}
+
+		if it.Binding != lastBinding {
+			if _, err := batch.ExecContext(ctx); err != nil {
+				return fmt.Errorf("load: batch insert on %q: %w", b.target.Identifier, err)
+			}
+
+			lastBinding = it.Binding
+
+			var colNames = []string{}
+			for _, col := range b.target.Keys {
+				// Column names passed here must not be quoted, so we use Field instead
+				// of Identifier
+				colNames = append(colNames, col.Field)
+			}
+
+			var err error
+			batch, err = txn.PrepareContext(ctx, mssqldb.CopyIn(b.tempLoadTableName, mssqldb.BulkOptions{}, colNames...))
+			if err != nil {
+				return fmt.Errorf("load: preparing bulk insert statement on %q: %w", b.tempLoadTableName, err)
+			}
+		}
+
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
-		} else {
-			// We cannot use COPY INTO (BULK INSERT) for load tables unfortunately. It
-			// seems like either the driver, or SQL Server itself, does not allow multiple
-			// BULK INSERT statements to be run as part of one connection, so we would
-			// have to either use one connection per binding (which I think is best to
-			// avoid, specially if we want to support large number of bindings), or do a
-			// normal insert as we are doing here. The performance does not seem bad.
-			if _, err := txn.ExecContext(ctx, b.loadInsertSQL, converted...); err != nil {
-				return fmt.Errorf("load: writing keys to %q: %w", b.tempLoadTableName, err)
-			}
+		} else if _, err := batch.ExecContext(ctx, converted...); err != nil {
+			return fmt.Errorf("load: writing data to batch on %q: %w", b.tempLoadTableName, err)
+		}
+	}
+
+	if batch != nil {
+		if _, err := batch.ExecContext(ctx); err != nil {
+			return fmt.Errorf("load batch insert on %q: %w", d.bindings[lastBinding].target.Identifier, err)
 		}
 	}
 
