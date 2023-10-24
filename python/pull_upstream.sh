@@ -2,13 +2,8 @@
 # Modified from https://stackoverflow.com/a/30386041
 
 git-merge-subpath() {
-    local SQUASH
-    if [[ $1 == "--squash" ]]; then
-        SQUASH=1
-        shift
-    fi
     if (( $# != 3 )); then
-        local PARAMS="[--squash] SOURCE_COMMIT SOURCE_PREFIX DEST_PREFIX"
+        local PARAMS="SOURCE_COMMIT SOURCE_PREFIX DEST_PREFIX"
         echo "USAGE: $(basename "$0") $PARAMS"
         return 1
     fi
@@ -48,10 +43,6 @@ git-merge-subpath() {
         # This is the first time git-merge-subpath is run, so diff against the
         # empty commit instead of the last commit created by git-merge-subpath.
         OLD_TREEISH=$(git hash-object -t tree /dev/null)
-    fi &&
-
-    if [[ -z $SQUASH ]]; then
-        git merge -s ours --no-commit --allow-unrelated-histories "$SOURCE_COMMIT"
     fi &&
 
     git diff --color=never "$OLD_TREEISH" "$SOURCE_COMMIT:$SOURCE_PREFIX" \
