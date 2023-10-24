@@ -641,6 +641,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 				if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
 					return fmt.Errorf("truncating load table: %w", err)
 				}
+
+				// reset the value for next transaction
+				b.needsMerge = false
 			}
 
 			var err error
