@@ -24,6 +24,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	}
 
 	// Compute backfill query and arguments list
+	var disableParallelWorkers bool
 	var query string
 	var args []any
 	switch state.Mode {
@@ -35,6 +36,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		logEntry.WithField("ctid", afterCTID).Debug("scanning keyless table chunk")
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{afterCTID}
+		disableParallelWorkers = true
 	case sqlcapture.TableModePreciseBackfill, sqlcapture.TableModeUnfilteredBackfill:
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
@@ -56,6 +58,23 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		}
 	default:
 		return fmt.Errorf("invalid backfill mode %q", state.Mode)
+	}
+
+	// Keyless backfill queries need to return results in CTID order, but we can't ask
+	// for that because `ORDER BY ctid` forces a sort, so we rely on it being true as an
+	// implementation detail of how `WHERE ctid > $1` queries execute in practice. But
+	// parallel query execution breaks that assumption, so we need to force the query
+	// planner to not use parallel workers in such cases.
+	if disableParallelWorkers {
+		if _, err := db.conn.Exec(ctx, "SET max_parallel_workers_per_gather TO 0"); err != nil {
+			logrus.WithField("err", err).Warn("error attempting to disable parallel workers")
+		} else {
+			defer func() {
+				if _, err := db.conn.Exec(ctx, "SET max_parallel_workers_per_gather TO DEFAULT"); err != nil {
+					logrus.WithField("err", err).Warn("error resetting max_parallel_workers to default")
+				}
+			}()
+		}
 	}
 
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
