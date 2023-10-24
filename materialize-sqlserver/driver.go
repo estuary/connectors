@@ -391,12 +391,6 @@ func prepareNewTransactor(
 type binding struct {
 	target               sql.Table
 
-	// a binding needs to be merged if there are updates to existing documents
-	// otherwise we just do a direct copy by moving all data from temporary table
-	// into the target table. Note that in case of delta updates, "needsMerge"
-	// will always be false
-	needsMerge           bool
-
 	createLoadTableSQL   string
 	loadQuerySQL         string
 	loadInsertSQL        string
@@ -557,6 +551,12 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 	}()
 
+	// a binding needs to be merged if there are updates to existing documents
+	// otherwise we just do a direct copy by moving all data from temporary table
+	// into the target table. Note that in case of delta updates, "needsMerge"
+	// will always be false
+	var needsMerge = make([]bool, len(d.bindings))
+
 	// The mssql driver uses prepared statements to drive bulk inserts. A bulk
 	// insert is initiated by preparing a `mssqldb.CopyIn` statement. Afterwards,
 	// executions of this prepared statement that have arguments, are considered rows
@@ -615,7 +615,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 
 		if it.Exists {
-			b.needsMerge = true
+			needsMerge[it.Binding] = true
 		}
 	}
 
@@ -627,8 +627,8 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		return nil, pf.RunAsyncOperation(func() error {
 			defer txn.Rollback()
 
-			for _, b := range d.bindings {
-				if b.needsMerge {
+			for i, b := range d.bindings {
+				if needsMerge[i] {
 					if _, err := txn.ExecContext(ctx, b.mergeInto); err != nil {
 						return fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
 					}
