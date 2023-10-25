@@ -1,5 +1,5 @@
 [virtualenvs]
 # This configures Poetry to create virtual environments inside each
 # module (i.e connector), instead of creating one that you have to constantly
-# switch between. 
+# recreate and switch between. 
 in-project = true
