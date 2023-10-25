@@ -29,7 +29,9 @@ ENV PYTHONPATH="/builder:$PYTHONPATH"
 RUN --mount=type=cache,target=/root/.cache curl -sSL https://install.python-poetry.org | python -
 
 # install connector dependencies
-COPY source-airtable ./
+COPY source-airtable ./source-airtable
+COPY python ./python
+WORKDIR /builder/source-airtable
 RUN --mount=type=cache,target=/root/.cache poetry install --no-root --only main
 
 FROM builder
@@ -41,9 +43,8 @@ LABEL FLOW_RUNTIME_CODEC=json
 COPY --from=builder $POETRY_HOME $POETRY_HOME
 COPY --from=builder $VIRTUAL_ENV $VIRTUAL_ENV
 
-WORKDIR /connector/source-airtable
-COPY source-airtable ./
 WORKDIR /connector
+COPY source-airtable ./source-airtable
 COPY python ./python
 
 
