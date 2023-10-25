@@ -1,4 +1,7 @@
+# syntax=docker/dockerfile:1
 FROM python:3.11-slim as builder
+
+ARG CONNECTOR_NAME
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
@@ -29,22 +32,27 @@ ENV PYTHONPATH="/builder:$PYTHONPATH"
 RUN --mount=type=cache,target=/root/.cache curl -sSL https://install.python-poetry.org | python -
 
 # install connector dependencies
-COPY source-changeme ./
+COPY $CONNECTOR_NAME ./connector
+COPY python ./python
+WORKDIR /builder/connector
 RUN --mount=type=cache,target=/root/.cache poetry install --no-root --only main
 
 FROM builder
 
-LABEL FLOW_RUNTIME_PROTOCOL=capture
+ARG CONNECTOR_NAME
+ARG CONNECTOR_TYPE
+
+LABEL FLOW_RUNTIME_PROTOCOL=$CONNECTOR_TYPE
 LABEL FLOW_RUNTIME_CODEC=json
 
 # copy in our built poetry + venv
 COPY --from=builder $POETRY_HOME $POETRY_HOME
 COPY --from=builder $VIRTUAL_ENV $VIRTUAL_ENV
 
-WORKDIR /connector/source-changeme
-COPY source-changeme ./
 WORKDIR /connector
-COPY python ./python
+COPY --from=builder /builder/connector ./$CONNECTOR_NAME
+COPY --from=builder /builder/python ./python
 
-
-CMD ["python", "-m", "source-changeme"]
+# Arg substitution in CMD doesn't seem to work
+ENV CONNECTOR_NAME=$CONNECTOR_NAME
+CMD python -m $CONNECTOR_NAME
