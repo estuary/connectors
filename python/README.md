@@ -28,14 +28,14 @@ A Python connector is composed of a few critical pieces:
   ```
 
 ## Pulling an open-source connector in tree
-While using existing builds of open-source connectors is all well and good, there will come a time in every connector's life that we need to make changes to it. Before deciding to pull a connector in-tree, first make sure that the version of the connector you're going to pull is licensed to allow this usage. Then, the connector can be imported like so
+While using existing builds of open-source connectors is all well and good, there will come a time in every connector's life that we need to make changes to it. Before deciding to pull a connector in-tree, first make sure that the version of the connector you're going to pull is licensed to allow this usage, and that you have its location in the origin repository. Then, the connector can be imported like so
 
 ```bash
 $ git remote add -f --no-tags bigdata https://github.com/big/data.git 
-$ ./python/pull_upstream.sh bigdata/master path/in/source/repo path/in/this/repo
+$ ./python/pull_upstream.sh bigdata/master path/in/source/repo path/in/this/repo license_type path/to/LICENSE
 ```
 
-This will create a special merge commit that indicates the SHA of the latest commit that is being imported, where it came from, and where it's going. This commit format serves two purposes. First, it acts as a record of the point in time that the open source connector was imported. This is important in order to verify that the imported connector was properly licensed at the time it was imported. Second, it allows for subsequent `pull_upstream.sh` invocations to cleanly merge in upstream changes, if desired.
+This will create a special merge commit that indicates the SHA of the latest commit that is being imported, where it came from, where it's going, what the specified license type was, and where that license lived. This commit format serves two purposes. First, it acts as a record of the point in time that the open source connector was imported. This is important in order to verify that the imported connector was properly licensed at the time it was imported. Second, it allows for subsequent `pull_upstream.sh` invocations to cleanly merge in upstream changes, if desired.
 
 ## Running/Debugging connectors
 Connectors can be invoked locally using [`flowctl`](https://docs.estuary.dev/getting-started/installation/#get-started-with-the-flow-cli). For example, to inspect the `spec` output of your connector with a minimal `test.flow.yaml` file that looks like the following 
