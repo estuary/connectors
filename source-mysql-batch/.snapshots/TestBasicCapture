@@ -254,5 +254,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"Streams":{"test_basic_capture_826935":{"CursorNames":["id"],"CursorValues":[249]}}}
+{"Streams":{"test_basic_capture_826935":{"CursorNames":["id"],"CursorValues":[249],"LastPolled":"<TIMESTAMP>"}}}
 

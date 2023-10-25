@@ -475,6 +475,7 @@ type captureState struct {
 type streamState struct {
 	CursorNames  []string
 	CursorValues []any
+	LastPolled   time.Time
 }
 
 func (s *captureState) Validate() error {
@@ -511,27 +512,9 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 		return fmt.Errorf("error parsing template: %w", err)
 	}
 
-	// Polling interval can be configured per binding. If unset, falls back to the
-	// connector global polling interval.
-	var pollStr = c.Config.Advanced.PollInterval
-	if res.PollInterval != "" {
-		pollStr = res.PollInterval
-	}
-	pollInterval, err := time.ParseDuration(pollStr)
-	if err != nil {
-		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
-	}
-
 	for {
-		log.WithField("name", res.Name).Info("scheduled to poll")
 		if err := c.poll(ctx, bindingIndex, queryTemplate, res); err != nil {
 			return fmt.Errorf("error polling table: %w", err)
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(pollInterval):
-			continue
 		}
 	}
 }
@@ -569,10 +552,6 @@ func quoteColumnName(name string) string {
 }
 
 func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Template, res *Resource) error {
-	// Acquire mutex so that only one worker at a time can be actively executing a query.
-	c.Mutex.Lock()
-	defer c.Mutex.Unlock()
-
 	var state, ok = c.State.Streams[res.Name]
 	if !ok {
 		return fmt.Errorf("internal error: no state for stream %q", res.Name)
@@ -595,11 +574,39 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	}
 	var query, args = expandQueryPlaceholders(queryBuf.String(), cursorValues)
 
+	// Polling interval can be configured per binding. If unset, falls back to the
+	// connector global polling interval.
+	var pollStr = c.Config.Advanced.PollInterval
+	if res.PollInterval != "" {
+		pollStr = res.PollInterval
+	}
+	pollInterval, err := time.ParseDuration(pollStr)
+	if err != nil {
+		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
+	}
+
+	// Sleep until it's been more than <pollInterval> since the last iteration,
+	// then update the "Last Polled" timestamp.
+	if !state.LastPolled.IsZero() && time.Since(state.LastPolled) < pollInterval {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Until(state.LastPolled.Add(pollInterval))):
+		}
+	}
+	log.WithField("name", res.Name).Info("ready to poll")
+	var pollTime = time.Now().UTC()
+	state.LastPolled = pollTime
+
+	// Acquire mutex so that only one worker at a time can be actively executing a query.
+	c.Mutex.Lock()
+	defer c.Mutex.Unlock()
+
 	log.WithFields(log.Fields{"query": query, "args": args}).Info("executing query")
 
 	// There is no helper function for a streaming select query _with arguments_,
 	// so we have to drop down a level and prepare the statement ourselves here.
-	var stmt, err = c.DB.Prepare(query)
+	stmt, err := c.DB.Prepare(query)
 	if err != nil {
 		return fmt.Errorf("error preparing query %q: %w", query, err)
 	}
@@ -608,9 +615,7 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	var result mysql.Result
 	defer result.Close() // Ensure the resultset allocated during ExecuteSelectStreaming is returned to the pool when done
 
-	var pollTime = time.Now().UTC()
 	var count int
-
 	var shape *encrow.Shape
 	var cursorIndices []int
 	var rowValues []any
