@@ -13,7 +13,7 @@ connector
 
 # Python type-checkingr, virtual environment, and cached bytecode.
 /.mypy_cache
-/.venv
+.venv/
 __pycache__
 # Currently-active pyproject, which is overwritten by ./python/activate.sh
 /poetry.lock

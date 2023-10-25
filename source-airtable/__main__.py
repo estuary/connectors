@@ -1,4 +1,4 @@
-from python import shim_airbyte_cdk
+from common import shim_airbyte_cdk
 from source_airtable import SourceAirtable
 
 shim_airbyte_cdk.CaptureShim(
