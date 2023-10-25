@@ -9,7 +9,7 @@ airbyte-cdk = "0.51.14"
 mypy = "^1.5"
 python = "^3.11"
 debugpy = "^1.8.0"
-source_airtable = { path = "upstream-connector" }
+source_airtable = { path = "source_airtable" }
 common = {path="../python"}
 
 [build-system]
