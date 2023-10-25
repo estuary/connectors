@@ -172,7 +172,7 @@ Teach vscode how to attach to the debugger in `.vscode/launch.json`
 Then run your connector, attach the debugger, and debug away!
 
 ## Building
-Once you've written and tested your connector, the next step is to package it into a Docker image for publication. Make sure that you have a proper `Dockerfile` (see `python/Dockerfile.example` for a useful jumping-off point), and then run `build-local.sh <your-connector>`. This will build the connector and tag it so that `flowctl` can find your local build.
+Once you've written and tested your connector, the next step is to package it into a Docker image for publication. You can build your connector with `build-local.sh <your-connector> python/Dockerfile`. This will build the connector using the Dockerfile template provided, and tag it so that `flowctl` can find your local build. If you need to customize the Dockerfile, simply omit the parameter to `build-local.sh` and the `Dockerfile` inside your connector directory will be used instead.
 > **Hint**: `flowctl` won't try and pull Docker images tagged with `:local`, instead opting to run the locally tagged image. This is what `build-local.sh` does to ensure that your built image works when testing locally before it's pushed.
 
 Once you've built your image, update your `test.flow.yaml` to reference it
