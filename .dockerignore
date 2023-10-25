@@ -33,3 +33,4 @@ __pycache__/
 .mypy_cache/
 .docker-cache/
 MANIFEST
+Dockerfile
