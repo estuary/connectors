@@ -52,7 +52,7 @@ def init_logger():
         "disable_existing_loggers": False,
         "formatters": {
             "flow": {
-                "()": "python.logger.LogFormatter",
+                "()": "common.logger.LogFormatter",
                 "format": "",
             },
         },
