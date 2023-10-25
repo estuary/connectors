@@ -9,6 +9,11 @@ A Python connector is composed of a few critical pieces:
   source_bigdata = { git = "https://github.com/big/data.git", subdirectory = "connector" }
   # If we're working with an open-source connector that we have pulled in-tree, we can define it like this, where the connector was pulled into the subdirectory "upstream-connector"
   source_bigdata = { path = "upstream-connector" }
+
+  # If you're working on an Airbyte connector, you need the Airbyte CDK
+  airbyte-cdk = "^0.52"
+  # If you're working on a Singer/Meltaon connector, you need the singer SDK
+  singer-sdk = "^0.33.0"
   ```
 * In addition to being useful documentation for other people running your connector, `test.flow.yaml` or some other valid Flow spec is needed to invoke your connector locally. You'll point `flowctl` at this file to test your connector when developing locally.
 * `__main__.py` is the entrypoint of your connector. In the case that your connector is using a shim to wrap a supported open-source connector protocol, the file will be quite simple:
@@ -20,8 +25,7 @@ A Python connector is composed of a few critical pieces:
       delegate=SourceBigData(),
       oauth2=None
   ).main()
-  ``` 
-* A `Dockerfile` to build your connector into a container image that will be run in production. An example dockerfile can be found in this directory. Make sure to `source-changeme` with the name of your connector. If you are writing a materialization connector, make sure to also change the `LABEL FLOW_RUNTIME_PROTOCOL` to `materialization`.
+  ```
 
 ## Pulling an open-source connector in tree
 While using existing builds of open-source connectors is all well and good, there will come a time in every connector's life that we need to make changes to it. Before deciding to pull a connector in-tree, first make sure that the version of the connector you're going to pull is licensed to allow this usage. Then, the connector can be imported like so

@@ -5,6 +5,7 @@ description = ""
 authors = ["Joseph Shearer <joseph@estuary.dev>"]
 
 [tool.poetry.dependencies]
+airbyte-cdk = "0.51.14"
 mypy = "^1.5"
 python = "^3.11"
 debugpy = "^1.8.0"
