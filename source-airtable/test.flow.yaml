@@ -2,6 +2,12 @@
 captures:
   acmeCo/source-airtable:
     endpoint:
+      # connector:
+      #   image: ghcr.io/estuary/source-airtable:local
+      #   config:
+      #       credentials:
+      #         auth_method: api_key
+      #         api_key: pat... 
       local:
         command:
           - python
