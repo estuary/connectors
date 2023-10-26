@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "common"
+name = "flow-sdk"
 version = "0.1.0"
 description = ""
 authors = ["Joseph Shearer <joseph@estuary.dev>", "Johnny Graettinger <johnny@estuary.dev>"]
@@ -12,7 +12,7 @@ orjson = "^3.9.7"
 pydantic = "1.10.12"
 python = "^3.11"
 requests = "^2.31.0"
-types-requests = "^2.31.0.2"
+types-requests = "^2.31"
 
 [build-system]
 requires = ["poetry-core"]

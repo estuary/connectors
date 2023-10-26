@@ -11,7 +11,10 @@ from airbyte_protocol.models import (
 )
 
 from .capture import Connector, request, response, Response
-from . import flow, logger, ValidateError
+from . import flow, ValidateError, logger
+from .logger import init_logger
+
+logger = init_logger()
 
 # `logger` has name "flow", and we thread it through the Airbyte APIs,
 # but connectors may still get their own "airbyte" logger.
