@@ -33,8 +33,10 @@ While using existing builds of open-source connectors is all well and good, ther
 
 ```bash
 $ git remote add -f --no-tags bigdata https://github.com/big/data.git 
-$ ./python/pull_upstream.sh bigdata/master path/in/source/repo path/in/this/repo license_type path/to/LICENSE
+$ ./python/pull_upstream.sh bigdata/master upstream/path/to/source-foobar ./source-bigdata license_type path/to/LICENSE
 ```
+
+> **Note:** `license_type` here corresponds to an SPDX license identifier. You can find the list of valid licenses [here](https://spdx.org/licenses/).
 
 This will create a special merge commit that indicates the SHA of the latest commit that is being imported, where it came from, where it's going, what the specified license type was, and where that license lived. This commit format serves two purposes. First, it acts as a record of the point in time that the open source connector was imported. This is important in order to verify that the imported connector was properly licensed at the time it was imported. Second, it allows for subsequent `pull_upstream.sh` invocations to cleanly merge in upstream changes, if desired.
 
