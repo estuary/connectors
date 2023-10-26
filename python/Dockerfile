@@ -2,7 +2,10 @@
 FROM python:3.11-slim as builder
 
 ARG CONNECTOR_NAME
+# Adapted from here: https://github.com/orgs/python-poetry/discussions/1879#discussioncomment-7284113
 
+# This disables buffering in python output which can sometimes
+# obscure errors that happen as the container is crashing
 ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_DEFAULT_TIMEOUT=100 \
