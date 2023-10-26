@@ -588,10 +588,16 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	// Sleep until it's been more than <pollInterval> since the last iteration,
 	// then update the "Last Polled" timestamp.
 	if !state.LastPolled.IsZero() && time.Since(state.LastPolled) < pollInterval {
+		var sleepDuration = time.Until(state.LastPolled.Add(pollInterval))
+		log.WithFields(log.Fields{
+			"name": res.Name,
+			"wait": sleepDuration,
+			"poll": pollInterval,
+		}).Info("waiting for next poll")
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(time.Until(state.LastPolled.Add(pollInterval))):
+		case <-time.After(sleepDuration):
 		}
 	}
 	log.WithField("name", res.Name).Info("ready to poll")
