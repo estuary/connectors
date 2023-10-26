@@ -487,7 +487,24 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 // ExecStatements is used for the DDL statements of ApplyUpsert and ApplyDelete.
 // Mysql does not support transactional DDL statements
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
+	return c.withDB(func(db *stdsql.DB) error {
+		var err = sql.StdSQLExecStatements(ctx, db, statements)
+
+		var mysqlErr *mysql.MySQLError
+		if errors.As(err, &mysqlErr) {
+			// See MySQL error reference: https://dev.mysql.com/doc/mysql-errors/5.7/en/error-reference-introduction.html
+			switch mysqlErr.Number {
+			case 1059:
+				err = fmt.Errorf("%w.\nPossible resolutions include:\n%s\n%s\n%s",
+				err,
+				"1. Adding a projection to rename this field, see https://go.estuary.dev/docs-projections",
+				"2. Exclude the field, see https://go.estuary.dev/docs-field-selection",
+				"3. Disable the corresponding binding")
+			}
+		}
+
+		return err
+	})
 }
 
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
