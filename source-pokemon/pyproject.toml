@@ -15,7 +15,7 @@ python = "^3.11"
 requests = "^2.31.0"
 types-requests = "^2.31.0.2"
 debugpy = "^1.8.0"
-common = {path="../python"}
+flow_sdk = {path="../python"}
 
 [build-system]
 requires = ["poetry-core"]
