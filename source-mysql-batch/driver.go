@@ -519,12 +519,13 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 	}
 }
 
-var queryPlaceholderRegexp = regexp.MustCompile(`([?]|:[0-9]+)`)
+var queryPlaceholderRegexp = regexp.MustCompile(`([?]|:[0-9]+|@flow_cursor_value\[[0-9]+\])`)
 
 // expandQueryPlaceholders simulates numbered query placeholders in MySQL by replacing
 // each numbered placeholder `:N` with a question mark while replacing the input list
 // of argument values into an output list corresponding to the usage sequence.
-func expandQueryPlaceholders(query string, argvals []any) (string, []any) {
+func expandQueryPlaceholders(query string, argvals []any) (string, []any, error) {
+	var errReturn error
 	var argseq []any
 	var prevIndex int
 	query = queryPlaceholderRegexp.ReplaceAllStringFunc(query, func(param string) string {
@@ -534,15 +535,38 @@ func expandQueryPlaceholders(query string, argvals []any) (string, []any) {
 			return "?"
 		}
 
-		var paramIndex, err = strconv.ParseInt(strings.TrimPrefix(param, ":"), 10, 64)
-		if err != nil {
-			panic(fmt.Errorf("internal error: failed to parse parameter name %q", param))
+		// Deprecated and soon-to-be-removed numbered placeholder syntax.
+		if strings.HasPrefix(param, ":") {
+			var paramIndex, err = strconv.ParseInt(strings.TrimPrefix(param, ":"), 10, 64)
+			if err != nil {
+				errReturn = fmt.Errorf("internal error: failed to parse parameter name %q", param)
+			} else if paramIndex < 0 || int(paramIndex) >= len(argvals) {
+				errReturn = fmt.Errorf("parameter index %d outside of valid range [0,%d)", paramIndex, len(argvals))
+			} else {
+				argseq = append(argseq, argvals[paramIndex])
+				prevIndex = int(paramIndex)
+			}
+			return "?"
 		}
-		argseq = append(argseq, argvals[paramIndex])
-		prevIndex = int(paramIndex)
-		return "?"
+
+		if strings.HasPrefix(param, "@flow_cursor_value[") {
+			param = strings.TrimPrefix(param, "@flow_cursor_value[")
+			param = strings.TrimSuffix(param, "]")
+			var paramIndex, err = strconv.ParseInt(strings.TrimPrefix(param, ":"), 10, 64)
+			if err != nil {
+				errReturn = fmt.Errorf("internal error: failed to parse parameter name %q", param)
+			} else if paramIndex < 0 || int(paramIndex) >= len(argvals) {
+				errReturn = fmt.Errorf("parameter index %d outside of valid range [0,%d)", paramIndex, len(argvals))
+			} else {
+				argseq = append(argseq, argvals[paramIndex])
+				prevIndex = int(paramIndex)
+			}
+			return "?"
+		}
+
+		return param
 	})
-	return query, argseq
+	return query, argseq, errReturn
 }
 
 func quoteColumnName(name string) string {
@@ -572,7 +596,14 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	if err := tmpl.Execute(queryBuf, templateArg); err != nil {
 		return fmt.Errorf("error generating query: %w", err)
 	}
-	var query, args = expandQueryPlaceholders(queryBuf.String(), cursorValues)
+	log.WithFields(log.Fields{
+		"query":  queryBuf.String(),
+		"values": cursorValues,
+	}).Debug("expanding query")
+	var query, args, err = expandQueryPlaceholders(queryBuf.String(), cursorValues)
+	if err != nil {
+		return fmt.Errorf("error expanding query placeholders: %w", err)
+	}
 
 	// Polling interval can be configured per binding. If unset, falls back to the
 	// connector global polling interval.
