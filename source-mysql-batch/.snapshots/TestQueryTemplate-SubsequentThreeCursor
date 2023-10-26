@@ -1,1 +1,1 @@
-SELECT * FROM `test`.`foobar` WHERE (`ka` > :0) OR (`ka` = :0 AND `kb` > :1) OR (`ka` = :0 AND `kb` = :1 AND `kc` > :2) ORDER BY `ka`, `kb`, `kc`;
+SELECT * FROM `test`.`foobar` WHERE (`ka` > @flow_cursor_value[0]) OR (`ka` = @flow_cursor_value[0] AND `kb` > @flow_cursor_value[1]) OR (`ka` = @flow_cursor_value[0] AND `kb` = @flow_cursor_value[1] AND `kc` > @flow_cursor_value[2]) ORDER BY `ka`, `kb`, `kc`;
