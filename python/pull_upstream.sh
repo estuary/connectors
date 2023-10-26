@@ -41,8 +41,6 @@ git-merge-subpath() {
         return 1
     fi
 
-
-
     local OLD_SHA1
     local GIT_ROOT
     GIT_ROOT=$(git rev-parse --show-toplevel)
