@@ -1,4 +1,4 @@
-from python import shim_singer_sdk
+from flow_sdk import shim_singer_sdk
 from tap_investing.tap import TapInvesting
 
 shim_singer_sdk.CaptureShim(

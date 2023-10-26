@@ -8,5 +8,5 @@ set -x
 ROOTDIR="$(git rev-parse --show-toplevel)"
 CONNECTOR=$1
 
-poetry -C ${ROOTDIR}/${CONNECTOR} install
-poetry -C ${ROOTDIR}/${CONNECTOR} shell
+poetry --directory ${ROOTDIR}/${CONNECTOR} install
+poetry --directory ${ROOTDIR}/${CONNECTOR} shell

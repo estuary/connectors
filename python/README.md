@@ -7,14 +7,15 @@ A Python connector is composed of a few critical pieces:
   [tool.poetry.dependencies]
   # If we're pulling in an open-source connector that doesn't need any changes, we can define it here. Subdirectory can be omitted if the connector lives at the root of the repo.
   source_bigdata = { git = "https://github.com/big/data.git", subdirectory = "connector" }
-  # If we're working with an open-source connector that we have pulled in-tree, we can define it like this, where the connector was pulled into the subdirectory "upstream-connector"
-  source_bigdata = { path = "upstream-connector" }
+  # If we're working with an open-source connector that we have pulled in-tree, we can define it like this, where the connector was pulled into the subdirectory "source_bigdata".
+  source_bigdata = { path = "source_bigdata" }
 
   # If you're working on an Airbyte connector, you need the Airbyte CDK
   airbyte-cdk = "^0.52"
   # If you're working on a Singer/Meltaon connector, you need the singer SDK
   singer-sdk = "^0.33.0"
   ```
+  > **Note:** We need to include the imported connector as a dependency rather than just referencing it as a module because it contains its own `pyproject.toml` or `setup.py`, which define any dependencies and build instructions it might have. This way, we ensure those dependencies are installed and the build instructions are followed.
 * In addition to being useful documentation for other people running your connector, `test.flow.yaml` or some other valid Flow spec is needed to invoke your connector locally. You'll point `flowctl` at this file to test your connector when developing locally.
 * `__main__.py` is the entrypoint of your connector. In the case that your connector is using a shim to wrap a supported open-source connector protocol, the file will be quite simple:
   ```python
