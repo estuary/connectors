@@ -81,7 +81,7 @@ func TestQueryTemplate(t *testing.T) {
 }
 
 func TestQueryPlaceholderExpansion(t *testing.T) {
-	var querySource = `SELECT * FROM "test"."foobar" WHERE (ka > :0) OR (ka = :0 AND kb > :1) OR (ka = :0 AND kb = :1 AND kc > :2) OR (x > ?) OR (y > ?);`
+	var querySource = `SELECT * FROM "test"."foobar" WHERE (ka > @flow_cursor_value[0]) OR (ka = @flow_cursor_value[0] AND kb > @flow_cursor_value[1]) OR (ka = @flow_cursor_value[0] AND kb = @flow_cursor_value[1] AND kc > @flow_cursor_value[2]) OR (x > ?) OR (y > ?);`
 	var argvals = []any{1, "two", 3.0, "xval", "yval"}
 	var query, args, err = expandQueryPlaceholders(querySource, argvals)
 	require.NoError(t, err)

@@ -522,8 +522,8 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 var queryPlaceholderRegexp = regexp.MustCompile(`([?]|:[0-9]+|@flow_cursor_value\[[0-9]+\])`)
 
 // expandQueryPlaceholders simulates numbered query placeholders in MySQL by replacing
-// each numbered placeholder `:N` with a question mark while replacing the input list
-// of argument values into an output list corresponding to the usage sequence.
+// each numbered placeholder `@flow_cursor_value[N]` with a question mark while replacing
+// the input list of argument values into an output list corresponding to the usage sequence.
 func expandQueryPlaceholders(query string, argvals []any) (string, []any, error) {
 	var errReturn error
 	var argseq []any

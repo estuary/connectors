@@ -131,9 +131,9 @@ const tableQueryTemplateTemplate = `{{/*****************************************
 	  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}
       {{- range $j, $n := $.CursorFields -}}
 		{{- if lt $j $i -}}
-		  {{$n}} = :{{$j}} AND {{end -}}
+		  {{$n}} = @flow_cursor_value[{{$j}}] AND {{end -}}
 	  {{- end -}}
-	  {{$k}} > :{{$i}}
+	  {{$k}} > @flow_cursor_value[{{$i}}]
 	{{- end -}}
 	) ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}}
 	;
