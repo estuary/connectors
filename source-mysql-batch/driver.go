@@ -592,19 +592,6 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		"CursorFields": quotedCursorNames,
 	}
 
-	var queryBuf = new(strings.Builder)
-	if err := tmpl.Execute(queryBuf, templateArg); err != nil {
-		return fmt.Errorf("error generating query: %w", err)
-	}
-	log.WithFields(log.Fields{
-		"query":  queryBuf.String(),
-		"values": cursorValues,
-	}).Debug("expanding query")
-	var query, args, err = expandQueryPlaceholders(queryBuf.String(), cursorValues)
-	if err != nil {
-		return fmt.Errorf("error expanding query placeholders: %w", err)
-	}
-
 	// Polling interval can be configured per binding. If unset, falls back to the
 	// connector global polling interval.
 	var pollStr = c.Config.Advanced.PollInterval
@@ -638,6 +625,19 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	// Acquire mutex so that only one worker at a time can be actively executing a query.
 	c.Mutex.Lock()
 	defer c.Mutex.Unlock()
+
+	var queryBuf = new(strings.Builder)
+	if err := tmpl.Execute(queryBuf, templateArg); err != nil {
+		return fmt.Errorf("error generating query: %w", err)
+	}
+	log.WithFields(log.Fields{
+		"query":  queryBuf.String(),
+		"values": cursorValues,
+	}).Debug("expanding query")
+	query, args, err := expandQueryPlaceholders(queryBuf.String(), cursorValues)
+	if err != nil {
+		return fmt.Errorf("error expanding query placeholders: %w", err)
+	}
 
 	log.WithFields(log.Fields{"query": query, "args": args}).Info("executing query")
 
