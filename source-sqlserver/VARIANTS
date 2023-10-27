@@ -1,2 +1,3 @@
 source-azure-sqlserver
 source-google-cloud-sql-sqlserver
+Source-amazon-rds-sqlserver
