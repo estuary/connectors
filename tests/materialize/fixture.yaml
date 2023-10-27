@@ -51,8 +51,11 @@ transactions:
       - [true, { "yin": "", "yan": "ab", "num": 4, "_meta": {"uuid": "8458b580-20e1-11ee-990b-ffd12dfcd47f"}}]
     tests/formatted-strings:
       - [false, { "id":1, "int_and_str":1, "num_and_str":1.1, "int_str": "10", "num_str":"10.1", "datetime":"0000-01-01T00:00:00Z", "date":"0000-01-01", "time":"00:00:00Z", "_meta": {"uuid": "b1e13a0e-20e1-11ee-990b-ffd12dfcd47f"}}]
-      - [false, { "id":2, "int_and_str":2, "num_and_str":2.1, "int_str": "20", "num_str":"20.1", "datetime":"1999-02-02T14:20:12.33Z", "date":"1999-02-02", "time":"14:20:12.33Z",  "_meta": {"uuid": "b81a9bf4-20e1-11ee-990b-ffd12dfcd47f"}}]
-      - [false, { "id":5, "int_and_str":"5", "num_and_str":"5.1", "int_str": "50", "num_str":"50.1", "datetime":"9999-12-31T23:59:59Z", "date":"9999-12-31", "time":"23:59:59Z",  "_meta": {"uuid": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [false, { "id":2, "int_and_str":2, "num_and_str":2.1, "int_str": "20", "num_str":"20.1", "datetime":"1999-02-02T14:20:12.33Z", "date":"1999-02-02", "time":"14:20:12.33Z", "_meta": {"uuid": "b81a9bf4-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [false, { "id":5, "int_and_str":"5", "num_and_str":"5.1", "int_str": "50", "num_str":"50.1", "datetime":"9999-12-31T23:59:59Z", "date":"9999-12-31", "time":"23:59:59Z", "_meta": {"uuid": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [false, { "id":8, "num_str":"NaN", "_meta": {"uuid": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [false, { "id":9, "num_str":"Infinity", "_meta": {"uuid": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"}}]
+      - [false, { "id":10, "num_str":"-Infinity", "_meta": {"uuid": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"}}]
     tests/multiple-data-types:
       - [true, { "id": 6, "str_field": "str6 v2", "float_field": 66.66, "bool_field": true , "nullable_int": 6   , "array_int":[61, 62], "nested": {"id": "i6"}, "multiple": ["one", 2, true], "_meta": {"uuid": "e4b646c2-20e1-11ee-990b-ffd12dfcd47f"}}]
       - [true, { "id": 7, "str_field": "str7 v2", "float_field": 77.77, "bool_field": false, "nullable_int": null, "array_int":[71, 72], "nested": {"id": "i7"}, "multiple": {"object": "seven"}, "_meta": {"uuid": "eb40dafc-20e1-11ee-990b-ffd12dfcd47f"}}]

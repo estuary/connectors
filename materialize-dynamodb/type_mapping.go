@@ -148,7 +148,14 @@ func convertNumeric(te tuple.TupleElement) (any, error) {
 
 	switch tt := te.(type) {
 	case string:
-		out.innerNumeric = tt
+		switch tt {
+		case "NaN", "Infinity", "-Infinity":
+			// DynamoDB doesn't support non-numeric float values.
+			// https://boto3.amazonaws.com/v1/documentation/api/latest/_modules/boto3/dynamodb/types.html
+			return nil, nil
+		default:
+			out.innerNumeric = tt
+		}
 	case int:
 		out.innerNumeric = strconv.Itoa(tt)
 	case int64:

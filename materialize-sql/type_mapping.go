@@ -273,14 +273,26 @@ func StdStrToInt() ElementConverter {
 
 // StdStrToFloat builds an ElementConverter that attempts to convert a string into an float64 value.
 // It can be used for endpoints that do not require more digits than an float64 can provide.
-func StdStrToFloat() ElementConverter {
+// `format: number` strings may have special values `NaN`, `Infinity`, and `-Infinity`,
+// and note that a native float64-parsed value of these types is not JSON-encodable.
+// The caller must provide specific sentinels to return for these special values,
+// and those sentinel values may depend on what's supported by the endpoint system.
+func StdStrToFloat(nan, posInfinity, negInfinity interface{}) ElementConverter {
 	return StringCastConverter(func(str string) (interface{}, error) {
-		out, err := strconv.ParseFloat(str, 64)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert %q to float64: %w", str, err)
+		switch str {
+		case "NaN":
+			return nan, nil
+		case "Infinity":
+			return posInfinity, nil
+		case "-Infinity":
+			return negInfinity, nil
+		default:
+			out, err := strconv.ParseFloat(str, 64)
+			if err != nil {
+				return nil, fmt.Errorf("could not convert %q to float64: %w", str, err)
+			}
+			return out, nil
 		}
-
-		return out, nil
 	})
 }
 
