@@ -1,3 +1,4 @@
 source-mariadb
 source-amazon-aurora-mysql
 source-google-cloud-sql-mysql
+source-amazon-rds-mysql
