@@ -404,7 +404,7 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 	// explicitly by { $natural: 1 }, then the database will disregard any indices
 	// and do a full collection scan.
 	// See https://www.mongodb.com/docs/manual/reference/method/cursor.hint
-	var opts = options.Find().SetBatchSize(BackfillBatchSize).SetHint(bson.M{"_id": 1}).SetNoCursorTimeout(true)
+	var opts = options.Find().SetBatchSize(BackfillBatchSize).SetHint(bson.M{"_id": 1})
 	var filter = bson.D{}
 	if state.Backfill.LastId.Validate() == nil {
 		var v interface{}
