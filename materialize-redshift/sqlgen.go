@@ -51,7 +51,10 @@ var rsDialect = func() sql.Dialect {
 				},
 				"number": sql.PrimaryKeyMapper{
 					PrimaryKey: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)),
-					Delegate:   sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+					// NOTE(johnny): I can't find any documentation on Redshift Nan/Infinity/-Infinity handling.
+					// There's some indication that others have resorted to mapping these to NULL:
+					// https://stitch-docs.netlify.app/docs/data-structure/redshift-data-loading-behavior#new-table-scenarios
+					Delegate: sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat(nil, nil, nil))),
 				},
 				"date": sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(

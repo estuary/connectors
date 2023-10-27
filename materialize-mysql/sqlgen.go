@@ -30,7 +30,8 @@ var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
 				},
 				"number": sql.PrimaryKeyMapper{
 					PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-					Delegate:   sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+					// We encode as CSV and must send MySQL string sentinels.
+					Delegate: sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat("NaN", "+inf", "-inf"))),
 				},
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("DATETIME(6)", sql.WithElementConverter(rfc3339ToTZ(tzLocation))),

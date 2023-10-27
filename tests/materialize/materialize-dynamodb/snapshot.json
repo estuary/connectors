@@ -1755,6 +1755,49 @@
     },
     {
       "date": {
+        "NULL": true
+      },
+      "datetime": {
+        "NULL": true
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "9"
+          },
+          "num_str": {
+            "S": "Infinity"
+          }
+        }
+      },
+      "id": {
+        "N": "9"
+      },
+      "int_and_str": {
+        "NULL": true
+      },
+      "int_str": {
+        "NULL": true
+      },
+      "num_and_str": {
+        "NULL": true
+      },
+      "num_str": {
+        "NULL": true
+      },
+      "time": {
+        "NULL": true
+      }
+    },
+    {
+      "date": {
         "S": "0000-01-01"
       },
       "datetime": {
@@ -1934,6 +1977,92 @@
       },
       "time": {
         "S": "23:59:59Z"
+      }
+    },
+    {
+      "date": {
+        "NULL": true
+      },
+      "datetime": {
+        "NULL": true
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "8"
+          },
+          "num_str": {
+            "S": "NaN"
+          }
+        }
+      },
+      "id": {
+        "N": "8"
+      },
+      "int_and_str": {
+        "NULL": true
+      },
+      "int_str": {
+        "NULL": true
+      },
+      "num_and_str": {
+        "NULL": true
+      },
+      "num_str": {
+        "NULL": true
+      },
+      "time": {
+        "NULL": true
+      }
+    },
+    {
+      "date": {
+        "NULL": true
+      },
+      "datetime": {
+        "NULL": true
+      },
+      "flow_document": {
+        "M": {
+          "_meta": {
+            "M": {
+              "uuid": {
+                "S": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+              }
+            }
+          },
+          "id": {
+            "N": "10"
+          },
+          "num_str": {
+            "S": "-Infinity"
+          }
+        }
+      },
+      "id": {
+        "N": "10"
+      },
+      "int_and_str": {
+        "NULL": true
+      },
+      "int_str": {
+        "NULL": true
+      },
+      "num_and_str": {
+        "NULL": true
+      },
+      "num_str": {
+        "NULL": true
+      },
+      "time": {
+        "NULL": true
       }
     },
     {
