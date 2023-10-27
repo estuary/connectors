@@ -16,6 +16,9 @@ import (
 
 	_ "github.com/databricks/databricks-sql-go"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
+	"github.com/databricks/databricks-sdk-go"
+	dbConfig "github.com/databricks/databricks-sdk-go/config"
+	"github.com/databricks/databricks-sdk-go/service/files"
 	driverctx "github.com/databricks/databricks-sql-go/driverctx"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -309,6 +312,8 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 type transactor struct {
 	cfg *config
 
+	wsClient *databricks.WorkspaceClient
+
 	localStagingPath string
 
 	// Variables exclusively used by Load.
@@ -335,7 +340,17 @@ func newTransactor(
 	bindings []sql.Table,
 ) (_ pm.Transactor, err error) {
 	var cfg = ep.Config.(*config)
-	var d = &transactor{cfg: cfg}
+
+	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
+		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+		Token:       cfg.AccessToken,
+		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+	})
+	if err != nil {
+		return nil, fmt.Errorf("initialising workspace client: %w", err)
+	}
+
+	var d = &transactor{cfg: cfg, wsClient: wsClient}
 	d.store.fence = fence
 
 	// Establish connections.
@@ -474,16 +489,16 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = d.Context(it.Context())
 
-	var files = make(map[int]*os.File)
+	var localFiles = make(map[int]*os.File)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
 		} else {
-			if _, ok := files[it.Binding]; !ok {
+			if _, ok := localFiles[it.Binding]; !ok {
 				var err error
-				if files[it.Binding], err = os.Create(fmt.Sprintf("%s/%d_load.json", d.localStagingPath, it.Binding)); err != nil {
+				if localFiles[it.Binding], err = os.Create(fmt.Sprintf("%s/%d_load.json", d.localStagingPath, it.Binding)); err != nil {
 					return fmt.Errorf("load: creating staged file: %w", err)
 				}
 			}
@@ -498,17 +513,17 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 				return fmt.Errorf("marshalling load document component: %w", err)
 			} else {
 				bs = append(bs, byte('\n'))
-				files[it.Binding].Write(bs)
+				localFiles[it.Binding].Write(bs)
 			}
 		}
 	}
 
-	for _, f := range files {
+	for _, f := range localFiles {
 		f.Close()
 	}
 
 	// Upload the staged file
-	for binding, _ := range files {
+	for binding, _ := range localFiles {
 		var b = d.bindings[binding]
 
 		var source = fmt.Sprintf("%s/%d_load.json", d.localStagingPath, binding)
@@ -522,10 +537,11 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			}).Warn("debug")
 		}
 
-		//var query = fmt.Sprintf("PUT '%s' INTO '%s' OVERWRITE", source, destination)
-		/*if _, err := d.load.conn.ExecContext(ctx, query); err != nil {
-			return fmt.Errorf("load: uploading staging file: %w", err)
-		}*/
+		if sourceFile, err := os.Open(source); err != nil {
+			return fmt.Errorf("opening local staged file: %w", err)
+		} else if err := d.wsClient.Files.Upload(ctx, files.UploadRequest{ Contents: sourceFile, FilePath: destination, Overwrite: true}); err != nil {
+			return fmt.Errorf("opening remote staged file: %w", err)
+		}
 
 		// COPY INTO temporary load table from staged files
 		if _, err := d.load.conn.ExecContext(ctx, b.copyIntoLoad); err != nil {
@@ -577,13 +593,13 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
 	ctx := it.Context()
 
-	var files = make(map[int]*os.File)
+	var localFiles = make(map[int]*os.File)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if _, ok := files[it.Binding]; !ok {
+		if _, ok := localFiles[it.Binding]; !ok {
 			var err error
-			if files[it.Binding], err = os.Create(fmt.Sprintf("%s/%d_store.json", d.localStagingPath, it.Binding)); err != nil {
+			if localFiles[it.Binding], err = os.Create(fmt.Sprintf("%s/%d_store.json", d.localStagingPath, it.Binding)); err != nil {
 				return nil, fmt.Errorf("load: creating staged file: %w", err)
 			}
 		}
@@ -607,7 +623,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			return nil, fmt.Errorf("marshalling load document component: %w", err)
 		} else {
 			bs = append(bs, byte('\n'))
-			files[it.Binding].Write(bs)
+			localFiles[it.Binding].Write(bs)
 		}
 
 		if it.Exists {
@@ -615,12 +631,12 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 	}
 
-	for _, f := range files {
+	for _, f := range localFiles {
 		f.Close()
 	}
 
 	// Upload the staged files
-	for binding, _ := range files {
+	for binding, _ := range localFiles {
 		var b = d.bindings[binding]
 
 		// In case of delta updates, we directly copy from staged files into the target table
@@ -639,10 +655,11 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			}).Warn("debug")
 		}
 
-		//var query = fmt.Sprintf("PUT '%s' INTO '%s' OVERWRITE", source, destination)
-		/*if _, err := d.store.conn.ExecContext(ctx, query); err != nil {
-			return fmt.Errorf("store: uploading staging file: %w", err)
-		}*/
+		if sourceFile, err := os.Open(source); err != nil {
+			return nil, fmt.Errorf("opening local staged file: %w", err)
+		} else if err := d.wsClient.Files.Upload(ctx, files.UploadRequest{ Contents: sourceFile, FilePath: destination, Overwrite: true}); err != nil {
+			return nil, fmt.Errorf("opening remote staged file: %w", err)
+		}
 
 		// COPY INTO temporary load table from staged files
 		if _, err := d.store.conn.ExecContext(ctx, b.copyIntoStore); err != nil {
