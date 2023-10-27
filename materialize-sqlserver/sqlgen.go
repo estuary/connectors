@@ -75,7 +75,8 @@ var sqlServerDialect = func(collation string) sql.Dialect {
 				},
 				"number": sql.PrimaryKeyMapper{
 					PrimaryKey: sql.NewStaticMapper(textPKType),
-					Delegate:   sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat())),
+					// SQL Server doesn't handle non-numeric float types and we must map them to NULL.
+					Delegate: sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat(nil, nil, nil))),
 				},
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("DATETIME2", sql.WithElementConverter(rfc3339ToUTC())),

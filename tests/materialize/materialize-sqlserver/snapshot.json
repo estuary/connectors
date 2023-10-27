@@ -782,6 +782,48 @@
 }
 {
   "row": {
+    "date": null,
+    "datetime": null,
+    "flow_published_at": "2023-07-12T18:27:25.889321Z",
+    "id": 8,
+    "int_and_str": null,
+    "int_str": null,
+    "num_and_str": null,
+    "num_str": null,
+    "time": null
+  },
+  "table": "Formatted Strings"
+}
+{
+  "row": {
+    "date": null,
+    "datetime": null,
+    "flow_published_at": "2023-07-12T18:27:25.889321Z",
+    "id": 9,
+    "int_and_str": null,
+    "int_str": null,
+    "num_and_str": null,
+    "num_str": null,
+    "time": null
+  },
+  "table": "Formatted Strings"
+}
+{
+  "row": {
+    "date": null,
+    "datetime": null,
+    "flow_published_at": "2023-07-12T18:27:25.889321Z",
+    "id": 10,
+    "int_and_str": null,
+    "int_str": null,
+    "num_and_str": null,
+    "num_str": null,
+    "time": null
+  },
+  "table": "Formatted Strings"
+}
+{
+  "row": {
     "flow_published_at": "2023-07-12T18:25:45.520064Z",
     "num": 4,
     "yan": "ab",

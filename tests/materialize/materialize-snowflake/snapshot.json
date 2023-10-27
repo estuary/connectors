@@ -645,6 +645,42 @@
       "NUM_AND_STR": 5.1,
       "NUM_STR": 50.1,
       "TIME": "23:59:59Z"
+    },
+    {
+      "DATE": null,
+      "DATETIME": null,
+      "FLOW_DOCUMENT": "{\n  \"_meta\": {\n    \"uuid\": \"c02bd79a-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 8,\n  \"num_str\": \"NaN\"\n}",
+      "FLOW_PUBLISHED_AT": "2023-07-12T18:27:25.889321Z",
+      "ID": "8",
+      "INT_AND_STR": null,
+      "INT_STR": null,
+      "NUM_AND_STR": null,
+      "NUM_STR": "NaN",
+      "TIME": null
+    },
+    {
+      "DATE": null,
+      "DATETIME": null,
+      "FLOW_DOCUMENT": "{\n  \"_meta\": {\n    \"uuid\": \"c02bd79a-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 9,\n  \"num_str\": \"Infinity\"\n}",
+      "FLOW_PUBLISHED_AT": "2023-07-12T18:27:25.889321Z",
+      "ID": "9",
+      "INT_AND_STR": null,
+      "INT_STR": null,
+      "NUM_AND_STR": null,
+      "NUM_STR": "Infinity",
+      "TIME": null
+    },
+    {
+      "DATE": null,
+      "DATETIME": null,
+      "FLOW_DOCUMENT": "{\n  \"_meta\": {\n    \"uuid\": \"c02bd79a-20e1-11ee-990b-ffd12dfcd47f\"\n  },\n  \"id\": 10,\n  \"num_str\": \"-Infinity\"\n}",
+      "FLOW_PUBLISHED_AT": "2023-07-12T18:27:25.889321Z",
+      "ID": "10",
+      "INT_AND_STR": null,
+      "INT_STR": null,
+      "NUM_AND_STR": null,
+      "NUM_STR": "-Infinity",
+      "TIME": null
     }
   ]
 }

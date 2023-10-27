@@ -56,7 +56,8 @@ var snowflakeDialect = func() sql.Dialect {
 				},
 				"number": sql.PrimaryKeyMapper{
 					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat())),
+					// https://docs.snowflake.com/en/sql-reference/data-types-numeric#special-values
+					Delegate: sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat("NaN", "inf", "-inf"))),
 				},
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMP"),

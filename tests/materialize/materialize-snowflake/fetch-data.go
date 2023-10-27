@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 
 	sf "github.com/snowflakedb/gosnowflake"
@@ -110,8 +111,18 @@ func main() {
 			log.Fatal("scanning row: %w", err)
 		}
 		row := make(map[string]any)
-		for idx := range data {
-			row[cols[idx]] = data[idx]
+		for idx, val := range data {
+			switch v := val.(type) {
+			case float64:
+				if math.IsNaN(v) {
+					val = "NaN"
+				} else if math.IsInf(v, +1) {
+					val = "Infinity"
+				} else if math.IsInf(v, -1) {
+					val = "-Infinity"
+				}
+			}
+			row[cols[idx]] = val
 		}
 
 		queriedRows = append(queriedRows, row)

@@ -770,6 +770,48 @@
 }
 {
   "row": {
+    "date": null,
+    "datetime": null,
+    "flow_published_at": "2023-07-12 18:27:25.889321",
+    "id": 8,
+    "int_and_str": null,
+    "int_str": null,
+    "num_and_str": null,
+    "num_str": 0,
+    "time": null
+  },
+  "table": "Formatted Strings"
+}
+{
+  "row": {
+    "date": null,
+    "datetime": null,
+    "flow_published_at": "2023-07-12 18:27:25.889321",
+    "id": 9,
+    "int_and_str": null,
+    "int_str": null,
+    "num_and_str": null,
+    "num_str": 0,
+    "time": null
+  },
+  "table": "Formatted Strings"
+}
+{
+  "row": {
+    "date": null,
+    "datetime": null,
+    "flow_published_at": "2023-07-12 18:27:25.889321",
+    "id": 10,
+    "int_and_str": null,
+    "int_str": null,
+    "num_and_str": null,
+    "num_str": 0,
+    "time": null
+  },
+  "table": "Formatted Strings"
+}
+{
+  "row": {
     "flow_published_at": "2023-07-12 18:29:04.671352",
     "id": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru.",
     "str_field": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru."

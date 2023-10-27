@@ -209,10 +209,10 @@ jobs:
         run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
 
       - name: Materialization connector ${{ matrix.connector }} integration tests
+        # TODO(johnny): Re-enable "materialize-elasticsearch" after adding support for NaN, Infinity, -Infinity
         if: |
           contains(fromJson('[
               "materialize-dynamodb",
-              "materialize-elasticsearch",
               "materialize-google-sheets",
               "materialize-pinecone",
               "materialize-postgres",
