@@ -1,3 +1,4 @@
 source-alloydb
 source-amazon-aurora-postgres
 source-google-cloud-sql-postgres
+Source-amazon-rds-postgres
