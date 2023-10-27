@@ -2,4 +2,5 @@ materialize-amazon-aurora-mysql
 materialize-mariadb
 materialize-mysql-heatwave
 materialize-google-cloud-sql-mysql
-Materialize-amazon-rds-mysql
+materialize-amazon-rds-mysql
+materialize-amazon-rds-mariadb
