@@ -92,20 +92,21 @@ jobs:
           - source-test
           - materialize-bigquery
           - materialize-dynamodb
-          - materialize-redshift
           - materialize-elasticsearch
           - materialize-firebolt
           - materialize-google-pubsub
           - materialize-google-sheets
           - materialize-mongodb
+          - materialize-motherduck
+          - materialize-mysql
           - materialize-pinecone
           - materialize-postgres
+          - materialize-redshift
           - materialize-rockset
           - materialize-s3-parquet
-          - materialize-sqlite
           - materialize-snowflake
+          - materialize-sqlite
           - materialize-webhook
-          - materialize-mysql
           - materialize-sqlserver
 
     steps:
