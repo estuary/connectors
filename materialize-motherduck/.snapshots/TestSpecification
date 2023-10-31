@@ -1,0 +1,99 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-motherduck/config",
+    "properties": {
+      "token": {
+        "type": "string",
+        "title": "Motherduck Service Token",
+        "description": "Service token for authenticating with MotherDuck.",
+        "order": 0,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "The database to materialize to.",
+        "order": 1
+      },
+      "schema": {
+        "type": "string",
+        "title": "Database Schema",
+        "description": "Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables.",
+        "default": "main",
+        "order": 2
+      },
+      "bucket": {
+        "type": "string",
+        "title": "S3 Staging Bucket",
+        "description": "Name of the S3 bucket to use for staging data loads.",
+        "order": 3
+      },
+      "awsAccessKeyId": {
+        "type": "string",
+        "title": "Access Key ID",
+        "description": "AWS Access Key ID for reading and writing data to the S3 staging bucket.",
+        "order": 4
+      },
+      "awsSecretAccessKey": {
+        "type": "string",
+        "title": "Secret Access Key",
+        "description": "AWS Secret Access Key for reading and writing data to the S3 staging bucket.",
+        "order": 5,
+        "secret": true
+      },
+      "region": {
+        "type": "string",
+        "title": "S3 Bucket Region",
+        "description": "Region of the S3 staging bucket.",
+        "order": 6
+      },
+      "bucketPath": {
+        "type": "string",
+        "title": "Bucket Path",
+        "description": "An optional prefix that will be used to store objects in S3.",
+        "order": 7
+      }
+    },
+    "type": "object",
+    "required": [
+      "token",
+      "database",
+      "schema",
+      "bucket",
+      "awsAccessKeyId",
+      "awsSecretAccessKey",
+      "region"
+    ],
+    "title": "SQL Connection"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-motherduck/table-config",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the database table.",
+        "x-collection-name": true
+      },
+      "schema": {
+        "type": "string",
+        "title": "Alternative Schema",
+        "description": "Alternative schema for this table (optional)."
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Update",
+        "description": "Should updates to this table be done via delta updates. Currently this connector only supports delta updates.",
+        "default": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "SQL Table"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-motherduck"
+}
