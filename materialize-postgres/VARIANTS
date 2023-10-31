@@ -2,3 +2,4 @@ materialize-timescaledb
 materialize-alloydb
 materialize-amazon-aurora-postgres
 materialize-google-cloud-sql-postgres
+materialize-amazon-rds-postgres
