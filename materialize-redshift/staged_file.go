@@ -55,7 +55,7 @@ type stagedFile struct {
 	group   *errgroup.Group
 
 	// List of file names uploaded during the current transaction for transaction data, not
-	// including the manifest file name itself. These data files are randomly generated UUIDs.
+	// including the manifest file name itself. These data file names randomly generated UUIDs.
 	uploaded []string
 
 	// Indicates if the stagedFile has been initialized for this transaction yet. Set `true` by
