@@ -398,52 +398,25 @@ func newTransactor(
 		return nil, fmt.Errorf("creating store connection: %w", err)
 	}
 
-	d := &transactor{
+	t := &transactor{
 		cfg:       cfg,
 		storeConn: storeConn,
 		fence:     fence,
 	}
 
-	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, cfg.Bucket, cfg.BucketPath, s3client); err != nil {
-			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
-		}
+	for _, b := range bindings {
+		t.bindings = append(t.bindings, &binding{
+			target:    b,
+			storeFile: newStagedFile(s3client, cfg.Bucket, cfg.BucketPath, b.Columns()),
+		})
 	}
 
-	return d, nil
+	return t, nil
 }
 
 type binding struct {
-	target        sql.Table
-	storeFile     *stagedFile
-	storeQuerySql string
-}
-
-func (t *transactor) addBinding(
-	ctx context.Context,
-	target sql.Table,
-	bucket string,
-	bucketPath string,
-	client *s3.Client,
-) error {
-	b := &binding{
-		target:    target,
-		storeFile: newStagedFile(client, bucket, bucketPath, target.Columns()),
-	}
-
-	var storeQuery strings.Builder
-	if err := tplStoreQuery.Execute(&storeQuery, &s3Params{
-		Table:  target,
-		Bucket: bucket,
-		Key:    b.storeFile.key,
-	}); err != nil {
-		return err
-	}
-
-	b.storeQuerySql = storeQuery.String()
-
-	t.bindings = append(t.bindings, b)
-	return nil
+	target    sql.Table
+	storeFile *stagedFile
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
@@ -456,43 +429,18 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	ctx := it.Context()
 
-	cleanups := make([]func(context.Context) error, len(d.bindings))
-	lastBinding := -1
-	flushBinding := func() error {
-		cleanup, err := d.bindings[lastBinding].storeFile.flush()
-		if err != nil {
-			return fmt.Errorf("flushing binding %d: %w", lastBinding, err)
-		}
-		cleanups[lastBinding] = cleanup
-
-		return nil
-	}
-
 	for it.Next() {
-		if lastBinding != -1 && lastBinding != it.Binding {
-			if err := flushBinding(); err != nil {
-				return nil, err
-			}
-		}
-
 		b := d.bindings[it.Binding]
-		b.storeFile.start(ctx)
+		b.storeFile.start()
 
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err := b.storeFile.encodeRow(converted); err != nil {
+		} else if err := b.storeFile.encodeRow(ctx, converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
 		}
-
-		lastBinding = it.Binding
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
-	}
-
-	// Flush the final binding.
-	if err := flushBinding(); err != nil {
-		return nil, err
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
@@ -526,12 +474,26 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			}
 
 			for idx, b := range d.bindings {
-				if cleanups[idx] == nil {
+				if !b.storeFile.started {
 					// No stores for this binding.
 					continue
 				}
-				defer cleanups[idx](ctx)
-				if _, err := txn.ExecContext(ctx, b.storeQuerySql); err != nil {
+
+				delete, err := b.storeFile.flush(ctx)
+				if err != nil {
+					return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
+				}
+				defer delete(ctx)
+
+				var storeQuery strings.Builder
+				if err := tplStoreQuery.Execute(&storeQuery, &storeParams{
+					Table: b.target,
+					Files: b.storeFile.allFiles(),
+				}); err != nil {
+					return err
+				}
+
+				if _, err := txn.ExecContext(ctx, storeQuery.String()); err != nil {
 					return fmt.Errorf("executing store query for binding[%d]: %w", idx, err)
 				}
 			}

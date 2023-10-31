@@ -39,10 +39,9 @@ func TestSQLGeneration(t *testing.T) {
 		var testcase = table.Identifier + " " + tpl.Name()
 
 		snap.WriteString("--- Begin " + testcase + " ---")
-		require.NoError(t, tpl.Execute(&snap, &s3Params{
-			Table:  table,
-			Bucket: "a-bucket",
-			Key:    "key.jsonl",
+		require.NoError(t, tpl.Execute(&snap, &storeParams{
+			Table: table,
+			Files: []string{"s3://bucket/file1", "s3://bucket/file2"},
 		}))
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
