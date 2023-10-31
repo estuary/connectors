@@ -152,7 +152,7 @@ func RunApplyTestCases(
 
 			if len(spec.Bindings) > 0 {
 				for idx := range spec.Bindings {
-					snap.WriteString(fmt.Sprintf("\n* Schema for %s:\n", spec.Bindings[idx].ResourcePath))
+					snap.WriteString(fmt.Sprintf("\n* Schema for %s:\n", strings.Join(spec.Bindings[idx].ResourcePath, ".")))
 					snap.WriteString(dumpSchema(t, spec.Bindings[idx].ResourcePath))
 				}
 			}
