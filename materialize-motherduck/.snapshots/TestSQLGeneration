@@ -1,0 +1,27 @@
+--- Begin db.schema.delta_updates createTargetTable ---
+CREATE TABLE IF NOT EXISTS db.schema.delta_updates (
+	"theKey" VARCHAR NOT NULL,
+	"aValue" BIGINT
+);
+--- End db.schema.delta_updates createTargetTable ---
+
+--- Begin db.schema.delta_updates storeQuery ---
+INSERT INTO db.schema.delta_updates BY NAME
+SELECT * FROM read_json(
+	's3://a-bucket/key.jsonl',
+	format='newline_delimited',
+	columns={
+		"theKey": 'VARCHAR NOT NULL',
+		"aValue": 'BIGINT'
+	}
+);
+--- End db.schema.delta_updates storeQuery ---
+
+--- Begin Fence Update ---
+UPDATE checkpoints
+	SET   checkpoint = 'AAECAwQFBgcICQ=='
+	WHERE materialization = 'some/Materialization'
+	AND   key_begin = 1122867
+	AND   key_end   = 4293844428
+	AND   fence     = 123;
+--- End Fence Update ---
