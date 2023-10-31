@@ -1,3 +1,6 @@
+import:
+  - _base-collection.flow.yaml
+
 materializations:
   test/sqlite:
     endpoint:
@@ -5,6 +8,3 @@ materializations:
         image: ghcr.io/estuary/materialize-sqlite:dev
         config: {}
     bindings: []
-
-storageMappings:
-  "": { stores: [{ provider: S3, bucket: a-bucket }] }

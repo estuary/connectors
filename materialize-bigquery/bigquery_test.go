@@ -19,8 +19,8 @@ import (
 )
 
 func mustGetCfg(t *testing.T) config {
-	if os.Getenv("TESTDB") != "yes" {
-		t.Skipf("skipping %q: ${TESTDB} != \"yes\"", t.Name())
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
 		return config{}
 	}
 

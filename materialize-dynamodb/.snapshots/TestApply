@@ -1,6 +1,6 @@
 --- Begin base ---
 * Table list: [first-table flow_materializations_v2]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
@@ -11,7 +11,7 @@
 
 --- Begin remove original required field ---
 * Table list: [first-table flow_materializations_v2]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
@@ -22,7 +22,7 @@
 
 --- Begin re-add removed original required field ---
 * Table list: [first-table flow_materializations_v2]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
@@ -33,7 +33,7 @@
 
 --- Begin remove original optional field ---
 * Table list: [first-table flow_materializations_v2]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
@@ -44,7 +44,7 @@
 
 --- Begin re-add removed original optional field ---
 * Table list: [first-table flow_materializations_v2]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
@@ -55,7 +55,7 @@
 
 --- Begin add new required field ---
 * Table list: [first-table flow_materializations_v2]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
@@ -66,7 +66,7 @@
 
 --- Begin remove new required field ---
 * Table list: [first-table flow_materializations_v2]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
@@ -77,7 +77,7 @@
 
 --- Begin add new optional field ---
 * Table list: [first-table flow_materializations_v2]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
@@ -88,7 +88,7 @@
 
 --- Begin remove new optional field ---
 * Table list: [first-table flow_materializations_v2]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
@@ -99,14 +99,14 @@
 
 --- Begin add new binding ---
 * Table list: [first-table flow_materializations_v2 second-table]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
     "AttributeType": "S"
   }
 ]
-* Schema for [second-table]:
+* Schema for second-table:
 [
   {
     "AttributeName": "secondKey",
@@ -117,7 +117,7 @@
 
 --- Begin remove new binding ---
 * Table list: [first-table flow_materializations_v2 second-table]:
-* Schema for [first-table]:
+* Schema for first-table:
 [
   {
     "AttributeName": "key",
