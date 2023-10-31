@@ -59,10 +59,9 @@ var duckDialect = func() sql.Dialect {
 	}
 }()
 
-type s3Params struct {
+type storeParams struct {
 	sql.Table
-	Bucket string
-	Key    string
+	Files []string
 }
 
 var (
@@ -83,8 +82,13 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 {{ define "storeQuery" }}
 INSERT INTO {{$.Identifier}} BY NAME
 SELECT * FROM read_json(
-	's3://{{$.Bucket}}/{{$.Key}}',
+	[
+	{{- range $ind, $f := $.Files }}
+	{{- if $ind }}, {{ end }}'{{ $f }}'
+	{{- end -}}
+	],
 	format='newline_delimited',
+	compression='gzip',
 	columns={
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
