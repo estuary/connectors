@@ -619,7 +619,7 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 		resp, err := listenClient.Recv()
 		if err == io.EOF {
 			logEntry.Debug("listen stream closed, shutting down")
-			return nil
+			return fmt.Errorf("listen stream was closed unexpectedly: %w", err)
 		} else if status.Code(err) == codes.Canceled {
 			logEntry.Debug("context canceled, shutting down")
 			return context.Canceled // Undo an awful bit of wrapping which breaks errors.Is()
