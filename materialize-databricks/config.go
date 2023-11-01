@@ -97,7 +97,7 @@ func (c *config) Validate() error {
 		}
 	}
 
-	return nil
+	return c.Credentials.Validate()
 }
 
 // ToURI puts together address and http_path to form the full workspace URL
@@ -109,7 +109,7 @@ func (c *config) ToURI() string {
 
 	var params = make(url.Values)
 	params.Add("catalog", c.CatalogName)
-	params.Add("userAgentEntry", "Estuary Technologies+Flow")
+	params.Add("userAgentEntry", "Estuary Technologies Flow")
 
 	var uri = url.URL{
 		Host: address,
