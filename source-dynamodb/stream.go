@@ -256,11 +256,12 @@ func (c *capture) readShard(
 		}
 
 		// Acquire one of the stream semaphores before initiating the GetRecords request, which may
-		// return up to 10MB of data that will be buffered in-memory.
+		// return up to 10MB of data that will be buffered in-memory. The semaphore is released
+		// after the records have been emitted to Flow. Any error that occurs between here and then
+		// will cause the connector to exit.
 		if err := sema.Acquire(ctx, 1); err != nil {
 			return err
 		}
-		defer sema.Release(1)
 
 		recs, err := c.client.stream.GetRecords(ctx, &dynamodbstreams.GetRecordsInput{
 			ShardIterator: iter,
@@ -301,6 +302,8 @@ func (c *capture) readShard(
 				return fmt.Errorf("emitting stream documents for table '%s': %w", t.tableName, err)
 			}
 		}
+
+		sema.Release(1)
 
 		if reachedHorizon {
 			return nil
