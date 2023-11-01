@@ -149,6 +149,7 @@ SELECT -1, NULL
   FILEFORMAT = JSON
   FILES = ('{{ $.Table.Binding }}_store.json')
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
+	COPY_OPTIONS ( 'force' = 'true' )
   ;
 {{ end }}
 
@@ -165,6 +166,7 @@ SELECT -1, NULL
   FILEFORMAT = JSON
   FILES = ('{{ $.Table.Binding }}_store.json')
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
+	COPY_OPTIONS ( 'force' = 'true' )
   ;
 {{ end }}
 
@@ -181,6 +183,7 @@ SELECT -1, NULL
   FILEFORMAT = JSON
   FILES = ('{{ $.Table.Binding }}_load.json')
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
+	COPY_OPTIONS ( 'force' = 'true' )
   ;
 {{ end }}
 
@@ -217,6 +220,15 @@ SELECT -1, NULL
 		{{- end -}}
 	);
 {{ end }}
+
+{{ define "updateFence" }}
+UPDATE {{ Identifier $.TablePath }}
+	SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
+	WHERE materialization = {{ Literal $.Materialization.String }}
+	AND   key_begin = {{ $.KeyBegin }}
+	AND   key_end   = {{ $.KeyEnd }}
+	AND   fence     = {{ $.Fence }};
+{{ end }}
   `)
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
 	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
@@ -230,6 +242,7 @@ SELECT -1, NULL
 	tplCopyIntoLoad      = tplAll.Lookup("copyIntoLoad")
 	tplCopyIntoStore     = tplAll.Lookup("copyIntoStore")
 	tplMergeInto         = tplAll.Lookup("mergeInto")
+	tplUpdateFence       = tplAll.Lookup("updateFence")
 )
 
 type CopyTemplate struct {
