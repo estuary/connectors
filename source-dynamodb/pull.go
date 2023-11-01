@@ -33,6 +33,9 @@ const (
 
 	// Number of concurrent workers to use when backfilling a table.
 	backfillConcurrency = 3
+
+	// Number of stream workers which may concurrently send requests for stream data.
+	streamConcurrency = 5
 )
 
 type table struct {
