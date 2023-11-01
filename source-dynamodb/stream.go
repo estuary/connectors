@@ -11,6 +11,7 @@ import (
 	streamTypes "github.com/aws/aws-sdk-go-v2/service/dynamodbstreams/types"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 )
 
@@ -66,16 +67,12 @@ func (c *capture) streamTable(ctx context.Context, t *table) error {
 			// is no way to read shards for completely accurate ordering of events across _all_ keys
 			// - we can only get correct ordering relative to individual keys by reading shards in
 			// this way.
-			//
-			// TODO(whb): We may need to consider some kind of semaphore for cases where there are a
-			// huge number of shards to read from. We do need to read each shard (well, shard tree)
-			// concurrently to make progress on every shard. But if there are many shards we might
-			// hit memory issues if we get a set of results back from each one and are delayed in
-			// emitting it to the runtime.
+
+			streamSemaphore := semaphore.NewWeighted(streamConcurrency)
 			for _, shardTree := range buildShardTrees(currentShards) {
 				shardTree := shardTree
 				workers.Go(func() error {
-					return c.readShardTree(workersCtx, t, shardTree, workers, workersStop, false, 0)
+					return c.readShardTree(workersCtx, streamSemaphore, t, shardTree, workers, workersStop, false, 0)
 				})
 			}
 
@@ -111,10 +108,11 @@ func (c *capture) catchupStreams(ctx context.Context, t *table, horizon time.Dur
 
 	workers, workersCtx := errgroup.WithContext(ctx)
 
+	streamSemaphore := semaphore.NewWeighted(streamConcurrency)
 	for _, shardTree := range buildShardTrees(currentShards) {
 		shardTree := shardTree
 		workers.Go(func() error {
-			return c.readShardTree(workersCtx, t, shardTree, workers, make(chan struct{}), true, horizon)
+			return c.readShardTree(workersCtx, streamSemaphore, t, shardTree, workers, make(chan struct{}), true, horizon)
 		})
 	}
 
@@ -162,6 +160,7 @@ func (c *capture) pruneShards(tableName string, activeShards map[string]streamTy
 
 func (c *capture) readShardTree(
 	ctx context.Context,
+	sema *semaphore.Weighted,
 	t *table,
 	l *shardTree,
 	workers *errgroup.Group,
@@ -182,7 +181,7 @@ func (c *capture) readShardTree(
 
 	// Read the root shard to the end. If the shard is currently open, this will block until the
 	// shard is closed.
-	if err := c.readShard(ctx, t, l.shard, workersStop, horizon); err != nil {
+	if err := c.readShard(ctx, sema, t, l.shard, workersStop, horizon); err != nil {
 		return fmt.Errorf("reading shard tree: %w", err)
 	}
 
@@ -197,7 +196,7 @@ func (c *capture) readShardTree(
 		for _, child := range l.children {
 			child := child
 			workers.Go(func() error {
-				return c.readShardTree(ctx, t, child, workers, workersStop, catchup, horizon)
+				return c.readShardTree(ctx, sema, t, child, workers, workersStop, catchup, horizon)
 			})
 		}
 
@@ -207,6 +206,7 @@ func (c *capture) readShardTree(
 
 func (c *capture) readShard(
 	ctx context.Context,
+	sema *semaphore.Weighted,
 	t *table,
 	shard streamTypes.Shard,
 	workersStop <-chan struct{},
@@ -254,6 +254,13 @@ func (c *capture) readShard(
 		if err := limiter.Wait(ctx); err != nil {
 			return fmt.Errorf("stream limiter wait: %w", err)
 		}
+
+		// Acquire one of the stream semaphores before initiating the GetRecords request, which may
+		// return up to 10MB of data that will be buffered in-memory.
+		if err := sema.Acquire(ctx, 1); err != nil {
+			return err
+		}
+		defer sema.Release(1)
 
 		recs, err := c.client.stream.GetRecords(ctx, &dynamodbstreams.GetRecordsInput{
 			ShardIterator: iter,
