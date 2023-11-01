@@ -72,18 +72,7 @@ func (c *config) Validate() error {
 	return nil
 }
 
-// setupCmds are the common commands needed for the connector to work with MotherDuck.
-func (c *config) setupCmds() []string {
-	return []string{
-		"SET autoinstall_known_extensions=1;",
-		"SET autoload_known_extensions=1;",
-		fmt.Sprintf("SET s3_access_key_id='%s'", c.AWSAccessKeyID),
-		fmt.Sprintf("SET s3_secret_access_key='%s';", c.AWSSecretAccessKey),
-		fmt.Sprintf("SET s3_region='%s';", c.Region),
-	}
-}
-
-func (c *config) db() (*stdsql.DB, error) {
+func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 	db, err := stdsql.Open("duckdb", fmt.Sprintf("md:%s?motherduck_token=%s", c.Database, c.Token))
 	if err != nil {
 		if strings.Contains(err.Error(), "Jwt header is an invalid JSON (UNAUTHENTICATED") {
@@ -92,37 +81,19 @@ func (c *config) db() (*stdsql.DB, error) {
 		return nil, err
 	}
 
-	return db, err
-}
-
-func (c *config) configuredDb(ctx context.Context) (*stdsql.DB, error) {
-	db, err := c.db()
-	if err != nil {
-		return nil, err
-	}
-
-	for idx, c := range c.setupCmds() {
+	for idx, c := range []string{
+		"SET autoinstall_known_extensions=1;",
+		"SET autoload_known_extensions=1;",
+		fmt.Sprintf("SET s3_access_key_id='%s'", c.AWSAccessKeyID),
+		fmt.Sprintf("SET s3_secret_access_key='%s';", c.AWSSecretAccessKey),
+		fmt.Sprintf("SET s3_region='%s';", c.Region),
+	} {
 		if _, err := db.ExecContext(ctx, c); err != nil {
 			return nil, fmt.Errorf("executing setup command %d: %w", idx, err)
 		}
 	}
 
-	return db, nil
-}
-
-func (c *config) configuredConn(ctx context.Context, db *stdsql.DB) (*stdsql.Conn, error) {
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("opening database connection: %w", err)
-	}
-
-	for idx, c := range c.setupCmds() {
-		if _, err := conn.ExecContext(ctx, c); err != nil {
-			return nil, fmt.Errorf("executing setup command %d: %w", idx, err)
-		}
-	}
-
-	return conn, nil
+	return db, err
 }
 
 func (c *config) toS3Client(ctx context.Context) (*s3.Client, error) {
@@ -198,7 +169,7 @@ func newDuckDriver() *sql.Driver {
 
 			metaSpecs, metaCheckpoints := sql.MetaTables([]string{cfg.Database, cfg.Schema})
 
-			db, err := cfg.configuredDb(ctx)
+			db, err := cfg.db(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("opening database: %w", err)
 			}
@@ -226,7 +197,7 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if db, err := cfg.configuredDb(ctx); err != nil {
+	if db, err := cfg.db(ctx); err != nil {
 		errs.Err(err)
 	} else if err := db.PingContext(pingCtx); err != nil {
 		errs.Err(err)
@@ -388,12 +359,7 @@ func newTransactor(
 		return nil, err
 	}
 
-	db, err := cfg.db()
-	if err != nil {
-		return nil, err
-	}
-
-	storeConn, err := cfg.configuredConn(ctx, db)
+	storeConn, err := ep.Client.(client).db.Conn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating store connection: %w", err)
 	}

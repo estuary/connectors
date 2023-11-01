@@ -50,7 +50,7 @@ func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 
 	var cfg = mustGetCfg(t)
-	db, err := cfg.configuredDb(ctx)
+	db, err := cfg.db(ctx)
 	require.NoError(t, err)
 	var client = client{db: db}
 
@@ -201,7 +201,7 @@ func TestApply(t *testing.T) {
 		func(t *testing.T) []string {
 			t.Helper()
 
-			db, err := cfg.db()
+			db, err := cfg.db(ctx)
 			require.NoError(t, err)
 
 			rows, err := db.QueryContext(
@@ -225,7 +225,7 @@ func TestApply(t *testing.T) {
 		func(t *testing.T, resourcePath []string) string {
 			t.Helper()
 
-			db, err := cfg.db()
+			db, err := cfg.db(ctx)
 			require.NoError(t, err)
 
 			q := fmt.Sprintf(`
@@ -265,7 +265,7 @@ func TestApply(t *testing.T) {
 		func(t *testing.T) {
 			t.Helper()
 
-			db, err := cfg.db()
+			db, err := cfg.db(ctx)
 			require.NoError(t, err)
 
 			for _, tbl := range []string{firstTable, secondTable} {
