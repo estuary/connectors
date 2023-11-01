@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -11,38 +10,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMySQLConfig(t *testing.T) {
+func TestDatabricksConfig(t *testing.T) {
 	var validConfig = config{
-		Address:  "post.toast:1234",
-		User:     "youser",
-		Password: "shmassword",
-		Database: "namegame",
+		Address:  "db-something.cloud.databricks.com:400",
+		CatalogName: "mycatalog",
+		HTTPPath: "/sql/1.0/warehouses/someid",
+		Credentials: credentialConfig{
+			AuthType: "PAT",
+			PersonalAccessToken: "secret",
+		},
 	}
 	require.NoError(t, validConfig.Validate())
 	var uri = validConfig.ToURI()
-	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1234?TrustServerCertificate=true&app+name=Flow+Materialization+Connector&database=namegame&encrypt=true", uri)
+	require.Equal(t, "token:secret@db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?catalog=mycatalog&userAgentEntry=Estuary+Technologies+Flow", uri)
 
 	var noPort = validConfig
-	noPort.Address = "post.toast"
+	noPort.Address = "db-something.cloud.databricks.com"
 	require.NoError(t, noPort.Validate())
 	uri = noPort.ToURI()
-	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1433?TrustServerCertificate=true&app+name=Flow+Materialization+Connector&database=namegame&encrypt=true", uri)
+	require.Equal(t, "token:secret@db-something.cloud.databricks.com:443/sql/1.0/warehouses/someid?catalog=mycatalog&userAgentEntry=Estuary+Technologies+Flow", uri)
 
 	var noAddress = validConfig
 	noAddress.Address = ""
 	require.Error(t, noAddress.Validate(), "expected validation error")
 
-	var noUser = validConfig
-	noUser.User = ""
-	require.Error(t, noUser.Validate(), "expected validation error")
+	var noCatalog = validConfig
+	noCatalog.CatalogName = ""
+	require.Error(t, noCatalog.Validate(), "expected validation error")
 
-	var noPass = validConfig
-	noPass.Password = ""
-	require.Error(t, noPass.Validate(), "expected validation error")
+	var noPath = validConfig
+	noPath.HTTPPath = ""
+	require.Error(t, noPath.Validate(), "expected validation error")
 
-	var noDatabase = validConfig
-	noDatabase.Database = ""
-	require.Error(t, noDatabase.Validate(), "expected validation error")
+	var noPAT = validConfig
+	noPAT.Credentials.PersonalAccessToken = ""
+	require.Error(t, noPAT.Validate(), "expected validation error")
 }
 
 func TestSpecification(t *testing.T) {
@@ -54,24 +56,4 @@ func TestSpecification(t *testing.T) {
 	require.NoError(t, err)
 
 	cupaloy.SnapshotT(t, formatted)
-}
-
-func TestConfigURI(t *testing.T) {
-	for name, cfg := range map[string]config{
-		"Basic": {
-			Address:  "example.com",
-			User:     "will",
-			Password: "secret1234",
-			Database: "somedb",
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			var valid = "config valid"
-			if err := cfg.Validate(); err != nil {
-				valid = err.Error()
-			}
-			var uri = cfg.ToURI()
-			cupaloy.SnapshotT(t, fmt.Sprintf("%s\n%s", uri, valid))
-		})
-	}
 }
