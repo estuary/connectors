@@ -465,14 +465,6 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			}
 			defer txn.Rollback()
 
-			if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating checkpoints: %w", err)
-			} else if rows, err := res.RowsAffected(); err != nil {
-				return fmt.Errorf("getting fence update rows affected: %w", err)
-			} else if rows != 1 {
-				return fmt.Errorf("this instance was fenced off by another")
-			}
-
 			for idx, b := range d.bindings {
 				if !b.storeFile.started {
 					// No stores for this binding.
@@ -498,7 +490,13 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 				}
 			}
 
-			if err := txn.Commit(); err != nil {
+			if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
+				return fmt.Errorf("updating checkpoints: %w", err)
+			} else if rows, err := res.RowsAffected(); err != nil {
+				return fmt.Errorf("getting fence update rows affected: %w", err)
+			} else if rows != 1 {
+				return fmt.Errorf("this instance was fenced off by another")
+			} else if err := txn.Commit(); err != nil {
 				return fmt.Errorf("committing store transaction: %w", err)
 			}
 
