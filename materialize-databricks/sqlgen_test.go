@@ -10,7 +10,6 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,25 +28,27 @@ func TestSQLGeneration(t *testing.T) {
 		Schema:         "default",
 		Table:          "Delta Updates",
 		Delta:          true,
-		endpointSchema: "default",
 	})
 	shape2.Document = nil // TODO(johnny): this is a bit gross.
 
-	table1, err := sqlDriver.ResolveTable(shape1, snowflakeDialect)
+	table1, err := sqlDriver.ResolveTable(shape1, databricksDialect)
 	require.NoError(t, err)
-	table2, err := sqlDriver.ResolveTable(shape2, snowflakeDialect)
+	table2, err := sqlDriver.ResolveTable(shape2, databricksDialect)
 	require.NoError(t, err)
 
 	var snap strings.Builder
 
 	for _, tbl := range []sqlDriver.Table{table1, table2} {
-		withUUID := TableWithUUID{
-			Table:      &tbl,
-			RandomUUID: uuid.UUID{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}.String(),
-		}
-
 		for _, tpl := range []*template.Template{
 			tplCreateTargetTable,
+			tplCreateLoadTable,
+			tplCreateStoreTable,
+			tplLoadQuery,
+			tplTruncateLoad,
+			tplTruncateStore,
+			tplDropLoad,
+			tplDropStore,
+			tplMergeInto,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -56,15 +57,17 @@ func TestSQLGeneration(t *testing.T) {
 			snap.WriteString("--- End " + testcase + " ---\n\n")
 		}
 
+
 		for _, tpl := range []*template.Template{
-			tplLoadQuery,
-			tplCopyInto,
-			tplMergeInto,
+			tplCopyIntoDirect,
+			tplCopyIntoStore,
+			tplCopyIntoLoad,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
+			var copyData = CopyTemplate{Table: &tbl, StagingPath: "test-staging-path"}
 			snap.WriteString("--- Begin " + testcase + " ---")
-			require.NoError(t, tpl.Execute(&snap, &withUUID))
+			require.NoError(t, tpl.Execute(&snap, &copyData))
 			snap.WriteString("--- End " + testcase + " ---\n\n")
 		}
 	}
@@ -73,16 +76,11 @@ func TestSQLGeneration(t *testing.T) {
 		Table: "target_table_no_values_materialized",
 		Delta: false,
 	})
-	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, snowflakeDialect)
+	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, databricksDialect)
 	require.NoError(t, err)
 
-	tableNoValuesWithUUID := TableWithUUID{
-		Table:      &tableNoValues,
-		RandomUUID: uuid.UUID{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}.String(),
-	}
-
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized mergeInto" + " ---")
-	require.NoError(t, tplMergeInto.Execute(&snap, &tableNoValuesWithUUID))
+	require.NoError(t, tplMergeInto.Execute(&snap, &tableNoValues))
 	snap.WriteString("--- End " + "target_table_no_values_materialized mergeInto" + " ---\n\n")
 
 	var fence = sqlDriver.Fence{
