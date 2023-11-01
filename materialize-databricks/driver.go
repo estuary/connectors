@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/url"
 	"strings"
 	"text/template"
 	"time"
@@ -31,56 +30,6 @@ import (
 const defaultPort = "443"
 const volumeName = "flow_staging"
 
-// config represents the endpoint configuration for sql server.
-type config struct {
-	Address  string         `json:"address" jsonschema:"title=Address,description=Host and port of the SQL warehouse (in the form of host[:port]). Port 443 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	HTTPPath string         `json:"httpPath" jsonschema:"title=HTTP path,description=HTTP path of your SQL warehouse"`
-	AccessToken string      `json:"accessToken" jsonschema:"title=Personal Access Token,description=Your personal access token for accessing the SQL warehouse"`
-	CatalogName string      `json:"catalogName" jsonschema:"title=Catalog Name,description=Name of your Unity Catalog."`
-
-	// TODO: support Azure and GCP authentication
-}
-
-// Validate the configuration.
-func (c *config) Validate() error {
-	var requiredProperties = [][]string{
-		{"address", c.Address},
-		{"httpPath", c.HTTPPath},
-		{"accessToken", c.AccessToken},
-		{"catalogName", c.CatalogName},
-	}
-	for _, req := range requiredProperties {
-		if req[1] == "" {
-			return fmt.Errorf("missing '%s'", req[0])
-		}
-	}
-
-	return nil
-}
-
-// ToURI puts together address and httpPath to form the full workspace URL
-func (c *config) ToURI() string {
-	var address = c.Address
-	if !strings.Contains(address, ":") {
-		address = address + ":" + defaultPort
-	}
-
-	var params = make(url.Values)
-	params.Add("catalog", c.CatalogName)
-	params.Add("userAgentEntry", "Estuary Technologies+Flow")
-
-	var uri = url.URL{
-		Host: address,
-		Path: c.HTTPPath,
-		User: url.UserPassword("token", c.AccessToken),
-		RawQuery: params.Encode(),
-	}
-
-	return strings.TrimLeft(uri.String(), "/")
-}
-
-// TODO: validate table names must conform to these limitations:
-// https://docs.databricks.com/en/sql/language-manual/sql-ref-names.html
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
 	Schema        string `json:"schema" jsonschema:"title=Schema,description=Schema where the table resides,default=default"`
@@ -97,6 +46,12 @@ func (r tableConfig) Validate() error {
 	if r.Table == "" {
 		return fmt.Errorf("missing table")
 	}
+  var notAllowedCharacters = []string{".", " ", "/"}
+  for _, char := range notAllowedCharacters {
+    if strings.Contains(r.Table, char) {
+      return fmt.Errorf("table name %q contains forbidden character %s", r.Table, char)
+    }
+  }
 	return nil
 }
 
@@ -343,7 +298,7 @@ func newTransactor(
 
 	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
 		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-		Token:       cfg.AccessToken,
+		Token:       cfg.Credentials.PersonalAccessToken,
 		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
 	})
 	if err != nil {
