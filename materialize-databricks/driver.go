@@ -343,7 +343,9 @@ type binding struct {
 	target               sql.Table
 
 	// path to where we store staging files
-	remoteStagingPath    string
+	rootStagingPath      string
+	loadStagingPath      string
+	storeStagingPath     string
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
@@ -370,7 +372,10 @@ type binding struct {
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	var b = &binding{target: target}
 
-	b.remoteStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s", t.cfg.CatalogName, target.Path[0], volumeName)
+	var idx = len(t.bindings)
+	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s", t.cfg.CatalogName, target.Path[0], volumeName)
+	b.loadStagingPath = fmt.Sprintf("%s/%d_load.json", b.rootStagingPath, idx)
+	b.storeStagingPath = fmt.Sprintf("%s/%d_store.json", b.rootStagingPath, idx)
 
 	for _, m := range []struct {
 		sql *string
@@ -396,15 +401,14 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		tpl *template.Template
 	}{
 		{&b.copyIntoDirect, tplCopyIntoDirect},
-		{&b.copyIntoLoad, tplCopyIntoLoad},
 		{&b.copyIntoStore, tplCopyIntoStore},
+		{&b.copyIntoLoad, tplCopyIntoLoad},
 	} {
 		var err error
-		if *m.sql, err = RenderTableWithStagingPath(target, b.remoteStagingPath, m.tpl); err != nil {
+		if *m.sql, err = RenderTableWithStagingPath(target, b.rootStagingPath, m.tpl); err != nil {
 			return err
 		}
 	}
-
 
 	t.bindings = append(t.bindings, b)
 
@@ -432,6 +436,13 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = d.Context(it.Context())
+
+	// Delete existing staging files
+	for _, b := range d.bindings {
+		if err := d.wsClient.Files.DeleteByFilePath(ctx, b.loadStagingPath); err != nil && !strings.Contains(fmt.Sprintf("%s", err), "Not Found") {
+			return fmt.Errorf("deleting staging file %q: %w", b.loadStagingPath, err)
+		}
+	}
 
 	var localFiles = make(map[int]*os.File)
 	for it.Next() {
@@ -471,14 +482,14 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		var b = d.bindings[binding]
 
 		var source = fmt.Sprintf("%s/%d_load.json", d.localStagingPath, binding)
-		var destination = fmt.Sprintf("%s/%d_load.json", b.remoteStagingPath, binding)
+		var destination = b.loadStagingPath
 		if bs, err := os.ReadFile(source); err != nil {
 			return err
 		} else {
 			log.WithFields(log.Fields{
 				"content": string(bs),
 				"destination": destination,
-			}).Warn("debug")
+			}).Warn("load file")
 		}
 
 		if sourceFile, err := os.Open(source); err != nil {
@@ -537,6 +548,13 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
 	ctx := it.Context()
 
+	// Delete existing staging files
+	for _, b := range d.bindings {
+		if err := d.wsClient.Files.DeleteByFilePath(ctx, b.storeStagingPath); err != nil && !strings.Contains(fmt.Sprintf("%s", err), "Not Found") {
+			return nil, fmt.Errorf("deleting staging file %q: %w", b.storeStagingPath, err)
+		}
+	}
+
 	var localFiles = make(map[int]*os.File)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
@@ -570,6 +588,11 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			localFiles[it.Binding].Write(bs)
 		}
 
+		log.WithFields(log.Fields{
+			"binding": it.Binding,
+			"exists": it.Exists,
+			"doc": jsonMap,
+		}).Warn("store iterator")
 		if it.Exists {
 			b.needsMerge = true
 		}
@@ -589,14 +612,15 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 
 		var source = fmt.Sprintf("%s/%d_store.json", d.localStagingPath, binding)
-		var destination = fmt.Sprintf("%s/%d_store.json", b.remoteStagingPath, binding)
+		var destination = b.storeStagingPath
 		if bs, err := os.ReadFile(source); err != nil {
 			return nil, err
 		} else {
 			log.WithFields(log.Fields{
+				"binding": binding,
 				"content": string(bs),
 				"destination": destination,
-			}).Warn("debug")
+			}).Warn("store file")
 		}
 
 		if sourceFile, err := os.Open(source); err != nil {
@@ -613,12 +637,70 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
 		return nil, pf.RunAsyncOperation(func() error {
-			for _, b := range d.bindings {
+			// TODO: Databricks does not support transactions across tables, how can we
+			// handle the fence update in this case?
+			var err error
+			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+				return fmt.Errorf("marshalling checkpoint: %w", err)
+			}
+
+			var fenceUpdate strings.Builder
+			if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+				return fmt.Errorf("evaluating fence template: %w", err)
+			}
+
+			if results, err := d.store.conn.ExecContext(ctx, fenceUpdate.String()); err != nil {
+				return fmt.Errorf("updating flow checkpoint: %w", err)
+			} else if rowsAffected, err := results.RowsAffected(); err != nil {
+				return fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
+			} else if rowsAffected < 1 {
+				return fmt.Errorf("This instance was fenced off by another")
+			}
+
+			for idx, b := range d.bindings {
 				if b.needsMerge {
+					log.WithFields(log.Fields{
+						"mergeInto": b.mergeInto,
+					}).Warn("running merge")
+
+					if rows, err := d.store.conn.QueryContext(ctx, fmt.Sprintf("SELECT * FROM flow_temp_store_table_%d;", idx)); err != nil {
+						return fmt.Errorf("reading from load table: %w", err)
+					} else {
+						defer rows.Close()
+						for rows.Next() {
+							var cols, _ = rows.Columns()
+							var columns = make([]interface{}, len(cols))
+							var columnPtrs = make([]interface{}, len(cols))
+
+							for i, _ := range cols {
+								columnPtrs[i] = &columns[i]
+							}
+
+							if err = rows.Scan(columnPtrs...); err != nil {
+								return fmt.Errorf("scanning document: %w", err)
+							} else {
+								var m = make(map[string]interface{})
+								for i, col := range cols {
+									m[col] = columns[i]
+								}
+								log.WithFields(log.Fields{
+									"m": m,
+								}).Warn("scanned document")
+							}
+						}
+
+						if err = rows.Err(); err != nil {
+							return fmt.Errorf("querying Loads: %w", err)
+						}
+					}
+
 					if _, err := d.store.conn.ExecContext(ctx, b.mergeInto); err != nil {
 						return fmt.Errorf("store merge on %q: %w", b.target.Identifier, err)
 					}
 				} else {
+					log.WithFields(log.Fields{
+						"mergeInto": b.copyIntoDirect,
+					}).Warn("running direct copy")
 					if _, err := d.store.conn.ExecContext(ctx, b.copyIntoDirect); err != nil {
 						return  fmt.Errorf("store direct copy on %q: %w", b.target.Identifier, err)
 					}
@@ -628,30 +710,6 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 					return fmt.Errorf("truncating store table: %w", err)
 				}
 			}
-
-			/*
-			TODO: handle fencing
-			var err error
-			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
-			}
-
-			var fenceUpdate strings.Builder
-			if err := d.templates["updateFence"].Execute(&fenceUpdate, d.store.fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
-			}
-
-			if results, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating flow checkpoint: %w", err)
-			} else if rowsAffected, err := results.RowsAffected(); err != nil {
-				return fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
-			} else if rowsAffected < 1 {
-				return fmt.Errorf("This instance was fenced off by another")
-			}
-
-			if err := txn.Commit(); err != nil {
-				return fmt.Errorf("committing Store transaction: %w", err)
-			}*/
 
 			return nil
 		})
