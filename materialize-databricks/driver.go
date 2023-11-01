@@ -27,6 +27,8 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
+// TODO: Error logging is really bad from the driver, it is almost always followed by a "Command Not Found" error
+
 const defaultPort = "443"
 const volumeName = "flow_staging"
 
@@ -43,15 +45,21 @@ func newTableConfig(ep *sql.Endpoint) sql.Resource {
 
 // Validate the resource configuration.
 func (r tableConfig) Validate() error {
+	var forbiddenChars = ". /"
 	if r.Table == "" {
 		return fmt.Errorf("missing table")
 	}
-  var notAllowedCharacters = []string{".", " ", "/"}
-  for _, char := range notAllowedCharacters {
-    if strings.Contains(r.Table, char) {
-      return fmt.Errorf("table name %q contains forbidden character %s", r.Table, char)
-    }
-  }
+	if strings.ContainsAny(r.Table, forbiddenChars) {
+		return fmt.Errorf("table name %q contains one of the forbidden characters %q", r.Table, forbiddenChars)
+	}
+
+	if r.Schema == "" {
+		return fmt.Errorf("missing schema")
+	}
+	if strings.ContainsAny(r.Schema, forbiddenChars) {
+		return fmt.Errorf("schema name %q contains one of the forbidden characters %q", r.Schema, forbiddenChars)
+	}
+
 	return nil
 }
 
@@ -154,13 +162,12 @@ type client struct {
 }
 
 
-// TODO: test
 func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
 	var query string
 
 	err := c.withDB(func(db *stdsql.DB) error {
 		query = fmt.Sprintf(
-			"ALTER TABLE %s ADD %s %s;",
+			"ALTER TABLE %s ADD COLUMN %s %s;",
 			tableIdentifier,
 			columnIdentifier,
 			columnDDL,
@@ -168,19 +175,13 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 
 		if !dryRun {
 			if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-				// TODO: handle error case
-				//var sqlServerError *mssqldb.Error
-
-				//if errors.As(err, &sqlServerError) {
-				//// See SQLServer error reference:
-				//// https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors-1000-to-1999?view=sql-server-2017
-				//switch sqlServerError.Number {
-				//case 1909:
-				//// 1909: Duplicate column name, means the column already exists, we
-				//// just skip
-				//return nil
-				//}
-				//}
+				var execErr dbsqlerr.DBExecutionError
+				if errors.As(err, &execErr) {
+					// If the column already exists, we can just skip
+					if strings.Contains(execErr.Error(), "FIELDS_ALREADY_EXISTS") {
+						return nil
+					}
+				}
 
 				return err
 			}
@@ -196,20 +197,11 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 	return query, nil
 }
 
-// TODO: test
 func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
-	var projection = column.Projection
-	projection.Inference.Exists = pf.Inference_MAY
-	var mapped, err = databricksDialect.TypeMapper.MapType(&projection)
-	if err != nil {
-		return "", fmt.Errorf("drop not null: mapping type of %s failed: %w", column.Identifier, err)
-	}
-
 	query := fmt.Sprintf(
-		"ALTER TABLE %s ALTER COLUMN %s %s;",
+		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
 		table.Identifier,
 		column.Identifier,
-		mapped.DDL,
 	)
 
 	if !dryRun {
@@ -378,9 +370,6 @@ type binding struct {
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	var b = &binding{target: target}
 
-	log.WithFields(log.Fields{
-		"path": target.Path,
-	}).Warn("debug")
 	b.remoteStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s", t.cfg.CatalogName, target.Path[0], volumeName)
 
 	for _, m := range []struct {
