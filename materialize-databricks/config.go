@@ -1,8 +1,8 @@
 package main
 
 import (
-  "fmt"
-  "strings"
+	"fmt"
+	"strings"
 	"net/url"
 	"github.com/invopop/jsonschema"
 	"github.com/iancoleman/orderedmap"
