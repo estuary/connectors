@@ -36,7 +36,7 @@ var databricksDialect = func() sql.Dialect {
 				},
 				"number": sql.PrimaryKeyMapper{
 					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat())),
+					Delegate:   sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat("NaN", "Inf", "-Inf"))),
 				},
 				"date":      sql.NewStaticMapper("DATE"),
 				"date-time": sql.NewStaticMapper("TIMESTAMP"),
