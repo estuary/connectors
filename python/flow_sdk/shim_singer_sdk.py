@@ -4,7 +4,7 @@ import singer_sdk.metrics
 import typing as t
 
 from .capture import Connector, request, response, Response
-from . import flow, logger
+from . import flow, logger, retain_paths_in_jsonschema
 
 class Config(t.TypedDict):
     pass
@@ -30,6 +30,7 @@ singer.write_message = write_message_panics
 class CaptureShim(Connector):
     config_schema: dict
     delegate_factory: t.Callable[[Config, singer.Catalog | None, State | None], singer_sdk.Tap]
+    usesSchemaInference: bool
 
     def __init__(
         self,
@@ -37,10 +38,12 @@ class CaptureShim(Connector):
         delegate_factory: t.Callable[
             [Config, singer.Catalog | None, State | None], singer_sdk.Tap
         ],
+        usesSchemaInference = True
     ):
         super().__init__()
         self.config_schema = config_schema
         self.delegate_factory = delegate_factory
+        self.usesSchemaInference = usesSchemaInference
 
     def spec(self, _: request.Spec) -> flow.Spec:
         out = flow.Spec(
@@ -88,7 +91,16 @@ class CaptureShim(Connector):
                     meta.selected = True
 
             resourceConfig = entry.to_dict()
-            json_schema = resourceConfig.pop("schema")
+            
+            if self.usesSchemaInference:
+                json_schema = retain_paths_in_jsonschema(
+                    resourceConfig.pop("schema"), 
+                    [p.split("/") for p in entry.key_properties] if entry.key_properties 
+                    else [["_meta","row_id"]]
+                )
+                json_schema["x-infer-schema"] = True
+            else:
+                json_schema = resourceConfig.pop("schema")
 
             bindings.append(
                 response.DiscoveredBinding(
