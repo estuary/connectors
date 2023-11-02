@@ -4,7 +4,6 @@ import (
 	"os"
 	"context"
 	stdsql "database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,6 +23,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
+	"github.com/google/uuid"
 	"go.gazette.dev/core/consumer/protocol"
 )
 
@@ -92,13 +92,13 @@ func newSqlServerDriver() *sql.Driver {
 			}).Info("connecting to databricks")
 
 			var metaBase sql.TablePath
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
+			var metaSpecs, _ = sql.MetaTables(metaBase)
 
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             databricksDialect,
 				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
+				MetaCheckpoints:     nil,
 				Client:              client{uri: cfg.ToURI()},
 				CreateTableTemplate: tplCreateTargetTable,
 				NewResource:         newTableConfig,
@@ -239,12 +239,7 @@ func (c client) ExecStatements(ctx context.Context, statements []string) error {
 }
 
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	var err = c.withDB(func(db *stdsql.DB) error {
-		var err error
-		fence, err = installFence(ctx, databricksDialect, db, checkpoints, fence, base64.StdEncoding.DecodeString)
-		return err
-	})
-	return fence, err
+	return sql.Fence{}, nil
 }
 
 func (c client) withDB(fn func(*stdsql.DB) error) error {
@@ -271,7 +266,6 @@ type transactor struct {
 	// Variables exclusively used by Store.
 	store struct {
 		conn  *stdsql.Conn
-		fence sql.Fence
 	}
 	bindings []*binding
 }
@@ -285,6 +279,7 @@ func newTransactor(
 	ep *sql.Endpoint,
 	fence sql.Fence,
 	bindings []sql.Table,
+	open pm.Request_Open,
 ) (_ pm.Transactor, err error) {
 	var cfg = ep.Config.(*config)
 
@@ -298,7 +293,6 @@ func newTransactor(
 	}
 
 	var d = &transactor{cfg: cfg, wsClient: wsClient}
-	d.store.fence = fence
 
 	// Establish connections.
 	if db, err := stdsql.Open("databricks", cfg.ToURI()); err != nil {
@@ -316,6 +310,17 @@ func newTransactor(
 		if err = d.addBinding(ctx, binding); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
+	}
+
+	var cp checkpoint
+	if open.StateJson != nil {
+		if err := json.Unmarshal(open.StateJson, &cp); err != nil {
+			return nil, fmt.Errorf("parsing driver config: %w", err)
+		}
+	}
+
+	if err = d.applyCheckpoint(ctx, cp); err != nil {
+		return nil, fmt.Errorf("applying recovered checkpoint: %w", err)
 	}
 
 	// Build a query which unions the results of each load subquery.
@@ -344,8 +349,6 @@ type binding struct {
 
 	// path to where we store staging files
 	rootStagingPath      string
-	loadStagingPath      string
-	storeStagingPath     string
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
@@ -372,10 +375,7 @@ type binding struct {
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	var b = &binding{target: target}
 
-	var idx = len(t.bindings)
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s", t.cfg.CatalogName, target.Path[0], volumeName)
-	b.loadStagingPath = fmt.Sprintf("%s/%d_load.json", b.rootStagingPath, idx)
-	b.storeStagingPath = fmt.Sprintf("%s/%d_store.json", b.rootStagingPath, idx)
 
 	for _, m := range []struct {
 		sql *string
@@ -437,13 +437,6 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = d.Context(it.Context())
 
-	// Delete existing staging files
-	for _, b := range d.bindings {
-		if err := d.wsClient.Files.DeleteByFilePath(ctx, b.loadStagingPath); err != nil && !strings.Contains(fmt.Sprintf("%s", err), "Not Found") {
-			return fmt.Errorf("deleting staging file %q: %w", b.loadStagingPath, err)
-		}
-	}
-
 	var localFiles = make(map[int]*os.File)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
@@ -460,7 +453,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 			var jsonMap = make(map[string]interface{}, len(b.target.Keys))
 			for i, col := range b.target.Keys {
-				// TODO: what happens here in case of nested keys?
+				// FIXME: what happens here in case of nested keys?
 				jsonMap[col.Field] = converted[i]
 			}
 
@@ -481,8 +474,14 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	for binding, _ := range localFiles {
 		var b = d.bindings[binding]
 
+		var randomKey, err = uuid.NewRandom()
+		if err != nil {
+			return fmt.Errorf("generating random key for file: %w", err)
+		}
+
 		var source = fmt.Sprintf("%s/%d_load.json", d.localStagingPath, binding)
-		var destination = b.loadStagingPath
+		var destination = fmt.Sprintf("%s/%d_%s_load.json", b.rootStagingPath, binding, randomKey)
+
 		if bs, err := os.ReadFile(source); err != nil {
 			return err
 		} else {
@@ -545,15 +544,12 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return nil
 }
 
+type checkpoint struct {
+	Queries []string
+}
+
 func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
 	ctx := it.Context()
-
-	// Delete existing staging files
-	for _, b := range d.bindings {
-		if err := d.wsClient.Files.DeleteByFilePath(ctx, b.storeStagingPath); err != nil && !strings.Contains(fmt.Sprintf("%s", err), "Not Found") {
-			return nil, fmt.Errorf("deleting staging file %q: %w", b.storeStagingPath, err)
-		}
-	}
 
 	var localFiles = make(map[int]*os.File)
 	for it.Next() {
@@ -602,7 +598,12 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		f.Close()
 	}
 
-	// Upload the staged files
+	// Upload the staged files and build a list of merge and truncate queries that need to be run
+	// to effectively commit the files into destination tables. These queries are stored
+	// in the checkpoint so that if the connector is restarted in middle of a commit
+	// it can run the same queries on the next startup. This is the pattern for 
+	// recovery log being authoritative and the connector idempotently applies a commit
+	var queries []string
 	for binding, _ := range localFiles {
 		var b = d.bindings[binding]
 
@@ -611,8 +612,14 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			continue
 		}
 
+		var randomKey, err = uuid.NewRandom()
+		if err != nil {
+			return nil, fmt.Errorf("generating random key for file: %w", err)
+		}
+
 		var source = fmt.Sprintf("%s/%d_store.json", d.localStagingPath, binding)
-		var destination = b.storeStagingPath
+		var destination = fmt.Sprintf("%s/%d_%s_store.json", b.rootStagingPath, binding, randomKey)
+
 		if bs, err := os.ReadFile(source); err != nil {
 			return nil, err
 		} else {
@@ -630,90 +637,50 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 
 		// COPY INTO temporary load table from staged files
-		if _, err := d.store.conn.ExecContext(ctx, b.copyIntoStore); err != nil {
+		if _, err := d.store.conn.ExecContext(ctx, renderWithFiles(b.copyIntoStore, destination)); err != nil {
 			return nil, fmt.Errorf("store: writing to temporary table: %w", err)
 		}
+
+		queries = append(queries, renderWithFiles(b.mergeInto, destination), b.truncateStoreSQL)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		return nil, pf.RunAsyncOperation(func() error {
-			// TODO: Databricks does not support transactions across tables, how can we
-			// handle the fence update in this case?
-			var err error
-			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
+		var cp = checkpoint{Queries: queries}
+
+		var checkpointJSON, err = json.Marshal(cp)
+		if err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+		}
+
+		var commitOp = pf.RunAsyncOperation(func() error {
+			select {
+			case <-runtimeAckCh:
+				return d.applyCheckpoint(ctx, cp)
+			case <-ctx.Done():
+				return ctx.Err()
 			}
-
-			var fenceUpdate strings.Builder
-			if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
-			}
-
-			if results, err := d.store.conn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating flow checkpoint: %w", err)
-			} else if rowsAffected, err := results.RowsAffected(); err != nil {
-				return fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
-			} else if rowsAffected < 1 {
-				return fmt.Errorf("This instance was fenced off by another")
-			}
-
-			for idx, b := range d.bindings {
-				if b.needsMerge {
-					log.WithFields(log.Fields{
-						"mergeInto": b.mergeInto,
-					}).Warn("running merge")
-
-					if rows, err := d.store.conn.QueryContext(ctx, fmt.Sprintf("SELECT * FROM flow_temp_store_table_%d;", idx)); err != nil {
-						return fmt.Errorf("reading from load table: %w", err)
-					} else {
-						defer rows.Close()
-						for rows.Next() {
-							var cols, _ = rows.Columns()
-							var columns = make([]interface{}, len(cols))
-							var columnPtrs = make([]interface{}, len(cols))
-
-							for i, _ := range cols {
-								columnPtrs[i] = &columns[i]
-							}
-
-							if err = rows.Scan(columnPtrs...); err != nil {
-								return fmt.Errorf("scanning document: %w", err)
-							} else {
-								var m = make(map[string]interface{})
-								for i, col := range cols {
-									m[col] = columns[i]
-								}
-								log.WithFields(log.Fields{
-									"m": m,
-								}).Warn("scanned document")
-							}
-						}
-
-						if err = rows.Err(); err != nil {
-							return fmt.Errorf("querying Loads: %w", err)
-						}
-					}
-
-					if _, err := d.store.conn.ExecContext(ctx, b.mergeInto); err != nil {
-						return fmt.Errorf("store merge on %q: %w", b.target.Identifier, err)
-					}
-				} else {
-					log.WithFields(log.Fields{
-						"mergeInto": b.copyIntoDirect,
-					}).Warn("running direct copy")
-					if _, err := d.store.conn.ExecContext(ctx, b.copyIntoDirect); err != nil {
-						return  fmt.Errorf("store direct copy on %q: %w", b.target.Identifier, err)
-					}
-				}
-
-				if _, err = d.store.conn.ExecContext(ctx, b.truncateStoreSQL); err != nil {
-					return fmt.Errorf("truncating store table: %w", err)
-				}
-			}
-
-			return nil
 		})
+
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, commitOp
 	}, nil
+}
+
+func renderWithFiles(tpl string, files ...string) string {
+	var s = strings.Join(files, "','")
+	s = "'" + s + "'"
+
+	return fmt.Sprintf(tpl, s)
+}
+
+// applyCheckpoint merges data from temporary table to main table
+func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint) error {
+	for _, q := range cp.Queries {
+		if _, err := d.store.conn.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("query %q failed: %w", q, err)
+		}
+	}
+
+	return nil
 }
 
 func (d *transactor) Destroy() {

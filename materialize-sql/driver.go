@@ -347,7 +347,7 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tr
 		}
 	}
 
-	transactor, err := endpoint.NewTransactor(ctx, endpoint, fence, tables)
+	transactor, err := endpoint.NewTransactor(ctx, endpoint, fence, tables, open)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building transactor: %w", err)
 	}

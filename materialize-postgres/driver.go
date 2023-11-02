@@ -350,6 +350,7 @@ func newTransactor(
 	ep *sql.Endpoint,
 	fence sql.Fence,
 	bindings []sql.Table,
+	open pm.Request_Open,
 ) (_ pm.Transactor, err error) {
 	var d = &transactor{}
 	d.store.fence = fence

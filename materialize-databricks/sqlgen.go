@@ -97,7 +97,13 @@ DROP TABLE IF EXISTS {{ template "temp_name_load" . }}
 
 -- Idempotent creation of the store table for staging new records.
 {{ define "createStoreTable" }}
-CREATE TABLE IF NOT EXISTS {{ template "temp_name_store" . }} LIKE {{$.Identifier}};
+CREATE TABLE IF NOT EXISTS {{ template "temp_name_store" . }} (
+	_metadata_file_name STRING,
+  {{- range $ind, $col := $.Columns }}
+  ,
+  {{$col.Identifier}} {{$col.DDL}}
+  {{- end }}
+);
 {{ end }}
 
 -- Templated truncation of the temporary store table:
@@ -147,9 +153,8 @@ SELECT -1, NULL
   FROM {{ Literal $.StagingPath }}
 	)
   FILEFORMAT = JSON
-  FILES = ('{{ $.Table.Binding }}_store.json')
+  FILES = (%s)
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
-	COPY_OPTIONS ( 'force' = 'true' )
   ;
 {{ end }}
 
@@ -157,16 +162,16 @@ SELECT -1, NULL
 {{ define "copyIntoStore" }}
 	COPY INTO {{ template "temp_name_store" $.Table }} FROM (
     SELECT
+		_metadata.file_name as _metadata_file_name,
 		{{ range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
+			,
 			{{$key.Identifier -}}
 		{{- end }}
     FROM {{ Literal $.StagingPath }}
 	)
   FILEFORMAT = JSON
-  FILES = ('{{ $.Table.Binding }}_store.json')
+  FILES = (%s)
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
-	COPY_OPTIONS ( 'force' = 'true' )
   ;
 {{ end }}
 
@@ -181,9 +186,8 @@ SELECT -1, NULL
     FROM {{ Literal $.StagingPath }}
   )
   FILEFORMAT = JSON
-  FILES = ('{{ $.Table.Binding }}_load.json')
+  FILES = (%s)
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
-	COPY_OPTIONS ( 'force' = 'true' )
   ;
 {{ end }}
 
@@ -192,7 +196,8 @@ SELECT -1, NULL
 	USING {{ template "temp_name_store" . }} AS r
 	ON {{ range $ind, $key := $.Keys }}
 		{{- if $ind }} AND {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }} AND
+		r._metadata_file_name IN (%s)
 	{{- end }}
 	{{- if $.Document }}
 	WHEN MATCHED AND r.{{ $.Document.Identifier }} <=> NULL THEN
