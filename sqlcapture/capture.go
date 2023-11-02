@@ -14,6 +14,7 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 // PersistentState represents the part of a connector's state which can be serialized
@@ -117,9 +118,9 @@ type Capture struct {
 }
 
 const (
-	nonexistentWatermark   = "nonexistent-watermark" // The watermark which will be used for the final "tailing" stream call.
-	streamIdleWarning      = 60 * time.Second        // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
-	streamProgressInterval = 60 * time.Second        // After `streamProgressInterval` the replication streaming code may log a progress report.
+	heartbeatWatermarkInterval = 60 * time.Second // When streaming indefinitely, write a heartbeat watermark this often
+	streamIdleWarning          = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
+	streamProgressInterval     = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
 )
 
 // Run is the top level entry point of the capture process.
@@ -283,7 +284,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// gets emitted. This ensures that streams reliably transition into the Active
 	// state on the first connector run even if there are no replication events
 	// occurring.
-	logrus.Debug("no tables currently require backfilling")
+	logrus.Info("no tables currently require backfilling")
 	if err := c.emitState(); err != nil {
 		return err
 	}
@@ -407,44 +408,6 @@ func (c *Capture) updateState(ctx context.Context) error {
 	return c.emitState()
 }
 
-// This code is all about logging enough information to give insight into
-// connector replication progress without being unusably spammy. These logs
-// take two forms:
-//
-//   - A warning/info message when the stream has been sitting idle
-//     for a while since the last replication event. This is a warning
-//     when we expect to catch up to a watermark, and informational when
-//     that watermark is "nonexistent-watermark".
-//   - Periodic progress updates, just to show that streaming is ongoing.
-//
-// Neither of these can occur more frequently than their respective timeout
-// values, so the impact of the additional logging should be minimal.
-type streamProgressReport struct {
-	eventCount   int
-	nextProgress time.Time
-	idleTimeout  *time.Timer
-}
-
-func startProgressReport(onIdle func()) *streamProgressReport {
-	return &streamProgressReport{
-		nextProgress: time.Now().Add(streamProgressInterval),
-		idleTimeout:  time.AfterFunc(streamIdleWarning, onIdle),
-	}
-}
-
-func (spr *streamProgressReport) Progress() {
-	spr.eventCount++
-	if time.Now().After(spr.nextProgress) {
-		logrus.WithField("count", spr.eventCount).Info("replication stream progress")
-		spr.nextProgress = time.Now().Add(streamProgressInterval)
-	}
-	spr.idleTimeout.Reset(streamIdleWarning)
-}
-
-func (spr *streamProgressReport) Stop() {
-	spr.idleTimeout.Stop()
-}
-
 func (c *Capture) streamCatchup(ctx context.Context, replStream ReplicationStream, watermark string) error {
 	return c.streamToWatermarkWithOptions(ctx, replStream, watermark, true)
 }
@@ -454,50 +417,70 @@ func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationS
 }
 
 func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStream) error {
-	return c.streamToWatermarkWithOptions(ctx, replStream, nonexistentWatermark, true)
+	logrus.Info("streaming replication events indefinitely")
+	for ctx.Err() == nil {
+		// Spawn a worker goroutine which will write the watermark value after the appropriate interval.
+		var watermark = uuid.New().String()
+		var group, workerCtx = errgroup.WithContext(ctx)
+		group.Go(func() error {
+			select {
+			case <-workerCtx.Done():
+				return workerCtx.Err()
+			case <-time.After(heartbeatWatermarkInterval):
+				if err := c.Database.WriteWatermark(workerCtx, watermark); err != nil {
+					return fmt.Errorf("error writing next watermark: %w", err)
+				}
+			}
+			return nil
+		})
+
+		// Perform replication streaming until the watermark is reached (or the
+		// watermark-writing thread returns an error which cancels the context).
+		if err := c.streamCatchup(workerCtx, replStream, watermark); err != nil {
+			return fmt.Errorf("error streaming until watermark: %w", err)
+		}
+
+		// If the watermark worker encountered an error, return that.
+		if err := group.Wait(); err != nil {
+			return err
+		}
+	}
+	return ctx.Err()
 }
 
-// streamToWatermarkWithOptions implements three very similar operations:
+// streamToWatermarkWithOptions implements two very similar operations:
 //
 //   - streamCatchup: Processes replication events until the watermark is reached
 //     and then stops. Whenever a database transaction commit is reported, a Flow
 //     state checkpoint update is emitted.
-//   - streamForever: Like streamCatchup but the watermark doesn't actually exist
-//     and so will never be reached.
 //   - streamToWatermark: Like streamCatchup except that no state checkpoints are
 //     emitted during replication processing. This is done during backfills so that
 //     a chunk of backfilled rows plus all relevant replication events will be
 //     committed into the same Flow transaction.
 //
-// All three operations are implemented as a single function here with parameters
-// controlling its behavior because the three operations are so similar.
+// Both operations are implemented as a single function here with a parameter
+// controlling checkpoint behavior because they're so similar.
 func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream ReplicationStream, watermark string, reportFlush bool) error {
 	logrus.WithField("watermark", watermark).Info("streaming to watermark")
 	var watermarksTable = c.Database.WatermarksTable()
 	var watermarkReached = false
 
-	var idleIsBad = watermark != nonexistentWatermark
-	var diagnosticsTimeout = time.AfterFunc(5*time.Minute, func() {
-		if idleIsBad {
-			logrus.Warn("replication streaming has been ongoing for an atypically long amount of time, running replication diagnostics")
-			if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
-				logrus.WithField("err", err).Error("replication diagnostics error")
-			}
+	// Log a warning and perform replication diagnostics if we don't observe the watermark within a few minutes
+	var diagnosticsTimeout = time.AfterFunc(2*heartbeatWatermarkInterval, func() {
+		logrus.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
+		if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
+			logrus.WithField("err", err).Error("replication diagnostics error")
 		}
 	})
 	defer diagnosticsTimeout.Stop()
 
-	var progressReport = startProgressReport(func() {
-		if idleIsBad {
-			logrus.WithField("timeout", streamIdleWarning.String()).Warn("replication stream idle")
-		} else {
-			logrus.WithField("timeout", streamIdleWarning.String()).Info("replication stream idle")
-		}
-	})
-	defer progressReport.Stop()
+	// When streaming completes (because we've either reached the watermark or encountered an error),
+	// log the number of events which have been processed.
+	var eventCount int
+	defer func() { logrus.WithField("events", eventCount).Info("processed replication events") }()
 
 	for event := range replStream.Events() {
-		progressReport.Progress()
+		eventCount++
 
 		// Flush events update the checkpointed LSN and trigger a state update.
 		// If this is the commit after the target watermark, it also ends the loop.
@@ -532,9 +515,6 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 	}
 	if err := ctx.Err(); err != nil {
 		return err
-	}
-	if watermark == nonexistentWatermark {
-		return fmt.Errorf("replication stream closed")
 	}
 	return fmt.Errorf("replication stream closed before reaching watermark")
 }
