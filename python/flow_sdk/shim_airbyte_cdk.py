@@ -11,7 +11,7 @@ from airbyte_protocol.models import (
 )
 
 from .capture import Connector, request, response, Response
-from . import flow, ValidateError, logger
+from . import flow, ValidateError, logger, retain_paths_in_jsonschema
 from .logger import init_logger
 
 logger = init_logger()
@@ -24,15 +24,18 @@ logging.getLogger("airbyte").setLevel(logger.level)
 
 class CaptureShim(Connector):
     delegate: Source
+    usesSchemaInference: bool
 
     def __init__(
         self,
         delegate: Source,
         oauth2: flow.OAuth2 | None,
+        usesSchemaInference = True
     ):
         super().__init__()
         self.delegate = delegate
         self.oauth2 = oauth2
+        self.usesSchemaInference = usesSchemaInference
 
     def spec(self, _: request.Spec) -> flow.Spec:
         spec = self.delegate.spec(logger)
@@ -68,6 +71,8 @@ class CaptureShim(Connector):
             }
             if stream.namespace:
                 config["namespace"] = stream.namespace
+            
+            json_schema = stream.json_schema
 
             if stream.source_defined_primary_key:
                 # Map array of array of property names into an array of JSON pointers.
@@ -78,6 +83,8 @@ class CaptureShim(Connector):
                     )
                     for component in stream.source_defined_primary_key
                 ]
+                if self.usesSchemaInference:
+                    json_schema = retain_paths_in_jsonschema(stream.json_schema,stream.source_defined_primary_key)
             elif sync_mode == SyncMode.full_refresh:
                 # Synthesize a key based on the record's order within each stream refresh.
                 key = ["/_meta/row_id"]
@@ -88,16 +95,23 @@ class CaptureShim(Connector):
                 )
                 meta.setdefault("properties", {})["row_id"] = {"type": "integer"}
                 meta.setdefault("required", []).append("row_id")
+                json_schema = stream.json_schema
+
+                if self.usesSchemaInference:
+                    json_schema = retain_paths_in_jsonschema(stream.json_schema,[["_meta","row_id"]])
             else:
                 raise RuntimeError(
                     "incremental stream is missing a source-defined primary key",
                     stream.name,
-                )
+                )   
+
+            if self.usesSchemaInference:
+                json_schema["x-infer-schema"] = True
 
             bindings.append(
                 response.DiscoveredBinding(
                     recommendedName=stream.name,
-                    documentSchema=stream.json_schema,
+                    documentSchema=json_schema,
                     resourceConfig=t.cast(dict, config),
                     key=key,
                 )
