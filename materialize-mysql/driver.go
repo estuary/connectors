@@ -544,7 +544,7 @@ type transactor struct {
 func prepareNewTransactor(
 	dialect sql.Dialect,
 	templates map[string]*template.Template,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table) (pm.Transactor, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (pm.Transactor, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
