@@ -436,11 +436,13 @@ func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStrea
 
 		// Perform replication streaming until the watermark is reached (or the
 		// watermark-writing thread returns an error which cancels the context).
-		if err := c.streamCatchup(workerCtx, replStream, watermark); err != nil {
-			return fmt.Errorf("error streaming until watermark: %w", err)
-		}
+		group.Go(func() error {
+			if err := c.streamCatchup(workerCtx, replStream, watermark); err != nil {
+				return fmt.Errorf("error streaming until watermark: %w", err)
+			}
+			return nil
+		})
 
-		// If the watermark worker encountered an error, return that.
 		if err := group.Wait(); err != nil {
 			return err
 		}
