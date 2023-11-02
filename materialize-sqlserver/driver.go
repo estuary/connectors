@@ -354,6 +354,7 @@ func prepareNewTransactor(
 		ep *sql.Endpoint,
 		fence sql.Fence,
 		bindings []sql.Table,
+		open pm.Request_Open,
 	) (_ pm.Transactor, err error) {
 		var d = &transactor{templates: templates}
 		d.store.fence = fence

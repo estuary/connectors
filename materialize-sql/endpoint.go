@@ -94,7 +94,7 @@ type Endpoint struct {
 	// which will be parsed into and validated from a resource configuration.
 	NewResource func(*Endpoint) Resource
 	// NewTransactor returns a Transactor ready for pm.RunTransactions.
-	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table) (pm.Transactor, error)
+	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open) (pm.Transactor, error)
 	// CheckPrerequisites validates that the proposed configuration is able to connect to the
 	// endpoint and perform the required actions. It assumes that any required SSH tunneling is
 	// setup prior to its call.
