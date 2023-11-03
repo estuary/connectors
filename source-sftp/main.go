@@ -104,6 +104,10 @@ func (c config) DiscoverRoot() string {
 	return c.Directory
 }
 
+func (c config) RecommendedName() string {
+	return strings.Trim(c.DiscoverRoot(), "/")
+}
+
 func (c config) FilesAreMonotonic() bool {
 	return c.Advanced.AscendingKeys
 }

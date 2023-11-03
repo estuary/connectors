@@ -43,6 +43,10 @@ func (c config) DiscoverRoot() string {
 	return filesource.PartsToPath(c.Bucket, c.Prefix)
 }
 
+func (c config) RecommendedName() string {
+	return strings.Trim(c.DiscoverRoot(), "/")
+}
+
 func (c config) FilesAreMonotonic() bool {
 	return c.Advanced.AscendingKeys
 }
