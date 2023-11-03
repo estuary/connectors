@@ -1,0 +1,38 @@
+{
+  "properties": {
+    "id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "attributes": {
+      "properties": {
+        "advertiserName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "meta": {
+          "properties": {},
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "type": "object"
+}

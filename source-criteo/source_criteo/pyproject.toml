@@ -1,0 +1,60 @@
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+
+[tool.poetry]
+name = "tap-criteo"
+version = "0.0.1"
+description = "`tap-criteo` is a Singer tap for Criteo, built with the Meltano SDK for Singer Taps."
+authors = ["Edgar Ramírez-Mondragón <edgarrm358@gmail.com>"]
+maintainers = ["Edgar Ramírez-Mondragón <edgarrm358@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/edgarrmondragon/tap-criteo"
+repository = "https://github.com/edgarrmondragon/tap-criteo"
+documentation = "https://github.com/edgarrmondragon/tap-criteo/#readme"
+keywords = [
+  "ELT",
+  "singer.io",
+  "Criteo",
+]
+
+[tool.poetry.dependencies]
+python = "<3.12,>=3.7.1"
+singer-sdk = "==0.24.0"
+python-dateutil = "==2.8.2"
+
+[tool.poetry.group.dev.dependencies]
+singer-sdk = { version = "0.24.0", extras = ["testing"] }
+
+[tool.poetry.scripts]
+tap-criteo = 'tap_criteo.tap:TapCriteo.cli'
+
+[tool.ruff]
+ignore = [
+  "ANN101",  # missing-type-self
+  "FIX002",  # line-contains-todo
+]
+line-length = 88
+select = ["ALL"]
+src = ["tap_criteo", "tests"]
+target-version = "py37"
+unfixable = [
+  "ERA001",  # commented-out-code
+]
+
+[tool.ruff.per-file-ignores]
+"noxfile.py" = ["ANN", "INP001"]
+"tests/*" = [
+  "ANN201",
+  "S101",
+]
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.ruff.isort]
+known-first-party = ["tap_criteo"]

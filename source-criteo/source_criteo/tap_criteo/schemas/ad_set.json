@@ -1,0 +1,330 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema",
+  "properties": {
+    "id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "attributes": {
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "advertiserId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "campaignId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "destinationEnvironment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schedule": {
+          "properties": {
+            "startDate": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "endDate": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "activationStatus": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "deliveryStatus": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "bidding": {
+          "properties": {
+            "bidAmount": {
+              "properties": {
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "bidStrategy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "costController": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "targeting": {
+          "properties": {
+            "deliveryLimitations": {
+              "properties": {
+                "environments": {
+                  "items": {
+                    "type": [
+                      "string"
+                    ]
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "devices": {
+                  "items": {
+                    "type": [
+                      "string"
+                    ]
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                },
+                "operatingSystems": {
+                  "items": {
+                    "type": [
+                      "string"
+                    ]
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              },
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "geoLocation": {
+              "properties": {
+                "countries": {
+                  "properties": {
+                    "value": {
+                      "properties": {
+                        "operand": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "values": {
+                          "items": {
+                            "type": [
+                              "string"
+                            ]
+                          },
+                          "type": [
+                            "array",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "subdivisions": {
+                  "properties": {
+                    "value": {
+                      "properties": {
+                        "operand": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "values": {
+                          "items": {
+                            "type": [
+                              "string"
+                            ]
+                          },
+                          "type": [
+                            "array",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "zipCodes": {
+                  "properties": {
+                    "value": {
+                      "properties": {
+                        "operand": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "values": {
+                          "items": {
+                            "type": [
+                              "string"
+                            ]
+                          },
+                          "type": [
+                            "array",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                }
+              },
+              "type": [
+                "object",
+                "null"
+              ]
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "budget": {
+          "properties": {
+            "budgetStrategy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "budgetRenewal": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "budgetDeliverySmoothing": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "budgetDeliveryWeek": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "budgetAmount": {
+              "properties": {
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "type": [
+                "object",
+                "null"
+              ]
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "type": "object"
+}

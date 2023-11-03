@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "http://example.com/example.json",
+  "type": "object",
+  "properties": {
+    "categoryHashCode": {
+      "$id": "#/properties/categoryHashCode",
+      "type": "integer"
+    },
+    "categoryName": {
+      "$id": "#/properties/categoryName",
+      "type": "string"
+    },
+    "catalogId": {
+      "$id": "#/properties/catalogId",
+      "type": "integer"
+    },
+    "catalogName": {
+      "$id": "#/properties/catalogName",
+      "type": "string"
+    },
+    "advertiserId": {
+      "$id": "#/properties/advertiserId",
+      "type": "integer"
+    },
+    "advertiserName": {
+      "$id": "#/properties/advertiserName",
+      "type": "string"
+    },
+    "campaignId": {
+      "$id": "#/properties/campaignId",
+      "type": "integer"
+    },
+    "campaignName": {
+      "$id": "#/properties/campaignName",
+      "type": "string"
+    },
+    "averagePrice": {
+      "$id": "#/properties/averagePrice",
+      "type": "integer"
+    },
+    "numberOfProducts": {
+      "$id": "#/properties/numberOfProducts",
+      "type": "integer"
+    },
+    "categoryBid": {
+      "$id": "#/properties/categoryBid",
+      "type": "object",
+      "properties": {
+        "bidValue": {
+          "$id": "#/properties/categoryBid/properties/bidValue",
+          "type": "integer"
+        },
+        "bidCurrency": {
+          "$id": "#/properties/categoryBid/properties/bidCurrency",
+          "type": "string"
+        },
+        "bidType": {
+          "$id": "#/properties/categoryBid/properties/bidType",
+          "type": "string"
+        },
+        "bidIsPending": {
+          "$id": "#/properties/categoryBid/properties/bidIsPending",
+          "type": "boolean"
+        }
+      }
+    },
+    "enabled": {
+      "$id": "#/properties/enabled",
+      "type": "boolean"
+    }
+  }
+}
