@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/jackc/pglogrepl"
 	"github.com/sirupsen/logrus"
@@ -451,4 +452,36 @@ func TestCaptureCapitalization(t *testing.T) {
 	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (2, 'world'), (3, 'fdsa');`, testSchemaName, tableB))
 
 	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB)))
+}
+
+func TestCaptureOversizedFields(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "64819605"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, tdata TEXT, bdata BYTEA, jdata JSON, jbdata JSONB)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = new(st.ChecksumValidator)
+
+	var oldCaptureShutdownDelay = tests.CaptureShutdownDelay
+	tests.CaptureShutdownDelay = 10 * time.Second
+	t.Cleanup(func() { tests.CaptureShutdownDelay = oldCaptureShutdownDelay })
+
+	var largeText = strings.Repeat("data", 4194304)         // 16MiB string
+	var largeJSON = fmt.Sprintf(`{"text":"%s"}`, largeText) // ~16MiB JSON object
+	tb.Insert(ctx, t, tableName, [][]any{
+		{0, largeText, []byte(largeText), largeJSON, largeJSON},
+		{1, largeText, []byte(largeText), largeJSON, largeJSON},
+		{2, largeText, []byte(largeText), largeJSON, largeJSON},
+		{3, largeText, []byte(largeText), largeJSON, largeJSON},
+	})
+	tests.VerifiedCapture(ctx, t, cs)
+
+	t.Run("Replication", func(t *testing.T) {
+		tb.Insert(ctx, t, tableName, [][]any{
+			{4, largeText, []byte(largeText), largeJSON, largeJSON},
+			{5, largeText, []byte(largeText), largeJSON, largeJSON},
+			{6, largeText, []byte(largeText), largeJSON, largeJSON},
+			{7, largeText, []byte(largeText), largeJSON, largeJSON},
+		})
+		tests.VerifiedCapture(ctx, t, cs)
+	})
 }
