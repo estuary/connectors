@@ -155,11 +155,10 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 func (db *postgresDatabase) WriteWatermark(ctx context.Context, watermark string) error {
 	logrus.WithField("watermark", watermark).Debug("writing watermark")
 	var query = fmt.Sprintf(`INSERT INTO %s (slot, watermark) VALUES ($1,$2) ON CONFLICT (slot) DO UPDATE SET watermark = $2;`, db.config.Advanced.WatermarksTable)
-	var rows, err = db.conn.Query(ctx, query, db.config.Advanced.SlotName, watermark)
+	var _, err = db.conn.Exec(ctx, query, db.config.Advanced.SlotName, watermark)
 	if err != nil {
 		return fmt.Errorf("error upserting new watermark for slot %q: %w", db.config.Advanced.SlotName, err)
 	}
-	rows.Close()
 	return nil
 }
 
