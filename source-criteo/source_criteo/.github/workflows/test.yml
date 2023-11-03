@@ -1,0 +1,60 @@
+name: Test tap-criteo
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    env:
+      PIP_CONSTRAINT: .github/workflows/constraints.txt
+      NOXSESSION: ${{ matrix.session }}-${{ matrix.python-version }}
+      FORCE_COLOR: "1"
+    strategy:
+      matrix:
+        include:
+        - {python-version: "3.11", session: "tests"}
+        - {python-version: "3.10", session: "tests"}
+        - {python-version: "3.9", session: "tests"}
+        - {python-version: "3.8", session: "tests"}
+        - {python-version: "3.7", session: "tests"}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3.5.2
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4.5.0
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Upgrade pip
+      run: |
+        pip install pip
+        pip --version
+
+    - name: Install Poetry
+      run: |
+        pipx install poetry
+        pipx inject poetry poetry-dynamic-versioning[plugin]
+        poetry --version
+        poetry self show plugins
+
+    - name: Install Nox
+      run: |
+        pipx install nox
+        pipx inject nox nox-poetry
+        nox --version
+
+    - name: Run Nox
+      env:
+        TAP_CRITEO_CLIENT_ID: ${{ secrets.TAP_CRITEO_CLIENT_ID }}
+        TAP_CRITEO_CLIENT_SECRET: ${{ secrets.TAP_CRITEO_CLIENT_SECRET }}
+        TAP_CRITEO_ADVERTISER_IDS: ${{ secrets.TAP_CRITEO_ADVERTISER_IDS }}
+      run: |
+        nox

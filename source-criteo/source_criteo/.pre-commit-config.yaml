@@ -1,0 +1,45 @@
+ci:
+  autofix_prs: true
+  autofix_commit_msg: "[pre-commit.ci] auto fixes"
+  autoupdate_schedule: weekly
+  autoupdate_commit_msg: "chore(deps): pre-commit autoupdate"
+
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.4.0
+  hooks:
+  - id: check-json
+    exclude: "\\.vscode/.*.json"
+  - id: check-toml
+  - id: check-yaml
+  - id: end-of-file-fixer
+    exclude: "plugins/.*/.*\\.lock"
+  - id: trailing-whitespace
+
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: 'v0.0.275'
+  hooks:
+  - id: ruff
+    args: [--fix, --exit-non-zero-on-fix, --show-fixes]
+
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v1.4.1
+  hooks:
+  - id: mypy
+    pass_filenames: true
+    additional_dependencies:
+    - types-python-dateutil
+    - types-requests
+
+- repo: https://github.com/psf/black
+  rev: "23.3.0"
+  hooks:
+  - id: black
+
+- repo: https://github.com/pycqa/flake8
+  rev: 6.0.0
+  hooks:
+  - id: flake8
+    additional_dependencies:
+    - darglint
+    exclude: "noxfile\\.py"

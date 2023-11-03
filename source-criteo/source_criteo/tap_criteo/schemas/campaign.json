@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "http://example.com/example.json",
+  "type": "object",
+  "title": "Campaign",
+  "description": "A campaign object.",
+  "required": [
+    "id",
+    "type",
+    "attributes"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "title": "Campaign ID",
+      "examples": [
+        "123456"
+      ]
+    },
+    "type": {
+      "type": "string",
+      "title": "Object type",
+      "examples": [
+        "Campaign"
+      ]
+    },
+    "attributes": {
+      "type": "object",
+      "required": [
+        "name",
+        "advertiserId",
+        "objective",
+        "spendLimit"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Campaign Name",
+          "examples": [
+            "Retargeting"
+          ]
+        },
+        "advertiserId": {
+          "type": "string",
+          "title": "Advertiser ID",
+          "examples": [
+            "12345"
+          ]
+        },
+        "objective": {
+          "type": "string",
+          "title": "Campaign objective",
+          "examples": [
+            "Conversion"
+          ]
+        },
+        "spendLimit": {
+          "type": "object",
+          "title": "Campaign's spend limit",
+          "required": [
+            "spendLimitType",
+            "spendLimitRenewal",
+            "spendLimitAmount"
+          ],
+          "properties": {
+            "spendLimitType": {
+              "type": "string",
+              "title": "Spend limit type",
+              "examples": [
+                "capped"
+              ]
+            },
+            "spendLimitRenewal": {
+              "type": "string",
+              "title": "Spend limit renewal period",
+              "examples": [
+                "daily"
+              ]
+            },
+            "spendLimitAmount": {
+              "type": "object",
+              "title": "Spend limit amount",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
