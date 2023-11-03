@@ -20,6 +20,7 @@ func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 		"Join":       func(s []string, delim string) string { return strings.Join(s, delim) },
 		"Repeat":     func(n int) []bool { return make([]bool, n) },
 		"Add":        func(a, b int) int { return a + b },
+		"Contains":   func(s string, substr string) bool { return strings.Contains(s, substr) },
 	})
 	return template.Must(tpl.Parse(body))
 }

@@ -480,7 +480,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		}
 
 		var source = fmt.Sprintf("%s/%d_load.json", d.localStagingPath, binding)
-		var destination = fmt.Sprintf("%s/%d_%s_load.json", b.rootStagingPath, binding, randomKey)
+		var fileName = fmt.Sprintf("%d_%s_load.json", binding, randomKey)
+		var destination = fmt.Sprintf("%s/%s", b.rootStagingPath, fileName)
 
 		if bs, err := os.ReadFile(source); err != nil {
 			return err
@@ -498,7 +499,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		}
 
 		// COPY INTO temporary load table from staged files
-		if _, err := d.load.conn.ExecContext(ctx, b.copyIntoLoad); err != nil {
+		if _, err := d.load.conn.ExecContext(ctx, renderWithFiles(b.copyIntoLoad, fileName)); err != nil {
 			return fmt.Errorf("load: writing keys: %w", err)
 		}
 	}
@@ -522,8 +523,10 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 		if err = rows.Scan(&binding, &document); err != nil {
 			return fmt.Errorf("scanning Load document: %w", err)
-		} else if err = loaded(binding, json.RawMessage([]byte(document))); err != nil {
-			return err
+		} else if binding > -1 {
+			if err = loaded(binding, json.RawMessage([]byte(document))); err != nil {
+				return err
+			}
 		}
 		log.WithFields(log.Fields{
 			"content": document,
@@ -607,27 +610,17 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 	for binding, _ := range localFiles {
 		var b = d.bindings[binding]
 
-		// In case of delta updates, we directly copy from staged files into the target table
-		if b.target.DeltaUpdates {
-			continue
-		}
-
 		var randomKey, err = uuid.NewRandom()
 		if err != nil {
 			return nil, fmt.Errorf("generating random key for file: %w", err)
 		}
 
 		var source = fmt.Sprintf("%s/%d_store.json", d.localStagingPath, binding)
-		var destination = fmt.Sprintf("%s/%d_%s_store.json", b.rootStagingPath, binding, randomKey)
+		var fileName = fmt.Sprintf("%d_%s_store.json", binding, randomKey)
+		var destination = fmt.Sprintf("%s/%s", b.rootStagingPath, fileName)
 
-		if bs, err := os.ReadFile(source); err != nil {
+		if _, err := os.ReadFile(source); err != nil {
 			return nil, err
-		} else {
-			log.WithFields(log.Fields{
-				"binding": binding,
-				"content": string(bs),
-				"destination": destination,
-			}).Warn("store file")
 		}
 
 		if sourceFile, err := os.Open(source); err != nil {
@@ -636,12 +629,23 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			return nil, fmt.Errorf("opening remote staged file: %w", err)
 		}
 
-		// COPY INTO temporary load table from staged files
-		if _, err := d.store.conn.ExecContext(ctx, renderWithFiles(b.copyIntoStore, destination)); err != nil {
-			return nil, fmt.Errorf("store: writing to temporary table: %w", err)
-		}
+		log.WithFields(log.Fields{
+			"binding": binding,
+			"destination": destination,
+		}).Warn("store file")
 
-		queries = append(queries, renderWithFiles(b.mergeInto, destination), b.truncateStoreSQL)
+		// In case of delta updates, we directly copy from staged files into the target table
+		if b.target.DeltaUpdates || !b.needsMerge {
+			queries = append(queries, renderWithFiles(b.copyIntoDirect, fileName))
+			continue
+		} else {
+			// COPY INTO temporary load table from staged files
+			if _, err := d.store.conn.ExecContext(ctx, renderWithFiles(b.copyIntoStore, fileName)); err != nil {
+				return nil, fmt.Errorf("store: writing to temporary table: %w", err)
+			}
+
+			queries = append(queries, renderWithFiles(b.mergeInto, fileName), b.truncateStoreSQL)
+		}
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
@@ -652,6 +656,8 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
 
+		// TODO: Test this by using a sleep and killing the connector, having the reactor spin it back up
+		// and the files should be correctly copied over
 		var commitOp = pf.RunAsyncOperation(func() error {
 			select {
 			case <-runtimeAckCh:
