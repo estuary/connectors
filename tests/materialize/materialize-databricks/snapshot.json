@@ -1,0 +1,844 @@
+{
+  "applied": {
+    "actionDescription": "\nCREATE TABLE IF NOT EXISTS flow_materializations_v2 (\n  materialization STRING NOT NULL COMMENT 'The name of the materialization.',\n  version STRING NOT NULL COMMENT 'Version of the materialization.',\n  spec STRING NOT NULL COMMENT 'Specification of the materialization, encoded as base64 protobuf.'\n) COMMENT 'This table is the source of truth for all materializations into this system.';\n\n\nCREATE TABLE IF NOT EXISTS `default`.simple (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  canary STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /canary with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/simple';\n\n\nCREATE TABLE IF NOT EXISTS `default`.duplicate_keys_standard (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `default`.duplicate_keys_delta (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `default`.duplicate_keys_delta_exclude_flow_doc (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int BIGINT COMMENT 'auto-generated projection of JSON at: /int with inferred types: [integer]',\n  str STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str with inferred types: [string]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/duplicated-keys';\n\n\nCREATE TABLE IF NOT EXISTS `default`.multiple_types (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  array_int STRING COMMENT 'auto-generated projection of JSON at: /array_int with inferred types: [array]',\n  bool_field BOOLEAN COMMENT 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]',\n  float_field DOUBLE COMMENT 'auto-generated projection of JSON at: /float_field with inferred types: [number]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  multiple STRING COMMENT 'auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string]',\n  nested STRING COMMENT 'auto-generated projection of JSON at: /nested with inferred types: [object]',\n  nullable_int BIGINT COMMENT 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]',\n  str_field STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /str_field with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/multiple-data-types';\n\n\nCREATE TABLE IF NOT EXISTS `default`.formatted_strings (\n  id BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  date DATE COMMENT 'auto-generated projection of JSON at: /date with inferred types: [string]',\n  datetime TIMESTAMP COMMENT 'auto-generated projection of JSON at: /datetime with inferred types: [string]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  int_and_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]',\n  int_str BIGINT COMMENT 'auto-generated projection of JSON at: /int_str with inferred types: [string]',\n  num_and_str DOUBLE COMMENT 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]',\n  num_str DOUBLE COMMENT 'auto-generated projection of JSON at: /num_str with inferred types: [string]',\n  time STRING COMMENT 'auto-generated projection of JSON at: /time with inferred types: [string]',\n  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'\n) COMMENT 'Generated for materialization tests/materialize-databricks/materialize of collection tests/formatted-strings';\n\nINSERT INTO flow_materializations_v2 (version, spec, materialization) VALUES ('test', '(a-base64-encoded-value)', 'tests/materialize-databricks/materialize');"
+  }
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {
+    "state": {
+      "updated": {
+        "Queries": [
+          "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT\n, date::DATE\n, datetime::TIMESTAMP\n, flow_published_at::TIMESTAMP\n, int_and_str::BIGINT\n, int_str::BIGINT\n, num_and_str::DOUBLE\n, num_str::DOUBLE\n, time\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('5_a433425f-c14b-47c2-a506-fa259c7f8bc0_store.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.multiple_types FROM (\n    SELECT\n\t\tid::BIGINT\n, array_int\n, bool_field::BOOLEAN\n, float_field::DOUBLE\n, flow_published_at::TIMESTAMP\n, multiple\n, nested\n, nullable_int::BIGINT\n, str_field\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('4_934fc0d4-9628-4947-b3aa-77a00c417641_store.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT\n, canary\n, flow_published_at::TIMESTAMP\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('0_9d818d17-39c8-4003-9447-1655de26941b_store.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_standard FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('1_13a4ab97-a8ba-4d0f-ab9f-1479dc0450a8_store.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('2_f1c2b38e-b430-4073-a76d-8cdaa42d37ac_store.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n\n  FROM '/Volumes/main/default/flow_staging'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('3_5ae0fafc-98f3-400f-b1dc-2e69a7864501_store.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n"
+        ]
+      }
+    }
+  }
+}
+{
+  "acknowledged": {}
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_meta": {
+        "uuid": "75c06bd6-20e0-11ee-990b-ffd12dfcd47f"
+      },
+      "id": 1,
+      "int": 1,
+      "str": "str 1"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_meta": {
+        "uuid": "7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f"
+      },
+      "id": 2,
+      "int": 2,
+      "str": "str 2"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_meta": {
+        "uuid": "8bbf898a-20e0-11ee-990b-ffd12dfcd47f"
+      },
+      "id": 3,
+      "int": 3,
+      "str": "str 3"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_meta": {
+        "uuid": "9b994ae4-20e0-11ee-990b-ffd12dfcd47f"
+      },
+      "id": 4,
+      "int": 4,
+      "str": "str 4"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 1,
+    "doc": {
+      "_meta": {
+        "uuid": "bcef4bc6-20e0-11ee-990b-ffd12dfcd47f"
+      },
+      "id": 5,
+      "int": 5,
+      "str": "str 5"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "5fc54530-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        61,
+        62
+      ],
+      "bool_field": true,
+      "float_field": 6.6,
+      "id": 6,
+      "multiple": [
+        "one",
+        2,
+        true
+      ],
+      "nested": {
+        "id": "i6"
+      },
+      "nullable_int": 6,
+      "str_field": "str6"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "64b39506-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        71,
+        72
+      ],
+      "bool_field": false,
+      "float_field": 7.7,
+      "id": 7,
+      "multiple": {
+        "object": "seven"
+      },
+      "nested": {
+        "id": "i7"
+      },
+      "nullable_int": null,
+      "str_field": "str7"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "6acb8444-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        81,
+        82
+      ],
+      "bool_field": true,
+      "float_field": 8.8,
+      "id": 8,
+      "multiple": null,
+      "nested": {
+        "id": "i8"
+      },
+      "nullable_int": 8,
+      "str_field": "str8"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "6ff68e0a-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        91,
+        92
+      ],
+      "bool_field": false,
+      "float_field": 9.9,
+      "id": 9,
+      "nested": {
+        "id": "i9"
+      },
+      "nullable_int": null,
+      "str_field": "str9"
+    }
+  }
+}
+{
+  "loaded": {
+    "binding": 4,
+    "doc": {
+      "_meta": {
+        "uuid": "75679e4c-20e1-11ee-990b-ffd12dfcd47f"
+      },
+      "array_int": [
+        1,
+        2
+      ],
+      "bool_field": true,
+      "float_field": 10.1,
+      "id": 10,
+      "nested": {
+        "id": "i10"
+      },
+      "nullable_int": 10,
+      "str_field": "str10"
+    }
+  }
+}
+{
+  "flushed": {}
+}
+{
+  "startedCommit": {
+    "state": {
+      "updated": {
+        "Queries": [
+          "\n\tMERGE INTO `default`.duplicate_keys_standard AS l\n\tUSING flow_temp_store_table_1 AS r\n\tON l.id = r.id::BIGINT\n\n\tAND r._metadata_file_name IN ('1_56d95480-3230-46c2-aca0-370c9caf1644_store.json')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.flow_published_at = r.flow_published_at::TIMESTAMP\n, l.int = r.int::BIGINT\n, l.str = r.str\n, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, flow_published_at, int, str, flow_document)\n\t\tVALUES (r.id::BIGINT\n, r.flow_published_at::TIMESTAMP\n, r.int::BIGINT\n, r.str\n, r.flow_document\n);\n",
+          "\nTRUNCATE TABLE flow_temp_store_table_1;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('2_3f335a8c-152d-40a3-b2e9-c7ea6cf16115_store.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n\n  FROM '/Volumes/main/default/flow_staging'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('3_edf7618a-25d2-4b4d-a911-bad8485e08ae_store.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT\n, date::DATE\n, datetime::TIMESTAMP\n, flow_published_at::TIMESTAMP\n, int_and_str::BIGINT\n, int_str::BIGINT\n, num_and_str::DOUBLE\n, num_str::DOUBLE\n, time\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('5_63bd74fb-2f26-4da7-b502-5a02fea0b738_store.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tMERGE INTO `default`.multiple_types AS l\n\tUSING flow_temp_store_table_4 AS r\n\tON l.id = r.id::BIGINT\n\n\tAND r._metadata_file_name IN ('4_7ed900a2-6acd-49dc-83f2-600a95e39eef_store.json')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.array_int = r.array_int\n, l.bool_field = r.bool_field::BOOLEAN\n, l.float_field = r.float_field::DOUBLE\n, l.flow_published_at = r.flow_published_at::TIMESTAMP\n, l.multiple = r.multiple\n, l.nested = r.nested\n, l.nullable_int = r.nullable_int::BIGINT\n, l.str_field = r.str_field\n, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\t\tVALUES (r.id::BIGINT\n, r.array_int\n, r.bool_field::BOOLEAN\n, r.float_field::DOUBLE\n, r.flow_published_at::TIMESTAMP\n, r.multiple\n, r.nested\n, r.nullable_int::BIGINT\n, r.str_field\n, r.flow_document\n);\n",
+          "\nTRUNCATE TABLE flow_temp_store_table_4;\n",
+          "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT\n, canary\n, flow_published_at::TIMESTAMP\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('0_8797e205-744b-420e-8189-a9abd081ffcb_store.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n"
+        ]
+      }
+    }
+  }
+}
+{
+  "acknowledged": {}
+}
+{
+  "row": {
+    "canary": "amputation's",
+    "flow_document": "{\"_meta\":{\"uuid\":\"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"amputation's\",\"id\":1}",
+    "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
+    "id": 1
+  },
+  "table": "`main`.default.simple"
+}
+{
+  "row": {
+    "canary": "armament's",
+    "flow_document": "{\"_meta\":{\"uuid\":\"7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"armament's\",\"id\":2}",
+    "flow_published_at": "2023-07-12 18:18:24.946758+00:00",
+    "id": 2
+  },
+  "table": "`main`.default.simple"
+}
+{
+  "row": {
+    "canary": "splatters",
+    "flow_document": "{\"_meta\":{\"uuid\":\"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"splatters\",\"id\":3}",
+    "flow_published_at": "2023-07-12 18:18:48.441281+00:00",
+    "id": 3
+  },
+  "table": "`main`.default.simple"
+}
+{
+  "row": {
+    "canary": "strengthen",
+    "flow_document": "{\"_meta\":{\"uuid\":\"9b994ae4-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"strengthen\",\"id\":4}",
+    "flow_published_at": "2023-07-12 18:19:15.034186+00:00",
+    "id": 4
+  },
+  "table": "`main`.default.simple"
+}
+{
+  "row": {
+    "canary": "Kringle's",
+    "flow_document": "{\"_meta\":{\"uuid\":\"b4b60968-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"Kringle's\",\"id\":5}",
+    "flow_published_at": "2023-07-12 18:19:57.165604+00:00",
+    "id": 5
+  },
+  "table": "`main`.default.simple"
+}
+{
+  "row": {
+    "canary": "grosbeak's",
+    "flow_document": "{\"_meta\":{\"uuid\":\"bcef4bc6-20e0-11ee-990b-ffd12dfcd47f\"},\"canary\":\"grosbeak's\",\"id\":6}",
+    "flow_published_at": "2023-07-12 18:20:10.962631+00:00",
+    "id": 6
+  },
+  "table": "`main`.default.simple"
+}
+{
+  "row": {
+    "canary": "pieced",
+    "flow_document": "{\"_meta\":{\"uuid\":\"134a1456-20e1-11ee-990b-ffd12dfcd47f\"},\"canary\":\"pieced\",\"id\":7}",
+    "flow_published_at": "2023-07-12 18:22:35.841647+00:00",
+    "id": 7
+  },
+  "table": "`main`.default.simple"
+}
+{
+  "row": {
+    "canary": "roaches",
+    "flow_document": "{\"_meta\":{\"uuid\":\"1b953992-20e1-11ee-990b-ffd12dfcd47f\"},\"canary\":\"roaches\",\"id\":8}",
+    "flow_published_at": "2023-07-12 18:22:49.755893+00:00",
+    "id": 8
+  },
+  "table": "`main`.default.simple"
+}
+{
+  "row": {
+    "canary": "devilish",
+    "flow_document": "{\"_meta\":{\"uuid\":\"7e2df422-20e1-11ee-990b-ffd12dfcd47f\"},\"canary\":\"devilish\",\"id\":9}",
+    "flow_published_at": "2023-07-12 18:25:35.173533+00:00",
+    "id": 9
+  },
+  "table": "`main`.default.simple"
+}
+{
+  "row": {
+    "canary": "glucose's",
+    "flow_document": "{\"_meta\":{\"uuid\":\"8458b580-20e1-11ee-990b-ffd12dfcd47f\"},\"canary\":\"glucose's\",\"id\":10}",
+    "flow_published_at": "2023-07-12 18:25:45.520064+00:00",
+    "id": 10
+  },
+  "table": "`main`.default.simple"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"8de85150-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int\":6,\"str\":\"str 6\"}",
+    "flow_published_at": "2023-07-12 18:26:01.560712+00:00",
+    "id": 1,
+    "int": 6,
+    "str": "str 6"
+  },
+  "table": "`main`.default.duplicate_keys_standard"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"957348bc-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":2,\"int\":7,\"str\":\"str 7\"}",
+    "flow_published_at": "2023-07-12 18:26:14.215494+00:00",
+    "id": 2,
+    "int": 7,
+    "str": "str 7"
+  },
+  "table": "`main`.default.duplicate_keys_standard"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"9afb3ff6-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":3,\"int\":8,\"str\":\"str 8\"}",
+    "flow_published_at": "2023-07-12 18:26:23.495167+00:00",
+    "id": 3,
+    "int": 8,
+    "str": "str 8"
+  },
+  "table": "`main`.default.duplicate_keys_standard"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"a1100a70-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":4,\"int\":9,\"str\":\"str 9\"}",
+    "flow_published_at": "2023-07-12 18:26:33.697752+00:00",
+    "id": 4,
+    "int": 9,
+    "str": "str 9"
+  },
+  "table": "`main`.default.duplicate_keys_standard"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"a65203a8-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":5,\"int\":10,\"str\":\"str 10\"}",
+    "flow_published_at": "2023-07-12 18:26:42.518724+00:00",
+    "id": 5,
+    "int": 10,
+    "str": "str 10"
+  },
+  "table": "`main`.default.duplicate_keys_standard"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int\":1,\"str\":\"str 1\"}",
+    "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
+    "id": 1,
+    "int": 1,
+    "str": "str 1"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":2,\"int\":2,\"str\":\"str 2\"}",
+    "flow_published_at": "2023-07-12 18:18:24.946758+00:00",
+    "id": 2,
+    "int": 2,
+    "str": "str 2"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":3,\"int\":3,\"str\":\"str 3\"}",
+    "flow_published_at": "2023-07-12 18:18:48.441281+00:00",
+    "id": 3,
+    "int": 3,
+    "str": "str 3"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"9b994ae4-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":4,\"int\":4,\"str\":\"str 4\"}",
+    "flow_published_at": "2023-07-12 18:19:15.034186+00:00",
+    "id": 4,
+    "int": 4,
+    "str": "str 4"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"bcef4bc6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":5,\"int\":5,\"str\":\"str 5\"}",
+    "flow_published_at": "2023-07-12 18:20:10.962631+00:00",
+    "id": 5,
+    "int": 5,
+    "str": "str 5"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"8de85150-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int\":6,\"str\":\"str 6\"}",
+    "flow_published_at": "2023-07-12 18:26:01.560712+00:00",
+    "id": 1,
+    "int": 6,
+    "str": "str 6"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"957348bc-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":2,\"int\":7,\"str\":\"str 7\"}",
+    "flow_published_at": "2023-07-12 18:26:14.215494+00:00",
+    "id": 2,
+    "int": 7,
+    "str": "str 7"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"9afb3ff6-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":3,\"int\":8,\"str\":\"str 8\"}",
+    "flow_published_at": "2023-07-12 18:26:23.495167+00:00",
+    "id": 3,
+    "int": 8,
+    "str": "str 8"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"a1100a70-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":4,\"int\":9,\"str\":\"str 9\"}",
+    "flow_published_at": "2023-07-12 18:26:33.697752+00:00",
+    "id": 4,
+    "int": 9,
+    "str": "str 9"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"a65203a8-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":5,\"int\":10,\"str\":\"str 10\"}",
+    "flow_published_at": "2023-07-12 18:26:42.518724+00:00",
+    "id": 5,
+    "int": 10,
+    "str": "str 10"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
+    "id": 1,
+    "int": 1,
+    "str": "str 1"
+  },
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12 18:18:24.946758+00:00",
+    "id": 2,
+    "int": 2,
+    "str": "str 2"
+  },
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12 18:18:48.441281+00:00",
+    "id": 3,
+    "int": 3,
+    "str": "str 3"
+  },
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12 18:19:15.034186+00:00",
+    "id": 4,
+    "int": 4,
+    "str": "str 4"
+  },
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12 18:20:10.962631+00:00",
+    "id": 5,
+    "int": 5,
+    "str": "str 5"
+  },
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12 18:26:01.560712+00:00",
+    "id": 1,
+    "int": 6,
+    "str": "str 6"
+  },
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12 18:26:14.215494+00:00",
+    "id": 2,
+    "int": 7,
+    "str": "str 7"
+  },
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12 18:26:23.495167+00:00",
+    "id": 3,
+    "int": 8,
+    "str": "str 8"
+  },
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12 18:26:33.697752+00:00",
+    "id": 4,
+    "int": 9,
+    "str": "str 9"
+  },
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "flow_published_at": "2023-07-12 18:26:42.518724+00:00",
+    "id": 5,
+    "int": 10,
+    "str": "str 10"
+  },
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "row": {
+    "array_int": "[11,12]",
+    "bool_field": "False",
+    "float_field": 1.1,
+    "flow_document": "{\"_meta\":{\"uuid\":\"3fd2ec78-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}",
+    "flow_published_at": "2023-07-12 18:23:50.558220+00:00",
+    "id": 1,
+    "multiple": 1,
+    "nested": "{\"id\":\"i1\"}",
+    "nullable_int": "",
+    "str_field": "str1"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[21,22]",
+    "bool_field": "True",
+    "float_field": 2.2,
+    "flow_document": "{\"_meta\":{\"uuid\":\"4b37f0b8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}",
+    "flow_published_at": "2023-07-12 18:24:09.675180+00:00",
+    "id": 2,
+    "multiple": 2.2,
+    "nested": "{\"id\":\"i2\"}",
+    "nullable_int": 2,
+    "str_field": "str2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[31,32]",
+    "bool_field": "False",
+    "float_field": 3.3,
+    "flow_document": "{\"_meta\":{\"uuid\":\"51016380-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}",
+    "flow_published_at": "2023-07-12 18:24:19.384000+00:00",
+    "id": 3,
+    "multiple": "true",
+    "nested": "{\"id\":\"i3\"}",
+    "nullable_int": "",
+    "str_field": "str3"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[41,42]",
+    "bool_field": "True",
+    "float_field": 4.4,
+    "flow_document": "{\"_meta\":{\"uuid\":\"5660aaca-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}",
+    "flow_published_at": "2023-07-12 18:24:28.397025+00:00",
+    "id": 4,
+    "multiple": "false",
+    "nested": "{\"id\":\"i4\"}",
+    "nullable_int": 4,
+    "str_field": "str4"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[51,52]",
+    "bool_field": "False",
+    "float_field": 5.5,
+    "flow_document": "{\"_meta\":{\"uuid\":\"5af9e236-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}",
+    "flow_published_at": "2023-07-12 18:24:36.112031+00:00",
+    "id": 5,
+    "multiple": "\"string five\"",
+    "nested": "{\"id\":\"i5\"}",
+    "nullable_int": "",
+    "str_field": "str5"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[61,62]",
+    "bool_field": "True",
+    "float_field": 66.66,
+    "flow_document": "{\"_meta\":{\"uuid\":\"e4b646c2-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}",
+    "flow_published_at": "2023-07-12 18:28:27.194541+00:00",
+    "id": 6,
+    "multiple": "[\"one\",2,true]",
+    "nested": "{\"id\":\"i6\"}",
+    "nullable_int": 6,
+    "str_field": "str6 v2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[71,72]",
+    "bool_field": "False",
+    "float_field": 77.77,
+    "flow_document": "{\"_meta\":{\"uuid\":\"eb40dafc-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}",
+    "flow_published_at": "2023-07-12 18:28:38.169062+00:00",
+    "id": 7,
+    "multiple": "{\"object\":\"seven\"}",
+    "nested": "{\"id\":\"i7\"}",
+    "nullable_int": "",
+    "str_field": "str7 v2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[81,82]",
+    "bool_field": "True",
+    "float_field": 88.88,
+    "flow_document": "{\"_meta\":{\"uuid\":\"f163eef6-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}",
+    "flow_published_at": "2023-07-12 18:28:48.465279+00:00",
+    "id": 8,
+    "multiple": "",
+    "nested": "{\"id\":\"i8\"}",
+    "nullable_int": 8,
+    "str_field": "str8 v2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[91,92]",
+    "bool_field": "False",
+    "float_field": 99.99,
+    "flow_document": "{\"_meta\":{\"uuid\":\"f5b064a8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[91,92],\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}",
+    "flow_published_at": "2023-07-12 18:28:55.677252+00:00",
+    "id": 9,
+    "multiple": "",
+    "nested": "{\"id\":\"i9\"}",
+    "nullable_int": "",
+    "str_field": "str9 v2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[1,2]",
+    "bool_field": "True",
+    "float_field": 1010.101,
+    "flow_document": "{\"_meta\":{\"uuid\":\"fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[1,2],\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}",
+    "flow_published_at": "2023-07-12 18:29:04.671352+00:00",
+    "id": 10,
+    "multiple": "",
+    "nested": "{\"id\":\"i10\"}",
+    "nullable_int": 10,
+    "str_field": "str10 v2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "date": "1000-03-03",
+    "datetime": "1000-03-03 23:59:38.1",
+    "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
+    "id": 3,
+    "int_and_str": 3,
+    "int_str": 30,
+    "num_and_str": 3.1,
+    "num_str": 30.1,
+    "time": "23:59:38.10Z"
+  },
+  "table": "`main`.default.formatted_strings"
+}
+{
+  "row": {
+    "date": "2023-08-29",
+    "datetime": "2023-08-29 23:59:38",
+    "flow_published_at": "2023-07-12 18:18:48.441281+00:00",
+    "id": 4,
+    "int_and_str": 4,
+    "int_str": 40,
+    "num_and_str": 4.1,
+    "num_str": 40.1,
+    "time": "23:59:38Z"
+  },
+  "table": "`main`.default.formatted_strings"
+}
+{
+  "row": {
+    "date": "0000-01-01",
+    "datetime": "0000-01-01 00:00:00",
+    "flow_published_at": "2023-07-12 18:27:01.912219+00:00",
+    "id": 1,
+    "int_and_str": 1,
+    "int_str": 10,
+    "num_and_str": 1.1,
+    "num_str": 10.1,
+    "time": "00:00:00Z"
+  },
+  "table": "`main`.default.formatted_strings"
+}
+{
+  "row": {
+    "date": "1999-02-02",
+    "datetime": "1999-02-02 14:20:12.33",
+    "flow_published_at": "2023-07-12 18:27:12.354610+00:00",
+    "id": 2,
+    "int_and_str": 2,
+    "int_str": 20,
+    "num_and_str": 2.1,
+    "num_str": 20.1,
+    "time": "14:20:12.33Z"
+  },
+  "table": "`main`.default.formatted_strings"
+}
+{
+  "row": {
+    "date": "9999-12-31",
+    "datetime": "9999-12-31 23:59:59",
+    "flow_published_at": "2023-07-12 18:27:25.889321+00:00",
+    "id": 5,
+    "int_and_str": 5,
+    "int_str": 50,
+    "num_and_str": 5.1,
+    "num_str": 50.1,
+    "time": "23:59:59Z"
+  },
+  "table": "`main`.default.formatted_strings"
+}
+{
+  "row": {
+    "date": "",
+    "datetime": "",
+    "flow_published_at": "2023-07-12 18:27:25.889321+00:00",
+    "id": 8,
+    "int_and_str": "",
+    "int_str": "",
+    "num_and_str": "",
+    "num_str": "",
+    "time": ""
+  },
+  "table": "`main`.default.formatted_strings"
+}
+{
+  "row": {
+    "date": "",
+    "datetime": "",
+    "flow_published_at": "2023-07-12 18:27:25.889321+00:00",
+    "id": 9,
+    "int_and_str": "",
+    "int_str": "",
+    "num_and_str": "",
+    "num_str": "inf",
+    "time": ""
+  },
+  "table": "`main`.default.formatted_strings"
+}
+{
+  "row": {
+    "date": "",
+    "datetime": "",
+    "flow_published_at": "2023-07-12 18:27:25.889321+00:00",
+    "id": 10,
+    "int_and_str": "",
+    "int_str": "",
+    "num_and_str": "",
+    "num_str": "-inf",
+    "time": ""
+  },
+  "table": "`main`.default.formatted_strings"
+}
+{
+  "applied": {
+    "actionDescription": "\nCREATE TABLE IF NOT EXISTS flow_materializations_v2 (\n  materialization STRING NOT NULL COMMENT 'The name of the materialization.',\n  version STRING NOT NULL COMMENT 'Version of the materialization.',\n  spec STRING NOT NULL COMMENT 'Specification of the materialization, encoded as base64 protobuf.'\n) COMMENT 'This table is the source of truth for all materializations into this system.';\n\nUPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-databricks/materialize';"
+  }
+}
+{
+  "opened": {}
+}
+{
+  "acknowledged": {}
+}
