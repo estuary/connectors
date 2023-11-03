@@ -28,6 +28,9 @@ type Config interface {
 	Validate() error
 	// DiscoverRoot path to use when walking discoverable directories.
 	DiscoverRoot() string
+	// RecommendedName produces a name to use for the discovered
+	// collection for the capture.
+	RecommendedName() string
 	// FilesAreMonotonic is true if files are created or modified in
 	// strictly monotonic, lexicographic order within each and every
 	// captured stream prefix.
@@ -216,7 +219,7 @@ func (src *Source) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.
 	}
 
 	return &pc.Response_Discovered{Bindings: []*pc.Response_Discovered_Binding{{
-		RecommendedName:    "file-data",
+		RecommendedName:    conn.config.RecommendedName(),
 		ResourceConfigJson: resourceJSON,
 		DocumentSchemaJson: json.RawMessage(minimalDocumentSchema),
 		Key:                []string{"/_meta/file", "/_meta/offset"},

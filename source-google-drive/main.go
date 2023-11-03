@@ -49,6 +49,12 @@ func (c config) DiscoverRoot() string {
 	return folderURLRe.FindStringSubmatch(c.FolderURL)[1]
 }
 
+func (c config) RecommendedName() string {
+	// Google drive folder names are generated strings and are not really human-readable, so this
+	// generic value is used instead.
+	return "file-data"
+}
+
 func (c config) FilesAreMonotonic() bool {
 	return c.Advanced.AscendingKeys
 }

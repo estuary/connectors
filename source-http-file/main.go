@@ -75,6 +75,10 @@ func (c config) DiscoverRoot() string {
 	return name
 }
 
+func (c config) RecommendedName() string {
+	return strings.Trim(c.DiscoverRoot(), "/")
+}
+
 func (c config) FilesAreMonotonic() bool {
 	// Conceptually, if the source files are monotonic, the same file will not be visited again, and only
 	// ascending file names are visited, so we set this to false.
