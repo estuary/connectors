@@ -32,7 +32,7 @@ var databricksDialect = func() sql.Dialect {
 			WithFormat: map[string]sql.TypeMapper{
 				"integer": sql.PrimaryKeyMapper{
 					PrimaryKey: sql.NewStaticMapper("STRING"),
-					Delegate:   sql.NewStaticMapper("INTEGER", sql.WithElementConverter(sql.StdStrToInt())), // Equivalent to NUMBER(38,0)
+					Delegate:   sql.NewStaticMapper("BIGINT", sql.WithElementConverter(sql.StdStrToInt())),
 				},
 				"number": sql.PrimaryKeyMapper{
 					PrimaryKey: sql.NewStaticMapper("STRING"),
@@ -97,13 +97,7 @@ DROP TABLE IF EXISTS {{ template "temp_name_load" . }}
 
 -- Idempotent creation of the store table for staging new records.
 {{ define "createStoreTable" }}
-CREATE TABLE IF NOT EXISTS {{ template "temp_name_store" . }} (
-	_metadata_file_name STRING,
-  {{- range $ind, $col := $.Columns }}
-  ,
-  {{$col.Identifier}} {{$col.DDL}}
-  {{- end }}
-);
+CREATE TABLE IF NOT EXISTS {{ template "temp_name_store" . }};
 {{ end }}
 
 -- Templated truncation of the temporary store table:
@@ -138,8 +132,24 @@ SELECT {{ $.Binding }}, {{ $.Identifier }}.{{ $.Document.Identifier }}
 	{{ $.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{ else -}}
-SELECT -1, NULL
+SELECT -1, ""
 {{ end -}}
+{{ end }}
+
+{{ define "cast" }}
+{{- if Contains $ "DATE" -}}
+	::DATE
+{{- else if Contains $ "TIMESTAMP" -}}
+	::TIMESTAMP
+{{- else if Contains $ "DOUBLE" -}}
+	::DOUBLE
+{{- else if Contains $ "BIGINT" -}}
+	::BIGINT
+{{- else if Contains $ "BOOLEAN" -}}
+	::BOOLEAN
+{{- else if Contains $ "BINARY" -}}
+	::BINARY
+{{- end }}
 {{ end }}
 
 -- Directly copy into the target table
@@ -148,13 +158,13 @@ SELECT -1, NULL
     SELECT
 		{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}
+			{{$key.Identifier -}}{{ template "cast" $key.DDL }}
 		{{- end }}
   FROM {{ Literal $.StagingPath }}
 	)
   FILEFORMAT = JSON
   FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )
   ;
 {{ end }}
 
@@ -164,14 +174,15 @@ SELECT -1, NULL
     SELECT
 		_metadata.file_name as _metadata_file_name,
 		{{ range $ind, $key := $.Table.Columns }}
-			,
+			{{- if $ind }}, {{ end -}}
 			{{$key.Identifier -}}
 		{{- end }}
     FROM {{ Literal $.StagingPath }}
 	)
   FILEFORMAT = JSON
   FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'mergeSchema' = 'true', 'primitivesAsString' = 'true' )
+	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 {{ end }}
 
@@ -187,7 +198,7 @@ SELECT -1, NULL
   )
   FILEFORMAT = JSON
   FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )
   ;
 {{ end }}
 
@@ -196,9 +207,9 @@ SELECT -1, NULL
 	USING {{ template "temp_name_store" . }} AS r
 	ON {{ range $ind, $key := $.Keys }}
 		{{- if $ind }} AND {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }} AND
-		r._metadata_file_name IN (%s)
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL }}
 	{{- end }}
+	AND r._metadata_file_name IN (%s)
 	{{- if $.Document }}
 	WHEN MATCHED AND r.{{ $.Document.Identifier }} <=> NULL THEN
 		DELETE
@@ -206,7 +217,7 @@ SELECT -1, NULL
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Values }}
 		{{- if $ind }}, {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL }}
 	{{- end -}}
 	{{- if $.Document -}}
 	{{ if $.Values }}, {{ end }}l.{{ $.Document.Identifier}} = r.{{ $.Document.Identifier }}
@@ -221,7 +232,7 @@ SELECT -1, NULL
 		VALUES (
 		{{- range $ind, $key := $.Columns }}
 			{{- if $ind }}, {{ end -}}
-			r.{{$key.Identifier -}}
+			r.{{ $key.Identifier }}{{ template "cast" $key.DDL }}
 		{{- end -}}
 	);
 {{ end }}
