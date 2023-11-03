@@ -1,0 +1,9 @@
+# ================================
+# Collection "acmeCo/test/test_captureoversizedfields_64819605": 4 Documents
+# ================================
+Checksum: 239a210f0a60102947975c862914ef87e995e9cc61f22b32ef39235c00d91779
+# ================================
+# Final State Checkpoint
+# ================================
+{"cursor":"0/1111111","streams":{"test.captureoversizedfields_64819605":{"backfilled":4,"key_columns":["id"],"mode":"Active"}}}
+
