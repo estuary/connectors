@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "http://example.com/example.json",
+  "type": "object",
+  "properties": {
+    "id": {
+      "$id": "#/properties/id",
+      "type": "integer"
+    },
+    "advertiserId": {
+      "$id": "#/properties/advertiserId",
+      "type": "integer"
+    },
+    "name": {
+      "$id": "#/properties/name",
+      "type": "string"
+    },
+    "description": {
+      "$id": "#/properties/description",
+      "type": "string"
+    },
+    "created": {
+      "$id": "#/properties/created",
+      "type": "integer"
+    },
+    "updated": {
+      "$id": "#/properties/updated",
+      "type": "integer"
+    },
+    "nbLines": {
+      "$id": "#/properties/nbLines",
+      "type": "integer"
+    },
+    "nbLinesEmail": {
+      "$id": "#/properties/nbLinesEmail",
+      "type": "integer"
+    },
+    "nbMatchesEmail": {
+      "$id": "#/properties/nbMatchesEmail",
+      "type": "integer"
+    }
+  }
+}

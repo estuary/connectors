@@ -1,0 +1,81 @@
+version: 1
+send_anonymous_usage_stats: no
+project_id: tap-criteo
+
+plugins:
+  extractors:
+  - name: tap-criteo
+    namespace: tap_criteo
+    pip_url: -e .
+    capabilities:
+    - state
+    - catalog
+    - discover
+    settings:
+    - name: client_id
+      kind: password
+    - name: client_secret
+      kind: password
+    - name: advertiser_ids
+      kind: array
+    - name: start_date
+      kind: date_iso8601
+    - name: reports
+      kind: array
+    config:
+      start_date: '2021-07-05T00:00:00Z'
+      reports:
+      - name: daily_clicks
+        dimensions:
+        - CampaignId
+        - AdsetId
+        - AdvertiserId
+        - Day
+        metrics:
+        - Clicks
+      - name: daily_displays
+        dimensions:
+        - CampaignId
+        - AdsetId
+        - AdvertiserId
+        - Day
+        metrics:
+        - Displays
+
+  loaders:
+  - name: target-jsonl
+    variant: andyh1203
+    pip_url: target-jsonl
+
+  - name: target-sqlite
+    variant: meltano
+    config:
+      database: ${MELTANO_EXTRACT__LOAD_SCHEMA}.db
+      batch_size: 500
+
+  - name: target-stitch
+    namespace: target_stitch
+    pip_url: target-stitch
+    executable: target-stitch
+    settings:
+    - name: client_id
+      kind: integer
+    - name: token
+      kind: password
+    - name: small_batch_url
+      kind: string
+    - name: big_batch_url
+      kind: string
+    - name: batch_size_preferences
+      kind: object
+    config:
+      small_batch_url: https://api.eu-central-1.stitchdata.com/v2/import/batch
+      big_batch_url: https://api.eu-central-1.stitchdata.com/v2/import/batch
+      batch_size_preferences:
+        full_table_streams:
+        - ad_sets
+        - advertisers
+        - audiences
+        - campaigns
+        batch_size_preference': null
+        user_batch_size_preference': null

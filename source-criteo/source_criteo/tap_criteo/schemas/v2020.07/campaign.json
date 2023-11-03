@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "http://example.com/example.json",
+  "type": "object",
+  "properties": {
+    "campaignType": {
+      "$id": "#/properties/campaignType",
+      "type": "string"
+    },
+    "advertiserName": {
+      "$id": "#/properties/advertiserName",
+      "type": "string"
+    },
+    "categories": {
+      "$id": "#/properties/categories",
+      "type": "array",
+      "items": {
+        "$id": "#/properties/categories/items",
+        "anyOf": [
+          {
+            "$id": "#/properties/categories/items/anyOf/0",
+            "type": "integer"
+          }
+        ]
+      }
+    },
+    "budgetId": {
+      "$id": "#/properties/budgetId",
+      "type": "integer"
+    },
+    "campaignId": {
+      "$id": "#/properties/campaignId",
+      "type": "integer"
+    },
+    "campaignName": {
+      "$id": "#/properties/campaignName",
+      "type": "string"
+    },
+    "advertiserId": {
+      "$id": "#/properties/advertiserId",
+      "type": "integer"
+    },
+    "campaignStatus": {
+      "$id": "#/properties/campaignStatus",
+      "type": "string"
+    },
+    "campaignBid": {
+      "$id": "#/properties/campaignBid",
+      "type": "object",
+      "properties": {
+        "bidValue": {
+          "$id": "#/properties/campaignBid/properties/bidValue",
+          "type": "integer"
+        },
+        "bidCurrency": {
+          "$id": "#/properties/campaignBid/properties/bidCurrency",
+          "type": "string"
+        },
+        "bidType": {
+          "$id": "#/properties/campaignBid/properties/bidType",
+          "type": "string"
+        },
+        "bidIsPending": {
+          "$id": "#/properties/campaignBid/properties/bidIsPending",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

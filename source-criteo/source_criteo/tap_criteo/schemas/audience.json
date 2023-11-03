@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "http://example.com/example.json",
+  "type": "object",
+  "properties": {
+    "type": {
+      "$id": "#/properties/type",
+      "type": "string"
+    },
+    "id": {
+      "$id": "#/properties/id",
+      "type": "string"
+    },
+    "attributes": {
+      "$id": "#/properties/attributes",
+      "type": "object",
+      "properties": {
+        "advertiserId": {
+          "$id": "#/properties/attributes/properties/advertiserId",
+          "type": "string"
+        },
+        "name": {
+          "$id": "#/properties/attributes/properties/name",
+          "type": "string"
+        },
+        "description": {
+          "$id": "#/properties/attributes/properties/description",
+          "type": "string"
+        },
+        "created": {
+          "$id": "#/properties/attributes/properties/created",
+          "type": "string"
+        },
+        "updated": {
+          "$id": "#/properties/attributes/properties/updated",
+          "type": "string"
+        },
+        "nbLines": {
+          "$id": "#/properties/attributes/properties/nbLines",
+          "type": "integer"
+        },
+        "nbLinesEmail": {
+          "$id": "#/properties/attributes/properties/nbLinesEmail",
+          "type": "integer"
+        },
+        "nbMatchesEmail": {
+          "$id": "#/properties/attributes/properties/nbMatchesEmail",
+          "type": "integer"
+        }
+      }
+    }
+  }
+}
