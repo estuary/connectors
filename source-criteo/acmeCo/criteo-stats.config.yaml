@@ -1,0 +1,63 @@
+---
+tap_stream_id: MyReport
+replication_method: FULL_TABLE
+key_properties:
+  - Day
+  - Campaign
+  - CampaignId
+stream: MyReport
+metadata:
+  - breadcrumb:
+      - properties
+      - Currency
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - AdvertiserCost
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - Clicks
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - Displays
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - Visits
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - Day
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - Campaign
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - CampaignId
+    metadata:
+      inclusion: automatic
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - Day
+        - Campaign
+        - CampaignId

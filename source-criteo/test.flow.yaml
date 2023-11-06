@@ -1,4 +1,6 @@
 ---
+import:
+  - acmeCo/flow.yaml
 captures:
   acmeCo/source-criteo:
     endpoint:
@@ -10,4 +12,6 @@ captures:
         config: connector_config.yaml
         env:
           LOG_LEVEL: debug
-    bindings: []
+    bindings:
+      - resource: acmeCo/criteo-stats.config.yaml
+        target: acmeCo/MyReport
