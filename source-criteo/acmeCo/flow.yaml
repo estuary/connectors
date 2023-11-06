@@ -1,0 +1,28 @@
+---
+collections:
+  acmeCo/MyReport:
+    schema:
+      properties:
+        Currency:
+          type: string
+        AdvertiserCost:
+          type: number
+        Clicks:
+          type: integer
+        Displays:
+          type: integer
+        Visits:
+          type: integer
+        Day:
+          format: date
+          type: string
+        Campaign:
+          type: string
+        CampaignId:
+          type: string
+      type: object
+      x-infer-schema: true
+    key:
+      - /Day
+      - /Campaign
+      - /CampaignId
