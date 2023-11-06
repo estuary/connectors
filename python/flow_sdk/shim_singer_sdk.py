@@ -131,7 +131,13 @@ class CaptureShim(Connector):
             logger.debug("connection test message", message)
 
         singer.write_message = _on_message
-        _ = delegate.run_connection_test()  # Either returns True, or panics.
+        # run_connection_test() attempts to read from streams that are not selected
+        # which we don't want -- we only want to validate that streams we care about work,
+        # not that all possible streams work.
+        _ = delegate.run_sync_dry_run(
+            dry_run_record_limit=1,
+            streams=[stream for stream in delegate.streams.values() if stream.selected],
+        )
         singer.write_message = write_message_panics
 
         return response.Validated(bindings=bindings)
