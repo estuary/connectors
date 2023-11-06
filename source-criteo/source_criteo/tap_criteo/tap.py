@@ -62,7 +62,7 @@ class TapCriteo(Tap):
         """
         objects = [
             stream_class(tap=self)
-            for api in ("current", "preview")
+            for api in ("current", "preview", "legacy")
             for stream_class in OBJECT_STREAMS[api]
         ]
 

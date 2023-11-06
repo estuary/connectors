@@ -1,0 +1,13 @@
+---
+captures:
+  acmeCo/source-criteo:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-criteo
+        config: connector_config.yaml
+        env:
+          LOG_LEVEL: debug
+    bindings: []
