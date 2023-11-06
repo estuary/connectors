@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "source-criteo-estuary"
+version = "0.1.0"
+description = ""
+authors = []
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.11.6"
+singer-sdk = "^0.33.0"
+flow-sdk = {path="../python", develop=true}
+tap-criteo = { path = "source_criteo", develop=true }
+debugpy = "^1.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
