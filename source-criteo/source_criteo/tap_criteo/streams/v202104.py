@@ -80,7 +80,7 @@ class StatsReportStream(CriteoStream):
             report: The report dictionary.
         """
         name = report["name"]
-        schema = {"properties": {"Currency": {"type": "string"}}}
+        schema = {"type": "object", "properties": {"Currency": {"type": "string"}}}
         schema["properties"].update(
             {k: analytics_type_mappings[k] for k in report["metrics"]},
         )

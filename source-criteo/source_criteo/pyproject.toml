@@ -24,11 +24,11 @@ keywords = [
 
 [tool.poetry.dependencies]
 python = "<3.12,>=3.7.1"
-singer-sdk = "==0.24.0"
+singer-sdk = "==0.33.0"
 python-dateutil = "==2.8.2"
 
 [tool.poetry.group.dev.dependencies]
-singer-sdk = { version = "0.24.0", extras = ["testing"] }
+singer-sdk = { version = "0.33.0", extras = ["testing"] }
 
 [tool.poetry.scripts]
 tap-criteo = 'tap_criteo.tap:TapCriteo.cli'
