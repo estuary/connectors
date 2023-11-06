@@ -403,6 +403,17 @@ func (c *Capture) updateState(ctx context.Context) error {
 		}
 	}
 
+	// If no bindings are present, forget the old replication cursor. This is safe
+	// because logically if no streams are active then we can't miss any events of
+	// interest when the replication stream jumps ahead, and doing this allows the
+	// user an easy recovery path after WAL deletion, they just need to disable all
+	// bindings and then re-enable them (which will cause them all to get backfilled
+	// anew, as they should after such an event).
+	if len(c.Bindings) == 0 {
+		logrus.Info("no active bindings, resetting cursor")
+		c.State.Cursor = ""
+	}
+
 	// Emit the new state to stdout. This isn't strictly necessary but it helps to make
 	// the emitted sequence of state updates a lot more readable.
 	return c.emitState()
