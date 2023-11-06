@@ -4,7 +4,7 @@ import singer_sdk.metrics
 import typing as t
 
 from .capture import Connector, request, response, Response
-from . import flow, logger, retain_paths_in_jsonschema
+from . import flow, logger 
 
 class Config(t.TypedDict):
     pass
@@ -92,15 +92,10 @@ class CaptureShim(Connector):
 
             resourceConfig = entry.to_dict()
             
+            json_schema = resourceConfig.pop("schema")
+            
             if self.usesSchemaInference:
-                json_schema = retain_paths_in_jsonschema(
-                    resourceConfig.pop("schema"), 
-                    [p.split("/") for p in entry.key_properties] if entry.key_properties 
-                    else [["_meta","row_id"]]
-                )
                 json_schema["x-infer-schema"] = True
-            else:
-                json_schema = resourceConfig.pop("schema")
 
             bindings.append(
                 response.DiscoveredBinding(
