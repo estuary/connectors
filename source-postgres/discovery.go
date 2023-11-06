@@ -21,7 +21,7 @@ const (
 	infinityTimestamp         = "9999-12-31T23:59:59Z"
 	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
 	RFC3339TimeFormat         = "15:04:05.999999999Z07:00"
-	truncateColumnThreshold   = 1 * 1024 * 1024 // Arbitrarily selected value
+	truncateColumnThreshold   = 8 * 1024 * 1024 // Arbitrarily selected value
 )
 
 // DiscoverTables queries the database for information about tables available for capture.

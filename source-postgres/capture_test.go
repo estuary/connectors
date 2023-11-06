@@ -455,6 +455,10 @@ func TestCaptureCapitalization(t *testing.T) {
 }
 
 func TestCaptureOversizedFields(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	var tb, ctx = postgresTestBackend(t), context.Background()
 	var uniqueID = "64819605"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, tdata TEXT, bdata BYTEA, jdata JSON, jbdata JSONB)")
