@@ -11,7 +11,7 @@ from airbyte_protocol.models import (
 )
 
 from .capture import Connector, request, response, Response
-from . import flow, ValidateError, logger, retain_paths_in_jsonschema
+from . import flow, ValidateError, logger 
 from .logger import init_logger
 
 logger = init_logger()
@@ -83,8 +83,6 @@ class CaptureShim(Connector):
                     )
                     for component in stream.source_defined_primary_key
                 ]
-                if self.usesSchemaInference:
-                    json_schema = retain_paths_in_jsonschema(stream.json_schema,stream.source_defined_primary_key)
             elif sync_mode == SyncMode.full_refresh:
                 # Synthesize a key based on the record's order within each stream refresh.
                 key = ["/_meta/row_id"]
@@ -96,9 +94,6 @@ class CaptureShim(Connector):
                 meta.setdefault("properties", {})["row_id"] = {"type": "integer"}
                 meta.setdefault("required", []).append("row_id")
                 json_schema = stream.json_schema
-
-                if self.usesSchemaInference:
-                    json_schema = retain_paths_in_jsonschema(stream.json_schema,[["_meta","row_id"]])
             else:
                 raise RuntimeError(
                     "incremental stream is missing a source-defined primary key",
