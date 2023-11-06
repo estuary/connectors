@@ -13,6 +13,7 @@ pydantic = "1.10.12"
 python = "^3.11"
 requests = "^2.31.0"
 types-requests = "^2.31"
+pytest = "^7.4.3"
 
 [build-system]
 requires = ["poetry-core"]

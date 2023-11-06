@@ -1,22 +1,20 @@
 import os
+import sys
 import singer_sdk._singerlib as singer
 import singer_sdk.metrics
+from singer_sdk.streams import Stream
 import typing as t
 
 from .capture import Connector, request, response, Response
-from . import flow, logger 
+from . import flow, init_logger
 
 class Config(t.TypedDict):
     pass
 
-
-class State(t.TypedDict):
-    pass
-
+logger = init_logger()
 
 def write_message_panics(message: singer.Message) -> None:
     raise RuntimeError("unexpected call to singer.write_message", message.to_dict())
-
 
 # Disable the _setup_logging routine, as it otherwise clobbers our logging setup.
 singer_sdk.metrics._setup_logging = lambda _config: None
@@ -26,6 +24,11 @@ os.environ.setdefault("LOGLEVEL", os.environ.get("LOG_LEVEL", "INFO").upper())
 # We don't expect it to ever be called outside of those specific contexts.
 singer.write_message = write_message_panics
 
+class Config(t.TypedDict):
+    pass
+
+class State(t.TypedDict):
+    pass
 
 class CaptureShim(Connector):
     config_schema: dict
@@ -60,7 +63,7 @@ class CaptureShim(Connector):
 
     def discover(self, discover: request.Discover) -> response.Discovered:
         config = t.cast(Config, discover["config"])
-        delegate = self.delegate_factory(config, None, None)
+        delegate = self.delegate_factory(config=config)
 
         bindings: t.List[response.DiscoveredBinding] = []
 
@@ -122,7 +125,7 @@ class CaptureShim(Connector):
                 response.ValidatedBinding(resourcePath=[entry.tap_stream_id])
             )
 
-        delegate = self.delegate_factory(config, catalog, None)
+        delegate = self.delegate_factory(config=config, catalog=catalog)
 
         def _on_message(message: singer.Message) -> None:
             logger.debug("connection test message", message)
@@ -150,7 +153,7 @@ class CaptureShim(Connector):
             index[entry.tap_stream_id] = [i, 1]
             catalog[entry.tap_stream_id] = entry
 
-        delegate: singer_sdk.Tap = self.delegate_factory(config, catalog, state)
+        delegate: singer_sdk.Tap = self.delegate_factory(config=config, catalog=catalog, state=state)
         emit(Response(opened=response.Opened(explicitAcknowledgements=False)))
 
         def _on_message(message: singer.Message):
@@ -175,8 +178,40 @@ class CaptureShim(Connector):
                 raise RuntimeError("unexpected singer_sdk Message", message)
 
         singer.write_message = _on_message
-        delegate.sync_all()
+        self.sync_streams(delegate)
         singer.write_message = write_message_panics
+
+    # Lifted from singer-sdk for the moment, but pulling this in-tree will
+    # allow us to do fancy things like driving streams in parallel
+    # instead of the current implementation which drives them sequentially.
+    def sync_streams(self, delegate: singer_sdk.Tap): 
+        delegate._reset_state_progress_markers()
+        delegate._set_compatible_replication_methods()
+        singer.write_message(singer.StateMessage(value=delegate.state))
+
+        stream: Stream
+        for stream in delegate.streams.values():
+            if not stream.selected and not stream.has_selected_descendents:
+                delegate.logger.info("Skipping deselected stream '%s'.", stream.name)
+                continue
+
+            if stream.parent_stream_type:
+                delegate.logger.debug(
+                    "Child stream '%s' is expected to be called "
+                    "by parent stream '%s'. "
+                    "Skipping direct invocation.",
+                    type(stream).__name__,
+                    stream.parent_stream_type.__name__,
+                )
+                continue
+
+            stream.sync()
+            stream.finalize_state_progress_markers()
+
+        # this second loop is needed for all streams to print out their costs
+        # including child streams which are otherwise skipped in the loop above
+        for stream in delegate.streams.values():
+            stream.log_sync_costs()
 
 
 resource_config_schema = {
