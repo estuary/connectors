@@ -16,14 +16,12 @@ import (
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
-	"github.com/databricks/databricks-sdk-go/service/files"
 	driverctx "github.com/databricks/databricks-sql-go/driverctx"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
-	"github.com/google/uuid"
 	"go.gazette.dev/core/consumer/protocol"
 )
 
@@ -312,6 +310,11 @@ func newTransactor(
 		}
 	}
 
+	// Create volume for storing staged files
+	if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS %s;", volumeName)); err != nil {
+		return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS %s;): %w", volumeName, err)
+	}
+
 	var cp checkpoint
 	if open.StateJson != nil {
 		if err := json.Unmarshal(open.StateJson, &cp); err != nil {
@@ -319,7 +322,7 @@ func newTransactor(
 		}
 	}
 
-	if err = d.applyCheckpoint(ctx, cp); err != nil {
+	if err = d.applyCheckpoint(ctx, cp, true); err != nil {
 		return nil, fmt.Errorf("applying recovered checkpoint: %w", err)
 	}
 
@@ -336,11 +339,6 @@ func newTransactor(
 		d.localStagingPath = tempDir
 	}
 
-	// Create volume for storing staged files
-	if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS %s;", volumeName)); err != nil {
-		return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS %s;): %w", volumeName, err)
-	}
-
 	return d, nil
 }
 
@@ -349,6 +347,9 @@ type binding struct {
 
 	// path to where we store staging files
 	rootStagingPath      string
+
+	loadFile                *stagedFile
+	storeFile               *stagedFile
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
@@ -375,7 +376,9 @@ type binding struct {
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	var b = &binding{target: target}
 
-	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s", t.cfg.CatalogName, target.Path[0], volumeName)
+	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
+  b.loadFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, target.KeyNames())
+  b.storeFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, target.ColumnNames())
 
 	for _, m := range []struct {
 		sql *string
@@ -420,90 +423,48 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		return fmt.Errorf("Exec(%s): %w", b.dropStoreSQL, err)
 	}
 
-	// Create a binding-scoped temporary table for staged keys to load.
-	if _, err := t.load.conn.ExecContext(ctx, b.createLoadTableSQL); err != nil {
-		return fmt.Errorf("Exec(%s): %w", b.createLoadTableSQL, err)
-	}
-
-	// Create a binding-scoped temporary table for store documents to be merged
-	// into target table
-	if _, err := t.store.conn.ExecContext(ctx, b.createStoreTableSQL); err != nil {
-		return fmt.Errorf("Exec(%s): %w", b.createStoreTableSQL, err)
-	}
-
 	return nil
 }
 
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = d.Context(it.Context())
 
-	var localFiles = make(map[int]*os.File)
+  for _, b := range d.bindings {
+    // Create a binding-scoped temporary table for staged keys to load.
+    if _, err := d.load.conn.ExecContext(ctx, b.createLoadTableSQL); err != nil {
+      return fmt.Errorf("Exec(%s): %w", b.createLoadTableSQL, err)
+    }
+  }
+
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
+		b.loadFile.start()
+
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
-		} else {
-			if _, ok := localFiles[it.Binding]; !ok {
-				var err error
-				if localFiles[it.Binding], err = os.Create(fmt.Sprintf("%s/%d_load.json", d.localStagingPath, it.Binding)); err != nil {
-					return fmt.Errorf("load: creating staged file: %w", err)
-				}
-			}
-
-			var jsonMap = make(map[string]interface{}, len(b.target.Keys))
-			for i, col := range b.target.Keys {
-				// FIXME: what happens here in case of nested keys?
-				jsonMap[col.Field] = converted[i]
-			}
-
-			if bs, err := json.Marshal(jsonMap); err != nil {
-				return fmt.Errorf("marshalling load document component: %w", err)
-			} else {
-				bs = append(bs, byte('\n'))
-				localFiles[it.Binding].Write(bs)
-			}
+		} else if err := b.loadFile.encodeRow(ctx, converted); err != nil {
+			return fmt.Errorf("encoding row for load: %w", err)
 		}
 	}
 
-	for _, f := range localFiles {
-		f.Close()
-	}
+  // Copy the staged files
+	for idx, b := range d.bindings {
+    if !b.loadFile.started {
+      continue
+    }
 
-	// Upload the staged file
-	for binding, _ := range localFiles {
-		var b = d.bindings[binding]
-
-		var randomKey, err = uuid.NewRandom()
+		toCopy, toDelete, err := b.loadFile.flush(ctx)
 		if err != nil {
-			return fmt.Errorf("generating random key for file: %w", err)
+			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
-
-		var source = fmt.Sprintf("%s/%d_load.json", d.localStagingPath, binding)
-		var fileName = fmt.Sprintf("%d_%s_load.json", binding, randomKey)
-		var destination = fmt.Sprintf("%s/%s", b.rootStagingPath, fileName)
-
-		if bs, err := os.ReadFile(source); err != nil {
-			return err
-		} else {
-			log.WithFields(log.Fields{
-				"content": string(bs),
-				"destination": destination,
-			}).Warn("load file")
-		}
-
-		if sourceFile, err := os.Open(source); err != nil {
-			return fmt.Errorf("opening local staged file: %w", err)
-		} else if err := d.wsClient.Files.Upload(ctx, files.UploadRequest{ Contents: sourceFile, FilePath: destination, Overwrite: true}); err != nil {
-			return fmt.Errorf("opening remote staged file: %w", err)
-		}
+		defer d.deleteFiles(ctx, toDelete)
 
 		// COPY INTO temporary load table from staged files
-		if _, err := d.load.conn.ExecContext(ctx, renderWithFiles(b.copyIntoLoad, fileName)); err != nil {
+		if _, err := d.load.conn.ExecContext(ctx, renderWithFiles(b.copyIntoLoad, toCopy...)); err != nil {
 			return fmt.Errorf("load: writing keys: %w", err)
 		}
 	}
-
 
 	if it.Err() != nil {
 		return it.Err()
@@ -539,7 +500,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 
 	for _, b := range d.bindings {
-		if _, err = d.load.conn.ExecContext(ctx, b.truncateLoadSQL); err != nil {
+		if _, err = d.load.conn.ExecContext(ctx, b.dropLoadSQL); err != nil {
 			return fmt.Errorf("truncating load table: %w", err)
 		}
 	}
@@ -549,56 +510,43 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 type checkpoint struct {
 	Queries []string
+
+  // List of files to cleanup after committing the queries
+  ToDelete []string
+}
+
+func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
+  for _, f := range files {
+    if err := d.wsClient.Files.DeleteByFilePath(ctx, f); err != nil {
+      return fmt.Errorf("cleaning up file %q: %w", f, err)
+    }
+  }
+
+  return nil
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
 	ctx := it.Context()
 
-	var localFiles = make(map[int]*os.File)
 	for it.Next() {
+		log.WithFields(log.Fields{
+			"binding": it.Binding,
+		}).Warn("1 store iterator")
 		var b = d.bindings[it.Binding]
-
-		if _, ok := localFiles[it.Binding]; !ok {
-			var err error
-			if localFiles[it.Binding], err = os.Create(fmt.Sprintf("%s/%d_store.json", d.localStagingPath, it.Binding)); err != nil {
-				return nil, fmt.Errorf("load: creating staged file: %w", err)
-			}
-		}
+		b.storeFile.start()
 
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON);
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
 
-		var jsonMap = make(map[string]interface{}, len(b.target.Columns()))
-		for i, col := range b.target.Columns() {
-			// We store JSON fields as strings
-			if v, ok := converted[i].(json.RawMessage); ok {
-				jsonMap[col.Field] = string(v)
-			} else {
-				jsonMap[col.Field] = converted[i]
-			}
+		if err := b.storeFile.encodeRow(ctx, converted); err != nil {
+			return nil, fmt.Errorf("encoding row for store: %w", err)
 		}
 
-		if bs, err := json.Marshal(jsonMap); err != nil {
-			return nil, fmt.Errorf("marshalling load document component: %w", err)
-		} else {
-			bs = append(bs, byte('\n'))
-			localFiles[it.Binding].Write(bs)
-		}
-
-		log.WithFields(log.Fields{
-			"binding": it.Binding,
-			"exists": it.Exists,
-			"doc": jsonMap,
-		}).Warn("store iterator")
 		if it.Exists {
 			b.needsMerge = true
 		}
-	}
-
-	for _, f := range localFiles {
-		f.Close()
 	}
 
 	// Upload the staged files and build a list of merge and truncate queries that need to be run
@@ -607,61 +555,56 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 	// it can run the same queries on the next startup. This is the pattern for 
 	// recovery log being authoritative and the connector idempotently applies a commit
 	var queries []string
-	for binding, _ := range localFiles {
-		var b = d.bindings[binding]
+  // all files uploaded across bindings
+  var toDelete []string
+	for idx, b := range d.bindings {
+    if !b.storeFile.started {
+      continue
+    }
 
-		var randomKey, err = uuid.NewRandom()
+    // Create a binding-scoped temporary table for store documents to be merged
+    // into target table
+    if _, err := d.store.conn.ExecContext(ctx, b.createStoreTableSQL); err != nil {
+      return nil, fmt.Errorf("Exec(%s): %w", b.createStoreTableSQL, err)
+    }
+
+		toCopy, toDeleteBinding, err := b.storeFile.flush(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("generating random key for file: %w", err)
+			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
-
-		var source = fmt.Sprintf("%s/%d_store.json", d.localStagingPath, binding)
-		var fileName = fmt.Sprintf("%d_%s_store.json", binding, randomKey)
-		var destination = fmt.Sprintf("%s/%s", b.rootStagingPath, fileName)
-
-		if _, err := os.ReadFile(source); err != nil {
-			return nil, err
-		}
-
-		if sourceFile, err := os.Open(source); err != nil {
-			return nil, fmt.Errorf("opening local staged file: %w", err)
-		} else if err := d.wsClient.Files.Upload(ctx, files.UploadRequest{ Contents: sourceFile, FilePath: destination, Overwrite: true}); err != nil {
-			return nil, fmt.Errorf("opening remote staged file: %w", err)
-		}
-
-		log.WithFields(log.Fields{
-			"binding": binding,
-			"destination": destination,
-		}).Warn("store file")
+    toDelete = append(toDelete, toDeleteBinding...)
 
 		// In case of delta updates, we directly copy from staged files into the target table
 		if b.target.DeltaUpdates || !b.needsMerge {
-			queries = append(queries, renderWithFiles(b.copyIntoDirect, fileName))
+			// MergeInto always in checkpoint for standard materializations?? copy into is idempotent so not necessary
+			queries = append(queries, renderWithFiles(b.copyIntoDirect, toCopy...))
 			continue
 		} else {
 			// COPY INTO temporary load table from staged files
-			if _, err := d.store.conn.ExecContext(ctx, renderWithFiles(b.copyIntoStore, fileName)); err != nil {
-				return nil, fmt.Errorf("store: writing to temporary table: %w", err)
+			if _, err := d.store.conn.ExecContext(ctx, renderWithFiles(b.copyIntoStore, toCopy...)); err != nil {
+				return nil, fmt.Errorf("store: copying into to temporary table: %w", err)
 			}
 
-			queries = append(queries, renderWithFiles(b.mergeInto, fileName), b.truncateStoreSQL)
+			queries = append(queries, renderWithFiles(b.mergeInto, toCopy...), b.dropStoreSQL)
 		}
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		var cp = checkpoint{Queries: queries}
+    var cp = checkpoint{Queries: queries, ToDelete: toDelete}
 
 		var checkpointJSON, err = json.Marshal(cp)
 		if err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-
 		// TODO: Test this by using a sleep and killing the connector, having the reactor spin it back up
 		// and the files should be correctly copied over
+
+		// TODO: copyIntoDirect can duplicate data across restarts -- No? It's supposed to be idempotent
+		// Test it out
 		var commitOp = pf.RunAsyncOperation(func() error {
 			select {
 			case <-runtimeAckCh:
-				return d.applyCheckpoint(ctx, cp)
+				return d.applyCheckpoint(ctx, cp, false)
 			case <-ctx.Done():
 				return ctx.Err()
 			}
@@ -679,12 +622,28 @@ func renderWithFiles(tpl string, files ...string) string {
 }
 
 // applyCheckpoint merges data from temporary table to main table
-func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint) error {
+func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
+	/*log.WithFields(log.Fields{
+	}).Warn("restart now")
+	time.Sleep(20 * time.Second)*/
+
 	for _, q := range cp.Queries {
 		if _, err := d.store.conn.ExecContext(ctx, q); err != nil {
+      // When doing a recovery apply, it may be the case that some files have already been applied, in this
+      // case, it is okay to skip files that do not exist
+      if recovery {
+        if strings.Contains(err.Error(), "PATH_NOT_FOUND") {
+          continue
+        }
+      }
 			return fmt.Errorf("query %q failed: %w", q, err)
 		}
 	}
+
+  // Cleanup files and tables
+  if err := d.deleteFiles(ctx, cp.ToDelete); err != nil {
+    return err
+  }
 
 	return nil
 }
