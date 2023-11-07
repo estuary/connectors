@@ -2,6 +2,7 @@ package connector
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"cloud.google.com/go/pubsub"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -46,15 +47,17 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		errGroup.Go(func() error {
 			// This will block until the individual publish call is complete.
-			_, err := res.Get(ctx)
+			if _, err := res.Get(ctx); err != nil {
+				// An error here indicates a non-retryable error. Retrying retryable errors is handled
+				// by the PubSub client. Returning an error from (*transactor).Store will result in the
+				// transaction being cancelled. With ordering enabled, we would normally need to resume
+				// publishing (see https://cloud.google.com/pubsub/docs/publisher#retry_ordering), but
+				// since returning an error here will cause the connector to exit, we don't need to
+				// worry about resuming publishing from the same client.
+				return fmt.Errorf("error publishing document for binding [%d]: %w", it.Binding, err)
+			}
 
-			// An error here indicates a non-retryable error. Retrying retryable errors is handled
-			// by the PubSub client. Returning an error from (*transactor).Store will result in the
-			// transaction being cancelled. With ordering enabled, we would normally need to resume
-			// publishing (see https://cloud.google.com/pubsub/docs/publisher#retry_ordering), but
-			// since returning an error here will cause the connector to exit, we don't need to
-			// worry about resuming publishing from the same client.
-			return err
+			return nil
 		})
 	}
 
