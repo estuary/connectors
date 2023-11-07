@@ -43,8 +43,7 @@
         },
         "id": {
             "type": [
-                "number",
-                "null"
+                "integer"
             ]
         },
         "legacy": {

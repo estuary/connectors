@@ -10,8 +10,7 @@
         },
         "inventory_item_id": {
             "type": [
-                "number",
-                "null"
+                "integer"
             ]
         },
         "location_id": {
