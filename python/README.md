@@ -231,3 +231,28 @@ client_secret_sops: ENC[AES256_GCM,data:c3BEsuHJLjIt7+G1hwb6x29BU7CK,iv:6LfUthR8
     version: 3.7.3
   ```
 3. From here on, you must use sops to edit this encrypted file. Even if you only change an unencrypted field, the `mac` will no longer be valid and the file will fail to decrypt. To edit the file using your terminal's built-in editor, simply run `sops path/to/connector_config.yaml`, make changes, save, and `sops` will re-encrypt the file for you.
+
+### Adding your connector to CI
+Once you have tested your connector locally including building/running a local image, you will want to configure CI to automatically build/release changes to the connector automatically.
+
+1. Add your connector to the matrix build in `.github/workflows/ci.yaml`
+  ```yaml
+  jobs:
+    build_connectors:
+      strategy:
+        matrix:
+          connector:
+            - your-connector-here
+  ```
+2. Configure your connector. Python connectors have a slightly different build process than non-python connectors, as such you need to provide a couple pieces of metadata into the matrix job that builds your connector. 
+  ```yaml
+  jobs:
+    build_connectors:
+      strategy:
+        matrix:
+          include:
+            - connector: your-connector-here
+              python: true
+              # allowed values: capture, materialization
+              connector_type: capture
+  ```
