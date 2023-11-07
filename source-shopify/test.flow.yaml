@@ -1,0 +1,13 @@
+---
+captures:
+  acmeCo/source-shopify:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-shopify
+        config: connector_config.yaml
+        env:
+          LOG_LEVEL: debug
+    bindings: []

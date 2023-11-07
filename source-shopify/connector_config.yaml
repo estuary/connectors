@@ -1,0 +1,16 @@
+access_token: 
+store: 60ec54
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow
+          created_at: "2023-11-06T22:06:28Z"
+          enc: CiQAW8BC2KWrtYhS2NB5azHyfI6skjH7GmNx2uiBnofwuaoQL1kSSQBgR/fK40ekUfW6PPnjNr+kE5JQaKNhnChZKW+/OOiakO4Lva1OTZo/b1HKcJzG8ZhaiAmGXhEwnXkzHYbTUuG8GEV1cyWscuI=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2023-11-07T19:39:52Z"
+    mac: ENC[AES256_GCM,data:vo70FhKjSZ76Qrk4EuhIUEuIygEp84ZGegJ+FrV6IcAxBgnD6GCmQOgqE6rYbor0fo6YW9wjeRCnT5cJ2qKXC/hLDPPE9AQwdKZtv7SRlk4Axf/IfsN4YtUlseDtcLu+MRMfLeaNfRurK3cf6wa8ZaTIgOE0lQUaEJ/JlBTYzkk=,iv:mout5vP6wES36vGWwdV0k3CqFpYArjWQTB9Gt3asOA4=,tag:kRNxRfAENdK1BTBiCX9R3w==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3
