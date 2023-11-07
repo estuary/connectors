@@ -520,6 +520,11 @@ func resourceId(res resource) string {
 func eventResourceId(ev changeEvent) string {
 	return fmt.Sprintf("%s.%s", ev.Ns.Database, ev.Ns.Collection)
 }
+// MongoDB considers datetimes outside of the 0-9999 year range to be _unsafe_
+// so we enforce this constraint in our connector.
+// see https://www.mongodb.com/docs/manual/reference/method/Date/#behavior
+const maxTimeMilli = 253402300799999
+const minTimeMilli = -62167219200000
 
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
@@ -528,6 +533,12 @@ func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 			doc[key] = idToString(value)
 		} else {
 			switch v := value.(type) {
+			case primitive.DateTime:
+				if v < minTimeMilli {
+					doc[key] = primitive.DateTime(minTimeMilli)
+				} else if v > maxTimeMilli {
+					doc[key] = primitive.DateTime(maxTimeMilli)
+				}
 			case float64:
 				if math.IsNaN(v) {
 					doc[key] = "NaN"
