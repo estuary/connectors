@@ -72,6 +72,7 @@ jobs:
       matrix:
         connector:
           - source-alpaca
+          - source-criteo
           - source-dynamodb
           - source-firestore
           - source-gcs
@@ -107,6 +108,10 @@ jobs:
           - materialize-webhook
           - materialize-mysql
           - materialize-sqlserver
+        include:
+          - connector: source-criteo
+            connector_type: capture
+            python: true
 
     steps:
       - uses: actions/checkout@v2
@@ -174,6 +179,7 @@ jobs:
 
       - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v2
+        if: ${{!matrix.python}}
         with:
           context: .
           file: ${{ matrix.connector }}/Dockerfile
@@ -182,6 +188,18 @@ jobs:
           tags: ghcr.io/estuary/${{ matrix.connector }}:local
           secrets: |
             "rockset_api_key=${{ secrets.ROCKSET_API_KEY }}"
+      
+      - name: Build ${{ matrix.connector }} Python Docker Image
+        uses: docker/build-push-action@v2
+        if: ${{matrix.python}}
+        with:
+          context: .
+          file: python/Dockerfile
+          load: true
+          build-args: |
+            CONNECTOR_NAME=${{matrix.connector}}
+            CONNECTOR_TYPE=${{matrix.connector_type}}
+          tags: ghcr.io/estuary/${{ matrix.connector }}:local
 
       - name: Start Dockerized test infrastructure
         if: matrix.connector == 'source-kafka'

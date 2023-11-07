@@ -1,4 +1,5 @@
 import logging
+import os
 import typing as t
 from airbyte_cdk.sources.source import Source
 from airbyte_protocol.models import (
@@ -21,6 +22,7 @@ logger = init_logger()
 # Patch it to use the same log level as the "flow" Logger.
 logging.getLogger("airbyte").setLevel(logger.level)
 
+DOCS_URL = os.getenv("DOCS_URL")
 
 class CaptureShim(Connector):
     delegate: Source
@@ -41,7 +43,7 @@ class CaptureShim(Connector):
         spec = self.delegate.spec(logger)
 
         out: flow.Spec = {
-            "documentationUrl": f"{spec.documentationUrl}",
+            "documentationUrl": f"{DOCS_URL if DOCS_URL else spec.documentationUrl}",
             "configSchema": spec.connectionSpecification,
             "resourceConfigSchema": resource_config_schema,
         }
