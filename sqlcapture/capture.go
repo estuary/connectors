@@ -436,13 +436,16 @@ func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStrea
 		group.Go(func() error {
 			select {
 			case <-workerCtx.Done():
+				logrus.WithField("watermark", watermark).Warn("not writing watermark due to context cancellation")
 				return workerCtx.Err()
 			case <-time.After(heartbeatWatermarkInterval):
 				if err := c.Database.WriteWatermark(workerCtx, watermark); err != nil {
+					logrus.WithField("watermark", watermark).Error("failed to write watermark")
 					return fmt.Errorf("error writing next watermark: %w", err)
 				}
+				logrus.WithField("watermark", watermark).Debug("watermark written")
+				return nil
 			}
-			return nil
 		})
 
 		// Perform replication streaming until the watermark is reached (or the

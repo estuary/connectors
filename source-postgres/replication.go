@@ -654,6 +654,41 @@ func (s *replicationStream) Close(ctx context.Context) error {
 }
 
 func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
-	// TODO: Run some useful diagnostics queries for Postgres replication and log the results
+	var query = func(q string) {
+		logrus.WithField("query", q).Info("running diagnostics query")
+		var result, err = db.conn.Query(ctx, q)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"query": q,
+				"err":   err,
+			}).Error("unable to execute diagnostics query")
+			return
+		}
+		defer result.Close()
+
+		var numResults int
+		var keys = result.FieldDescriptions()
+		for result.Next() {
+			numResults++
+			var row, err = result.Values()
+			if err != nil {
+				logrus.WithField("err", err).Error("unable to process result row")
+				continue
+			}
+
+			var logFields = logrus.Fields{}
+			for idx, val := range row {
+				logFields[string(keys[idx].Name)] = val
+			}
+			logrus.WithFields(logFields).Info("got row")
+		}
+		if numResults == 0 {
+			logrus.WithField("query", q).Info("no results")
+		}
+	}
+
+	query("SELECT * FROM public.flow_watermarks;")
+	query("SELECT * FROM pg_replication_slots;")
+	query("SELECT pg_current_wal_flush_lsn(), pg_current_wal_insert_lsn(), pg_current_wal_lsn();")
 	return nil
 }
