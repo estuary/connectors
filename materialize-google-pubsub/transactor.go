@@ -1,11 +1,13 @@
 package connector
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
 	"cloud.google.com/go/pubsub"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/minio/highwayhash"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -26,6 +28,20 @@ func (t *transactor) Load(it *pm.LoadIterator, _ func(int, json.RawMessage) erro
 	return nil
 }
 
+// The hash function and hash key below are copied directly from the Flow repo, go/flow/mapping.go.
+// In the future if the hashed value of the packedKey is added to the materialization connector
+// protocol, the PubSub materialization can be converted to using the hashed value directly instead
+// of computing it separately.
+
+// PackedKeyHash_HH64 builds a packed key hash from the top 32-bits of a
+// HighwayHash 64-bit checksum computed using a fixed key.
+func PackedKeyHash_HH64(packedKey []byte) uint32 {
+	return uint32(highwayhash.Sum64(packedKey, highwayHashKey) >> 32)
+}
+
+// highwayHashKey is a fixed 32 bytes (as required by HighwayHash) read from /dev/random.
+var highwayHashKey, _ = hex.DecodeString("ba737e89155238d47d8067c35aad4d25ecdd1c3488227e011ffa480c022bd3ba")
+
 func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
 
@@ -34,7 +50,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		msg := &pubsub.Message{
 			Data:        it.RawJSON,
-			OrderingKey: fmt.Sprintf("%x", it.PackedKey), // Allows for reading of messages for the same key in order.
+			OrderingKey: fmt.Sprintf("%d", PackedKeyHash_HH64(it.PackedKey)),
 		}
 		// Only include an identifier attribute if an identifier has been configured.
 		if binding.identifier != "" {
