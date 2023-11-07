@@ -32,16 +32,25 @@ type CountingEncoder struct {
 }
 
 // NewCountingEncoder creates a CountingEncoder from w. w is closed when CountingEncoder is closed.
-func NewCountingEncoder(w io.WriteCloser) *CountingEncoder {
+func NewCountingEncoder(w io.WriteCloser, gzipCompression bool) *CountingEncoder {
 	cwc := &countingWriteCloser{w: w}
-	gz, err := gzip.NewWriterLevel(cwc, compressionLevel)
-	if err != nil {
-		// Only possible if compressionLevel is not valid.
-		panic("invalid compression level for gzip.NewWriterLevel")
-	}
 
-	enc := json.NewEncoder(gz)
-	enc.SetIndent("", "")
+  var enc *json.Encoder
+  var gz *gzip.Writer
+  if gzipCompression {
+    var err error
+    gz, err = gzip.NewWriterLevel(cwc, compressionLevel)
+    if err != nil {
+      // Only possible if compressionLevel is not valid.
+      panic("invalid compression level for gzip.NewWriterLevel")
+    }
+
+    enc = json.NewEncoder(gz)
+  } else {
+    enc = json.NewEncoder(cwc)
+  }
+
+  enc.SetIndent("", "")
 
 	// We certainly don't want to escape <, >, &, etc., and also setting this to false might be
 	// beneficial to throughput.
@@ -68,9 +77,13 @@ func (e *CountingEncoder) Written() int {
 // Close closes the underlying gzip writer, flushing its data and writing the GZIP footer. It also
 // closes io.WriteCloser that was used to initialize the counting encoder.
 func (e *CountingEncoder) Close() error {
-	if err := e.gz.Close(); err != nil {
-		return fmt.Errorf("closing gzip writer: %w", err)
-	} else if err := e.cwc.Close(); err != nil {
+  if e.gz != nil {
+    if err := e.gz.Close(); err != nil {
+      return fmt.Errorf("closing gzip writer: %w", err)
+    }
+	}
+
+  if err := e.cwc.Close(); err != nil {
 		return fmt.Errorf("closing counting writer: %w", err)
 	}
 	return nil

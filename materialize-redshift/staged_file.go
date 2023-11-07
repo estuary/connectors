@@ -101,7 +101,7 @@ func (f *stagedFile) start() {
 func (f *stagedFile) newFile(ctx context.Context) {
 	r, w := io.Pipe()
 
-	f.encoder = sql.NewCountingEncoder(w)
+	f.encoder = sql.NewCountingEncoder(w, true)
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	f.group = group

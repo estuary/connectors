@@ -66,6 +66,8 @@ var databricksDialect = func() sql.Dialect {
 	}
 }()
 
+
+// TODO: shard key in temporary table names
 var (
 	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
 {{ define "temp_name_load" -}}

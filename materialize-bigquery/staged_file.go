@@ -56,7 +56,7 @@ func (f *stagedFile) start() {
 func (f *stagedFile) newFile(ctx context.Context) {
 	fName := uuid.NewString()
 	writer := f.client.Bucket(f.bucket).Object(path.Join(f.prefix, fName)).NewWriter(ctx)
-	f.encoder = sql.NewCountingEncoder(writer)
+	f.encoder = sql.NewCountingEncoder(writer, true)
 	f.uploaded = append(f.uploaded, fName)
 }
 

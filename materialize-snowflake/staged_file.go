@@ -224,7 +224,7 @@ func (f *stagedFile) newFile() error {
 		buf:  bufio.NewWriter(file),
 		file: file,
 	}
-	f.encoder = sql.NewCountingEncoder(f.buf)
+	f.encoder = sql.NewCountingEncoder(f.buf, true)
 	f.fileIdx += 1
 
 	return nil
