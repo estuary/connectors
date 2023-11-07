@@ -515,14 +515,14 @@ type checkpoint struct {
   ToDelete []string
 }
 
-func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
+func (d *transactor) deleteFiles(ctx context.Context, files []string) {
   for _, f := range files {
     if err := d.wsClient.Files.DeleteByFilePath(ctx, f); err != nil {
-      return fmt.Errorf("cleaning up file %q: %w", f, err)
+      log.WithFields(log.Fields{
+        "file": f,
+      }).Warn("deleteFiles failed")
     }
   }
-
-  return nil
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
@@ -574,11 +574,13 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
     toDelete = append(toDelete, toDeleteBinding...)
 
-		// In case of delta updates, we directly copy from staged files into the target table
+		// In case of delta updates or if there are no existing keys being stored
+    // we directly copy from staged files into the target table. Note that this is retriable
+    // given that COPY INTO is idempotent by default: files that have already been loaded into a table will
+    // not be loaded again
+    // see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
 		if b.target.DeltaUpdates || !b.needsMerge {
-			// MergeInto always in checkpoint for standard materializations?? copy into is idempotent so not necessary
 			queries = append(queries, renderWithFiles(b.copyIntoDirect, toCopy...))
-			continue
 		} else {
 			// COPY INTO temporary load table from staged files
 			if _, err := d.store.conn.ExecContext(ctx, renderWithFiles(b.copyIntoStore, toCopy...)); err != nil {
@@ -596,11 +598,6 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		if err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-		// TODO: Test this by using a sleep and killing the connector, having the reactor spin it back up
-		// and the files should be correctly copied over
-
-		// TODO: copyIntoDirect can duplicate data across restarts -- No? It's supposed to be idempotent
-		// Test it out
 		var commitOp = pf.RunAsyncOperation(func() error {
 			select {
 			case <-runtimeAckCh:
@@ -623,16 +620,20 @@ func renderWithFiles(tpl string, files ...string) string {
 
 // applyCheckpoint merges data from temporary table to main table
 func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
-	/*log.WithFields(log.Fields{
-	}).Warn("restart now")
-	time.Sleep(20 * time.Second)*/
+	log.WithFields(log.Fields{
+    "queries": cp.Queries,
+	}).Warn("restart now - before applying")
+	time.Sleep(20 * time.Second)
 
 	for _, q := range cp.Queries {
 		if _, err := d.store.conn.ExecContext(ctx, q); err != nil {
-      // When doing a recovery apply, it may be the case that some files have already been applied, in this
-      // case, it is okay to skip files that do not exist
+      // When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
+      // it is okay to skip them in this case
       if recovery {
         if strings.Contains(err.Error(), "PATH_NOT_FOUND") {
+          continue
+        }
+        if strings.Contains(err.Error(), "Table doesn't exist") {
           continue
         }
       }
@@ -640,10 +641,13 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 		}
 	}
 
+	log.WithFields(log.Fields{
+    "files": cp.ToDelete,
+	}).Warn("restart now - before cleaning up files")
+	time.Sleep(20 * time.Second)
+
   // Cleanup files and tables
-  if err := d.deleteFiles(ctx, cp.ToDelete); err != nil {
-    return err
-  }
+  d.deleteFiles(ctx, cp.ToDelete)
 
 	return nil
 }
