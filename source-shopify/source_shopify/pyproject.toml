@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "tap-shopify"
+version = "0.3.0"
+description = "`tap-shopify` is a Singer tap for tap_shopify, built with the Meltano SDK for Singer Taps."
+authors = ["Aaron Phethean"]
+keywords = [
+    "ELT",
+    "tap_shopify",
+]
+license = "AGPL-3.0"
+
+[tool.poetry.dependencies]
+python = "<3.12,>=3.7.1"
+requests = "^2.31.0"
+singer-sdk = "^0.30.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.5"
+tox = "^3.24.4"
+flake8 = "^3.9.2"
+black = "^22.3.0"
+pydocstyle = "^6.1.1"
+mypy = "^0.910"
+types-requests = "^2.26.1"
+isort = "^5.10.1"
+responses = "0.17.0"
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3 # Vertical Hanging Indent
+src_paths = "tap_shopify"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+# CLI declaration
+tap-shopify = 'tap_shopify.tap:Tap_Shopify.cli'
