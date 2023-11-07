@@ -72,8 +72,7 @@
         },
         "id": {
             "type": [
-                "integer",
-                "null"
+                "integer"
             ]
         },
         "kind": {

@@ -4,8 +4,7 @@
     "properties": {
         "id": {
             "type": [
-                "integer",
-                "null"
+                "integer"
             ]
         },
         "admin_graphql_api_id": {

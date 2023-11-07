@@ -48,8 +48,7 @@
         },
         "id": {
             "type": [
-                "number",
-                "null"
+                "integer"
             ]
         },
         "province_code_of_origin": {
