@@ -26,7 +26,7 @@ const (
 type credentialConfig struct {
 	AuthType            string `json:"auth_type"`
 
-	PersonalAccessToken string `json:"personal_access_token,omitempty"`
+	PersonalAccessToken string `json:"personal_access_token"`
 }
 
 
