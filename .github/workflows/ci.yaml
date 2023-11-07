@@ -95,6 +95,7 @@ jobs:
           - source-test
           - materialize-bigquery
           - materialize-dynamodb
+          - materialize-databricks
           - materialize-elasticsearch
           - materialize-firebolt
           - materialize-google-pubsub
