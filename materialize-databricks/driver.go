@@ -305,7 +305,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding); err != nil {
+		if err = d.addBinding(ctx, binding, open.Range); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -373,7 +373,7 @@ type binding struct {
 	copyIntoStore        string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *pf.RangeSpec) error {
 	var b = &binding{target: target}
 
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
@@ -386,6 +386,9 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	}{
 		{&b.createLoadTableSQL, tplCreateLoadTable},
 		{&b.createStoreTableSQL, tplCreateStoreTable},
+		{&b.copyIntoDirect, tplCopyIntoDirect},
+		{&b.copyIntoStore, tplCopyIntoStore},
+		{&b.copyIntoLoad, tplCopyIntoLoad},
 		{&b.loadQuerySQL, tplLoadQuery},
 		{&b.truncateLoadSQL, tplTruncateLoad},
 		{&b.truncateStoreSQL, tplTruncateStore},
@@ -394,21 +397,8 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		{&b.mergeInto, tplMergeInto},
 	} {
 		var err error
-		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
-			return err
-		}
-	}
-
-	for _, m := range []struct {
-		sql *string
-		tpl *template.Template
-	}{
-		{&b.copyIntoDirect, tplCopyIntoDirect},
-		{&b.copyIntoStore, tplCopyIntoStore},
-		{&b.copyIntoLoad, tplCopyIntoLoad},
-	} {
-		var err error
-		if *m.sql, err = RenderTableWithStagingPath(target, b.rootStagingPath, m.tpl); err != nil {
+    var shardRange = fmt.Sprintf("%08x_%08x", _range.KeyBegin, _range.RClockBegin)
+		if *m.sql, err = RenderTable(target, b.rootStagingPath, shardRange, m.tpl); err != nil {
 			return err
 		}
 	}
@@ -529,9 +519,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 	ctx := it.Context()
 
 	for it.Next() {
-		log.WithFields(log.Fields{
-			"binding": it.Binding,
-		}).Warn("1 store iterator")
+		//log.WithFields(log.Fields{
+			//"binding": it.Binding,
+		//}).Warn("1 store iterator")
 		var b = d.bindings[it.Binding]
 		b.storeFile.start()
 
@@ -620,10 +610,8 @@ func renderWithFiles(tpl string, files ...string) string {
 
 // applyCheckpoint merges data from temporary table to main table
 func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
-	log.WithFields(log.Fields{
-    "queries": cp.Queries,
-	}).Warn("restart now - before applying")
-	time.Sleep(20 * time.Second)
+  //log.WithFields(log.Fields{"queries": cp.Queries}).Warn("restart now - before applying")
+  //time.Sleep(20 * time.Second)
 
 	for _, q := range cp.Queries {
 		if _, err := d.store.conn.ExecContext(ctx, q); err != nil {
@@ -641,10 +629,8 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 		}
 	}
 
-	log.WithFields(log.Fields{
-    "files": cp.ToDelete,
-	}).Warn("restart now - before cleaning up files")
-	time.Sleep(20 * time.Second)
+	//log.WithFields(log.Fields{ "files": cp.ToDelete}).Warn("restart now - before cleaning up files")
+	//time.Sleep(20 * time.Second)
 
   // Cleanup files and tables
   d.deleteFiles(ctx, cp.ToDelete)
