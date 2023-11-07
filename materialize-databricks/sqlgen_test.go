@@ -40,7 +40,6 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tbl := range []sqlDriver.Table{table1, table2} {
 		for _, tpl := range []*template.Template{
-			tplCreateTargetTable,
 			tplCreateLoadTable,
 			tplCreateStoreTable,
 			tplLoadQuery,
@@ -49,25 +48,25 @@ func TestSQLGeneration(t *testing.T) {
 			tplDropLoad,
 			tplDropStore,
 			tplMergeInto,
-		} {
-			var testcase = tbl.Identifier + " " + tpl.Name()
-
-			snap.WriteString("--- Begin " + testcase + " ---")
-			require.NoError(t, tpl.Execute(&snap, &tbl))
-			snap.WriteString("--- End " + testcase + " ---\n\n")
-		}
-
-
-		for _, tpl := range []*template.Template{
 			tplCopyIntoDirect,
 			tplCopyIntoStore,
 			tplCopyIntoLoad,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
-			var copyData = CopyTemplate{Table: &tbl, StagingPath: "test-staging-path"}
+      var tplData = Template{Table: &tbl, StagingPath: "test-staging-path", ShardRange: "shard-range"}
 			snap.WriteString("--- Begin " + testcase + " ---")
-			require.NoError(t, tpl.Execute(&snap, &copyData))
+			require.NoError(t, tpl.Execute(&snap, &tplData))
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
+
+		for _, tpl := range []*template.Template{
+			tplCreateTargetTable,
+		} {
+			var testcase = tbl.Identifier + " " + tpl.Name()
+
+			snap.WriteString("--- Begin " + testcase + " ---")
+			require.NoError(t, tpl.Execute(&snap, &tbl))
 			snap.WriteString("--- End " + testcase + " ---\n\n")
 		}
 	}
@@ -80,20 +79,9 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, err)
 
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized mergeInto" + " ---")
-	require.NoError(t, tplMergeInto.Execute(&snap, &tableNoValues))
+  var tplData = Template{Table: &tableNoValues, StagingPath: "test-staging-path", ShardRange: "shard-range"}
+	require.NoError(t, tplMergeInto.Execute(&snap, &tplData))
 	snap.WriteString("--- End " + "target_table_no_values_materialized mergeInto" + " ---\n\n")
-
-	var fence = sqlDriver.Fence{
-		TablePath:       sqlDriver.TablePath{"path", "To", "checkpoints"},
-		Checkpoint:      []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-		Fence:           123,
-		Materialization: pf.Materialization("some/Materialization"),
-		KeyBegin:        0x00112233,
-		KeyEnd:          0xffeeddcc,
-	}
-	snap.WriteString("--- Begin Fence Update ---")
-	require.NoError(t, tplUpdateFence.Execute(&snap, fence))
-	snap.WriteString("--- End Fence Update ---\n")
 
 	cupaloy.SnapshotT(t, snap.String())
 }
