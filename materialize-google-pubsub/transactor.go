@@ -34,7 +34,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		msg := &pubsub.Message{
 			Data:        it.RawJSON,
-			OrderingKey: string(it.PackedKey), // Allows for reading of messages for the same key in order.
+			OrderingKey: fmt.Sprintf("%x", it.PackedKey), // Allows for reading of messages for the same key in order.
 		}
 		// Only include an identifier attribute if an identifier has been configured.
 		if binding.identifier != "" {
