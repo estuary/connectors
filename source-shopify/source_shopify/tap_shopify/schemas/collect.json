@@ -1,0 +1,48 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "type": "object",
+    "properties": {
+        "collection_id": {
+            "type": [
+                "integer",
+                "null"
+            ]
+        },
+        "created_at": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "id": {
+            "type": [
+                "integer",
+                "null"
+            ]
+        },
+        "position": {
+            "type": [
+                "integer",
+                "null"
+            ]
+        },
+        "product_id": {
+            "type": [
+                "integer",
+                "null"
+            ]
+        },
+        "sort_value": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "updated_at": {
+            "type": [
+                "string",
+                "null"
+            ]
+        }
+    }
+}
