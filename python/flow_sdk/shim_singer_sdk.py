@@ -8,9 +8,6 @@ import typing as t
 from .capture import Connector, request, response, Response
 from . import flow, init_logger
 
-class Config(t.TypedDict):
-    pass
-
 logger = init_logger()
 
 def write_message_panics(message: singer.Message) -> None:
@@ -23,6 +20,8 @@ os.environ.setdefault("LOGLEVEL", os.environ.get("LOG_LEVEL", "INFO").upper())
 # CaptureShim instruments singer.write_message as-needed to capture message callbacks.
 # We don't expect it to ever be called outside of those specific contexts.
 singer.write_message = write_message_panics
+
+DOCS_URL = os.getenv("DOCS_URL")
 
 class Config(t.TypedDict):
     pass
@@ -50,7 +49,7 @@ class CaptureShim(Connector):
 
     def spec(self, _: request.Spec) -> flow.Spec:
         out = flow.Spec(
-            documentationUrl="not://sure",  # TODO
+            documentationUrl=DOCS_URL if DOCS_URL else "https://docs.estuary.dev",
             configSchema=self.config_schema,
             resourceConfigSchema=resource_config_schema,
         )
