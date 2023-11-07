@@ -4,8 +4,7 @@
     "properties": {
         "id": {
             "type": [
-                "integer",
-                "null"
+                "integer"
             ]
         },
         "first_name": {
