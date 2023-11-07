@@ -27,7 +27,7 @@ func TestCountingEncoder(t *testing.T) {
 		w: &buf,
 	}
 
-	enc := NewCountingEncoder(tw)
+	enc := NewCountingEncoder(tw, true)
 	require.NoError(t, enc.Encode(testData))
 	require.NoError(t, enc.Close())
 
