@@ -189,10 +189,12 @@ func (db *postgresDatabase) prerequisiteWatermarksTable(ctx context.Context) err
 	if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
 		logEntry.Debug("watermarks table already exists")
 		return nil
+	} else {
+		logEntry.WithField("err", err).Warn("error writing to watermarks table")
 	}
 
 	// If we can create the watermarks table and then write a watermark, that also works
-	logEntry.Info("watermarks table doesn't exist, attempting to create it")
+	logEntry.Info("attempting to create watermarks table")
 	var _, err = db.conn.Exec(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", table))
 	if err == nil {
 		if err := db.WriteWatermark(ctx, "existence-check"); err == nil {

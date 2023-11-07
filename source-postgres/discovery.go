@@ -21,6 +21,7 @@ const (
 	infinityTimestamp         = "9999-12-31T23:59:59Z"
 	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
 	RFC3339TimeFormat         = "15:04:05.999999999Z07:00"
+	truncateColumnThreshold   = 8 * 1024 * 1024 // Arbitrarily selected value
 )
 
 // DiscoverTables queries the database for information about tables available for capture.
@@ -225,14 +226,20 @@ func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interfa
 	return nil
 }
 
+func oversizePlaceholderJSON(orig []byte) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{"flow_truncated":true,"original_size":%d}`, len(orig)))
+}
+
 // translateRecordField "translates" a value from the PostgreSQL driver into
 // an appropriate JSON-encodeable output format. As a concrete example, the
 // PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
 func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
+	var columnName = "<unknown>"
 	var dataType interface{}
 	if column != nil {
+		columnName = column.Name
 		dataType = column.DataType
 	}
 
@@ -250,8 +257,45 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 			fmt.Fprintf(s, "%02x", x[i])
 		}
 		return s.String(), nil
+	case string:
+		if len(x) > truncateColumnThreshold {
+			return x[:truncateColumnThreshold], nil
+		}
+		return x, nil
+	case []byte:
+		if len(x) > truncateColumnThreshold {
+			return x[:truncateColumnThreshold], nil
+		}
+		return x, nil
+	case map[string]any:
+		var bs, err = json.Marshal(x)
+		if err != nil {
+			return nil, fmt.Errorf("error reserializing json column %q: %w", columnName, err)
+		}
+		if len(bs) > truncateColumnThreshold {
+			return oversizePlaceholderJSON(bs), nil
+		}
+		return json.RawMessage(bs), nil
+	case pgtype.Text:
+		if len(x.String) > truncateColumnThreshold {
+			return x.String[:truncateColumnThreshold], nil
+		}
+		return x.String, nil
 	case pgtype.Bytea:
+		if len(x.Bytes) > truncateColumnThreshold {
+			return x.Bytes[:truncateColumnThreshold], nil
+		}
 		return x.Bytes, nil
+	case pgtype.JSON:
+		if len(x.Bytes) > truncateColumnThreshold {
+			return oversizePlaceholderJSON(x.Bytes), nil
+		}
+		return json.RawMessage(x.Bytes), nil
+	case pgtype.JSONB:
+		if len(x.Bytes) > truncateColumnThreshold {
+			return oversizePlaceholderJSON(x.Bytes), nil
+		}
+		return json.RawMessage(x.Bytes), nil
 	case pgtype.Float4:
 		return x.Float, nil
 	case pgtype.Float8:
