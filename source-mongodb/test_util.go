@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 	"flag"
 	"fmt"
 	"os"
@@ -79,6 +80,9 @@ func addTestTableData(
 				"array": []string{"a", "b", "c"},
 				"int": 1,
 				"float": 1.23,
+				"date-max": time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC),
+				"date-min": time.Date(-1, 1, 1, 0, 0, 0, 0, time.UTC),
+				"date-normal": time.Date(2023, 11, 7, 16, 57, 0, 0, time.UTC),
 			}
 		}
 
