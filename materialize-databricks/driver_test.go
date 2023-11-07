@@ -3,11 +3,11 @@
 package main
 
 import (
-	"context"
+	/*"context"
 	stdsql "database/sql"
 	"fmt"
 	"os"
-	"strings"
+	"strings"*/
 	"testing"
 
 	sql "github.com/estuary/connectors/materialize-sql"

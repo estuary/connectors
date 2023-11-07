@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS flow_temp_load_table_0 (
 --- End `a-schema`.target_table createLoadTable ---
 
 --- Begin `a-schema`.target_table createStoreTable ---
-CREATE TABLE IF NOT EXISTS flow_temp_store_table_0 LIKE `a-schema`.target_table;
+CREATE TABLE IF NOT EXISTS flow_temp_store_table_0;
 --- End `a-schema`.target_table createStoreTable ---
 
 --- Begin `a-schema`.target_table loadQuery ---
@@ -47,39 +47,60 @@ DROP TABLE IF EXISTS flow_temp_store_table_0
 --- Begin `a-schema`.target_table mergeInto ---
 	MERGE INTO `a-schema`.target_table AS l
 	USING flow_temp_store_table_0 AS r
-	ON l.key1 = r.key1 AND l.key2 = r.key2
+	ON l.key1 = r.key1::BIGINT
+ AND l.key2 = r.key2::BOOLEAN
+
+	AND r._metadata_file_name IN (%s)
 	WHEN MATCHED AND r.flow_document <=> NULL THEN
 		DELETE
 	WHEN MATCHED THEN
-		UPDATE SET l.boolean = r.boolean, l.integer = r.integer, l.number = r.number, l.string = r.string, l.flow_document = r.flow_document
+		UPDATE SET l.boolean = r.boolean::BOOLEAN
+, l.integer = r.integer::BIGINT
+, l.number = r.number::DOUBLE
+, l.string = r.string
+, l.flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
 		INSERT (key1, key2, boolean, integer, number, string, flow_document)
-		VALUES (r.key1, r.key2, r.boolean, r.integer, r.number, r.string, r.flow_document);
+		VALUES (r.key1::BIGINT
+, r.key2::BOOLEAN
+, r.boolean::BOOLEAN
+, r.integer::BIGINT
+, r.number::DOUBLE
+, r.string
+, r.flow_document
+);
 --- End `a-schema`.target_table mergeInto ---
 
 --- Begin `a-schema`.target_table copyIntoDirect ---
 	COPY INTO `a-schema`.target_table FROM (
     SELECT
-		key1, key2, boolean, integer, number, string, flow_document
+		key1::BIGINT
+, key2::BOOLEAN
+, boolean::BOOLEAN
+, integer::BIGINT
+, number::DOUBLE
+, string
+, flow_document
+
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
-  FILES = ('0_store.json')
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
-	COPY_OPTIONS ( 'force' = 'true' )
+  FILES = (%s)
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )
   ;
 --- End `a-schema`.target_table copyIntoDirect ---
 
 --- Begin `a-schema`.target_table copyIntoStore ---
 	COPY INTO flow_temp_store_table_0 FROM (
     SELECT
+		_metadata.file_name as _metadata_file_name,
 		key1, key2, boolean, integer, number, string, flow_document
     FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
-  FILES = ('0_store.json')
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
-	COPY_OPTIONS ( 'force' = 'true' )
+  FILES = (%s)
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'mergeSchema' = 'true', 'primitivesAsString' = 'true' )
+	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 --- End `a-schema`.target_table copyIntoStore ---
 
@@ -90,9 +111,8 @@ DROP TABLE IF EXISTS flow_temp_store_table_0
     FROM 'test-staging-path'
   )
   FILEFORMAT = JSON
-  FILES = ('0_load.json')
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
-	COPY_OPTIONS ( 'force' = 'true' )
+  FILES = (%s)
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )
   ;
 --- End `a-schema`.target_table copyIntoLoad ---
 
@@ -111,11 +131,11 @@ CREATE TABLE IF NOT EXISTS flow_temp_load_table_1 (
 --- End `default`.`Delta Updates` createLoadTable ---
 
 --- Begin `default`.`Delta Updates` createStoreTable ---
-CREATE TABLE IF NOT EXISTS flow_temp_store_table_1 LIKE `default`.`Delta Updates`;
+CREATE TABLE IF NOT EXISTS flow_temp_store_table_1;
 --- End `default`.`Delta Updates` createStoreTable ---
 
 --- Begin `default`.`Delta Updates` loadQuery ---
-SELECT -1, NULL
+SELECT -1, ""
 --- End `default`.`Delta Updates` loadQuery ---
 
 --- Begin `default`.`Delta Updates` truncateLoadTable ---
@@ -138,36 +158,43 @@ DROP TABLE IF EXISTS flow_temp_store_table_1
 	MERGE INTO `default`.`Delta Updates` AS l
 	USING flow_temp_store_table_1 AS r
 	ON l.`theKey` = r.`theKey`
+
+	AND r._metadata_file_name IN (%s)
 	WHEN MATCHED THEN
-		UPDATE SET l.`aValue` = r.`aValue`
+		UPDATE SET l.`aValue` = r.`aValue`::BIGINT
+
 	WHEN NOT MATCHED THEN
 		INSERT (`theKey`, `aValue`)
-		VALUES (r.`theKey`, r.`aValue`);
+		VALUES (r.`theKey`
+, r.`aValue`::BIGINT
+);
 --- End `default`.`Delta Updates` mergeInto ---
 
 --- Begin `default`.`Delta Updates` copyIntoDirect ---
 	COPY INTO `default`.`Delta Updates` FROM (
     SELECT
-		`theKey`, `aValue`
+		`theKey`
+, `aValue`::BIGINT
+
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
-  FILES = ('1_store.json')
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
-	COPY_OPTIONS ( 'force' = 'true' )
+  FILES = (%s)
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )
   ;
 --- End `default`.`Delta Updates` copyIntoDirect ---
 
 --- Begin `default`.`Delta Updates` copyIntoStore ---
 	COPY INTO flow_temp_store_table_1 FROM (
     SELECT
+		_metadata.file_name as _metadata_file_name,
 		`theKey`, `aValue`
     FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
-  FILES = ('1_store.json')
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
-	COPY_OPTIONS ( 'force' = 'true' )
+  FILES = (%s)
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'mergeSchema' = 'true', 'primitivesAsString' = 'true' )
+	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 --- End `default`.`Delta Updates` copyIntoStore ---
 
@@ -178,23 +205,28 @@ DROP TABLE IF EXISTS flow_temp_store_table_1
     FROM 'test-staging-path'
   )
   FILEFORMAT = JSON
-  FILES = ('1_load.json')
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'inferTimestamp' = 'true' )
-	COPY_OPTIONS ( 'force' = 'true' )
+  FILES = (%s)
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )
   ;
 --- End `default`.`Delta Updates` copyIntoLoad ---
 
 --- Begin target_table_no_values_materialized mergeInto ---
 	MERGE INTO ``.target_table_no_values_materialized AS l
 	USING flow_temp_store_table_2 AS r
-	ON l.key1 = r.key1 AND l.key2 = r.key2
+	ON l.key1 = r.key1::BIGINT
+ AND l.key2 = r.key2::BOOLEAN
+
+	AND r._metadata_file_name IN (%s)
 	WHEN MATCHED AND r.flow_document <=> NULL THEN
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET l.flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
 		INSERT (key1, key2, flow_document)
-		VALUES (r.key1, r.key2, r.flow_document);
+		VALUES (r.key1::BIGINT
+, r.key2::BOOLEAN
+, r.flow_document
+);
 --- End target_table_no_values_materialized mergeInto ---
 
 --- Begin Fence Update ---

@@ -25,7 +25,7 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
-// TODO: Error logging is really bad from the driver, it is almost always followed by a "Command Not Found" error
+// TODO: Add info logs on start and end of long-running jobs
 
 const defaultPort = "443"
 const volumeName = "flow_staging"
