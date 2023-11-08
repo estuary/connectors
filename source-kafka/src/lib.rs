@@ -1,10 +1,10 @@
 extern crate serde_with;
 
-use proto_flow::capture::{Response, response, request};
-use proto_flow::flow::{ConnectorState, CaptureSpec, RangeSpec};
-use serde_json::json;
-use schemars::schema_for;
 use crate::connector::ConnectorConfig;
+use proto_flow::capture::{request, response, Response};
+use proto_flow::flow::{CaptureSpec, ConnectorState, RangeSpec};
+use schemars::schema_for;
+use serde_json::json;
 
 use std::fmt::Debug;
 use std::io::Write;
@@ -24,10 +24,12 @@ impl connector::Connector for KafkaConnector {
     type State = state::CheckpointSet;
 
     fn spec(output: &mut dyn Write) -> eyre::Result<()> {
-        let message  = Response {
+        let message = Response {
             spec: Some(response::Spec {
                 protocol: PROTOCOL_VERSION,
-                config_schema_json: serde_json::to_string(&schema_for!(configuration::Configuration))?,
+                config_schema_json: serde_json::to_string(&schema_for!(
+                    configuration::Configuration
+                ))?,
                 resource_config_schema_json: serde_json::to_string(&json!({
                     "type": "object",
                     "properties": {
@@ -47,10 +49,12 @@ impl connector::Connector for KafkaConnector {
         Ok(())
     }
 
-    fn validate(output: &mut dyn Write, validate: request::Validate) -> eyre::Result<()> {
+    fn validate(output: &mut dyn Write, mut validate: request::Validate) -> eyre::Result<()> {
         let config = Self::Config::parse(&validate.config_json)?;
         let consumer = kafka::consumer_from_config(&config)?;
-        let message = kafka::test_connection(&config, &consumer, validate.bindings)?;
+        // This is because validate implements drop (see: `rustc --explain E0509`)
+        let bindings = std::mem::take(&mut validate.bindings);
+        let message = kafka::test_connection(&config, &consumer, bindings)?;
 
         connector::write_message(output, message)?;
         Ok(())
@@ -62,9 +66,7 @@ impl connector::Connector for KafkaConnector {
         let metadata = kafka::fetch_metadata(&config, &consumer)?;
         let bindings = kafka::available_streams(&metadata);
         let message = Response {
-            discovered: Some(response::Discovered {
-                bindings
-            }),
+            discovered: Some(response::Discovered { bindings }),
             ..Default::default()
         };
 
@@ -73,12 +75,15 @@ impl connector::Connector for KafkaConnector {
     }
 
     fn apply(output: &mut dyn Write, _config: Self::Config) -> eyre::Result<()> {
-        connector::write_message(output, Response {
-            applied: Some(response::Applied {
-                action_description: "".to_string(),
-            }),
-            ..Default::default()
-        })?;
+        connector::write_message(
+            output,
+            Response {
+                applied: Some(response::Applied {
+                    action_description: "".to_string(),
+                }),
+                ..Default::default()
+            },
+        )?;
 
         Ok(())
     }
@@ -101,12 +106,15 @@ impl connector::Connector for KafkaConnector {
         )?;
         kafka::subscribe(&consumer, &checkpoints)?;
 
-        connector::write_message(output, Response {
-            opened: Some(response::Opened {
-                explicit_acknowledgements: false,
-            }),
-            ..Default::default()
-        })?;
+        connector::write_message(
+            output,
+            Response {
+                opened: Some(response::Opened {
+                    explicit_acknowledgements: false,
+                }),
+                ..Default::default()
+            },
+        )?;
 
         loop {
             let msg = consumer
@@ -123,13 +131,25 @@ impl connector::Connector for KafkaConnector {
                             checkpoint.partition.to_string(): checkpoint.offset
                         }
                     }))?,
-                    merge_patch: false
-                })
+                    merge_patch: false,
+                }),
             };
             checkpoints.add(checkpoint);
 
-            connector::write_message(output, Response { captured: Some(record), ..Default::default() })?;
-            connector::write_message(output, Response { checkpoint: Some(delta_state), ..Default::default() })?;
+            connector::write_message(
+                output,
+                Response {
+                    captured: Some(record),
+                    ..Default::default()
+                },
+            )?;
+            connector::write_message(
+                output,
+                Response {
+                    checkpoint: Some(delta_state),
+                    ..Default::default()
+                },
+            )?;
         }
     }
 }

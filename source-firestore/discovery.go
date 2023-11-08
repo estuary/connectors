@@ -197,6 +197,7 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.R
 			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: minimalSchema,
 			Key:                []string{documentPath},
+			ResourcePath:       []string{resourcePath},
 		})
 	}
 

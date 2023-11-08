@@ -91,6 +91,9 @@ Binding 0:
     },
     "key": [
       "/partitionKey"
+    ],
+    "resource_path": [
+      "discoverTable"
     ]
   }
 

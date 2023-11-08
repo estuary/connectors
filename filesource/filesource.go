@@ -223,6 +223,7 @@ func (src *Source) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.
 		ResourceConfigJson: resourceJSON,
 		DocumentSchemaJson: json.RawMessage(minimalDocumentSchema),
 		Key:                []string{"/_meta/file", "/_meta/offset"},
+		ResourcePath:       []string{root},
 	}}}, nil
 }
 

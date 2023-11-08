@@ -103,7 +103,8 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		return nil, fmt.Errorf("generating message schema: %w", err)
 	}
 
-	resourceJSON, err := json.Marshal(resource{Name: "greetings", Prefix: "Hello {}!"})
+	var resourceName = "greetings"
+	resourceJSON, err := json.Marshal(resource{Name: resourceName, Prefix: "Hello {}!"})
 	if err != nil {
 		return nil, fmt.Errorf("serializing resource json: %w", err)
 	}
@@ -114,6 +115,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: messageSchema,
 			Key:                []string{"/ts"},
+			ResourcePath:       []string{resourceName},
 		}},
 	}, nil
 }

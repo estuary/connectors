@@ -113,6 +113,10 @@ Binding 0:
     },
     "key": [
       "/_meta/source/cursor"
+    ],
+    "resource_path": [
+      "test",
+      "SecondaryIndexDiscovery_nonunique_index_g22906"
     ]
   }
 

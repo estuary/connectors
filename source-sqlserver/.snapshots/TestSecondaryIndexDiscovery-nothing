@@ -120,6 +120,10 @@ Binding 0:
     "key": [
       "/_meta/source/lsn",
       "/_meta/source/seqval"
+    ],
+    "resource_path": [
+      "dbo",
+      "test_SecondaryIndexDiscovery_nothing_g14307"
     ]
   }
 

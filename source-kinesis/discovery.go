@@ -62,6 +62,7 @@ func discoverStreams(ctx context.Context, client *kinesis.Kinesis, streamNames [
 			DocumentSchemaJson: json.RawMessage(bs),
 			ResourceConfigJson: resourceJSON,
 			Key:                []string{fmt.Sprintf("/%s/%s", metaProperty, sequenceNumber), fmt.Sprintf("/%s/%s", metaProperty, partitionKey)},
+			ResourcePath:       []string{name},
 		}
 	}
 
