@@ -95,6 +95,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: documentSchema,
 			Key:                []string{"/ID", "/Symbol", "/Exchange", "/Timestamp"},
+			ResourcePath:       []string{cfg.Feed},
 		}},
 	}, nil
 }

@@ -112,6 +112,10 @@ Binding 0:
     },
     "key": [
       "/logdate"
+    ],
+    "resource_path": [
+      "test",
+      "partitionedtablediscovery_27339326"
     ]
   }
 

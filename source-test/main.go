@@ -159,6 +159,7 @@ func (connector) Discover(context.Context, *pc.Request_Discover) (*pc.Response_D
 				ResourceConfigJson: json.RawMessage(`{"stream":"greetings"}`),
 				DocumentSchemaJson: greetingSchema,
 				Key:                []string{"/count"},
+				ResourcePath:       []string{"greetings", "0"},
 			},
 		},
 	}, nil
