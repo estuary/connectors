@@ -45,6 +45,8 @@ fn require_auth_token_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema 
 #[derive(Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceConfig {
+    #[serde(default)]
+    pub stream: Option<String>,
     /// The URL path to use for adding documents to this binding. Defaults to the name of the collection.
     #[serde(default)]
     pub path: Option<String>,
@@ -56,10 +58,31 @@ pub struct ResourceConfig {
     pub id_from_header: Option<String>,
 }
 
+impl ResourceConfig {
+    /// The resource path is just an arrbitrary string that uniquely names the binding.
+    /// The `stream` is allowed to be missing in order to retain compatibility with existing
+    /// captures. Discovery will always output a non-empty `stream`, though.
+    pub fn resource_path(&self) -> Vec<String> {
+        let p = self
+            .stream
+            .clone()
+            .unwrap_or_else(|| "webhook-data".to_string());
+        vec![p]
+    }
+}
+
 pub struct Binding {
     pub collection: CollectionSpec,
-    pub resource_path: Vec<String>,
     pub resource_config: ResourceConfig,
+}
+
+impl Binding {
+    pub fn url_path(&self) -> String {
+        self.resource_config
+            .path
+            .clone()
+            .unwrap_or_else(|| self.collection.name.clone())
+    }
 }
 
 pub struct HttpIngestConnector {}
@@ -89,10 +112,10 @@ pub async fn run_connector(
         return do_spec(stdout).await;
     }
     if let Some(discover_req) = discover {
-        return do_discover(discover_req.config_json, stdout).await;
+        return do_discover(&discover_req.config_json, stdout).await;
     }
     if let Some(validate_req) = validate {
-        return do_validate(validate_req.config_json, validate_req.bindings, stdout).await;
+        return do_validate(&validate_req.config_json, &validate_req.bindings, stdout).await;
     }
     if let Some(_) = apply {
         return do_apply(stdout).await;
@@ -110,7 +133,12 @@ async fn do_pull(
     stdin: io::BufReader<io::Stdin>,
     mut stdout: io::Stdout,
 ) -> anyhow::Result<()> {
-    let Some(CaptureSpec { config_json, bindings, .. }) = capture else {
+    let Some(CaptureSpec {
+        config_json,
+        bindings,
+        ..
+    }) = &capture
+    else {
         anyhow::bail!("open request is missing capture spec");
     };
 
@@ -120,7 +148,7 @@ async fn do_pull(
     for ApplyBinding {
         collection,
         resource_config_json,
-        resource_path,
+        ..
     } in bindings
     {
         let Some(collection) = collection else {
@@ -129,8 +157,7 @@ async fn do_pull(
         let resource_config = serde_json::from_str::<ResourceConfig>(&resource_config_json)
             .context("deserializing resource config")?;
         typed_bindings.push(Binding {
-            collection,
-            resource_path,
+            collection: collection.clone(),
             resource_config,
         });
     }
@@ -176,9 +203,9 @@ async fn do_spec(mut stdout: io::Stdout) -> anyhow::Result<()> {
     write_capture_response(response, &mut stdout).await
 }
 
-async fn do_discover(config: String, mut stdout: io::Stdout) -> anyhow::Result<()> {
+async fn do_discover(config: &str, mut stdout: io::Stdout) -> anyhow::Result<()> {
     // make sure we can parse the config, just as an extra sanity check
-    let _ = serde_json::from_str::<EndpointConfig>(&config).context("parsing endpoint config")?;
+    let _ = serde_json::from_str::<EndpointConfig>(config).context("parsing endpoint config")?;
     let bindings = vec![discovered_webhook_collection()];
     let response = Response {
         discovered: Some(Discovered { bindings }),
@@ -188,12 +215,12 @@ async fn do_discover(config: String, mut stdout: io::Stdout) -> anyhow::Result<(
 }
 
 async fn do_validate(
-    config: String,
-    bindings: Vec<ValidateBinding>,
+    config: &str,
+    bindings: &[ValidateBinding],
     mut stdout: io::Stdout,
 ) -> anyhow::Result<()> {
     let config =
-        serde_json::from_str::<EndpointConfig>(&config).context("deserializing endpoint config")?;
+        serde_json::from_str::<EndpointConfig>(config).context("deserializing endpoint config")?;
     let mut output = Vec::with_capacity(bindings.len());
     let mut typed_bindings = Vec::with_capacity(bindings.len());
     for ValidateBinding {
@@ -207,18 +234,11 @@ async fn do_validate(
         let resource_config = serde_json::from_str::<ResourceConfig>(&resource_config_json)
             .context("deserializing resource config")?;
 
-        let resource_path = if let Some(path) = resource_config.path.as_ref() {
-            vec![server::ensure_slash_prefix(path.as_str().trim())]
-        } else {
-            vec![collection.name.clone()]
-        };
-
         output.push(ValidatedBinding {
-            resource_path: resource_path.clone(),
+            resource_path: resource_config.resource_path(),
         });
         typed_bindings.push(Binding {
-            collection,
-            resource_path,
+            collection: collection.clone(),
             resource_config,
         });
     }
@@ -266,6 +286,8 @@ pub async fn write_capture_response(
 
 fn discovered_webhook_collection() -> DiscoveredBinding {
     DiscoveredBinding {
+        disable: false,
+        resource_path: vec![], // TODO: fixme
         recommended_name: "webhook-data".to_string(),
         resource_config_json: serde_json::to_string(&ResourceConfig::default()).unwrap(),
         document_schema_json: serde_json::to_string(&serde_json::json!({

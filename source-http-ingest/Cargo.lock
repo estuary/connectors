@@ -234,9 +234,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.12.0"
+version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d261e256854913907f67ed06efbc3338dfe6179796deefc1ff763fc1aee5535"
+checksum = "7f30e7476521f6f8af1a1c4c0b8cc94f0bee37d91763d0ca2665f299b6cd8aec"
 
 [[package]]
 name = "bytecheck"
@@ -379,10 +379,11 @@ dependencies = [
 [[package]]
 name = "doc"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#43db16b1b0cb1ebcdd69b1339fa4452e66da1326"
+source = "git+https://github.com/estuary/flow#c03c3d9b5a70a82ce4bfc7c2baa49d3317d06f73"
 dependencies = [
  "base64 0.13.1",
  "bumpalo",
+ "bytes",
  "fancy-regex",
  "futures",
  "fxhash",
@@ -390,13 +391,16 @@ dependencies = [
  "json",
  "lz4",
  "rkyv",
+ "schemars",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror",
+ "time",
  "tracing",
  "tuple",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -842,7 +846,7 @@ dependencies = [
 [[package]]
 name = "json"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#43db16b1b0cb1ebcdd69b1339fa4452e66da1326"
+source = "git+https://github.com/estuary/flow#c03c3d9b5a70a82ce4bfc7c2baa49d3317d06f73"
 dependencies = [
  "addr",
  "bigdecimal",
@@ -852,7 +856,6 @@ dependencies = [
  "iri-string",
  "itertools",
  "lazy_static",
- "num-bigint",
  "percent-encoding",
  "serde",
  "serde_json",
@@ -1266,7 +1269,7 @@ dependencies = [
 [[package]]
 name = "proto-flow"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#43db16b1b0cb1ebcdd69b1339fa4452e66da1326"
+source = "git+https://github.com/estuary/flow#c03c3d9b5a70a82ce4bfc7c2baa49d3317d06f73"
 dependencies = [
  "bytes",
  "pbjson",
@@ -1275,12 +1278,13 @@ dependencies = [
  "proto-gazette",
  "serde",
  "serde_json",
+ "zeroize",
 ]
 
 [[package]]
 name = "proto-gazette"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#43db16b1b0cb1ebcdd69b1339fa4452e66da1326"
+source = "git+https://github.com/estuary/flow#c03c3d9b5a70a82ce4bfc7c2baa49d3317d06f73"
 dependencies = [
  "bytes",
  "pbjson",
@@ -2025,7 +2029,7 @@ checksum = "3528ecfd12c466c6f163363caf2d02a71161dd5e1cc6ae7b34207ea2d42d81ed"
 [[package]]
 name = "tuple"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#43db16b1b0cb1ebcdd69b1339fa4452e66da1326"
+source = "git+https://github.com/estuary/flow#c03c3d9b5a70a82ce4bfc7c2baa49d3317d06f73"
 dependencies = [
  "memchr",
  "serde_json",
@@ -2389,6 +2393,12 @@ checksum = "56c1936c4cc7a1c9ab21a1ebb602eb942ba868cbd44a99cb7cdc5892335e1c85"
 dependencies = [
  "linked-hash-map",
 ]
+
+[[package]]
+name = "zeroize"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a0956f1ba7c7909bfb66c2e9e4124ab6f6482560f6628b5aaeba39207c9aad9"
 
 [[package]]
 name = "zip"

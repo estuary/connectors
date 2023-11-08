@@ -232,17 +232,9 @@ impl Handler {
 
         for (i, binding) in bindings.into_iter().enumerate() {
             let binding_index = i as u32;
+            let url_path = binding.url_path();
 
-            let Binding {
-                resource_path,
-                collection,
-                resource_config,
-            } = binding;
-            let url_path = resource_path
-                .into_iter()
-                .next()
-                .ok_or_else(|| anyhow::anyhow!("missing resource path for binding: {i}"))?;
-            tracing::info!(%url_path, collection = %collection.name, "binding http url path to collection");
+            tracing::info!(%url_path, collection = %binding.collection.name, "binding http url path to collection");
 
             // In documentation and configuration, we always represent the path with the leading /.
             // But the axum `Path` extractor always strips out the leading /, so we strip it here
@@ -253,7 +245,7 @@ impl Handler {
                 url_path
             };
 
-            let schema_value = serde_json::from_str::<Value>(&collection.write_schema_json)
+            let schema_value = serde_json::from_str::<Value>(&binding.collection.write_schema_json)
                 .context("parsing write_schema_json")?;
             let uri = url::Url::parse("http://not.areal.host/").unwrap();
             let schema = json::schema::build::build_schema(uri, &schema_value)?;
@@ -264,7 +256,7 @@ impl Handler {
                 CollectionHandler {
                     validator,
                     binding_index,
-                    id_header: resource_config.id_from_header,
+                    id_header: binding.resource_config.id_from_header,
                 },
             );
         }
@@ -338,7 +330,10 @@ impl Handler {
 
         let Some(collection) = handlers_guard.get_mut(collection_path.as_str()) else {
             tracing::info!(uri_path = %collection_path, "unknown uri path");
-            return Ok((StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "not found"}))));
+            return Ok((
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "not found"})),
+            ));
         };
 
         tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "acquired lock on handler");
@@ -430,7 +425,7 @@ pub fn openapi_spec<'a>(
     let mut paths = openapi::PathsBuilder::new();
 
     for binding in bindings.iter() {
-        let url_path = ensure_slash_prefix(binding.resource_path[0].as_str());
+        let url_path = ensure_slash_prefix(&binding.url_path());
 
         let openapi_schema =
             serde_json::from_str::<openapi::Schema>(&binding.collection.write_schema_json)
@@ -570,8 +565,8 @@ mod test {
                 "projections": []
             }))
             .unwrap(),
-            resource_path: vec!["/aliceCo/test/webhook-data".to_string()],
             resource_config: crate::ResourceConfig {
+                stream: None,
                 path: None,
                 id_from_header: Some("X-Webhook-Id".to_string()),
             },
@@ -596,8 +591,8 @@ mod test {
                 "projections": []
             }))
             .unwrap(),
-            resource_path: vec!["/another.json".to_string()],
             resource_config: crate::ResourceConfig {
+                stream: Some("my-binding".to_string()),
                 path: Some("/another.json".to_string()),
                 id_from_header: None,
             },
