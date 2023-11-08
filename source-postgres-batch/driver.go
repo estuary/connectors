@@ -220,6 +220,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			ResourceConfigJson: resourceConfigJSON,
 			DocumentSchemaJson: collectionSchema,
 			Key:                collectionKey,
+			ResourcePath:       []string{res.Name},
 		})
 	}
 

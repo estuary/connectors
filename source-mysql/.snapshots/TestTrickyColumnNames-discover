@@ -106,6 +106,10 @@ Binding 0:
     },
     "key": [
       "/Meta~1`wtf`~0ID"
+    ],
+    "resource_path": [
+      "test",
+      "TrickyColumnNames_14055203"
     ]
   }
 Binding 1:
@@ -216,6 +220,10 @@ Binding 1:
     },
     "key": [
       "/table"
+    ],
+    "resource_path": [
+      "test",
+      "TrickyColumnNames_28395292"
     ]
   }
 

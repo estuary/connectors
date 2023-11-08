@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use proto_flow::capture::{Response, response, request};
+use proto_flow::capture::{request, response, Response};
 use proto_flow::flow::capture_spec::Binding;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::error::KafkaError;
@@ -59,26 +59,37 @@ pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsume
     config.create().map_err(Error::Config)
 }
 
-pub fn test_connection<C: Consumer>(configuration: &Configuration, consumer: &C, bindings: Vec<request::validate::Binding>) -> Result<Response, Error> {
+pub fn test_connection<C: Consumer>(
+    configuration: &Configuration,
+    consumer: &C,
+    bindings: Vec<request::validate::Binding>,
+) -> Result<Response, Error> {
     let metadata = fetch_metadata(configuration, consumer)?;
     Ok(Response {
         validated: Some(response::Validated {
-            bindings: metadata.topics().iter().filter(|topic| {
-                bindings.iter().any(|binding| {
-                    let res: Resource = serde_json::from_str(&binding.resource_config_json).expect("parse resource config");
-                    res.stream == topic.name()
+            bindings: metadata
+                .topics()
+                .iter()
+                .filter(|topic| {
+                    bindings.iter().any(|binding| {
+                        let res: Resource = serde_json::from_str(&binding.resource_config_json)
+                            .expect("parse resource config");
+                        res.stream == topic.name()
+                    })
                 })
-            }).map(|topic| {
-                response::validated::Binding {
+                .map(|topic| response::validated::Binding {
                     resource_path: vec![topic.name().to_string()],
-                }
-            }).collect()
+                })
+                .collect(),
         }),
         ..Default::default()
     })
 }
 
-pub fn fetch_metadata<C: Consumer>(configuration: &Configuration, consumer: &C) -> Result<Metadata, Error> {
+pub fn fetch_metadata<C: Consumer>(
+    configuration: &Configuration,
+    consumer: &C,
+) -> Result<Metadata, Error> {
     consumer
         .fetch_metadata(None, Some(KAFKA_TIMEOUT))
         .map_err(|err| Error::Metadata(configuration.brokers(), err))
@@ -94,7 +105,8 @@ pub fn available_streams(metadata: &Metadata) -> Vec<response::discovered::Bindi
             recommended_name: s.to_owned(),
             resource_config_json: serde_json::to_string(&json!({
                 "stream": s.to_owned(),
-            })).expect("resource config"),
+            }))
+            .expect("resource config"),
             document_schema_json: serde_json::to_string(&json!({
                 "x-infer-schema": true,
                 "type": "object",
@@ -115,8 +127,11 @@ pub fn available_streams(metadata: &Metadata) -> Vec<response::discovered::Bindi
                     }
                 },
                 "required": ["_meta"]
-            })).expect("document schema"),
+            }))
+            .expect("document schema"),
             key: vec!["/_meta/partition".to_string(), "/_meta/offset".to_string()],
+            resource_path: vec![s.to_owned()],
+            disable: false,
         })
         .collect()
 }
@@ -214,17 +229,23 @@ pub fn process_message<'m>(
 ) -> Result<(response::Captured, state::Checkpoint), ProcessingError> {
     let mut payload = parse_message(msg)?;
 
-    let binding_index = bindings.iter().position(|s| {
-        let res = serde_json::from_str::<Resource>(&s.resource_config_json).expect("to parse resource config");
-        res.stream == msg.topic()
-    }).expect("got message for unknown binding");
+    let binding_index = bindings
+        .iter()
+        .position(|s| {
+            let res = serde_json::from_str::<Resource>(&s.resource_config_json)
+                .expect("to parse resource config");
+            res.stream == msg.topic()
+        })
+        .expect("got message for unknown binding");
 
     let meta = json!({
         "partition": msg.partition(),
         "offset": msg.offset()
     });
 
-    payload.as_object_mut().unwrap()
+    payload
+        .as_object_mut()
+        .unwrap()
         .insert("_meta".to_string(), meta);
 
     let message = response::Captured {

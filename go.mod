@@ -22,7 +22,7 @@ require (
 	github.com/benbjohnson/clock v1.3.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
-	github.com/estuary/flow v0.3.9-0.20231101171501-fcdb1e7d6867
+	github.com/estuary/flow v0.3.9-0.20231106201646-c03c3d9b5a70
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/go-sql-driver/mysql v1.6.0

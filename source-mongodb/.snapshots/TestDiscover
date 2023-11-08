@@ -42,6 +42,10 @@ Binding 0:
     },
     "key": [
       "/_id"
+    ],
+    "resource_path": [
+      "test",
+      "collection1"
     ]
   }
 Binding 1:
@@ -88,6 +92,10 @@ Binding 1:
     },
     "key": [
       "/_id"
+    ],
+    "resource_path": [
+      "test",
+      "collection2"
     ]
   }
 

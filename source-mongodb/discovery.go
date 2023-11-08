@@ -23,8 +23,8 @@ var minimalSchema = generateMinimalSchema()
 const idProperty = "_id"
 
 const (
-	metaProperty    = "_meta"
-	opProperty      = "op"
+	metaProperty = "_meta"
+	opProperty   = "op"
 )
 
 type documentMetadata struct {
@@ -126,6 +126,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: minimalSchema,
 			Key:                []string{"/" + idProperty},
+			ResourcePath:       []string{db.Name(), collection.Name},
 		})
 	}
 

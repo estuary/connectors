@@ -129,6 +129,10 @@ Binding 0:
     "key": [
       "/k2",
       "/k1"
+    ],
+    "resource_path": [
+      "test",
+      "discoverycomplex_cheap_oxygenation"
     ]
   }
 

@@ -112,6 +112,10 @@ Binding 0:
     },
     "key": [
       "/id"
+    ],
+    "resource_path": [
+      "dbo",
+      "test_VarcharKeyDiscovery_42325208"
     ]
   }
 

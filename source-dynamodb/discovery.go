@@ -200,6 +200,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: rawSchema,
 			Key:                keyPtrs,
+			ResourcePath:       []string{table.name},
 		})
 
 	}
