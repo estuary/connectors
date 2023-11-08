@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 	"github.com/databricks/databricks-sdk-go/service/files"
+	log "github.com/sirupsen/logrus"
 )
 
 const fileSizeLimit = 128 * 1024 * 1024
@@ -78,6 +79,7 @@ func (f *stagedFile) newFile(ctx context.Context) {
 	f.uploaded = append(f.uploaded, fName)
 
 	f.group.Go(func() error {
+    log.WithField("name", fName).Debug("staged file: starting upload")
 		err := f.filesAPI.Upload(groupCtx, files.UploadRequest{
       Contents: r,
       FilePath: f.filePath(fName),
@@ -98,6 +100,7 @@ func (f *stagedFile) flushFile() error {
 		return nil
 	}
 
+  log.Debug("staged file: flushFile")
 	if err := f.encoder.Close(); err != nil {
 		return fmt.Errorf("closing encoder: %w", err)
 	} else if err := f.group.Wait(); err != nil {
