@@ -87,6 +87,7 @@ func newSqlServerDriver() *sql.Driver {
 			log.WithFields(log.Fields{
 				"address":  cfg.Address,
 				"path": cfg.HTTPPath,
+        "catalog": cfg.CatalogName,
 			}).Info("connecting to databricks")
 
 			var metaBase sql.TablePath
@@ -111,10 +112,6 @@ func newSqlServerDriver() *sql.Driver {
 func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
-
-	log.WithFields(log.Fields{
-		"url":  cfg.ToURI(),
-	}).Warn("connecting to databricks")
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
@@ -426,6 +423,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
     }
   }
 
+  log.Info("load: starting upload of files")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -456,10 +454,13 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		}
 	}
 
+  log.Info("load: finished upload of files")
+
 	if it.Err() != nil {
 		return it.Err()
 	}
 
+  log.Info("load: starting join query")
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
 	rows, err := d.load.conn.QueryContext(ctx, d.load.unionSQL)
@@ -479,15 +480,12 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 				return err
 			}
 		}
-		log.WithFields(log.Fields{
-			"content": document,
-			"binding": binding,
-		}).Warn("loaded")
 	}
 
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("querying Loads: %w", err)
 	}
+  log.Info("load: finished join query")
 
 	for _, b := range d.bindings {
 		if _, err = d.load.conn.ExecContext(ctx, b.dropLoadSQL); err != nil {
@@ -518,10 +516,8 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
 	ctx := it.Context()
 
+  log.Info("store: starting file uploads")
 	for it.Next() {
-		//log.WithFields(log.Fields{
-			//"binding": it.Binding,
-		//}).Warn("1 store iterator")
 		var b = d.bindings[it.Binding]
 		b.storeFile.start()
 
@@ -581,6 +577,8 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 	}
 
+  log.Info("store: finished file uploads")
+
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
     var cp = checkpoint{Queries: queries, ToDelete: toDelete}
 
@@ -610,9 +608,7 @@ func renderWithFiles(tpl string, files ...string) string {
 
 // applyCheckpoint merges data from temporary table to main table
 func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
-  //log.WithFields(log.Fields{"queries": cp.Queries}).Warn("restart now - before applying")
-  //time.Sleep(20 * time.Second)
-
+  log.Info("store: starting committing changes")
 	for _, q := range cp.Queries {
 		if _, err := d.store.conn.ExecContext(ctx, q); err != nil {
       // When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
@@ -628,9 +624,7 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 			return fmt.Errorf("query %q failed: %w", q, err)
 		}
 	}
-
-	//log.WithFields(log.Fields{ "files": cp.ToDelete}).Warn("restart now - before cleaning up files")
-	//time.Sleep(20 * time.Second)
+  log.Info("store: finished committing changes")
 
   // Cleanup files and tables
   d.deleteFiles(ctx, cp.ToDelete)
