@@ -22,43 +22,43 @@ CLUSTER BY key1, key2, boolean, integer;
 SELECT 0, l.flow_document
 	FROM projectID.dataset.target_table AS l
 	JOIN flow_temp_table_0 AS r
-		 ON l.key1 = r.key1
-		 AND l.key2 = r.key2
-		 AND l.boolean = r.boolean
-		 AND l.integer = r.integer
-		 AND l.string = r.string
+		 ON l.key1 = r.c0
+		 AND l.key2 = r.c1
+		 AND l.boolean = r.c2
+		 AND l.integer = r.c3
+		 AND l.string = r.c4
 
 --- End projectID.dataset.target_table loadQuery ---
 
 --- Begin projectID.dataset.target_table storeInsert ---
 INSERT INTO projectID.dataset.target_table (key1, key2, boolean, integer, string, `defAULT`, number, person_place_, source_name, `with-dash`, flow_document)
-SELECT key1, key2, boolean, integer, string, `defAULT`, number, person_place_, source_name, `with-dash`, flow_document FROM flow_temp_table_0;
+SELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10 FROM flow_temp_table_0;
 --- End projectID.dataset.target_table storeInsert ---
 
 --- Begin projectID.dataset.target_table storeUpdate ---
 MERGE INTO projectID.dataset.target_table AS l
 USING flow_temp_table_0 AS r
-ON l.key1 = r.key1 AND l.key2 = r.key2 AND l.boolean = r.boolean AND l.integer = r.integer AND l.string = r.string
-WHEN MATCHED AND r.flow_document IS NULL THEN
+ON l.key1 = r.c0 AND l.key2 = r.c1 AND l.boolean = r.c2 AND l.integer = r.c3 AND l.string = r.c4
+WHEN MATCHED AND r.c10 IS NULL THEN
 	DELETE
 WHEN MATCHED THEN
-	UPDATE SET l.`defAULT` = r.`defAULT`, l.number = r.number, l.person_place_ = r.person_place_, l.source_name = r.source_name, l.`with-dash` = r.`with-dash`, l.flow_document = r.flow_document
+	UPDATE SET l.`defAULT` = r.c5, l.number = r.c6, l.person_place_ = r.c7, l.source_name = r.c8, l.`with-dash` = r.c9, l.flow_document = r.c10
 WHEN NOT MATCHED THEN
 	INSERT (key1, key2, boolean, integer, string, `defAULT`, number, person_place_, source_name, `with-dash`, flow_document)
-	VALUES (r.key1, r.key2, r.boolean, r.integer, r.string, r.`defAULT`, r.number, r.person_place_, r.source_name, r.`with-dash`, r.flow_document);
+	VALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10);
 --- End projectID.dataset.target_table storeUpdate ---
 
 --- Begin target_table_no_values_materialized storeUpdate ---
 MERGE INTO projectID.dataset.target_table_no_values_materialized AS l
 USING flow_temp_table_1 AS r
-ON l.key1 = r.key1 AND l.key2 = r.key2
-WHEN MATCHED AND r.flow_document IS NULL THEN
+ON l.key1 = r.c0 AND l.key2 = r.c1
+WHEN MATCHED AND r.c2 IS NULL THEN
 	DELETE
 WHEN MATCHED THEN
-	UPDATE SET l.flow_document = r.flow_document
+	UPDATE SET l.flow_document = r.c2
 WHEN NOT MATCHED THEN
 	INSERT (key1, key2, flow_document)
-	VALUES (r.key1, r.key2, r.flow_document);
+	VALUES (r.c0, r.c1, r.c2);
 --- End target_table_no_values_materialized storeUpdate ---
 
 --- Begin Fence Install ---

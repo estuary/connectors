@@ -131,11 +131,18 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, fieldSche
 func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSchema) ([]*bigquery.FieldSchema, error) {
 	s := make([]*bigquery.FieldSchema, 0, len(cols))
 
-	for _, col := range cols {
+	for idx, col := range cols {
 		schema, ok := fieldSchemas[translateFlowIdentifier(col.Field)]
 		if !ok {
 			return nil, fmt.Errorf("could not find metadata for field '%s'", col.Field)
 		}
+
+		// Use a placeholder value instead of the actual field name for the external table schema.
+		// This allows for materialized tables to use "Flexible column names", which is not yet
+		// supported by external tables. A similar placeholder is used in the generated SQL queries
+		// to match this.
+		schema.Name = fmt.Sprintf("c%d", idx)
+
 		s = append(s, schema)
 	}
 
