@@ -15,28 +15,18 @@ import (
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#identifiers.
 var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
-// Bigquery allows only alphanumeric characters and underscores for column names. We will convert
-// everything else to underscore. Column names are also not allowed to start with a number. Table
-// names are generally much more permissive but for historical reasons, we will sanitize table names
-// in the same way as column names. A notable incongruity here (also for historical reasons) is that
-// hyphens are _not_ sanitized. Hyphens are allowed in table names but not column names. There are
-// existing materializations that have table names with hyphens, and underscoring hyphens in table
-// names would break these.
+// Up until recently, BigQuery had a number of restrictions on allowable characters in column names.
+// Because of this, we convert non-alphanumeric characters of identifiers (both table names and
+// columns) to underscores, with the exception of hyphens.
 
-// It would be possible to modify the materialize-sql framework to use a separate identifier for
-// column names vs. table names to work with this peculiarity of Bigquery perhaps. An even better
-// long-term solution may be to use resource-specific constraints for BigQuery and require column
-// names to have compliant projections and do away with this identifier transforming entirely. But
-// until we have UI capabilities that would support easily providing a large number of projections,
-// I am leaving things as-is and not adding the complexity of a separate table vs. column identifier
-// that would only be applicable to Bigquery. We should revisit this once projection editing is
-// better supported.
+// With BigQuery supporting "Flexible Column Names"
+// (https://cloud.google.com/bigquery/docs/schemas#flexible-column-names), it may now be possible
+// significantly relax these conversions, but the migration for existing materializations would need
+// to be figured out. So for now we continue to sanitize fields in the same historical way.
 
-// As-is, the connector will error on ApplyUpsert under the following conditions:
-//   - Field name has a hyphen
-//   - Field name starts with a number
-//   - Field name collisions due to underscore conversion:
-//     Ex: "field!" vs. "field?" both sanitizing to "field_".
+// As it is, there is a potential for an error if these "sanitized" column names collide, for
+// example "field!" vs. "field?" both sanitizing to "field_".  In this case an alternate projection
+// name for one of the fields will be required.
 var identifierSanitizerRegexp = regexp.MustCompile(`[^\-_0-9a-zA-Z]`)
 
 func identifierSanitizer(delegate func(string) string) func(string) string {
@@ -144,7 +134,7 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 	JOIN {{ template "tempTableName" . }} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+		l.{{ $key.Identifier }} = r.c{{$ind}}
 	{{- end }}
 {{ else }}
 SELECT -1, NULL LIMIT 0
@@ -162,7 +152,7 @@ INSERT INTO {{ $.Identifier }} (
 )
 SELECT {{ range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
-		{{$col.Identifier}}
+		c{{$ind}}
 	{{- end }} FROM {{ template "tempTableName" . }};
 {{ end }}
 
@@ -173,19 +163,19 @@ MERGE INTO {{ $.Identifier }} AS l
 USING {{ template "tempTableName" . }} AS r
 ON {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
-	l.{{$key.Identifier}} = r.{{$key.Identifier}}
+	l.{{$key.Identifier}} = r.c{{$ind}}
 {{- end}}
 {{- if $.Document }}
-WHEN MATCHED AND r.{{$.Document.Identifier}} IS NULL THEN
+WHEN MATCHED AND r.c{{ Add (len $.Columns) -1 }} IS NULL THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
-		l.{{$val.Identifier}} = r.{{$val.Identifier}}
+		l.{{$val.Identifier}} = r.c{{ Add (len $.Keys) $ind}}
 	{{- end}} 
 	{{- if $.Document -}}
-		{{ if $.Values  }}, {{ end }}l.{{$.Document.Identifier}} = r.{{$.Document.Identifier}}
+		{{ if $.Values  }}, {{ end }}l.{{$.Document.Identifier}} = r.c{{ Add (len $.Columns) -1 }}
 	{{- end }}
 WHEN NOT MATCHED THEN
 	INSERT (
@@ -197,7 +187,7 @@ WHEN NOT MATCHED THEN
 	VALUES (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
-		r.{{$col.Identifier}}
+		r.c{{$ind}}
 	{{- end -}}
 	);
 {{ end }}
