@@ -15,6 +15,7 @@ import (
 )
 
 const fileSizeLimit = 128 * 1024 * 1024
+const uploadConcurrency = 10 // that means we may use up to 1.28GB disk space
 
 // fileBuffer provides Close() for a *bufio.Writer writing to an *os.File. Close() will flush the
 // buffer and close the underlying file.
@@ -112,7 +113,6 @@ func newStagedFile(filesAPI *files.FilesAPI, root string, fields []string) *stag
 	}
 }
 
-const uploadConcurrency = 5
 func (f *stagedFile) start(ctx context.Context) error {
 	if f.started {
 		return nil
