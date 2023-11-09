@@ -373,7 +373,7 @@ func newTransactor(
 	for _, b := range bindings {
 		t.bindings = append(t.bindings, &binding{
 			target:    b,
-			storeFile: newStagedFile(s3client, cfg.Bucket, cfg.BucketPath, b.Columns()),
+			storeFile: newStagedFile(s3client, cfg.Bucket, cfg.BucketPath, b.ColumnNames()),
 		})
 	}
 
