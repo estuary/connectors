@@ -3,7 +3,6 @@ package sql
 import (
 	"bytes"
 	"compress/gzip"
-	"encoding/json"
 	"io"
 	"testing"
 
@@ -11,38 +10,78 @@ import (
 )
 
 func TestCountingEncoder(t *testing.T) {
-	testData := "this is a test"
+	for _, tt := range []struct {
+		name      string
+		fields    []string
+		input     []any
+		wantBytes []byte
+	}{
+		{
+			name:      "object",
+			fields:    []string{"str", "int", "bool", "num"},
+			input:     []any{"testing", 1, true, 2.3},
+			wantBytes: append([]byte(`{"bool":true,"int":1,"num":2.3,"str":"testing"}`), '\n'),
+		},
+		{
+			name:      "array",
+			fields:    nil,
+			input:     []any{"testing", 1, true, 2.3},
+			wantBytes: append([]byte(`["testing",1,true,2.3]`), '\n'),
+		},
+		{
+			name:      "single field object",
+			fields:    []string{"str"},
+			input:     []any{"testing"},
+			wantBytes: append([]byte(`{"str":"testing"}`), '\n'),
+		},
+		{
+			name:      "single field array",
+			fields:    nil,
+			input:     []any{"testing"},
+			wantBytes: append([]byte(`["testing"]`), '\n'),
+		},
+		{
+			name:      "empty object",
+			fields:    []string{},
+			input:     []any{},
+			wantBytes: append([]byte(`{}`), '\n'),
+		},
+		{
+			name:      "empty array",
+			fields:    nil,
+			input:     []any{},
+			wantBytes: append([]byte(`[]`), '\n'),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var wantGzipBytes bytes.Buffer
+			gzw, err := gzip.NewWriterLevel(&wantGzipBytes, compressionLevel)
+			require.NoError(t, err)
 
-	var wantBytes bytes.Buffer
-	require.NoError(t, json.NewEncoder(&wantBytes).Encode(testData))
+			_, err = gzw.Write(tt.wantBytes)
+			require.NoError(t, err)
+			require.NoError(t, gzw.Close())
 
-	var wantGzipBytes bytes.Buffer
-	gzw, err := gzip.NewWriterLevel(&wantGzipBytes, compressionLevel)
-	require.NoError(t, err)
-	require.NoError(t, json.NewEncoder(gzw).Encode(testData))
-	require.NoError(t, gzw.Close())
+			var buf bytes.Buffer
+			tw := &testWriter{
+				w: &buf,
+			}
 
-	var buf bytes.Buffer
-	tw := &testWriter{
-		w: &buf,
+			enc := NewCountingEncoder(tw, tt.fields)
+			require.NoError(t, enc.Encode(tt.input))
+			require.NoError(t, enc.Close())
+
+			// The provided writer is closed when enc is closed.
+			require.True(t, tw.closed)
+
+			// The written bytes can be unzip'd correctly.
+			r, err := gzip.NewReader(&buf)
+			require.NoError(t, err)
+			gotBytes, err := io.ReadAll(r)
+			require.NoError(t, err)
+			require.Equal(t, string(tt.wantBytes), string(gotBytes))
+		})
 	}
-
-	enc := NewCountingEncoder(tw)
-	require.NoError(t, enc.Encode(testData))
-	require.NoError(t, enc.Close())
-
-	// The provided writer is closed when enc is closed.
-	require.True(t, tw.closed)
-
-	// The count of bytes written is for the GZIP'd bytes.
-	require.Equal(t, wantGzipBytes.Len(), enc.Written())
-
-	// The written bytes can be unzip'd correctly.
-	r, err := gzip.NewReader(&buf)
-	require.NoError(t, err)
-	gotBytes, err := io.ReadAll(r)
-	require.NoError(t, err)
-	require.Equal(t, wantBytes.Bytes(), gotBytes)
 }
 
 type testWriter struct {

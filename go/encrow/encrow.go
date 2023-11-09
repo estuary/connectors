@@ -13,6 +13,7 @@ type Shape struct {
 	arity    int
 	prefixes []string
 	swizzle  []int
+	flags    json.AppendFlags
 }
 
 // NewShape constructs a new Shape corresponding to the provided field names.
@@ -36,7 +37,14 @@ func NewShape(fields []string) *Shape {
 		arity:    len(sortedNames),
 		prefixes: generatePrefixes(sortedNames),
 		swizzle:  swizzle,
+		// Default flags, unless overridden via SetFlags.
+		flags: json.EscapeHTML | json.SortMapKeys,
 	}
+}
+
+// SetFlags overrides the default flags, if alternate behavior is desired.
+func (s *Shape) SetFlags(flags json.AppendFlags) {
+	s.flags = flags
 }
 
 func generatePrefixes(fields []string) []string {
@@ -69,7 +77,7 @@ func (s *Shape) Encode(buf []byte, values []any) ([]byte, error) {
 	buf = buf[:0]
 	for idx, vidx := range s.swizzle {
 		buf = append(buf, s.prefixes[idx]...)
-		buf, err = json.Append(buf, values[vidx], json.EscapeHTML|json.SortMapKeys)
+		buf, err = json.Append(buf, values[vidx], s.flags)
 		if err != nil {
 			return nil, err
 		}
