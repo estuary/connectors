@@ -1,0 +1,127 @@
+---
+tap_stream_id: locations
+replication_method: FULL_TABLE
+key_properties:
+  - id
+stream: locations
+metadata:
+  - breadcrumb:
+      - properties
+      - active
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - address1
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - address2
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - city
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - country
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - country_code
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - created_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - legacy
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - phone
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - province
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - province_code
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - updated_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - zip
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - localized_country_name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - localized_province_name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - country_name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - admin_graphql_api_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id

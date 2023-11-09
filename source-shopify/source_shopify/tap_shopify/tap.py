@@ -21,18 +21,19 @@ from tap_shopify.streams import (
     UsersStream,
 )
 
+# Commented stream types are gated behind our shopify app being granted protected data permissions
 STREAM_TYPES = [
-    AbandonedCheckouts,
+    # AbandonedCheckouts,
     CollectStream,
     CustomCollections,
-    CustomersStream,
+    # CustomersStream,
     InventoryItemsStream,
     InventoryLevelsStream,
     LocationsStream,
     MetafieldsStream,
-    OrdersStream,
+    # OrdersStream,
     ProductsStream,
-    TransactionsStream,
+    # TransactionsStream,
 ]
 
 

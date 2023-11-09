@@ -1,4 +1,6 @@
 ---
+import:
+  - acmeCo/flow.yaml
 captures:
   acmeCo/source-shopify:
     endpoint:
@@ -10,4 +12,18 @@ captures:
         config: connector_config.yaml
         env:
           LOG_LEVEL: debug
-    bindings: []
+    bindings:
+      - resource: acmeCo/configs/source-shopify.resource.0.config.yaml
+        target: acmeCo/collects
+      - resource: acmeCo/configs/source-shopify.resource.1.config.yaml
+        target: acmeCo/custom_collections
+      - resource: acmeCo/configs/source-shopify.resource.2.config.yaml
+        target: acmeCo/inventory_items
+      - resource: acmeCo/configs/source-shopify.resource.3.config.yaml
+        target: acmeCo/inventory_levels
+      - resource: acmeCo/configs/source-shopify.resource.4.config.yaml
+        target: acmeCo/locations
+      - resource: acmeCo/configs/source-shopify.resource.5.config.yaml
+        target: acmeCo/metafields
+      - resource: acmeCo/configs/source-shopify.resource.6.config.yaml
+        target: acmeCo/products
