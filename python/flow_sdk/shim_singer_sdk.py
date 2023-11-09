@@ -107,6 +107,7 @@ class CaptureShim(Connector):
                     documentSchema=json_schema,
                     resourceConfig=resourceConfig,
                     key=key,
+                    resourcePath=[entry.tap_stream_id],
                 )
             )
 
