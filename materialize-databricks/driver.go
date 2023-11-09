@@ -23,6 +23,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+	"golang.org/x/sync/errgroup"
 )
 
 // TODO: Add info logs on start and end of long-running jobs
@@ -436,22 +437,27 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		}
 	}
 
-  // Copy the staged files
+  // Copy the staged files in parallel
+  group, groupCtx := errgroup.WithContext(ctx)
 	for idx, b := range d.bindings {
     if !b.loadFile.started {
       continue
     }
 
-		toCopy, _, err := b.loadFile.flush()
-		if err != nil {
-			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
-		}
-		// defer d.deleteFiles(ctx, toDelete)
+    group.Go(func() error {
+      toCopy, toDelete, err := b.loadFile.flush()
+      if err != nil {
+        return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
+      }
+      defer d.deleteFiles(groupCtx, toDelete)
 
-		// COPY INTO temporary load table from staged files
-		if _, err := d.load.conn.ExecContext(ctx, renderWithFiles(b.copyIntoLoad, toCopy...)); err != nil {
-			return fmt.Errorf("load: writing keys: %w", err)
-		}
+      // COPY INTO temporary load table from staged files
+      if _, err := d.load.conn.ExecContext(groupCtx, renderWithFiles(b.copyIntoLoad, toCopy...)); err != nil {
+        return fmt.Errorf("load: writing keys: %w", err)
+      }
+
+      return nil
+    })
 	}
 
   log.Info("load: finished upload of files")
@@ -459,6 +465,10 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	if it.Err() != nil {
 		return it.Err()
 	}
+
+  if err := group.Wait(); err != nil {
+    return err
+  }
 
   log.Info("load: starting join query")
 	// Issue a union join of the target tables and their (now staged) load keys,
@@ -544,39 +554,49 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 	var queries []string
   // all files uploaded across bindings
   var toDelete []string
+  // we run these processes in parallel
+  group, groupCtx := errgroup.WithContext(ctx)
 	for idx, b := range d.bindings {
     if !b.storeFile.started {
       continue
     }
 
-    // Create a binding-scoped temporary table for store documents to be merged
-    // into target table
-    if _, err := d.store.conn.ExecContext(ctx, b.createStoreTableSQL); err != nil {
-      return nil, fmt.Errorf("Exec(%s): %w", b.createStoreTableSQL, err)
-    }
+    group.Go(func() error {
+      // Create a binding-scoped temporary table for store documents to be merged
+      // into target table
+      if _, err := d.store.conn.ExecContext(groupCtx, b.createStoreTableSQL); err != nil {
+        return fmt.Errorf("Exec(%s): %w", b.createStoreTableSQL, err)
+      }
 
-		toCopy, toDeleteBinding, err := b.storeFile.flush()
-		if err != nil {
-			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
-		}
-    toDelete = append(toDelete, toDeleteBinding...)
+      toCopy, toDeleteBinding, err := b.storeFile.flush()
+      if err != nil {
+        return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
+      }
+      toDelete = append(toDelete, toDeleteBinding...)
 
-		// In case of delta updates or if there are no existing keys being stored
-    // we directly copy from staged files into the target table. Note that this is retriable
-    // given that COPY INTO is idempotent by default: files that have already been loaded into a table will
-    // not be loaded again
-    // see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
-		if b.target.DeltaUpdates || !b.needsMerge {
-			queries = append(queries, renderWithFiles(b.copyIntoDirect, toCopy...))
-		} else {
-			// COPY INTO temporary load table from staged files
-			if _, err := d.store.conn.ExecContext(ctx, renderWithFiles(b.copyIntoStore, toCopy...)); err != nil {
-				return nil, fmt.Errorf("store: copying into to temporary table: %w", err)
-			}
+      // In case of delta updates or if there are no existing keys being stored
+      // we directly copy from staged files into the target table. Note that this is retriable
+      // given that COPY INTO is idempotent by default: files that have already been loaded into a table will
+      // not be loaded again
+      // see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
+      if b.target.DeltaUpdates || !b.needsMerge {
+        queries = append(queries, renderWithFiles(b.copyIntoDirect, toCopy...))
+      } else {
+        // COPY INTO temporary load table from staged files
+        if _, err := d.store.conn.ExecContext(groupCtx, renderWithFiles(b.copyIntoStore, toCopy...)); err != nil {
+          return fmt.Errorf("store: copying into to temporary table: %w", err)
+        }
 
-			queries = append(queries, renderWithFiles(b.mergeInto, toCopy...), b.dropStoreSQL)
-		}
+        queries = append(queries, renderWithFiles(b.mergeInto, toCopy...), b.dropStoreSQL)
+      }
+
+      return nil
+    })
 	}
+
+  if err := group.Wait(); err != nil {
+    return nil, err
+  }
 
   log.Info("store: finished file uploads")
 
