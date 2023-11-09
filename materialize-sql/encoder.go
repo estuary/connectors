@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/estuary/connectors/go/encrow"
 	"github.com/segmentio/encoding/json"
 )
 
@@ -26,43 +27,76 @@ const (
 // CountingEncoder provides access to a count of gzip'd bytes that have been written by a
 // json.Encoder to an io.WriterCloser.
 type CountingEncoder struct {
-	enc *json.Encoder
-	cwc *countingWriteCloser
-	gz  *gzip.Writer
+	gz      *gzip.Writer
+	w       io.WriteCloser
+	written int
+	shape   *encrow.Shape
+	buf     []byte
 }
 
 // NewCountingEncoder creates a CountingEncoder from w. w is closed when CountingEncoder is closed.
-func NewCountingEncoder(w io.WriteCloser) *CountingEncoder {
-	cwc := &countingWriteCloser{w: w}
-	gz, err := gzip.NewWriterLevel(cwc, compressionLevel)
+// If `fields` is nil, values will be encoded as a JSON array rather than as an object.
+func NewCountingEncoder(w io.WriteCloser, fields []string) *CountingEncoder {
+	gz, err := gzip.NewWriterLevel(w, compressionLevel)
 	if err != nil {
 		// Only possible if compressionLevel is not valid.
 		panic("invalid compression level for gzip.NewWriterLevel")
 	}
 
-	enc := json.NewEncoder(gz)
-	enc.SetIndent("", "")
-
-	// We certainly don't want to escape <, >, &, etc., and also setting this to false might be
-	// beneficial to throughput.
-	enc.SetEscapeHTML(false)
-
-	return &CountingEncoder{
-		enc: enc,
-		cwc: cwc,
-		gz:  gz,
+	enc := &CountingEncoder{
+		gz: gz,
+		w:  w,
 	}
+
+	if fields != nil {
+		enc.shape = encrow.NewShape(fields)
+		// Setting TrustRawMessage here prevents unnecessary validation of pre-serialized JSON
+		// received from the runtime, which we can assume to be valid (flow_document for example).
+		// Note that we are also not setting SortMapKeys or EscapeHTML: Sorting keys is not needed
+		// because encrow.Shape already sorts the top-level keys and any object values are already
+		// serialized as JSON, and escaping HTML is not desired so as to avoid escaping values like
+		// <, >, &, etc. if they are present in the materialized collection's data.
+		enc.shape.SetFlags(json.TrustRawMessage)
+	}
+
+	return enc
 }
 
-func (e *CountingEncoder) Encode(v any) error {
-	if err := e.enc.Encode(v); err != nil {
-		return fmt.Errorf("countingEncoder encoding to enc: %w", err)
+func (e *CountingEncoder) Encode(vals []any) (err error) {
+	if e.shape == nil {
+		// Serialize as a JSON array of values.
+		e.buf = e.buf[:0]
+		e.buf = append(e.buf, '[')
+		for idx, v := range vals {
+			if e.buf, err = json.Append(e.buf, v, json.TrustRawMessage); err != nil {
+				return fmt.Errorf("encoding JSON array value: %w", err)
+			}
+			if idx != len(vals)-1 {
+				e.buf = append(e.buf, ',')
+			}
+		}
+		e.buf = append(e.buf, ']')
+	} else {
+		// Serialize as a JSON object.
+		if e.buf, err = e.shape.Encode(e.buf, vals); err != nil {
+			return fmt.Errorf("encoding shape: %w", err)
+		}
 	}
+
+	e.buf = append(e.buf, '\n')
+
+	n, err := e.gz.Write(e.buf)
+	if err != nil {
+		return fmt.Errorf("writing gzip bytes: %w", err)
+	}
+
+	e.written += n
+
 	return nil
 }
 
 func (e *CountingEncoder) Written() int {
-	return e.cwc.written
+	return e.written
 }
 
 // Close closes the underlying gzip writer, flushing its data and writing the GZIP footer. It also
@@ -70,32 +104,8 @@ func (e *CountingEncoder) Written() int {
 func (e *CountingEncoder) Close() error {
 	if err := e.gz.Close(); err != nil {
 		return fmt.Errorf("closing gzip writer: %w", err)
-	} else if err := e.cwc.Close(); err != nil {
+	} else if err := e.w.Close(); err != nil {
 		return fmt.Errorf("closing counting writer: %w", err)
-	}
-	return nil
-}
-
-// countingWriteCloser is used internally by CountingEncoder to access the count of compressed bytes
-// written to the writer.
-type countingWriteCloser struct {
-	written int
-	w       io.WriteCloser
-}
-
-func (c *countingWriteCloser) Write(p []byte) (int, error) {
-	n, err := c.w.Write(p)
-	if err != nil {
-		return 0, fmt.Errorf("countingWriteCloser writing to w: %w", err)
-	}
-	c.written += n
-
-	return n, nil
-}
-
-func (c *countingWriteCloser) Close() error {
-	if err := c.w.Close(); err != nil {
-		return fmt.Errorf("countingWriteCloser closing w: %w", err)
 	}
 	return nil
 }
