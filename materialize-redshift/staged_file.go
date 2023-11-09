@@ -40,7 +40,7 @@ const (
 // be used by Redshift to load all of the files stored for the current transaction. Returns a
 // function that will delete all stored files, including the manifest file.
 type stagedFile struct {
-	cols     []*sql.Column
+	fields   []string
 	client   *s3.Client
 	uploader *manager.Uploader
 
@@ -64,9 +64,9 @@ type stagedFile struct {
 	started bool
 }
 
-func newStagedFile(client *s3.Client, bucket string, bucketPath string, cols []*sql.Column) *stagedFile {
+func newStagedFile(client *s3.Client, bucket string, bucketPath string, fields []string) *stagedFile {
 	return &stagedFile{
-		cols:   cols,
+		fields: fields,
 		client: client,
 		uploader: manager.NewUploader(client, func(u *manager.Uploader) {
 			// The default concurrency is 5, which will potentially start up 5 separate goroutines
@@ -101,7 +101,7 @@ func (f *stagedFile) start() {
 func (f *stagedFile) newFile(ctx context.Context) {
 	r, w := io.Pipe()
 
-	f.encoder = sql.NewCountingEncoder(w)
+	f.encoder = sql.NewCountingEncoder(w, true, f.fields)
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	f.group = group
@@ -141,22 +141,13 @@ func (f *stagedFile) flushFile() error {
 }
 
 func (f *stagedFile) encodeRow(ctx context.Context, row []interface{}) error {
-	if len(row) != len(f.cols) { // Sanity check
-		return fmt.Errorf("number of headers in row to encode (%d) differs from number of configured headers (%d)", len(row), len(f.cols))
-	}
-
-	d := make(map[string]interface{})
-	for idx := range row {
-		d[f.cols[idx].Field] = row[idx]
-	}
-
 	// May not have an encoder set yet if the previous encodeRow() resulted in flushing the current
 	// file, or for the very first call to encodeRow().
 	if f.encoder == nil {
 		f.newFile(ctx)
 	}
 
-	if err := f.encoder.Encode(d); err != nil {
+	if err := f.encoder.Encode(row); err != nil {
 		return fmt.Errorf("encoding row: %w", err)
 	}
 
