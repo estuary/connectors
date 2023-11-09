@@ -427,11 +427,11 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		b.loadFile.start()
+		b.loadFile.start(ctx)
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
-		} else if err := b.loadFile.encodeRow(ctx, converted); err != nil {
+		} else if err := b.loadFile.encodeRow(converted); err != nil {
 			return fmt.Errorf("encoding row for load: %w", err)
 		}
 	}
@@ -442,11 +442,11 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
       continue
     }
 
-		toCopy, toDelete, err := b.loadFile.flush(ctx)
+		toCopy, _, err := b.loadFile.flush()
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
-		defer d.deleteFiles(ctx, toDelete)
+		// defer d.deleteFiles(ctx, toDelete)
 
 		// COPY INTO temporary load table from staged files
 		if _, err := d.load.conn.ExecContext(ctx, renderWithFiles(b.copyIntoLoad, toCopy...)); err != nil {
@@ -508,7 +508,8 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) {
     if err := d.wsClient.Files.DeleteByFilePath(ctx, f); err != nil {
       log.WithFields(log.Fields{
         "file": f,
-      }).Warn("deleteFiles failed")
+        "err": err,
+      }).Debug("deleteFiles failed")
     }
   }
 }
@@ -519,14 +520,14 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
   log.Info("store: starting file uploads")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
-		b.storeFile.start()
+		b.storeFile.start(ctx)
 
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON);
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
 
-		if err := b.storeFile.encodeRow(ctx, converted); err != nil {
+		if err := b.storeFile.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
 		}
 
@@ -554,7 +555,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
       return nil, fmt.Errorf("Exec(%s): %w", b.createStoreTableSQL, err)
     }
 
-		toCopy, toDeleteBinding, err := b.storeFile.flush(ctx)
+		toCopy, toDeleteBinding, err := b.storeFile.flush()
 		if err != nil {
 			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
@@ -614,10 +615,7 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
       // When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
       // it is okay to skip them in this case
       if recovery {
-        if strings.Contains(err.Error(), "PATH_NOT_FOUND") {
-          continue
-        }
-        if strings.Contains(err.Error(), "Table doesn't exist") {
+        if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") {
           continue
         }
       }
