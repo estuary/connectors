@@ -27,25 +27,31 @@ const (
 // CountingEncoder provides access to a count of gzip'd bytes that have been written by a
 // json.Encoder to an io.WriterCloser.
 type CountingEncoder struct {
-	gz      *gzip.Writer
-	w       io.WriteCloser
-	written int
-	shape   *encrow.Shape
-	buf     []byte
+	w          io.Writer // will be set to either `gz` for compressed writes or `underlying` if compression is disabled
+	gz         *gzip.Writer
+	underlying io.WriteCloser
+	written    int
+	shape      *encrow.Shape
+	buf        []byte
 }
 
 // NewCountingEncoder creates a CountingEncoder from w. w is closed when CountingEncoder is closed.
 // If `fields` is nil, values will be encoded as a JSON array rather than as an object.
-func NewCountingEncoder(w io.WriteCloser, fields []string) *CountingEncoder {
-	gz, err := gzip.NewWriterLevel(w, compressionLevel)
-	if err != nil {
-		// Only possible if compressionLevel is not valid.
-		panic("invalid compression level for gzip.NewWriterLevel")
+func NewCountingEncoder(w io.WriteCloser, gzipCompression bool, fields []string) *CountingEncoder {
+	enc := &CountingEncoder{
+		underlying: w,
 	}
 
-	enc := &CountingEncoder{
-		gz: gz,
-		w:  w,
+	if gzipCompression {
+		gz, err := gzip.NewWriterLevel(w, compressionLevel)
+		if err != nil {
+			// Only possible if compressionLevel is not valid.
+			panic("invalid compression level for gzip.NewWriterLevel")
+		}
+		enc.gz = gz
+		enc.w = gz
+	} else {
+		enc.w = w
 	}
 
 	if fields != nil {
@@ -85,7 +91,7 @@ func (e *CountingEncoder) Encode(vals []any) (err error) {
 
 	e.buf = append(e.buf, '\n')
 
-	n, err := e.gz.Write(e.buf)
+	n, err := e.w.Write(e.buf)
 	if err != nil {
 		return fmt.Errorf("writing gzip bytes: %w", err)
 	}
@@ -99,12 +105,17 @@ func (e *CountingEncoder) Written() int {
 	return e.written
 }
 
-// Close closes the underlying gzip writer, flushing its data and writing the GZIP footer. It also
-// closes io.WriteCloser that was used to initialize the counting encoder.
+// Close closes the underlying gzip writer if compression is enabled, flushing its data and writing
+// the GZIP footer. It also closes the underlying io.WriteCloser that was used to initialize the
+// counting encoder.
 func (e *CountingEncoder) Close() error {
-	if err := e.gz.Close(); err != nil {
-		return fmt.Errorf("closing gzip writer: %w", err)
-	} else if err := e.w.Close(); err != nil {
+	if e.gz != nil {
+		if err := e.gz.Close(); err != nil {
+			return fmt.Errorf("closing gzip writer: %w", err)
+		}
+	}
+
+	if err := e.underlying.Close(); err != nil {
 		return fmt.Errorf("closing counting writer: %w", err)
 	}
 	return nil
