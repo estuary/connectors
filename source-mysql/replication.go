@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -497,7 +498,9 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 			}).Info("parsed components of ALTER TABLE statement")
 
 			if stmt.PartitionSpec == nil || len(stmt.AlterOptions) != 0 {
-				return rs.handleAlterTable(ctx, stmt, query, streamID)
+				if err := rs.handleAlterTable(ctx, stmt, query, streamID); err != nil {
+					return fmt.Errorf("cannot handle table alteration %q: %w", query, err)
+				}
 			}
 		}
 	case *sqlparser.DropTable:
@@ -557,61 +560,99 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 		// These should be all of the table alterations which might possibly impact our capture
 		// in ways we don't currently support, so the default behavior can be to log and ignore.
 		case *sqlparser.RenameColumn:
-			return fmt.Errorf("unsupported column alteration (go.estuary.dev/eVVwet): %s", query)
+			var oldName = alter.OldName.Name.String()
+			var newName = alter.NewName.Name.String()
+
+			var colIndex = slices.Index(meta.Schema.Columns, oldName)
+			if colIndex == -1 {
+				return fmt.Errorf("unknown column %q", oldName)
+			}
+			meta.Schema.Columns[colIndex] = newName
+
+			var colType = meta.Schema.ColumnTypes[oldName]
+			meta.Schema.ColumnTypes[oldName] = nil
+			meta.Schema.ColumnTypes[newName] = colType
 		case *sqlparser.RenameTableName:
 			return fmt.Errorf("unsupported table alteration (go.estuary.dev/eVVwet): %s", query)
 		case *sqlparser.ChangeColumn:
-			if !alter.OldColumn.Name.Equal(alter.NewColDefinition.Name) {
-				return fmt.Errorf("unsupported query %q: cannot currently process column renaming", query)
+			var oldName = alter.OldColumn.Name.String()
+			var oldIndex = slices.Index(meta.Schema.Columns, oldName)
+			if oldIndex == -1 {
+				return fmt.Errorf("unknown column %q", oldName)
 			}
-			if alter.First || alter.After != nil {
-				return fmt.Errorf("unsupported query %q: cannot currently process column repositioning", query)
-			}
+			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
+
 			var newName = alter.NewColDefinition.Name.String()
 			var newType = translateDataType(alter.NewColDefinition.Type)
-			logrus.WithField("name", newName).WithField("type", newType).Info("processed CHANGE COLUMN alteration")
+			var newIndex = oldIndex
+			if alter.First {
+				newIndex = 0
+			} else if alter.After != nil {
+				var afterName = alter.After.Name.String()
+				var afterIndex = slices.Index(meta.Schema.Columns, afterName)
+				if afterIndex == -1 {
+					return fmt.Errorf("unknown column %q", afterName)
+				}
+				newIndex = afterIndex + 1
+			}
+			meta.Schema.Columns = slices.Insert(meta.Schema.Columns, newIndex, newName)
+			meta.Schema.ColumnTypes[oldName] = nil // Set to nil rather than delete so that JSON patch merging deletes it
 			meta.Schema.ColumnTypes[newName] = newType
+			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed CHANGE COLUMN alteration")
 		case *sqlparser.ModifyColumn:
-			if alter.First || alter.After != nil {
-				return fmt.Errorf("unsupported query %q: cannot currently process column repositioning", query)
+			var colName = alter.NewColDefinition.Name.String()
+			var oldIndex = slices.Index(meta.Schema.Columns, colName)
+			if oldIndex == -1 {
+				return fmt.Errorf("unknown column %q", colName)
 			}
-			var newName = alter.NewColDefinition.Name.String()
+			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
+
 			var newType = translateDataType(alter.NewColDefinition.Type)
-			logrus.WithField("name", newName).WithField("type", newType).Info("processed MODIFY COLUMN alteration")
-			meta.Schema.ColumnTypes[newName] = newType
+			var newIndex = oldIndex
+			if alter.First {
+				newIndex = 0
+			} else if alter.After != nil {
+				var afterName = alter.After.Name.String()
+				var afterIndex = slices.Index(meta.Schema.Columns, afterName)
+				if afterIndex == -1 {
+					return fmt.Errorf("unknown column %q", afterName)
+				}
+				newIndex = afterIndex + 1
+			}
+
+			meta.Schema.Columns = slices.Insert(meta.Schema.Columns, newIndex, colName)
+			meta.Schema.ColumnTypes[colName] = newType
+			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed MODIFY COLUMN alteration")
 		case *sqlparser.AddColumns:
-			insertAt := len(meta.Schema.Columns)
+			var insertAt = len(meta.Schema.Columns)
 			if alter.First {
 				insertAt = 0
 			} else if after := alter.After; after != nil {
-				insertAt = findStr(after.Name.String(), meta.Schema.Columns)
-				if insertAt == -1 {
-					return fmt.Errorf("column %q not tracked in replication stream state for query %q", after.Name.String(), query)
+				var afterIndex = slices.Index(meta.Schema.Columns, after.Name.String())
+				if afterIndex == -1 {
+					return fmt.Errorf("unknown column %q", after.Name.String())
 				}
-				insertAt++ // Insert after the found column
+				insertAt = afterIndex + 1
 			}
 
-			newCols := []string{}
+			var newCols []string
 			for _, col := range alter.Columns {
 				newCols = append(newCols, col.Name.String())
 				var dataType = translateDataType(col.Type)
 				meta.Schema.ColumnTypes[col.Name.String()] = dataType
 			}
 
-			meta.Schema.Columns = append(
-				meta.Schema.Columns[:insertAt],
-				append(newCols, meta.Schema.Columns[insertAt:]...)...,
-			)
+			meta.Schema.Columns = slices.Insert(meta.Schema.Columns, insertAt, newCols...)
+			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed CHANGE COLUMN alteration")
 		case *sqlparser.DropColumn:
-			dropped := alter.Name.Name.String()
-
-			idx := findStr(dropped, meta.Schema.Columns)
-			if idx == -1 {
-				return fmt.Errorf("column %q not tracked in replication stream state for query %q", dropped, query)
+			var colName = alter.Name.Name.String()
+			var oldIndex = slices.Index(meta.Schema.Columns, colName)
+			if oldIndex == -1 {
+				return fmt.Errorf("unknown column %q", colName)
 			}
-
-			meta.Schema.Columns = append(meta.Schema.Columns[:idx], meta.Schema.Columns[idx+1:]...)
-			meta.Schema.ColumnTypes[dropped] = nil
+			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
+			meta.Schema.ColumnTypes[colName] = nil // Set to nil rather than delete so that JSON patch merging deletes it
+			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed CHANGE COLUMN alteration")
 		default:
 			logrus.WithField("query", query).Info("ignorable table alteration")
 		}
