@@ -14,6 +14,7 @@ import (
 
 type stagedFile struct {
 	schema []*bigquery.FieldSchema
+	fields []string
 	client *storage.Client
 
 	// The GCS bucket configured for the materialization.
@@ -36,8 +37,14 @@ type stagedFile struct {
 }
 
 func newStagedFile(client *storage.Client, bucket string, bucketPath string, schema []*bigquery.FieldSchema) *stagedFile {
+	fields := make([]string, 0, len(schema))
+	for _, f := range schema {
+		fields = append(fields, f.Name)
+	}
+
 	return &stagedFile{
 		schema: schema,
+		fields: fields,
 		client: client,
 		bucket: bucket,
 		prefix: path.Join(bucketPath, uuid.NewString()),
@@ -56,7 +63,7 @@ func (f *stagedFile) start() {
 func (f *stagedFile) newFile(ctx context.Context) {
 	fName := uuid.NewString()
 	writer := f.client.Bucket(f.bucket).Object(path.Join(f.prefix, fName)).NewWriter(ctx)
-	f.encoder = sql.NewCountingEncoder(writer)
+	f.encoder = sql.NewCountingEncoder(writer, true, f.fields)
 	f.uploaded = append(f.uploaded, fName)
 }
 
@@ -72,22 +79,13 @@ func (f *stagedFile) flushFile() error {
 }
 
 func (f *stagedFile) encodeRow(ctx context.Context, row []interface{}) error {
-	if len(row) != len(f.schema) { // Sanity check
-		return fmt.Errorf("number of values in row to encode (%d) differs from number of configured fields (%d)", len(row), len(f.schema))
-	}
-
-	d := make(map[string]interface{})
-	for idx := range row {
-		d[f.schema[idx].Name] = row[idx]
-	}
-
 	// May not have an encoder set yet if the previous encodeRow() resulted in flushing the current
 	// file, or for the very first call to encodeRow().
 	if f.encoder == nil {
 		f.newFile(ctx)
 	}
 
-	if err := f.encoder.Encode(d); err != nil {
+	if err := f.encoder.Encode(row); err != nil {
 		return fmt.Errorf("encoding row: %w", err)
 	}
 

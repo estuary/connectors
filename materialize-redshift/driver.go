@@ -544,8 +544,8 @@ func (t *transactor) addBinding(
 ) error {
 	var b = &binding{
 		target:    target,
-		loadFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyPtrs()),
-		storeFile: newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.Columns()),
+		loadFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyNames()),
+		storeFile: newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.ColumnNames()),
 	}
 
 	// Render templates that require specific S3 "COPY INTO" parameters.
