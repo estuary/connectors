@@ -7,6 +7,7 @@ class DiscoveredBinding(t.TypedDict):
     documentSchema: dict
     key: t.List[str]
     disable: t.NotRequired[bool]
+    resourcePath: t.List[str]
 
 class Discovered(t.TypedDict):
     bindings: t.List[DiscoveredBinding]

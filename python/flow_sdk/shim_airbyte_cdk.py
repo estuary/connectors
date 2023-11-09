@@ -105,12 +105,18 @@ class CaptureShim(Connector):
             if self.usesSchemaInference:
                 json_schema["x-infer-schema"] = True
 
+            if ns := config.get("namespace"):
+                resource_path = [ns, config["stream"]]
+            else:
+                resource_path = [config["stream"]]
+
             bindings.append(
                 response.DiscoveredBinding(
                     recommendedName=stream.name,
                     documentSchema=json_schema,
                     resourceConfig=t.cast(dict, config),
                     key=key,
+                    resourcePath=resource_path,
                 )
             )
 
