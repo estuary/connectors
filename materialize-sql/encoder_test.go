@@ -3,9 +3,14 @@ package sql
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
+	"fmt"
 	"io"
+	"math/rand"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -102,4 +107,81 @@ func (t *testWriter) Write(p []byte) (int, error) {
 func (t *testWriter) Close() error {
 	t.closed = true
 	return nil
+}
+
+const benchmarkDatasetSize = 1000
+
+func BenchmarkEncodingObjects(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		var names, values = benchmarkDataset(b, benchmarkDatasetSize)
+		b.StartTimer()
+
+		enc := NewCountingEncoder(&nopWriteCloser{w: io.Discard}, true, names)
+		for _, row := range values {
+			require.NoError(b, enc.Encode(row))
+		}
+		require.NoError(b, enc.Close())
+	}
+}
+
+func BenchmarkEncodingArrays(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		var _, values = benchmarkDataset(b, benchmarkDatasetSize)
+		b.StartTimer()
+
+		enc := NewCountingEncoder(&nopWriteCloser{w: io.Discard}, true, nil)
+		for _, row := range values {
+			require.NoError(b, enc.Encode(row))
+		}
+		require.NoError(b, enc.Close())
+	}
+}
+
+type nopWriteCloser struct {
+	w io.Writer
+}
+
+func (w *nopWriteCloser) Write(p []byte) (int, error) {
+	return w.w.Write(p)
+}
+
+func (w *nopWriteCloser) Close() error {
+	return nil
+}
+
+func benchmarkDataset(b *testing.B, size int) ([]string, [][]any) {
+	var names = []string{"id", "type", "ctime", "mtime", "name", "description", "sequenceNumber", "state", "version", "intParamA", "intParamB", "intParamC", "intParamD", "flow_document"}
+	var values [][]any
+	for i := 0; i < size; i++ {
+		var row = []any{
+			uuid.New().String(),
+			[]string{"event", "action", "item", "unknown"}[rand.Intn(4)],
+			time.Now().Add(-time.Duration(rand.Intn(10000000)+50000000) * time.Second),
+			time.Now().Add(-time.Duration(rand.Intn(10000000)+10000000) * time.Second),
+			fmt.Sprintf("Row Number %d", i),
+			fmt.Sprintf("An object representing some row in a synthetic dataset. This one is row number %d.", i),
+			i,
+			[]string{"new", "in-progress", "completed"}[rand.Intn(3)],
+			rand.Intn(3),
+			rand.Intn(1000000000),
+			rand.Intn(1000000000),
+			rand.Intn(1000000000),
+			rand.Intn(1000000000),
+		}
+
+		doc := make(map[string]any)
+		for idx, n := range names[:len(names)-1] {
+			doc[n] = row[idx]
+		}
+		docJson, err := json.Marshal(doc)
+		require.NoError(b, err)
+		row = append(row, json.RawMessage(docJson))
+
+		values = append(values, row)
+	}
+	return names, values
 }
