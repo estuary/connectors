@@ -219,13 +219,13 @@ func (f *stagedFile) putWorker(ctx context.Context, filePaths <-chan string) err
 		}
 
 		var fName = filepath.Base(file)
-		log.WithField("filepath", f.remoteFilePath(fName)).Info("staged file: uploading")
+		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: uploading")
 		if r, err := os.Open(file); err != nil {
 			return fmt.Errorf("opening file: %w", err)
 		} else if err := f.filesAPI.Upload(ctx, files.UploadRequest{Contents: r, FilePath: f.remoteFilePath(fName)}); err != nil {
 			return fmt.Errorf("uploading file: %w", err)
 		}
-		log.WithField("filepath", f.remoteFilePath(fName)).Info("staged file: upload done")
+		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: upload done")
 
 		// Once the file has been staged to Databricks we don't need it locally anymore and can
 		// remove the local copy to manage disk usage.

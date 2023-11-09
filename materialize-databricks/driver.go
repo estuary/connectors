@@ -444,15 +444,18 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
       continue
     }
 
+    // This is due to a bug in Golang, see https://go.dev/blog/loopvar-preview
+    var bindingCopy = b
+    var idxCopy = idx
     group.Go(func() error {
-      toCopy, toDelete, err := b.loadFile.flush()
+      toCopy, toDelete, err := bindingCopy.loadFile.flush()
       if err != nil {
-        return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
+        return fmt.Errorf("flushing load file for binding[%d]: %w", idxCopy, err)
       }
       defer d.deleteFiles(groupCtx, toDelete)
 
       // COPY INTO temporary load table from staged files
-      if _, err := d.load.conn.ExecContext(groupCtx, renderWithFiles(b.copyIntoLoad, toCopy...)); err != nil {
+      if _, err := d.load.conn.ExecContext(groupCtx, renderWithFiles(bindingCopy.copyIntoLoad, toCopy...)); err != nil {
         return fmt.Errorf("load: writing keys: %w", err)
       }
 
@@ -561,16 +564,18 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
       continue
     }
 
+    var bindingCopy = b
+    var idxCopy = idx
     group.Go(func() error {
       // Create a binding-scoped temporary table for store documents to be merged
       // into target table
-      if _, err := d.store.conn.ExecContext(groupCtx, b.createStoreTableSQL); err != nil {
-        return fmt.Errorf("Exec(%s): %w", b.createStoreTableSQL, err)
+      if _, err := d.store.conn.ExecContext(groupCtx, bindingCopy.createStoreTableSQL); err != nil {
+        return fmt.Errorf("Exec(%s): %w", bindingCopy.createStoreTableSQL, err)
       }
 
-      toCopy, toDeleteBinding, err := b.storeFile.flush()
+      toCopy, toDeleteBinding, err := bindingCopy.storeFile.flush()
       if err != nil {
-        return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
+        return fmt.Errorf("flushing store file for binding[%d]: %w", idxCopy, err)
       }
       toDelete = append(toDelete, toDeleteBinding...)
 
@@ -579,15 +584,15 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
       // given that COPY INTO is idempotent by default: files that have already been loaded into a table will
       // not be loaded again
       // see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
-      if b.target.DeltaUpdates || !b.needsMerge {
-        queries = append(queries, renderWithFiles(b.copyIntoDirect, toCopy...))
+      if bindingCopy.target.DeltaUpdates || !bindingCopy.needsMerge {
+        queries = append(queries, renderWithFiles(bindingCopy.copyIntoDirect, toCopy...))
       } else {
         // COPY INTO temporary load table from staged files
-        if _, err := d.store.conn.ExecContext(groupCtx, renderWithFiles(b.copyIntoStore, toCopy...)); err != nil {
+        if _, err := d.store.conn.ExecContext(groupCtx, renderWithFiles(bindingCopy.copyIntoStore, toCopy...)); err != nil {
           return fmt.Errorf("store: copying into to temporary table: %w", err)
         }
 
-        queries = append(queries, renderWithFiles(b.mergeInto, toCopy...), b.dropStoreSQL)
+        queries = append(queries, renderWithFiles(bindingCopy.mergeInto, toCopy...), bindingCopy.dropStoreSQL)
       }
 
       return nil
