@@ -116,6 +116,27 @@ func (t *Table) KeyPtrs() []*Column {
 	return out
 }
 
+// KeyNames returns all key names of the Table as a single slice.
+func (t *Table) KeyNames() []string {
+	keys := t.KeyPtrs()
+	out := make([]string, 0, len(keys))
+	for _, c := range keys {
+		out = append(out, c.Field)
+	}
+	return out
+}
+
+// ColumnNames returns all column names of the Table as a single slice,
+// ordered as Keys, then Values, then the Document.
+func (t *Table) ColumnNames() []string {
+	cols := t.Columns()
+	out := make([]string, 0, len(cols))
+	for _, c := range cols {
+		out = append(out, c.Field)
+	}
+	return out
+}
+
 // ResolveTable maps a TableShape into a Table using the given Dialect.
 func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 	var table = Table{
