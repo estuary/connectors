@@ -17,20 +17,20 @@
     "state": {
       "updated": {
         "Queries": [
-          "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT\n, canary\n, flow_published_at::TIMESTAMP\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('6ac42a3f-9b7d-486f-8e3c-d277bdbb24fc.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_standard FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('394d8530-573f-443a-900a-3176ce938892.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('ec5f6220-218c-4d28-ba92-3f27075b3d68.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('0540b611-ba29-40f6-8d9b-523e8ad86979.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
-          "\n\tCOPY INTO `default`.multiple_types FROM (\n    SELECT\n\t\tid::BIGINT\n, array_int\n, bool_field::BOOLEAN\n, float_field::DOUBLE\n, flow_published_at::TIMESTAMP\n, multiple\n, nested\n, nullable_int::BIGINT\n, str_field\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('992e78fd-8f43-404d-bb47-6caaff077f21.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
-          "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT\n, date::DATE\n, datetime::TIMESTAMP\n, flow_published_at::TIMESTAMP\n, int_and_str::BIGINT\n, int_str::BIGINT\n, num_and_str::DOUBLE\n, num_str::DOUBLE\n, time\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('72079e61-40dd-4d5b-b889-c01e0610e931.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n"
+          "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT\n, date::DATE\n, datetime::TIMESTAMP\n, flow_published_at::TIMESTAMP\n, int_and_str::BIGINT\n, int_str::BIGINT\n, num_and_str::DOUBLE\n, num_str::DOUBLE\n, time\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('f2dc9b7f-1f38-4c75-a563-4edae66825f5.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('0267ced6-f828-4a92-9264-9304057508e6.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_standard FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('ceb890c1-5bc6-4e36-9dc4-d4ea9af3e806.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.multiple_types FROM (\n    SELECT\n\t\tid::BIGINT\n, array_int\n, bool_field::BOOLEAN\n, float_field::DOUBLE\n, flow_published_at::TIMESTAMP\n, multiple\n, nested\n, nullable_int::BIGINT\n, str_field\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('d675f0a5-4f54-4c87-9a38-cc87111deb4d.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('095ab95b-1d4d-491d-9d19-68b0e7d012db.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT\n, canary\n, flow_published_at::TIMESTAMP\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('8376f2fa-286f-4876-aac5-29e7a944961c.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n"
         ],
         "ToDelete": [
-          "/Volumes/main/default/flow_staging/flow_temp_tables/6ac42a3f-9b7d-486f-8e3c-d277bdbb24fc.json",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/394d8530-573f-443a-900a-3176ce938892.json",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/ec5f6220-218c-4d28-ba92-3f27075b3d68.json",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/0540b611-ba29-40f6-8d9b-523e8ad86979.json",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/992e78fd-8f43-404d-bb47-6caaff077f21.json",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/72079e61-40dd-4d5b-b889-c01e0610e931.json"
+          "/Volumes/main/default/flow_staging/flow_temp_tables/f2dc9b7f-1f38-4c75-a563-4edae66825f5.json",
+          "/Volumes/main/default/flow_staging/flow_temp_tables/0267ced6-f828-4a92-9264-9304057508e6.json",
+          "/Volumes/main/default/flow_staging/flow_temp_tables/ceb890c1-5bc6-4e36-9dc4-d4ea9af3e806.json",
+          "/Volumes/main/default/flow_staging/flow_temp_tables/d675f0a5-4f54-4c87-9a38-cc87111deb4d.json",
+          "/Volumes/main/default/flow_staging/flow_temp_tables/095ab95b-1d4d-491d-9d19-68b0e7d012db.json",
+          "/Volumes/main/default/flow_staging/flow_temp_tables/8376f2fa-286f-4876-aac5-29e7a944961c.json"
         ]
       }
     }
@@ -231,22 +231,22 @@
     "state": {
       "updated": {
         "Queries": [
-          "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT\n, canary\n, flow_published_at::TIMESTAMP\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('44a72cb0-9224-4fae-ac95-079d663715f6.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
-          "\n\tMERGE INTO `default`.duplicate_keys_standard AS l\n\tUSING flow_temp_store_table_00000000_00000000_1 AS r\n\tON l.id = r.id::BIGINT\n\n\tAND r._metadata_file_name IN ('37e2c7fa-4912-4c63-b098-f966f51e32a9.json')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.flow_published_at = r.flow_published_at::TIMESTAMP\n, l.int = r.int::BIGINT\n, l.str = r.str\n, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, flow_published_at, int, str, flow_document)\n\t\tVALUES (r.id::BIGINT\n, r.flow_published_at::TIMESTAMP\n, r.int::BIGINT\n, r.str\n, r.flow_document\n);\n",
+          "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT\n, date::DATE\n, datetime::TIMESTAMP\n, flow_published_at::TIMESTAMP\n, int_and_str::BIGINT\n, int_str::BIGINT\n, num_and_str::DOUBLE\n, num_str::DOUBLE\n, time\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('30fe284a-fe74-4c1b-98de-7f8db8d3d60a.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT\n, canary\n, flow_published_at::TIMESTAMP\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('995e1322-ebe5-477e-a1e2-1c8eb8b9d1ce.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('ec9454e2-ce23-40e8-9372-9c1c98a6074a.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('9016bf45-ebf7-4590-a0c5-1f179c104374.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
+          "\n\tMERGE INTO `default`.duplicate_keys_standard AS l\n\tUSING flow_temp_store_table_00000000_00000000_1 AS r\n\tON l.id = r.id::BIGINT\n\n\tAND r._metadata_file_name IN ('5a1fbe5e-2d7d-4a10-9af7-dac2f4e6d0e0.json')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.flow_published_at = r.flow_published_at::TIMESTAMP\n, l.int = r.int::BIGINT\n, l.str = r.str\n, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, flow_published_at, int, str, flow_document)\n\t\tVALUES (r.id::BIGINT\n, r.flow_published_at::TIMESTAMP\n, r.int::BIGINT\n, r.str\n, r.flow_document\n);\n",
           "\nDROP TABLE IF EXISTS flow_temp_store_table_00000000_00000000_1\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('3453ba47-59f7-4295-a3ea-1b4958d75c09.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT\n, flow_published_at::TIMESTAMP\n, int::BIGINT\n, str\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('28502919-cb94-4e0a-aa79-e5f307d560bc.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n",
-          "\n\tMERGE INTO `default`.multiple_types AS l\n\tUSING flow_temp_store_table_00000000_00000000_4 AS r\n\tON l.id = r.id::BIGINT\n\n\tAND r._metadata_file_name IN ('dd351541-31b5-4a33-b6ad-5a6a2665a5c4.json')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.array_int = r.array_int\n, l.bool_field = r.bool_field::BOOLEAN\n, l.float_field = r.float_field::DOUBLE\n, l.flow_published_at = r.flow_published_at::TIMESTAMP\n, l.multiple = r.multiple\n, l.nested = r.nested\n, l.nullable_int = r.nullable_int::BIGINT\n, l.str_field = r.str_field\n, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\t\tVALUES (r.id::BIGINT\n, r.array_int\n, r.bool_field::BOOLEAN\n, r.float_field::DOUBLE\n, r.flow_published_at::TIMESTAMP\n, r.multiple\n, r.nested\n, r.nullable_int::BIGINT\n, r.str_field\n, r.flow_document\n);\n",
-          "\nDROP TABLE IF EXISTS flow_temp_store_table_00000000_00000000_4\n",
-          "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT\n, date::DATE\n, datetime::TIMESTAMP\n, flow_published_at::TIMESTAMP\n, int_and_str::BIGINT\n, int_str::BIGINT\n, num_and_str::DOUBLE\n, num_str::DOUBLE\n, time\n, flow_document\n\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('19aad109-c071-4114-b4e4-d2a9f5f65e41.json')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )\n  ;\n"
+          "\n\tMERGE INTO `default`.multiple_types AS l\n\tUSING flow_temp_store_table_00000000_00000000_4 AS r\n\tON l.id = r.id::BIGINT\n\n\tAND r._metadata_file_name IN ('6bb64474-44a5-4b0f-9a56-d22dcbab92f2.json')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.array_int = r.array_int\n, l.bool_field = r.bool_field::BOOLEAN\n, l.float_field = r.float_field::DOUBLE\n, l.flow_published_at = r.flow_published_at::TIMESTAMP\n, l.multiple = r.multiple\n, l.nested = r.nested\n, l.nullable_int = r.nullable_int::BIGINT\n, l.str_field = r.str_field\n, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\t\tVALUES (r.id::BIGINT\n, r.array_int\n, r.bool_field::BOOLEAN\n, r.float_field::DOUBLE\n, r.flow_published_at::TIMESTAMP\n, r.multiple\n, r.nested\n, r.nullable_int::BIGINT\n, r.str_field\n, r.flow_document\n);\n",
+          "\nDROP TABLE IF EXISTS flow_temp_store_table_00000000_00000000_4\n"
         ],
         "ToDelete": [
-          "/Volumes/main/default/flow_staging/flow_temp_tables/44a72cb0-9224-4fae-ac95-079d663715f6.json",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/37e2c7fa-4912-4c63-b098-f966f51e32a9.json",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/3453ba47-59f7-4295-a3ea-1b4958d75c09.json",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/28502919-cb94-4e0a-aa79-e5f307d560bc.json",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/dd351541-31b5-4a33-b6ad-5a6a2665a5c4.json",
-          "/Volumes/main/default/flow_staging/flow_temp_tables/19aad109-c071-4114-b4e4-d2a9f5f65e41.json"
+          "/Volumes/main/default/flow_staging/flow_temp_tables/30fe284a-fe74-4c1b-98de-7f8db8d3d60a.json",
+          "/Volumes/main/default/flow_staging/flow_temp_tables/995e1322-ebe5-477e-a1e2-1c8eb8b9d1ce.json",
+          "/Volumes/main/default/flow_staging/flow_temp_tables/5a1fbe5e-2d7d-4a10-9af7-dac2f4e6d0e0.json",
+          "/Volumes/main/default/flow_staging/flow_temp_tables/ec9454e2-ce23-40e8-9372-9c1c98a6074a.json",
+          "/Volumes/main/default/flow_staging/flow_temp_tables/9016bf45-ebf7-4590-a0c5-1f179c104374.json",
+          "/Volumes/main/default/flow_staging/flow_temp_tables/6bb64474-44a5-4b0f-9a56-d22dcbab92f2.json"
         ]
       }
     }
@@ -397,56 +397,6 @@
 }
 {
   "row": {
-    "flow_document": "{\"_meta\":{\"uuid\":\"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int\":1,\"str\":\"str 1\"}",
-    "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
-    "id": 1,
-    "int": 1,
-    "str": "str 1"
-  },
-  "table": "`main`.default.duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_document": "{\"_meta\":{\"uuid\":\"7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":2,\"int\":2,\"str\":\"str 2\"}",
-    "flow_published_at": "2023-07-12 18:18:24.946758+00:00",
-    "id": 2,
-    "int": 2,
-    "str": "str 2"
-  },
-  "table": "`main`.default.duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_document": "{\"_meta\":{\"uuid\":\"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":3,\"int\":3,\"str\":\"str 3\"}",
-    "flow_published_at": "2023-07-12 18:18:48.441281+00:00",
-    "id": 3,
-    "int": 3,
-    "str": "str 3"
-  },
-  "table": "`main`.default.duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_document": "{\"_meta\":{\"uuid\":\"9b994ae4-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":4,\"int\":4,\"str\":\"str 4\"}",
-    "flow_published_at": "2023-07-12 18:19:15.034186+00:00",
-    "id": 4,
-    "int": 4,
-    "str": "str 4"
-  },
-  "table": "`main`.default.duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_document": "{\"_meta\":{\"uuid\":\"bcef4bc6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":5,\"int\":5,\"str\":\"str 5\"}",
-    "flow_published_at": "2023-07-12 18:20:10.962631+00:00",
-    "id": 5,
-    "int": 5,
-    "str": "str 5"
-  },
-  "table": "`main`.default.duplicate_keys_delta"
-}
-{
-  "row": {
     "flow_document": "{\"_meta\":{\"uuid\":\"8de85150-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int\":6,\"str\":\"str 6\"}",
     "flow_published_at": "2023-07-12 18:26:01.560712+00:00",
     "id": 1,
@@ -497,6 +447,56 @@
 }
 {
   "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int\":1,\"str\":\"str 1\"}",
+    "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
+    "id": 1,
+    "int": 1,
+    "str": "str 1"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":2,\"int\":2,\"str\":\"str 2\"}",
+    "flow_published_at": "2023-07-12 18:18:24.946758+00:00",
+    "id": 2,
+    "int": 2,
+    "str": "str 2"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":3,\"int\":3,\"str\":\"str 3\"}",
+    "flow_published_at": "2023-07-12 18:18:48.441281+00:00",
+    "id": 3,
+    "int": 3,
+    "str": "str 3"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"9b994ae4-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":4,\"int\":4,\"str\":\"str 4\"}",
+    "flow_published_at": "2023-07-12 18:19:15.034186+00:00",
+    "id": 4,
+    "int": 4,
+    "str": "str 4"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"bcef4bc6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":5,\"int\":5,\"str\":\"str 5\"}",
+    "flow_published_at": "2023-07-12 18:20:10.962631+00:00",
+    "id": 5,
+    "int": 5,
+    "str": "str 5"
+  },
+  "table": "`main`.default.duplicate_keys_delta"
+}
+{
+  "row": {
     "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
     "id": 1,
     "int": 1,
@@ -584,81 +584,6 @@
     "str": "str 10"
   },
   "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
-}
-{
-  "row": {
-    "array_int": "[11,12]",
-    "bool_field": "False",
-    "float_field": 1.1,
-    "flow_document": "{\"_meta\":{\"uuid\":\"3fd2ec78-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}",
-    "flow_published_at": "2023-07-12 18:23:50.558220+00:00",
-    "id": 1,
-    "multiple": 1,
-    "nested": "{\"id\":\"i1\"}",
-    "nullable_int": "",
-    "str_field": "str1"
-  },
-  "table": "`main`.default.multiple_types"
-}
-{
-  "row": {
-    "array_int": "[21,22]",
-    "bool_field": "True",
-    "float_field": 2.2,
-    "flow_document": "{\"_meta\":{\"uuid\":\"4b37f0b8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}",
-    "flow_published_at": "2023-07-12 18:24:09.675180+00:00",
-    "id": 2,
-    "multiple": 2.2,
-    "nested": "{\"id\":\"i2\"}",
-    "nullable_int": 2,
-    "str_field": "str2"
-  },
-  "table": "`main`.default.multiple_types"
-}
-{
-  "row": {
-    "array_int": "[31,32]",
-    "bool_field": "False",
-    "float_field": 3.3,
-    "flow_document": "{\"_meta\":{\"uuid\":\"51016380-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}",
-    "flow_published_at": "2023-07-12 18:24:19.384000+00:00",
-    "id": 3,
-    "multiple": "true",
-    "nested": "{\"id\":\"i3\"}",
-    "nullable_int": "",
-    "str_field": "str3"
-  },
-  "table": "`main`.default.multiple_types"
-}
-{
-  "row": {
-    "array_int": "[41,42]",
-    "bool_field": "True",
-    "float_field": 4.4,
-    "flow_document": "{\"_meta\":{\"uuid\":\"5660aaca-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}",
-    "flow_published_at": "2023-07-12 18:24:28.397025+00:00",
-    "id": 4,
-    "multiple": "false",
-    "nested": "{\"id\":\"i4\"}",
-    "nullable_int": 4,
-    "str_field": "str4"
-  },
-  "table": "`main`.default.multiple_types"
-}
-{
-  "row": {
-    "array_int": "[51,52]",
-    "bool_field": "False",
-    "float_field": 5.5,
-    "flow_document": "{\"_meta\":{\"uuid\":\"5af9e236-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}",
-    "flow_published_at": "2023-07-12 18:24:36.112031+00:00",
-    "id": 5,
-    "multiple": "\"string five\"",
-    "nested": "{\"id\":\"i5\"}",
-    "nullable_int": "",
-    "str_field": "str5"
-  },
-  "table": "`main`.default.multiple_types"
 }
 {
   "row": {
@@ -732,6 +657,81 @@
     "nested": "{\"id\":\"i10\"}",
     "nullable_int": 10,
     "str_field": "str10 v2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[11,12]",
+    "bool_field": "False",
+    "float_field": 1.1,
+    "flow_document": "{\"_meta\":{\"uuid\":\"3fd2ec78-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}",
+    "flow_published_at": "2023-07-12 18:23:50.558220+00:00",
+    "id": 1,
+    "multiple": 1,
+    "nested": "{\"id\":\"i1\"}",
+    "nullable_int": "",
+    "str_field": "str1"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[21,22]",
+    "bool_field": "True",
+    "float_field": 2.2,
+    "flow_document": "{\"_meta\":{\"uuid\":\"4b37f0b8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}",
+    "flow_published_at": "2023-07-12 18:24:09.675180+00:00",
+    "id": 2,
+    "multiple": 2.2,
+    "nested": "{\"id\":\"i2\"}",
+    "nullable_int": 2,
+    "str_field": "str2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[31,32]",
+    "bool_field": "False",
+    "float_field": 3.3,
+    "flow_document": "{\"_meta\":{\"uuid\":\"51016380-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}",
+    "flow_published_at": "2023-07-12 18:24:19.384000+00:00",
+    "id": 3,
+    "multiple": "true",
+    "nested": "{\"id\":\"i3\"}",
+    "nullable_int": "",
+    "str_field": "str3"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[41,42]",
+    "bool_field": "True",
+    "float_field": 4.4,
+    "flow_document": "{\"_meta\":{\"uuid\":\"5660aaca-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}",
+    "flow_published_at": "2023-07-12 18:24:28.397025+00:00",
+    "id": 4,
+    "multiple": "false",
+    "nested": "{\"id\":\"i4\"}",
+    "nullable_int": 4,
+    "str_field": "str4"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[51,52]",
+    "bool_field": "False",
+    "float_field": 5.5,
+    "flow_document": "{\"_meta\":{\"uuid\":\"5af9e236-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}",
+    "flow_published_at": "2023-07-12 18:24:36.112031+00:00",
+    "id": 5,
+    "multiple": "\"string five\"",
+    "nested": "{\"id\":\"i5\"}",
+    "nullable_int": "",
+    "str_field": "str5"
   },
   "table": "`main`.default.multiple_types"
 }
