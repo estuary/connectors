@@ -89,6 +89,7 @@ jobs:
           - source-postgres-batch
           - source-s3
           - source-sftp
+          - source-shopify
           - source-sqlserver
           - source-test
           - materialize-bigquery
@@ -111,6 +112,9 @@ jobs:
           - materialize-sqlserver
         include:
           - connector: source-criteo
+            connector_type: capture
+            python: true
+          - connector: source-shopify
             connector_type: capture
             python: true
 
