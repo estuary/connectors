@@ -1,0 +1,70 @@
+---
+properties:
+  body_html:
+    type:
+      - string
+      - "null"
+  handle:
+    type:
+      - string
+      - "null"
+  image:
+    properties:
+      alt:
+        type:
+          - string
+          - "null"
+      src:
+        type:
+          - string
+          - "null"
+      width:
+        type:
+          - integer
+          - "null"
+      height:
+        type:
+          - integer
+          - "null"
+      created_at:
+        type:
+          - string
+          - "null"
+    type:
+      - object
+      - "null"
+  id:
+    type:
+      - integer
+  published:
+    type: boolean
+  published_at:
+    type:
+      - string
+      - "null"
+  published_scope:
+    type:
+      - string
+      - "null"
+  sort_order:
+    type:
+      - string
+      - "null"
+  template_suffix:
+    type:
+      - string
+      - "null"
+  title:
+    type:
+      - string
+      - "null"
+  updated_at:
+    type:
+      - string
+      - "null"
+  admin_graphql_api_id:
+    type:
+      - string
+      - "null"
+type: object
+x-infer-schema: true

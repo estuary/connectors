@@ -4,7 +4,9 @@ from tap_shopify.tap import Tap_Shopify
 scopes = ",".join([
     "read_locales",
     "read_products",
+    # TODO (jshearer): Switch to `read_all_orders` once our app is granted permission
     "read_orders",
+    "read_checkouts",
     "read_locations",
     "read_inventory",
     "read_fulfillments",

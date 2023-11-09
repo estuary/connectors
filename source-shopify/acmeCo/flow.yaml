@@ -1,0 +1,126 @@
+---
+collections:
+  acmeCo/collects:
+    schema:
+      properties:
+        collection_id:
+          type:
+            - integer
+            - "null"
+        created_at:
+          type:
+            - string
+            - "null"
+        id:
+          type:
+            - integer
+        position:
+          type:
+            - integer
+            - "null"
+        product_id:
+          type:
+            - integer
+            - "null"
+        sort_value:
+          type:
+            - string
+            - "null"
+        updated_at:
+          type:
+            - string
+            - "null"
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/custom_collections:
+    schema: custom_collections.schema.yaml
+    key:
+      - /id
+  acmeCo/inventory_items:
+    schema: inventory_items.schema.yaml
+    key:
+      - /id
+  acmeCo/inventory_levels:
+    schema:
+      properties:
+        available:
+          type:
+            - number
+            - "null"
+        inventory_item_id:
+          type:
+            - integer
+        location_id:
+          type:
+            - number
+            - "null"
+        updated_at:
+          type:
+            - string
+            - "null"
+      type: object
+      x-infer-schema: true
+    key:
+      - /inventory_item_id
+  acmeCo/locations:
+    schema: locations.schema.yaml
+    key:
+      - /id
+  acmeCo/metafields:
+    schema:
+      properties:
+        created_at:
+          type:
+            - string
+            - "null"
+        description:
+          type:
+            - string
+            - "null"
+        id:
+          type:
+            - integer
+        key:
+          type:
+            - string
+            - "null"
+        namespace:
+          type:
+            - string
+            - "null"
+        owner_id:
+          type:
+            - integer
+            - "null"
+        owner_resource:
+          type:
+            - string
+            - "null"
+        updated_at:
+          type:
+            - string
+            - "null"
+        value:
+          type:
+            - string
+            - integer
+            - boolean
+            - "null"
+        type:
+          type:
+            - string
+            - "null"
+        value_type:
+          type:
+            - string
+            - "null"
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/products:
+    schema: products.schema.yaml
+    key:
+      - /id
