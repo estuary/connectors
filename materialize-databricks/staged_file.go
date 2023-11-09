@@ -14,6 +14,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const fileSizeLimit = 128 * 1024 * 1024
+
 // fileBuffer provides Close() for a *bufio.Writer writing to an *os.File. Close() will flush the
 // buffer and close the underlying file.
 type fileBuffer struct {
@@ -110,6 +112,7 @@ func newStagedFile(filesAPI *files.FilesAPI, root string, fields []string) *stag
 	}
 }
 
+const uploadConcurrency = 5
 func (f *stagedFile) start(ctx context.Context) error {
 	if f.started {
 		return nil
@@ -130,10 +133,12 @@ func (f *stagedFile) start(ctx context.Context) error {
 	f.group, f.groupCtx = errgroup.WithContext(ctx)
 	f.putFiles = make(chan string)
 
-	// Start the putWorker for this transaction.
-	f.group.Go(func() error {
-		return f.putWorker(f.groupCtx, f.putFiles)
-	})
+	for i := 0; i < uploadConcurrency; i++ {
+		// Start the putWorker for this transaction.
+		f.group.Go(func() error {
+			return f.putWorker(f.groupCtx, f.putFiles)
+		})
+	}
 
 	return nil
 }
@@ -153,7 +158,7 @@ func (f *stagedFile) encodeRow(row []interface{}) error {
 
 	// Concurrently start the PUT process for this file if the current file has reached
 	// fileSizeLimit.
-	if f.encoder.Written() >= sql.DefaultFileSizeLimit {
+	if f.encoder.Written() >= fileSizeLimit {
 		if err := f.putFile(); err != nil {
 			return fmt.Errorf("encodeRow putFile: %w", err)
 		}
