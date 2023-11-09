@@ -62,24 +62,30 @@ func TestCountingEncoder(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, gzw.Close())
 
-			var buf bytes.Buffer
-			tw := &testWriter{
-				w: &buf,
+			for _, compress := range []bool{true, false} {
+				var buf bytes.Buffer
+				tw := &testWriter{
+					w: &buf,
+				}
+
+				enc := NewCountingEncoder(tw, compress, tt.fields)
+				require.NoError(t, enc.Encode(tt.input))
+				require.NoError(t, enc.Close())
+
+				// The provided writer is closed when enc is closed.
+				require.True(t, tw.closed)
+
+				if compress {
+					// The written bytes can be unzip'd correctly.
+					r, err := gzip.NewReader(&buf)
+					require.NoError(t, err)
+					gotBytes, err := io.ReadAll(r)
+					require.NoError(t, err)
+					require.Equal(t, string(tt.wantBytes), string(gotBytes))
+				} else {
+					require.Equal(t, string(tt.wantBytes), buf.String())
+				}
 			}
-
-			enc := NewCountingEncoder(tw, tt.fields)
-			require.NoError(t, enc.Encode(tt.input))
-			require.NoError(t, enc.Close())
-
-			// The provided writer is closed when enc is closed.
-			require.True(t, tw.closed)
-
-			// The written bytes can be unzip'd correctly.
-			r, err := gzip.NewReader(&buf)
-			require.NoError(t, err)
-			gotBytes, err := io.ReadAll(r)
-			require.NoError(t, err)
-			require.Equal(t, string(tt.wantBytes), string(gotBytes))
 		})
 	}
 }
