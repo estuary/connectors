@@ -35,7 +35,7 @@ class tap_shopifyStream(RESTStream):
         return tap_shopifyAuthenticator(
             self,
             key="X-Shopify-Access-Token",
-            value=str(self.config["access_token"]),
+            value=str(self.config["authentication"]["access_token"]),
             location="header",
         )
 

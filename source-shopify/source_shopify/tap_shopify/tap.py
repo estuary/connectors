@@ -43,10 +43,47 @@ class Tap_Shopify(Tap):
 
     config_jsonschema = th.PropertiesList(
         th.Property(
-            "access_token",
-            th.StringType,
-            required=True,
-            description="The access token to authenticate with the Shopify API",
+            "authentication",
+            th.CustomType(
+                {
+                    **th.DiscriminatedUnion(
+                        "auth_type", 
+                        oauth=th.PropertiesList(
+                            th.Property(
+                                "client_id",
+                                th.StringType,
+                                required=True,
+                                secret=True
+                            ),
+                            th.Property(
+                                "client_secret",
+                                th.StringType,
+                                required=True,
+                                secret=True
+                            ),
+                            th.Property(
+                                "access_token",
+                                th.StringType,
+                                required=True,
+                                secret=True
+                            )
+                        ),
+                        access_token=th.PropertiesList(
+                            th.Property(
+                                "access_token",
+                                th.StringType,
+                                required=True,
+                                description="The access token to authenticate with the Shopify API",
+                            ),
+                        )
+                    ).to_dict(),
+                    "type": "object",
+                    "discriminator": {
+                        "propertyName": "auth_type"
+                    }
+                },
+            ),
+            required=True
         ),
         th.Property(
             "store",

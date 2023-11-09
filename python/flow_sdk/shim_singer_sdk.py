@@ -33,6 +33,7 @@ class CaptureShim(Connector):
     config_schema: dict
     delegate_factory: t.Callable[[Config, singer.Catalog | None, State | None], singer_sdk.Tap]
     usesSchemaInference: bool
+    oauth2: flow.OAuth2 | None
 
     def __init__(
         self,
@@ -40,12 +41,14 @@ class CaptureShim(Connector):
         delegate_factory: t.Callable[
             [Config, singer.Catalog | None, State | None], singer_sdk.Tap
         ],
-        usesSchemaInference = True
+        usesSchemaInference = True,
+        oauth2: flow.OAuth2 | None = None
     ):
         super().__init__()
         self.config_schema = config_schema
         self.delegate_factory = delegate_factory
         self.usesSchemaInference = usesSchemaInference
+        self.oauth2 = oauth2
 
     def spec(self, _: request.Spec) -> flow.Spec:
         out = flow.Spec(
@@ -54,9 +57,8 @@ class CaptureShim(Connector):
             resourceConfigSchema=resource_config_schema,
         )
 
-        # TODO(johnny): Can we map spec.advanced_auth into flow.OAuth2 ?
-        # jif self.oauth2:
-        #    out["oauth2"] = self.oauth2
+        if self.oauth2:
+           out["oauth2"] = self.oauth2
 
         return out
 
