@@ -1,0 +1,75 @@
+---
+properties:
+  active:
+    type: boolean
+  address1:
+    type:
+      - string
+      - "null"
+  address2:
+    type:
+      - string
+      - "null"
+  city:
+    type:
+      - string
+      - "null"
+  country:
+    type:
+      - string
+      - "null"
+  country_code:
+    type:
+      - string
+      - "null"
+  created_at:
+    type:
+      - string
+      - "null"
+  id:
+    type:
+      - integer
+  legacy:
+    type: boolean
+  name:
+    type:
+      - string
+      - "null"
+  phone:
+    type:
+      - string
+      - "null"
+  province:
+    type:
+      - string
+      - "null"
+  province_code:
+    type:
+      - string
+      - "null"
+  updated_at:
+    type:
+      - string
+      - "null"
+  zip:
+    type:
+      - string
+      - "null"
+  localized_country_name:
+    type:
+      - string
+      - "null"
+  localized_province_name:
+    type:
+      - string
+      - "null"
+  country_name:
+    type:
+      - string
+      - "null"
+  admin_graphql_api_id:
+    type:
+      - string
+      - "null"
+type: object
+x-infer-schema: true

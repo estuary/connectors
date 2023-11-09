@@ -1,5 +1,9 @@
-access_token: 
-store: 60ec54
+authentication:
+    auth_type: oauth
+    client_id_sops: ENC[AES256_GCM,data:Dz4Qy8X2xpnkCgM8Ewr0RyPRj1kMEJxnuiNjH11s5RI=,iv:iU1gO2hVVW7rSm1Xa1B1PXU3Xqtrui/sifUPxFj1Rss=,tag:M89jBnWBrCmbwjObHlHLlQ==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:5RUqkJsI86uWLwPklvRFsvR8l91nYFYXCL+GgJrwg0s=,iv:Qpim/W39Z0GTKj6BG02iqDGGwhOtEyzXlaj0Yf+BR3A=,tag:LvC+sxiVP9V+EgnwZ/Bd+g==,type:str]
+    access_token_sops: ENC[AES256_GCM,data:uVjw8ht1bBLVUV4qoeXa4n+trIzX2884+I3VFOej2QTBZV3GlVM=,iv:pYFevosDigVVus2b0s5wJTRoo0JyP/jvxiz5dBivLWk=,tag:lfXde+QOun5w6PEnkmL4Aw==,type:str]
+store: estuary-testing-1
 sops:
     kms: []
     gcp_kms:
@@ -9,8 +13,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2023-11-07T19:39:52Z"
-    mac: ENC[AES256_GCM,data:vo70FhKjSZ76Qrk4EuhIUEuIygEp84ZGegJ+FrV6IcAxBgnD6GCmQOgqE6rYbor0fo6YW9wjeRCnT5cJ2qKXC/hLDPPE9AQwdKZtv7SRlk4Axf/IfsN4YtUlseDtcLu+MRMfLeaNfRurK3cf6wa8ZaTIgOE0lQUaEJ/JlBTYzkk=,iv:mout5vP6wES36vGWwdV0k3CqFpYArjWQTB9Gt3asOA4=,tag:kRNxRfAENdK1BTBiCX9R3w==,type:str]
+    lastmodified: "2023-11-09T18:24:17Z"
+    mac: ENC[AES256_GCM,data:6Lzdo9tvfvCYhSaAdY+clBOw7xYff+34a+7XcfgRCFswGBKMybY4zkzGU/6S4ucj4kTv+WbKswDSYtritypu4ngYiJCrUjSpWljagSAfspa7p2YAIMOYjr2WH1vPsYsSMP4VILx/cbYsoUvvXLOB4X7mSV+sKGB4dEtV1Ex7DO8=,iv:L36KEQyzCIPopPW7Tpc8H6VPddvQZO2Ikl/APAhrdvs=,tag:O8x7owWQvMqi8iIDB1hsAQ==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.7.3
