@@ -50,7 +50,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		msg := &pubsub.Message{
 			Data:        it.RawJSON,
-			OrderingKey: fmt.Sprintf("%d", PackedKeyHash_HH64(it.PackedKey)),
+			OrderingKey: fmt.Sprintf("%08x", PackedKeyHash_HH64(it.PackedKey)),
 		}
 		// Only include an identifier attribute if an identifier has been configured.
 		if binding.identifier != "" {
