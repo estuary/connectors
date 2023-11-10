@@ -24,26 +24,25 @@ const (
 	DefaultFileSizeLimit = 250 * 1024 * 1024
 )
 
-// CountingEncoder provides access to a count of gzip'd bytes that have been written by a
+// CountingEncoder provides access to a count of optionally gzip'd bytes that have been written by a
 // json.Encoder to an io.WriterCloser.
 type CountingEncoder struct {
-	w          io.Writer // will be set to either `gz` for compressed writes or `underlying` if compression is disabled
-	gz         *gzip.Writer
-	underlying io.WriteCloser
-	written    int
-	shape      *encrow.Shape
-	buf        []byte
+	w     io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
+	cwc   *countingWriteCloser
+	gz    *gzip.Writer
+	shape *encrow.Shape
+	buf   []byte
 }
 
 // NewCountingEncoder creates a CountingEncoder from w. w is closed when CountingEncoder is closed.
 // If `fields` is nil, values will be encoded as a JSON array rather than as an object.
 func NewCountingEncoder(w io.WriteCloser, gzipCompression bool, fields []string) *CountingEncoder {
 	enc := &CountingEncoder{
-		underlying: w,
+		cwc: &countingWriteCloser{w: w},
 	}
 
 	if gzipCompression {
-		gz, err := gzip.NewWriterLevel(w, compressionLevel)
+		gz, err := gzip.NewWriterLevel(enc.cwc, compressionLevel)
 		if err != nil {
 			// Only possible if compressionLevel is not valid.
 			panic("invalid compression level for gzip.NewWriterLevel")
@@ -51,7 +50,7 @@ func NewCountingEncoder(w io.WriteCloser, gzipCompression bool, fields []string)
 		enc.gz = gz
 		enc.w = gz
 	} else {
-		enc.w = w
+		enc.w = enc.cwc
 	}
 
 	if fields != nil {
@@ -91,18 +90,15 @@ func (e *CountingEncoder) Encode(vals []any) (err error) {
 
 	e.buf = append(e.buf, '\n')
 
-	n, err := e.w.Write(e.buf)
-	if err != nil {
+	if _, err := e.w.Write(e.buf); err != nil {
 		return fmt.Errorf("writing gzip bytes: %w", err)
 	}
-
-	e.written += n
 
 	return nil
 }
 
 func (e *CountingEncoder) Written() int {
-	return e.written
+	return e.cwc.written
 }
 
 // Close closes the underlying gzip writer if compression is enabled, flushing its data and writing
@@ -115,8 +111,32 @@ func (e *CountingEncoder) Close() error {
 		}
 	}
 
-	if err := e.underlying.Close(); err != nil {
+	if err := e.cwc.Close(); err != nil {
 		return fmt.Errorf("closing counting writer: %w", err)
+	}
+	return nil
+}
+
+// countingWriteCloser is used internally by CountingEncoder to access the count of compressed bytes
+// written to the writer.
+type countingWriteCloser struct {
+	written int
+	w       io.WriteCloser
+}
+
+func (c *countingWriteCloser) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	if err != nil {
+		return 0, fmt.Errorf("countingWriteCloser writing to w: %w", err)
+	}
+	c.written += n
+
+	return n, nil
+}
+
+func (c *countingWriteCloser) Close() error {
+	if err := c.w.Close(); err != nil {
+		return fmt.Errorf("countingWriteCloser closing w: %w", err)
 	}
 	return nil
 }
