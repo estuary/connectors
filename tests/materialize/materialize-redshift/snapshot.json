@@ -645,6 +645,42 @@
       "num_and_str": 5.1,
       "num_str": 50.1,
       "time": "23:59:59Z"
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_document": "{\"_meta\":{\"uuid\":\"c02bd79a-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":8,\"num_str\":\"NaN\"}",
+      "flow_published_at": "2023-07-12 18:27:25.889321 +0000 UTC",
+      "id": 8,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_document": "{\"_meta\":{\"uuid\":\"c02bd79a-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":9,\"num_str\":\"Infinity\"}",
+      "flow_published_at": "2023-07-12 18:27:25.889321 +0000 UTC",
+      "id": 9,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_document": "{\"_meta\":{\"uuid\":\"c02bd79a-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":10,\"num_str\":\"-Infinity\"}",
+      "flow_published_at": "2023-07-12 18:27:25.889321 +0000 UTC",
+      "id": 10,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
     }
   ]
 }
