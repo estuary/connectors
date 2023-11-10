@@ -87,10 +87,17 @@ func NewSQLiteDriver() *sql.Driver {
 				CreateTableTemplate: tplCreateTargetTable,
 				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
-				CheckPrerequisites:  func(_ context.Context, _ *sql.Endpoint) *sql.PrereqErr { return &sql.PrereqErr{} },
 			}, nil
 		},
 	}
+}
+
+type client struct {
+	path string
+}
+
+func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
+	return &sql.PrereqErr{}
 }
 
 // AddColumnToTable and DropNotNullForColumn are no-ops since SQLite does not persist a
@@ -104,10 +111,6 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 
 func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
 	return "", nil
-}
-
-type client struct {
-	path string
 }
 
 // We don't use specs table for sqlite since it is ephemeral and won't be

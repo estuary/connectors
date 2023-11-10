@@ -174,8 +174,7 @@ func TestPrereqs(t *testing.T) {
 			cfg := tt.cfg(cfg)
 			client, err := cfg.client(context.Background())
 			require.NoError(t, err)
-
-			require.Equal(t, tt.want, prereqs(context.Background(), &sql.Endpoint{
+			require.Equal(t, tt.want, client.PreReqs(context.Background(), &sql.Endpoint{
 				Config: cfg,
 				Client: client,
 				Tenant: "tenant",

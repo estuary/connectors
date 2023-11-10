@@ -328,7 +328,6 @@ func newMysqlDriver() *sql.Driver {
 				CreateTableTemplate: templates["createTargetTable"],
 				NewResource:         newTableConfig,
 				NewTransactor:       prepareNewTransactor(dialect, templates),
-				CheckPrerequisites:  prereqs,
 				Tenant:              tenant,
 			}, nil
 		},
@@ -352,7 +351,12 @@ func queryTimeZone(ctx context.Context, conn *stdsql.Conn) (string, error) {
 	return tzName, nil
 }
 
-func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
+type client struct {
+	uri     string
+	dialect sql.Dialect
+}
+
+func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
 
@@ -407,12 +411,6 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-// client implements the sql.Client interface.
-type client struct {
-	uri     string
-	dialect sql.Dialect
 }
 
 func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
@@ -496,10 +494,10 @@ func (c client) ExecStatements(ctx context.Context, statements []string) error {
 			switch mysqlErr.Number {
 			case 1059:
 				err = fmt.Errorf("%w.\nPossible resolutions include:\n%s\n%s\n%s",
-				err,
-				"1. Adding a projection to rename this field, see https://go.estuary.dev/docs-projections",
-				"2. Exclude the field, see https://go.estuary.dev/docs-field-selection",
-				"3. Disable the corresponding binding")
+					err,
+					"1. Adding a projection to rename this field, see https://go.estuary.dev/docs-projections",
+					"2. Exclude the field, see https://go.estuary.dev/docs-field-selection",
+					"3. Disable the corresponding binding")
 			}
 		}
 
