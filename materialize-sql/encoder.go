@@ -2,11 +2,11 @@ package sql
 
 import (
 	"compress/flate"
-	"compress/gzip"
 	"fmt"
 	"io"
 
 	"github.com/estuary/connectors/go/encrow"
+	"github.com/klauspost/compress/gzip"
 	"github.com/segmentio/encoding/json"
 )
 
