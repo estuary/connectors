@@ -192,14 +192,19 @@ func newBigQueryDriver() *sql.Driver {
 				CreateTableTemplate: tplCreateTargetTable,
 				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
-				CheckPrerequisites:  prereqs,
 				Tenant:              tenant,
 			}, nil
 		},
 	}
 }
 
-func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
+type client struct {
+	bigqueryClient     *bigquery.Client
+	cloudStorageClient *storage.Client
+	config             config
+}
+
+func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	client := ep.Client.(*client)
 	errs := &sql.PrereqErr{}
@@ -269,13 +274,6 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-// client implements the sql.Client interface.
-type client struct {
-	bigqueryClient     *bigquery.Client
-	cloudStorageClient *storage.Client
-	config             config
 }
 
 func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
