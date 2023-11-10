@@ -192,45 +192,88 @@ func TestGeneric(t *testing.T) {
 	tests.Run(context.Background(), t, tb)
 }
 
-func TestAlterTable_Unsupported(t *testing.T) {
+func TestAlterTable_ChangeColumn(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var uniqueA, uniqueB, uniqueC = "17220185", "28221107", "31129906"
-	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableC = tb.CreateTable(ctx, t, uniqueC, "(id INTEGER PRIMARY KEY, data TEXT)")
-	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "abc"}, {2, "def"}})
+	var uniqueID = "27484562"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, table, [][]interface{}{{1, "aaa"}, {2, "bbb"}})
 
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	// Altering tableC, which is not being captured, should be fine
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s CHANGE COLUMN data data2 INTEGER;", tableC))
+	// Rename and change type to varchar, but don't change position
+	tb.Insert(ctx, t, table, [][]interface{}{{3, "ccc"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %[1]s CHANGE COLUMN `data` `data_two` VARCHAR(10);", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{4, "ddd"}})
 	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	// Altering tableB, which is being captured, should result in an error
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s CHANGE COLUMN data data2 INTEGER;", tableB))
-	tb.Insert(ctx, t, tableB, [][]interface{}{{3, 30}, {4, 40}})
-	t.Run("capture2-fails", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	// Rename, preserving the varchar type, but reorder to be the first column
+	tb.Insert(ctx, t, table, [][]interface{}{{5, "eee"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %[1]s CHANGE COLUMN `data_two` `data_three` VARCHAR(10) FIRST;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{"fff", 6}})
+	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	// Restarting the capture won't fix this
-	t.Run("capture3-fails", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	// Rename, changing datatype back to text, and move the column back to the end
+	tb.Insert(ctx, t, table, [][]interface{}{{"ggg", 7}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %[1]s CHANGE COLUMN `data_three` `data` TEXT AFTER `id`;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{8, "hhh"}})
+	t.Run("capture3", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
 
-	// But removing the problematic table should fix it
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA))
+func TestAlterTable_ModifyColumn(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "13419621"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, tag TEXT, data TEXT)")
+	tb.Insert(ctx, t, table, [][]interface{}{{1, "A", "aaa"}, {2, "B", "bbb"}})
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Change type to varchar but don't move it
+	tb.Insert(ctx, t, table, [][]interface{}{{3, "C", "ccc"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %[1]s MODIFY COLUMN `tag` VARCHAR(10);", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{4, "D", "ddd"}})
+	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Preserve varchar type, move to beginning
+	tb.Insert(ctx, t, table, [][]interface{}{{5, "E", "eee"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %[1]s MODIFY COLUMN `tag` VARCHAR(10) FIRST;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{"F", 6, "fff"}})
+	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Change back to text, move to end
+	tb.Insert(ctx, t, table, [][]interface{}{{"G", 7, "ggg"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %[1]s MODIFY COLUMN `tag` TEXT AFTER `data`;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{8, "hhh", "H"}})
+	t.Run("capture3", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Preserve text type, move to middle
+	tb.Insert(ctx, t, table, [][]interface{}{{9, "iii", "I"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %[1]s MODIFY COLUMN `tag` TEXT AFTER `id`;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{10, "J", "jjj"}})
 	t.Run("capture4", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
 
-	// And we can then re-add the table and it should start over after the problem
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
-	t.Run("capture5", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+func TestAlterTable_RenameColumn(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "73330825"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, table, [][]interface{}{{1, "aaa"}, {2, "bbb"}})
 
-	// Finally we exercise the trickiest edge case, in which a new table (C)
-	// is added to the capture *when it was also altered after the last state
-	// checkpoint*. This should still work, because tables only become active
-	// after the first stream-to-watermark operation.
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s CHANGE COLUMN data2 data3 BOOL;", tableC))
-	tb.Insert(ctx, t, tableC, [][]interface{}{{5, true}, {6, false}})
-	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB), regexp.MustCompile(uniqueC))
-	t.Run("capture6", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Rename the column
+	tb.Insert(ctx, t, table, [][]interface{}{{3, "ccc"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %[1]s RENAME COLUMN `data` TO `data_two`;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{4, "ddd"}})
+	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Rename back to the original name
+	tb.Insert(ctx, t, table, [][]interface{}{{5, "eee"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %[1]s RENAME COLUMN `data_two` TO `data`;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{6, "fff"}})
+	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
 func TestAlterTable_AddColumnBasic(t *testing.T) {
