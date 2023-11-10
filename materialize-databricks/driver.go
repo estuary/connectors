@@ -640,7 +640,7 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
       // When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
       // it is okay to skip them in this case
       if recovery {
-        if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") {
+        if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
           continue
         }
       }
