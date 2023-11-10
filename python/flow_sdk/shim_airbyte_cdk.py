@@ -244,7 +244,7 @@ resource_config_schema = {
     "type": "object",
     "properties": {
         "stream": {"type": "string"},
-        "syncMode": {"enum": ["incremental", "full_refresh"]},
+        "syncMode": {"type": "string", "enum": ["incremental", "full_refresh"]},
         "namespace": {"type": "string"},
         "cursorField": {
             "type": "array",
