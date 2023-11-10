@@ -220,7 +220,9 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		rs.tables.dirtyMetadata = nil
 		rs.tables.RUnlock()
 		for _, metadataEvent := range metadataEvents {
-			rs.events <- metadataEvent
+			if err := rs.emitEvent(ctx, metadataEvent); err != nil {
+				return err
+			}
 		}
 
 		// Process the next binlog event from the database.
@@ -288,11 +290,13 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if rs.db.includeTxIDs[streamID] {
 						sourceInfo.TxID = rs.gtidString
 					}
-					rs.events <- &sqlcapture.ChangeEvent{
+					if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
 						Operation: sqlcapture.InsertOp,
 						RowKey:    rowKey,
 						After:     after,
 						Source:    sourceInfo,
+					}); err != nil {
+						return err
 					}
 				}
 			case replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
@@ -324,12 +328,14 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 						if rs.db.includeTxIDs[streamID] {
 							sourceInfo.TxID = rs.gtidString
 						}
-						rs.events <- &sqlcapture.ChangeEvent{
+						if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
 							Operation: sqlcapture.UpdateOp,
 							RowKey:    rowKey,
 							Before:    before,
 							After:     after,
 							Source:    sourceInfo,
+						}); err != nil {
+							return err
 						}
 					}
 				}
@@ -354,11 +360,13 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 					if rs.db.includeTxIDs[streamID] {
 						sourceInfo.TxID = rs.gtidString
 					}
-					rs.events <- &sqlcapture.ChangeEvent{
+					if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
 						Operation: sqlcapture.DeleteOp,
 						RowKey:    rowKey,
 						Before:    before,
 						Source:    sourceInfo,
+					}); err != nil {
+						return err
 					}
 				}
 			default:
@@ -369,8 +377,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 				"xid":    data.XID,
 				"cursor": rs.cursor,
 			}).Trace("XID Event")
-			rs.events <- &sqlcapture.FlushEvent{
+			if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
 				Cursor: fmt.Sprintf("%s:%d", rs.cursor.Name, rs.cursor.Pos),
+			}); err != nil {
+				return err
 			}
 		case *replication.TableMapEvent:
 			logrus.WithField("data", data).Trace("Table Map Event")
@@ -390,7 +400,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context) error {
 		case *replication.PreviousGTIDsEvent:
 			logrus.WithField("gtids", data.GTIDSets).Trace("PreviousGTIDs Event")
 		case *replication.QueryEvent:
-			if err := rs.handleQuery(string(data.Schema), string(data.Query)); err != nil {
+			if err := rs.handleQuery(ctx, string(data.Schema), string(data.Query)); err != nil {
 				return fmt.Errorf("error processing query event: %w", err)
 			}
 		case *replication.RotateEvent:
@@ -441,7 +451,7 @@ func decodeRow(streamID string, colNames []string, row []interface{}) (map[strin
 // by extracting and ignoring a SET STATEMENT stanza prior to parsing.
 var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|CREATE DEFINER|DROP USER|ALTER USER|DROP PROCEDURE|DROP TRIGGER|SET STATEMENT|# |/\*|-- )`)
 
-func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
+func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query string) error {
 	// There are basically three types of query events we might receive:
 	//   * An INSERT/UPDATE/DELETE query is an error, we should never receive
 	//     these if the server's `binlog_format` is set to ROW as it should be
@@ -487,7 +497,7 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 			}).Info("parsed components of ALTER TABLE statement")
 
 			if stmt.PartitionSpec == nil || len(stmt.AlterOptions) != 0 {
-				return rs.handleAlterTable(stmt, query, streamID)
+				return rs.handleAlterTable(ctx, stmt, query, streamID)
 			}
 		}
 	case *sqlparser.DropTable:
@@ -533,7 +543,7 @@ func (rs *mysqlReplicationStream) handleQuery(schema, query string) error {
 	return nil
 }
 
-func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, query string, streamID string) error {
+func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sqlparser.AlterTable, query string, streamID string) error {
 	// This lock and assignment to `meta` isn't actually needed unless we are able to handle the
 	// alteration. But if we can't handle the alteration the connector is probably going to crash,
 	// so any performance implication is negligible at that point and it makes things a little
@@ -611,9 +621,11 @@ func (rs *mysqlReplicationStream) handleAlterTable(stmt *sqlparser.AlterTable, q
 	if err != nil {
 		return fmt.Errorf("error serializing metadata JSON for %q: %w", streamID, err)
 	}
-	rs.events <- &sqlcapture.MetadataEvent{
+	if err := rs.emitEvent(ctx, &sqlcapture.MetadataEvent{
 		StreamID: streamID,
 		Metadata: json.RawMessage(bs),
+	}); err != nil {
+		return err
 	}
 
 	return nil
@@ -737,6 +749,15 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 	rs.tables.metadata[streamID] = metadata
 	rs.tables.dirtyMetadata = append(rs.tables.dirtyMetadata, streamID)
 	return nil
+}
+
+func (rs *mysqlReplicationStream) emitEvent(ctx context.Context, event sqlcapture.DatabaseEvent) error {
+	select {
+	case rs.events <- event:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (rs *mysqlReplicationStream) Events() <-chan sqlcapture.DatabaseEvent {
