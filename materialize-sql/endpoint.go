@@ -37,6 +37,12 @@ type Client interface {
 	// collection schema because required fields added to a table after initial creation will be
 	// created as nullable.
 	DropNotNullForColumn(ctx context.Context, dryRun bool, table Table, column Column) (string, error)
+
+	// PreReqs performs verification checks that the provided configuration can be used to interact
+	// with the endpoint to the degree required by the connector, to as much of an extent as
+	// possible. The returned PrereqErr can include multiple separate errors if it possible to
+	// determine that there is more than one issue that needs corrected.
+	PreReqs(ctx context.Context, ep *Endpoint) *PrereqErr
 }
 
 // Resource is a driver-provided type which represents the SQL resource
@@ -95,11 +101,6 @@ type Endpoint struct {
 	NewResource func(*Endpoint) Resource
 	// NewTransactor returns a Transactor ready for pm.RunTransactions.
 	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open) (pm.Transactor, error)
-	// CheckPrerequisites validates that the proposed configuration is able to connect to the
-	// endpoint and perform the required actions. It assumes that any required SSH tunneling is
-	// setup prior to its call.
-	CheckPrerequisites func(ctx context.Context, ep *Endpoint) *PrereqErr
-
 	// Tenant owning this task, as determined from the task name.
 	Tenant string
 }
