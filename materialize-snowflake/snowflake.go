@@ -215,14 +215,17 @@ func newSnowflakeDriver() *sql.Driver {
 				CreateTableTemplate: tplCreateTargetTable,
 				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
-				CheckPrerequisites:  prereqs,
 				Tenant:              tenant,
 			}, nil
 		},
 	}
 }
 
-func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
+type client struct {
+	uri string
+}
+
+func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
 
@@ -268,11 +271,6 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-// client implements the sql.Client interface.
-type client struct {
-	uri string
 }
 
 func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {

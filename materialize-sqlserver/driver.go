@@ -14,11 +14,11 @@ import (
 	"time"
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
-	mssqldb "github.com/microsoft/go-mssqldb"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 )
@@ -34,10 +34,10 @@ type tunnelConfig struct {
 
 // config represents the endpoint configuration for sql server.
 type config struct {
-	Address  string         `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 1433 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	User     string         `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password string         `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string         `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 1433 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
+	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
@@ -59,8 +59,8 @@ func (c *config) Validate() error {
 	return nil
 }
 
-
 const defaultPort = "1433"
+
 // ToURI converts the Config to a DSN string.
 func (c *config) ToURI() string {
 	var address = c.Address
@@ -83,9 +83,9 @@ func (c *config) ToURI() string {
 	params.Add("database", c.Database)
 
 	var uri = url.URL{
-		Scheme: "sqlserver",
-		Host:   address,
-		User:   url.UserPassword(c.User, c.Password),
+		Scheme:   "sqlserver",
+		Host:     address,
+		User:     url.UserPassword(c.User, c.Password),
 		RawQuery: params.Encode(),
 	}
 
@@ -182,14 +182,18 @@ func newSqlServerDriver() *sql.Driver {
 				CreateTableTemplate: templates["createTargetTable"],
 				NewResource:         newTableConfig,
 				NewTransactor:       prepareNewTransactor(templates),
-				CheckPrerequisites:  prereqs,
 				Tenant:              tenant,
 			}, nil
 		},
 	}
 }
 
-func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
+type client struct {
+	uri     string
+	dialect sql.Dialect
+}
+
+func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
 
@@ -229,12 +233,6 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return errs
 }
 
-// client implements the sql.Client interface.
-type client struct {
-	uri string
-	dialect sql.Dialect
-}
-
 func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
 	var query string
 
@@ -266,7 +264,7 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 		}
 
 		return nil
-	});
+	})
 
 	if err != nil {
 		return "", err
@@ -390,25 +388,25 @@ func prepareNewTransactor(
 }
 
 type binding struct {
-	target               sql.Table
+	target sql.Table
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
 	// into the target table. Note that in case of delta updates, "needsMerge"
 	// will always be false
-	needsMerge           bool
+	needsMerge bool
 
-	createLoadTableSQL   string
-	loadQuerySQL         string
-	loadInsertSQL        string
-	tempLoadTableName    string
-	tempLoadTruncate     string
+	createLoadTableSQL string
+	loadQuerySQL       string
+	loadInsertSQL      string
+	tempLoadTableName  string
+	tempLoadTruncate   string
 
-	createStoreTableSQL  string
-	tempStoreTableName   string
-	tempStoreTruncate    string
-	mergeInto            string
-	directCopy           string
+	createStoreTableSQL string
+	tempStoreTableName  string
+	tempStoreTruncate   string
+	mergeInto           string
+	directCopy          string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
@@ -591,7 +589,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 		var b = d.bindings[it.Binding]
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON);
+		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
@@ -638,7 +636,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 				} else {
 					log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
 					if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
-						return  fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err)
+						return fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err)
 					}
 					log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
 				}
