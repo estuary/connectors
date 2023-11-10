@@ -303,10 +303,6 @@ github.com/envoyproxy/go-control-plane v0.9.9-0.20210217033140-668b12f5399d/go.m
 github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0/go.mod h1:hliV/p42l8fGbc6Y9bQ70uLwIvmJyVE5k4iMKlh8wCQ=
 github.com/envoyproxy/go-control-plane v0.9.10-0.20210907150352-cf90f659a021/go.mod h1:AFq3mo9L8Lqqiid3OhADV3RfLJnjiw63cSpi+fDTRC0=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
-github.com/estuary/flow v0.3.4-0.20230718195208-1aed3cc73e86 h1:Y8KzHCwjvlFP8RHTiUlcEZrEG+pnaohDr1M7qCWT1T4=
-github.com/estuary/flow v0.3.4-0.20230718195208-1aed3cc73e86/go.mod h1:e3dXZ46QzqPQCgJBA8fevk14ecsYbMTejFWycAqWujc=
-github.com/estuary/flow v0.3.8 h1:T0vMPQprEktJpjSwmx6ahr/dSYMJcb+5IaobIaVqplQ=
-github.com/estuary/flow v0.3.8/go.mod h1:0g2acMNbyUpvBVO2zBaeXt3jC7Hr2F2bvTxcKgjXQpo=
 github.com/estuary/flow v0.3.9-0.20231101171501-fcdb1e7d6867 h1:ksUkoodoBfVHL7GcJI8FULXxGLmlQ2BVstdEXeoFUXw=
 github.com/estuary/flow v0.3.9-0.20231101171501-fcdb1e7d6867/go.mod h1:0g2acMNbyUpvBVO2zBaeXt3jC7Hr2F2bvTxcKgjXQpo=
 github.com/evanphx/json-patch/v5 v5.6.0 h1:b91NhWfaz02IuVxO9faSllyAtNXHMPkC5J8sJCLunww=
@@ -611,6 +607,8 @@ github.com/klauspost/compress v1.13.1/go.mod h1:8dP1Hq4DHOhN9w426knH3Rhby4rFm6D8
 github.com/klauspost/compress v1.13.6/go.mod h1:/3/Vjq9QcHkK5uEr5lBEmyoZ1iFhe47etQ6QUkpK6sk=
 github.com/klauspost/compress v1.15.15 h1:EF27CXIuDsYJ6mmvtBRlEuB2UVOqHG1tAXgZ7yIO+lw=
 github.com/klauspost/compress v1.15.15/go.mod h1:ZcK2JAFqKOpnBlxcLsJzYfrS9X1akm9fHZNnD9+Vo/4=
+github.com/klauspost/compress v1.17.2 h1:RlWWUY/Dr4fL8qk9YG7DTZ7PDgME2V4csBXA8L/ixi4=
+github.com/klauspost/compress v1.17.2/go.mod h1:ntbaceVETuRiXiv4DpjP66DpAtAGkEQskQzEyD//IeE=
 github.com/klauspost/cpuid/v2 v2.2.3 h1:sxCkb+qR91z4vsqw4vGGZlDgPz3G7gjaLyK3V8y70BU=
 github.com/klauspost/cpuid/v2 v2.2.3/go.mod h1:RVVoqg1df56z8g3pUjL/3lE5UfnlrJX8tyFgg4nqhuY=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
@@ -875,8 +873,6 @@ go.etcd.io/etcd/client/pkg/v3 v3.5.7 h1:y3kf5Gbp4e4q7egZdn5T7W9TSHUvkClN6u+Rq9mE
 go.etcd.io/etcd/client/pkg/v3 v3.5.7/go.mod h1:o0Abi1MK86iad3YrWhgUsbGx1pmTS+hrORWc2CamuhY=
 go.etcd.io/etcd/client/v3 v3.5.7 h1:u/OhpiuCgYY8awOHlhIhmGIGpxfBU/GZBUP3m/3/Iz4=
 go.etcd.io/etcd/client/v3 v3.5.7/go.mod h1:sOWmj9DZUMyAngS7QQwCyAXXAL6WhgTOPLNS/NabQgw=
-go.gazette.dev/core v0.89.1-0.20230717210749-2615d43e1202 h1:WLYJQre7newMdKrYyv4sKH1DXcy7PieSYJZ6bEZ8iIo=
-go.gazette.dev/core v0.89.1-0.20230717210749-2615d43e1202/go.mod h1:/fdxqReMWKS26yROKEKDY8JlXjwz8TqeEZggpNwb5I0=
 go.gazette.dev/core v0.89.1-0.20231012132739-dfed675b7fd1 h1:oRtrsDKboiCGeG0B6kJvaJ9KVAn7U797oGMGTqdHnwo=
 go.gazette.dev/core v0.89.1-0.20231012132739-dfed675b7fd1/go.mod h1:/fdxqReMWKS26yROKEKDY8JlXjwz8TqeEZggpNwb5I0=
 go.mongodb.org/mongo-driver v1.12.1 h1:nLkghSU8fQNaK7oUmDhQFsnrtcoNy7Z6LVFKsEecqgE=
