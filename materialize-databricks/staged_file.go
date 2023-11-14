@@ -46,8 +46,8 @@ func (f *fileBuffer) Close() error {
 //   - To allow for parallel processing within Databricks
 //   - To enable some amount of concurrency between the network operations for PUTs and the encoding
 //     & writing of JSON data locally
-//   - To prevent any individual file from becoming excessively large, which seems to bog down the
-//     encryption process used within the go-snowflake driver
+//   - To prevent any individual file from becoming excessively large. We aim for 128MB for files as per
+//     recommendation by Databricks: https://docs.databricks.com/en/_extras/documents/best-practices-ingestion-partner-volumes.pdf
 //
 // Ideally we would stream directly to the Databricks internal stage rather than reading from a local
 // disk file, but streaming PUTs do not currently work well and we have not been able to stream more than
@@ -67,9 +67,6 @@ func (f *fileBuffer) Close() error {
 type stagedFile struct {
 	fields     []string
 
-	// Random string that will serve as the directory for local files of this binding.
-	uuid string
-
 	// The full directory path of local files for this binding formed by joining tempdir and uuid.
 	dir string
 
@@ -81,10 +78,6 @@ type stagedFile struct {
 	// Indicates if the stagedFile has been initialized for this transaction yet. Set `true` by
 	// start() and `false` by flush().
 	started bool
-
-	// Index of the current file for this transaction. Starts at 0 and is incremented by 1 for each
-	// new file that is created.
-	fileIdx int
 
 	// References to the current file being written.
 	buf     *fileBuffer
@@ -106,7 +99,6 @@ func newStagedFile(filesAPI *files.FilesAPI, root string, fields []string) *stag
 
 	return &stagedFile{
 		fields: fields,
-		uuid: uuid,
 		dir:  filepath.Join(tempdir, uuid),
 		root: root,
 		filesAPI: filesAPI,
@@ -236,7 +228,6 @@ func (f *stagedFile) newFile() error {
 	}
 	f.encoder = sql.NewCountingEncoder(f.buf, false, f.fields)
 	f.uploaded = append(f.uploaded, fName)
-	f.fileIdx += 1
 
 	return nil
 }

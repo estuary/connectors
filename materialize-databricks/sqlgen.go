@@ -167,7 +167,7 @@ SELECT -1, ""
 	)
   FILEFORMAT = JSON
   FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
   ;
 {{ end }}
 
@@ -184,7 +184,7 @@ SELECT -1, ""
 	)
   FILEFORMAT = JSON
   FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'mergeSchema' = 'true', 'primitivesAsString' = 'true' )
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'mergeSchema' = 'true', 'primitivesAsString' = 'true', 'ignoreMissingFiles' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 {{ end }}
@@ -201,7 +201,7 @@ SELECT -1, ""
   )
   FILEFORMAT = JSON
   FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST' )
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
   ;
 {{ end }}
 
