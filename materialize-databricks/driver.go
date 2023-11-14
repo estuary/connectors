@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+  "sync"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
@@ -563,6 +564,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 	var queries []string
   // all files uploaded across bindings
   var toDelete []string
+  // mutex to ensure safety of updating these variables
+  m := sync.Mutex{}
+
   // we run these processes in parallel
   group, groupCtx := errgroup.WithContext(ctx)
 	for idx, b := range d.bindings {
@@ -573,17 +577,13 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
     var bindingCopy = b
     var idxCopy = idx
     group.Go(func() error {
-      // Create a binding-scoped temporary table for store documents to be merged
-      // into target table
-      if _, err := d.store.conn.ExecContext(groupCtx, bindingCopy.createStoreTableSQL); err != nil {
-        return fmt.Errorf("Exec(%s): %w", bindingCopy.createStoreTableSQL, err)
-      }
-
       toCopy, toDeleteBinding, err := bindingCopy.storeFile.flush()
       if err != nil {
         return fmt.Errorf("flushing store file for binding[%d]: %w", idxCopy, err)
       }
+      m.Lock()
       toDelete = append(toDelete, toDeleteBinding...)
+      m.Unlock()
 
       // In case of delta updates or if there are no existing keys being stored
       // we directly copy from staged files into the target table. Note that this is retriable
@@ -591,14 +591,24 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
       // not be loaded again
       // see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
       if bindingCopy.target.DeltaUpdates || !bindingCopy.needsMerge {
+        m.Lock()
         queries = append(queries, renderWithFiles(bindingCopy.copyIntoDirect, toCopy...))
+        m.Unlock()
       } else {
+        // Create a binding-scoped temporary table for store documents to be merged
+        // into target table
+        if _, err := d.store.conn.ExecContext(groupCtx, bindingCopy.createStoreTableSQL); err != nil {
+          return fmt.Errorf("Exec(%s): %w", bindingCopy.createStoreTableSQL, err)
+        }
+
         // COPY INTO temporary load table from staged files
         if _, err := d.store.conn.ExecContext(groupCtx, renderWithFiles(bindingCopy.copyIntoStore, toCopy...)); err != nil {
           return fmt.Errorf("store: copying into to temporary table: %w", err)
         }
 
+        m.Lock()
         queries = append(queries, renderWithFiles(bindingCopy.mergeInto, toCopy...), bindingCopy.dropStoreSQL)
+        m.Unlock()
       }
 
       return nil
@@ -639,6 +649,7 @@ func renderWithFiles(tpl string, files ...string) string {
 }
 
 // applyCheckpoint merges data from temporary table to main table
+// TODO: run these queries concurrently for improved performance
 func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
   log.Info("store: starting committing changes")
 	for _, q := range cp.Queries {
