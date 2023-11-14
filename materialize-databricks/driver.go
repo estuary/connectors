@@ -26,20 +26,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// TODO: Add info logs on start and end of long-running jobs
-
 const defaultPort = "443"
 const volumeName = "flow_staging"
 
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
 	Schema        string `json:"schema" jsonschema:"title=Schema,description=Schema where the table resides,default=default"`
-	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run in the same transaction that creates the table." jsonschema_extras:"multiline=true"`
 	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{Schema: "default"}
+	cfg := ep.Config.(*config)
+  var schema = cfg.SchemaName
+  if schema == "" {
+    schema = "default"
+  }
+	return &tableConfig{Schema: schema}
 }
 
 // Validate the resource configuration.
@@ -67,14 +69,14 @@ func (c tableConfig) Path() sql.TablePath {
 }
 
 func (c tableConfig) GetAdditionalSql() string {
-	return c.AdditionalSql
+	return ""
 }
 
 func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-func newSqlServerDriver() *sql.Driver {
+func newDatabricksDriver() *sql.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",
 		EndpointSpecType: new(config),
@@ -325,6 +327,10 @@ func newTransactor(
 	}
 
 	// Build a query which unions the results of each load subquery.
+  // TODO: we can build this query per-transaction so that tables that do not
+  // need to be loaded (such as delta updates tables) are not part of the query
+  // furthermore we can run these load queries concurrently for each binding to
+  // speed things up
 	var subqueries []string
 	for _, b := range d.bindings {
 		subqueries = append(subqueries, b.loadQuerySQL)
@@ -463,8 +469,6 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
     })
 	}
 
-  log.Info("load: finished upload of files")
-
 	if it.Err() != nil {
 		return it.Err()
 	}
@@ -472,6 +476,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
   if err := group.Wait(); err != nil {
     return err
   }
+
+  log.Info("load: finished upload of files")
 
   log.Info("load: starting join query")
 	// Issue a union join of the target tables and their (now staged) load keys,
@@ -661,5 +667,5 @@ func (d *transactor) Destroy() {
 }
 
 func main() {
-	boilerplate.RunMain(newSqlServerDriver())
+	boilerplate.RunMain(newDatabricksDriver())
 }

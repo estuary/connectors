@@ -13,6 +13,7 @@ type config struct {
 	Address     string           `json:"address" jsonschema:"title=Address,description=Host and port of the SQL warehouse (in the form of host[:port]). Port 443 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
 	HTTPPath    string           `json:"http_path" jsonschema:"title=HTTP path,description=HTTP path of your SQL warehouse"`
 	CatalogName string           `json:"catalog_name" jsonschema:"title=Catalog Name,description=Name of your Unity Catalog."`
+	SchemaName  string           `json:"schema_name,omitempty" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default"`
 
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication"`
 
@@ -41,7 +42,7 @@ func (c *credentialConfig) Validate() error {
 
 func (c *credentialConfig) validatePATCreds() error {
 	if c.PersonalAccessToken == "" {
-		return fmt.Errorf("missing service account credentials JSON")
+		return fmt.Errorf("missing personal_access_token")
 	}
 
 	return nil
@@ -68,7 +69,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 
 	return &jsonschema.Schema{
 		Title:       "Authentication",
-		Description: "Google API Credentials",
+		Description: "Databricks Credentials",
 		Default:     map[string]string{"auth_type": PAT_AUTH_TYPE},
 		OneOf: []*jsonschema.Schema{
 			{
