@@ -152,6 +152,8 @@ SELECT -1, ""
 	::BOOLEAN
 {{- else if Contains $ "BINARY" -}}
 	::BINARY
+{{- else if Contains $ "STRING" -}}
+	::STRING
 {{- end }}
 {{ end }}
 
@@ -178,7 +180,7 @@ SELECT -1, ""
 		_metadata.file_name as _metadata_file_name,
 		{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}
+			{{$key.Identifier -}}{{ template "cast" $key.DDL }}
 		{{- end }}
     FROM {{ Literal $.StagingPath }}
 	)
@@ -195,7 +197,7 @@ SELECT -1, ""
     SELECT
       {{ range $ind, $key := $.Table.Keys }}
         {{- if $ind }}, {{ end -}}
-        {{$key.Identifier -}}
+        {{$key.Identifier -}}{{ template "cast" $key.DDL }}
       {{- end }}
     FROM {{ Literal $.StagingPath }}
   )

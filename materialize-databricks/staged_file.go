@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"bufio"
 	"context"
 	"fmt"
@@ -144,7 +145,16 @@ func (f *stagedFile) encodeRow(row []interface{}) error {
 		}
 	}
 
-	if err := f.encoder.Encode(row); err != nil {
+	d := make([]any, len(row))
+	for idx := range row {
+		if v, ok := row[idx].(json.RawMessage); ok {
+			d[idx] = string(v)
+		} else {
+			d[idx] = row[idx]
+		}
+	}
+
+	if err := f.encoder.Encode(d); err != nil {
 		return fmt.Errorf("encoding row: %w", err)
 	}
 
