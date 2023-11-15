@@ -152,6 +152,7 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
+	log.Info("load: starting encoding and uploading of files")
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 		b.loadFile.start()
@@ -190,6 +191,7 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 		edcTableDefs[b.tempTableName] = b.loadFile.edc()
 	}
+	log.Info("load: finished encoding and uploading files")
 
 	if len(subqueries) == 0 {
 		return nil // Nothing to load.
@@ -222,6 +224,8 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		}
 	}
 
+	log.Info("load: finished loading")
+
 	return nil
 }
 
@@ -229,6 +233,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	var ctx = it.Context()
 	t.round++
 
+	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 		b.storeFile.start()
@@ -244,6 +249,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		log.Info("store: starting commit phase")
 		var err error
 		if t.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
@@ -293,6 +299,8 @@ func (t *transactor) commit(ctx context.Context) error {
 		}
 	}
 
+	log.Info("store: finished encoding and uploading of files")
+
 	// Complete the transaction and return the appropriate error.
 	subqueries = append(subqueries, `
 	COMMIT TRANSACTION;
@@ -308,6 +316,7 @@ func (t *transactor) commit(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("commit query: %w", err)
 	}
+	log.Info("store: finished commit")
 
 	if err != nil {
 		log.WithFields(log.Fields{

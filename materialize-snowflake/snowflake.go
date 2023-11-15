@@ -514,6 +514,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
+	log.Info("load: starting encoding and uploading of files")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -539,6 +540,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			subqueries = append(subqueries, b.load.loadQuery)
 		}
 	}
+
+	log.Info("load: finished encoding and uploading of files")
 
 	if len(subqueries) == 0 {
 		return nil // Nothing to load.
@@ -566,6 +569,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("querying Loads: %w", err)
 	}
+	log.Info("load: finished loading")
 
 	return nil
 }
@@ -573,6 +577,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	d.store.round++
 
+	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -590,6 +595,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		log.Info("store: starting commit phase")
 		var err error
 		if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
@@ -621,6 +627,7 @@ func (d *transactor) commit(ctx context.Context) error {
 		return err
 	}
 
+	log.Info("store: starting copying of files into tables")
 	for _, b := range d.bindings {
 		if !b.store.stage.started {
 			// No table update required
@@ -642,9 +649,12 @@ func (d *transactor) commit(ctx context.Context) error {
 		b.store.mustMerge = false
 	}
 
+	log.Info("store: finished encoding and uploading of files")
+
 	if err = txn.Commit(); err != nil {
 		return fmt.Errorf("txn.Commit: %w", err)
 	}
+	log.Info("store: finished commit")
 
 	return nil
 }

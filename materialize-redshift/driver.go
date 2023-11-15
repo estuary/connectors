@@ -632,6 +632,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	// can be created with long enough string columns.
 	maxStringLengths := make([]int, len(d.bindings))
 
+	log.Info("load: starting encoding and uploading of files")
 	for it.Next() {
 		gotLoads = true
 
@@ -720,6 +721,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		}
 	}
 
+	log.Info("load: finished encoding and uploading of files")
+
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
 	loadAllSQL := strings.Join(subqueries, "\nUNION ALL\n") + ";"
@@ -747,6 +750,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		return fmt.Errorf("commiting load transaction: %w", err)
 	}
 
+	log.Info("load: finished loading")
+
 	return nil
 }
 
@@ -765,6 +770,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	// Columns will only ever be to altered it to VARCHAR(MAX).
 	varcharColumnUpdates := make(map[string][]string)
 
+	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
 		if it.Exists {
 			hasUpdates[it.Binding] = true
@@ -817,6 +823,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		log.Info("store: starting commit phase")
 		var err error
 		if d.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
@@ -902,6 +909,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
 	}
 
+	log.Info("store: starting copying of files into tables")
 	for idx, b := range d.bindings {
 		if !b.storeFile.started {
 			// No stores for this binding.
@@ -935,6 +943,8 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		}
 	}
 
+	log.Info("store: finished encoding and uploading of files")
+
 	if fenceRes, err := txn.Exec(ctx, fenceUpdate); err != nil {
 		return fmt.Errorf("fetching fence update rows: %w", err)
 	} else if fenceRes.RowsAffected() != 1 {
@@ -943,6 +953,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		return fmt.Errorf("committing store transaction: %w", err)
 	}
 
+	log.Info("store: finished commit")
 	return nil
 }
 
