@@ -5,12 +5,15 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
 	sql "github.com/estuary/connectors/materialize-sql"
+	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,6 +62,86 @@ func TestFencingCases(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	sql.RunValidateTestCases(t, pgDialect)
+}
+
+func TestApply(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := config{
+		Address:  "localhost:5432",
+		User:     "postgres",
+		Password: "postgres",
+		Database: "postgres",
+		Schema:   "public",
+	}
+
+	configJson, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	firstTable := "first-table"
+	secondTable := "second-table"
+
+	firstResource := tableConfig{
+		Table:  firstTable,
+		Schema: cfg.Schema,
+	}
+	firstResourceJson, err := json.Marshal(firstResource)
+	require.NoError(t, err)
+
+	secondResource := tableConfig{
+		Table:  secondTable,
+		Schema: cfg.Schema,
+	}
+	secondResourceJson, err := json.Marshal(secondResource)
+	require.NoError(t, err)
+
+	bp_test.RunApplyTestCases(
+		t,
+		newPostgresDriver(),
+		configJson,
+		[2]json.RawMessage{firstResourceJson, secondResourceJson},
+		[2][]string{firstResource.Path(), secondResource.Path()},
+		func(t *testing.T) []string {
+			t.Helper()
+
+			db, err := stdsql.Open("pgx", cfg.ToURI())
+			require.NoError(t, err)
+
+			rows, err := sql.StdListTables(ctx, db, cfg.Database, cfg.Schema)
+			require.NoError(t, err)
+
+			return rows
+		},
+		func(t *testing.T, resourcePath []string) string {
+			t.Helper()
+
+			db, err := stdsql.Open("pgx", cfg.ToURI())
+			require.NoError(t, err)
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourcePath[0], resourcePath[1])
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T) {
+			t.Helper()
+
+			db, err := stdsql.Open("pgx", cfg.ToURI())
+			require.NoError(t, err)
+
+			for _, tbl := range []string{firstTable, secondTable} {
+				_, _ = db.ExecContext(ctx, fmt.Sprintf(
+					"drop table %s",
+					pgDialect.Identifier(cfg.Schema, tbl),
+				))
+			}
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = 'test/sqlite'",
+				pgDialect.Identifier(cfg.Schema, "flow_materializations_v2"),
+			))
+		},
+	)
 }
 
 func TestPrereqs(t *testing.T) {

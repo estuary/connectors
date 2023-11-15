@@ -10,9 +10,11 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
+	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,6 +35,7 @@ func mustGetCfg(t *testing.T) config {
 		{"REDSHIFT_PASSWORD", &out.Password},
 		{"REDSHIFT_DATABASE", &out.Database},
 		{"REDSHIFT_BUCKET", &out.Bucket},
+		{"REDSHIFT_SCHEMA", &out.Schema},
 		{"AWS_ACCESS_KEY_ID", &out.AWSAccessKeyID},
 		{"AWS_SECRET_ACCESS_KEY", &out.AWSSecretAccessKey},
 		{"AWS_REGION", &out.Region},
@@ -85,6 +88,79 @@ func TestFencingCases(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	sql.RunValidateTestCases(t, rsDialect)
+}
+
+func TestApply(t *testing.T) {
+	cfg := mustGetCfg(t)
+	ctx := context.Background()
+
+	configJson, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	firstTable := "first-table"
+	secondTable := "second-table"
+
+	firstResource := tableConfig{
+		Table:  firstTable,
+		Schema: cfg.Schema,
+	}
+	firstResourceJson, err := json.Marshal(firstResource)
+	require.NoError(t, err)
+
+	secondResource := tableConfig{
+		Table:  secondTable,
+		Schema: cfg.Schema,
+	}
+	secondResourceJson, err := json.Marshal(secondResource)
+	require.NoError(t, err)
+
+	bp_test.RunApplyTestCases(
+		t,
+		newRedshiftDriver(),
+		configJson,
+		[2]json.RawMessage{firstResourceJson, secondResourceJson},
+		[2][]string{firstResource.Path(), secondResource.Path()},
+		func(t *testing.T) []string {
+			t.Helper()
+
+			db, err := stdsql.Open("pgx", cfg.toURI())
+			require.NoError(t, err)
+
+			rows, err := sql.StdListTables(ctx, db, cfg.Database, cfg.Schema)
+			require.NoError(t, err)
+
+			return rows
+		},
+		func(t *testing.T, resourcePath []string) string {
+			t.Helper()
+
+			db, err := stdsql.Open("pgx", cfg.toURI())
+			require.NoError(t, err)
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourcePath[0], resourcePath[1])
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T) {
+			t.Helper()
+
+			db, err := stdsql.Open("pgx", cfg.toURI())
+			require.NoError(t, err)
+
+			for _, tbl := range []string{firstTable, secondTable} {
+				_, _ = db.ExecContext(ctx, fmt.Sprintf(
+					"drop table %s",
+					rsDialect.Identifier(cfg.Schema, tbl),
+				))
+			}
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = 'test/sqlite'",
+				rsDialect.Identifier(cfg.Schema, "flow_materializations_v2"),
+			))
+		},
+	)
 }
 
 func TestPrereqs(t *testing.T) {

@@ -1,374 +1,374 @@
 --- Begin base ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End base ---
 
 --- Begin remove original required field ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End remove original required field ---
 
 --- Begin re-add removed original required field ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End re-add removed original required field ---
 
 --- Begin remove original optional field ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End remove original optional field ---
 
 --- Begin re-add removed original optional field ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End re-add removed original optional field ---
 
 --- Begin add new required field ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "requiredVal2",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End add new required field ---
 
 --- Begin remove new required field ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "requiredVal2",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End remove new required field ---
 
 --- Begin add new optional field ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "optionalVal2",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "requiredVal2",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End add new optional field ---
 
 --- Begin remove new optional field ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "optionalVal2",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "requiredVal2",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End remove new optional field ---
 
 --- Begin add new binding ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2 second-table]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "optionalVal2",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "requiredVal2",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
-* Schema for test_db.test_schema.second-table:
+* Schema for public.second-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "flow_published_at",
     "Nullable": "NO",
-    "Type": "TIMESTAMP WITH TIME ZONE"
+    "Type": "timestamp with time zone"
   },
   {
     "Name": "int",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "secondKey",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "str",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End add new binding ---
 
 --- Begin remove new binding ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2 second-table]:
-* Schema for test_db.test_schema.first-table:
+* Schema for public.first-table:
 [
   {
     "Name": "flow_document",
     "Nullable": "NO",
-    "Type": "JSON"
+    "Type": "json"
   },
   {
     "Name": "key",
     "Nullable": "NO",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "optionalVal1",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "optionalVal2",
     "Nullable": "YES",
-    "Type": "BIGINT"
+    "Type": "bigint"
   },
   {
     "Name": "requiredVal1",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   },
   {
     "Name": "requiredVal2",
     "Nullable": "YES",
-    "Type": "VARCHAR"
+    "Type": "text"
   }
 ]
 --- End remove new binding ---

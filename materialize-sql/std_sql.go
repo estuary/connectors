@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -267,4 +269,95 @@ func (col *anyColumn) Scan(i interface{}) error {
 }
 func (col anyColumn) String() string {
 	return string(col)
+}
+
+// StdListTables is a convenience function for getting a list of tables for Client implementations
+// which use Go's standard `sql.DB` type and systems with an information_schema schema.
+func StdListTables(ctx context.Context, db *sql.DB, catalog string, schema string) ([]string, error) {
+	rows, err := db.QueryContext(
+		ctx,
+		fmt.Sprintf(
+			"select table_name from information_schema.tables where table_catalog = '%s' and table_schema = '%s';",
+			catalog,
+			schema,
+		))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []string{}
+	for rows.Next() {
+		var tableName string
+		if err := rows.Scan(&tableName); err != nil {
+			return nil, err
+		}
+		out = append(out, tableName)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	slices.Sort(out)
+
+	return out, nil
+}
+
+// StdGetSchema is a convenience function for getting a formatted schema for a table for Client
+// implementations which use Go's standard `sql.DB` type and systems with an information_schema
+// schema.
+func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string, name string) (string, error) {
+	q := fmt.Sprintf(`
+	select column_name, is_nullable, data_type
+	from information_schema.columns
+	where 
+		table_catalog = '%s' 
+		and table_schema = '%s'
+		and table_name = '%s';
+`,
+		catalog,
+		schema,
+		name,
+	)
+
+	rows, err := db.QueryContext(ctx, q)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	type foundColumn struct {
+		Name     string
+		Nullable string // string "YES" or "NO"
+		Type     string
+	}
+
+	cols := []foundColumn{}
+	for rows.Next() {
+		var c foundColumn
+		if err := rows.Scan(&c.Name, &c.Nullable, &c.Type); err != nil {
+			return "", err
+		}
+		cols = append(cols, c)
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+
+	slices.SortFunc(cols, func(a, b foundColumn) int {
+		if a.Name < b.Name {
+			return -1
+		} else if a.Name > b.Name {
+			return 1
+		} else {
+			return 0
+		}
+	})
+
+	b, err := json.MarshalIndent(cols, "", "  ")
+	if err != nil {
+		return "", err
+	}
+
+	return string(b), nil
 }

@@ -1,0 +1,380 @@
+--- Begin base ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  }
+]
+--- End base ---
+
+--- Begin remove original required field ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  }
+]
+--- End remove original required field ---
+
+--- Begin re-add removed original required field ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  }
+]
+--- End re-add removed original required field ---
+
+--- Begin remove original optional field ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  }
+]
+--- End remove original optional field ---
+
+--- Begin re-add removed original optional field ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  }
+]
+--- End re-add removed original optional field ---
+
+--- Begin add new required field ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "REQUIREDVAL2",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  }
+]
+--- End add new required field ---
+
+--- Begin remove new required field ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "REQUIREDVAL2",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  }
+]
+--- End remove new required field ---
+
+--- Begin add new optional field ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "OPTIONALVAL2",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "REQUIREDVAL2",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  }
+]
+--- End add new optional field ---
+
+--- Begin remove new optional field ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "OPTIONALVAL2",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "REQUIREDVAL2",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  }
+]
+--- End remove new optional field ---
+
+--- Begin add new binding ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table second-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "OPTIONALVAL2",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "REQUIREDVAL2",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  }
+]
+* Schema for second-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "FLOW_PUBLISHED_AT",
+    "Nullable": "NO",
+    "Type": "TIMESTAMP_NTZ"
+  },
+  {
+    "Name": "INT",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "SECONDKEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "STR",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  }
+]
+--- End add new binding ---
+
+--- Begin remove new binding ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table second-table]:
+* Schema for first-table:
+[
+  {
+    "Name": "FLOW_DOCUMENT",
+    "Nullable": "NO",
+    "Type": "VARIANT"
+  },
+  {
+    "Name": "KEY",
+    "Nullable": "NO",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "OPTIONALVAL1",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "OPTIONALVAL2",
+    "Nullable": "YES",
+    "Type": "NUMBER"
+  },
+  {
+    "Name": "REQUIREDVAL1",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  },
+  {
+    "Name": "REQUIREDVAL2",
+    "Nullable": "YES",
+    "Type": "TEXT"
+  }
+]
+--- End remove new binding ---
+
+--- Begin remove original binding ---
+* Table list: [FLOW_CHECKPOINTS_V1 FLOW_MATERIALIZATIONS_V2 first-table second-table]:
+--- End remove original binding ---
+
+

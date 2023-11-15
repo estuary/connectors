@@ -33,7 +33,7 @@ func mustGetCfg(t *testing.T) config {
 		{"MOTHERDUCK_TOKEN", &out.Token},
 		{"MOTHERDUCK_DATABASE", &out.Database},
 		{"MOTHERDUCK_SCHEMA", &out.Schema},
-		{"DUCKDB_BUCKET", &out.Bucket},
+		{"MOTHERDUCK_BUCKET", &out.Bucket},
 		{"AWS_ACCESS_KEY_ID", &out.AWSAccessKeyID},
 		{"AWS_SECRET_ACCESS_KEY", &out.AWSSecretAccessKey},
 		{"AWS_REGION", &out.Region},
@@ -168,6 +168,10 @@ func TestPrereqs(t *testing.T) {
 	}
 }
 
+func TestValidate(t *testing.T) {
+	sql.RunValidateTestCases(t, duckDialect)
+}
+
 func TestApply(t *testing.T) {
 	cfg := mustGetCfg(t)
 	ctx := context.Background()
@@ -208,23 +212,10 @@ func TestApply(t *testing.T) {
 			db, err := cfg.db(ctx)
 			require.NoError(t, err)
 
-			rows, err := db.QueryContext(
-				ctx,
-				fmt.Sprintf(
-					"select table_name from information_schema.tables where table_catalog = '%s' and table_schema = '%s';",
-					cfg.Database,
-					cfg.Schema,
-				))
+			rows, err := sql.StdListTables(ctx, db, cfg.Database, cfg.Schema)
 			require.NoError(t, err)
 
-			out := []string{}
-			for rows.Next() {
-				var tableName string
-				require.NoError(t, rows.Scan(&tableName))
-				out = append(out, tableName)
-			}
-
-			return out
+			return rows
 		},
 		func(t *testing.T, resourcePath []string) string {
 			t.Helper()
@@ -232,39 +223,10 @@ func TestApply(t *testing.T) {
 			db, err := cfg.db(ctx)
 			require.NoError(t, err)
 
-			q := fmt.Sprintf(`
-				select column_name, is_nullable, data_type
-				from information_schema.columns
-				where 
-					table_catalog = '%s' 
-					and table_schema = '%s'
-					and table_name = '%s';
-			`,
-				resourcePath[0],
-				resourcePath[1],
-				resourcePath[2],
-			)
-
-			rows, err := db.QueryContext(ctx, q)
+			sch, err := sql.StdGetSchema(ctx, db, resourcePath[0], resourcePath[1], resourcePath[2])
 			require.NoError(t, err)
 
-			type foundColumn struct {
-				Name     string
-				Nullable string // string "YES" or "NO"
-				Type     string
-			}
-
-			cols := []foundColumn{}
-			for rows.Next() {
-				var c foundColumn
-				require.NoError(t, rows.Scan(&c.Name, &c.Nullable, &c.Type))
-				cols = append(cols, c)
-			}
-
-			b, err := json.MarshalIndent(cols, "", "  ")
-			require.NoError(t, err)
-
-			return string(b)
+			return sch
 		},
 		func(t *testing.T) {
 			t.Helper()
@@ -273,12 +235,16 @@ func TestApply(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, tbl := range []string{firstTable, secondTable} {
-				_, err := db.ExecContext(ctx, fmt.Sprintf(
+				_, _ = db.ExecContext(ctx, fmt.Sprintf(
 					"drop table %s",
 					duckDialect.Identifier(cfg.Database, cfg.Schema, tbl),
 				))
-				require.NoError(t, err)
 			}
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = 'test/sqlite'",
+				duckDialect.Identifier(cfg.Schema, "flow_materializations_v2"),
+			))
 		},
 	)
 }
