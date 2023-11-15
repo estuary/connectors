@@ -1,12 +1,33 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"text/template"
 
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
+
+var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
+	switch ii := te.(type) {
+	case []byte:
+		return string(ii), nil
+	case json.RawMessage:
+		return string(ii), nil
+	case nil:
+		return string(json.RawMessage(nil)), nil
+	default:
+		var m, err = json.Marshal(ii)
+		if err != nil {
+			return nil, fmt.Errorf("cannot marshal %#v to json", ii)
+		}
+
+		return string(m), nil
+	}
+}
 
 // databricksDialect returns a representation of the Databricks SQL dialect.
 // https://docs.databricks.com/en/sql/language-manual/index.html
@@ -16,7 +37,7 @@ var databricksDialect = func() sql.Dialect {
   // Databricks supports JSON extraction using the : operator, this seems like
   // a simpler method for persisting JSON values:
   // https://docs.databricks.com/en/sql/language-manual/sql-ref-json-path-expression.html
-	var jsonMapper = sql.NewStaticMapper("STRING", sql.WithElementConverter(sql.JsonBytesConverter))
+	var jsonMapper = sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter))
 
   // https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
 	var typeMappings = sql.ProjectionTypeMapper{
@@ -100,7 +121,12 @@ DROP TABLE IF EXISTS {{ template "temp_name_load" . }}
 
 -- Idempotent creation of the store table for staging new records.
 {{ define "createStoreTable" }}
-CREATE TABLE IF NOT EXISTS {{ template "temp_name_store" . }};
+CREATE TABLE IF NOT EXISTS {{ template "temp_name_store" . }} (
+{{- range $ind, $key := $.Table.Columns }}
+	{{- if $ind }},{{ end }}
+	{{ $key.Identifier }} {{ $key.DDL }}
+{{- end }}
+);
 {{ end }}
 
 -- Templated truncation of the temporary store table:
@@ -170,6 +196,7 @@ SELECT -1, ""
   FILEFORMAT = JSON
   FILES = (%s)
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
+	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 {{ end }}
 
@@ -186,7 +213,7 @@ SELECT -1, ""
 	)
   FILEFORMAT = JSON
   FILES = (%s)
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'mergeSchema' = 'true', 'primitivesAsString' = 'true', 'ignoreMissingFiles' = 'false' )
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'primitivesAsString' = 'true', 'ignoreMissingFiles' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 {{ end }}
@@ -204,6 +231,7 @@ SELECT -1, ""
   FILEFORMAT = JSON
   FILES = (%s)
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
+	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 {{ end }}
 

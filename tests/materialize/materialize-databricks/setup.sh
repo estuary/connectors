@@ -17,6 +17,7 @@ config_json_template='{
    "address": "$DATABRICKS_HOST_NAME",
    "http_path": "$DATABRICKS_HTTP_PATH",
    "catalog_name": "$DATABRICKS_CATALOG",
+	 "schema_name": "default",
    "credentials": {
 			"auth_type": "PAT",
 			"personal_access_token": "$DATABRICKS_ACCESS_TOKEN"
