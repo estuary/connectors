@@ -27,8 +27,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// TODO: test non-default schema name
-
 const defaultPort = "443"
 const volumeName = "flow_staging"
 
@@ -309,7 +307,7 @@ func newTransactor(
 	}
 
 	// Create volume for storing staged files
-	if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS %s;", volumeName)); err != nil {
+	if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS %s.%s;", cfg.SchemaName, volumeName)); err != nil {
 		return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS %s;): %w", volumeName, err)
 	}
 
@@ -428,7 +426,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
     }
   }
 
-  log.Info("load: starting upload of files")
+  log.Info("load: starting upload and copying of files")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -477,7 +475,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
     return err
   }
 
-  log.Info("load: finished upload of files")
+  log.Info("load: finished upload and copying of files")
 
   log.Info("load: starting join query")
 	// Issue a union join of the target tables and their (now staged) load keys,
@@ -536,7 +534,7 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
 	ctx := it.Context()
 
-  log.Info("store: starting file uploads")
+  log.Info("store: starting file upload and copies")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 		b.storeFile.start(ctx)
@@ -618,7 +616,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
     return nil, err
   }
 
-  log.Info("store: finished file uploads")
+  log.Info("store: finished file upload and copies")
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
     var cp = checkpoint{Queries: queries, ToDelete: toDelete}
