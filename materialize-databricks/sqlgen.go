@@ -20,9 +20,9 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	case nil:
 		return string(json.RawMessage(nil)), nil
 	default:
-		var m, err = json.Marshal(ii)
+		var m, err = json.Marshal(te)
 		if err != nil {
-			return nil, fmt.Errorf("cannot marshal %#v to json", ii)
+			return nil, fmt.Errorf("cannot marshal %#v to json", te)
 		}
 
 		return string(json.RawMessage(m)), nil
@@ -88,16 +88,16 @@ var databricksDialect = func() sql.Dialect {
 }()
 
 
-// TODO: shard key in temporary table names
 // TODO: use create table USING location instead of copying data into temporary table
+// specially useful for delta updates but can also potentially be used for normal tables
 var (
 	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
 {{ define "temp_name_load" -}}
-flow_temp_load_table_{{ $.ShardRange }}_{{ $.Table.Binding }}
+` + "`" + `flow_temp_load_table_{{ $.ShardRange }}_{{ $.Table.Binding }}_{{ Last $.Table.Path }}` + "`" + `
 {{- end }}
 
 {{ define "temp_name_store" -}}
-flow_temp_store_table_{{ $.ShardRange }}_{{ $.Table.Binding }}
+` + "`" + `flow_temp_store_table_{{ $.ShardRange }}_{{ $.Table.Binding }}_{{ Last $.Table.Path }}` + "`" + `
 {{- end }}
 
 -- Idempotent creation of the load table for staging load keys.
@@ -180,7 +180,7 @@ SELECT -1, ""
 	::BINARY
 {{- else if Contains $ "STRING" -}}
 	::STRING
-{{- end }}
+{{- end -}}
 {{ end }}
 
 -- Directly copy into the target table
