@@ -13,7 +13,7 @@ type config struct {
 	Address     string           `json:"address" jsonschema:"title=Address,description=Host and port of the SQL warehouse (in the form of host[:port]). Port 443 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
 	HTTPPath    string           `json:"http_path" jsonschema:"title=HTTP path,description=HTTP path of your SQL warehouse"`
 	CatalogName string           `json:"catalog_name" jsonschema:"title=Catalog Name,description=Name of your Unity Catalog."`
-	SchemaName  string           `json:"schema_name,omitempty" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default"`
+	SchemaName  string           `json:"schema_name" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default"`
 
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication"`
 
@@ -91,6 +91,7 @@ func (c *config) Validate() error {
 		{"address", c.Address},
 		{"http_path", c.HTTPPath},
 		{"catalog_name", c.CatalogName},
+		{"schema_name", c.SchemaName},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
