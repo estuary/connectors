@@ -89,7 +89,6 @@ var databricksDialect = func() sql.Dialect {
 
 
 // TODO: use create table USING location instead of copying data into temporary table
-// specially useful for delta updates but can also potentially be used for normal tables
 var (
 	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
 {{ define "temp_name_load" -}}
