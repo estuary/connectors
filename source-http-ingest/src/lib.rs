@@ -285,11 +285,12 @@ pub async fn write_capture_response(
 }
 
 fn discovered_webhook_collection() -> DiscoveredBinding {
+    let resource_config = ResourceConfig::default();
     DiscoveredBinding {
         disable: false,
-        resource_path: vec![], // TODO: fixme
+        resource_path: resource_config.resource_path(),
         recommended_name: "webhook-data".to_string(),
-        resource_config_json: serde_json::to_string(&ResourceConfig::default()).unwrap(),
+        resource_config_json: serde_json::to_string(&resource_config).unwrap(),
         document_schema_json: serde_json::to_string(&serde_json::json!({
             "type": "object",
             "x-infer-schema": true,
