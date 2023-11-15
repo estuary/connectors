@@ -5,11 +5,14 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
+	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
 	sql "github.com/estuary/connectors/materialize-sql"
+	_ "github.com/microsoft/go-mssqldb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,6 +57,83 @@ func TestValidate(t *testing.T) {
 	sql.RunValidateTestCases(t, sqlServerDialect("Latin1_General_100_BIN2"))
 }
 
+func TestApply(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := config{
+		Address:  "localhost:1433",
+		User:     "sa",
+		Password: "!Flow1234",
+		Database: "flow",
+	}
+
+	configJson, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	firstTable := "first-table"
+	secondTable := "second-table"
+
+	firstResource := tableConfig{
+		Table: firstTable,
+	}
+	firstResourceJson, err := json.Marshal(firstResource)
+	require.NoError(t, err)
+
+	secondResource := tableConfig{
+		Table: secondTable,
+	}
+	secondResourceJson, err := json.Marshal(secondResource)
+	require.NoError(t, err)
+
+	bp_test.RunApplyTestCases(
+		t,
+		newSqlServerDriver(),
+		configJson,
+		[2]json.RawMessage{firstResourceJson, secondResourceJson},
+		[2][]string{firstResource.Path(), secondResource.Path()},
+		func(t *testing.T) []string {
+			t.Helper()
+
+			db, err := stdsql.Open("sqlserver", cfg.ToURI())
+			require.NoError(t, err)
+
+			rows, err := sql.StdListTables(ctx, db, cfg.Database, "dbo")
+			require.NoError(t, err)
+
+			return rows
+		},
+		func(t *testing.T, resourcePath []string) string {
+			t.Helper()
+
+			db, err := stdsql.Open("sqlserver", cfg.ToURI())
+			require.NoError(t, err)
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, "dbo", resourcePath[0])
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T) {
+			t.Helper()
+
+			db, err := stdsql.Open("sqlserver", cfg.ToURI())
+			require.NoError(t, err)
+
+			for _, tbl := range []string{firstTable, secondTable} {
+				_, _ = db.ExecContext(ctx, fmt.Sprintf(
+					"drop table %s",
+					sqlServerDialect("Latin1_General_100_BIN2").Identifier(tbl),
+				))
+			}
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = 'test/sqlite'",
+				sqlServerDialect("Latin1_General_100_BIN2").Identifier("flow_materializations_v2"),
+			))
+		},
+	)
+}
+
 func TestPrereqs(t *testing.T) {
 	cfg := config{
 		Address:  "localhost:1433",
@@ -78,7 +158,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.User = "wrong" + cfg.User
 				return &cfg
 			},
-			want: []string{fmt.Sprintf("Login failed for user 'wrongsa'")},
+			want: []string{"Login failed for user 'wrongsa'"},
 		},
 		{
 			name: "wrong password",
@@ -86,7 +166,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.Password = "wrong" + cfg.Password
 				return &cfg
 			},
-			want: []string{fmt.Sprintf("Login failed for user 'sa'")},
+			want: []string{"Login failed for user 'sa'"},
 		},
 		{
 			name: "wrong database",
@@ -94,7 +174,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.Database = "wrong" + cfg.Database
 				return &cfg
 			},
-			want: []string{fmt.Sprintf("Cannot open database \"wrongflow\" that was requested by the login.")},
+			want: []string{"Cannot open database \"wrongflow\" that was requested by the login."},
 		},
 		{
 			name: "wrong address",
