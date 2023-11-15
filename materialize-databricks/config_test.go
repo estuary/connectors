@@ -19,6 +19,7 @@ func TestDatabricksConfig(t *testing.T) {
 			AuthType: "PAT",
 			PersonalAccessToken: "secret",
 		},
+		SchemaName: "default",
 	}
 	require.NoError(t, validConfig.Validate())
 	var uri = validConfig.ToURI()
@@ -45,6 +46,10 @@ func TestDatabricksConfig(t *testing.T) {
 	var noPAT = validConfig
 	noPAT.Credentials.PersonalAccessToken = ""
 	require.Error(t, noPAT.Validate(), "expected validation error")
+
+	var noSchema = validConfig
+	noSchema.SchemaName = ""
+	require.Error(t, noSchema.Validate(), "expected validation error")
 }
 
 func TestSpecification(t *testing.T) {

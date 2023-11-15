@@ -19,6 +19,12 @@
         "title": "Catalog Name",
         "description": "Name of your Unity Catalog."
       },
+      "schema_name": {
+        "type": "string",
+        "title": "Schema Name",
+        "description": "Default schema to materialize to",
+        "default": "default"
+      },
       "credentials": {
         "oneOf": [
           {
@@ -57,6 +63,7 @@
       "address",
       "http_path",
       "catalog_name",
+      "schema_name",
       "credentials"
     ],
     "title": "SQL Connection"
@@ -76,12 +83,6 @@
         "title": "Schema",
         "description": "Schema where the table resides",
         "default": "default"
-      },
-      "additional_table_create_sql": {
-        "type": "string",
-        "title": "Additional Table Create SQL",
-        "description": "Additional SQL statement(s) to be run in the same transaction that creates the table.",
-        "multiline": true
       },
       "delta_updates": {
         "type": "boolean",
