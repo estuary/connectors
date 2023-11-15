@@ -189,7 +189,7 @@ SELECT -1, ""
     SELECT
 		{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}{{ template "cast" $key.DDL }}
+			{{$key.Identifier -}}{{ template "cast" $key.DDL -}}
 		{{- end }}
   FROM {{ Literal $.StagingPath }}
 	)
@@ -207,7 +207,7 @@ SELECT -1, ""
 		_metadata.file_name as _metadata_file_name,
 		{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}{{ template "cast" $key.DDL }}
+			{{$key.Identifier -}}{{ template "cast" $key.DDL -}}
 		{{- end }}
     FROM {{ Literal $.StagingPath }}
 	)
@@ -224,7 +224,7 @@ SELECT -1, ""
     SELECT
       {{ range $ind, $key := $.Table.Keys }}
         {{- if $ind }}, {{ end -}}
-        {{$key.Identifier -}}{{ template "cast" $key.DDL }}
+        {{$key.Identifier -}}{{ template "cast" $key.DDL -}}
       {{- end }}
     FROM {{ Literal $.StagingPath }}
   )
@@ -240,7 +240,7 @@ SELECT -1, ""
 	USING {{ template "temp_name_store" . }} AS r
 	ON {{ range $ind, $key := $.Table.Keys }}
 		{{- if $ind }} AND {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL }}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL -}}
 	{{- end }}
 	AND r._metadata_file_name IN (%s)
 	{{- if $.Table.Document }}
@@ -250,7 +250,7 @@ SELECT -1, ""
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Table.Values }}
 		{{- if $ind }}, {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL }}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}{{ template "cast" $key.DDL -}}
 	{{- end -}}
 	{{- if $.Table.Document -}}
 	{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
@@ -265,7 +265,7 @@ SELECT -1, ""
 		VALUES (
 		{{- range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			r.{{ $key.Identifier }}{{ template "cast" $key.DDL }}
+			r.{{ $key.Identifier }}{{ template "cast" $key.DDL -}}
 		{{- end -}}
 	);
 {{ end }}
