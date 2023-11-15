@@ -27,6 +27,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// TODO: test non-default schema name
+// TODO: add limit on concurrency of file uploads
+
 const defaultPort = "443"
 const volumeName = "flow_staging"
 
@@ -37,12 +40,7 @@ type tableConfig struct {
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	cfg := ep.Config.(*config)
-  var schema = cfg.SchemaName
-  if schema == "" {
-    schema = "default"
-  }
-	return &tableConfig{Schema: schema}
+	return &tableConfig{Schema: ep.Config.(*config).SchemaName}
 }
 
 // Validate the resource configuration.
@@ -94,7 +92,7 @@ func newDatabricksDriver() *sql.Driver {
         "catalog": cfg.CatalogName,
 			}).Info("connecting to databricks")
 
-			var metaBase sql.TablePath
+			var metaBase sql.TablePath = []string{cfg.SchemaName}
 			var metaSpecs, _ = sql.MetaTables(metaBase)
 
 			return &sql.Endpoint{
@@ -509,7 +507,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 	for _, b := range d.bindings {
 		if _, err = d.load.conn.ExecContext(ctx, b.dropLoadSQL); err != nil {
-			return fmt.Errorf("truncating load table: %w", err)
+			return fmt.Errorf("dropping load table: %w", err)
 		}
 	}
 
