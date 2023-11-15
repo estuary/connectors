@@ -28,7 +28,6 @@ import (
 )
 
 // TODO: test non-default schema name
-// TODO: add limit on concurrency of file uploads
 
 const defaultPort = "443"
 const volumeName = "flow_staging"
@@ -443,6 +442,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 
   // Copy the staged files in parallel
+  // TODO: we may want to limit the concurrency here, but we don't yet know a good
+  // value for tuning this
   group, groupCtx := errgroup.WithContext(ctx)
 	for idx, b := range d.bindings {
     if !b.loadFile.started {

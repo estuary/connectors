@@ -25,7 +25,7 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 			return nil, fmt.Errorf("cannot marshal %#v to json", ii)
 		}
 
-		return string(m), nil
+		return string(json.RawMessage(m)), nil
 	}
 }
 
