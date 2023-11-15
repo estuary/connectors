@@ -23,6 +23,7 @@ func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 	}
 
 	for _, prereq := range []func(ctx context.Context) error{
+		db.prerequisiteBinlogEnabled,
 		db.prerequisiteBinlogFormat,
 		db.prerequisiteBinlogExpiry,
 		db.prerequisiteWatermarksTable,
@@ -104,6 +105,21 @@ func (db *mysqlDatabase) prerequisiteVersion(ctx context.Context) error {
 	return nil
 }
 
+func (db *mysqlDatabase) prerequisiteBinlogEnabled(ctx context.Context) error {
+	var results, err = db.conn.Execute(`SHOW VARIABLES LIKE 'log_bin';`)
+	if err != nil {
+		return fmt.Errorf("unable to query 'log_bin' system variable: %w", err)
+	} else if len(results.Values) != 1 || len(results.Values[0]) != 2 {
+		return fmt.Errorf("unable to query 'log_bin' system variable: malformed response")
+	}
+	var value = string(results.Values[0][1].AsString())
+	logrus.WithField("log_bin", value).Info("queried system variable")
+	if value != "ON" {
+		return fmt.Errorf("binary logging is not enabled: system variable 'log_bin' = %q", value)
+	}
+	return nil
+}
+
 func (db *mysqlDatabase) prerequisiteBinlogFormat(ctx context.Context) error {
 	var results, err = db.conn.Execute(`SELECT @@GLOBAL.binlog_format;`)
 	if err != nil {
@@ -112,6 +128,7 @@ func (db *mysqlDatabase) prerequisiteBinlogFormat(ctx context.Context) error {
 		return fmt.Errorf("unable to query 'binlog_format' system variable: malformed response")
 	}
 	var format = string(results.Values[0][0].AsString())
+	logrus.WithField("binlog_format", format).Info("queried system variable")
 	if format != "ROW" {
 		return fmt.Errorf("system variable 'binlog_format' must be set to \"ROW\": current binlog_format = %q", format)
 	}
@@ -174,6 +191,12 @@ func (db *mysqlDatabase) prerequisiteUserPermissions(ctx context.Context) error 
 	var results, err = db.conn.Execute("SHOW MASTER STATUS;")
 	if err != nil {
 		return fmt.Errorf("user %q needs the REPLICATION CLIENT permission", db.config.User)
+	}
+	if len(results.Values) == 0 {
+		// This failure condition has nothing to do with user permissions, but since we're
+		// already running SHOW MASTER STATUS it would be redundant to do it again in a separate
+		// check just to verify that the result is non-empty.
+		return fmt.Errorf("unable to query latest binlog position (is binary logging enabled?)")
 	}
 	results.Close()
 
