@@ -5,12 +5,15 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
 	sql "github.com/estuary/connectors/materialize-sql"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,6 +52,84 @@ func TestFencingCases(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	sql.RunValidateTestCases(t, mysqlDialect(time.FixedZone("UTC", 0)))
+}
+
+func TestApply(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := config{
+		Address:  "localhost:3306",
+		User:     "flow",
+		Password: "flow",
+		Database: "flow",
+		Timezone: "UTC",
+	}
+
+	configJson, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	firstTable := "first-table"
+	secondTable := "second-table"
+
+	firstResource := tableConfig{
+		Table: firstTable,
+	}
+	firstResourceJson, err := json.Marshal(firstResource)
+	require.NoError(t, err)
+
+	secondResource := tableConfig{
+		Table: secondTable,
+	}
+	secondResourceJson, err := json.Marshal(secondResource)
+	require.NoError(t, err)
+
+	bp_test.RunApplyTestCases(
+		t,
+		newMysqlDriver(),
+		configJson,
+		[2]json.RawMessage{firstResourceJson, secondResourceJson},
+		[2][]string{firstResource.Path(), secondResource.Path()},
+		func(t *testing.T) []string {
+			t.Helper()
+
+			db, err := stdsql.Open("mysql", cfg.ToURI())
+			require.NoError(t, err)
+
+			rows, err := sql.StdListTables(ctx, db, "def", cfg.Database)
+			require.NoError(t, err)
+
+			return rows
+		},
+		func(t *testing.T, resourcePath []string) string {
+			t.Helper()
+
+			db, err := stdsql.Open("mysql", cfg.ToURI())
+			require.NoError(t, err)
+
+			sch, err := sql.StdGetSchema(ctx, db, "def", cfg.Database, resourcePath[0])
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T) {
+			t.Helper()
+
+			db, err := stdsql.Open("mysql", cfg.ToURI())
+			require.NoError(t, err)
+
+			for _, tbl := range []string{firstTable, secondTable} {
+				_, _ = db.ExecContext(ctx, fmt.Sprintf(
+					"drop table %s",
+					mysqlDialect(time.FixedZone("UTC", 0)).Identifier(tbl),
+				))
+			}
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = 'test/sqlite'",
+				mysqlDialect(time.FixedZone("UTC", 0)).Identifier("flow_materializations_v2"),
+			))
+		},
+	)
 }
 
 func TestPrereqs(t *testing.T) {

@@ -93,7 +93,7 @@ func (c *config) Validate() error {
 	}
 
 	if (c.Advanced.SSLMode == "verify_ca" || c.Advanced.SSLMode == "verify_identity") && c.Advanced.SSLServerCA == "" {
-		return fmt.Errorf("ssl_server_ca is required when using `verify_ca` and `verify_identity` modes.")
+		return fmt.Errorf("ssl_server_ca is required when using `verify_ca` and `verify_identity` modes")
 	}
 
 	return nil
@@ -106,7 +106,7 @@ func registerCustomSSL(c *config) error {
 	var rootCertPool = x509.NewCertPool()
 	var rawServerCert = []byte(c.Advanced.SSLServerCA)
 	if ok := rootCertPool.AppendCertsFromPEM(rawServerCert); !ok {
-		return fmt.Errorf("failed to append PEM, this usually means the PEM is not correctly formatted.")
+		return fmt.Errorf("failed to append PEM, this usually means the PEM is not correctly formatted")
 	}
 
 	// By default, Go's tls implementation verifies both the validity of the
@@ -311,8 +311,8 @@ func newMysqlDriver() *sql.Driver {
 				}
 
 				if tzLocation == nil {
-					log.WithField("error", err).Error("could not determine database timzone")
-					return nil, fmt.Errorf("unable to determine database timezone and no timezone in materialization configuration. A timezone is required for mysql materializations to avoid ambiguity about date-time and time fields.")
+					log.WithField("error", err).Error("could not determine database timezone")
+					return nil, fmt.Errorf("unable to determine database timezone and no timezone in materialization configuration. A timezone is required for mysql materializations to avoid ambiguity about date-time and time fields")
 				}
 			}
 
@@ -404,7 +404,7 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 		if err := row.Scan(&localInFileEnabled); err != nil {
 			errs.Err(fmt.Errorf("could not read `local_infile` global variable: %w", err))
 		} else if !localInFileEnabled {
-			errs.Err(fmt.Errorf("`local_infile` global variable must be enabled on your mysql server. You can enable this using `SET GLOBAL local_infile = true`."))
+			errs.Err(fmt.Errorf("`local_infile` global variable must be enabled on your mysql server. You can enable this using `SET GLOBAL local_infile = true`"))
 		} else {
 			db.Close()
 		}
@@ -608,9 +608,6 @@ type varcharColumnMeta struct {
 
 type binding struct {
 	target sql.Table
-
-	dialect   sql.Dialect
-	templates map[string]*template.Template
 
 	varcharColumnMetas []varcharColumnMeta
 	tempVarcharMetas   []varcharColumnMeta
