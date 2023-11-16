@@ -1,0 +1,331 @@
+---
+collections:
+  acmeCo/attachments:
+    schema: attachments.schema.yaml
+    key:
+      - /gid
+  acmeCo/attachments_compact:
+    schema:
+      type:
+        - object
+      properties:
+        gid:
+          type:
+            - "null"
+            - string
+        resource_type:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+        resource_subtype:
+          type:
+            - "null"
+            - string
+      x-infer-schema: true
+    key:
+      - /gid
+  acmeCo/custom_fields:
+    schema: custom_fields.schema.yaml
+    key:
+      - /gid
+  acmeCo/events:
+    schema: events.schema.yaml
+    key:
+      - /created_at
+  acmeCo/portfolios:
+    schema: portfolios.schema.yaml
+    key:
+      - /gid
+  acmeCo/portfolios_compact:
+    schema:
+      type:
+        - object
+      properties:
+        gid:
+          type:
+            - "null"
+            - string
+        resource_type:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+      x-infer-schema: true
+    key:
+      - /gid
+  acmeCo/portfolios_memberships:
+    schema: portfolios_memberships.schema.yaml
+    key:
+      - /gid
+  acmeCo/projects:
+    schema: projects.schema.yaml
+    key:
+      - /gid
+  acmeCo/sections:
+    schema:
+      type:
+        - object
+      properties:
+        gid:
+          type:
+            - "null"
+            - string
+        resource_type:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+        created_at:
+          type:
+            - "null"
+            - string
+          format: date-time
+        project:
+          type:
+            - "null"
+            - object
+          properties:
+            gid:
+              type:
+                - "null"
+                - string
+            resource_type:
+              type:
+                - "null"
+                - string
+            name:
+              type:
+                - "null"
+                - string
+      x-infer-schema: true
+    key:
+      - /gid
+  acmeCo/sections_compact:
+    schema:
+      type:
+        - object
+      properties:
+        gid:
+          type:
+            - "null"
+            - string
+        resource_type:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+      x-infer-schema: true
+    key:
+      - /gid
+  acmeCo/stories:
+    schema: stories.schema.yaml
+    key:
+      - /gid
+  acmeCo/stories_compact:
+    schema:
+      type:
+        - object
+      properties:
+        gid:
+          type:
+            - "null"
+            - string
+        resource_type:
+          type:
+            - "null"
+            - string
+        created_at:
+          type:
+            - "null"
+            - string
+          format: date-time
+        created_by:
+          type:
+            - "null"
+            - object
+          properties:
+            gid:
+              type:
+                - "null"
+                - string
+            resource_type:
+              type:
+                - "null"
+                - string
+            name:
+              type:
+                - "null"
+                - string
+        resource_subtype:
+          type:
+            - "null"
+            - string
+        text:
+          type:
+            - "null"
+            - string
+        type:
+          type:
+            - "null"
+            - string
+      x-infer-schema: true
+    key:
+      - /gid
+  acmeCo/tags:
+    schema: tags.schema.yaml
+    key:
+      - /gid
+  acmeCo/tasks:
+    schema: tasks.schema.yaml
+    key:
+      - /gid
+  acmeCo/team_memberships:
+    schema:
+      type:
+        - object
+      properties:
+        gid:
+          type:
+            - "null"
+            - string
+        resource_type:
+          type:
+            - "null"
+            - string
+        is_guest:
+          type:
+            - "null"
+            - boolean
+        team:
+          type:
+            - "null"
+            - object
+          properties:
+            gid:
+              type:
+                - "null"
+                - string
+            resource_type:
+              type:
+                - "null"
+                - string
+            name:
+              type:
+                - "null"
+                - string
+        user:
+          type:
+            - "null"
+            - object
+          properties:
+            gid:
+              type:
+                - "null"
+                - string
+            resource_type:
+              type:
+                - "null"
+                - string
+            name:
+              type:
+                - "null"
+                - string
+      x-infer-schema: true
+    key:
+      - /gid
+  acmeCo/teams:
+    schema:
+      type:
+        - object
+      properties:
+        gid:
+          type:
+            - "null"
+            - string
+        resource_type:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+        description:
+          type:
+            - "null"
+            - string
+        html_description:
+          type:
+            - "null"
+            - string
+        organization:
+          type:
+            - "null"
+            - object
+          properties:
+            gid:
+              type:
+                - "null"
+                - string
+            resource_type:
+              type:
+                - "null"
+                - string
+            name:
+              type:
+                - "null"
+                - string
+        permalink_url:
+          type:
+            - "null"
+            - string
+      x-infer-schema: true
+    key:
+      - /gid
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /gid
+  acmeCo/workspaces:
+    schema:
+      type:
+        - object
+      properties:
+        gid:
+          type:
+            - "null"
+            - string
+        resource_type:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+        email_domains:
+          type:
+            - "null"
+            - array
+          items:
+            type: string
+        is_organization:
+          type:
+            - "null"
+            - boolean
+      x-infer-schema: true
+    key:
+      - /gid
