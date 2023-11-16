@@ -1,0 +1,53 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "basic_capture_826935",
+      "template": "{{/* Default query template which adapts to cursor field selection */}}\n{{- if not .CursorFields -}}\n  SELECT * FROM `testdata`.`basic_capture_826935`;\n{{- else -}}\n  SELECT * FROM `testdata`.`basic_capture_826935`\n  {{- if not .IsFirstQuery -}}\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = @p{{$j}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e @p{{$i}}\n\t{{- end -}})\n  {{- end}}\n  ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- end}}"
+    },
+    "resource_path": [
+      "basic_capture_826935"
+    ],
+    "collection": {
+      "name": "acmeCo/test/basic_capture_826935",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta",
+          "id"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "http://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-bigquery-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index"
+            ]
+          },
+          "id": {
+            "type": "integer"
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ],
+      "projections": null
+    }
+  }
+

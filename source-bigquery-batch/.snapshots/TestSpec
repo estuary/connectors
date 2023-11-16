@@ -1,0 +1,89 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-bigquery-batch/config",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "title": "Project ID",
+        "description": "Google Cloud Project ID that owns the BigQuery dataset(s).",
+        "order": 0
+      },
+      "credentials_json": {
+        "type": "string",
+        "title": "Service Account JSON",
+        "description": "The JSON credentials of the service account to use for authorization.",
+        "multiline": true,
+        "order": 1,
+        "secret": true
+      },
+      "dataset": {
+        "type": "string",
+        "title": "Dataset",
+        "description": "BigQuery dataset to discover tables within.",
+        "order": 2
+      },
+      "advanced": {
+        "properties": {
+          "poll": {
+            "type": "string",
+            "title": "Default Poll Interval",
+            "description": "How often to execute fetch queries. Defaults to 24 hours if unset."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
+      }
+    },
+    "type": "object",
+    "required": [
+      "project_id",
+      "credentials_json",
+      "dataset"
+    ],
+    "title": "Batch BigQuery"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-bigquery-batch/resource",
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "description": "The unique name of this resource.",
+        "order": 0
+      },
+      "template": {
+        "type": "string",
+        "title": "Query Template",
+        "description": "The query template (pkg.go.dev/text/template) which will be rendered and then executed.",
+        "multiline": true,
+        "order": 3
+      },
+      "cursor": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array",
+        "title": "Cursor Columns",
+        "description": "The names of columns which should be persisted between query executions as a cursor.",
+        "order": 2
+      },
+      "poll": {
+        "type": "string",
+        "title": "Poll Interval",
+        "description": "How often to execute the fetch query (overrides the connector default setting)",
+        "order": 1
+      }
+    },
+    "type": "object",
+    "required": [
+      "name",
+      "template"
+    ],
+    "title": "BigQuery Batch Resource Spec"
+  },
+  "documentation_url": "https://go.estuary.dev/source-bigquery-batch"
+}
