@@ -513,11 +513,12 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 		return fmt.Errorf("error parsing template: %w", err)
 	}
 
-	for {
+	for ctx.Err() == nil {
 		if err := c.poll(ctx, bindingIndex, queryTemplate, res); err != nil {
 			return fmt.Errorf("error polling table: %w", err)
 		}
 	}
+	return ctx.Err()
 }
 
 var queryPlaceholderRegexp = regexp.MustCompile(`([?]|:[0-9]+|@flow_cursor_value\[[0-9]+\])`)
