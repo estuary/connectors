@@ -1,0 +1,2 @@
+SELECT * FROM `testdata`.`foobar` WHERE (`ka` > @p0) OR (`ka` = @p0 AND `kb` > @p1) OR (`ka` = @p0 AND `kb` = @p1 AND `kc` > @p2)
+  ORDER BY `ka`, `kb`, `kc`;
