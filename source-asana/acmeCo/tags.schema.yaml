@@ -1,0 +1,63 @@
+---
+type:
+  - object
+properties:
+  gid:
+    type:
+      - "null"
+      - string
+  resource_type:
+    type:
+      - "null"
+      - string
+  color:
+    type:
+      - "null"
+      - string
+  followers:
+    type:
+      - "null"
+      - array
+    items:
+      type:
+        - "null"
+        - object
+      properties:
+        gid:
+          type:
+            - "null"
+            - string
+        resource_type:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+  name:
+    type:
+      - "null"
+      - string
+  permalink_url:
+    type:
+      - "null"
+      - string
+  workspace:
+    type:
+      - "null"
+      - object
+    properties:
+      gid:
+        type:
+          - "null"
+          - string
+      resource_type:
+        type:
+          - "null"
+          - string
+      name:
+        type:
+          - "null"
+          - string
+x-infer-schema: true
