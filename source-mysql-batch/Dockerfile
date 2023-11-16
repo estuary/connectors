@@ -16,7 +16,6 @@ COPY source-boilerplate ./source-boilerplate
 
 RUN go install -v ./go/...
 RUN go install -v ./source-boilerplate/...
-RUN go install -v github.com/jackc/pgx/v4
 
 # Run tests and build the connector
 COPY source-mysql-batch ./source-mysql-batch
