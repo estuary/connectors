@@ -356,8 +356,7 @@ func discoverPrimaryKeys(ctx context.Context, db *bigquery.Client, dataset strin
 }
 
 var databaseTypeToJSON = map[string]*jsonschema.Schema{
-	"INT64":   {Type: "integer"},
-	"FLOAT64": {Type: "number"},
+	"INT64": {Type: "integer"},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
