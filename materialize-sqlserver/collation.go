@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"strings"
-	"strconv"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	stdsql "database/sql"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,19 +28,10 @@ const collationQuery = "SELECT name FROM sys.fn_helpcollations() WHERE name LIKE
 // 3. We prefer newer versions of collations to older versions (e.g. 140 is
 // better than 100 than 90 and so on...) as newer versions have more accurate
 // code point mappings.
-// 
+//
 // [0]: https://learn.microsoft.com/en-us/sql/relational-databases/collations/collation-and-unicode-support?view=sql-server-ver16#Supplementary_Characters
-func getCollation(ctx context.Context, cfg *config) (string, error) {
-	db, err := stdsql.Open("sqlserver", cfg.ToURI());
-	if err != nil {
-		return "", fmt.Errorf("opening database: %w", err)
-	}
-	conn, err := db.Conn(ctx);
-	if err != nil {
-		return "", fmt.Errorf("connecting to sqlserver: %w", err)
-	}
-
-	rows, err := conn.QueryContext(ctx, collationQuery);
+func getCollation(ctx context.Context, db *stdsql.DB) (string, error) {
+	rows, err := db.QueryContext(ctx, collationQuery)
 	if err != nil {
 		return "", fmt.Errorf("querying available collations: %w", err)
 	}
@@ -102,4 +94,3 @@ func sortCollations(collations []string) {
 		return finalScore < 0
 	})
 }
-

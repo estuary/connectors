@@ -8,7 +8,7 @@ import (
 )
 
 var duckDialect = func() sql.Dialect {
-	var typeMappings sql.TypeMapper = sql.ProjectionTypeMapper{
+	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
@@ -37,12 +37,16 @@ var duckDialect = func() sql.Dialect {
 		},
 	}
 
-	var nullable = sql.MaybeNullableMapper{
+	mapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    typeMappings,
+		Delegate:    mapper,
 	}
 
 	return sql.Dialect{
+		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
+		}),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
@@ -54,8 +58,7 @@ var duckDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return "?"
 		}),
-		TypeMapper:               nullable,
-		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
+		TypeMapper: mapper,
 	}
 }()
 

@@ -220,6 +220,62 @@ type client struct {
 	uri string
 }
 
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+	cfg := ep.Config.(*config)
+
+	db, err := stdsql.Open("pgx", c.uri)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	catalog := cfg.Database
+	if catalog == "" {
+		// An endpoint-level database configuration is not required, so query for the active
+		// database if that's the case.
+		if err := db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
+			return "", fmt.Errorf("querying for connected database: %w", err)
+		}
+	}
+
+	resolved, err := sql.ResolveActions(ctx, db, actions, pgDialect, catalog)
+	if err != nil {
+		return "", fmt.Errorf("resolving apply actions: %w", err)
+	}
+
+	statements := []string{}
+	for _, tc := range resolved.CreateTables {
+		statements = append(statements, tc.TableCreateSql)
+		if tc.AdditionalSql != "" {
+			statements = append(statements, tc.AdditionalSql)
+		}
+	}
+
+	for _, ta := range resolved.AlterTables {
+		var alterColumnStmt strings.Builder
+		if err := tplAlterTableColumns.Execute(&alterColumnStmt, ta); err != nil {
+			return "", fmt.Errorf("rendering alter table columns statement: %w", err)
+		}
+		statements = append(statements, alterColumnStmt.String())
+	}
+
+	// The spec update is last, only after all other actions are complete.
+	statements = append(statements, updateSpecStatement)
+
+	action := strings.Join(statements, "\n")
+	if dryRun {
+		return action, nil
+	}
+
+	for _, s := range statements {
+		if _, err := db.ExecContext(ctx, s); err != nil {
+			return "", fmt.Errorf("executing statement: %w", err)
+		}
+	}
+
+	return action, nil
+}
+
 func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
@@ -263,39 +319,6 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return errs
 }
 
-func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
-		tableIdentifier,
-		columnIdentifier,
-		columnDDL,
-	)
-
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
-}
-
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
-		table.Identifier,
-		column.Identifier,
-	)
-
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
-}
-
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
 	err = c.withDB(func(db *stdsql.DB) error {
 		specB64, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
@@ -304,10 +327,7 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 	return
 }
 
-// ExecStatements is used for the DDL statements of ApplyUpsert and ApplyDelete. Postgres supports
-// transactional DDL statements, so the statements are wrapped in a transaction.
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	statements = append(append([]string{"begin;"}, statements...), "commit;")
 	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
 }
 

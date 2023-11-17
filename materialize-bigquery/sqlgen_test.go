@@ -45,6 +45,43 @@ func TestSQLGeneration(t *testing.T) {
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 
+	addCols := []sqlDriver.Column{
+		{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
+		{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+	}
+	dropNotNulls := []sqlDriver.Column{
+		{Identifier: "first_required_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
+		{Identifier: "second_required_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+	}
+
+	for _, testcase := range []struct {
+		name         string
+		addColumns   []sqlDriver.Column
+		dropNotNulls []sqlDriver.Column
+	}{
+		{
+			name:         "alter table add columns and drop not nulls",
+			addColumns:   addCols,
+			dropNotNulls: dropNotNulls,
+		},
+		{
+			name:       "alter table add columns",
+			addColumns: addCols,
+		},
+		{
+			name:         "alter table drop not nulls",
+			dropNotNulls: dropNotNulls,
+		},
+	} {
+		snap.WriteString("--- Begin " + testcase.name + " ---\n")
+		require.NoError(t, tplAlterTableColumns.Execute(&snap, sqlDriver.TableAlter{
+			Table:        table,
+			AddColumns:   testcase.addColumns,
+			DropNotNulls: testcase.dropNotNulls,
+		}))
+		snap.WriteString("--- End " + testcase.name + " ---\n\n")
+	}
+
 	var shapeNoValues = sqlDriver.BuildTableShape(spec, 1, tableConfig{
 		Table:     "target_table_no_values_materialized",
 		Delta:     false,

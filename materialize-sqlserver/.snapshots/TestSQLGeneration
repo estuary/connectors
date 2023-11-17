@@ -181,6 +181,13 @@ SELECT TOP 0 -1, NULL
 
 --- End "Delta Updates" loadQuery ---
 
+--- Begin alter table add columns ---
+
+ALTER TABLE target_table ADD
+	first_new_column STRING,
+	second_new_column BOOL;
+--- End alter table add columns ---
+
 --- Begin Fence Update ---
 
 UPDATE "path"."To".checkpoints

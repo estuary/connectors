@@ -165,12 +165,25 @@ func newSqlServerDriver() *sql.Driver {
 				}
 			}
 
-			collation, err := getCollation(ctx, cfg)
+			db, err := stdsql.Open("sqlserver", cfg.ToURI())
+			if err != nil {
+				return nil, fmt.Errorf("opening db: %w", err)
+			}
+			defer db.Close()
+
+			collation, err := getCollation(ctx, db)
 			if err != nil {
 				return nil, fmt.Errorf("check collations: %w", err)
 			}
 
-			var dialect = sqlServerDialect(collation)
+			// We don't (yet) allow setting a schema for the endpoint or resources, so we need to get the
+			// default schema for the configured user.
+			var schema string
+			if err := db.QueryRowContext(ctx, "select schema_name()").Scan(&schema); err != nil {
+				return nil, fmt.Errorf("querying schema for current user: %w", err)
+			}
+
+			var dialect = sqlServerDialect(collation, schema)
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
@@ -191,6 +204,63 @@ func newSqlServerDriver() *sql.Driver {
 type client struct {
 	uri     string
 	dialect sql.Dialect
+}
+
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+	cfg := ep.Config.(*config)
+
+	db, err := stdsql.Open("sqlserver", c.uri)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	resolved, err := sql.ResolveActions(ctx, db, actions, c.dialect, cfg.Database)
+	if err != nil {
+		return "", fmt.Errorf("resolving apply actions: %w", err)
+	}
+
+	statements := []string{}
+	for _, tc := range resolved.CreateTables {
+		statements = append(statements, tc.TableCreateSql)
+	}
+
+	for _, ta := range resolved.AlterTables {
+		// SQL Server supports adding multiple columns in a single statement, but only a single
+		// modification per statement.
+		if len(ta.AddColumns) > 0 {
+			var addColumnsStmt strings.Builder
+			if err := renderTemplates(c.dialect)["alterTableColumns"].Execute(&addColumnsStmt, ta); err != nil {
+				return "", fmt.Errorf("rendering alter table columns statement: %w", err)
+			}
+			statements = append(statements, addColumnsStmt.String())
+		}
+
+		for _, dn := range ta.DropNotNulls {
+			statements = append(statements, fmt.Sprintf(
+				"ALTER TABLE %s ALTER COLUMN %s %s;",
+				ta.Identifier,
+				dn.Identifier,
+				dn.NullableDDL,
+			))
+		}
+	}
+
+	// The spec update is last, only after all other actions are complete.
+	statements = append(statements, updateSpecStatement)
+
+	action := strings.Join(statements, "\n")
+	if dryRun {
+		return action, nil
+	}
+
+	for _, s := range statements {
+		if _, err := db.ExecContext(ctx, s); err != nil {
+			return "", fmt.Errorf("executing statement: %w", err)
+		}
+	}
+
+	return action, nil
 }
 
 func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
@@ -233,70 +303,6 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return errs
 }
 
-func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
-	var query string
-
-	err := c.withDB(func(db *stdsql.DB) error {
-		query = fmt.Sprintf(
-			"ALTER TABLE %s ADD %s %s;",
-			tableIdentifier,
-			columnIdentifier,
-			columnDDL,
-		)
-
-		if !dryRun {
-			if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-				var sqlServerError *mssqldb.Error
-
-				if errors.As(err, &sqlServerError) {
-					// See SQLServer error reference:
-					// https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors-1000-to-1999?view=sql-server-2017
-					switch sqlServerError.Number {
-					case 1909:
-						// 1909: Duplicate column name, means the column already exists, we
-						// just skip
-						return nil
-					}
-				}
-
-				return err
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return query, nil
-}
-
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
-	var projection = column.Projection
-	projection.Inference.Exists = pf.Inference_MAY
-	var mapped, err = c.dialect.TypeMapper.MapType(&projection)
-	if err != nil {
-		return "", fmt.Errorf("drop not null: mapping type of %s failed: %w", column.Identifier, err)
-	}
-
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ALTER COLUMN %s %s;",
-		table.Identifier,
-		column.Identifier,
-		mapped.DDL,
-	)
-
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
-}
-
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
 	err = c.withDB(func(db *stdsql.DB) error {
 		specB64, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
@@ -305,8 +311,6 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 	return
 }
 
-// ExecStatements is used for the DDL statements of ApplyUpsert and ApplyDelete.
-// SQLServer does not support transactional DDL statements
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
 	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
 }

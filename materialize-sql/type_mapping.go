@@ -125,8 +125,12 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 }
 
 type MappedType struct {
-	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct inclusion in raw SQL.
+	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct inclusion in raw SQL
+	// for new table creation.
 	DDL string
+	// NullableDDL is DDL type for this mapping, always in its nullable form, to be used for
+	// existing table alterations.
+	NullableDDL string
 	// Converter of tuple elements for this mapping, into SQL runtime values.
 	Converter ElementConverter `json:"-"`
 	// ParsedFieldConfig is a Dialect-defined parsed implementation of the (optional)
@@ -167,6 +171,7 @@ func (sm StaticMapper) MapType(*Projection) (MappedType, error) {
 func NewStaticMapper(ddl string, opts ...StaticMapperOption) StaticMapper {
 	sm := StaticMapper{
 		DDL:               ddl,
+		NullableDDL:       ddl,
 		Converter:         func(te tuple.TupleElement) (interface{}, error) { return te, nil },
 		ParsedFieldConfig: nil,
 	}
@@ -326,39 +331,29 @@ func ClampDate() ElementConverter {
 	})
 }
 
-// MaybeNullableMapper wraps a ColumnMapper to add "NULL" and/or "NOT NULL" to the generated SQL type
+// NullableMapper wraps a ColumnMapper to add "NULL" and/or "NOT NULL" to the generated SQL type
 // depending on the nullability of the column. Most databases will assume that a column may contain
 // null as long as it isn't declared with a NOT NULL constraint, but some databases (e.g. ms sql
 // server) make that behavior configurable, requiring the DDL to explicitly declare a column with
 // NULL if it may contain null values. This wrapper will handle either or both cases.
-type MaybeNullableMapper struct {
+type NullableMapper struct {
 	NotNullText, NullableText string
 	Delegate                  TypeMapper
 }
 
-var _ TypeMapper = MaybeNullableMapper{}
+var _ TypeMapper = NullableMapper{}
 
-func (m MaybeNullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
+func (m NullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
 	if mapped, err = m.Delegate.MapType(p); err != nil {
 		return
 	} else if _, notNull := p.AsFlatType(); notNull && m.NotNullText != "" {
 		mapped.DDL += " " + m.NotNullText
 	} else if m.NullableText != "" {
 		mapped.DDL += " " + m.NullableText
+		mapped.NullableDDL = mapped.DDL
 	}
 
 	return
-}
-
-// AlwaysNullableMapper wraps a ColumnMapper to always produce DDL for a nullable column.
-type AlwaysNullableMapper struct {
-	Delegate TypeMapper
-}
-
-var _ AlwaysNullableTypeMapper = AlwaysNullableMapper{}
-
-func (m AlwaysNullableMapper) MapTypeNullable(p *Projection) (mapped MappedType, err error) {
-	return m.Delegate.MapType(p)
 }
 
 // PrimaryKeyMapper wraps a ColumnMapper to specify the type of the column in
@@ -553,7 +548,7 @@ func (c constrainter) Compatible(existing *pf.Projection, proposed *pf.Projectio
 		}
 	}
 
-	existingMapped, err := c.dialect.MapTypeNullable(&Projection{
+	existingMapped, err := c.dialect.MapType(&Projection{
 		Projection:     *existing,
 		RawFieldConfig: rawFieldConfig,
 	})
@@ -561,7 +556,7 @@ func (c constrainter) Compatible(existing *pf.Projection, proposed *pf.Projectio
 		return false, err
 	}
 
-	proposedMapped, err := c.dialect.MapTypeNullable(&Projection{
+	proposedMapped, err := c.dialect.MapType(&Projection{
 		Projection:     *proposed,
 		RawFieldConfig: rawFieldConfig,
 	})
@@ -569,7 +564,7 @@ func (c constrainter) Compatible(existing *pf.Projection, proposed *pf.Projectio
 		return false, err
 	}
 
-	return existingMapped.DDL == proposedMapped.DDL, nil
+	return existingMapped.NullableDDL == proposedMapped.NullableDDL, nil
 }
 
 func (constrainter) DescriptionForType(p *pf.Projection) string {

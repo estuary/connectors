@@ -7,11 +7,40 @@ import (
 
 // Dialect encapsulates many specifics of an Endpoint's interpretation of SQL.
 type Dialect struct {
+	TableLocatorer
+	ColumnLocatorer
 	Identifierer
 	Literaler
 	Placeholderer
 	TypeMapper
-	AlwaysNullableTypeMapper
+}
+
+// TableLocatorer produces an InfoTableLocation for a given path.
+type TableLocatorer interface {
+	TableLocator(path ...string) InfoTableLocation
+}
+
+// InfoTableLocation represents how to find a table in the INFORMATION_SCHEMA view for the endpoint.
+// INFORMATION_SCHEMA has a "table_schema" and "table_name" column, and those columns correspond to
+// the TableSchema and TableName properties here. They should _not_ be quoted, but _should_ have any
+// connector-specific transforms applied. For example, in Redshift every identifier is lower-case in
+// INFORMATION_SCHEMA, so materialize-redshift's dialect must provide these values in their
+// lower-case form.
+//
+// The TableSchema is often part of the binding's resource path, but not always. Some
+// materializations do not require or support specifying an explicit schema for a binding, and in
+// these cases it is up to the dialect to produce an appropriate value for TableSchema, usually
+// based on some default of the database.
+type InfoTableLocation struct {
+	TableSchema string
+	TableName   string
+}
+
+// ColumnLocatorer translates a field name from a Flow collection spec into the value used to locate
+// that field in the INFORMATION_SCHEMA view for the endpoint. This is similar to how an
+// InfoTableLocation must apply connector-specific transforms for the TableSchema and TableName.
+type ColumnLocatorer interface {
+	ColumnLocator(field string) string
 }
 
 // Identifierer takes path components and returns a raw SQL identifier for the
@@ -38,13 +67,15 @@ type TypeMapper interface {
 	MapType(*Projection) (MappedType, error)
 }
 
-// AlwaysNullableTypeMapper is like a TypeMapper, but always considers the mapped type to be
-// nullable. This is useful when adding new columns to a table that must be nullable regardless of
-// their JSON schema, or for comparing compatible type changes which do not need to consider
-// nullability.
-type AlwaysNullableTypeMapper interface {
-	MapTypeNullable(*Projection) (MappedType, error)
-}
+// TableLocatorFn is a function that implements TableLocatorer.
+type TableLocatorFn func(path ...string) InfoTableLocation
+
+func (f TableLocatorFn) TableLocator(path ...string) InfoTableLocation { return f(path...) }
+
+// ColumnLocatorFn is a function that implements ColumnLocatorer.
+type ColumnLocatorFn func(field string) string
+
+func (f ColumnLocatorFn) ColumnLocator(field string) string { return f(field) }
 
 // IdentifierFn is a function that implements Identifierer.
 type IdentifierFn func(path ...string) string
@@ -69,11 +100,12 @@ func (f TypeMapperFn) MapType(p *Projection) (MappedType, error) { return f(p) }
 // Compile-time check that wrapping functions with typed  Fn() implementations
 // can be used to build a Dialect.
 var _ = Dialect{
-	Placeholderer:            PlaceholderFn(func(index int) string { return "" }),
-	Literaler:                LiteralFn(func(s string) string { return "" }),
-	Identifierer:             IdentifierFn(func(path ...string) string { return "" }),
-	TypeMapper:               &MaybeNullableMapper{},
-	AlwaysNullableTypeMapper: &AlwaysNullableMapper{},
+	TableLocatorer:  TableLocatorFn(func(path ...string) InfoTableLocation { return InfoTableLocation{} }),
+	ColumnLocatorer: ColumnLocatorFn(func(field string) string { return field }),
+	Placeholderer:   PlaceholderFn(func(index int) string { return "" }),
+	Literaler:       LiteralFn(func(s string) string { return "" }),
+	Identifierer:    IdentifierFn(func(path ...string) string { return "" }),
+	TypeMapper:      &NullableMapper{},
 }
 
 // PassThroughTransform returns a function that evaluates `if_` over its input
