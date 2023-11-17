@@ -634,15 +634,19 @@ func (d *transactor) commit(ctx context.Context) error {
 		} else if err := b.store.stage.flush(); err != nil {
 			return err
 		} else if !b.store.mustMerge {
+			log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
 			// We can issue a faster COPY INTO the target table.
 			if _, err = txn.ExecContext(ctx, b.store.copyInto); err != nil {
 				return fmt.Errorf("copying Store documents into table %q: %w", b.target.Identifier, err)
 			}
+			log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
 		} else {
+			log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
 			// We must MERGE into the target table.
 			if _, err = txn.ExecContext(ctx, b.store.mergeInto); err != nil {
 				return fmt.Errorf("merging Store documents into table %q: %w", b.target.Identifier, err)
 			}
+			log.WithField("table", b.target.Identifier).Info("store: finishing merging data into table")
 		}
 
 		// Reset for next transaction.

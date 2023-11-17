@@ -629,17 +629,21 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 			for _, b := range d.bindings {
 				if b.needsMerge {
+					log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
 					if _, err := txn.ExecContext(ctx, b.mergeInto); err != nil {
 						return fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
 					}
+					log.WithField("table", b.target.Identifier).Info("store: finishing merging data into table")
 				} else {
+					log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
 					if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
 						return  fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err)
 					}
+					log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
 				}
 
 				if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
-					return fmt.Errorf("truncating load table: %w", err)
+					return fmt.Errorf("truncating store table: %w", err)
 				}
 
 				// reset the value for next transaction

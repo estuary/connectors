@@ -930,16 +930,20 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 				return fmt.Errorf("creating store table: %w", err)
 			}
 
+			log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
 			if _, err := txn.Exec(ctx, b.copyIntoMergeTableSQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
 				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
 			}
+			log.WithField("table", b.target.Identifier).Info("store: finished merging data into table")
 		} else {
+			log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
 			// Can copy directly into the target table since all values are new.
 			if _, err := txn.Exec(ctx, b.copyIntoTargetTableSQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			}
+			log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
 		}
 	}
 
