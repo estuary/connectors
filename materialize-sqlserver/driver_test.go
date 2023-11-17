@@ -18,7 +18,7 @@ import (
 
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
-	var dialect = sqlServerDialect("Latin1_General_100_BIN2")
+	var dialect = testDialect
 	var templates = renderTemplates(dialect)
 	var client = client{uri: "sqlserver://sa:!Flow1234@localhost:1433/flow", dialect: dialect}
 	sql.RunFenceTestCases(t,
@@ -28,7 +28,6 @@ func TestFencingCases(t *testing.T) {
 		templates["createTargetTable"],
 		func(table sql.Table, fence sql.Fence) error {
 			var err = client.withDB(func(db *stdsql.DB) error {
-				// Option 1: Update using template.
 				var fenceUpdate strings.Builder
 				if err := templates["updateFence"].Execute(&fenceUpdate, fence); err != nil {
 					return fmt.Errorf("evaluating fence template: %w", err)
@@ -54,7 +53,7 @@ func TestFencingCases(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	sql.RunValidateTestCases(t, sqlServerDialect("Latin1_General_100_BIN2"))
+	sql.RunValidateTestCases(t, testDialect)
 }
 
 func TestApply(t *testing.T) {
@@ -122,13 +121,13 @@ func TestApply(t *testing.T) {
 			for _, tbl := range []string{firstTable, secondTable} {
 				_, _ = db.ExecContext(ctx, fmt.Sprintf(
 					"drop table %s",
-					sqlServerDialect("Latin1_General_100_BIN2").Identifier(tbl),
+					testDialect.Identifier(tbl),
 				))
 			}
 
 			_, _ = db.ExecContext(ctx, fmt.Sprintf(
 				"delete from %s where materialization = 'test/sqlite'",
-				sqlServerDialect("Latin1_General_100_BIN2").Identifier("flow_materializations_v2"),
+				testDialect.Identifier("flow_materializations_v2"),
 			))
 		},
 	)

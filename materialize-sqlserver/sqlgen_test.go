@@ -1,11 +1,11 @@
 package main
 
 import (
-	"time"
 	"encoding/json"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
@@ -13,8 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8", "dbo")
+
 func TestSQLGeneration(t *testing.T) {
-	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var dialect = testDialect
 	var templates = renderTemplates(dialect)
 
 	var spec *pf.MaterializationSpec
@@ -23,12 +25,12 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, json.Unmarshal(specJson, &spec))
 
 	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
-		Table:  "target_table",
-		Delta:  false,
+		Table: "target_table",
+		Delta: false,
 	})
 	var shape2 = sqlDriver.BuildTableShape(spec, 1, tableConfig{
-		Table:  "Delta Updates",
-		Delta:  true,
+		Table: "Delta Updates",
+		Delta: true,
 	})
 	shape2.Document = nil // TODO(johnny): this is a bit gross.
 
@@ -63,6 +65,16 @@ func TestSQLGeneration(t *testing.T) {
 		}
 	}
 
+	snap.WriteString("--- Begin alter table add columns ---\n")
+	require.NoError(t, templates["alterTableColumns"].Execute(&snap, sqlDriver.TableAlter{
+		Table: table1,
+		AddColumns: []sqlDriver.Column{
+			{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
+			{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+		},
+	}))
+	snap.WriteString("--- End alter table add columns ---\n\n")
+
 	var fence = sqlDriver.Fence{
 		TablePath:       sqlDriver.TablePath{"path", "To", "checkpoints"},
 		Checkpoint:      []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
@@ -80,7 +92,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var dialect = testDialect
 	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
@@ -101,7 +113,7 @@ func TestDateTimeColumn(t *testing.T) {
 }
 
 func TestDateTimePKColumn(t *testing.T) {
-	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var dialect = testDialect
 	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
@@ -117,7 +129,7 @@ func TestDateTimePKColumn(t *testing.T) {
 }
 
 func TestTimeColumn(t *testing.T) {
-	var dialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8")
+	var dialect = testDialect
 	var mapped, err = dialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{

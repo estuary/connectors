@@ -130,22 +130,36 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		panic(err) // Cannot fail to marshal.
 	}
 
+	actions := ApplyActions{}
+
 	// The Materialization specifications meta table is almost always required. It is only not
 	// required if the database is ephemeral (i.e. sqlite). The Checkpoints table is optional;
 	// include it if set by the Endpoint.
-	var tableShapes = []TableShape{}
-	if endpoint.MetaSpecs != nil {
-		tableShapes = append(tableShapes, *endpoint.MetaSpecs)
-	}
-	if endpoint.MetaCheckpoints != nil {
-		tableShapes = append(tableShapes, *endpoint.MetaCheckpoints)
-	}
+	for _, meta := range []*TableShape{endpoint.MetaSpecs, endpoint.MetaCheckpoints} {
+		if meta == nil {
+			continue
+		}
+		resolved, err := ResolveTable(*meta, endpoint.Dialect)
+		if err != nil {
+			return nil, err
+		}
+		createStatement, err := RenderTableTemplate(resolved, endpoint.CreateTableTemplate)
+		if err != nil {
+			return nil, err
+		}
 
-	var executedColumnModifications []string
+		actions.CreateTables = append(actions.CreateTables, TableCreate{
+			Table:          resolved,
+			TableCreateSql: createStatement,
+		})
+	}
 
 	validator := validate.NewValidator(constrainter{dialect: endpoint.Dialect})
 
 	for bindingIndex, bindingSpec := range req.Materialization.Bindings {
+		addColumns := []Column{}
+		dropNotNulls := []Column{}
+
 		resource := endpoint.NewResource(endpoint)
 		if err = pf.UnmarshalStrict(bindingSpec.ResourceConfigJson, resource); err != nil {
 			return nil, fmt.Errorf("unmarshalling resource binding for collection %q: %w", bindingSpec.Collection.Name.String(), err)
@@ -154,54 +168,31 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		var collection = bindingSpec.Collection.Name
 		var tableShape = BuildTableShape(req.Materialization, bindingIndex, resource)
 
-		loadedBinding, err := validate.FindExistingBinding(resource.Path(), bindingSpec.Collection.Name, loadedSpec)
+		proposedTable, err := ResolveTable(tableShape, endpoint.Dialect)
 		if err != nil {
 			return nil, err
 		}
 
+		loadedBinding, err := validate.FindExistingBinding(resource.Path(), bindingSpec.Collection.Name, loadedSpec)
 		if err != nil {
 			return nil, err
 		} else if err = validator.ValidateSelectedFields(bindingSpec, loadedSpec); err != nil {
 			// The applied binding is not a valid solution for its own constraints.
 			return nil, fmt.Errorf("binding for %s: %w", collection, err)
 		} else if loadedBinding != nil {
-			newTable, err := ResolveTable(tableShape, endpoint.Dialect)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, newCol := range newTable.Columns() {
-				// Add any new columns.
-				if !slices.Contains(loadedBinding.FieldSelection.AllFields(), newCol.Field) {
-					mapped, err := endpoint.MapTypeNullable(&newCol.Projection)
-					if err != nil {
-						return nil, err
-					}
-
-					addAction, err := endpoint.Client.AddColumnToTable(ctx, req.DryRun, newTable.Identifier, newCol.Identifier, mapped.DDL)
-					if err != nil {
-						return nil, fmt.Errorf("adding column '%s %s' to table '%s': %w", newCol.Identifier, mapped.DDL, newTable.Identifier, err)
-					}
-
-					if addAction != "" {
-						executedColumnModifications = append(executedColumnModifications, addAction)
-					}
+			for _, proposedCol := range proposedTable.Columns() {
+				if !slices.Contains(loadedBinding.FieldSelection.AllFields(), proposedCol.Field) {
+					// The proposed column does not exist in the current table.
+					addColumns = append(addColumns, *proposedCol)
 				} else {
 					// The new column is part of the existing table.
-					previousProjection := loadedBinding.Collection.GetProjection(newCol.Field)
+					previousProjection := loadedBinding.Collection.GetProjection(proposedCol.Field)
 					previousNullable := previousProjection.Inference.Exists != pf.Inference_MUST || slices.Contains(previousProjection.Inference.Types, "null")
 
 					// The column was previously created as not nullable, but the new specification
 					// indicates that it now nullable. Drop the "NOT NULL" constraint on the table.
-					if !previousNullable && !newCol.MustExist {
-						alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, req.DryRun, newTable, *newCol)
-						if err != nil {
-							return nil, fmt.Errorf("dropping NOT NULL constraint for column '%s' in table '%s' because it is no longer a required property: %w", newTable.Identifier, newCol.Identifier, err)
-						}
-
-						if alterAction != "" {
-							executedColumnModifications = append(executedColumnModifications, alterAction)
-						}
+					if !previousNullable && !proposedCol.MustExist {
+						dropNotNulls = append(dropNotNulls, *proposedCol)
 					}
 				}
 			}
@@ -214,46 +205,35 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 				if slices.Contains(allNewFields, field) {
 					continue
 				}
-
-				var col = Column{
-					Identifier: endpoint.Identifier(field),
-					Projection: Projection{Projection: *loadedBinding.Collection.GetProjection(field)},
-				}
-				alterAction, err := endpoint.Client.DropNotNullForColumn(ctx, req.DryRun, newTable, col)
+				proj := Projection{Projection: *loadedBinding.Collection.GetProjection(field)}
+				removedColumn, err := ResolveColumn(0, &proj, endpoint.Dialect)
 				if err != nil {
-					return nil, fmt.Errorf("dropping NOT NULL constraint for removed field for column '%s' in table '%s': %w", newTable.Identifier, field, err)
+					return nil, fmt.Errorf("resolving removed column %s of %s: %w", field, tableShape.Path, err)
 				}
 
-				if alterAction != "" {
-					executedColumnModifications = append(executedColumnModifications, alterAction)
-				}
+				dropNotNulls = append(dropNotNulls, removedColumn)
 			}
 
-			// For existing tables, do not add the rendered CreateTableTemplate, since the tables
-			// already exist and do not need to be re-created.
-			continue
-		}
-
-		tableShapes = append(tableShapes, tableShape)
-	}
-
-	// Build a list of table creation statements, followed by the spec update statement.
-	var statements []string
-	for _, shape := range tableShapes {
-		var table, err = ResolveTable(shape, endpoint.Dialect)
-		if err != nil {
-			return nil, err
-		} else if statement, err := RenderTableTemplate(table, endpoint.CreateTableTemplate); err != nil {
-			return nil, err
+			actions.AlterTables = append(actions.AlterTables, TableAlter{
+				Table:        proposedTable,
+				AddColumns:   addColumns,
+				DropNotNulls: dropNotNulls,
+			})
 		} else {
-			statements = append(statements, statement)
-		}
+			// Create a new table.
+			createStatement, err := RenderTableTemplate(proposedTable, endpoint.CreateTableTemplate)
+			if err != nil {
+				return nil, err
+			}
 
-		if shape.AdditionalSql != "" {
-			statements = append(statements, shape.AdditionalSql)
+			actions.CreateTables = append(actions.CreateTables, TableCreate{
+				Table:          proposedTable,
+				TableCreateSql: createStatement,
+			})
 		}
 	}
 
+	var specUpdate string
 	if endpoint.MetaSpecs != nil {
 		// Insert or update the materialization specification.
 		var args = []interface{}{
@@ -263,23 +243,20 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 			endpoint.Literal(req.Materialization.Name.String()),
 		}
 		if loadedSpec == nil {
-			statements = append(statements, fmt.Sprintf(
-				"INSERT INTO %[1]s (version, spec, materialization) VALUES (%[2]s, %[3]s, %[4]s);", args...))
+			specUpdate = fmt.Sprintf("INSERT INTO %[1]s (version, spec, materialization) VALUES (%[2]s, %[3]s, %[4]s);", args...)
 		} else {
-			statements = append(statements, fmt.Sprintf(
-				"UPDATE %[1]s SET version = %[2]s, spec = %[3]s WHERE materialization = %[4]s;", args...))
+			specUpdate = fmt.Sprintf("UPDATE %[1]s SET version = %[2]s, spec = %[3]s WHERE materialization = %[4]s;", args...)
 		}
 	}
 
-	if req.DryRun {
-		// No-op.
-	} else if err = endpoint.Client.ExecStatements(ctx, statements); err != nil {
+	action, err := endpoint.Client.Apply(ctx, endpoint, actions, specUpdate, req.DryRun)
+	if err != nil {
 		return nil, fmt.Errorf("applying schema updates: %w", err)
 	}
 
 	// Build and return a description of what happened (or would have happened).
 	return &pm.Response_Applied{
-		ActionDescription: strings.Join(append(statements, executedColumnModifications...), "\n"),
+		ActionDescription: action,
 	}, nil
 }
 

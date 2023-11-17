@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"slices"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
@@ -17,7 +18,9 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/googleapi"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
 
@@ -204,6 +207,122 @@ type client struct {
 	config             config
 }
 
+type columnRow struct {
+	TableName  string `bigquery:"table_name"`
+	ColumnName string `bigquery:"column_name"`
+	IsNullable string `bigquery:"is_nullable"` // string YES or NO
+	DataType   string `bigquery:"data_Type"`
+}
+
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+	client := ep.Client.(*client)
+	cfg := ep.Config.(*config)
+
+	// Query the information schema for all the datasets we care about to build up a list of
+	// existing tables and columns. The datasets we care about are the dataset configured for the
+	// overall endpoint, as well as any distinct datasets configured for any of the bindings.
+	datasets := []string{cfg.Dataset}
+	for _, t := range actions.CreateTables {
+		ds := t.Path[1]
+		if !slices.Contains(datasets, ds) {
+			datasets = append(datasets, ds)
+		}
+	}
+	for _, t := range actions.AlterTables {
+		ds := t.Path[1]
+		if !slices.Contains(datasets, ds) {
+			datasets = append(datasets, ds)
+		}
+	}
+	for idx := range datasets {
+		datasets[idx] = bqDialect.Identifier(datasets[idx])
+	}
+
+	existing := &sql.ExistingColumns{}
+	for _, ds := range datasets {
+		job, err := client.query(ctx, fmt.Sprintf(
+			"select table_name, column_name, is_nullable, data_type from %s.INFORMATION_SCHEMA.COLUMNS;",
+			bqDialect.Identifier(ds),
+		))
+		if err != nil {
+			return "", fmt.Errorf("querying INFORMATION_SCHEMA.COLUMNS for dataset %q: %w", ds, err)
+		}
+
+		it, err := job.Read(ctx)
+		if err != nil {
+			return "", fmt.Errorf("reading job: %w", err)
+		}
+
+		for {
+			var c columnRow
+			if err = it.Next(&c); err == iterator.Done {
+				break
+			} else if err != nil {
+				return "", fmt.Errorf("columnRow read: %w", err)
+			}
+
+			existing.PushColumn(
+				ds,
+				c.TableName,
+				c.ColumnName,
+				strings.EqualFold(c.IsNullable, "yes"),
+				c.DataType,
+			)
+		}
+	}
+
+	filtered, err := sql.FilterActions(actions, bqDialect, existing)
+	if err != nil {
+		return "", err
+	}
+
+	statements := []string{}
+	for _, tc := range filtered.CreateTables {
+		statements = append(statements, tc.TableCreateSql)
+	}
+
+	for _, ta := range filtered.AlterTables {
+		var alterColumnStmt strings.Builder
+		if err := tplAlterTableColumns.Execute(&alterColumnStmt, ta); err != nil {
+			return "", fmt.Errorf("rendering alter table columns statement: %w", err)
+		}
+		statements = append(statements, alterColumnStmt.String())
+	}
+
+	// The spec will get updated last, after all the other actions are complete, but include it in
+	// the description of actions.
+	action := strings.Join(append(statements, updateSpecStatement), "\n")
+	if dryRun {
+		return action, nil
+	}
+
+	// Execute statements in parallel for efficiency. Each statement acts on a single table, and
+	// everything that needs to be done for a given table is contained in that statement.
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(5)
+
+	for _, s := range statements {
+		s := s
+		group.Go(func() error {
+			if _, err := c.query(groupCtx, s); err != nil {
+				return fmt.Errorf("executing apply statement: %w", err)
+			}
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return "", err
+	}
+
+	// Once all the table actions are done, we can update the stored spec.
+	if _, err := c.query(ctx, updateSpecStatement); err != nil {
+		return "", fmt.Errorf("executing spec update statement: %w", err)
+	}
+
+	return action, nil
+}
+
 func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	client := ep.Client.(*client)
@@ -276,52 +395,6 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return errs
 }
 
-func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
-		tableIdentifier,
-		columnIdentifier,
-		columnDDL,
-	)
-
-	if !dryRun {
-		if _, err := c.query(ctx, query); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
-}
-
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
-		table.Identifier,
-		column.Identifier,
-	)
-
-	if !dryRun {
-		if _, err := c.query(ctx, query); err != nil {
-			// BigQuery will return an error if the column did not have a NOT NULL constraint and we try
-			// to drop it, so match on that error as best we can here.
-			var googleErr *googleapi.Error
-			if errors.As(err, &googleErr) &&
-				googleErr.Code == http.StatusBadRequest &&
-				strings.HasSuffix(googleErr.Message, "which does not have a NOT NULL constraint.") {
-				log.WithFields(log.Fields{
-					"table":  table.Identifier,
-					"column": column.Identifier,
-					"err":    err.Error(),
-				}).Debug("column was already nullable")
-			} else {
-				return "", err
-			}
-		}
-	}
-
-	return query, nil
-}
-
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
 	job, err := c.query(ctx, fmt.Sprintf(
 		"SELECT version, spec FROM %s WHERE materialization=%s;",
@@ -353,9 +426,6 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 }
 
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	// We don't explicitly wrap `statements` in a transaction, as not all databases support
-	// transactional DDL statements, but we do run them through a single connection. This allows a
-	// driver to explicitly run `BEGIN;` and `COMMIT;` statements around a transactional operation.
 	_, err := c.query(ctx, strings.Join(statements, "\n"))
 	return err
 }

@@ -316,7 +316,7 @@ func newMysqlDriver() *sql.Driver {
 				}
 			}
 
-			var dialect = mysqlDialect(tzLocation)
+			var dialect = mysqlDialect(tzLocation, cfg.Database)
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
@@ -354,6 +354,66 @@ func queryTimeZone(ctx context.Context, conn *stdsql.Conn) (string, error) {
 type client struct {
 	uri     string
 	dialect sql.Dialect
+}
+
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+	db, err := stdsql.Open("mysql", c.uri)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	resolved, err := sql.ResolveActions(ctx, db, actions, c.dialect, "def")
+	if err != nil {
+		return "", fmt.Errorf("resolving apply actions: %w", err)
+	}
+
+	statements := []string{}
+	for _, tc := range resolved.CreateTables {
+		statements = append(statements, tc.TableCreateSql)
+	}
+
+	for _, ta := range resolved.AlterTables {
+		var alterColumnStmt strings.Builder
+		if err := renderTemplates(c.dialect)["alterTableColumns"].Execute(&alterColumnStmt, ta); err != nil {
+			return "", fmt.Errorf("rendering alter table columns statement: %w", err)
+		}
+		statements = append(statements, alterColumnStmt.String())
+	}
+
+	// The spec update is last, only after all other actions are complete.
+	statements = append(statements, updateSpecStatement)
+
+	action := strings.Join(statements, "\n")
+	if dryRun {
+		return action, nil
+	}
+
+	for _, s := range statements {
+		if _, err := db.ExecContext(ctx, s); err != nil {
+			// Handling for errors resulting from identifiers being too long.
+			// TODO(whb): At some point we could consider moving this into `Validate` to check
+			// identifier lengths, rather than passing validate but failing in apply. I'm holding
+			// off on that for now since I don't know if the 64 character limit is universal, or
+			// specific to certain versions of MySQL/MariaDB.
+			var mysqlErr *mysql.MySQLError
+			if errors.As(err, &mysqlErr) {
+				// See MySQL error reference: https://dev.mysql.com/doc/mysql-errors/5.7/en/error-reference-introduction.html
+				switch mysqlErr.Number {
+				case 1059:
+					err = fmt.Errorf("%w.\nPossible resolutions include:\n%s\n%s\n%s",
+						err,
+						"1. Adding a projection to rename this field, see https://go.estuary.dev/docs-projections",
+						"2. Exclude the field, see https://go.estuary.dev/docs-field-selection",
+						"3. Disable the corresponding binding")
+				}
+			}
+
+			return "", fmt.Errorf("executing statement: %w", err)
+		}
+	}
+
+	return action, nil
 }
 
 func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
@@ -413,67 +473,6 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return errs
 }
 
-func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
-	var query string
-
-	err := c.withDB(func(db *stdsql.DB) error {
-		query = fmt.Sprintf(
-			"ALTER TABLE %s ADD COLUMN %s %s;",
-			tableIdentifier,
-			columnIdentifier,
-			columnDDL,
-		)
-
-		if !dryRun {
-			if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-				var mysqlErr *mysql.MySQLError
-
-				if errors.As(err, &mysqlErr) {
-					// See MySQL error reference: https://dev.mysql.com/doc/mysql-errors/5.7/en/error-reference-introduction.html
-					switch mysqlErr.Number {
-					case 1060:
-						// 1060: Duplicate column name, means the column already exists, we
-						// just skip
-						return nil
-					}
-				}
-
-				return err
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return query, nil
-}
-
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
-	var mapped, err = c.dialect.MapTypeNullable(&column.Projection)
-	if err != nil {
-		return "", fmt.Errorf("drop not null: mapping type of %s failed: %w", column.Identifier, err)
-	}
-
-	query := fmt.Sprintf(
-		"ALTER TABLE %s MODIFY %s %s;",
-		table.Identifier,
-		column.Identifier,
-		mapped.DDL,
-	)
-
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
-}
-
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
 	err = c.withDB(func(db *stdsql.DB) error {
 		specB64, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
@@ -482,27 +481,8 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 	return
 }
 
-// ExecStatements is used for the DDL statements of ApplyUpsert and ApplyDelete.
-// Mysql does not support transactional DDL statements
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	return c.withDB(func(db *stdsql.DB) error {
-		var err = sql.StdSQLExecStatements(ctx, db, statements)
-
-		var mysqlErr *mysql.MySQLError
-		if errors.As(err, &mysqlErr) {
-			// See MySQL error reference: https://dev.mysql.com/doc/mysql-errors/5.7/en/error-reference-introduction.html
-			switch mysqlErr.Number {
-			case 1059:
-				err = fmt.Errorf("%w.\nPossible resolutions include:\n%s\n%s\n%s",
-					err,
-					"1. Adding a projection to rename this field, see https://go.estuary.dev/docs-projections",
-					"2. Exclude the field, see https://go.estuary.dev/docs-field-selection",
-					"3. Disable the corresponding binding")
-			}
-		}
-
-		return err
-	})
+	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
 }
 
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {

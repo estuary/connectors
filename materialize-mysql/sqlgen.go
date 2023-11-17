@@ -10,8 +10,8 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
-var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
-	var typeMappings sql.TypeMapper = sql.ProjectionTypeMapper{
+var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect {
+	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
 		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
 		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
@@ -48,12 +48,19 @@ var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
 		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
 	}
 
-	var nullable = sql.MaybeNullableMapper{
+	mapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    typeMappings,
+		Delegate:    mapper,
 	}
 
 	return sql.Dialect{
+		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+			// For MySQL, the table_catalog is always "def", and table_schema is the name of the
+			// database. This is sort of weird, since in most other systems the table_catalog is the
+			// name of the database.
+			return sql.InfoTableLocation{TableSchema: database, TableName: path[0]}
+		}),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
@@ -65,8 +72,7 @@ var mysqlDialect = func(tzLocation *time.Location) sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return "?"
 		}),
-		TypeMapper:               nullable,
-		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
+		TypeMapper: mapper,
 	}
 }
 
@@ -128,6 +134,23 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	)
 	{{- end }}
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin {{- if $.Comment }} COMMENT={{Literal $.Comment}} {{- end }};
+{{ end }}
+
+-- Templated query which performs table alterations by adding columns and/or
+-- dropping nullability constraints. All table modifications are done in a 
+-- single statement for efficiency.
+
+{{ define "alterTableColumns" }}
+ALTER TABLE {{$.Identifier}}
+{{- range $ind, $col := $.AddColumns }}
+	{{- if $ind }},{{ end }}
+	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
+{{- end }}
+{{- if and $.DropNotNulls $.AddColumns}},{{ end }}
+{{- range $ind, $col := $.DropNotNulls }}
+	{{- if $ind }},{{ end }}
+	MODIFY {{$col.Identifier}} {{$col.NullableDDL}}
+{{- end }};
 {{ end }}
 
 -- Templated creation of a temporary load table:
@@ -315,6 +338,7 @@ UPDATE {{ Identifier $.TablePath }}
 		"createLoadTable":   tplAll.Lookup("createLoadTable"),
 		"createUpdateTable": tplAll.Lookup("createUpdateTable"),
 		"createTargetTable": tplAll.Lookup("createTargetTable"),
+		"alterTableColumns": tplAll.Lookup("alterTableColumns"),
 		"updateLoad":        tplAll.Lookup("updateLoad"),
 		"updateReplace":     tplAll.Lookup("updateReplace"),
 		"updateTruncate":    tplAll.Lookup("truncateUpdateTable"),

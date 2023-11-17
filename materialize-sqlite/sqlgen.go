@@ -8,7 +8,7 @@ import (
 )
 
 var sqliteDialect = func() sql.Dialect {
-	var typeMappings = sql.ProjectionTypeMapper{
+	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:   sql.NewStaticMapper("TEXT"),
 		sql.BINARY:  sql.NewStaticMapper("BLOB"),
 		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
@@ -29,9 +29,9 @@ var sqliteDialect = func() sql.Dialect {
 			},
 		},
 	}
-	var nullable sql.TypeMapper = sql.MaybeNullableMapper{
+	mapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    typeMappings,
+		Delegate:    mapper,
 	}
 
 	return sql.Dialect{
@@ -46,8 +46,7 @@ var sqliteDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper:               nullable,
-		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
+		TypeMapper: mapper,
 	}
 }()
 

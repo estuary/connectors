@@ -100,16 +100,11 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return &sql.PrereqErr{}
 }
 
-// AddColumnToTable and DropNotNullForColumn are no-ops since SQLite does not persist a
-// materialization spec, so there is no way for the connector to know if a column is new, removed,
-// or newly nullable. We may revisit this in the future if we want SQLite materialization to update
-// on the fly, but for now they can just be restarted which will re-create their tables in
-// accordance with the collection schema.
-func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
-	return "", nil
-}
-
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
+// Apply is a no-op since SQLite does not persist a materialization spec, so there is no way for the
+// connector to know if a column is new, removed, or newly nullable. We may revisit this in the
+// future if we want SQLite materialization to update on the fly, but for now they can just be
+// restarted which will re-create their tables in accordance with the collection schema.
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
 	return "", nil
 }
 

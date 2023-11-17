@@ -11,7 +11,7 @@ import (
 )
 
 func newTestDialect() Dialect {
-	var typeMappings TypeMapper = ProjectionTypeMapper{
+	var mapper TypeMapper = ProjectionTypeMapper{
 		INTEGER:  NewStaticMapper("BIGINT"),
 		NUMBER:   NewStaticMapper("DOUBLE PRECISION"),
 		BOOLEAN:  NewStaticMapper("BOOLEAN"),
@@ -28,12 +28,16 @@ func newTestDialect() Dialect {
 			},
 		},
 	}
-	var nullable = MaybeNullableMapper{
+	mapper = NullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    typeMappings,
+		Delegate:    mapper,
 	}
 
 	return Dialect{
+		TableLocatorer: TableLocatorFn(func(path ...string) InfoTableLocation {
+			return InfoTableLocation{TableSchema: path[1], TableName: path[2]}
+		}),
+		ColumnLocatorer: ColumnLocatorFn(func(field string) string { return field }),
 		Identifierer: IdentifierFn(JoinTransform(".",
 			PassThroughTransform(
 				func(s string) bool {
@@ -45,8 +49,7 @@ func newTestDialect() Dialect {
 		Placeholderer: PlaceholderFn(func(index int) string {
 			return fmt.Sprintf("$%d", index+1)
 		}),
-		TypeMapper:               nullable,
-		AlwaysNullableTypeMapper: AlwaysNullableMapper{Delegate: typeMappings},
+		TypeMapper: mapper,
 	}
 }
 

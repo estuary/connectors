@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 	"text/template"
-	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
@@ -20,8 +19,7 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(specJson, &spec))
 
-	var dialect = mysqlDialect(time.FixedZone("UTC", 0))
-	var templates = renderTemplates(dialect)
+	var templates = renderTemplates(testDialect)
 
 	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
 		Table: "target_table",
@@ -33,9 +31,9 @@ func TestSQLGeneration(t *testing.T) {
 	})
 	shape2.Document = nil // TODO(johnny): this is a bit gross.
 
-	table1, err := sqlDriver.ResolveTable(shape1, dialect)
+	table1, err := sqlDriver.ResolveTable(shape1, testDialect)
 	require.NoError(t, err)
-	table2, err := sqlDriver.ResolveTable(shape2, dialect)
+	table2, err := sqlDriver.ResolveTable(shape2, testDialect)
 	require.NoError(t, err)
 
 	var snap strings.Builder
@@ -60,6 +58,43 @@ func TestSQLGeneration(t *testing.T) {
 		}
 	}
 
+	addCols := []sqlDriver.Column{
+		{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
+		{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+	}
+	dropNotNulls := []sqlDriver.Column{
+		{Identifier: "first_required_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
+		{Identifier: "second_required_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+	}
+
+	for _, testcase := range []struct {
+		name         string
+		addColumns   []sqlDriver.Column
+		dropNotNulls []sqlDriver.Column
+	}{
+		{
+			name:         "alter table add columns and drop not nulls",
+			addColumns:   addCols,
+			dropNotNulls: dropNotNulls,
+		},
+		{
+			name:       "alter table add columns",
+			addColumns: addCols,
+		},
+		{
+			name:         "alter table drop not nulls",
+			dropNotNulls: dropNotNulls,
+		},
+	} {
+		snap.WriteString("--- Begin " + testcase.name + " ---\n")
+		require.NoError(t, templates["alterTableColumns"].Execute(&snap, sqlDriver.TableAlter{
+			Table:        table1,
+			AddColumns:   testcase.addColumns,
+			DropNotNulls: testcase.dropNotNulls,
+		}))
+		snap.WriteString("--- End " + testcase.name + " ---\n\n")
+	}
+
 	var fence = sqlDriver.Fence{
 		TablePath:       sqlDriver.TablePath{"path", "To", "checkpoints"},
 		Checkpoint:      []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
@@ -80,9 +115,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var dialect = mysqlDialect(time.FixedZone("UTC", 0))
-
-	var mapped, err = dialect.MapType(&sqlDriver.Projection{
+	var mapped, err = testDialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -100,9 +133,7 @@ func TestDateTimeColumn(t *testing.T) {
 }
 
 func TestDateTimePKColumn(t *testing.T) {
-	var dialect = mysqlDialect(time.FixedZone("UTC", 0))
-
-	var mapped, err = dialect.MapType(&sqlDriver.Projection{
+	var mapped, err = testDialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -117,9 +148,7 @@ func TestDateTimePKColumn(t *testing.T) {
 }
 
 func TestTimeColumn(t *testing.T) {
-	var dialect = mysqlDialect(time.FixedZone("UTC", 0))
-
-	var mapped, err = dialect.MapType(&sqlDriver.Projection{
+	var mapped, err = testDialect.MapType(&sqlDriver.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
