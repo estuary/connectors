@@ -9,7 +9,7 @@ import (
 )
 
 var pgDialect = func() sql.Dialect {
-	var typeMappings sql.TypeMapper = sql.ProjectionTypeMapper{
+	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
 		sql.NUMBER:   sql.NewStaticMapper("DOUBLE PRECISION"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
@@ -40,12 +40,22 @@ var pgDialect = func() sql.Dialect {
 		},
 	}
 
-	var nullable = sql.MaybeNullableMapper{
+	mapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    typeMappings,
+		Delegate:    mapper,
 	}
 
 	return sql.Dialect{
+		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+			if len(path) == 1 {
+				// A schema isn't required to be set on the endpoint or any resource, and if its empty the
+				// default postgres schema "public" will implicitly be used.
+				return sql.InfoTableLocation{TableSchema: "public", TableName: path[0]}
+			} else {
+				return sql.InfoTableLocation{TableSchema: path[0], TableName: path[1]}
+			}
+		}),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
@@ -58,8 +68,7 @@ var pgDialect = func() sql.Dialect {
 			// parameterIndex starts at 0, but postgres parameters start at $1
 			return fmt.Sprintf("$%d", index+1)
 		}),
-		TypeMapper:               nullable,
-		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
+		TypeMapper: mapper,
 	}
 }()
 
@@ -92,6 +101,23 @@ COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
 {{- range $col := .Columns }}
 COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment}};
 {{- end}}
+{{ end }}
+
+-- Templated query which performs table alterations by adding columns and/or
+-- dropping nullability constraints. All table modifications are done in a 
+-- single statement for efficiency.
+
+{{ define "alterTableColumns" }}
+ALTER TABLE {{$.Identifier}}
+{{- range $ind, $col := $.AddColumns }}
+	{{- if $ind }},{{ end }}
+	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
+{{- end }}
+{{- if and $.DropNotNulls $.AddColumns}},{{ end }}
+{{- range $ind, $col := $.DropNotNulls }}
+	{{- if $ind }},{{ end }}
+	ALTER COLUMN {{$col.Identifier}} DROP NOT NULL
+{{- end }};
 {{ end }}
 
 -- Templated creation of a temporary load table:
@@ -231,6 +257,7 @@ END $$;
 `)
 	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
 	tplLoadInsert        = tplAll.Lookup("loadInsert")
 	tplStoreInsert       = tplAll.Lookup("storeInsert")
 	tplStoreUpdate       = tplAll.Lookup("storeUpdate")

@@ -193,6 +193,63 @@ type client struct {
 	db *stdsql.DB
 }
 
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+	cfg := ep.Config.(*config)
+
+	db, err := cfg.db(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	resolved, err := sql.ResolveActions(ctx, db, actions, duckDialect, cfg.Database)
+	if err != nil {
+		return "", fmt.Errorf("resolving apply actions: %w", err)
+	}
+
+	statements := []string{}
+	for _, tc := range resolved.CreateTables {
+		statements = append(statements, tc.TableCreateSql)
+	}
+
+	for _, ta := range resolved.AlterTables {
+		// Duckdb only supports a single ALTER TABLE operation per statement.
+		for _, col := range ta.AddColumns {
+			statements = append(statements, fmt.Sprintf(
+				"ALTER TABLE %s ADD COLUMN %s %s;",
+				ta.Identifier,
+				col.Identifier,
+				col.NullableDDL,
+			))
+		}
+		for _, col := range ta.DropNotNulls {
+			statements = append(statements, fmt.Sprintf(
+				"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
+				ta.Identifier,
+				col.Identifier,
+			))
+		}
+	}
+
+	// The spec update is last, only after all other actions are complete.
+	statements = append(statements, updateSpecStatement)
+
+	action := strings.Join(statements, "\n")
+	if dryRun {
+		return action, nil
+	}
+
+	// Running these serially is going to be pretty slow, but it's currently not beneficial to use
+	// parallel requests with MotherDuck/DuckDB, so this is the best we can do.
+	for _, s := range statements {
+		if _, err := db.ExecContext(ctx, s); err != nil {
+			return "", fmt.Errorf("executing statement: %w", err)
+		}
+	}
+
+	return action, nil
+}
+
 func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
@@ -264,39 +321,6 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return errs
 }
 
-func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
-		tableIdentifier,
-		columnIdentifier,
-		columnDDL,
-	)
-
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
-}
-
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
-		table.Identifier,
-		column.Identifier,
-	)
-
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
-}
-
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
 	err = c.withDB(func(db *stdsql.DB) error {
 		specB64, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
@@ -306,21 +330,7 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 }
 
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	// Evidently you can't query a table immediately from within the same connection that created
-	// the table, so all of the table creation statements are run first, followed by the spec insert
-	// query from a separate connection. This allows for the metadata table to be created and the
-	// spec inserted in a single apply invocation, otherwise it would fail with a "table does not
-	// exist" error.
-	if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements[:len(statements)-1]) }); err != nil {
-		return err
-	}
-
-	return c.withDB(func(db *stdsql.DB) error {
-		if _, err := db.ExecContext(ctx, statements[len(statements)-1]); err != nil {
-			return fmt.Errorf("updating spec: %w", err)
-		}
-		return nil
-	})
+	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
 }
 
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {

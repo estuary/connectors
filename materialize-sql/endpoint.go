@@ -20,23 +20,9 @@ type Client interface {
 	ExecStatements(ctx context.Context, statements []string) error
 	InstallFence(ctx context.Context, checkpoints Table, fence Fence) (Fence, error)
 
-	// Driver-specific method for adding a column to a table. Some databases support syntax like
-	// "ADD COLUMN IF NOT EXISTS", and others need specific error handling for cases where a column
-	// already exists in a table. This is important for situations where a materialized table was
-	// initially created, had a field removed from the field selection, and then has the field added
-	// back to the field selection.
-	AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier, columnIdentifier, columnDDL string) (string, error)
-
-	// Driver specific method for dropping a NOT NULL constraint from a table. Some databases treat
-	// this as an idempotent action, where a column that is already NOT NULL returns a successful
-	// outcome. Others report and error, and still others don't support doing this at all and treat
-	// it as a no-op - all columns in the table must be created as NOT NULL for these cases.
-	// Handling these different cases is important for removing a field from a materialization if
-	// the table column is not nullable since we will always try to drop the NOT NULL constraint for
-	// the table when a field is removed. We cannot rely on the field being required in the
-	// collection schema because required fields added to a table after initial creation will be
-	// created as nullable.
-	DropNotNullForColumn(ctx context.Context, dryRun bool, table Table, column Column) (string, error)
+	// Apply performs the driver-specific table creation or alteration actions to achieve
+	// consistency with the proposed specification.
+	Apply(ctx context.Context, ep *Endpoint, actions ApplyActions, updateSpecStatement string, dryRun bool) (string, error)
 
 	// PreReqs performs verification checks that the provided configuration can be used to interact
 	// with the endpoint to the degree required by the connector, to as much of an extent as
@@ -50,7 +36,7 @@ type Client interface {
 type Resource interface {
 	// Validate returns an error if the Resource is malformed.
 	Validate() error
-	// Path returns the fully qualified name of the resource, as '.'-separated components.
+	// Path returns the fully qualified name of the resource as a slice of strings.
 	Path() TablePath
 	// Get any user-defined additional SQL to be executed transactionally with table creation.
 	GetAdditionalSql() string

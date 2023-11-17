@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDialect = snowflakeDialect("public")
+
 func TestSQLGeneration(t *testing.T) {
 	var spec *pf.MaterializationSpec
 	var specJson, err = os.ReadFile("testdata/spec.json")
@@ -33,10 +35,12 @@ func TestSQLGeneration(t *testing.T) {
 	})
 	shape2.Document = nil // TODO(johnny): this is a bit gross.
 
-	table1, err := sqlDriver.ResolveTable(shape1, snowflakeDialect)
+	table1, err := sqlDriver.ResolveTable(shape1, testDialect)
 	require.NoError(t, err)
-	table2, err := sqlDriver.ResolveTable(shape2, snowflakeDialect)
+	table2, err := sqlDriver.ResolveTable(shape2, testDialect)
 	require.NoError(t, err)
+
+	templates := renderTemplates(testDialect)
 
 	var snap strings.Builder
 
@@ -47,7 +51,7 @@ func TestSQLGeneration(t *testing.T) {
 		}
 
 		for _, tpl := range []*template.Template{
-			tplCreateTargetTable,
+			templates["createTargetTable"],
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -57,9 +61,9 @@ func TestSQLGeneration(t *testing.T) {
 		}
 
 		for _, tpl := range []*template.Template{
-			tplLoadQuery,
-			tplCopyInto,
-			tplMergeInto,
+			templates["loadQuery"],
+			templates["copyInto"],
+			templates["mergeInto"],
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -69,11 +73,48 @@ func TestSQLGeneration(t *testing.T) {
 		}
 	}
 
+	addCols := []sqlDriver.Column{
+		{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
+		{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+	}
+	dropNotNulls := []sqlDriver.Column{
+		{Identifier: "first_required_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
+		{Identifier: "second_required_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+	}
+
+	for _, testcase := range []struct {
+		name         string
+		addColumns   []sqlDriver.Column
+		dropNotNulls []sqlDriver.Column
+	}{
+		{
+			name:         "alter table add columns and drop not nulls",
+			addColumns:   addCols,
+			dropNotNulls: dropNotNulls,
+		},
+		{
+			name:       "alter table add columns",
+			addColumns: addCols,
+		},
+		{
+			name:         "alter table drop not nulls",
+			dropNotNulls: dropNotNulls,
+		},
+	} {
+		snap.WriteString("--- Begin " + testcase.name + " ---")
+		require.NoError(t, templates["alterTableColumns"].Execute(&snap, sqlDriver.TableAlter{
+			Table:        table1,
+			AddColumns:   testcase.addColumns,
+			DropNotNulls: testcase.dropNotNulls,
+		}))
+		snap.WriteString("--- End " + testcase.name + " ---\n\n")
+	}
+
 	var shapeNoValues = sqlDriver.BuildTableShape(spec, 2, tableConfig{
 		Table: "target_table_no_values_materialized",
 		Delta: false,
 	})
-	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, snowflakeDialect)
+	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, testDialect)
 	require.NoError(t, err)
 
 	tableNoValuesWithUUID := TableWithUUID{
@@ -82,7 +123,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized mergeInto" + " ---")
-	require.NoError(t, tplMergeInto.Execute(&snap, &tableNoValuesWithUUID))
+	require.NoError(t, templates["mergeInto"].Execute(&snap, &tableNoValuesWithUUID))
 	snap.WriteString("--- End " + "target_table_no_values_materialized mergeInto" + " ---\n\n")
 
 	var fence = sqlDriver.Fence{
@@ -94,7 +135,7 @@ func TestSQLGeneration(t *testing.T) {
 		KeyEnd:          0xffeeddcc,
 	}
 	snap.WriteString("--- Begin Fence Update ---")
-	require.NoError(t, tplUpdateFence.Execute(&snap, fence))
+	require.NoError(t, templates["updateFence"].Execute(&snap, fence))
 	snap.WriteString("--- End Fence Update ---\n")
 
 	cupaloy.SnapshotT(t, snap.String())

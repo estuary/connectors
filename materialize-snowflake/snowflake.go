@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"text/template"
 	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -206,13 +207,16 @@ func newSnowflakeDriver() *sql.Driver {
 			var metaBase sql.TablePath
 			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
+			var dialect = snowflakeDialect(parsed.Schema)
+			var templates = renderTemplates(dialect)
+
 			return &sql.Endpoint{
 				Config:              parsed,
-				Dialect:             snowflakeDialect,
+				Dialect:             dialect,
 				MetaSpecs:           &metaSpecs,
 				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: dsn},
-				CreateTableTemplate: tplCreateTargetTable,
+				Client:              client{uri: dsn, dialect: dialect},
+				CreateTableTemplate: templates["createTargetTable"],
 				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
@@ -222,7 +226,79 @@ func newSnowflakeDriver() *sql.Driver {
 }
 
 type client struct {
-	uri string
+	uri     string
+	dialect sql.Dialect
+}
+
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+	db, err := stdsql.Open("snowflake", c.uri)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	// Currently the "catalog" is always the database value from the endpoint configuration in all
+	// capital letters. It is possible to connect to Snowflake databases that aren't in all caps by
+	// quoting the database name. We don't do that currently and it's hard to say if we ever will
+	// need to, although that means we can't connect to databases that aren't in the Snowflake
+	// default ALL CAPS format. The practical implications are that if somebody puts in a database
+	// like "database", we'll actually connect to the database "DATABASE", and so we can't rely on
+	// the endpoint configuration value entirely and will query it here to be future-proof.
+	var catalog string
+	if err := db.QueryRowContext(ctx, "SELECT CURRENT_DATABASE()").Scan(&catalog); err != nil {
+		return "", fmt.Errorf("querying for connected database: %w", err)
+	}
+
+	resolved, err := sql.ResolveActions(ctx, db, actions, c.dialect, catalog)
+	if err != nil {
+		return "", fmt.Errorf("resolving apply actions: %w", err)
+	}
+
+	statements := []string{}
+	for _, tc := range resolved.CreateTables {
+		statements = append(statements, tc.TableCreateSql)
+	}
+
+	for _, ta := range resolved.AlterTables {
+		var alterColumnStmt strings.Builder
+		if err := renderTemplates(c.dialect)["alterTableColumns"].Execute(&alterColumnStmt, ta); err != nil {
+			return "", fmt.Errorf("rendering alter table columns statement: %w", err)
+		}
+		statements = append(statements, alterColumnStmt.String())
+	}
+
+	// The spec will get updated last, after all the other actions are complete, but include it in
+	// the description of actions.
+	action := strings.Join(append(statements, updateSpecStatement), "\n")
+	if dryRun {
+		return action, nil
+	}
+
+	// Execute statements in parallel for efficiency. Each statement acts on a single table, and
+	// everything that needs to be done for a given table is contained in that statement.
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(5)
+
+	for _, s := range statements {
+		s := s
+		group.Go(func() error {
+			if _, err := db.ExecContext(groupCtx, s); err != nil {
+				return fmt.Errorf("executing apply statement: %w", err)
+			}
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return "", err
+	}
+
+	// Once all the table actions are done, we can update the stored spec.
+	if _, err := db.ExecContext(ctx, updateSpecStatement); err != nil {
+		return "", fmt.Errorf("executing spec update statement: %w", err)
+	}
+
+	return action, nil
 }
 
 func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
@@ -273,67 +349,6 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return errs
 }
 
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL",
-		table.Identifier,
-		column.Identifier,
-	)
-
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error {
-			// Snowflake columns that are already NOT NULL will return successfully.
-			_, err := db.ExecContext(ctx, query)
-			return err
-		}); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
-}
-
-func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ADD COLUMN %s %s",
-		tableIdentifier,
-		columnIdentifier,
-		columnDDL,
-	)
-
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error {
-			if _, err := db.ExecContext(ctx, query); err != nil {
-				var sfError *sf.SnowflakeError
-				// There is no documentation for error number 1430 anywhere that I can find so I am not
-				// 100% sure if this error number is exclusively used for "column already exists" types
-				// of errors. So to be safe this error condition will match on the reported SQLState and
-				// the error text itself that has been observed for a table with a column that already
-				// exists.
-				if errors.As(err, &sfError) &&
-					sfError.Number == 1430 &&
-					sfError.SQLState == "42601" &&
-					strings.HasSuffix(err.Error(), "already exists") {
-					log.WithFields(log.Fields{
-						"table":  tableIdentifier,
-						"column": columnIdentifier,
-						"ddl":    columnDDL,
-						"err":    err.Error(),
-					}).Debug("column already existed in table")
-					err = nil
-				}
-				return err
-			}
-
-			return nil
-		}); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
-}
-
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
 	err = c.withDB(func(db *stdsql.DB) error {
 		specB64, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
@@ -343,49 +358,7 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 }
 
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	var (
-		tableCreateBatchSize = 25
-	)
-
-	group, groupCtx := errgroup.WithContext(ctx)
-	batch := []string{}
-
-	doBatch := func(stmts []string) {
-		group.Go(func() error {
-			return c.withDB(func(db *stdsql.DB) error {
-				_, err := db.ExecContext(groupCtx, strings.Join(stmts, "\n"))
-				return err
-			})
-		})
-	}
-
-	// Run all but the last statement in the list using parallel, batched calls to the database.
-	// Snowflake table creation cannot be done within a transaction, and running parallel calls
-	// drastically speeds up table creation when there is a large number of tables. The final
-	// statement provided is reserved for the spec statement and will be run only after all table
-	// creation statements have completed without error.
-	for _, tableCreate := range statements[:len(statements)-1] {
-		batch = append(batch, tableCreate)
-		if len(batch) == tableCreateBatchSize {
-			doBatch(batch)
-			batch = []string{}
-		}
-	}
-	if len(batch) > 0 {
-		doBatch(batch)
-	}
-
-	if err := group.Wait(); err != nil {
-		return fmt.Errorf("table create batch: %w", err)
-	}
-
-	// Once all table creation statements have completed, update the stored specification.
-	return c.withDB(func(db *stdsql.DB) error {
-		if _, err := db.ExecContext(ctx, statements[len(statements)-1]); err != nil {
-			return fmt.Errorf("updating spec: %w", err)
-		}
-		return nil
-	})
+	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
 }
 
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
@@ -418,6 +391,7 @@ type transactor struct {
 		fence *sql.Fence
 		round int
 	}
+	templates   map[string]*template.Template
 	bindings    []*binding
 	updateDelay time.Duration
 }
@@ -431,8 +405,11 @@ func newTransactor(
 ) (_ pm.Transactor, err error) {
 	var cfg = ep.Config.(*config)
 
+	dialect := snowflakeDialect(cfg.Schema)
+
 	var d = &transactor{
-		cfg: cfg,
+		cfg:       cfg,
+		templates: renderTemplates(dialect),
 	}
 
 	if d.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
@@ -496,13 +473,13 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	d.load.stage = newStagedFile(os.TempDir())
 	d.store.stage = newStagedFile(os.TempDir())
 
-	if d.load.loadQuery, err = RenderTableWithRandomUUIDTemplate(target, d.load.stage.uuid, tplLoadQuery); err != nil {
+	if d.load.loadQuery, err = RenderTableWithRandomUUIDTemplate(target, d.load.stage.uuid, t.templates["loadQuery"]); err != nil {
 		return fmt.Errorf("loadQuery template: %w", err)
 	}
-	if d.store.copyInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, tplCopyInto); err != nil {
+	if d.store.copyInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, t.templates["copyInto"]); err != nil {
 		return fmt.Errorf("copyInto template: %w", err)
 	}
-	if d.store.mergeInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, tplMergeInto); err != nil {
+	if d.store.mergeInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, t.templates["mergeInto"]); err != nil {
 		return fmt.Errorf("mergeInto template: %w", err)
 	}
 
@@ -613,7 +590,7 @@ func (d *transactor) commit(ctx context.Context) error {
 
 	// First we must validate the fence has not been modified.
 	var fenceUpdate strings.Builder
-	if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+	if err := d.templates["updateFence"].Execute(&fenceUpdate, d.store.fence); err != nil {
 		return fmt.Errorf("evaluating fence template: %w", err)
 	} else if _, err = txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
 		err = fmt.Errorf("txn.Exec: %w", err)
