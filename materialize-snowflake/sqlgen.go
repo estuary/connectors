@@ -37,9 +37,9 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 }
 
 // snowflakeDialect returns a representation of the Snowflake SQL dialect.
-var snowflakeDialect = func() sql.Dialect {
+var snowflakeDialect = func(configSchema string) sql.Dialect {
 	var variantMapper = sql.NewStaticMapper("VARIANT", sql.WithElementConverter(jsonConverter))
-	var typeMappings = sql.ProjectionTypeMapper{
+	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    variantMapper,
 		sql.BINARY:   sql.NewStaticMapper("BINARY"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
@@ -64,12 +64,41 @@ var snowflakeDialect = func() sql.Dialect {
 			},
 		},
 	}
-	var nullable sql.TypeMapper = sql.MaybeNullableMapper{
+	mapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    typeMappings,
+		Delegate:    mapper,
+	}
+
+	translateIdentifier := func(in string) string {
+		if isSimpleIdentifier(in) {
+			// Snowflake uppercases all identifiers unless they are quoted. We don't quote identifiers if
+			// isSimpleIdentifier is true.
+			return strings.ToUpper(in)
+		}
+		return in
 	}
 
 	return sql.Dialect{
+		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+			if len(path) == 1 {
+				// A schema isn't required to be set on any resource, but the endpoint configuration
+				// will always have one set. Also, as a matter of backwards compatibility, if a
+				// resource has the exact same schema set as the endpoint schema it will not be
+				// included in the path.
+				return sql.InfoTableLocation{
+					TableSchema: translateIdentifier(configSchema),
+					TableName:   translateIdentifier(path[0]),
+				}
+			} else {
+				return sql.InfoTableLocation{
+					TableSchema: translateIdentifier(path[0]),
+					TableName:   translateIdentifier(path[1]),
+				}
+			}
+		}),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string {
+			return translateIdentifier(field)
+		}),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				isSimpleIdentifier,
@@ -79,41 +108,66 @@ var snowflakeDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper:               nullable,
-		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
+		TypeMapper: mapper,
 	}
-}()
+}
 
-var (
-	tplAll = sql.MustParseTemplate(snowflakeDialect, "root", `
-  {{ define "temp_name" -}}
-  flow_temp_table_{{ $.Binding }}
-  {{- end }}
+func renderTemplates(dialect sql.Dialect) map[string]*template.Template {
+	var tplAll = sql.MustParseTemplate(dialect, "root", `
+{{ define "temp_name" -}}
+flow_temp_table_{{ $.Binding }}
+{{- end }}
 
-  -- Templated creation of a materialized table definition and comments:
+-- Templated creation of a materialized table definition and comments:
 
-  {{ define "createTargetTable" }}
-  CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
-    {{- range $ind, $col := $.Columns }}
-    {{- if $ind }},{{ end }}
-    {{$col.Identifier}} {{$col.DDL}}
-    {{- end }}
-    {{- if not $.DeltaUpdates }},
+{{ define "createTargetTable" }}
+CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
+{{- range $ind, $col := $.Columns }}
+{{- if $ind }},{{ end }}
+	{{$col.Identifier}} {{$col.DDL}}
+{{- end }}
+{{- if not $.DeltaUpdates }},
 
-    PRIMARY KEY (
-      {{- range $ind, $key := $.Keys }}
-      {{- if $ind }}, {{end -}}
-      {{$key.Identifier}}
-      {{- end -}}
-    )
-    {{- end }}
-  );
+	PRIMARY KEY (
+	{{- range $ind, $key := $.Keys }}
+	{{- if $ind }}, {{end -}}
+	{{$key.Identifier}}
+	{{- end -}}
+)
+{{- end }}
+);
 
-  COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
-  {{- range $col := .Columns }}
-  COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment}};
-  {{- end}}
-  {{ end }}
+COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
+{{- range $col := .Columns }}
+COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment}};
+{{- end}}
+{{ end }}
+
+-- Templated query which performs table alterations by adding columns and/or
+-- dropping nullability constraints. Snowflake does not allow adding columns and
+-- modifying columns together in the same statement, but either one of those
+-- things can be grouped together in separate statements, so this template will
+-- actually generate two separate statements if needed.
+
+{{ define "alterTableColumns" }}
+{{ if $.AddColumns -}}
+ALTER TABLE {{$.Identifier}} ADD COLUMN
+{{- range $ind, $col := $.AddColumns }}
+	{{- if $ind }},{{ end }}
+	{{$col.Identifier}} {{$col.NullableDDL}}
+{{- end }};
+{{- end -}}
+{{- if $.DropNotNulls -}}
+{{- if $.AddColumns }}
+
+{{ end -}}
+ALTER TABLE {{$.Identifier}} ALTER COLUMN
+{{- range $ind, $col := $.DropNotNulls }}
+	{{- if $ind }},{{ end }}
+	{{$col.Identifier}} DROP NOT NULL
+{{- end }};
+{{- end }}
+{{ end }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values. It
 -- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL.
@@ -139,59 +193,59 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{ end }}
 
 {{ define "copyInto" }}
-	COPY INTO {{ $.Table.Identifier }} (
-		{{ range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}
-		{{- end }}
-	) FROM (
-		SELECT {{ range $ind, $key := $.Table.Columns }}
+COPY INTO {{ $.Table.Identifier }} (
+	{{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
-		$1[{{$ind}}] AS {{$key.Identifier -}}
-		{{- end }}
-		FROM @flow_v1/{{ $.RandomUUID }}
-	);
+		{{$key.Identifier -}}
+	{{- end }}
+) FROM (
+	SELECT {{ range $ind, $key := $.Table.Columns }}
+	{{- if $ind }}, {{ end -}}
+	$1[{{$ind}}] AS {{$key.Identifier -}}
+	{{- end }}
+	FROM @flow_v1/{{ $.RandomUUID }}
+);
 {{ end }}
 
 
 {{ define "mergeInto" }}
-	MERGE INTO {{ $.Table.Identifier }} AS l
-	USING (
-		SELECT {{ range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			$1[{{$ind}}] AS {{$key.Identifier -}}
-		{{- end }}
-		FROM @flow_v1/{{ $.RandomUUID }}
-	) AS r
-	ON {{ range $ind, $key := $.Table.Keys }}
-		{{- if $ind }} AND {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
-	{{- end }}
-	{{- if $.Table.Document }}
-	WHEN MATCHED AND IS_NULL_VALUE(r.{{ $.Table.Document.Identifier }}) THEN
-		DELETE
-	{{- end }}
-	WHEN MATCHED THEN
-		UPDATE SET {{ range $ind, $key := $.Table.Values }}
+MERGE INTO {{ $.Table.Identifier }} AS l
+USING (
+	SELECT {{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
-	{{- end -}}
-	{{- if $.Table.Document -}}
-	{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
+		$1[{{$ind}}] AS {{$key.Identifier -}}
 	{{- end }}
-	WHEN NOT MATCHED THEN
-		INSERT (
-		{{- range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}
-		{{- end -}}
-	)
-		VALUES (
-		{{- range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			r.{{$key.Identifier -}}
-		{{- end -}}
-	);
+	FROM @flow_v1/{{ $.RandomUUID }}
+) AS r
+ON {{ range $ind, $key := $.Table.Keys }}
+	{{- if $ind }} AND {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end }}
+{{- if $.Table.Document }}
+WHEN MATCHED AND IS_NULL_VALUE(r.{{ $.Table.Document.Identifier }}) THEN
+	DELETE
+{{- end }}
+WHEN MATCHED THEN
+	UPDATE SET {{ range $ind, $key := $.Table.Values }}
+	{{- if $ind }}, {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end -}}
+{{- if $.Table.Document -}}
+{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
+{{- end }}
+WHEN NOT MATCHED THEN
+	INSERT (
+	{{- range $ind, $key := $.Table.Columns }}
+		{{- if $ind }}, {{ end -}}
+		{{$key.Identifier -}}
+	{{- end -}}
+)
+	VALUES (
+	{{- range $ind, $key := $.Table.Columns }}
+		{{- if $ind }}, {{ end -}}
+		r.{{$key.Identifier -}}
+	{{- end -}}
+);
 {{ end }}
 
 {{ define "updateFence" }}
@@ -214,12 +268,16 @@ BEGIN
 END $$;
 {{ end }}
   `)
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplCopyInto          = tplAll.Lookup("copyInto")
-	tplMergeInto         = tplAll.Lookup("mergeInto")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
-)
+
+	return map[string]*template.Template{
+		"createTargetTable": tplAll.Lookup("createTargetTable"),
+		"alterTableColumns": tplAll.Lookup("alterTableColumns"),
+		"loadQuery":         tplAll.Lookup("loadQuery"),
+		"copyInto":          tplAll.Lookup("copyInto"),
+		"mergeInto":         tplAll.Lookup("mergeInto"),
+		"updateFence":       tplAll.Lookup("updateFence"),
+	}
+}
 
 var createStageSQL = `
 CREATE STAGE IF NOT EXISTS flow_v1

@@ -125,6 +125,29 @@ UPDATE "Delta Updates" SET
 	 WHERE "theKey" = $1;
 --- End "Delta Updates" storeUpdate ---
 
+--- Begin alter table add columns and drop not nulls ---
+
+ALTER TABLE "a-schema".target_table
+	ADD COLUMN first_new_column STRING,
+	ADD COLUMN second_new_column BOOL,
+	ALTER COLUMN first_required_column DROP NOT NULL,
+	ALTER COLUMN second_required_column DROP NOT NULL;
+--- End alter table add columns and drop not nulls ---
+
+--- Begin alter table add columns ---
+
+ALTER TABLE "a-schema".target_table
+	ADD COLUMN first_new_column STRING,
+	ADD COLUMN second_new_column BOOL;
+--- End alter table add columns ---
+
+--- Begin alter table drop not nulls ---
+
+ALTER TABLE "a-schema".target_table
+	ALTER COLUMN first_required_column DROP NOT NULL,
+	ALTER COLUMN second_required_column DROP NOT NULL;
+--- End alter table drop not nulls ---
+
 --- Begin target_table_no_values_materialized storeUpdate ---
 
 UPDATE target_table_no_values_materialized SET

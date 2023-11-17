@@ -31,6 +31,7 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -263,6 +264,82 @@ type client struct {
 	uri string
 }
 
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+	cfg := ep.Config.(*config)
+
+	db, err := stdsql.Open("pgx", c.uri)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	resolved, err := sql.ResolveActions(ctx, db, actions, rsDialect, cfg.Database)
+	if err != nil {
+		return "", fmt.Errorf("resolving apply actions: %w", err)
+	}
+
+	statements := []string{}
+	for _, tc := range resolved.CreateTables {
+		statements = append(statements, tc.TableCreateSql)
+	}
+
+	// Redshift only allows a single column to be added per ALTER TABLE statement. Also, we will
+	// never need to drop nullability constraints, since Redshift does not allow dropping
+	// nullability and we don't ever create columns as NOT NULL as a result.
+	for _, ta := range resolved.AlterTables {
+		if len(ta.DropNotNulls) != 0 { // sanity check
+			return "", fmt.Errorf("logic error: redshift cannot drop nullability constraints but got %d DropNotNulls", len(ta.DropNotNulls))
+		}
+		if len(ta.AddColumns) > 0 {
+			addColStmts := []string{}
+			for _, c := range ta.AddColumns {
+				addColStmts = append(addColStmts, fmt.Sprintf(
+					"ALTER TABLE %s ADD COLUMN %s %s;",
+					ta.Identifier,
+					c.Identifier,
+					c.NullableDDL,
+				))
+			}
+			// Each table column addition statement is a separate statement, but will be grouped
+			// together in a single multi-statement query.
+			statements = append(statements, strings.Join(addColStmts, "\n"))
+		}
+	}
+
+	// The spec will get updated last, after all the other actions are complete, but include it in
+	// the description of actions.
+	action := strings.Join(append(statements, updateSpecStatement), "\n")
+	if dryRun {
+		return action, nil
+	}
+
+	// Execute statements in parallel for efficiency. Each statement acts on a single table, and
+	// everything that needs to be done for a given table is contained in that statement.
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(5)
+
+	for _, s := range statements {
+		s := s
+		group.Go(func() error {
+			if _, err := db.ExecContext(groupCtx, s); err != nil {
+				return fmt.Errorf("executing apply statement: %w", err)
+			}
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return "", err
+	}
+
+	// Once all the table actions are done, we can update the stored spec.
+	if _, err := db.ExecContext(ctx, updateSpecStatement); err != nil {
+		return "", fmt.Errorf("executing spec update statement: %w", err)
+	}
+
+	return action, nil
+}
+
 func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
@@ -354,47 +431,6 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ADD COLUMN %s %s",
-		tableIdentifier,
-		columnIdentifier,
-		columnDDL,
-	)
-
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error {
-			if _, err := db.ExecContext(ctx, query); err != nil {
-				var pgErr *pgconn.PgError
-				// Error code 42701 is the Postgres "duplicate_column" error code:
-				// https://www.postgresql.org/docs/current/errcodes-appendix.html
-				if errors.As(err, &pgErr); pgErr.Code == "42701" {
-					log.WithFields(log.Fields{
-						"table":  tableIdentifier,
-						"column": columnIdentifier,
-						"ddl":    columnDDL,
-						"err":    err.Error(),
-					}).Debug("column already existed in table")
-					err = nil
-				}
-				return err
-			}
-
-			return nil
-		}); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
-}
-
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
-	// No-op since Redshift does not support dropping NOT NULL constraints for columns, and the
-	// connector always creates columns as nullable because of this.
-	return "", nil
 }
 
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {

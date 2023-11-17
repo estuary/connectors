@@ -68,12 +68,12 @@ func TestApply(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := config{
-		Address:  "localhost:5432",
+		Address:  "localhost:5435",
 		User:     "postgres",
 		Password: "postgres",
-		Database: "postgres",
 		Schema:   "public",
 	}
+	catalog := "postgres"
 
 	configJson, err := json.Marshal(cfg)
 	require.NoError(t, err)
@@ -107,7 +107,7 @@ func TestApply(t *testing.T) {
 			db, err := stdsql.Open("pgx", cfg.ToURI())
 			require.NoError(t, err)
 
-			rows, err := sql.StdListTables(ctx, db, cfg.Database, cfg.Schema)
+			rows, err := sql.StdListTables(ctx, db, catalog, cfg.Schema)
 			require.NoError(t, err)
 
 			return rows
@@ -118,7 +118,7 @@ func TestApply(t *testing.T) {
 			db, err := stdsql.Open("pgx", cfg.ToURI())
 			require.NoError(t, err)
 
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourcePath[0], resourcePath[1])
+			sch, err := sql.StdGetSchema(ctx, db, catalog, resourcePath[0], resourcePath[1])
 			require.NoError(t, err)
 
 			return sch

@@ -36,6 +36,8 @@ type Table struct {
 
 	// Quoted identifier for this table, suited for direct inclusion in SQL.
 	Identifier string
+
+	InfoLocation InfoTableLocation
 	// Keys, Values, and the (optional) Document column.
 	Keys, Values []Column
 	Document     *Column
@@ -140,8 +142,9 @@ func (t *Table) ColumnNames() []string {
 // ResolveTable maps a TableShape into a Table using the given Dialect.
 func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 	var table = Table{
-		TableShape: shape,
-		Identifier: dialect.Identifier(shape.Path...),
+		TableShape:   shape,
+		Identifier:   dialect.Identifier(shape.Path...),
+		InfoLocation: dialect.TableLocator(shape.Path...),
 	}
 
 	for _, key := range shape.Keys {
@@ -156,18 +159,31 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 	}
 
 	for index, col := range table.Columns() {
-		var err error
-
-		if col.MappedType, err = dialect.MapType(&col.Projection); err != nil {
-			return Table{}, fmt.Errorf("mapping column %s of %s: %w", col.Field, shape.Path, err)
+		resolved, err := ResolveColumn(index, &col.Projection, dialect)
+		if err != nil {
+			return Table{}, fmt.Errorf("resolving column %s of %s: %w", col.Field, shape.Path, err)
 		}
-		_, mustExist := col.Projection.AsFlatType()
-		col.MustExist = mustExist
-		col.Identifier = dialect.Identifier(col.Field)
-		col.Placeholder = dialect.Placeholder(index)
+		*col = resolved
 	}
 
 	return table, nil
+}
+
+func ResolveColumn(index int, projection *Projection, dialect Dialect) (Column, error) {
+	mappedType, err := dialect.MapType(projection)
+	if err != nil {
+		return Column{}, err
+	}
+
+	_, mustExist := projection.AsFlatType()
+
+	return Column{
+		Projection:  *projection,
+		MappedType:  mappedType,
+		Identifier:  dialect.Identifier(projection.Field),
+		Placeholder: dialect.Placeholder(index),
+		MustExist:   mustExist,
+	}, nil
 }
 
 // BuildTableShape for the indexed specification binding, which has a corresponding database Resource.

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -19,7 +18,7 @@ import (
 
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
-	var dialect = mysqlDialect(time.FixedZone("UTC", 0))
+	var dialect = testDialect
 	var templates = renderTemplates(dialect)
 	var client = client{uri: "flow:flow@tcp(localhost:3306)/flow"}
 	sql.RunFenceTestCases(t,
@@ -51,7 +50,7 @@ func TestFencingCases(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	sql.RunValidateTestCases(t, mysqlDialect(time.FixedZone("UTC", 0)))
+	sql.RunValidateTestCases(t, testDialect)
 }
 
 func TestApply(t *testing.T) {
@@ -120,13 +119,13 @@ func TestApply(t *testing.T) {
 			for _, tbl := range []string{firstTable, secondTable} {
 				_, _ = db.ExecContext(ctx, fmt.Sprintf(
 					"drop table %s",
-					mysqlDialect(time.FixedZone("UTC", 0)).Identifier(tbl),
+					testDialect.Identifier(tbl),
 				))
 			}
 
 			_, _ = db.ExecContext(ctx, fmt.Sprintf(
 				"delete from %s where materialization = 'test/sqlite'",
-				mysqlDialect(time.FixedZone("UTC", 0)).Identifier("flow_materializations_v2"),
+				testDialect.Identifier("flow_materializations_v2"),
 			))
 		},
 	)

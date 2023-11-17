@@ -35,7 +35,7 @@ func strToInt() sql.ElementConverter {
 	})
 }
 
-var sqlServerDialect = func(collation string) sql.Dialect {
+var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 	var stringType = "varchar"
 	// If the collation does not support UTF8, we fallback to using nvarchar
 	// for string columns
@@ -51,7 +51,7 @@ var sqlServerDialect = func(collation string) sql.Dialect {
 	// to json.RawMessage
 	var jsonConverter = sql.WithElementConverter(sql.Compose(sql.StdByteArrayToStr, sql.JsonBytesConverter))
 
-	var typeMappings sql.TypeMapper = sql.ProjectionTypeMapper{
+	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
 		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
 		sql.BOOLEAN: sql.NewStaticMapper("BIT"),
@@ -86,12 +86,19 @@ var sqlServerDialect = func(collation string) sql.Dialect {
 		sql.MULTIPLE: sql.NewStaticMapper(textType, jsonConverter),
 	}
 
-	var nullable = sql.MaybeNullableMapper{
+	mapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    typeMappings,
+		Delegate:    mapper,
 	}
 
 	return sql.Dialect{
+		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+			return sql.InfoTableLocation{
+				TableSchema: schemaName,
+				TableName:   path[0],
+			}
+		}),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
@@ -104,8 +111,7 @@ var sqlServerDialect = func(collation string) sql.Dialect {
 			// parameterIndex starts at 0, but sqlserver parameters start at @p1
 			return fmt.Sprintf("@p%d", index+1)
 		}),
-		TypeMapper:               nullable,
-		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
+		TypeMapper: mapper,
 	}
 }
 
@@ -160,6 +166,18 @@ CREATE TABLE {{$.Identifier}} (
 	{{- end }}
 );
 END;
+{{ end }}
+
+-- Templated query which performs table alterations by adding columns.
+-- Dropping nullability constraints must be handled separately, since SQL
+-- Server does not support modifying multiple columns in a single statement.
+
+{{ define "alterTableColumns" }}
+ALTER TABLE {{$.Identifier}} ADD
+{{- range $ind, $col := $.AddColumns }}
+	{{- if $ind }},{{ end }}
+	{{$col.Identifier}} {{$col.NullableDDL}}
+{{- end }};
 {{ end }}
 
 -- Templated creation of a temporary load table:
@@ -321,6 +339,7 @@ UPDATE {{ Identifier $.TablePath }}
 		"tempStoreTruncate":  tplAll.Lookup("truncateTempStoreTable"),
 		"createLoadTable":    tplAll.Lookup("createLoadTable"),
 		"createStoreTable":   tplAll.Lookup("createStoreTable"),
+		"alterTableColumns":  tplAll.Lookup("alterTableColumns"),
 		"createTargetTable":  tplAll.Lookup("createTargetTable"),
 		"directCopy":         tplAll.Lookup("directCopy"),
 		"mergeInto":          tplAll.Lookup("mergeInto"),

@@ -220,6 +220,29 @@ TRUNCATE flow_temp_update_table_0;
 TRUNCATE flow_temp_update_table_1;
 --- End `Delta Updates` truncateUpdateTable ---
 
+--- Begin alter table add columns and drop not nulls ---
+
+ALTER TABLE target_table
+	ADD COLUMN first_new_column STRING,
+	ADD COLUMN second_new_column BOOL,
+	MODIFY first_required_column STRING,
+	MODIFY second_required_column BOOL;
+--- End alter table add columns and drop not nulls ---
+
+--- Begin alter table add columns ---
+
+ALTER TABLE target_table
+	ADD COLUMN first_new_column STRING,
+	ADD COLUMN second_new_column BOOL;
+--- End alter table add columns ---
+
+--- Begin alter table drop not nulls ---
+
+ALTER TABLE target_table
+	MODIFY first_required_column STRING,
+	MODIFY second_required_column BOOL;
+--- End alter table drop not nulls ---
+
 --- Begin Fence Install ---
 
 with

@@ -55,7 +55,7 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 }
 
 var bqDialect = func() sql.Dialect {
-	var typeMappings = sql.ProjectionTypeMapper{
+	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter)),
 		sql.BINARY:   sql.NewStaticMapper("BYTES"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOL"),
@@ -75,12 +75,19 @@ var bqDialect = func() sql.Dialect {
 		},
 	}
 
-	var nullable = sql.MaybeNullableMapper{
+	mapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    typeMappings,
+		Delegate:    mapper,
 	}
 
 	return sql.Dialect{
+		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+			return sql.InfoTableLocation{
+				TableSchema: path[1],
+				TableName:   translateFlowIdentifier(path[2]),
+			}
+		}),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return translateFlowIdentifier(field) }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			identifierSanitizer(sql.PassThroughTransform(
 				func(s string) bool {
@@ -94,8 +101,7 @@ var bqDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper:               nullable,
-		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
+		TypeMapper: mapper,
 	}
 }()
 
@@ -121,6 +127,32 @@ CLUSTER BY {{ range $ind, $key := $.Keys }}
 			{{$key.Identifier}}
 		{{- end -}}
 	{{- end}};
+{{ end }}
+
+-- Templated query which performs table alterations by adding columns and/or
+-- dropping nullability constraints. BigQuery does not allow adding columns and
+-- modifying columns together in the same statement, but either one of those
+-- things can be grouped together in separate statements, so this template will
+-- actually generate two separate statements if needed.
+
+{{ define "alterTableColumns" }}
+{{- if $.AddColumns -}}
+ALTER TABLE {{$.Identifier}}
+{{- range $ind, $col := $.AddColumns }}
+	{{- if $ind }},{{ end }}
+	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
+{{- end }};
+{{- end -}}
+{{- if $.DropNotNulls -}}
+{{- if $.AddColumns }}
+
+{{ end -}}
+ALTER TABLE {{$.Identifier}}
+{{- range $ind, $col := $.DropNotNulls }}
+	{{- if $ind }},{{ end }}
+	ALTER COLUMN {{$col.Identifier}} DROP NOT NULL
+{{- end }};
+{{- end }}
 {{ end }}
 
 -- Templated query which joins keys from the load table with the target table,
@@ -264,6 +296,7 @@ UPDATE {{ Identifier $.TablePath }}
 `)
 	tplTempTableName     = tplAll.Lookup("tempTableName")
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
 	tplInstallFence      = tplAll.Lookup("installFence")
 	tplUpdateFence       = tplAll.Lookup("updateFence")
 	tplLoadQuery         = tplAll.Lookup("loadQuery")

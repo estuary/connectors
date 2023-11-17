@@ -63,18 +63,19 @@ func TestFencingCases(t *testing.T) {
 	cfg := mustGetCfg(t)
 
 	client := client{uri: cfg.ToURI("tenant")}
+	templates := renderTemplates(testDialect)
 
 	ctx := context.Background()
 
 	sql.RunFenceTestCases(t,
 		client,
 		[]string{"temp_test_fencing_checkpoints"},
-		snowflakeDialect,
-		tplCreateTargetTable,
+		testDialect,
+		templates["createTargetTable"],
 		func(table sql.Table, fence sql.Fence) error {
 			var err = client.withDB(func(db *stdsql.DB) error {
 				var fenceUpdate strings.Builder
-				if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+				if err := templates["updateFence"].Execute(&fenceUpdate, fence); err != nil {
 					return fmt.Errorf("evaluating fence template: %w", err)
 				}
 				var _, err = db.Exec(fenceUpdate.String())
@@ -93,7 +94,7 @@ func TestFencingCases(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	sql.RunValidateTestCases(t, snowflakeDialect)
+	sql.RunValidateTestCases(t, testDialect)
 }
 
 func TestApply(t *testing.T) {
@@ -159,13 +160,13 @@ func TestApply(t *testing.T) {
 			for _, tbl := range []string{firstTable, secondTable} {
 				_, _ = db.ExecContext(ctx, fmt.Sprintf(
 					"drop table %s",
-					snowflakeDialect.Identifier(cfg.Schema, tbl),
+					testDialect.Identifier(cfg.Schema, tbl),
 				))
 			}
 
 			_, _ = db.ExecContext(ctx, fmt.Sprintf(
 				"delete from %s where materialization = 'test/sqlite'",
-				snowflakeDialect.Identifier(cfg.Schema, "flow_materializations_v2"),
+				testDialect.Identifier(cfg.Schema, "flow_materializations_v2"),
 			))
 		},
 	)
