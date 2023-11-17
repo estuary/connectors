@@ -459,6 +459,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 	defer txn.Rollback()
 
+  time.Sleep(10 * time.Second)
+
 	// The LoadIterator iterates over documents in a natural order, the keys are
 	// not ordered by their binding, but naturally keys from the same binding are
 	// usually grouped together. We take advantage of that by inserting these
@@ -639,7 +641,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 				}
 
 				if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
-					return fmt.Errorf("truncating load table: %w", err)
+					return fmt.Errorf("truncating store table: %w", err)
 				}
 
 				// reset the value for next transaction
@@ -663,6 +665,8 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			} else if rowsAffected < 1 {
 				return fmt.Errorf("This instance was fenced off by another")
 			}
+
+      return fmt.Errorf("hi")
 
 			if err := txn.Commit(); err != nil {
 				return fmt.Errorf("committing Store transaction: %w", err)

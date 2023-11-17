@@ -309,6 +309,8 @@ github.com/estuary/flow v0.3.9-0.20231103220322-8eeb6cd2430b h1:7Z9b3eeGqCbBdMAj
 github.com/estuary/flow v0.3.9-0.20231103220322-8eeb6cd2430b/go.mod h1:0g2acMNbyUpvBVO2zBaeXt3jC7Hr2F2bvTxcKgjXQpo=
 github.com/estuary/flow v0.3.9-0.20231106201646-c03c3d9b5a70 h1:CcbNIWKgIQlWIg1EwLwkprs45VVaUCuXj/vDDJW1ZBU=
 github.com/estuary/flow v0.3.9-0.20231106201646-c03c3d9b5a70/go.mod h1:0g2acMNbyUpvBVO2zBaeXt3jC7Hr2F2bvTxcKgjXQpo=
+github.com/estuary/flow v0.3.9-0.20231116184601-93f2abb4a933 h1:o1BDYkSSHpYMQXW/ycYTsj0U4PB3PL83AC7ok9qIBgM=
+github.com/estuary/flow v0.3.9-0.20231116184601-93f2abb4a933/go.mod h1:0g2acMNbyUpvBVO2zBaeXt3jC7Hr2F2bvTxcKgjXQpo=
 github.com/evanphx/json-patch/v5 v5.6.0 h1:b91NhWfaz02IuVxO9faSllyAtNXHMPkC5J8sJCLunww=
 github.com/evanphx/json-patch/v5 v5.6.0/go.mod h1:G79N1coSVB93tBe7j6PhzjmR3/2VvlbKOFpnXhI9Bw4=
 github.com/fatih/structs v1.1.0 h1:Q7juDM0QtcnhCpeyLGQKyg4TOIghuNXrkL32pHAUMxo=
