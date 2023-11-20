@@ -39,7 +39,7 @@ analytics_type_mappings = {
     "Clicks": {"type": "integer"},
     "Displays": {"type": "integer"},
     "Visits": {"type": "integer"},
-    "AdvertiserCost": {"type": "number"},
+    "AdvertiserCost": {"type": ["number", "string"], "format": "number"},
     "SalesClientAttribution": {"type": "integer"},
     "SalesAllClientAttribution": {"type": "integer"},
     "SalesPc30d": {"type": "integer"},

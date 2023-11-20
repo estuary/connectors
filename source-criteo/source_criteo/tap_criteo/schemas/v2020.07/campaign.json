@@ -16,12 +16,7 @@
       "type": "array",
       "items": {
         "$id": "#/properties/categories/items",
-        "anyOf": [
-          {
-            "$id": "#/properties/categories/items/anyOf/0",
-            "type": "integer"
-          }
-        ]
+        "type": "integer"
       }
     },
     "budgetId": {

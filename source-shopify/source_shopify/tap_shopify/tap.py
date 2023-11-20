@@ -44,44 +44,66 @@ class Tap_Shopify(Tap):
 
     config_jsonschema = th.PropertiesList(
         th.Property(
-            "authentication",
+            "credentials",
             th.CustomType(
                 {
-                    **th.DiscriminatedUnion(
-                        "auth_type", 
-                        oauth=th.PropertiesList(
-                            th.Property(
-                                "client_id",
-                                th.StringType,
-                                required=True,
-                                secret=True
-                            ),
-                            th.Property(
-                                "client_secret",
-                                th.StringType,
-                                required=True,
-                                secret=True
-                            ),
-                            th.Property(
-                                "access_token",
-                                th.StringType,
-                                required=True,
-                                secret=True
-                            )
-                        ),
-                        access_token=th.PropertiesList(
-                            th.Property(
-                                "access_token",
-                                th.StringType,
-                                required=True,
-                                description="The access token to authenticate with the Shopify API",
-                            ),
-                        )
-                    ).to_dict(),
                     "type": "object",
+                    "description": "Credentials for connecting to the Shopify API",
                     "discriminator": {
                         "propertyName": "auth_type"
-                    }
+                    },
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "title": "Shopify OAuth",
+                            "x-oauth2-provider": "shopify",
+                            "properties": {
+                                "auth_type": {
+                                    "type": "string",
+                                    "const": "oauth",
+                                    "description": "Discriminator for object of type 'oauth'."
+                                },
+                                "client_id": {
+                                    "type": "string",
+                                    "secret": True
+                                },
+                                "client_secret": {
+                                    "type": "string",
+                                    "secret": True
+                                },
+                                "access_token": {
+                                    "type": "string",
+                                    "secret": True
+                                }
+                            },
+                            "required": [
+                                "auth_type",
+                                "client_id",
+                                "client_secret",
+                                "access_token"
+                            ]
+                        },
+                        {
+                            "type": "object",
+                            "title": "Access Token",
+                            "properties": {
+                                "auth_type": {
+                                    "type": "string",
+                                    "const": "access_token",
+                                    "description": "Discriminator for object of type 'access_token'."
+                                },
+                                "access_token": {
+                                    "type": ["string"],
+                                    "description": "The access token to authenticate with the Shopify API",
+                                    "secret": True
+                                }
+                            },
+                            "required": [
+                                "auth_type",
+                                "access_token"
+                            ]
+                        }
+                    ]
                 },
             ),
             required=True
@@ -104,7 +126,8 @@ class Tap_Shopify(Tap):
             "admin_url",
             th.StringType,
             description=(
-                "The Admin url for your Shopify store " + "(overrides 'store' property)"
+                "The Admin url for your Shopify store " +
+                "(overrides 'store' property)"
             ),
         ),
         th.Property(
