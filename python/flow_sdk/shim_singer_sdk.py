@@ -182,6 +182,18 @@ class CaptureShim(Connector):
             elif message.type == singer.SingerMessageType.STATE:
                 state = t.cast(singer.StateMessage, message)
                 logger.debug("stream state", state)
+                # The Meltano SDK manages any stream-specific state for us.
+                # See their docs on this here: https://sdk.meltano.com/en/latest/implementation/state.html
+                emit(
+                    Response(
+                        checkpoint=response.Checkpoint(
+                            state=flow.ConnectorState(
+                                updated=state.to_dict(),
+                                mergePatch=False
+                            )
+                        )
+                    )
+                )
             else:
                 raise RuntimeError("unexpected singer_sdk Message", message)
 
@@ -213,7 +225,9 @@ class CaptureShim(Connector):
                 )
                 continue
 
+            delegate.logger.info("Syncing stream '%s'.", stream.name)
             stream.sync()
+            # This is where we tell the Meltano SDK to do any final state emits if neccesary
             stream.finalize_state_progress_markers()
 
         # this second loop is needed for all streams to print out their costs
