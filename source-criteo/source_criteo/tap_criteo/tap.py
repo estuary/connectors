@@ -33,8 +33,8 @@ class TapCriteo(Tap):
     name = "tap-criteo"
 
     config_jsonschema = th.PropertiesList(
-        th.Property("client_id", th.StringType, required=True),
-        th.Property("client_secret", th.StringType, required=True),
+        th.Property("client_id", th.StringType, required=True, secret=True),
+        th.Property("client_secret", th.StringType, required=True, secret=True),
         th.Property("advertiser_ids", th.ArrayType(th.StringType), required=True),
         th.Property("start_date", th.DateTimeType, required=True),
         th.Property(

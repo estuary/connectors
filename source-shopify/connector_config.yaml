@@ -1,8 +1,8 @@
-authentication:
+credentials:
     auth_type: oauth
-    client_id_sops: ENC[AES256_GCM,data:Dz4Qy8X2xpnkCgM8Ewr0RyPRj1kMEJxnuiNjH11s5RI=,iv:iU1gO2hVVW7rSm1Xa1B1PXU3Xqtrui/sifUPxFj1Rss=,tag:M89jBnWBrCmbwjObHlHLlQ==,type:str]
-    client_secret_sops: ENC[AES256_GCM,data:5RUqkJsI86uWLwPklvRFsvR8l91nYFYXCL+GgJrwg0s=,iv:Qpim/W39Z0GTKj6BG02iqDGGwhOtEyzXlaj0Yf+BR3A=,tag:LvC+sxiVP9V+EgnwZ/Bd+g==,type:str]
-    access_token_sops: ENC[AES256_GCM,data:uVjw8ht1bBLVUV4qoeXa4n+trIzX2884+I3VFOej2QTBZV3GlVM=,iv:pYFevosDigVVus2b0s5wJTRoo0JyP/jvxiz5dBivLWk=,tag:lfXde+QOun5w6PEnkmL4Aw==,type:str]
+    client_id_sops: ENC[AES256_GCM,data:th4bA5vmEOeij1OdYBO+KgL7YnpBOQOT4KR4E5t+NxA=,iv:8ETc1D93AvAcoYbjqog4CTvq51znj1dF8hG4DRwfMnk=,tag:tBOQ24wIYyucWhX5fsR65A==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:40lB5n+kfple9tQOiNkvCQTa4VzeKq6Y21F11YVWj6c=,iv:5NNEL56+Hs8S5Y4dRoaa8zygrcCTH0ppbTuQEzKESms=,tag:+fOcS0m6Ii4M7J6SEaDumg==,type:str]
+    access_token_sops: ENC[AES256_GCM,data:sgQspKJjwgzJGJFCEe9qJKrqmGtexNjXx6HKsZ40RZYTs9ZE1g8=,iv:nqWGZquM6nM0/7H+QX08G4N00v2e03J6GXNGajNlSVE=,tag:QnAUNo47EWl12lEb7g6tCQ==,type:str]
 store: estuary-testing-1
 sops:
     kms: []
@@ -13,8 +13,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2023-11-09T18:24:17Z"
-    mac: ENC[AES256_GCM,data:6Lzdo9tvfvCYhSaAdY+clBOw7xYff+34a+7XcfgRCFswGBKMybY4zkzGU/6S4ucj4kTv+WbKswDSYtritypu4ngYiJCrUjSpWljagSAfspa7p2YAIMOYjr2WH1vPsYsSMP4VILx/cbYsoUvvXLOB4X7mSV+sKGB4dEtV1Ex7DO8=,iv:L36KEQyzCIPopPW7Tpc8H6VPddvQZO2Ikl/APAhrdvs=,tag:O8x7owWQvMqi8iIDB1hsAQ==,type:str]
+    lastmodified: "2023-11-15T22:16:10Z"
+    mac: ENC[AES256_GCM,data:+lMIjMuBGsrN6NGlKROjdbOMdRTeDtjdqqiibKezFw2/Hizm/s11N2M9pNu2E4zMUwwi7yOQUTYjtBXedVVJijuCmjkN/vGuikvxWUHkvyurWcfCmxNGRnt7uJKi1b4vSDgozxbVJeyw9LT9wzJlBAUm63EKSXssstW1JEF8yDA=,iv:a6mO2jNIZw5hpasIvTM3yadzfBI8kq4tVkHWTm0Uu0o=,tag:TnU+QkOSuN1rmauWd095Ag==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.7.3
