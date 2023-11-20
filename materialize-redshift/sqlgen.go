@@ -140,11 +140,6 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{$col.Identifier}} {{$col.DDL}}
 {{- end }}
 );
-
-COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
-{{- range $col := .Columns }}
-COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment}};
-{{- end}}
 {{ end }}
 
 -- Idempotent creation of the load table for staging load keys.
@@ -166,7 +161,10 @@ CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
 
 {{ define "createStoreTable" }}
 CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
-	LIKE {{$.Identifier}}
+{{- range $ind, $col := $.Columns }}
+	{{- if $ind }},{{ end }}
+	{{$col.Identifier}} {{$col.DDL}}
+{{- end }}
 );
 {{ end }}
 

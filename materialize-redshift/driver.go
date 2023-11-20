@@ -82,6 +82,8 @@ type config struct {
 	Region             string `json:"region" jsonschema:"title=Region,description=Region of the S3 staging bucket. For optimal performance this should be in the same region as the Redshift database cluster." jsonschema_extras:"order=8"`
 	BucketPath         string `json:"bucketPath,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
 
+	DataShare string `json:"useDatashare,omitempty"`
+
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
@@ -167,9 +169,26 @@ type tableConfig struct {
 	Schema        string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)."`
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run in the same transaction that creates the table." jsonschema_extras:"multiline=true"`
 	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
+
+	dataShare string
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
+	dataShare := ep.Config.(*config).DataShare
+
+	if dataShare != "" {
+		sch := ep.Config.(*config).Schema
+		if sch == "" {
+			// Must be explicit for 3 part notation.
+			sch = defaultSchema
+		}
+
+		return &tableConfig{
+			Schema:    sch,
+			dataShare: dataShare,
+		}
+	}
+
 	return &tableConfig{
 		// Default to an explicit endpoint configuration schema, if set.
 		// This will be over-written by a present `schema` property within `raw`.
@@ -179,6 +198,10 @@ func newTableConfig(ep *sql.Endpoint) sql.Resource {
 
 // Validate the resource configuration.
 func (r tableConfig) Validate() error {
+	if r.dataShare != "" && !r.Delta {
+		return fmt.Errorf("must use delta updates if connecting to a datashare")
+	}
+
 	if r.Table == "" {
 		return fmt.Errorf("missing table")
 	}
@@ -186,7 +209,9 @@ func (r tableConfig) Validate() error {
 }
 
 func (c tableConfig) Path() sql.TablePath {
-	if c.Schema != "" {
+	if c.dataShare != "" {
+		return []string{c.dataShare, c.Schema, c.Table}
+	} else if c.Schema != "" {
 		return []string{c.Schema, c.Table}
 	}
 	return []string{c.Table}
@@ -218,7 +243,15 @@ func newRedshiftDriver() *sql.Driver {
 			}).Info("opening database")
 
 			var metaBase sql.TablePath
-			if cfg.Schema != "" {
+			if cfg.DataShare != "" {
+				sch := cfg.Schema
+				if sch == "" {
+					// Must be explicit for 3 part notation.
+					sch = defaultSchema
+				}
+				metaBase = []string{cfg.DataShare, cfg.Schema}
+
+			} else if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
 			}
 			metaSpecs, metaCheckpoints := sql.MetaTables(metaBase)
@@ -249,7 +282,7 @@ func newRedshiftDriver() *sql.Driver {
 				Dialect:             rsDialect,
 				MetaSpecs:           &metaSpecs,
 				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: cfg.toURI()},
+				Client:              client{uri: cfg.toURI(), datashare: cfg.DataShare},
 				CreateTableTemplate: tplCreateTargetTable,
 				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
@@ -355,7 +388,8 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 
 // client implements the sql.Client interface.
 type client struct {
-	uri string
+	uri       string
+	datashare string
 }
 
 func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
@@ -419,7 +453,14 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 }
 
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
+	for _, stmt := range statements {
+		// Multi-statement queries aren't allowed for datashares outside of an explicit transaction.
+		s := append(append([]string{"BEGIN;"}, stmt), "COMMIT;")
+		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, s) }); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
@@ -442,6 +483,11 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 	var db, err = stdsql.Open("pgx", c.uri)
 	if err != nil {
 		return err
+	}
+	if c.datashare != "" {
+		if _, err := db.ExecContext(context.Background(), fmt.Sprintf("USE %s;", rsDialect.Identifier(c.datashare))); err != nil {
+			return fmt.Errorf("setting USE for datashare: %w", err)
+		}
 	}
 	defer db.Close()
 	return fn(db)
@@ -779,31 +825,33 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 
 		// See if we need to increase any VARCHAR column lengths.
-		for idx, c := range converted {
-			varcharMeta := b.varcharColumnMetas[idx]
-			if varcharMeta.isVarchar {
-				switch v := c.(type) {
-				case string:
-					// If the column is already at its maximum length, it can't be enlarged any
-					// more. The string values will be truncated by Redshift when loading them into
-					// the table.
-					if len(v) > varcharMeta.maxLength && varcharMeta.maxLength != redshiftVarcharMaxLength {
-						log.WithFields(log.Fields{
-							"table":               b.target.Identifier,
-							"column":              varcharMeta.identifier,
-							"currentColumnLength": varcharMeta.maxLength,
-							"stringValueLength":   len(v),
-						}).Info("column will be altered to VARCHAR(MAX) to accommodate large string value")
-						varcharColumnUpdates[b.target.Identifier] = append(varcharColumnUpdates[b.target.Identifier], varcharMeta.identifier)
-						b.varcharColumnMetas[idx].maxLength = redshiftVarcharMaxLength // Do not need to alter this column again.
+		if d.cfg.DataShare == "" {
+			for idx, c := range converted {
+				varcharMeta := b.varcharColumnMetas[idx]
+				if varcharMeta.isVarchar {
+					switch v := c.(type) {
+					case string:
+						// If the column is already at its maximum length, it can't be enlarged any
+						// more. The string values will be truncated by Redshift when loading them into
+						// the table.
+						if len(v) > varcharMeta.maxLength && varcharMeta.maxLength != redshiftVarcharMaxLength {
+							log.WithFields(log.Fields{
+								"table":               b.target.Identifier,
+								"column":              varcharMeta.identifier,
+								"currentColumnLength": varcharMeta.maxLength,
+								"stringValueLength":   len(v),
+							}).Info("column will be altered to VARCHAR(MAX) to accommodate large string value")
+							varcharColumnUpdates[b.target.Identifier] = append(varcharColumnUpdates[b.target.Identifier], varcharMeta.identifier)
+							b.varcharColumnMetas[idx].maxLength = redshiftVarcharMaxLength // Do not need to alter this column again.
+						}
+					case nil:
+						// Values for string fields may be null, in which case there is nothing to do.
+						continue
+					default:
+						// Invariant: This value must either be a string or nil, since the column it is
+						// going into is a VARCHAR.
+						return nil, fmt.Errorf("expected type string or nil for column %s of table %s, got %T", varcharMeta.identifier, b.target.Identifier, c)
 					}
-				case nil:
-					// Values for string fields may be null, in which case there is nothing to do.
-					continue
-				default:
-					// Invariant: This value must either be a string or nil, since the column it is
-					// going into is a VARCHAR.
-					return nil, fmt.Errorf("expected type string or nil for column %s of table %s, got %T", varcharMeta.identifier, b.target.Identifier, c)
 				}
 			}
 		}
@@ -845,6 +893,12 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		return fmt.Errorf("store pgx.Connect: %w", err)
 	}
 	defer conn.Close(ctx)
+
+	if d.cfg.DataShare != "" {
+		if _, err := conn.Exec(ctx, fmt.Sprintf("USE %s;", rsDialect.Identifier(d.cfg.DataShare))); err != nil {
+			return fmt.Errorf("setting USE for datashare: %w", err)
+		}
+	}
 
 	// Truncate strings within SUPER types by setting this option, since these have the same limits
 	// on maximum VARCHAR lengths as table columns do. Notably, this will truncate any strings in
@@ -898,8 +952,10 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 	// checkpoints table. For best performance, a single materialization per database should be
 	// used, or separate materializations within the same database should use a different schema for
 	// their metadata.
-	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", rsDialect.Identifier(d.fence.TablePath...))); err != nil {
-		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
+	if d.cfg.DataShare == "" {
+		if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", rsDialect.Identifier(d.fence.TablePath...))); err != nil {
+			return fmt.Errorf("obtaining checkpoints table lock: %w", err)
+		}
 	}
 
 	for idx, b := range d.bindings {
