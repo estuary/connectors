@@ -28,6 +28,9 @@ A Python connector is composed of a few critical pieces:
   ).main()
   ```
 
+### Requirements
+In order to build python connectors, you will need to install [Poetry](https://python-poetry.org/docs/#installation).
+
 ## Pulling an open-source connector in tree
 While using existing builds of open-source connectors is all well and good, there will come a time in every connector's life that we need to make changes to it. Before deciding to pull a connector in-tree, first make sure that the version of the connector you're going to pull is licensed to allow this usage, and that you have its location in the origin repository. Then, the connector can be imported like so
 
