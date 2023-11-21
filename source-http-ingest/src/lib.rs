@@ -197,6 +197,7 @@ async fn do_spec(mut stdout: io::Stdout) -> anyhow::Result<()> {
             resource_config_schema_json,
             documentation_url: "https://go.estuary.dev/http-ingest".to_string(),
             oauth2: None,
+            resource_path_pointers: vec!["/stream".to_string()],
         }),
         ..Default::default()
     };
