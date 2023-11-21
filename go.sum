@@ -316,12 +316,8 @@ github.com/envoyproxy/go-control-plane v0.9.9-0.20201210154907-fd9021fe5dad/go.m
 github.com/envoyproxy/go-control-plane v0.9.9-0.20210217033140-668b12f5399d/go.mod h1:cXg6YxExXjJnVBQHBLXeUAgxn2UodCpnH306RInaBQk=
 github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0/go.mod h1:hliV/p42l8fGbc6Y9bQ70uLwIvmJyVE5k4iMKlh8wCQ=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
-github.com/estuary/flow v0.3.9-0.20231101171501-fcdb1e7d6867 h1:ksUkoodoBfVHL7GcJI8FULXxGLmlQ2BVstdEXeoFUXw=
-github.com/estuary/flow v0.3.9-0.20231101171501-fcdb1e7d6867/go.mod h1:0g2acMNbyUpvBVO2zBaeXt3jC7Hr2F2bvTxcKgjXQpo=
-github.com/estuary/flow v0.3.9-0.20231103220322-8eeb6cd2430b h1:7Z9b3eeGqCbBdMAjrOOLynQ4KJqWRJW4jrj3VImaIxc=
-github.com/estuary/flow v0.3.9-0.20231103220322-8eeb6cd2430b/go.mod h1:0g2acMNbyUpvBVO2zBaeXt3jC7Hr2F2bvTxcKgjXQpo=
-github.com/estuary/flow v0.3.9-0.20231106201646-c03c3d9b5a70 h1:CcbNIWKgIQlWIg1EwLwkprs45VVaUCuXj/vDDJW1ZBU=
-github.com/estuary/flow v0.3.9-0.20231106201646-c03c3d9b5a70/go.mod h1:0g2acMNbyUpvBVO2zBaeXt3jC7Hr2F2bvTxcKgjXQpo=
+github.com/estuary/flow v0.3.10-0.20231121201810-a2d18f85d49a h1:SSHxAFtRv6VIH/8PrXCnMsSLziShi8vTMgeQEaDFVRQ=
+github.com/estuary/flow v0.3.10-0.20231121201810-a2d18f85d49a/go.mod h1:eggSu1BKrBHbFtltbA/NoK1DtlScplOJuE+5KxlWkes=
 github.com/evanphx/json-patch/v5 v5.6.0 h1:b91NhWfaz02IuVxO9faSllyAtNXHMPkC5J8sJCLunww=
 github.com/evanphx/json-patch/v5 v5.6.0/go.mod h1:G79N1coSVB93tBe7j6PhzjmR3/2VvlbKOFpnXhI9Bw4=
 github.com/fatih/color v1.13.0 h1:8LOYc1KYPPmyKMuN8QV2DNRWNbLo6LZ0iLs8+mlH53w=
@@ -648,8 +644,6 @@ github.com/klauspost/compress v1.10.3/go.mod h1:aoV0uJVorq1K+umq18yTdKaF57EivdYs
 github.com/klauspost/compress v1.11.0/go.mod h1:aoV0uJVorq1K+umq18yTdKaF57EivdYsUV+/s2qKfXs=
 github.com/klauspost/compress v1.13.1/go.mod h1:8dP1Hq4DHOhN9w426knH3Rhby4rFm6D8eO+e+Dq5Gzg=
 github.com/klauspost/compress v1.13.6/go.mod h1:/3/Vjq9QcHkK5uEr5lBEmyoZ1iFhe47etQ6QUkpK6sk=
-github.com/klauspost/compress v1.15.15 h1:EF27CXIuDsYJ6mmvtBRlEuB2UVOqHG1tAXgZ7yIO+lw=
-github.com/klauspost/compress v1.15.15/go.mod h1:ZcK2JAFqKOpnBlxcLsJzYfrS9X1akm9fHZNnD9+Vo/4=
 github.com/klauspost/compress v1.17.2 h1:RlWWUY/Dr4fL8qk9YG7DTZ7PDgME2V4csBXA8L/ixi4=
 github.com/klauspost/compress v1.17.2/go.mod h1:ntbaceVETuRiXiv4DpjP66DpAtAGkEQskQzEyD//IeE=
 github.com/klauspost/cpuid/v2 v2.2.3 h1:sxCkb+qR91z4vsqw4vGGZlDgPz3G7gjaLyK3V8y70BU=
@@ -795,8 +789,8 @@ github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910/go.mod h1:
 github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/prometheus/client_model v0.2.0/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
-github.com/prometheus/client_model v0.3.0 h1:UBgGFHqYdG/TPFD1B1ogZywDqEkwp3fBMvqdiQ7Xew4=
-github.com/prometheus/client_model v0.3.0/go.mod h1:LDGWKZIo7rky3hgvBe+caln+Dr3dPggB5dvjtD7w9+w=
+github.com/prometheus/client_model v0.4.0 h1:5lQXD3cAg1OXBf4Wq03gTrXHeaV0TQvGfUooCfx1yqY=
+github.com/prometheus/client_model v0.4.0/go.mod h1:oMQmHW1/JoDwqLtg57MGgP/Fb1CJEYF2imWWhWtMkYU=
 github.com/prometheus/common v0.4.1/go.mod h1:TNfzLD0ON7rHzMJeJkieUDPYmFC7Snx/y86RQel1bk4=
 github.com/prometheus/common v0.10.0/go.mod h1:Tlit/dnDKsSWFlCLTWaA1cyBgKHSMdTB80sz/V91rCo=
 github.com/prometheus/common v0.26.0/go.mod h1:M7rCNAaPfAosfx8veZJCuw84e35h3Cfd9VFqTh1DIvc=
@@ -941,8 +935,6 @@ go.etcd.io/etcd/client/pkg/v3 v3.5.7 h1:y3kf5Gbp4e4q7egZdn5T7W9TSHUvkClN6u+Rq9mE
 go.etcd.io/etcd/client/pkg/v3 v3.5.7/go.mod h1:o0Abi1MK86iad3YrWhgUsbGx1pmTS+hrORWc2CamuhY=
 go.etcd.io/etcd/client/v3 v3.5.4 h1:p83BUL3tAYS0OT/r0qglgc3M1JjhM0diV8DSWAhVXv4=
 go.etcd.io/etcd/client/v3 v3.5.4/go.mod h1:ZaRkVgBZC+L+dLCjTcF1hRXpgZXQPOvnA/Ak/gq3kiY=
-go.gazette.dev/core v0.89.1-0.20231026212052-d34c1d3ba509 h1:5XDQdsqVe03xY7B2JXx02RzLy+xE8VB8UDFNiYy1gDw=
-go.gazette.dev/core v0.89.1-0.20231026212052-d34c1d3ba509/go.mod h1:pdChQZd77Kv4hkkZzB7nRUrTCJuug2GXv+ngfXjPK1k=
 go.gazette.dev/core v0.89.1-0.20231121115006-0fa83a6cc072 h1:AtrxzZXkoUDfjXq7arxx5MKo+GsM3tPxRsakMIp9UQo=
 go.gazette.dev/core v0.89.1-0.20231121115006-0fa83a6cc072/go.mod h1:pUISSIdKXHoL5AJHBMrlPS20SF6TrManQlFbu6oV/84=
 go.mongodb.org/mongo-driver v1.12.1 h1:nLkghSU8fQNaK7oUmDhQFsnrtcoNy7Z6LVFKsEecqgE=

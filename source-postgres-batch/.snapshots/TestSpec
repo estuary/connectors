@@ -95,5 +95,8 @@
     ],
     "title": "Batch SQL Resource Spec"
   },
-  "documentation_url": "https://go.estuary.dev/source-postgres-batch"
+  "documentation_url": "https://go.estuary.dev/source-postgres-batch",
+  "resource_path_pointers": [
+    "/name"
+  ]
 }

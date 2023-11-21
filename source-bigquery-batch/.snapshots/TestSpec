@@ -85,5 +85,8 @@
     ],
     "title": "BigQuery Batch Resource Spec"
   },
-  "documentation_url": "https://go.estuary.dev/source-bigquery-batch"
+  "documentation_url": "https://go.estuary.dev/source-bigquery-batch",
+  "resource_path_pointers": [
+    "/name"
+  ]
 }

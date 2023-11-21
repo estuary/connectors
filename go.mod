@@ -24,7 +24,7 @@ require (
 	github.com/databricks/databricks-sdk-go v0.24.0
 	github.com/databricks/databricks-sql-go v1.5.1
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
-	github.com/estuary/flow v0.3.9-0.20231106201646-c03c3d9b5a70
+	github.com/estuary/flow v0.3.10-0.20231121201810-a2d18f85d49a
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/go-sql-driver/mysql v1.6.0
@@ -166,7 +166,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
-	github.com/prometheus/client_model v0.3.0 // indirect
+	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rs/zerolog v1.28.0 // indirect
