@@ -263,6 +263,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 				c.ColumnName,
 				strings.EqualFold(c.IsNullable, "yes"),
 				c.DataType,
+				0, // BigQuery does not have a character_maximum_length in its INFORMATION_SCHEMA.COLUMNS view.
 			)
 		}
 	}
