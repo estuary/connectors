@@ -546,19 +546,14 @@ func prepareNewTransactor(
 			return nil, fmt.Errorf("newTransactor sql.Open: %w", err)
 		}
 		defer db.Close()
-		conn, err := db.Conn(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("newTransactor db.Conn: %w", err)
-		}
-		defer conn.Close()
 
-		tableVarchars, err := getVarcharDetails(ctx, dialect, cfg.Database, conn)
+		existingColumns, err := sql.FetchExistingColumns(ctx, db, dialect, "def", []string{cfg.Database})
 		if err != nil {
-			return nil, fmt.Errorf("getting existing varchar column lengths: %w", err)
+			return nil, err
 		}
 
 		for _, binding := range bindings {
-			if err = d.addBinding(ctx, binding, tableVarchars[binding.Identifier]); err != nil {
+			if err = d.addBinding(ctx, binding, existingColumns); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
@@ -601,7 +596,7 @@ type binding struct {
 	updateTruncateSQL string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars map[string]int) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, existingColumns *sql.ExistingColumns) error {
 	var b = &binding{target: target}
 
 	for _, m := range []struct {
@@ -630,23 +625,29 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, varchars 
 	// runtime for Store requests. Only VARCHAR columns will have non-zero-valued varcharColumnMeta.
 	allColumns := target.Columns()
 	columnMetas := make([]varcharColumnMeta, len(allColumns))
-	if varchars != nil { // There may not be any varchar columns for this binding
-		for idx, col := range allColumns {
-			// If this column is not found in varchars, it must not have been a VARCHAR column.
-			if maxLength, ok := varchars[col.Identifier]; ok {
-				columnMetas[idx] = varcharColumnMeta{
-					identifier: col.Identifier,
-					maxLength:  maxLength,
-				}
+	for idx, col := range allColumns {
+		existing, err := existingColumns.GetColumn(
+			target.InfoLocation.TableSchema,
+			target.InfoLocation.TableName,
+			t.dialect.ColumnLocator(col.Field),
+		)
+		if err != nil {
+			return fmt.Errorf("getting existing column metadata: %w", err)
+		}
 
-				log.WithFields(log.Fields{
-					"table":            b.target.Identifier,
-					"column":           col.Identifier,
-					"varcharMaxLength": maxLength,
-					"collection":       b.target.Source.String(),
-					"field":            col.Field,
-				}).Debug("matched string collection field to table VARCHAR column")
+		if existing.Type == "varchar" {
+			columnMetas[idx] = varcharColumnMeta{
+				identifier: col.Identifier,
+				maxLength:  existing.CharacterMaxLength,
 			}
+
+			log.WithFields(log.Fields{
+				"table":            b.target.Identifier,
+				"column":           col.Identifier,
+				"varcharMaxLength": existing.CharacterMaxLength,
+				"collection":       b.target.Source.String(),
+				"field":            col.Field,
+			}).Debug("matched string collection field to table VARCHAR column")
 		}
 	}
 	b.varcharColumnMetas = columnMetas
