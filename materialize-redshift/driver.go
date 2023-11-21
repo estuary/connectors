@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -53,12 +54,6 @@ const (
 
 	// The default TEXT column is an alias for VARCHAR(256).
 	redshiftTextColumnLength = 256
-
-	// If no schema is configured for a table, assume it's in the "public" schema, which is the
-	// default for Redshift. This is needed for correlating queried column lengths (which always
-	// include a schema) with actual resources, which may omit the schema to use "public" by
-	// default.
-	defaultSchema = "public"
 )
 
 type sshForwarding struct {
@@ -508,33 +503,31 @@ func newTransactor(
 		return nil, err
 	}
 
-	conn, err := pgx.Connect(ctx, d.cfg.toURI())
+	db, err := stdsql.Open("pgx", d.cfg.toURI())
 	if err != nil {
-		return nil, fmt.Errorf("newTransactor pgx.Connect: %w", err)
+		return nil, err
 	}
-	defer conn.Close(ctx)
+	defer db.Close()
 
-	tableVarchars, err := getVarcharLengths(ctx, conn)
+	schemas := []string{}
+	for _, b := range bindings {
+		if !slices.Contains(schemas, b.InfoLocation.TableSchema) {
+			schemas = append(schemas, b.InfoLocation.TableSchema)
+		}
+	}
+
+	existingColumns, err := sql.FetchExistingColumns(ctx, db, rsDialect, cfg.Database, schemas)
 	if err != nil {
-		return nil, fmt.Errorf("getting existing varchar column lengths: %w", err)
+		return nil, err
 	}
 
 	for idx, target := range bindings {
-		p := target.Path
-		if len(p) == 1 {
-			// No explicit schema set. Assume the default for identifying the table with respect to
-			// the VARCHAR lengths introspection query, which always include a schema.
-			p = []string{defaultSchema, p[0]}
-		}
-
-		// Redshift lowercases all table identifiers.
-		identifier := strings.ToLower(rsDialect.Identifier(p...))
 		if err = d.addBinding(
 			ctx,
 			idx,
 			target,
 			s3client,
-			tableVarchars[identifier],
+			existingColumns,
 		); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 		}
@@ -570,7 +563,7 @@ func (t *transactor) addBinding(
 	bindingIdx int,
 	target sql.Table,
 	client *s3.Client,
-	varchars map[string]int,
+	existingColumns *sql.ExistingColumns,
 ) error {
 	var b = &binding{
 		target:    target,
@@ -628,24 +621,30 @@ func (t *transactor) addBinding(
 	// varcharColumnMeta.
 	allColumns := target.Columns()
 	columnMetas := make([]varcharColumnMeta, len(allColumns))
-	if varchars != nil { // There may not be any varchar columns for this binding
-		for idx, col := range allColumns {
-			// If this column is not found in varchars, it must not have been a VARCHAR column.
-			if existingMaxLength, ok := varchars[strings.ToLower(col.Identifier)]; ok { // Redshift lowercases all column identifiers
-				columnMetas[idx] = varcharColumnMeta{
-					identifier: col.Identifier,
-					maxLength:  existingMaxLength,
-					isVarchar:  true,
-				}
+	for idx, col := range allColumns {
+		existing, err := existingColumns.GetColumn(
+			target.InfoLocation.TableSchema,
+			target.InfoLocation.TableName,
+			rsDialect.ColumnLocator(col.Field),
+		)
+		if err != nil {
+			return fmt.Errorf("getting existing column metadata: %w", err)
+		}
 
-				log.WithFields(log.Fields{
-					"table":            b.target.Identifier,
-					"column":           col.Identifier,
-					"varcharMaxLength": existingMaxLength,
-					"collection":       b.target.Source.String(),
-					"field":            col.Field,
-				}).Debug("matched string collection field to table VARCHAR column")
+		if existing.Type == "character varying" {
+			columnMetas[idx] = varcharColumnMeta{
+				identifier: col.Identifier,
+				maxLength:  existing.CharacterMaxLength,
+				isVarchar:  true,
 			}
+
+			log.WithFields(log.Fields{
+				"table":            b.target.Identifier,
+				"column":           col.Identifier,
+				"varcharMaxLength": existing.CharacterMaxLength,
+				"collection":       b.target.Source.String(),
+				"field":            col.Field,
+			}).Debug("matched string collection field to table VARCHAR column")
 		}
 	}
 	b.varcharColumnMetas = columnMetas

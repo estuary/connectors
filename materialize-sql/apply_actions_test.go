@@ -65,7 +65,7 @@ func TestFilterActions(t *testing.T) {
 			name: "one table exists",
 			in:   ApplyActions{CreateTables: []TableCreate{tableCreate1, tableCreate2}},
 			existing: ExistingColumns{
-				tables: map[string]map[string][]existingColumn{
+				tables: map[string]map[string][]ExistingColumn{
 					"schema": {"foo": {}},
 				},
 			},
@@ -81,7 +81,7 @@ func TestFilterActions(t *testing.T) {
 				}},
 			},
 			existing: ExistingColumns{
-				tables: map[string]map[string][]existingColumn{
+				tables: map[string]map[string][]ExistingColumn{
 					"schema": {"foo": {}},
 				},
 			},
@@ -102,7 +102,7 @@ func TestFilterActions(t *testing.T) {
 				}},
 			},
 			existing: ExistingColumns{
-				tables: map[string]map[string][]existingColumn{
+				tables: map[string]map[string][]ExistingColumn{
 					"schema": {"foo": {{
 						Name:     "newColumn",
 						Nullable: true,
@@ -122,7 +122,7 @@ func TestFilterActions(t *testing.T) {
 				}},
 			},
 			existing: ExistingColumns{
-				tables: map[string]map[string][]existingColumn{
+				tables: map[string]map[string][]ExistingColumn{
 					"schema": {"foo": {{
 						Name:     "newColumn",
 						Nullable: false,
@@ -147,7 +147,7 @@ func TestFilterActions(t *testing.T) {
 				}},
 			},
 			existing: ExistingColumns{
-				tables: map[string]map[string][]existingColumn{
+				tables: map[string]map[string][]ExistingColumn{
 					"schema": {"foo": {{
 						Name:     "newColumn",
 						Nullable: true,
@@ -167,7 +167,7 @@ func TestFilterActions(t *testing.T) {
 				}},
 			},
 			existing: ExistingColumns{
-				tables: map[string]map[string][]existingColumn{
+				tables: map[string]map[string][]ExistingColumn{
 					"schema": {"bar": {}},
 				},
 			},
@@ -183,7 +183,7 @@ func TestFilterActions(t *testing.T) {
 				}},
 			},
 			existing: ExistingColumns{
-				tables: map[string]map[string][]existingColumn{
+				tables: map[string]map[string][]ExistingColumn{
 					"schema": {"foo": {}},
 				},
 			},
@@ -199,7 +199,7 @@ func TestFilterActions(t *testing.T) {
 				}},
 			},
 			existing: ExistingColumns{
-				tables: map[string]map[string][]existingColumn{
+				tables: map[string]map[string][]ExistingColumn{
 					"schema": {"bar": {}},
 				},
 			},
@@ -225,6 +225,6 @@ func TestExistingColumns(t *testing.T) {
 	// The tests for FilterActions verify the hasTable/hasColumn/nullable operations, so this test
 	// is just making sure that adding a duplicate column is not allowed.
 	e := ExistingColumns{}
-	e.PushColumn("schema", "table", "column", true, "TEXT")
-	require.Panics(t, func() { e.PushColumn("schema", "table", "column", true, "TEXT") })
+	e.PushColumn("schema", "table", "column", true, "TEXT", 255)
+	require.Panics(t, func() { e.PushColumn("schema", "table", "column", true, "TEXT", 255) })
 }
