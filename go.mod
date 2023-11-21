@@ -54,7 +54,7 @@ require (
 	github.com/tidwall/gjson v1.16.0
 	github.com/xitongsys/parquet-go v1.6.2
 	github.com/xitongsys/parquet-go-source v0.0.0-20220527110425-ba4adb87a31b
-	go.gazette.dev/core v0.89.1-0.20231026212052-d34c1d3ba509
+	go.gazette.dev/core v0.89.1-0.20231121115006-0fa83a6cc072
 	go.mongodb.org/mongo-driver v1.12.1
 	golang.org/x/crypto v0.14.0
 	golang.org/x/oauth2 v0.13.0
