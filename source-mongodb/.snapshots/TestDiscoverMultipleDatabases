@@ -1,0 +1,177 @@
+Binding 0:
+{
+    "recommended_name": "bar/collection1",
+    "resource_config_json": {
+      "database": "bar",
+      "collection": "collection1"
+    },
+    "document_schema_json": {
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            }
+          },
+          "type": "object"
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ],
+    "resource_path": [
+      "bar",
+      "collection1"
+    ]
+  }
+Binding 1:
+{
+    "recommended_name": "bar/collection2",
+    "resource_config_json": {
+      "database": "bar",
+      "collection": "collection2"
+    },
+    "document_schema_json": {
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            }
+          },
+          "type": "object"
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ],
+    "resource_path": [
+      "bar",
+      "collection2"
+    ]
+  }
+Binding 2:
+{
+    "recommended_name": "foo/collection1",
+    "resource_config_json": {
+      "database": "foo",
+      "collection": "collection1"
+    },
+    "document_schema_json": {
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            }
+          },
+          "type": "object"
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ],
+    "resource_path": [
+      "foo",
+      "collection1"
+    ]
+  }
+Binding 3:
+{
+    "recommended_name": "foo/collection2",
+    "resource_config_json": {
+      "database": "foo",
+      "collection": "collection2"
+    },
+    "document_schema_json": {
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            }
+          },
+          "type": "object"
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ],
+    "resource_path": [
+      "foo",
+      "collection2"
+    ]
+  }
+
