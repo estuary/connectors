@@ -39,11 +39,6 @@ func generateMinimalSchema() json.RawMessage {
 	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
 	metadataSchema.Definitions = nil
 	metadataSchema.AdditionalProperties = nil
-	metadataSchema.Extras = map[string]interface{}{
-		"reduce": map[string]interface{}{
-			"strategy": "merge",
-		},
-	}
 
 	// Wrap metadata into an enclosing object schema with a /_meta property
 	var schema = &jsonschema.Schema{
@@ -58,9 +53,6 @@ func generateMinimalSchema() json.RawMessage {
 				metaProperty: metadataSchema,
 			},
 			"x-infer-schema": true,
-			"reduce": map[string]interface{}{
-				"strategy": "merge",
-			},
 		},
 	}
 
