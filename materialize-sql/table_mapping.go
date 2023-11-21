@@ -35,7 +35,9 @@ type Table struct {
 	// Quoted identifier for this table, suited for direct inclusion in SQL.
 	Identifier string
 
+	// Can be used to "locate" the table in a query result from the INFORMATION_SCHEMAS view.
 	InfoLocation InfoTableLocation
+
 	// Keys, Values, and the (optional) Document column.
 	Keys, Values []Column
 	Document     *Column
