@@ -47,7 +47,7 @@ type config struct {
 	Address  string `json:"address" jsonschema:"title=Address" jsonschema_description:"The connection URI for your database without the username and password. For example mongodb://my-mongo.test?authSource=admin." jsonschema_extras:"order=0"`
 	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string `json:"database" jsonschema:"title=Database,description=Name of the database to capture from." jsonschema_extras:"order=3"`
+	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Optional comma-separated list of the databases to discover. If not provided will discover all available databases in the instance." jsonschema_extras:"order=3"`
 
 	// We still don't have any exposed advanced configurations
 	Advanced advancedConfig `json:"advanced" jsonschema:"-"`
@@ -66,7 +66,6 @@ func (c *config) Validate() error {
 		{"address", c.Address},
 		{"user", c.User},
 		{"password", c.Password},
-		{"database", c.Database},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -97,9 +96,7 @@ func (c *config) ToURI() string {
 
 	uri.User = url.UserPassword(c.User, c.Password)
 
-	if c.Database != "" {
-		uri.Path = "/" + c.Database
-	}
+	uri.Path = "/"
 
 	return uri.String()
 }

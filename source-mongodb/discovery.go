@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -82,44 +83,61 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		}
 	}()
 
-	var db = client.Database(cfg.Database)
+	var systemDatabases = []string{"config", "local"}
 
-	collections, err := db.ListCollectionSpecifications(ctx, bson.D{})
-	if err != nil {
-		return nil, fmt.Errorf("listing collections: %w", err)
-	}
+	var databaseNames []string
+	// If no databases are provided in config, we discover across all databases
+	if cfg.Database == "" {
+		rawNames, err := client.ListDatabaseNames(ctx, bson.D{})
+		if err != nil {
+			return nil, fmt.Errorf("getting list of databases: %w", err)
+		}
+		for _, d := range rawNames {
+			if slices.Contains(systemDatabases, d) {
+				continue
+			}
 
-	var systemCollections = []string{
-		"system.views",
-		"system.js",
-		"system.profile",
-		"system.indexes",
-		"system.namespaces",
-		"system.buckets",
+			databaseNames = append(databaseNames, d)
+		}
+	} else {
+		databaseNames = strings.Split(cfg.Database, ",")
+		for i, d := range databaseNames {
+			databaseNames[i] = strings.TrimSpace(d)
+		}
 	}
 
 	var bindings = []*pc.Response_Discovered_Binding{}
-	for _, collection := range collections {
-		// Views cannot be used with change streams, so we don't support them for
-		// capturing at the moment
-		if collection.Type == "view" {
-			continue
-		}
-		if slices.Contains(systemCollections, collection.Name) {
-			continue
-		}
-		resourceJSON, err := json.Marshal(resource{Database: db.Name(), Collection: collection.Name})
+
+	for _, dbName := range databaseNames {
+		var db = client.Database(dbName)
+
+		collections, err := db.ListCollectionSpecifications(ctx, bson.D{})
 		if err != nil {
-			return nil, fmt.Errorf("serializing resource json: %w", err)
+			return nil, fmt.Errorf("listing collections: %w", err)
 		}
 
-		bindings = append(bindings, &pc.Response_Discovered_Binding{
-			RecommendedName:    fmt.Sprintf("%s/%s", db.Name(), collection.Name),
-			ResourceConfigJson: resourceJSON,
-			DocumentSchemaJson: minimalSchema,
-			Key:                []string{"/" + idProperty},
-			ResourcePath:       []string{db.Name(), collection.Name},
-		})
+		for _, collection := range collections {
+			// Views cannot be used with change streams, so we don't support them for
+			// capturing at the moment
+			if collection.Type == "view" {
+				continue
+			}
+			if strings.HasPrefix(collection.Name, "system.") {
+				continue
+			}
+			resourceJSON, err := json.Marshal(resource{Database: db.Name(), Collection: collection.Name})
+			if err != nil {
+				return nil, fmt.Errorf("serializing resource json: %w", err)
+			}
+
+			bindings = append(bindings, &pc.Response_Discovered_Binding{
+				RecommendedName:    fmt.Sprintf("%s/%s", db.Name(), collection.Name),
+				ResourceConfigJson: resourceJSON,
+				DocumentSchemaJson: minimalSchema,
+				Key:                []string{"/" + idProperty},
+				ResourcePath:       []string{db.Name(), collection.Name},
+			})
+		}
 	}
 
 	return &pc.Response_Discovered{Bindings: bindings}, nil
