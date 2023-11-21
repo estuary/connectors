@@ -3,6 +3,7 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -19,6 +20,8 @@ type ApplyActions struct {
 type TableCreate struct {
 	Table
 	TableCreateSql string
+
+	ResourceConfigJson json.RawMessage
 }
 
 // TableAlter is the alterations for a table that are needed, including new columns that should be

@@ -175,10 +175,6 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-func (c tableConfig) GetAdditionalSql() string {
-	return ""
-}
-
 // The Snowflake driver Params map uses string pointers as values, which is what this is used for.
 var trueString = "true"
 

@@ -21,8 +21,6 @@ type TableShape struct {
 	Source pf.Collection
 	// Comment for this table.
 	Comment string
-	// User-defined additional SQL to be executed transactionally with table creation.
-	AdditionalSql string
 	// The table is operating in delta-updates mode (instead of a standard materialization).
 	DeltaUpdates bool
 
@@ -196,15 +194,14 @@ func BuildTableShape(spec *pf.MaterializationSpec, index int, resource Resource)
 	)
 
 	return TableShape{
-		Path:          resource.Path(),
-		Binding:       index,
-		Source:        binding.Collection.Name,
-		Comment:       comment,
-		AdditionalSql: resource.GetAdditionalSql(),
-		DeltaUpdates:  resource.DeltaUpdates(),
-		Keys:          keys,
-		Values:        values,
-		Document:      document,
+		Path:         resource.Path(),
+		Binding:      index,
+		Source:       binding.Collection.Name,
+		Comment:      comment,
+		DeltaUpdates: resource.DeltaUpdates(),
+		Keys:         keys,
+		Values:       values,
+		Document:     document,
 	}
 }
 

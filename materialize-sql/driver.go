@@ -149,8 +149,9 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		}
 
 		actions.CreateTables = append(actions.CreateTables, TableCreate{
-			Table:          resolved,
-			TableCreateSql: createStatement,
+			Table:              resolved,
+			TableCreateSql:     createStatement,
+			ResourceConfigJson: nil, // not applicable for meta tables
 		})
 	}
 
@@ -227,8 +228,9 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 			}
 
 			actions.CreateTables = append(actions.CreateTables, TableCreate{
-				Table:          proposedTable,
-				TableCreateSql: createStatement,
+				Table:              proposedTable,
+				TableCreateSql:     createStatement,
+				ResourceConfigJson: bindingSpec.ResourceConfigJson,
 			})
 		}
 	}

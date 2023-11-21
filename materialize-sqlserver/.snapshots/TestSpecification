@@ -80,12 +80,6 @@
         "description": "Name of the database table",
         "x-collection-name": true
       },
-      "additional_table_create_sql": {
-        "type": "string",
-        "title": "Additional Table Create SQL",
-        "description": "Additional SQL statement(s) to be run in the same transaction that creates the table.",
-        "multiline": true
-      },
       "delta_updates": {
         "type": "boolean",
         "title": "Delta Update",
