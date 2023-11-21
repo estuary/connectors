@@ -522,7 +522,7 @@
 }
 {
   "applied": {
-    "actionDescription": "\nCREATE TABLE IF NOT EXISTS test_db.test_schema.flow_materializations_v2 (\n\tmaterialization VARCHAR NOT NULL,\n\tversion VARCHAR NOT NULL,\n\tspec VARCHAR NOT NULL\n);\n\n\nCREATE TABLE IF NOT EXISTS test_db.test_schema.flow_checkpoints_v1 (\n\tmaterialization VARCHAR NOT NULL,\n\tkey_begin BIGINT NOT NULL,\n\tkey_end BIGINT NOT NULL,\n\tfence BIGINT NOT NULL,\n\tcheckpoint VARCHAR NOT NULL\n);\n\nUPDATE test_db.test_schema.flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-motherduck/materialize';"
+    "actionDescription": "UPDATE test_db.test_schema.flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-motherduck/materialize';"
   }
 }
 {
