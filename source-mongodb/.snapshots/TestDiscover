@@ -29,14 +29,8 @@ Binding 0:
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
             }
           },
-          "type": "object",
-          "reduce": {
-            "strategy": "merge"
-          }
+          "type": "object"
         }
-      },
-      "reduce": {
-        "strategy": "merge"
       },
       "x-infer-schema": true
     },
@@ -79,14 +73,8 @@ Binding 1:
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
             }
           },
-          "type": "object",
-          "reduce": {
-            "strategy": "merge"
-          }
+          "type": "object"
         }
-      },
-      "reduce": {
-        "strategy": "merge"
       },
       "x-infer-schema": true
     },
