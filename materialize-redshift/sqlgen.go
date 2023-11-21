@@ -90,15 +90,15 @@ var rsDialect = func() sql.Dialect {
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
 			if len(path) == 1 {
-				// A schema isn't required to be set on the endpoint or any resource, and if its empty the
-				// default Redshift schema "public" will implicitly be used.
-				return sql.InfoTableLocation{TableSchema: defaultSchema, TableName: path[0]}
+				// A schema isn't required to be set on the endpoint or any resource, and if its
+				// empty the default Redshift schema "public" will implicitly be used. Also note
+				// that Redshift lowercases all identifiers.
+				return sql.InfoTableLocation{TableSchema: "public", TableName: strings.ToLower(path[0])}
 			} else {
-				return sql.InfoTableLocation{TableSchema: path[0], TableName: path[1]}
+				return sql.InfoTableLocation{TableSchema: strings.ToLower(path[0]), TableName: strings.ToLower(path[1])}
 			}
 		}),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string {
-			// Redshift lowercases all identifiers.
 			return strings.ToLower(field)
 		}),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",

@@ -39,25 +39,33 @@ type TableAlter struct {
 // depending on how the materialized system transforms values, particularly with respect to
 // capitalization.
 type ExistingColumns struct {
-	tables map[string]map[string][]existingColumn
+	tables map[string]map[string][]ExistingColumn
 }
 
-type existingColumn struct {
-	Name     string
-	Nullable bool
-	Type     string // Per INFORMATION_SCHEMA; database-specific, not currently used.
+type ExistingColumn struct {
+	Name               string
+	Nullable           bool
+	Type               string // Per INFORMATION_SCHEMA; database-specific, not currently used.
+	CharacterMaxLength int    // May be 0 if the column is not a text/varchar type.
 }
 
 // PushColumn adds a column to the list of columns in the table of the schema.
-func (e *ExistingColumns) PushColumn(schema string, table string, column string, nullable bool, endpointType string) {
+func (e *ExistingColumns) PushColumn(
+	schema string,
+	table string,
+	column string,
+	nullable bool,
+	endpointType string,
+	maxLength int,
+) {
 	if e.tables == nil {
-		e.tables = make(map[string]map[string][]existingColumn)
+		e.tables = make(map[string]map[string][]ExistingColumn)
 	}
 	if _, ok := e.tables[schema]; !ok {
-		e.tables[schema] = make(map[string][]existingColumn)
+		e.tables[schema] = make(map[string][]ExistingColumn)
 	}
 
-	if slices.ContainsFunc(e.tables[schema][table], func(ec existingColumn) bool {
+	if slices.ContainsFunc(e.tables[schema][table], func(ec ExistingColumn) bool {
 		return column == ec.Name
 	}) {
 		// This should never happen and would represent an application logic error, but sanity
@@ -69,11 +77,28 @@ func (e *ExistingColumns) PushColumn(schema string, table string, column string,
 		))
 	}
 
-	e.tables[schema][table] = append(e.tables[schema][table], existingColumn{
-		Name:     column,
-		Nullable: nullable,
-		Type:     endpointType,
+	e.tables[schema][table] = append(e.tables[schema][table], ExistingColumn{
+		Name:               column,
+		Nullable:           nullable,
+		Type:               endpointType,
+		CharacterMaxLength: maxLength,
 	})
+}
+
+func (e *ExistingColumns) GetColumn(schema string, table string, column string) (ExistingColumn, error) {
+	if exists, err := e.hasColumn(schema, table, column); err != nil {
+		return ExistingColumn{}, err
+	} else if !exists {
+		return ExistingColumn{}, fmt.Errorf("column %q does not exist table %q of schema %q", column, table, schema)
+	}
+
+	cols := e.tables[schema][table]
+	for _, c := range cols {
+		if column == c.Name {
+			return c, nil
+		}
+	}
+	panic("not reached")
 }
 
 func (e *ExistingColumns) hasTable(schema, table string) bool {
@@ -94,7 +119,7 @@ func (e *ExistingColumns) hasColumn(schema, table, column string) (bool, error) 
 		return false, fmt.Errorf("table '%s.%s' not found in destination, but binding still exists", schema, table)
 	}
 
-	exists := slices.ContainsFunc(e.tables[schema][table], func(ec existingColumn) bool {
+	exists := slices.ContainsFunc(e.tables[schema][table], func(ec ExistingColumn) bool {
 		return column == ec.Name
 	})
 
@@ -113,7 +138,7 @@ func (e *ExistingColumns) nullable(schema, table, column string) (bool, error) {
 		return false, fmt.Errorf("could not find column %q in table '%s.%s' in existing tables, but field is still part of the materialization", column, schema, table)
 	}
 
-	nullable := slices.ContainsFunc(e.tables[schema][table], func(ec existingColumn) bool {
+	nullable := slices.ContainsFunc(e.tables[schema][table], func(ec ExistingColumn) bool {
 		return column == ec.Name && ec.Nullable
 	})
 
@@ -180,7 +205,11 @@ func FetchExistingColumns(
 	catalog string, // typically the "database"
 	schemas []string,
 ) (*ExistingColumns, error) {
-	existingTables := &ExistingColumns{}
+	existingColumns := &ExistingColumns{}
+
+	if len(schemas) == 0 {
+		return existingColumns, nil
+	}
 
 	// Map the schemas to an appropriate identifier for inclusion in the coming query.
 	for i := range schemas {
@@ -188,7 +217,7 @@ func FetchExistingColumns(
 	}
 
 	rows, err := db.QueryContext(ctx, fmt.Sprintf(`
-		select table_schema, table_name, column_name, is_nullable, data_type
+		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length
 		from information_schema.columns
 		where table_catalog = %s
 		and table_schema in (%s);
@@ -201,34 +230,35 @@ func FetchExistingColumns(
 	}
 	defer rows.Close()
 
-	// TODO(whb): It may be useful to also include the maximum length of string columns.
 	type columnRow struct {
-		TableSchema string
-		TableName   string
-		ColumnName  string
-		IsNullable  string
-		DataType    string
+		TableSchema            string
+		TableName              string
+		ColumnName             string
+		IsNullable             string
+		DataType               string
+		CharacterMaximumLength sql.NullInt64
 	}
 
 	for rows.Next() {
 		var c columnRow
-		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType); err != nil {
+		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength); err != nil {
 			return nil, err
 		}
 
-		existingTables.PushColumn(
+		existingColumns.PushColumn(
 			c.TableSchema,
 			c.TableName,
 			c.ColumnName,
 			strings.EqualFold(c.IsNullable, "yes"),
 			c.DataType,
+			int(c.CharacterMaximumLength.Int64),
 		)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return existingTables, nil
+	return existingColumns, nil
 }
 
 // ResolveActions determines the minimal set of actions needed to be taken to satisfy a total list
