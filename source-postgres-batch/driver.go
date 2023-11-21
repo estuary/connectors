@@ -132,6 +132,7 @@ func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.
 		ConfigSchemaJson:         drv.ConfigSchema,
 		ResourceConfigSchemaJson: resourceSchema,
 		DocumentationUrl:         drv.DocumentationURL,
+		ResourcePathPointers:     []string{"/name"},
 	}, nil
 }
 
