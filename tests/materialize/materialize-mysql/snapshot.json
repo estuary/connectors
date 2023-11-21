@@ -820,7 +820,7 @@
 }
 {
   "applied": {
-    "actionDescription": "\nCREATE TABLE IF NOT EXISTS flow_materializations_v2 (\n\t\tmaterialization VARCHAR(256) NOT NULL COMMENT 'The name of the materialization.',\n\t\tversion LONGTEXT NOT NULL COMMENT 'Version of the materialization.',\n\t\tspec LONGBLOB NOT NULL COMMENT 'Specification of the materialization, encoded as base64 protobuf.',\n\n\t\tPRIMARY KEY (materialization)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='This table is the source of truth for all materializations into this system.';\n\n\nCREATE TABLE IF NOT EXISTS flow_checkpoints_v1 (\n\t\tmaterialization VARCHAR(256) NOT NULL COMMENT 'The name of the materialization.',\n\t\tkey_begin BIGINT NOT NULL COMMENT 'The inclusive lower-bound key hash covered by this checkpoint.',\n\t\tkey_end BIGINT NOT NULL COMMENT 'The inclusive upper-bound key hash covered by this checkpoint.',\n\t\tfence BIGINT NOT NULL COMMENT 'This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.',\n\t\tcheckpoint LONGBLOB NOT NULL COMMENT 'Checkpoint of the Flow consumer shard, encoded as base64 protobuf.',\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='This table holds Flow processing checkpoints used for exactly-once processing of materializations';\n\nUPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-mysql/materialize';"
+    "actionDescription": "UPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-mysql/materialize';"
   }
 }
 {
