@@ -860,7 +860,7 @@
 }
 {
   "applied": {
-    "actionDescription": "\nIF OBJECT_ID(N'flow_materializations_v2', 'U') IS NULL BEGIN\nCREATE TABLE flow_materializations_v2 (\n\t\tmaterialization nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tversion nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tspec nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (materialization)\n);\nEND;\n\n\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization nvarchar(900) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" nvarchar(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\nUPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-sqlserver/materialize';"
+    "actionDescription": "UPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-sqlserver/materialize';"
   }
 }
 {
