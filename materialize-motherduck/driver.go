@@ -144,10 +144,6 @@ func (c tableConfig) Path() sql.TablePath {
 	return []string{c.database, c.Schema, c.Table}
 }
 
-func (c tableConfig) GetAdditionalSql() string {
-	return ""
-}
-
 func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }

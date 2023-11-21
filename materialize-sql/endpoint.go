@@ -38,8 +38,6 @@ type Resource interface {
 	Validate() error
 	// Path returns the fully qualified name of the resource as a slice of strings.
 	Path() TablePath
-	// Get any user-defined additional SQL to be executed transactionally with table creation.
-	GetAdditionalSql() string
 	// DeltaUpdates is true if the resource should be materialized using delta updates.
 	DeltaUpdates() bool
 }
