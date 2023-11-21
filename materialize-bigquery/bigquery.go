@@ -130,10 +130,6 @@ func (c tableConfig) Path() sql.TablePath {
 	return []string{c.projectID, c.Dataset, c.Table}
 }
 
-func (c tableConfig) GetAdditionalSql() string {
-	return ""
-}
-
 // DeltaUpdates returns if BigQuery is in DeltaUpdates mode or not.
 func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta

@@ -147,10 +147,6 @@ func (c tableConfig) Path() sql.TablePath {
 	return []string{c.Table}
 }
 
-func (c tableConfig) GetAdditionalSql() string {
-	return c.AdditionalSql
-}
-
 func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
@@ -245,9 +241,17 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 
 	statements := []string{}
 	for _, tc := range resolved.CreateTables {
-		statements = append(statements, tc.TableCreateSql)
-		if tc.AdditionalSql != "" {
-			statements = append(statements, tc.AdditionalSql)
+		var res tableConfig
+		if tc.ResourceConfigJson != nil {
+			if err = pf.UnmarshalStrict(tc.ResourceConfigJson, &res); err != nil {
+				return "", fmt.Errorf("unmarshalling resource binding for bound collection %q: %w", tc.Source.String(), err)
+			}
+		}
+
+		if res.AdditionalSql != "" {
+			statements = append(statements, strings.Join([]string{"BEGIN;", tc.TableCreateSql, res.AdditionalSql, "COMMIT;"}, "\n"))
+		} else {
+			statements = append(statements, tc.TableCreateSql)
 		}
 	}
 

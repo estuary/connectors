@@ -164,10 +164,9 @@ func (c *config) toS3Client(ctx context.Context) (*s3.Client, error) {
 }
 
 type tableConfig struct {
-	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
-	Schema        string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)."`
-	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run in the same transaction that creates the table." jsonschema_extras:"multiline=true"`
-	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
+	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
+	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)."`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
@@ -191,10 +190,6 @@ func (c tableConfig) Path() sql.TablePath {
 		return []string{c.Schema, c.Table}
 	}
 	return []string{c.Table}
-}
-
-func (c tableConfig) GetAdditionalSql() string {
-	return c.AdditionalSql
 }
 
 func (c tableConfig) DeltaUpdates() bool {
