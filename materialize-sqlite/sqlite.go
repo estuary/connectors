@@ -39,10 +39,6 @@ func (c tableConfig) Validate() error {
 	return nil
 }
 
-func (c tableConfig) GetAdditionalSql() string {
-	return ""
-}
-
 func (c tableConfig) Path() sql.TablePath {
 	return []string{c.Table}
 }
@@ -177,10 +173,6 @@ func newTransactor(
 			return nil, err
 		} else {
 			statements = append(statements, statement)
-		}
-
-		if table.AdditionalSql != "" {
-			statements = append(statements, table.AdditionalSql)
 		}
 	}
 
