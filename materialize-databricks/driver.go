@@ -1,23 +1,23 @@
 package main
 
 import (
-	"os"
-  "sync"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
-	_ "github.com/databricks/databricks-sql-go"
-	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
+	_ "github.com/databricks/databricks-sql-go"
 	driverctx "github.com/databricks/databricks-sql-go/driverctx"
+	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -31,9 +31,9 @@ const defaultPort = "443"
 const volumeName = "flow_staging"
 
 type tableConfig struct {
-	Table         string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
-	Schema        string `json:"schema" jsonschema:"title=Schema,description=Schema where the table resides,default=default"`
-	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
+	Table  string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
+	Schema string `json:"schema" jsonschema:"title=Schema,description=Schema where the table resides,default=default"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
@@ -84,9 +84,9 @@ func newDatabricksDriver() *sql.Driver {
 			}
 
 			log.WithFields(log.Fields{
-				"address":  cfg.Address,
-				"path": cfg.HTTPPath,
-        "catalog": cfg.CatalogName,
+				"address": cfg.Address,
+				"path":    cfg.HTTPPath,
+				"catalog": cfg.CatalogName,
 			}).Info("connecting to databricks")
 
 			var metaBase sql.TablePath = []string{cfg.SchemaName}
@@ -101,14 +101,115 @@ func newDatabricksDriver() *sql.Driver {
 				CreateTableTemplate: tplCreateTargetTable,
 				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
-				CheckPrerequisites:  prereqs,
 				Tenant:              tenant,
 			}, nil
 		},
 	}
 }
 
-func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
+type client struct {
+	uri string
+}
+
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+	cfg := ep.Config.(*config)
+
+	db, err := stdsql.Open("databricks", c.uri)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	resolved, err := sql.ResolveActions(ctx, db, actions, databricksDialect, cfg.CatalogName)
+	if err != nil {
+		return "", fmt.Errorf("resolving apply actions: %w", err)
+	}
+
+	// Build up the list of actions for logging. These won't be executed directly, since Databricks
+	// apparently doesn't support multi-statement queries or dropping nullability for multiple
+	// columns in a single statement, and throws errors on concurrent table updates.
+	actionList := []string{}
+	for _, tc := range resolved.CreateTables {
+		actionList = append(actionList, tc.TableCreateSql)
+	}
+	for _, ta := range resolved.AlterTables {
+		if len(ta.AddColumns) > 0 {
+			var addColumnsStmt strings.Builder
+			if err := tplAlterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
+				return "", fmt.Errorf("rendering alter table columns statement: %w", err)
+			}
+			actionList = append(actionList, addColumnsStmt.String())
+		}
+		for _, dn := range ta.DropNotNulls {
+			actionList = append(actionList, fmt.Sprintf(
+				"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
+				ta.Identifier,
+				dn.Identifier,
+			))
+		}
+	}
+	action := strings.Join(append(actionList, updateSpecStatement), "\n")
+	if dryRun {
+		return action, nil
+	}
+
+	// Execute actions for each table involved separately. Concurrent actions can't be done on the
+	// same table without throwing errors, so each goroutine handles the actions only for that
+	// table, looping over them if needed until they are done. This is going to look pretty similar
+	// to building the actions list, except this time we are actually running the queries.
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(5)
+
+	for _, tc := range resolved.CreateTables {
+		tc := tc
+		group.Go(func() error {
+			if _, err := db.ExecContext(groupCtx, tc.TableCreateSql); err != nil {
+				return fmt.Errorf("executing table create statement: %w", err)
+			}
+			return nil
+		})
+	}
+
+	for _, ta := range resolved.AlterTables {
+		ta := ta
+
+		group.Go(func() error {
+			if len(ta.AddColumns) > 0 {
+				var addColumnsStmt strings.Builder
+				if err := tplAlterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
+					return fmt.Errorf("rendering alter table columns statement: %w", err)
+				}
+				if _, err := db.ExecContext(groupCtx, addColumnsStmt.String()); err != nil {
+					return fmt.Errorf("executing table add columns statement: %w", err)
+				}
+			}
+			for _, dn := range ta.DropNotNulls {
+				q := fmt.Sprintf(
+					"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
+					ta.Identifier,
+					dn.Identifier,
+				)
+				if _, err := db.ExecContext(groupCtx, q); err != nil {
+					return fmt.Errorf("executing table drop not null statement: %w", err)
+				}
+			}
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return "", err
+	}
+
+	// Once all the table actions are done, we can update the stored spec.
+	if _, err := db.ExecContext(ctx, updateSpecStatement); err != nil {
+		return "", fmt.Errorf("executing spec update statement: %w", err)
+	}
+
+	return action, nil
+}
+
+func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
 
@@ -119,7 +220,7 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	if db, err := stdsql.Open("databricks", cfg.ToURI()); err != nil {
+	if db, err := stdsql.Open("databricks", c.uri); err != nil {
 		errs.Err(err)
 	} else if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
@@ -150,12 +251,6 @@ func prereqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return errs
 }
 
-// client implements the sql.Client interface.
-type client struct {
-	uri string
-}
-
-
 func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
 	var query string
 
@@ -182,7 +277,7 @@ func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifi
 		}
 
 		return nil
-	});
+	})
 
 	if err != nil {
 		return "", err
@@ -259,7 +354,7 @@ type transactor struct {
 	}
 	// Variables exclusively used by Store.
 	store struct {
-		conn  *stdsql.Conn
+		conn *stdsql.Conn
 	}
 	bindings []*binding
 }
@@ -323,10 +418,10 @@ func newTransactor(
 	}
 
 	// Build a query which unions the results of each load subquery.
-  // TODO: we can build this query per-transaction so that tables that do not
-  // need to be loaded (such as delta updates tables) are not part of the query
-  // furthermore we can run these load queries concurrently for each binding to
-  // speed things up
+	// TODO: we can build this query per-transaction so that tables that do not
+	// need to be loaded (such as delta updates tables) are not part of the query
+	// furthermore we can run these load queries concurrently for each binding to
+	// speed things up
 	var subqueries []string
 	for _, b := range d.bindings {
 		subqueries = append(subqueries, b.loadQuerySQL)
@@ -343,42 +438,42 @@ func newTransactor(
 }
 
 type binding struct {
-	target               sql.Table
+	target sql.Table
 
 	// path to where we store staging files
-	rootStagingPath      string
+	rootStagingPath string
 
-	loadFile                *stagedFile
-	storeFile               *stagedFile
+	loadFile  *stagedFile
+	storeFile *stagedFile
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
 	// into the target table. Note that in case of delta updates, "needsMerge"
 	// will always be false
-	needsMerge           bool
+	needsMerge bool
 
-	createLoadTableSQL   string
-	truncateLoadSQL      string
-	dropLoadSQL          string
-	loadQuerySQL         string
+	createLoadTableSQL string
+	truncateLoadSQL    string
+	dropLoadSQL        string
+	loadQuerySQL       string
 
-	createStoreTableSQL  string
-	truncateStoreSQL     string
-	dropStoreSQL         string
+	createStoreTableSQL string
+	truncateStoreSQL    string
+	dropStoreSQL        string
 
-	mergeInto            string
+	mergeInto string
 
-	copyIntoDirect       string
-	copyIntoLoad         string
-	copyIntoStore        string
+	copyIntoDirect string
+	copyIntoLoad   string
+	copyIntoStore  string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *pf.RangeSpec) error {
 	var b = &binding{target: target}
 
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
-  b.loadFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, target.KeyNames())
-  b.storeFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, target.ColumnNames())
+	b.loadFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, target.KeyNames())
+	b.storeFile = newStagedFile(t.wsClient.Files, b.rootStagingPath, target.ColumnNames())
 
 	for _, m := range []struct {
 		sql *string
@@ -397,7 +492,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *p
 		{&b.mergeInto, tplMergeInto},
 	} {
 		var err error
-    var shardRange = fmt.Sprintf("%08x_%08x", _range.KeyBegin, _range.RClockBegin)
+		var shardRange = fmt.Sprintf("%08x_%08x", _range.KeyBegin, _range.RClockBegin)
 		if *m.sql, err = RenderTable(target, b.rootStagingPath, shardRange, m.tpl); err != nil {
 			return err
 		}
@@ -419,14 +514,14 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *p
 func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = d.Context(it.Context())
 
-  for _, b := range d.bindings {
-    // Create a binding-scoped temporary table for staged keys to load.
-    if _, err := d.load.conn.ExecContext(ctx, b.createLoadTableSQL); err != nil {
-      return fmt.Errorf("Exec(%s): %w", b.createLoadTableSQL, err)
-    }
-  }
+	for _, b := range d.bindings {
+		// Create a binding-scoped temporary table for staged keys to load.
+		if _, err := d.load.conn.ExecContext(ctx, b.createLoadTableSQL); err != nil {
+			return fmt.Errorf("Exec(%s): %w", b.createLoadTableSQL, err)
+		}
+	}
 
-  log.Info("load: starting upload and copying of files")
+	log.Info("load: starting upload and copying of files")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -439,45 +534,45 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 		}
 	}
 
-  // Copy the staged files in parallel
-  // TODO: we may want to limit the concurrency here, but we don't yet know a good
-  // value for tuning this
-  group, groupCtx := errgroup.WithContext(ctx)
+	// Copy the staged files in parallel
+	// TODO: we may want to limit the concurrency here, but we don't yet know a good
+	// value for tuning this
+	group, groupCtx := errgroup.WithContext(ctx)
 	for idx, b := range d.bindings {
-    if !b.loadFile.started {
-      continue
-    }
+		if !b.loadFile.started {
+			continue
+		}
 
-    // This is due to a bug in Golang, see https://go.dev/blog/loopvar-preview
-    var bindingCopy = b
-    var idxCopy = idx
-    group.Go(func() error {
-      toCopy, toDelete, err := bindingCopy.loadFile.flush()
-      if err != nil {
-        return fmt.Errorf("flushing load file for binding[%d]: %w", idxCopy, err)
-      }
-      defer d.deleteFiles(groupCtx, toDelete)
+		// This is due to a bug in Golang, see https://go.dev/blog/loopvar-preview
+		var bindingCopy = b
+		var idxCopy = idx
+		group.Go(func() error {
+			toCopy, toDelete, err := bindingCopy.loadFile.flush()
+			if err != nil {
+				return fmt.Errorf("flushing load file for binding[%d]: %w", idxCopy, err)
+			}
+			defer d.deleteFiles(groupCtx, toDelete)
 
-      // COPY INTO temporary load table from staged files
-      if _, err := d.load.conn.ExecContext(groupCtx, renderWithFiles(bindingCopy.copyIntoLoad, toCopy...)); err != nil {
-        return fmt.Errorf("load: writing keys: %w", err)
-      }
+			// COPY INTO temporary load table from staged files
+			if _, err := d.load.conn.ExecContext(groupCtx, renderWithFiles(bindingCopy.copyIntoLoad, toCopy...)); err != nil {
+				return fmt.Errorf("load: writing keys: %w", err)
+			}
 
-      return nil
-    })
+			return nil
+		})
 	}
 
 	if it.Err() != nil {
 		return it.Err()
 	}
 
-  if err := group.Wait(); err != nil {
-    return err
-  }
+	if err := group.Wait(); err != nil {
+		return err
+	}
 
-  log.Info("load: finished upload and copying of files")
+	log.Info("load: finished upload and copying of files")
 
-  log.Info("load: starting join query")
+	log.Info("load: starting join query")
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
 	rows, err := d.load.conn.QueryContext(ctx, d.load.unionSQL)
@@ -502,7 +597,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("querying Loads: %w", err)
 	}
-  log.Info("load: finished join query")
+	log.Info("load: finished join query")
 
 	for _, b := range d.bindings {
 		if _, err = d.load.conn.ExecContext(ctx, b.dropLoadSQL); err != nil {
@@ -516,30 +611,30 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 type checkpoint struct {
 	Queries []string
 
-  // List of files to cleanup after committing the queries
-  ToDelete []string
+	// List of files to cleanup after committing the queries
+	ToDelete []string
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
-  for _, f := range files {
-    if err := d.wsClient.Files.DeleteByFilePath(ctx, f); err != nil {
-      log.WithFields(log.Fields{
-        "file": f,
-        "err": err,
-      }).Debug("deleteFiles failed")
-    }
-  }
+	for _, f := range files {
+		if err := d.wsClient.Files.DeleteByFilePath(ctx, f); err != nil {
+			log.WithFields(log.Fields{
+				"file": f,
+				"err":  err,
+			}).Debug("deleteFiles failed")
+		}
+	}
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
 	ctx := it.Context()
 
-  log.Info("store: starting file upload and copies")
+	log.Info("store: starting file upload and copies")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 		b.storeFile.start(ctx)
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON);
+		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
@@ -556,70 +651,70 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 	// Upload the staged files and build a list of merge and truncate queries that need to be run
 	// to effectively commit the files into destination tables. These queries are stored
 	// in the checkpoint so that if the connector is restarted in middle of a commit
-	// it can run the same queries on the next startup. This is the pattern for 
+	// it can run the same queries on the next startup. This is the pattern for
 	// recovery log being authoritative and the connector idempotently applies a commit
 	var queries []string
-  // all files uploaded across bindings
-  var toDelete []string
-  // mutex to ensure safety of updating these variables
-  m := sync.Mutex{}
+	// all files uploaded across bindings
+	var toDelete []string
+	// mutex to ensure safety of updating these variables
+	m := sync.Mutex{}
 
-  // we run these processes in parallel
-  group, groupCtx := errgroup.WithContext(ctx)
+	// we run these processes in parallel
+	group, groupCtx := errgroup.WithContext(ctx)
 	for idx, b := range d.bindings {
-    if !b.storeFile.started {
-      continue
-    }
+		if !b.storeFile.started {
+			continue
+		}
 
-    var bindingCopy = b
-    var idxCopy = idx
-    group.Go(func() error {
-      toCopy, toDeleteBinding, err := bindingCopy.storeFile.flush()
-      if err != nil {
-        return fmt.Errorf("flushing store file for binding[%d]: %w", idxCopy, err)
-      }
-      m.Lock()
-      toDelete = append(toDelete, toDeleteBinding...)
-      m.Unlock()
+		var bindingCopy = b
+		var idxCopy = idx
+		group.Go(func() error {
+			toCopy, toDeleteBinding, err := bindingCopy.storeFile.flush()
+			if err != nil {
+				return fmt.Errorf("flushing store file for binding[%d]: %w", idxCopy, err)
+			}
+			m.Lock()
+			toDelete = append(toDelete, toDeleteBinding...)
+			m.Unlock()
 
-      // In case of delta updates or if there are no existing keys being stored
-      // we directly copy from staged files into the target table. Note that this is retriable
-      // given that COPY INTO is idempotent by default: files that have already been loaded into a table will
-      // not be loaded again
-      // see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
-      if bindingCopy.target.DeltaUpdates || !bindingCopy.needsMerge {
-        m.Lock()
-        queries = append(queries, renderWithFiles(bindingCopy.copyIntoDirect, toCopy...))
-        m.Unlock()
-      } else {
-        // Create a binding-scoped temporary table for store documents to be merged
-        // into target table
-        if _, err := d.store.conn.ExecContext(groupCtx, bindingCopy.createStoreTableSQL); err != nil {
-          return fmt.Errorf("Exec(%s): %w", bindingCopy.createStoreTableSQL, err)
-        }
+			// In case of delta updates or if there are no existing keys being stored
+			// we directly copy from staged files into the target table. Note that this is retriable
+			// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
+			// not be loaded again
+			// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
+			if bindingCopy.target.DeltaUpdates || !bindingCopy.needsMerge {
+				m.Lock()
+				queries = append(queries, renderWithFiles(bindingCopy.copyIntoDirect, toCopy...))
+				m.Unlock()
+			} else {
+				// Create a binding-scoped temporary table for store documents to be merged
+				// into target table
+				if _, err := d.store.conn.ExecContext(groupCtx, bindingCopy.createStoreTableSQL); err != nil {
+					return fmt.Errorf("Exec(%s): %w", bindingCopy.createStoreTableSQL, err)
+				}
 
-        // COPY INTO temporary load table from staged files
-        if _, err := d.store.conn.ExecContext(groupCtx, renderWithFiles(bindingCopy.copyIntoStore, toCopy...)); err != nil {
-          return fmt.Errorf("store: copying into to temporary table: %w", err)
-        }
+				// COPY INTO temporary load table from staged files
+				if _, err := d.store.conn.ExecContext(groupCtx, renderWithFiles(bindingCopy.copyIntoStore, toCopy...)); err != nil {
+					return fmt.Errorf("store: copying into to temporary table: %w", err)
+				}
 
-        m.Lock()
-        queries = append(queries, renderWithFiles(bindingCopy.mergeInto, toCopy...), bindingCopy.dropStoreSQL)
-        m.Unlock()
-      }
+				m.Lock()
+				queries = append(queries, renderWithFiles(bindingCopy.mergeInto, toCopy...), bindingCopy.dropStoreSQL)
+				m.Unlock()
+			}
 
-      return nil
-    })
+			return nil
+		})
 	}
 
-  if err := group.Wait(); err != nil {
-    return nil, err
-  }
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
 
-  log.Info("store: finished file upload and copies")
+	log.Info("store: finished file upload and copies")
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-    var cp = checkpoint{Queries: queries, ToDelete: toDelete}
+		var cp = checkpoint{Queries: queries, ToDelete: toDelete}
 
 		var checkpointJSON, err = json.Marshal(cp)
 		if err != nil {
@@ -648,23 +743,23 @@ func renderWithFiles(tpl string, files ...string) string {
 // applyCheckpoint merges data from temporary table to main table
 // TODO: run these queries concurrently for improved performance
 func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
-  log.Info("store: starting committing changes")
+	log.Info("store: starting committing changes")
 	for _, q := range cp.Queries {
 		if _, err := d.store.conn.ExecContext(ctx, q); err != nil {
-      // When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
-      // it is okay to skip them in this case
-      if recovery {
-        if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
-          continue
-        }
-      }
+			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
+			// it is okay to skip them in this case
+			if recovery {
+				if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
+					continue
+				}
+			}
 			return fmt.Errorf("query %q failed: %w", q, err)
 		}
 	}
-  log.Info("store: finished committing changes")
+	log.Info("store: finished committing changes")
 
-  // Cleanup files and tables
-  d.deleteFiles(ctx, cp.ToDelete)
+	// Cleanup files and tables
+	d.deleteFiles(ctx, cp.ToDelete)
 
 	return nil
 }
