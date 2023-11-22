@@ -32,15 +32,15 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 // databricksDialect returns a representation of the Databricks SQL dialect.
 // https://docs.databricks.com/en/sql/language-manual/index.html
 var databricksDialect = func() sql.Dialect {
-  // Although databricks does support ARRAY and MAP types, they are statically
-  // typed and the MAP type is not comparable.
-  // Databricks supports JSON extraction using the : operator, this seems like
-  // a simpler method for persisting JSON values:
-  // https://docs.databricks.com/en/sql/language-manual/sql-ref-json-path-expression.html
+	// Although databricks does support ARRAY and MAP types, they are statically
+	// typed and the MAP type is not comparable.
+	// Databricks supports JSON extraction using the : operator, this seems like
+	// a simpler method for persisting JSON values:
+	// https://docs.databricks.com/en/sql/language-manual/sql-ref-json-path-expression.html
 	var jsonMapper = sql.NewStaticMapper("STRING", sql.WithElementConverter(jsonConverter))
 
-  // https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
-	var typeMappings = sql.ProjectionTypeMapper{
+	// https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
+	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
 		sql.ARRAY:    jsonMapper,
 		sql.BINARY:   sql.NewStaticMapper("BINARY"),
 		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
@@ -64,39 +64,47 @@ var databricksDialect = func() sql.Dialect {
 			},
 		},
 	}
-	var nullable sql.TypeMapper = sql.MaybeNullableMapper{
+
+	mapper = sql.NullableMapper{
 		NotNullText: "NOT NULL",
-		Delegate:    typeMappings,
+		Delegate:    mapper,
 	}
 
 	return sql.Dialect{
-    // https://docs.databricks.com/en/sql/language-manual/sql-ref-identifiers.html
-		Identifierer: sql.IdentifierFn(sql.JoinTransform(".", 
+		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+			return sql.InfoTableLocation{
+				// Object names (including schemas and table names) are lowercased in Databricks.
+				// Column names are case-sensitive though.
+				TableSchema: strings.ToLower(path[0]),
+				TableName:   strings.ToLower(path[1]),
+			}
+		}),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
+		// https://docs.databricks.com/en/sql/language-manual/sql-ref-identifiers.html
+		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
 					return sql.IsSimpleIdentifier(s) && !slices.Contains(DATABRICKS_RESERVED_WORDS, strings.ToLower(s))
 				},
-        sql.QuoteTransform("`", "``"),
-      ))),
+				sql.QuoteTransform("`", "``"),
+			))),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "\\'")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper:               nullable,
-		AlwaysNullableTypeMapper: sql.AlwaysNullableMapper{Delegate: typeMappings},
+		TypeMapper: mapper,
 	}
 }()
-
 
 // TODO: use create table USING location instead of copying data into temporary table
 var (
 	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
 {{ define "temp_name_load" -}}
-` + "`" + `flow_temp_load_table_{{ $.ShardRange }}_{{ $.Table.Binding }}_{{ Last $.Table.Path }}` + "`" + `
+`+"`"+`flow_temp_load_table_{{ $.ShardRange }}_{{ $.Table.Binding }}_{{ Last $.Table.Path }}`+"`"+`
 {{- end }}
 
 {{ define "temp_name_store" -}}
-` + "`" + `flow_temp_store_table_{{ $.ShardRange }}_{{ $.Table.Binding }}_{{ Last $.Table.Path }}` + "`" + `
+`+"`"+`flow_temp_store_table_{{ $.ShardRange }}_{{ $.Table.Binding }}_{{ Last $.Table.Path }}`+"`"+`
 {{- end }}
 
 -- Idempotent creation of the load table for staging load keys.
@@ -145,6 +153,19 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
   {{$col.Identifier}} {{$col.DDL}} COMMENT {{ Literal $col.Comment }}
   {{- end }}
 ) COMMENT {{ Literal $.Comment }};
+{{ end }}
+
+-- Templated query which performs table alterations by adding columns.
+-- Dropping nullability constraints must be handled separately, since
+-- Databricks does not support modifying multiple columns in a single
+-- statement.
+
+{{ define "alterTableColumns" }}
+ALTER TABLE {{$.Identifier}} ADD COLUMN
+{{- range $ind, $col := $.AddColumns }}
+	{{- if $ind }},{{ end }}
+	{{$col.Identifier}} {{$col.NullableDDL}}
+{{- end }};
 {{ end }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values. It
@@ -270,13 +291,14 @@ SELECT -1, ""
 {{ end }}
   `)
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
 	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
 	tplCreateStoreTable  = tplAll.Lookup("createStoreTable")
 	tplLoadQuery         = tplAll.Lookup("loadQuery")
-  tplTruncateLoad      = tplAll.Lookup("truncateLoadTable")
-  tplTruncateStore     = tplAll.Lookup("truncateStoreTable")
-  tplDropLoad          = tplAll.Lookup("dropLoadTable")
-  tplDropStore         = tplAll.Lookup("dropStoreTable")
+	tplTruncateLoad      = tplAll.Lookup("truncateLoadTable")
+	tplTruncateStore     = tplAll.Lookup("truncateStoreTable")
+	tplDropLoad          = tplAll.Lookup("dropLoadTable")
+	tplDropStore         = tplAll.Lookup("dropStoreTable")
 	tplCopyIntoDirect    = tplAll.Lookup("copyIntoDirect")
 	tplCopyIntoLoad      = tplAll.Lookup("copyIntoLoad")
 	tplCopyIntoStore     = tplAll.Lookup("copyIntoStore")
@@ -284,14 +306,14 @@ SELECT -1, ""
 )
 
 type Template struct {
-  StagingPath string
-  ShardRange string
-  Table *sql.Table
+	StagingPath string
+	ShardRange  string
+	Table       *sql.Table
 }
 
 func RenderTable(table sql.Table, stagingPath string, shardRange string, tpl *template.Template) (string, error) {
 	var w strings.Builder
-  if err := tpl.Execute(&w, &Template{Table: &table, StagingPath: stagingPath, ShardRange: shardRange}); err != nil {
+	if err := tpl.Execute(&w, &Template{Table: &table, StagingPath: stagingPath, ShardRange: shardRange}); err != nil {
 		return "", err
 	}
 	return w.String(), nil

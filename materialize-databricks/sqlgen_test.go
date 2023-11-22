@@ -25,9 +25,9 @@ func TestSQLGeneration(t *testing.T) {
 		Delta:  false,
 	})
 	var shape2 = sqlDriver.BuildTableShape(spec, 1, tableConfig{
-		Schema:         "default",
-		Table:          "Delta Updates",
-		Delta:          true,
+		Schema: "default",
+		Table:  "Delta Updates",
+		Delta:  true,
 	})
 	shape2.Document = nil // TODO(johnny): this is a bit gross.
 
@@ -54,7 +54,7 @@ func TestSQLGeneration(t *testing.T) {
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
-      var tplData = Template{Table: &tbl, StagingPath: "test-staging-path", ShardRange: "shard-range"}
+			var tplData = Template{Table: &tbl, StagingPath: "test-staging-path", ShardRange: "shard-range"}
 			snap.WriteString("--- Begin " + testcase + " ---")
 			require.NoError(t, tpl.Execute(&snap, &tplData))
 			snap.WriteString("--- End " + testcase + " ---\n\n")
@@ -71,6 +71,16 @@ func TestSQLGeneration(t *testing.T) {
 		}
 	}
 
+	snap.WriteString("--- Begin alter table add columns ---")
+	require.NoError(t, tplAlterTableColumns.Execute(&snap, sqlDriver.TableAlter{
+		Table: table1,
+		AddColumns: []sqlDriver.Column{
+			{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
+			{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+		},
+	}))
+	snap.WriteString("--- End alter table add columns ---\n\n")
+
 	var shapeNoValues = sqlDriver.BuildTableShape(spec, 2, tableConfig{
 		Table: "target_table_no_values_materialized",
 		Delta: false,
@@ -79,7 +89,7 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, err)
 
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized mergeInto" + " ---")
-  var tplData = Template{Table: &tableNoValues, StagingPath: "test-staging-path", ShardRange: "shard-range"}
+	var tplData = Template{Table: &tableNoValues, StagingPath: "test-staging-path", ShardRange: "shard-range"}
 	require.NoError(t, tplMergeInto.Execute(&snap, &tplData))
 	snap.WriteString("--- End " + "target_table_no_values_materialized mergeInto" + " ---\n\n")
 
