@@ -263,7 +263,16 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 	}
 	defer db.Close()
 
-	resolved, err := sql.ResolveActions(ctx, db, actions, rsDialect, cfg.Database)
+	catalog := cfg.Database
+	if catalog == "" {
+		// An endpoint-level database configuration is not required, so query for the active
+		// database if that's the case.
+		if err := db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
+			return "", fmt.Errorf("querying for connected database: %w", err)
+		}
+	}
+
+	resolved, err := sql.ResolveActions(ctx, db, actions, rsDialect, catalog)
 	if err != nil {
 		return "", fmt.Errorf("resolving apply actions: %w", err)
 	}
@@ -516,7 +525,16 @@ func newTransactor(
 		}
 	}
 
-	existingColumns, err := sql.FetchExistingColumns(ctx, db, rsDialect, cfg.Database, schemas)
+	catalog := cfg.Database
+	if catalog == "" {
+		// An endpoint-level database configuration is not required, so query for the active
+		// database if that's the case.
+		if err := db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
+			return nil, fmt.Errorf("querying for connected database: %w", err)
+		}
+	}
+
+	existingColumns, err := sql.FetchExistingColumns(ctx, db, rsDialect, catalog, schemas)
 	if err != nil {
 		return nil, err
 	}
