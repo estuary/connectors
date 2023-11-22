@@ -52,6 +52,7 @@ class Spec(t.TypedDict):
     resourceConfigSchema: dict
     documentationUrl: str
     oauth2: t.NotRequired[OAuth2]
+    resourcePathPointers: t.List[str]
 
 class ConnectorState(t.TypedDict):
     updated: dict
