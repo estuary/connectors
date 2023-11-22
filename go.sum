@@ -1574,3 +1574,5 @@ rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
 sigs.k8s.io/yaml v1.2.0/go.mod h1:yfXDCHCao9+ENCvLSE62v9VSji2MKu5jeNfTrofGhJc=
 vitess.io/vitess v0.13.3 h1:AJKQvoS7LE4whuePZq8WZ9H7M/LzEGIKCpuve+EjA9Q=
 vitess.io/vitess v0.13.3/go.mod h1:ZMLpsNhCdp0HrWMLtUrfOp/czjXrg0MmdmxYtSK8avc=
+vitess.io/vitess v0.15.3 h1:oUKxu7duyz2kYokQSH80psvWU1J3jhJbOYdSF7MMrRc=
+vitess.io/vitess v0.15.3/go.mod h1:s1C7K4tuiCFz3L+GnLFHx/2hrFY1Gyk57lXS5VAEr04=
