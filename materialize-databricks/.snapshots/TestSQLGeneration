@@ -199,6 +199,12 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]'
 ) COMMENT 'Generated for materialization test/sqlite of collection delta/updates';
 --- End `default`.`Delta Updates` createTargetTable ---
 
+--- Begin alter table add columns ---
+ALTER TABLE `a-schema`.target_table ADD COLUMN
+	first_new_column STRING,
+	second_new_column BOOL;
+--- End alter table add columns ---
+
 --- Begin target_table_no_values_materialized mergeInto ---
 	MERGE INTO ``.target_table_no_values_materialized AS l
 	USING `flow_temp_store_table_shard-range_2_target_table_no_values_materialized` AS r
