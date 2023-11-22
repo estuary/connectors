@@ -849,7 +849,7 @@
 }
 {
   "applied": {
-    "actionDescription": "\nCREATE TABLE IF NOT EXISTS flow_materializations_v2 (\n  materialization STRING NOT NULL COMMENT 'The name of the materialization.',\n  version STRING NOT NULL COMMENT 'Version of the materialization.',\n  spec STRING NOT NULL COMMENT 'Specification of the materialization, encoded as base64 protobuf.'\n) COMMENT 'This table is the source of truth for all materializations into this system.';\n\nUPDATE flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-databricks/materialize';"
+    "actionDescription": "UPDATE `default`.flow_materializations_v2 SET version = 'test', spec = '(a-base64-encoded-value)' WHERE materialization = 'tests/materialize-databricks/materialize';"
   }
 }
 {

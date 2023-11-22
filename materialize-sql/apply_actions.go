@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // ApplyActions is a list of actions that must be taken to bring an endpoint into consistency with a
@@ -165,6 +167,9 @@ func FilterActions(in ApplyActions, dialect Dialect, existing *ExistingColumns) 
 		}
 	}
 
+	countAddColumns := 0
+	countAlterColumns := 0
+
 	for _, ta := range in.AlterTables {
 		alter := TableAlter{
 			Table: ta.Table,
@@ -176,6 +181,7 @@ func FilterActions(in ApplyActions, dialect Dialect, existing *ExistingColumns) 
 				return ApplyActions{}, err
 			} else if !exists {
 				alter.AddColumns = append(alter.AddColumns, c)
+				countAddColumns++
 			}
 		}
 
@@ -185,6 +191,7 @@ func FilterActions(in ApplyActions, dialect Dialect, existing *ExistingColumns) 
 				return ApplyActions{}, err
 			} else if !nullable {
 				alter.DropNotNulls = append(alter.DropNotNulls, c)
+				countAlterColumns++
 			}
 		}
 
@@ -192,6 +199,12 @@ func FilterActions(in ApplyActions, dialect Dialect, existing *ExistingColumns) 
 			out.AlterTables = append(out.AlterTables, alter)
 		}
 	}
+
+	log.WithFields(log.Fields{
+		"createTables": len(out.CreateTables),
+		"addColumns":   countAddColumns,
+		"alterColumns": countAlterColumns,
+	}).Info("required apply actions")
 
 	return out, nil
 }
