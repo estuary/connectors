@@ -64,7 +64,7 @@ require (
 	google.golang.org/genproto v0.0.0-20230913181813-007df8e322eb
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
-	vitess.io/vitess v0.13.3
+	vitess.io/vitess v0.15.3
 )
 
 require (
