@@ -1,10 +1,6 @@
 ---
 source: tests/it/main.rs
 expression: parse_from_output(&stdout)
-
 ---
-validated:
-  bindings:
-    - resourcePath:
-        - __consumer_offsets
+validated: {}
 

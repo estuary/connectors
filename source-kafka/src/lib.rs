@@ -41,6 +41,7 @@ impl connector::Connector for KafkaConnector {
                 }))?,
                 documentation_url: "https://go.estuary.dev/source-kafka".to_string(),
                 oauth2: None,
+                resource_path_pointers: vec!["/stream".to_string()],
             }),
             ..Default::default()
         };
