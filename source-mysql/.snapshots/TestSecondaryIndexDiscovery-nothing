@@ -113,10 +113,6 @@ Binding 0:
     },
     "key": [
       "/_meta/source/cursor"
-    ],
-    "resource_path": [
-      "test",
-      "SecondaryIndexDiscovery_nothing_g14307"
     ]
   }
 

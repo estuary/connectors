@@ -175,7 +175,6 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 			ResourceConfigJson: resourceSpecJSON,
 			DocumentSchemaJson: rawSchema,
 			Key:                keyPointers,
-			ResourcePath:       []string{res.Namespace, res.Stream},
 		})
 
 	}

@@ -148,5 +148,9 @@
     ],
     "title": "SQL Database Resource Spec"
   },
-  "documentation_url": "https://go.estuary.dev/source-mysql"
+  "documentation_url": "https://go.estuary.dev/source-mysql",
+  "resource_path_pointers": [
+    "/stream",
+    "/namespace"
+  ]
 }

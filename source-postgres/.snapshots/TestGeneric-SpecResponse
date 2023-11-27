@@ -160,5 +160,9 @@
     ],
     "title": "SQL Database Resource Spec"
   },
-  "documentation_url": "https://go.estuary.dev/source-postgresql"
+  "documentation_url": "https://go.estuary.dev/source-postgresql",
+  "resource_path_pointers": [
+    "/stream",
+    "/namespace"
+  ]
 }

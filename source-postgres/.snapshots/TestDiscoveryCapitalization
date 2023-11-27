@@ -111,10 +111,6 @@ Binding 0:
     },
     "key": [
       "/id"
-    ],
-    "resource_path": [
-      "test",
-      "DiscoveryCapitalization_AaAaA"
     ]
   }
 Binding 1:
@@ -230,10 +226,6 @@ Binding 1:
     },
     "key": [
       "/id"
-    ],
-    "resource_path": [
-      "test",
-      "discoverycapitalization_bbbbb"
     ]
   }
 Binding 2:
@@ -349,10 +341,6 @@ Binding 2:
     },
     "key": [
       "/id"
-    ],
-    "resource_path": [
-      "test",
-      "discoverycapitalization_ccccc"
     ]
   }
 

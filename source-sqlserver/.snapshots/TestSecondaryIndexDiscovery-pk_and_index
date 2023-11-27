@@ -118,10 +118,6 @@ Binding 0:
     },
     "key": [
       "/k1"
-    ],
-    "resource_path": [
-      "dbo",
-      "test_SecondaryIndexDiscovery_pk_and_index_g14228"
     ]
   }
 
