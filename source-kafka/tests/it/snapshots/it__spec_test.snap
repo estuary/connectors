@@ -1,20 +1,25 @@
 ---
 source: tests/it/main.rs
 expression: parse_from_output(&stdout)
-
 ---
 spec:
   configSchema:
     $schema: "http://json-schema.org/draft-07/schema#"
-    definitions:
-      Authentication:
-        description: The information necessary to connect to Kafka.
+    properties:
+      authentication:
+        description: "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments."
+        order: 1
         properties:
           mechanism:
-            allOf:
-              - $ref: "#/definitions/SaslMechanism"
+            default: PLAIN
+            description: The SASL Mechanism describes how to exchange and authenticate clients/servers.
+            enum:
+              - PLAIN
+              - SCRAM-SHA-256
+              - SCRAM-SHA-512
             order: 0
-            title: Sasl Mechanism
+            title: SASL Mechanism
+            type: string
           password:
             order: 2
             secret: true
@@ -31,52 +36,25 @@ spec:
           - username
         title: Authentication
         type: object
-      SaslMechanism:
-        description: The SASL Mechanism describes how to exchange and authenticate clients/servers.
-        enum:
-          - PLAIN
-          - SCRAM-SHA-256
-          - SCRAM-SHA-512
-        title: SASL Mechanism
-        type: string
-      TlsSettings:
-        default: system_certificates
-        description: Controls how should TLS certificates be found or used.
-        enum:
-          - system_certificates
-        title: TLS Settings
-        type: string
-    properties:
-      authentication:
-        description: "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments."
-        oneOf:
-          - allOf:
-              - $ref: "#/definitions/Authentication"
-            title: Enabled
-          - title: Disabled
-            type: "null"
-        order: 1
-        title: Authentication
       bootstrap_servers:
+        default:
+          - "localhost:9092"
         description: The initial servers in the Kafka cluster to initially connect to. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.
         items:
-          default:
-            - "localhost:9092"
           type: string
         order: 0
         title: Bootstrap Servers
         type: array
       tls:
+        default: system_certificates
         description: Controls how should TLS certificates be found or used.
-        oneOf:
-          - allOf:
-              - $ref: "#/definitions/TlsSettings"
-            title: Enabled
-          - title: Disabled
-            type: "null"
+        enum:
+          - system_certificates
         order: 2
         title: TLS Settings
+        type: string
     required:
+      - authentication
       - bootstrap_servers
     title: Kafka Source Configuration
     type: object
@@ -88,4 +66,6 @@ spec:
         type: string
         x-collection-name: true
     type: object
+  resourcePathPointers:
+    - /stream
 

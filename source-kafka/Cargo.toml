@@ -27,4 +27,4 @@ tracing-subscriber = "0.2.19"
 #sasl2-sys = { version = "0.1.14", features = ["vendored" ] }
 
 [dev-dependencies]
-insta = { version = "1.8.0", features = ["redactions"] }
+insta = { version = "1.8.0", features = ["redactions", "yaml"] }
