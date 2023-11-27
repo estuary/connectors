@@ -126,10 +126,6 @@ Binding 0:
       "/_meta/source/loc/0",
       "/_meta/source/loc/1",
       "/_meta/source/loc/2"
-    ],
-    "resource_path": [
-      "test",
-      "secondaryindexdiscovery_nullable_index_g31990"
     ]
   }
 

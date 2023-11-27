@@ -123,10 +123,6 @@ Binding 0:
     "key": [
       "/_meta/source/lsn",
       "/_meta/source/seqval"
-    ],
-    "resource_path": [
-      "dbo",
-      "test_Generic_KeylessDiscovery_t32386"
     ]
   }
 

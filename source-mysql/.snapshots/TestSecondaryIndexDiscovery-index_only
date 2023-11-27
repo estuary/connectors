@@ -117,10 +117,6 @@ Binding 0:
     "key": [
       "/k2",
       "/k3"
-    ],
-    "resource_path": [
-      "test",
-      "SecondaryIndexDiscovery_index_only_g26313"
     ]
   }
 
