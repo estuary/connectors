@@ -123,10 +123,6 @@ Binding 0:
     "key": [
       "/k2",
       "/k3"
-    ],
-    "resource_path": [
-      "dbo",
-      "test_SecondaryIndexDiscovery_index_only_g26313"
     ]
   }
 

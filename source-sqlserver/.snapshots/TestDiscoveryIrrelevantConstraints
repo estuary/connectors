@@ -118,10 +118,6 @@ Binding 0:
     },
     "key": [
       "/id"
-    ],
-    "resource_path": [
-      "dbo",
-      "test_DiscoveryIrrelevantConstraints_44516719"
     ]
   }
 

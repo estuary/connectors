@@ -115,10 +115,6 @@ Binding 0:
     },
     "key": [
       "/a"
-    ],
-    "resource_path": [
-      "test",
-      "Generic_SimpleDiscovery_49210954"
     ]
   }
 
