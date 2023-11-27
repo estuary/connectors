@@ -4,11 +4,8 @@ import:
 captures:
   acmeCo/source-asana:
     endpoint:
-      local:
-        command:
-          - python
-          - "-m"
-          - source-asana
+      connector:
+        image: ghcr.io/estuary/source-asana:local
         config:
           credentials:
             personal_access_token: "2/1205846172619387/1205961971802604:2732de6298d59fd0d4ef056a028a9fce"
