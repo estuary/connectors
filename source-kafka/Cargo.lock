@@ -883,7 +883,7 @@ dependencies = [
 [[package]]
 name = "proto-flow"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#c03c3d9b5a70a82ce4bfc7c2baa49d3317d06f73"
+source = "git+https://github.com/estuary/flow#9d9e68cfa4a54ce8a8cdc2dd0acaeb7dbefa8d59"
 dependencies = [
  "bytes",
  "pbjson",
@@ -898,7 +898,7 @@ dependencies = [
 [[package]]
 name = "proto-gazette"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#c03c3d9b5a70a82ce4bfc7c2baa49d3317d06f73"
+source = "git+https://github.com/estuary/flow#9d9e68cfa4a54ce8a8cdc2dd0acaeb7dbefa8d59"
 dependencies = [
  "bytes",
  "pbjson",
