@@ -170,6 +170,7 @@ func (src Source) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_
 		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
 		DocumentationUrl:         src.DocumentationURL,
 		Oauth2:                   src.Oauth2,
+		ResourcePathPointers:     []string{"/stream"},
 	}, nil
 }
 
@@ -223,7 +224,6 @@ func (src *Source) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.
 		ResourceConfigJson: resourceJSON,
 		DocumentSchemaJson: json.RawMessage(minimalDocumentSchema),
 		Key:                []string{"/_meta/file", "/_meta/offset"},
-		ResourcePath:       []string{root},
 	}}}, nil
 }
 
