@@ -1,0 +1,12 @@
+captures:
+  acmeCo/source-zoom:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-zoom
+        config: {}
+	  env:
+	    LOG_LEVEL: debug
+    binding:
