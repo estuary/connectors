@@ -269,6 +269,12 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 			statements = append(statements, fmt.Sprintf(
 				"UPDATE %[1]s SET version = %[2]s, spec = %[3]s WHERE materialization = %[4]s;", args...))
 		}
+		// TODO(whb): Attaching these spec update arguments to the context is a short-term
+		// workaround and will be removed shortly when I do a larger revamp of SQL materialization
+		// applies. This allows for materialize-bigquery to construct a parameterized query to do
+		// its spec update, rather than a single string, to be compatible with BigQuery's statement
+		// size limitations.
+		ctx = context.WithValue(ctx, ExecStatementsContextKeyArgs, args)
 	}
 
 	if req.DryRun {
@@ -282,6 +288,12 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		ActionDescription: strings.Join(append(statements, executedColumnModifications...), "\n"),
 	}, nil
 }
+
+type ExecStatementsContextKey string
+
+var (
+	ExecStatementsContextKeyArgs ExecStatementsContextKey = "SPEC_ARGS"
+)
 
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
 	var loadedVersion string
