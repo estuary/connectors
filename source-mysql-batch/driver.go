@@ -609,8 +609,7 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
 	}
 
-	// Sleep until it's been more than <pollInterval> since the last iteration,
-	// then update the "Last Polled" timestamp.
+	// Sleep until it's been more than <pollInterval> since the last iteration.
 	if !state.LastPolled.IsZero() && time.Since(state.LastPolled) < pollInterval {
 		var sleepDuration = time.Until(state.LastPolled.Add(pollInterval))
 		log.WithFields(log.Fields{
@@ -629,8 +628,6 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		"poll": pollInterval.String(),
 		"prev": state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("ready to poll")
-	var pollTime = time.Now().UTC()
-	state.LastPolled = pollTime
 
 	// Acquire mutex so that only one worker at a time can be actively executing a query.
 	c.Mutex.Lock()
@@ -649,7 +646,12 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		return fmt.Errorf("error expanding query placeholders: %w", err)
 	}
 
-	log.WithFields(log.Fields{"query": query, "args": args}).Info("executing query")
+	log.WithFields(log.Fields{
+		"query": query,
+		"args":  args,
+	}).Info("executing query")
+	var pollTime = time.Now().UTC()
+	state.LastPolled = pollTime
 
 	// There is no helper function for a streaming select query _with arguments_,
 	// so we have to drop down a level and prepare the statement ourselves here.
