@@ -22,7 +22,7 @@ type Client interface {
 
 	// Apply performs the driver-specific table creation or alteration actions to achieve
 	// consistency with the proposed specification.
-	Apply(ctx context.Context, ep *Endpoint, actions ApplyActions, updateSpecStatement string, dryRun bool) (string, error)
+	Apply(ctx context.Context, ep *Endpoint, actions ApplyActions, updateSpec MetaSpecsUpdate, dryRun bool) (string, error)
 
 	// PreReqs performs verification checks that the provided configuration can be used to interact
 	// with the endpoint to the degree required by the connector, to as much of an extent as

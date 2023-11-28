@@ -56,7 +56,7 @@ func TestFencingCases(t *testing.T) {
 
 	sql.RunFenceTestCases(t,
 		client,
-		[]string{"temp_test_fencing_checkpoints"},
+		[]string{cfg.Database, cfg.Schema, "temp_test_fencing_checkpoints"},
 		duckDialect,
 		tplCreateTargetTable,
 		func(table sql.Table, fence sql.Fence) error {

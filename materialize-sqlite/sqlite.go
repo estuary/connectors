@@ -100,7 +100,7 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 // connector to know if a column is new, removed, or newly nullable. We may revisit this in the
 // future if we want SQLite materialization to update on the fly, but for now they can just be
 // restarted which will re-create their tables in accordance with the collection schema.
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
 	return "", nil
 }
 

@@ -235,26 +235,39 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		}
 	}
 
-	var specUpdate string
+	var specUpdate MetaSpecsUpdate
 	if endpoint.MetaSpecs != nil {
-		// Insert or update the materialization specification.
-		var args = []interface{}{
+		// Insert or update the materialization specification. Both parameterized queries and
+		// literal query strings are supported. A parameterized query is generally preferable, but
+		// some endpoints don't have support for those.
+		var paramArgs = []interface{}{
 			endpoint.Identifier(endpoint.MetaSpecs.Path...),
-			endpoint.Literal(req.Version),
-			endpoint.Literal(base64.StdEncoding.EncodeToString(specBytes)),
-			endpoint.Literal(req.Materialization.Name.String()),
+			endpoint.Placeholder(0),
+			endpoint.Placeholder(1),
+			endpoint.Placeholder(2),
 		}
+		var params = []interface{}{
+			req.Version,
+			base64.StdEncoding.EncodeToString(specBytes),
+			req.Materialization.Name.String(),
+		}
+		var queryStringArgs = []interface{}{
+			paramArgs[0],
+			endpoint.Literal(params[0].(string)),
+			endpoint.Literal(params[1].(string)),
+			endpoint.Literal(params[2].(string)),
+		}
+
+		var q string
 		if loadedSpec == nil {
-			specUpdate = fmt.Sprintf("INSERT INTO %[1]s (version, spec, materialization) VALUES (%[2]s, %[3]s, %[4]s);", args...)
+			q = "INSERT INTO %[1]s (version, spec, materialization) VALUES (%[2]s, %[3]s, %[4]s);"
 		} else {
-			specUpdate = fmt.Sprintf("UPDATE %[1]s SET version = %[2]s, spec = %[3]s WHERE materialization = %[4]s;", args...)
+			q = "UPDATE %[1]s SET version = %[2]s, spec = %[3]s WHERE materialization = %[4]s;"
 		}
-		// TODO(whb): Attaching these spec update arguments to the context is a short-term
-		// workaround and will be removed shortly when I do a larger revamp of SQL materialization
-		// applies. This allows for materialize-bigquery to construct a parameterized query to do
-		// its spec update, rather than a single string, to be compatible with BigQuery's statement
-		// size limitations.
-		ctx = context.WithValue(ctx, ExecStatementsContextKeyArgs, args)
+
+		specUpdate.ParameterizedQuery = fmt.Sprintf(q, paramArgs...)
+		specUpdate.Parameters = params
+		specUpdate.QueryString = fmt.Sprintf(q, queryStringArgs...)
 	}
 
 	action, err := endpoint.Client.Apply(ctx, endpoint, actions, specUpdate, req.DryRun)
@@ -267,12 +280,6 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		ActionDescription: action,
 	}, nil
 }
-
-type ExecStatementsContextKey string
-
-var (
-	ExecStatementsContextKeyArgs ExecStatementsContextKey = "SPEC_ARGS"
-)
 
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
 	var loadedVersion string
