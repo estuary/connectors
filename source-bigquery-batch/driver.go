@@ -563,8 +563,8 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		var sleepDuration = time.Until(state.LastPolled.Add(pollInterval))
 		log.WithFields(log.Fields{
 			"name": res.Name,
-			"wait": sleepDuration,
-			"poll": pollInterval,
+			"wait": sleepDuration.String(),
+			"poll": pollInterval.String(),
 		}).Info("waiting for next poll")
 		select {
 		case <-ctx.Done():
@@ -572,7 +572,11 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		case <-time.After(sleepDuration):
 		}
 	}
-	log.WithField("name", res.Name).Info("ready to poll")
+	log.WithFields(log.Fields{
+		"name": res.Name,
+		"poll": pollInterval.String(),
+		"prev": state.LastPolled.Format(time.RFC3339Nano),
+	}).Info("ready to poll")
 	var pollTime = time.Now().UTC()
 	state.LastPolled = pollTime
 
