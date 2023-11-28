@@ -557,8 +557,7 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
 	}
 
-	// Sleep until it's been more than <pollInterval> since the last iteration,
-	// then update the "Last Polled" timestamp.
+	// Sleep until it's been more than <pollInterval> since the last iteration.
 	if !state.LastPolled.IsZero() && time.Since(state.LastPolled) < pollInterval {
 		var sleepDuration = time.Until(state.LastPolled.Add(pollInterval))
 		log.WithFields(log.Fields{
@@ -577,8 +576,6 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		"poll": pollInterval.String(),
 		"prev": state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("ready to poll")
-	var pollTime = time.Now().UTC()
-	state.LastPolled = pollTime
 
 	// Acquire mutex so that only one worker at a time can be actively executing a query.
 	c.Mutex.Lock()
@@ -590,7 +587,13 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	}
 	var query = queryBuf.String()
 
-	log.WithFields(log.Fields{"query": query, "args": cursorValues}).Info("executing query")
+	log.WithFields(log.Fields{
+		"query": query,
+		"args":  cursorValues,
+	}).Info("executing query")
+	var pollTime = time.Now().UTC()
+	state.LastPolled = pollTime
+
 	var q = c.DB.Query(query)
 	var params []bigquery.QueryParameter
 	for idx, val := range cursorValues {
