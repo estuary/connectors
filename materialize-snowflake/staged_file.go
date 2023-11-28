@@ -96,6 +96,8 @@ func newStagedFile(tempdir string) *stagedFile {
 	}
 }
 
+const MaxConcurrentUploads = 5
+
 func (f *stagedFile) start(ctx context.Context, conn *stdsql.Conn) error {
 	if f.started {
 		return nil
@@ -133,10 +135,12 @@ func (f *stagedFile) start(ctx context.Context, conn *stdsql.Conn) error {
 	f.group, f.groupCtx = errgroup.WithContext(ctx)
 	f.putFiles = make(chan string)
 
-	// Start the putWorker for this transaction.
-	f.group.Go(func() error {
-		return f.putWorker(f.groupCtx, conn, f.putFiles)
-	})
+	for i := 0; i < MaxConcurrentUploads; i++ {
+		// Start the putWorker for this transaction.
+		f.group.Go(func() error {
+			return f.putWorker(f.groupCtx, conn, f.putFiles)
+		})
+	}
 
 	return nil
 }
