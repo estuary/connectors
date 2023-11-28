@@ -143,6 +143,7 @@ func (connector) Spec(context.Context, *pc.Request_Spec) (*pc.Response_Spec, err
 				"refresh_token": json.RawMessage(`"/refresh_token"`),
 			},
 		},
+		ResourcePathPointers: []string{"/stream"},
 	}, nil
 }
 
