@@ -111,7 +111,7 @@ type client struct {
 	uri string
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
 	cfg := ep.Config.(*config)
 
 	db, err := stdsql.Open("databricks", c.uri)
@@ -148,7 +148,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 			))
 		}
 	}
-	action := strings.Join(append(actionList, updateSpecStatement), "\n")
+	action := strings.Join(append(actionList, updateSpec.QueryString), "\n")
 	if dryRun {
 		return action, nil
 	}
@@ -202,7 +202,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 	}
 
 	// Once all the table actions are done, we can update the stored spec.
-	if _, err := db.ExecContext(ctx, updateSpecStatement); err != nil {
+	if _, err := db.ExecContext(ctx, updateSpec.QueryString); err != nil {
 		return "", fmt.Errorf("executing spec update statement: %w", err)
 	}
 
@@ -249,57 +249,6 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-func (c client) AddColumnToTable(ctx context.Context, dryRun bool, tableIdentifier string, columnIdentifier string, columnDDL string) (string, error) {
-	var query string
-
-	err := c.withDB(func(db *stdsql.DB) error {
-		query = fmt.Sprintf(
-			"ALTER TABLE %s ADD COLUMN %s %s;",
-			tableIdentifier,
-			columnIdentifier,
-			columnDDL,
-		)
-
-		if !dryRun {
-			if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-				var execErr dbsqlerr.DBExecutionError
-				if errors.As(err, &execErr) {
-					// If the column already exists, we can just skip
-					if strings.Contains(execErr.Error(), "FIELDS_ALREADY_EXISTS") {
-						return nil
-					}
-				}
-
-				return err
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return query, nil
-}
-
-func (c client) DropNotNullForColumn(ctx context.Context, dryRun bool, table sql.Table, column sql.Column) (string, error) {
-	query := fmt.Sprintf(
-		"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
-		table.Identifier,
-		column.Identifier,
-	)
-
-	if !dryRun {
-		if err := c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, []string{query}) }); err != nil {
-			return "", err
-		}
-	}
-
-	return query, nil
 }
 
 func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {

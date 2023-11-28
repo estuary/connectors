@@ -254,7 +254,7 @@ type client struct {
 	uri string
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
 	cfg := ep.Config.(*config)
 
 	db, err := stdsql.Open("pgx", c.uri)
@@ -307,7 +307,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 
 	// The spec will get updated last, after all the other actions are complete, but include it in
 	// the description of actions.
-	action := strings.Join(append(statements, updateSpecStatement), "\n")
+	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
 	if dryRun {
 		return action, nil
 	}
@@ -332,7 +332,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 	}
 
 	// Once all the table actions are done, we can update the stored spec.
-	if _, err := db.ExecContext(ctx, updateSpecStatement); err != nil {
+	if _, err := db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...); err != nil {
 		return "", fmt.Errorf("executing spec update statement: %w", err)
 	}
 
