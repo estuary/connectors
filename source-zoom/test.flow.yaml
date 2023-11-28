@@ -1,3 +1,4 @@
+---
 captures:
   acmeCo/source-zoom:
     endpoint:
@@ -6,7 +7,8 @@ captures:
           - python
           - "-m"
           - source-zoom
-        config: {}
+        config:
+          access_token: "dadsfads"
 	  env:
 	    LOG_LEVEL: debug
     binding:
