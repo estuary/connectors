@@ -351,7 +351,7 @@ type client struct {
 	dialect sql.Dialect
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
 	db, err := stdsql.Open("mysql", c.uri)
 	if err != nil {
 		return "", err
@@ -376,10 +376,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 		statements = append(statements, alterColumnStmt.String())
 	}
 
-	// The spec update is last, only after all other actions are complete.
-	statements = append(statements, updateSpecStatement)
-
-	action := strings.Join(statements, "\n")
+	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
 	if dryRun {
 		return action, nil
 	}
@@ -406,6 +403,11 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 
 			return "", fmt.Errorf("executing statement: %w", err)
 		}
+	}
+
+	// Once all the table actions are done, we can update the stored spec.
+	if _, err := db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...); err != nil {
+		return "", fmt.Errorf("executing spec update statement: %w", err)
 	}
 
 	return action, nil

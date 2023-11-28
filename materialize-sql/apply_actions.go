@@ -34,6 +34,14 @@ type TableAlter struct {
 	DropNotNulls []Column
 }
 
+// MetaSpecsUpdate is an endpoint-specific parameterized query and parameters needed to persist a
+// new or updated materialization spec.
+type MetaSpecsUpdate struct {
+	ParameterizedQuery string
+	Parameters         []interface{}
+	QueryString        string // For endpoints that do not support parameterized queries.
+}
+
 // ExistingColumns is a mapping of existing table columns to their tables and schemas. The top-level
 // key in the `tables` map is the database schema, and the key in the nested map is the table name
 // which accesses its list of columns. These string keys are as reported by the database's

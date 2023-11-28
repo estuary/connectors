@@ -54,15 +54,13 @@ func TestFencingCases(t *testing.T) {
 	// minutes for this test to complete.
 	cfg := mustGetCfg(t)
 
-	tablePath := []string{cfg.ProjectID, cfg.Dataset, "temp_test_fencing_checkpoints"}
-
 	var ctx = context.Background()
 	client, err := cfg.client(ctx)
 	require.NoError(t, err)
 
 	sql.RunFenceTestCases(t,
 		client,
-		tablePath,
+		[]string{cfg.ProjectID, cfg.Dataset, "temp_test_fencing_checkpoints"},
 		bqDialect,
 		tplCreateTargetTable,
 		func(table sql.Table, fence sql.Fence) error {

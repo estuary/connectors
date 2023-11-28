@@ -68,7 +68,7 @@ func TestApply(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := config{
-		Address:  "localhost:5435",
+		Address:  "localhost:5432",
 		User:     "postgres",
 		Password: "postgres",
 		Schema:   "public",

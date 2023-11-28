@@ -210,7 +210,7 @@ type columnRow struct {
 	DataType   string `bigquery:"data_Type"`
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpecStatement string, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
 	client := ep.Client.(*client)
 	cfg := ep.Config.(*config)
 
@@ -288,7 +288,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 
 	// The spec will get updated last, after all the other actions are complete, but include it in
 	// the description of actions.
-	action := strings.Join(append(statements, updateSpecStatement), "\n")
+	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
 	if dryRun {
 		return action, nil
 	}
@@ -313,7 +313,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 	}
 
 	// Once all the table actions are done, we can update the stored spec.
-	if _, err := c.query(ctx, updateSpecStatement); err != nil {
+	if _, err := c.query(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...); err != nil {
 		return "", fmt.Errorf("executing spec update statement: %w", err)
 	}
 
@@ -423,64 +423,7 @@ func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materi
 }
 
 func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	// We don't explicitly wrap `statements` in a transaction, as not all databases support
-	// transactional DDL statements, but we do run them through a single connection. This allows a
-	// driver to explicitly run `BEGIN;` and `COMMIT;` statements around a transactional operation.
-
-	// The last statement in the list is always the "spec update" during normal operation. BigQuery
-	// will error if the total size of the query is greater than 1 MiB, so we must use a
-	// parameterized query here to prevent that from happening.
-	// TODO(whb): This current implementation is a hack, and I plan to fix it shortly in a larger
-	// revamp of how SQL materialization applies work.
-
-	updateSpecStmt := statements[len(statements)-1]
-	if !strings.HasPrefix(updateSpecStmt, "INSERT INTO") && !strings.HasPrefix(updateSpecStmt, "UPDATE") {
-		// Run all the statements as one single multi-statement query if the final statement is NOT
-		// a "spec update" statement. This only happens for the `TestFencingCases` tests.
-		_, err := c.query(ctx, strings.Join(statements, "\n"))
-		return err
-	}
-
-	// Run all the statements except the final "spec update" statement as a single multi-statement query.
-	if _, err := c.query(ctx, strings.Join(statements[:len(statements)-1], "\n")); err != nil {
-		return err
-	}
-
-	args := ctx.Value(sql.ExecStatementsContextKeyArgs).([]interface{})
-	if args == nil {
-		return fmt.Errorf("could not find SPEC_ARGS in context")
-	}
-	// args are in the order of:
-	//  - Identifier of the MetaSpecs table
-	//  - Literal of the materialization version
-	//  - Literal of the base64 encoded spec
-	//  - Literal of the materialization name
-	// The MetaSpecs table identifier will be included directly in the query string.
-	params := []string{}
-	for _, a := range args[1:] {
-		params = append(params, strings.Trim(a.(string), "'")) // Don't include Literal quotes when using values as parameters.
-	}
-
-	var metaSpecParameterizedQuery string
-	if strings.HasPrefix(updateSpecStmt, "INSERT INTO") {
-		metaSpecParameterizedQuery = fmt.Sprintf(
-			"INSERT INTO %s (version, spec, materialization) VALUES (%s, %s, %s);",
-			args[0].(string),
-			bqDialect.Placeholder(0),
-			bqDialect.Placeholder(1),
-			bqDialect.Placeholder(2),
-		)
-	} else {
-		metaSpecParameterizedQuery = fmt.Sprintf(
-			"UPDATE %[1]s SET version = %[2]s, spec = %[3]s WHERE materialization = %[4]s;",
-			args[0].(string),
-			bqDialect.Placeholder(0),
-			bqDialect.Placeholder(1),
-			bqDialect.Placeholder(2),
-		)
-	}
-
-	_, err := c.query(ctx, metaSpecParameterizedQuery, params[0], params[1], params[2])
+	_, err := c.query(ctx, strings.Join(statements, "\n"))
 	return err
 }
 
