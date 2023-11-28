@@ -53,5 +53,8 @@
     ],
     "title": "Kinesis Resource Spec"
   },
-  "documentation_url": "https://go.estuary.dev/source-kinesis"
+  "documentation_url": "https://go.estuary.dev/source-kinesis",
+  "resource_path_pointers": [
+    "/stream"
+  ]
 }
