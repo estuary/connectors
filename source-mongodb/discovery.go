@@ -1,12 +1,12 @@
 package main
 
 import (
-	"strings"
 	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -135,7 +135,6 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 				ResourceConfigJson: resourceJSON,
 				DocumentSchemaJson: minimalSchema,
 				Key:                []string{"/" + idProperty},
-				ResourcePath:       []string{db.Name(), collection.Name},
 			})
 		}
 	}
