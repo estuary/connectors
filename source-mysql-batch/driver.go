@@ -67,6 +67,9 @@ func (r Resource) Validate() error {
 	if _, err := template.New("query").Parse(r.Template); err != nil {
 		return fmt.Errorf("error parsing template: %w", err)
 	}
+	if slices.Contains(r.Cursor, "") {
+		return fmt.Errorf("cursor column names can't be empty (got %q)", r.Cursor)
+	}
 	if r.PollInterval != "" {
 		if _, err := time.ParseDuration(r.PollInterval); err != nil {
 			return fmt.Errorf("invalid poll interval %q: %w", r.PollInterval, err)
