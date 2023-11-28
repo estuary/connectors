@@ -490,6 +490,7 @@ type captureState struct {
 type streamState struct {
 	CursorNames  []string
 	CursorValues []any
+	LastPolled   time.Time
 }
 
 func (s *captureState) Validate() error {
@@ -532,29 +533,12 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 		return fmt.Errorf("error parsing template: %w", err)
 	}
 
-	// Polling interval can be configured per binding. If unset, falls back to the
-	// connector global polling interval.
-	var pollStr = c.Config.Advanced.PollInterval
-	if res.PollInterval != "" {
-		pollStr = res.PollInterval
-	}
-	pollInterval, err := time.ParseDuration(pollStr)
-	if err != nil {
-		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
-	}
-
-	for {
-		log.WithField("name", res.Name).Info("polling for updates")
+	for ctx.Err() == nil {
 		if err := c.poll(ctx, bindingIndex, queryTemplate, res); err != nil {
 			return fmt.Errorf("error polling table: %w", err)
 		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(pollInterval):
-			continue
-		}
 	}
+	return ctx.Err()
 }
 
 func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Template, res *Resource) error {
@@ -575,16 +559,48 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		"CursorFields": quotedCursorNames,
 	}
 
+	// Polling interval can be configured per binding. If unset, falls back to the
+	// connector global polling interval.
+	var pollStr = c.Config.Advanced.PollInterval
+	if res.PollInterval != "" {
+		pollStr = res.PollInterval
+	}
+	pollInterval, err := time.ParseDuration(pollStr)
+	if err != nil {
+		return fmt.Errorf("invalid poll interval %q: %w", res.PollInterval, err)
+	}
+
+	// Sleep until it's been more than <pollInterval> since the last iteration,
+	// then update the "Last Polled" timestamp.
+	if !state.LastPolled.IsZero() && time.Since(state.LastPolled) < pollInterval {
+		var sleepDuration = time.Until(state.LastPolled.Add(pollInterval))
+		log.WithFields(log.Fields{
+			"name": res.Name,
+			"wait": sleepDuration.String(),
+			"poll": pollInterval.String(),
+		}).Info("waiting for next poll")
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(sleepDuration):
+		}
+	}
+	log.WithFields(log.Fields{
+		"name": res.Name,
+		"poll": pollInterval.String(),
+		"prev": state.LastPolled.Format(time.RFC3339Nano),
+	}).Info("ready to poll")
+	var pollTime = time.Now().UTC()
+	state.LastPolled = pollTime
+
 	var queryBuf = new(strings.Builder)
 	if err := tmpl.Execute(queryBuf, templateArg); err != nil {
 		return fmt.Errorf("error generating query: %w", err)
 	}
 	var query = queryBuf.String()
 
-	var pollTime = time.Now().UTC()
-
 	log.WithFields(log.Fields{"query": query, "args": cursorValues}).Info("executing query")
-	var rows, err = c.DB.QueryContext(ctx, query, cursorValues...)
+	rows, err := c.DB.QueryContext(ctx, query, cursorValues...)
 	if err != nil {
 		return fmt.Errorf("error executing query: %w", err)
 	}
