@@ -26,7 +26,7 @@ import (
 const (
 	// Minimum oplog time difference: see the comment on OplogTimeDifference in
 	// oplog.go
-	minOplogTimediffHours = 24
+	minOplogTimediffHours   = 24
 	minOplogTimediffSeconds = minOplogTimediffHours * 60 * 60 // 24 hours, in seconds
 )
 
@@ -105,7 +105,7 @@ type driver struct{}
 
 func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	// Create a new client and connect to the server
-	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zstd","zlib","snappy"})
+	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zstd", "zlib", "snappy"})
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -171,6 +171,7 @@ func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec
 		ConfigSchemaJson:         json.RawMessage(endpointSchema),
 		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
 		DocumentationUrl:         "https://go.estuary.dev/source-mongodb",
+		ResourcePathPointers:     []string{"/database", "/collection"},
 	}, nil
 }
 

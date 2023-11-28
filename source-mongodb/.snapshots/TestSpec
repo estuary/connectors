@@ -57,5 +57,9 @@
     ],
     "title": "MongoDB Resource Spec"
   },
-  "documentation_url": "https://go.estuary.dev/source-mongodb"
+  "documentation_url": "https://go.estuary.dev/source-mongodb",
+  "resource_path_pointers": [
+    "/database",
+    "/collection"
+  ]
 }

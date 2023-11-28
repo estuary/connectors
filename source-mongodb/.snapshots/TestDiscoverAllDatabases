@@ -36,10 +36,6 @@ Binding 0:
     },
     "key": [
       "/_id"
-    ],
-    "resource_path": [
-      "bar",
-      "collection1"
     ]
   }
 Binding 1:
@@ -80,10 +76,6 @@ Binding 1:
     },
     "key": [
       "/_id"
-    ],
-    "resource_path": [
-      "bar",
-      "collection2"
     ]
   }
 Binding 2:
@@ -124,10 +116,6 @@ Binding 2:
     },
     "key": [
       "/_id"
-    ],
-    "resource_path": [
-      "baz",
-      "collection1"
     ]
   }
 Binding 3:
@@ -168,10 +156,6 @@ Binding 3:
     },
     "key": [
       "/_id"
-    ],
-    "resource_path": [
-      "baz",
-      "collection2"
     ]
   }
 Binding 4:
@@ -212,10 +196,6 @@ Binding 4:
     },
     "key": [
       "/_id"
-    ],
-    "resource_path": [
-      "foo",
-      "collection1"
     ]
   }
 Binding 5:
@@ -256,10 +236,6 @@ Binding 5:
     },
     "key": [
       "/_id"
-    ],
-    "resource_path": [
-      "foo",
-      "collection2"
     ]
   }
 
