@@ -53,5 +53,8 @@
     ],
     "title": "Firestore Resource Spec"
   },
-  "documentation_url": "https://go.estuary.dev/source-firestore"
+  "documentation_url": "https://go.estuary.dev/source-firestore",
+  "resource_path_pointers": [
+    "/path"
+  ]
 }
