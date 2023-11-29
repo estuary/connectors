@@ -96,12 +96,24 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return &sql.PrereqErr{}
 }
 
-// Apply is a no-op since SQLite does not persist a materialization spec, so there is no way for the
-// connector to know if a column is new, removed, or newly nullable. We may revisit this in the
-// future if we want SQLite materialization to update on the fly, but for now they can just be
-// restarted which will re-create their tables in accordance with the collection schema.
+// Apply for sqlite will always create new tables, since no materialization spec is persisted and
+// all tables must be created every time the connector starts.
 func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
-	return "", nil
+	db, err := stdsql.Open("sqlite3", c.path)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	actionList := []string{}
+	for _, tc := range actions.CreateTables {
+		actionList = append(actionList, tc.TableCreateSql)
+		if _, err := db.ExecContext(ctx, tc.TableCreateSql); err != nil {
+			return "", err
+		}
+	}
+
+	return strings.Join(actionList, "\n"), nil
 }
 
 // We don't use specs table for sqlite since it is ephemeral and won't be
