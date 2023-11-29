@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 	"text/template"
 	"time"
@@ -24,107 +23,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"sync"
 )
-
-// config represents the endpoint configuration for snowflake.
-// It must match the one defined for the source specs (flow.yaml) in Rust.
-type config struct {
-	Host      string `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0"`
-	Account   string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier." jsonschema_extras:"order=1"`
-	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=2"`
-	Password  string `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=3"`
-	Database  string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=4"`
-	Schema    string `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=5"`
-	Warehouse string `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=6"`
-	Role      string `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=7"`
-
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
-}
-
-type advancedConfig struct {
-	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active warehouse time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
-}
-
-// ToURI converts the Config to a DSN string.
-func (c *config) ToURI(tenant string) string {
-	// Build a DSN connection string.
-	var configCopy = c.asSnowflakeConfig(tenant)
-	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
-	// Without this, the authentication token will expire after 4 hours of inactivity.
-	// The Params map will not have been initialized if the endpoint config didn't specify
-	// it, so we check and initialize here if needed.
-	if configCopy.Params == nil {
-		configCopy.Params = make(map[string]*string)
-	}
-	configCopy.Params["client_session_keep_alive"] = &trueString
-	dsn, err := sf.DSN(&configCopy)
-	if err != nil {
-		panic(fmt.Errorf("building snowflake dsn: %w", err))
-	}
-
-	return dsn
-}
-
-func (c *config) asSnowflakeConfig(tenant string) sf.Config {
-	var maxStatementCount string = "0"
-	var json string = "json"
-	return sf.Config{
-		Account:     c.Account,
-		Host:        c.Host,
-		User:        c.User,
-		Password:    c.Password,
-		Database:    c.Database,
-		Schema:      c.Schema,
-		Warehouse:   c.Warehouse,
-		Role:        c.Role,
-		Application: fmt.Sprintf("%s_EstuaryFlow", tenant),
-		Params: map[string]*string{
-			// By default Snowflake expects the number of statements to be provided
-			// with every request. By setting this parameter to zero we are allowing a
-			// variable number of statements to be executed in a single request
-			"MULTI_STATEMENT_COUNT":  &maxStatementCount,
-			"GO_QUERY_RESULT_FORMAT": &json,
-		},
-	}
-}
-
-var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)
-
-func validHost(h string) error {
-	hasProtocol := strings.Contains(h, "://")
-	missingDomain := !hostRe.MatchString(h)
-
-	if hasProtocol && missingDomain {
-		return fmt.Errorf("invalid host %q (must end in snowflakecomputing.com and not include a protocol)", h)
-	} else if hasProtocol {
-		return fmt.Errorf("invalid host %q (must not include a protocol)", h)
-	} else if missingDomain {
-		return fmt.Errorf("invalid host %q (must end in snowflakecomputing.com)", h)
-	}
-
-	return nil
-}
-
-func (c *config) Validate() error {
-	var requiredProperties = [][]string{
-		{"account", c.Account},
-		{"host", c.Host},
-		{"user", c.User},
-		{"password", c.Password},
-		{"database", c.Database},
-		{"schema", c.Schema},
-	}
-	for _, req := range requiredProperties {
-		if req[1] == "" {
-			return fmt.Errorf("missing '%s'", req[0])
-		}
-	}
-
-	if _, err := sql.ParseDelay(c.Advanced.UpdateDelay); err != nil {
-		return err
-	}
-
-	return validHost(c.Host)
-}
 
 type tableConfig struct {
 	Table  string `json:"table" jsonschema_extras:"x-collection-name=true"`

@@ -2,34 +2,32 @@ package main
 
 import (
 	"fmt"
-	"strings"
-	"net/url"
-	"github.com/invopop/jsonschema"
 	"github.com/iancoleman/orderedmap"
+	"github.com/invopop/jsonschema"
+	"net/url"
+	"strings"
 )
 
 // config represents the endpoint configuration for sql server.
 type config struct {
-	Address     string           `json:"address" jsonschema:"title=Address,description=Host and port of the SQL warehouse (in the form of host[:port]). Port 443 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	HTTPPath    string           `json:"http_path" jsonschema:"title=HTTP path,description=HTTP path of your SQL warehouse"`
-	CatalogName string           `json:"catalog_name" jsonschema:"title=Catalog Name,description=Name of your Unity Catalog."`
-	SchemaName  string           `json:"schema_name" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default"`
+	Address     string `json:"address" jsonschema:"title=Address,description=Host and port of the SQL warehouse (in the form of host[:port]). Port 443 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
+	HTTPPath    string `json:"http_path" jsonschema:"title=HTTP path,description=HTTP path of your SQL warehouse"`
+	CatalogName string `json:"catalog_name" jsonschema:"title=Catalog Name,description=Name of your Unity Catalog."`
+	SchemaName  string `json:"schema_name" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default"`
 
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication"`
-
 }
 
 const (
 	// TODO: support Azure, GCP and OAuth authentication
-	PAT_AUTH_TYPE  = "PAT" // personal access token
+	PAT_AUTH_TYPE = "PAT" // personal access token
 )
 
 type credentialConfig struct {
-	AuthType            string `json:"auth_type"`
+	AuthType string `json:"auth_type"`
 
 	PersonalAccessToken string `json:"personal_access_token"`
 }
-
 
 func (c *credentialConfig) Validate() error {
 	switch c.AuthType {
@@ -60,10 +58,10 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 	})
 	patProps.Set("personal_access_token", &jsonschema.Schema{
 		Title:       "Personal Access Token",
-		Description: "Personal Access Token,description=Your personal access token for accessing the SQL warehouse",
+		Description: "Your personal access token for accessing the SQL warehouse",
 		Type:        "string",
 		Extras: map[string]interface{}{
-			"secret":    true,
+			"secret": true,
 		},
 	})
 
@@ -114,12 +112,11 @@ func (c *config) ToURI() string {
 	params.Add("userAgentEntry", "Estuary Technologies Flow")
 
 	var uri = url.URL{
-		Host: address,
-		Path: c.HTTPPath,
-		User: url.UserPassword("token", c.Credentials.PersonalAccessToken),
+		Host:     address,
+		Path:     c.HTTPPath,
+		User:     url.UserPassword("token", c.Credentials.PersonalAccessToken),
 		RawQuery: params.Encode(),
 	}
 
 	return strings.TrimLeft(uri.String(), "/")
 }
-
