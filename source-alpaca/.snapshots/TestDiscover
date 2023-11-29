@@ -70,9 +70,6 @@ Binding 0:
       "/Symbol",
       "/Exchange",
       "/Timestamp"
-    ],
-    "resource_path": [
-      "iex"
     ]
   }
 
