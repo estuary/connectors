@@ -91,9 +91,6 @@ Binding 0:
     },
     "key": [
       "/partitionKey"
-    ],
-    "resource_path": [
-      "discoverTable"
     ]
   }
 Binding 1:
@@ -195,9 +192,6 @@ Binding 1:
     "key": [
       "/partitionKeyString",
       "/sortKeyNumber"
-    ],
-    "resource_path": [
-      "secondTable"
     ]
   }
 Binding 2:
@@ -300,9 +294,6 @@ Binding 2:
     "key": [
       "/partitionKeyBinary",
       "/sortKeyBinary"
-    ],
-    "resource_path": [
-      "thirdTable"
     ]
   }
 
