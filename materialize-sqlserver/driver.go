@@ -182,15 +182,16 @@ func newSqlServerDriver() *sql.Driver {
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
-				Config:              cfg,
-				Dialect:             dialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: cfg.ToURI(), dialect: dialect},
-				CreateTableTemplate: templates["createTargetTable"],
-				NewResource:         newTableConfig,
-				NewTransactor:       prepareNewTransactor(templates),
-				Tenant:              tenant,
+				Config:               cfg,
+				Dialect:              dialect,
+				MetaSpecs:            &metaSpecs,
+				MetaCheckpoints:      &metaCheckpoints,
+				Client:               client{uri: cfg.ToURI(), dialect: dialect},
+				CreateTableTemplate:  templates["createTargetTable"],
+				ReplaceTableTemplate: templates["replaceTargetTable"],
+				NewResource:          newTableConfig,
+				NewTransactor:        prepareNewTransactor(templates),
+				Tenant:               tenant,
 			}, nil
 		},
 	}
@@ -201,7 +202,7 @@ type client struct {
 	dialect sql.Dialect
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
 	cfg := ep.Config.(*config)
 
 	db, err := stdsql.Open("sqlserver", c.uri)
@@ -210,7 +211,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 	}
 	defer db.Close()
 
-	resolved, err := sql.ResolveActions(ctx, db, actions, c.dialect, cfg.Database)
+	resolved, err := sql.ResolveActions(ctx, db, actions, ep.Dialect, cfg.Database)
 	if err != nil {
 		return "", fmt.Errorf("resolving apply actions: %w", err)
 	}
@@ -241,9 +242,19 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 		}
 	}
 
+	for _, tr := range resolved.ReplaceTables {
+		statements = append(statements, tr.TableReplaceSql)
+	}
+
 	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if dryRun {
+	if req.DryRun {
 		return action, nil
+	}
+
+	if len(resolved.ReplaceTables) > 0 {
+		if err := sql.StdIncrementFence(ctx, db, ep, req.Materialization.Name.String()); err != nil {
+			return "", err
+		}
 	}
 
 	for _, s := range statements {
