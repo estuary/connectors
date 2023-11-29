@@ -137,7 +137,7 @@
   },
   "documentation_url": "https://go.estuary.dev/source-sqlserver",
   "resource_path_pointers": [
-    "/stream",
-    "/namespace"
+    "/namespace",
+    "/stream"
   ]
 }
