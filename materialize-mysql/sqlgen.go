@@ -136,6 +136,15 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin {{- if $.Comment }} COMMENT={{Literal $.Comment}} {{- end }};
 {{ end }}
 
+-- Templated replacement of a materialized table. MySQL doesn't support
+-- transactional DDL and also doesn't have a CREATE OR REPLACE TABLE
+-- type of operation so this is the best we can do.
+
+{{ define "replaceTargetTable" }}
+DROP TABLE IF EXISTS {{$.Identifier}};
+{{ template "createTargetTable" . }}
+{{ end }}
+
 -- Templated query which performs table alterations by adding columns and/or
 -- dropping nullability constraints. All table modifications are done in a 
 -- single statement for efficiency.
@@ -333,20 +342,21 @@ UPDATE {{ Identifier $.TablePath }}
 `)
 
 	return map[string]*template.Template{
-		"tempTableName":     tplAll.Lookup("temp_load_name"),
-		"tempTruncate":      tplAll.Lookup("truncateTempTable"),
-		"createLoadTable":   tplAll.Lookup("createLoadTable"),
-		"createUpdateTable": tplAll.Lookup("createUpdateTable"),
-		"createTargetTable": tplAll.Lookup("createTargetTable"),
-		"alterTableColumns": tplAll.Lookup("alterTableColumns"),
-		"updateLoad":        tplAll.Lookup("updateLoad"),
-		"updateReplace":     tplAll.Lookup("updateReplace"),
-		"updateTruncate":    tplAll.Lookup("truncateUpdateTable"),
-		"storeLoad":         tplAll.Lookup("storeLoad"),
-		"loadQuery":         tplAll.Lookup("loadQuery"),
-		"loadLoad":          tplAll.Lookup("loadLoad"),
-		"installFence":      tplAll.Lookup("installFence"),
-		"updateFence":       tplAll.Lookup("updateFence"),
+		"tempTableName":      tplAll.Lookup("temp_load_name"),
+		"tempTruncate":       tplAll.Lookup("truncateTempTable"),
+		"createLoadTable":    tplAll.Lookup("createLoadTable"),
+		"createUpdateTable":  tplAll.Lookup("createUpdateTable"),
+		"createTargetTable":  tplAll.Lookup("createTargetTable"),
+		"replaceTargetTable": tplAll.Lookup("replaceTargetTable"),
+		"alterTableColumns":  tplAll.Lookup("alterTableColumns"),
+		"updateLoad":         tplAll.Lookup("updateLoad"),
+		"updateReplace":      tplAll.Lookup("updateReplace"),
+		"updateTruncate":     tplAll.Lookup("truncateUpdateTable"),
+		"storeLoad":          tplAll.Lookup("storeLoad"),
+		"loadQuery":          tplAll.Lookup("loadQuery"),
+		"loadLoad":           tplAll.Lookup("loadLoad"),
+		"installFence":       tplAll.Lookup("installFence"),
+		"updateFence":        tplAll.Lookup("updateFence"),
 	}
 }
 

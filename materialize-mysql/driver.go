@@ -178,6 +178,7 @@ func (c *config) ToURI() string {
 	mysqlCfg.User = c.User
 	mysqlCfg.Passwd = c.Password
 	mysqlCfg.DBName = c.Database
+	mysqlCfg.MultiStatements = true
 
 	if c.Advanced.SSLMode != "" {
 		// see https://pkg.go.dev/github.com/go-sql-driver/mysql#section-readme
@@ -315,15 +316,16 @@ func newMysqlDriver() *sql.Driver {
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
-				Config:              cfg,
-				Dialect:             dialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: cfg.ToURI(), dialect: dialect},
-				CreateTableTemplate: templates["createTargetTable"],
-				NewResource:         newTableConfig,
-				NewTransactor:       prepareNewTransactor(dialect, templates),
-				Tenant:              tenant,
+				Config:               cfg,
+				Dialect:              dialect,
+				MetaSpecs:            &metaSpecs,
+				MetaCheckpoints:      &metaCheckpoints,
+				Client:               client{uri: cfg.ToURI()},
+				CreateTableTemplate:  templates["createTargetTable"],
+				ReplaceTableTemplate: templates["replaceTargetTable"],
+				NewResource:          newTableConfig,
+				NewTransactor:        prepareNewTransactor(dialect, templates),
+				Tenant:               tenant,
 			}, nil
 		},
 	}
@@ -347,18 +349,17 @@ func queryTimeZone(ctx context.Context, conn *stdsql.Conn) (string, error) {
 }
 
 type client struct {
-	uri     string
-	dialect sql.Dialect
+	uri string
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
 	db, err := stdsql.Open("mysql", c.uri)
 	if err != nil {
 		return "", err
 	}
 	defer db.Close()
 
-	resolved, err := sql.ResolveActions(ctx, db, actions, c.dialect, "def")
+	resolved, err := sql.ResolveActions(ctx, db, actions, ep.Dialect, "def")
 	if err != nil {
 		return "", fmt.Errorf("resolving apply actions: %w", err)
 	}
@@ -370,15 +371,25 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 
 	for _, ta := range resolved.AlterTables {
 		var alterColumnStmt strings.Builder
-		if err := renderTemplates(c.dialect)["alterTableColumns"].Execute(&alterColumnStmt, ta); err != nil {
+		if err := renderTemplates(ep.Dialect)["alterTableColumns"].Execute(&alterColumnStmt, ta); err != nil {
 			return "", fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
 		statements = append(statements, alterColumnStmt.String())
 	}
 
+	for _, tr := range resolved.ReplaceTables {
+		statements = append(statements, tr.TableReplaceSql)
+	}
+
 	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if dryRun {
+	if req.DryRun {
 		return action, nil
+	}
+
+	if len(resolved.ReplaceTables) > 0 {
+		if err := sql.StdIncrementFence(ctx, db, ep, req.Materialization.Name.String()); err != nil {
+			return "", err
+		}
 	}
 
 	for _, s := range statements {
