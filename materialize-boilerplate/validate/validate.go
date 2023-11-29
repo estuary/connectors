@@ -55,6 +55,7 @@ func (v Validator) ValidateSelectedFields(
 	bindingConstraints, err := v.ValidateBinding(
 		binding.ResourcePath,
 		binding.DeltaUpdates,
+		binding.Backfill,
 		binding.Collection,
 		binding.FieldSelection.FieldConfigJsonMap,
 		storedSpec,
@@ -126,6 +127,7 @@ func (v Validator) ValidateSelectedFields(
 func (v Validator) ValidateBinding(
 	path []string,
 	deltaUpdates bool,
+	backfill uint32,
 	boundCollection pf.CollectionSpec,
 	fieldConfigJsonMap map[string]json.RawMessage,
 	storedSpec *pf.MaterializationSpec,
@@ -135,8 +137,18 @@ func (v Validator) ValidateBinding(
 		return nil, err
 	}
 
+	if existingBinding != nil && existingBinding.Backfill > backfill {
+		// Sanity check: Don't allow backfill counters to decrease.
+		return nil, fmt.Errorf(
+			"backfill count %d for proposed binding of collection %s is less than previously applied count of %d",
+			backfill,
+			existingBinding.Collection.Name.String(),
+			existingBinding.Backfill,
+		)
+	}
+
 	var constraints map[string]*pm.Response_Validated_Constraint
-	if existingBinding == nil {
+	if existingBinding == nil || backfill != existingBinding.Backfill {
 		constraints = v.validateNewBinding(boundCollection, deltaUpdates)
 	} else {
 		if existingBinding.DeltaUpdates && !deltaUpdates {
