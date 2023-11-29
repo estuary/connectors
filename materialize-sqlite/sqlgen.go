@@ -35,6 +35,10 @@ var sqliteDialect = func() sql.Dialect {
 	}
 
 	return sql.Dialect{
+		// TableLocator and ColumnLocator are not used for sqlite, since sqlite re-creates all tables
+		// from scratch every time it starts up.
+		TableLocatorer:  sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation { return sql.InfoTableLocation{} }),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
