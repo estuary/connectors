@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/estuary/connectors/materialize-pinecone/client"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/pkoukk/tiktoken-go"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -22,6 +25,11 @@ type transactor struct {
 	pineconeClient *client.PineconeClient
 	openAiClient   *client.OpenAiClient
 	bindings       []binding
+
+	// Tokenizer for select embedding models. May be `nil` if the materialization is not configured
+	// with a well-known embedding model.
+	tokenizer        *tiktoken.Tiktoken
+	maxAllowedTokens int
 
 	group    *errgroup.Group
 	groupCtx context.Context
@@ -53,6 +61,16 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 	batches := make(map[string][]upsertDoc)
 
+	truncatedCount := 0
+	defer func() {
+		if truncatedCount > 0 {
+			log.WithFields(log.Fields{
+				"maxAllowedTokens": t.maxAllowedTokens,
+				"truncatedCount":   truncatedCount,
+			}).Warn("documents were truncated for this transaction to comply with token limits. consider using a derivation for more precise splitting of input documents.")
+		}
+	}()
+
 	for it.Next() {
 		b := t.bindings[it.Binding]
 
@@ -72,8 +90,13 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		namespace := t.bindings[it.Binding].namespace
 
+		input, truncated := truncateInput(embeddingInput, t.tokenizer, t.maxAllowedTokens)
+		if truncated {
+			truncatedCount += 1
+		}
+
 		batches[namespace] = append(batches[namespace], upsertDoc{
-			input: embeddingInput,
+			input: input,
 			key:   base64.RawURLEncoding.EncodeToString(it.PackedKey),
 			// Only the document is included as metadata.
 			metadata: map[string]interface{}{
@@ -99,6 +122,36 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	}
 
 	return nil, t.group.Wait()
+}
+
+// truncateInput truncates the input string such that it tokenizes to a number of tokens less than
+// maxAllowedTokens. If no tokenizer has been set, tokenizer will be nil and the input will not be
+// truncated. Input strings are truncated proportionally to how much larger their tokenized count is
+// to maxAllowedTokens. This may not always result in the longest possible input that still falls
+// within maxAllowedTokens, but for reasonably large values for maxAllowedTokens the difference is
+// not likely to be significant.
+func truncateInput(input string, tokenizer *tiktoken.Tiktoken, maxAllowedTokens int) (string, bool) {
+	if tokenizer == nil {
+		return input, false
+	}
+
+	truncated := false
+
+	for n := len(tokenizer.Encode(input, nil, nil)); n > maxAllowedTokens; n = len(tokenizer.Encode(input, nil, nil)) {
+		bytesPerToken := float64(len(input)) / float64(n)
+		wantByteLength := int(bytesPerToken * float64(maxAllowedTokens))
+
+		// Don't corrupt the final rune in the input string by truncating in the middle of a
+		// multi-byte character.
+		for wantByteLength > 0 && !utf8.RuneStart(input[wantByteLength]) {
+			wantByteLength--
+		}
+
+		input = input[:wantByteLength]
+		truncated = true
+	}
+
+	return input, truncated
 }
 
 // The embedding input is an aggregate string of all included keys and values of the

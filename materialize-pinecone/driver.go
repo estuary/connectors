@@ -11,6 +11,7 @@ import (
 	"github.com/estuary/connectors/materialize-pinecone/client"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/pkoukk/tiktoken-go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -282,16 +283,30 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 		return nil, nil, err
 	}
 
-	log.WithFields(log.Fields{
-		"index":       cfg.Index,
-		"environment": cfg.Environment,
-	}).Info("starting materialize-pinecone")
-
-	return &transactor{
+	t := &transactor{
 		pineconeClient: pc,
 		openAiClient:   cfg.openAiClient(),
 		bindings:       bindings,
-	}, &pm.Response_Opened{}, nil
+	}
+
+	// For now, the tokenizer and downstream automatic truncation is only enabled for the
+	// "text-embedding-ada-002" model.
+	if cfg.EmbeddingModel == textEmbeddingAda002 {
+		tokenizer, err := tiktoken.EncodingForModel(cfg.EmbeddingModel)
+		if err != nil {
+			return nil, nil, fmt.Errorf("build tokenizer for model %q: %w", cfg.EmbeddingModel, err)
+		}
+		t.tokenizer = tokenizer
+		t.maxAllowedTokens = 8192
+	}
+
+	log.WithFields(log.Fields{
+		"index":          cfg.Index,
+		"environment":    cfg.Environment,
+		"embeddingModel": cfg.EmbeddingModel,
+	}).Info("starting materialize-pinecone")
+
+	return t, &pm.Response_Opened{}, nil
 }
 
 func resolveEndpointConfig(specJson json.RawMessage) (config, error) {
