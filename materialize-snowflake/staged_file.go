@@ -98,7 +98,7 @@ func newStagedFile(tempdir string) *stagedFile {
 
 const MaxConcurrentUploads = 5
 
-func (f *stagedFile) start(ctx context.Context, conn *stdsql.Conn) error {
+func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 	if f.started {
 		return nil
 	}
@@ -114,7 +114,7 @@ func (f *stagedFile) start(ctx context.Context, conn *stdsql.Conn) error {
 	}
 
 	// Clear the Snowflake stage directory of any existing files leftover from the last txn.
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf(`REMOVE @flow_v1/%s;`, f.uuid)); err != nil {
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`REMOVE @flow_v1/%s;`, f.uuid)); err != nil {
 		return fmt.Errorf("clearing stage: %w", err)
 	}
 
@@ -122,7 +122,7 @@ func (f *stagedFile) start(ctx context.Context, conn *stdsql.Conn) error {
 	// if the REMOVE command is successful it means that all files really were removed so
 	// theoretically this is a superfluous check, but the consequences of any lingering files in the
 	// directory are incorrect loaded data and this is a cheap check to be extra sure.
-	if rows, err := conn.QueryContext(ctx, fmt.Sprintf(`LIST @flow_v1/%s;`, f.uuid)); err != nil {
+	if rows, err := db.QueryContext(ctx, fmt.Sprintf(`LIST @flow_v1/%s;`, f.uuid)); err != nil {
 		return fmt.Errorf("verifying stage empty: %w", err)
 	} else if rows.Next() {
 		return fmt.Errorf("unexpected existing file from LIST @flow_v1/%s", f.uuid)
@@ -138,7 +138,7 @@ func (f *stagedFile) start(ctx context.Context, conn *stdsql.Conn) error {
 	for i := 0; i < MaxConcurrentUploads; i++ {
 		// Start the putWorker for this transaction.
 		f.group.Go(func() error {
-			return f.putWorker(f.groupCtx, conn, f.putFiles)
+			return f.putWorker(f.groupCtx, db, f.putFiles)
 		})
 	}
 
@@ -181,7 +181,7 @@ func (f *stagedFile) flush() error {
 	return f.group.Wait()
 }
 
-func (f *stagedFile) putWorker(ctx context.Context, conn *stdsql.Conn, filePaths <-chan string) error {
+func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-chan string) error {
 	for {
 		var file string
 
@@ -202,7 +202,7 @@ func (f *stagedFile) putWorker(ctx context.Context, conn *stdsql.Conn, filePaths
 			file, f.uuid,
 		)
 		var source, target, sourceSize, targetSize, sourceCompression, targetCompression, status, message string
-		if err := conn.QueryRowContext(ctx, query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message); err != nil {
+		if err := db.QueryRowContext(ctx, query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message); err != nil {
 			return fmt.Errorf("putWorker PUT to stage: %w", err)
 		} else if !strings.EqualFold("uploaded", status) {
 			return fmt.Errorf("putWorker PUT to stage unexpected upload status: %s", status)

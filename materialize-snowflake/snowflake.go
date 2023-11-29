@@ -377,8 +377,8 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 }
 
 type transactor struct {
-	cfg    *config
-	tenant string
+	cfg *config
+	db  *stdsql.DB
 	// Variables exclusively used by Load.
 	load struct {
 		conn *stdsql.Conn
@@ -405,10 +405,15 @@ func newTransactor(
 
 	dialect := snowflakeDialect(cfg.Schema)
 
+	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant))
+	if err != nil {
+		return nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
+	}
+
 	var d = &transactor{
 		cfg:       cfg,
 		templates: renderTemplates(dialect),
-		tenant:    ep.Tenant,
+		db:        db,
 	}
 
 	if d.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
@@ -495,7 +500,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if err := b.load.stage.start(ctx, d.load.conn); err != nil {
+		if err := b.load.stage.start(ctx, d.db); err != nil {
 			return err
 		} else if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
@@ -531,10 +536,6 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 	// In order for the concurrent requests below to be actually run concurrently we need
 	// a separate connection for each
-	db, err := stdsql.Open("snowflake", d.cfg.ToURI(d.tenant))
-	if err != nil {
-		return fmt.Errorf("load stdsql.Open: %w", err)
-	}
 
 	for iLoop, queryLoop := range subqueries {
 		var query = queryLoop
@@ -545,7 +546,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			log.WithField("table", b.target.Identifier).Info("load: starting querying documents")
 			// Issue a join of the target table and (now staged) load keys,
 			// and send results to the |loaded| callback.
-			rows, err := db.QueryContext(sf.WithStreamDownloader(groupCtx), query)
+			rows, err := d.db.QueryContext(sf.WithStreamDownloader(groupCtx), query)
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
@@ -592,7 +593,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if err := b.store.stage.start(it.Context(), d.store.conn); err != nil {
+		if err := b.store.stage.start(it.Context(), d.db); err != nil {
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
