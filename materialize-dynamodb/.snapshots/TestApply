@@ -126,6 +126,17 @@
 ]
 --- End remove new binding ---
 
+--- Begin replace original binding table ---
+* Table list: [first-table flow_materializations_v2 second-table]:
+* Schema for first-table:
+[
+  {
+    "AttributeName": "key",
+    "AttributeType": "S"
+  }
+]
+--- End replace original binding table ---
+
 --- Begin remove original binding ---
 * Table list: [first-table flow_materializations_v2 second-table]:
 --- End remove original binding ---

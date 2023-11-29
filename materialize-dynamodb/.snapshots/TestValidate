@@ -539,4 +539,45 @@
 }
 --- End root document projection change - delta updates ---
 
+--- Begin [field: key] unsatisfiable type change with backfill counter increment ---
+{
+	"flow_document": {
+		"type": 2,
+		"reason": "The root document is required for a standard updates materialization"
+	},
+	"flow_published_at": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"key": {
+		"type": 2,
+		"reason": "Primary key locations are required"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"numericString": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	}
+}
+--- End [field: key] unsatisfiable type change with backfill counter increment ---
+
 
