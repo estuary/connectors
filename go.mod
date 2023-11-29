@@ -24,7 +24,7 @@ require (
 	github.com/databricks/databricks-sdk-go v0.24.0
 	github.com/databricks/databricks-sql-go v1.5.1
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
-	github.com/estuary/flow v0.3.10-0.20231121201810-a2d18f85d49a
+	github.com/estuary/flow v0.3.10-0.20231121224003-f26be483f9bc
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/go-mysql-org/go-mysql v1.5.0
 	github.com/go-sql-driver/mysql v1.6.0

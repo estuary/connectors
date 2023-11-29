@@ -25,6 +25,7 @@ import (
 //go:generate ./generate-spec-proto.sh testdata/apply/add-new-optional.flow.yaml
 //go:generate ./generate-spec-proto.sh testdata/apply/add-new-binding.flow.yaml
 //go:generate ./generate-spec-proto.sh testdata/apply/remove-original-binding.flow.yaml
+//go:generate ./generate-spec-proto.sh testdata/apply/replace-original-binding.flow.yaml
 //go:generate ./generate-spec-proto.sh testdata/validate/base.flow.yaml
 //go:generate ./generate-spec-proto.sh testdata/validate/unsatisfiable.flow.yaml
 //go:generate ./generate-spec-proto.sh testdata/validate/forbidden.flow.yaml
@@ -121,6 +122,10 @@ func RunApplyTestCases(
 		{
 			name: "remove new binding",
 			spec: loadSpec(t, applyFs, "base.flow.proto"),
+		},
+		{
+			name: "replace original binding table",
+			spec: loadSpec(t, applyFs, "replace-original-binding.flow.proto"),
 		},
 		{
 			name: "remove original binding",
@@ -255,7 +260,7 @@ func RunValidateTestCases(t *testing.T, v validate.Validator, snapshotPath strin
 	var snap strings.Builder
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs, err := v.ValidateBinding([]string{"key_value"}, tt.deltaUpdates, tt.newSpec.Bindings[0].Collection, nil, tt.existingSpec)
+			cs, err := v.ValidateBinding([]string{"key_value"}, tt.deltaUpdates, 0, tt.newSpec.Bindings[0].Collection, nil, tt.existingSpec)
 			require.NoError(t, err)
 
 			j, err := json.MarshalIndent(cs, "", "\t")
@@ -266,6 +271,21 @@ func RunValidateTestCases(t *testing.T, v validate.Validator, snapshotPath strin
 			snap.WriteString("\n--- End " + tt.name + " ---\n\n")
 		})
 	}
+
+	t.Run("[field: key] unsatisfiable type change with backfill counter increment", func(t *testing.T) {
+		existingSpec := loadSpec(t, validateFs, "base.flow.proto")
+		newSpec := loadSpec(t, validateFs, "unsatisfiable.flow.proto")
+
+		cs, err := v.ValidateBinding([]string{"key_value"}, false, 1, newSpec.Bindings[0].Collection, nil, existingSpec)
+		require.NoError(t, err)
+
+		j, err := json.MarshalIndent(cs, "", "\t")
+		require.NoError(t, err)
+
+		snap.WriteString("--- Begin [field: key] unsatisfiable type change with backfill counter increment ---\n")
+		snap.WriteString(string(j))
+		snap.WriteString("\n--- End [field: key] unsatisfiable type change with backfill counter increment ---\n\n")
+	})
 
 	cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath)).SnapshotT(t, snap.String())
 }
