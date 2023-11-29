@@ -26,6 +26,40 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]'
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization test/sqlite of collection delta/updates';
 --- End `Delta Updates` createTargetTable ---
 
+--- Begin target_table replaceTargetTable ---
+
+DROP TABLE IF EXISTS target_table;
+
+CREATE TABLE IF NOT EXISTS target_table (
+		key1 BIGINT NOT NULL COMMENT 'Key One Title
+Key One Description
+auto-generated projection of JSON at: /key1 with inferred types: [integer]',
+		`key!2` BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key!2 with inferred types: [boolean]',
+		`Camel_Case` BIGINT COMMENT 'auto-generated projection of JSON at: /Camel_Case with inferred types: [integer]',
+		`a Time` DATETIME(6) COMMENT 'auto-generated projection of JSON at: /a Time with inferred types: [string]',
+		`array` JSON COMMENT 'This is an array!
+auto-generated projection of JSON at: /array with inferred types: [array]',
+		lower_case BIGINT COMMENT 'auto-generated projection of JSON at: /lower_case with inferred types: [integer]',
+		`value` LONGTEXT COMMENT 'auto-generated projection of JSON at: /value with inferred types: [string]',
+		flow_document JSON NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]',
+
+		PRIMARY KEY (key1, `key!2`)
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization test/sqlite of collection key/value';
+
+--- End target_table replaceTargetTable ---
+
+--- Begin `Delta Updates` replaceTargetTable ---
+
+DROP TABLE IF EXISTS `Delta Updates`;
+
+CREATE TABLE IF NOT EXISTS `Delta Updates` (
+		`theKey` VARCHAR(256) NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
+		`aValue` BIGINT COMMENT 'A super-awesome value.
+auto-generated projection of JSON at: /aValue with inferred types: [integer]'
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='Generated for materialization test/sqlite of collection delta/updates';
+
+--- End `Delta Updates` replaceTargetTable ---
+
 --- Begin target_table createLoadTable ---
 
 CREATE TEMPORARY TABLE flow_temp_load_table_0 (
