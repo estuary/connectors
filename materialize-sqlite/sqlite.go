@@ -98,7 +98,7 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 
 // Apply for sqlite will always create new tables, since no materialization spec is persisted and
 // all tables must be created every time the connector starts.
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
 	db, err := stdsql.Open("sqlite3", c.path)
 	if err != nil {
 		return "", err
