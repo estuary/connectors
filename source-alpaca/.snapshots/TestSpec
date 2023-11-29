@@ -102,5 +102,8 @@
     ],
     "title": "Resource"
   },
-  "documentation_url": "https://go.estuary.dev/source-alpaca"
+  "documentation_url": "https://go.estuary.dev/source-alpaca",
+  "resource_path_pointers": [
+    "/name"
+  ]
 }
