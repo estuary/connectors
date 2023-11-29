@@ -22,7 +22,7 @@ type Client interface {
 
 	// Apply performs the driver-specific table creation or alteration actions to achieve
 	// consistency with the proposed specification.
-	Apply(ctx context.Context, ep *Endpoint, actions ApplyActions, updateSpec MetaSpecsUpdate, dryRun bool) (string, error)
+	Apply(ctx context.Context, ep *Endpoint, req *pm.Request_Apply, actions ApplyActions, updateSpec MetaSpecsUpdate) (string, error)
 
 	// PreReqs performs verification checks that the provided configuration can be used to interact
 	// with the endpoint to the degree required by the connector, to as much of an extent as
@@ -80,6 +80,8 @@ type Endpoint struct {
 	Client Client
 	// CreateTableTemplate evaluates a Table into an endpoint statement which creates it.
 	CreateTableTemplate *template.Template
+	// ReplaceTableTemplate evaluates a Table into an endpoint statement which creates or replaces it.
+	ReplaceTableTemplate *template.Template
 	// NewResource returns an uninitialized or partially-initialized Resource
 	// which will be parsed into and validated from a resource configuration.
 	NewResource func(*Endpoint) Resource

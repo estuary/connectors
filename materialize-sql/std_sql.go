@@ -61,6 +61,27 @@ func StdSQLExecStatements(ctx context.Context, db *sql.DB, statements []string) 
 	return conn.Close() // Release to pool.
 }
 
+// StdIncrementFence increments the value for the fence for all checkpoints of the provided
+// materialization.
+func StdIncrementFence(ctx context.Context, db *sql.DB, ep *Endpoint, materialization string) error {
+	resolved, err := ResolveTable(*ep.MetaCheckpoints, ep.Dialect)
+	if err != nil {
+		return fmt.Errorf("resolving checkpoints table for fence increment: %w", err)
+	}
+
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(
+		`UPDATE %s SET fence=fence+1 WHERE materialization=%s;`,
+		resolved.Identifier,
+		resolved.Keys[0].Placeholder,
+	),
+		materialization,
+	); err != nil {
+		return fmt.Errorf("incrementing fence: %w", err)
+	}
+
+	return nil
+}
+
 // StdInstallFence is a convenience for Client implementations which
 // use Go's standard `sql.DB` type under the hood.
 func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence Fence, decodeFence func(string) ([]byte, error)) (Fence, error) {
