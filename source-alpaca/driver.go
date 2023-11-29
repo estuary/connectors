@@ -31,6 +31,7 @@ func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec
 		ConfigSchemaJson:         json.RawMessage(endpointSchema),
 		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
 		DocumentationUrl:         "https://go.estuary.dev/source-alpaca",
+		ResourcePathPointers:     []string{"/name"},
 	}, nil
 }
 
@@ -95,7 +96,6 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 			ResourceConfigJson: resourceJSON,
 			DocumentSchemaJson: documentSchema,
 			Key:                []string{"/ID", "/Symbol", "/Exchange", "/Timestamp"},
-			ResourcePath:       []string{cfg.Feed},
 		}},
 	}, nil
 }
