@@ -6,7 +6,7 @@
     "type": "object",
     "additionalProperties": true,
     "properties": {
-      "credentials": {
+      "authentication": {
         "title": "Authentication mechanism",
         "description": "Choose how to authenticate to Github",
         "type": "object",
