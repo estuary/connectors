@@ -103,6 +103,14 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 {{- end}}
 {{ end }}
 
+-- Templated replacement of a materialized table. Must be wrapped in BEGIN; and
+-- COMMIT; to perform the replacement transactionally.
+
+{{ define "replaceTargetTable" }}
+DROP TABLE IF EXISTS {{$.Identifier}};
+{{ template "createTargetTable" . }}
+{{ end }}
+
 -- Templated query which performs table alterations by adding columns and/or
 -- dropping nullability constraints. All table modifications are done in a 
 -- single statement for efficiency.
@@ -255,13 +263,14 @@ BEGIN
 END $$;
 {{ end }}
 `)
-	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplLoadInsert        = tplAll.Lookup("loadInsert")
-	tplStoreInsert       = tplAll.Lookup("storeInsert")
-	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplInstallFence      = tplAll.Lookup("installFence")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCreateLoadTable    = tplAll.Lookup("createLoadTable")
+	tplCreateTargetTable  = tplAll.Lookup("createTargetTable")
+	tplReplaceTargetTable = tplAll.Lookup("replaceTargetTable")
+	tplAlterTableColumns  = tplAll.Lookup("alterTableColumns")
+	tplLoadInsert         = tplAll.Lookup("loadInsert")
+	tplStoreInsert        = tplAll.Lookup("storeInsert")
+	tplStoreUpdate        = tplAll.Lookup("storeUpdate")
+	tplLoadQuery          = tplAll.Lookup("loadQuery")
+	tplInstallFence       = tplAll.Lookup("installFence")
+	tplUpdateFence        = tplAll.Lookup("updateFence")
 )
