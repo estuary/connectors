@@ -168,6 +168,15 @@ CREATE TABLE {{$.Identifier}} (
 END;
 {{ end }}
 
+-- Templated replacement of a materialized table.
+
+{{ define "replaceTargetTable" }}
+BEGIN TRANSACTION;
+DROP TABLE IF EXISTS {{$.Identifier}};
+{{ template "createTargetTable" . }}
+COMMIT TRANSACTION;
+{{ end }}
+
 -- Templated query which performs table alterations by adding columns.
 -- Dropping nullability constraints must be handled separately, since SQL
 -- Server does not support modifying multiple columns in a single statement.
@@ -341,6 +350,7 @@ UPDATE {{ Identifier $.TablePath }}
 		"createStoreTable":   tplAll.Lookup("createStoreTable"),
 		"alterTableColumns":  tplAll.Lookup("alterTableColumns"),
 		"createTargetTable":  tplAll.Lookup("createTargetTable"),
+		"replaceTargetTable": tplAll.Lookup("replaceTargetTable"),
 		"directCopy":         tplAll.Lookup("directCopy"),
 		"mergeInto":          tplAll.Lookup("mergeInto"),
 		"loadInsert":         tplAll.Lookup("loadInsert"),

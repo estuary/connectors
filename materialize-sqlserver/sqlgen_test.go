@@ -49,6 +49,7 @@ func TestSQLGeneration(t *testing.T) {
 		"createLoadTable",
 		"createStoreTable",
 		"createTargetTable",
+		"replaceTargetTable",
 		"directCopy",
 		"mergeInto",
 		"loadInsert",

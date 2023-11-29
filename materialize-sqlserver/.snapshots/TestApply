@@ -373,6 +373,33 @@
 ]
 --- End remove new binding ---
 
+--- Begin replace original binding table ---
+* Table list: [MSreplication_options first-table flow_checkpoints_v1 flow_materializations_v2 second-table spt_fallback_db spt_fallback_dev spt_fallback_usg spt_monitor spt_values]:
+* Schema for first-table:
+[
+  {
+    "Name": "flow_document",
+    "Nullable": "NO",
+    "Type": "varchar"
+  },
+  {
+    "Name": "key",
+    "Nullable": "NO",
+    "Type": "varchar"
+  },
+  {
+    "Name": "optionalVal1",
+    "Nullable": "YES",
+    "Type": "bigint"
+  },
+  {
+    "Name": "requiredVal1",
+    "Nullable": "NO",
+    "Type": "varchar"
+  }
+]
+--- End replace original binding table ---
+
 --- Begin remove original binding ---
 * Table list: [MSreplication_options first-table flow_checkpoints_v1 flow_materializations_v2 second-table spt_fallback_db spt_fallback_dev spt_fallback_usg spt_monitor spt_values]:
 --- End remove original binding ---
