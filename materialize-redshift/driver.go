@@ -29,7 +29,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
-	_ "github.com/jackc/pgx/v4/stdlib"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
@@ -236,15 +235,16 @@ func newRedshiftDriver() *sql.Driver {
 			}
 
 			return &sql.Endpoint{
-				Config:              cfg,
-				Dialect:             rsDialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: cfg.toURI()},
-				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
-				Tenant:              tenant,
+				Config:               cfg,
+				Dialect:              rsDialect,
+				MetaSpecs:            &metaSpecs,
+				MetaCheckpoints:      &metaCheckpoints,
+				Client:               client{uri: cfg.toURI()},
+				CreateTableTemplate:  tplCreateTargetTable,
+				ReplaceTableTemplate: tplReplaceTargetTable,
+				NewResource:          newTableConfig,
+				NewTransactor:        newTransactor,
+				Tenant:               tenant,
 			}, nil
 		},
 	}
@@ -254,7 +254,7 @@ type client struct {
 	uri string
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
 	cfg := ep.Config.(*config)
 
 	db, err := stdsql.Open("pgx", c.uri)
@@ -305,11 +305,21 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 		}
 	}
 
+	for _, tr := range resolved.ReplaceTables {
+		statements = append(statements, tr.TableReplaceSql)
+	}
+
 	// The spec will get updated last, after all the other actions are complete, but include it in
 	// the description of actions.
 	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if dryRun {
+	if req.DryRun {
 		return action, nil
+	}
+
+	if len(resolved.ReplaceTables) > 0 {
+		if err := sql.StdIncrementFence(ctx, db, ep, req.Materialization.Name.String()); err != nil {
+			return "", err
+		}
 	}
 
 	// Execute statements in parallel for efficiency. Each statement acts on a single table, and
