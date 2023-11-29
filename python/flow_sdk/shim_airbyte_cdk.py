@@ -46,7 +46,7 @@ class CaptureShim(Connector):
             "documentationUrl": f"{DOCS_URL if DOCS_URL else spec.documentationUrl}",
             "configSchema": spec.connectionSpecification,
             "resourceConfigSchema": resource_config_schema,
-            "resourcePathPointers": ["/stream", "/namespace"],
+            "resourcePathPointers": ["/namespace", "/stream"],
         }
 
         # TODO(johnny): Can we map spec.advanced_auth into flow.OAuth2 ?
