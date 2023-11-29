@@ -80,6 +80,18 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 );
 {{ end }}
 
+-- Templated creation or replacement of a target table. It's exactly the
+-- same as createTargetTable, except it uses CREATE OR REPLACE.
+
+{{ define "replaceTargetTable" }}
+CREATE OR REPLACE TABLE {{$.Identifier}} (
+{{- range $ind, $col := $.Columns }}
+	{{- if $ind }},{{ end }}
+	{{$col.Identifier}} {{$col.DDL}}
+{{- end }}
+);
+{{ end }}
+
 -- Templated query for merging documents from S3 into the target table.
 
 {{ define "storeQuery" }}
@@ -112,7 +124,8 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplStoreQuery        = tplAll.Lookup("storeQuery")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCreateTargetTable  = tplAll.Lookup("createTargetTable")
+	tplReplaceTargetTable = tplAll.Lookup("replaceTargetTable")
+	tplStoreQuery         = tplAll.Lookup("storeQuery")
+	tplUpdateFence        = tplAll.Lookup("updateFence")
 )
