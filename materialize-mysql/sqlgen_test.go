@@ -43,6 +43,7 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tpl := range []*template.Template{
 		templates["createTargetTable"],
+		templates["replaceTargetTable"],
 		templates["createLoadTable"],
 		templates["tempTruncate"],
 		templates["loadLoad"],
