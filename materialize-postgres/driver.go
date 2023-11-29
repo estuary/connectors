@@ -198,15 +198,16 @@ func newPostgresDriver() *sql.Driver {
 			}
 
 			return &sql.Endpoint{
-				Config:              cfg,
-				Dialect:             pgDialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: cfg.ToURI()},
-				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
-				Tenant:              tenant,
+				Config:               cfg,
+				Dialect:              pgDialect,
+				MetaSpecs:            &metaSpecs,
+				MetaCheckpoints:      &metaCheckpoints,
+				Client:               client{uri: cfg.ToURI()},
+				CreateTableTemplate:  tplCreateTargetTable,
+				ReplaceTableTemplate: tplReplaceTargetTable,
+				NewResource:          newTableConfig,
+				NewTransactor:        newTransactor,
+				Tenant:               tenant,
 			}, nil
 		},
 	}
@@ -216,7 +217,7 @@ type client struct {
 	uri string
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
 	cfg := ep.Config.(*config)
 
 	db, err := stdsql.Open("pgx", c.uri)
@@ -239,6 +240,11 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 		return "", fmt.Errorf("resolving apply actions: %w", err)
 	}
 
+	// Convenience for wrapping some number of statements in a transaction block.
+	txnStatements := func(stmts ...string) string {
+		return strings.Join(slices.Insert([]string{"BEGIN;", "COMMIT;"}, 1, stmts...), "\n")
+	}
+
 	statements := []string{}
 	for _, tc := range resolved.CreateTables {
 		var res tableConfig
@@ -249,7 +255,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 		}
 
 		if res.AdditionalSql != "" {
-			statements = append(statements, strings.Join([]string{"BEGIN;", tc.TableCreateSql, res.AdditionalSql, "COMMIT;"}, "\n"))
+			statements = append(statements, txnStatements(tc.TableCreateSql, res.AdditionalSql))
 		} else {
 			statements = append(statements, tc.TableCreateSql)
 		}
@@ -263,9 +269,30 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 		statements = append(statements, alterColumnStmt.String())
 	}
 
+	for _, tr := range resolved.ReplaceTables {
+		var res tableConfig
+		if tr.ResourceConfigJson != nil {
+			if err = pf.UnmarshalStrict(tr.ResourceConfigJson, &res); err != nil {
+				return "", fmt.Errorf("unmarshalling resource binding for bound collection %q: %w", tr.Source.String(), err)
+			}
+		}
+
+		if res.AdditionalSql != "" {
+			statements = append(statements, txnStatements(tr.TableReplaceSql, res.AdditionalSql))
+		} else {
+			statements = append(statements, txnStatements(tr.TableReplaceSql))
+		}
+	}
+
 	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if dryRun {
+	if req.DryRun {
 		return action, nil
+	}
+
+	if len(resolved.ReplaceTables) > 0 {
+		if err := sql.StdIncrementFence(ctx, db, ep, req.Materialization.Name.String()); err != nil {
+			return "", err
+		}
 	}
 
 	for _, s := range statements {
