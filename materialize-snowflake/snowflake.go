@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -22,7 +23,6 @@ import (
 	sf "github.com/snowflakedb/gosnowflake"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
-	"sync"
 )
 
 // config represents the endpoint configuration for snowflake.
@@ -208,26 +208,26 @@ func newSnowflakeDriver() *sql.Driver {
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
-				Config:              parsed,
-				Dialect:             dialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{uri: dsn, dialect: dialect},
-				CreateTableTemplate: templates["createTargetTable"],
-				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
-				Tenant:              tenant,
+				Config:               parsed,
+				Dialect:              dialect,
+				MetaSpecs:            &metaSpecs,
+				MetaCheckpoints:      &metaCheckpoints,
+				Client:               client{uri: dsn},
+				CreateTableTemplate:  templates["createTargetTable"],
+				ReplaceTableTemplate: templates["replaceTargetTable"],
+				NewResource:          newTableConfig,
+				NewTransactor:        newTransactor,
+				Tenant:               tenant,
 			}, nil
 		},
 	}
 }
 
 type client struct {
-	uri     string
-	dialect sql.Dialect
+	uri string
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
 	db, err := stdsql.Open("snowflake", c.uri)
 	if err != nil {
 		return "", err
@@ -246,7 +246,7 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 		return "", fmt.Errorf("querying for connected database: %w", err)
 	}
 
-	resolved, err := sql.ResolveActions(ctx, db, actions, c.dialect, catalog)
+	resolved, err := sql.ResolveActions(ctx, db, actions, ep.Dialect, catalog)
 	if err != nil {
 		return "", fmt.Errorf("resolving apply actions: %w", err)
 	}
@@ -258,17 +258,27 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 
 	for _, ta := range resolved.AlterTables {
 		var alterColumnStmt strings.Builder
-		if err := renderTemplates(c.dialect)["alterTableColumns"].Execute(&alterColumnStmt, ta); err != nil {
+		if err := renderTemplates(ep.Dialect)["alterTableColumns"].Execute(&alterColumnStmt, ta); err != nil {
 			return "", fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
 		statements = append(statements, alterColumnStmt.String())
 	}
 
+	for _, tr := range resolved.ReplaceTables {
+		statements = append(statements, tr.TableReplaceSql)
+	}
+
 	// The spec will get updated last, after all the other actions are complete, but include it in
 	// the description of actions.
 	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if dryRun {
+	if req.DryRun {
 		return action, nil
+	}
+
+	if len(resolved.ReplaceTables) > 0 {
+		if err := sql.StdIncrementFence(ctx, db, ep, req.Materialization.Name.String()); err != nil {
+			return "", err
+		}
 	}
 
 	// Execute statements in parallel for efficiency. Each statement acts on a single table, and
