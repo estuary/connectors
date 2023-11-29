@@ -539,4 +539,45 @@
 }
 --- End root document projection change - delta updates ---
 
+--- Begin [field: key] unsatisfiable type change with backfill counter increment ---
+{
+	"flow_document": {
+		"type": 2,
+		"reason": "The root document must be materialized"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 2,
+		"reason": "All Locations that are part of the collections key are required"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize a field where the only possible type is 'null'"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	}
+}
+--- End [field: key] unsatisfiable type change with backfill counter increment ---
+
 

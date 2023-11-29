@@ -14,14 +14,23 @@ import (
 // ApplyActions is a list of actions that must be taken to bring an endpoint into consistency with a
 // proposed materialization change, by creating new tables and/or altering existing columns.
 type ApplyActions struct {
-	CreateTables []TableCreate
-	AlterTables  []TableAlter
+	CreateTables  []TableCreate
+	AlterTables   []TableAlter
+	ReplaceTables []TableReplace
 }
 
 // TableCreate is a new table that needs to be created.
 type TableCreate struct {
 	Table
 	TableCreateSql string
+
+	ResourceConfigJson json.RawMessage
+}
+
+// TableReplace is a replacement of an existing table.
+type TableReplace struct {
+	Table
+	TableReplaceSql string
 
 	ResourceConfigJson json.RawMessage
 }
@@ -161,7 +170,9 @@ func (e *ExistingColumns) nullable(schema, table, column string) (bool, error) {
 // previous one left off, and still make incremental progress. This could be important for
 // destination systems that do not support efficient bulk actions of certain kinds.
 func FilterActions(in ApplyActions, dialect Dialect, existing *ExistingColumns) (ApplyActions, error) {
-	out := ApplyActions{}
+	out := ApplyActions{
+		ReplaceTables: in.ReplaceTables, // Always replace (or create) tables; there's no way to filter these out.
+	}
 
 	// Only create tables that don't already exist. TODO(whb): Consider checking the existence of
 	// columns, nullability, and data types of columns for tables that do already exist where the
@@ -209,9 +220,10 @@ func FilterActions(in ApplyActions, dialect Dialect, existing *ExistingColumns) 
 	}
 
 	log.WithFields(log.Fields{
-		"createTables": len(out.CreateTables),
-		"addColumns":   countAddColumns,
-		"alterColumns": countAlterColumns,
+		"createTables":  len(out.CreateTables),
+		"replaceTables": len(out.ReplaceTables),
+		"addColumns":    countAddColumns,
+		"alterColumns":  countAlterColumns,
 	}).Info("required apply actions")
 
 	return out, nil

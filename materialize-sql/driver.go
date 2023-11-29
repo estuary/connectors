@@ -93,6 +93,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		constraints, err := validator.ValidateBinding(
 			res.Path(),
 			res.DeltaUpdates(),
+			bindingSpec.Backfill,
 			bindingSpec.Collection,
 			bindingSpec.FieldConfigJsonMap,
 			loadedSpec,
@@ -180,6 +181,18 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		} else if err = validator.ValidateSelectedFields(bindingSpec, loadedSpec); err != nil {
 			// The applied binding is not a valid solution for its own constraints.
 			return nil, fmt.Errorf("binding for %s: %w", collection, err)
+		} else if loadedBinding != nil && bindingSpec.Backfill != loadedBinding.Backfill {
+			// Replace the exiting table.
+			replaceStatement, err := RenderTableTemplate(proposedTable, endpoint.ReplaceTableTemplate)
+			if err != nil {
+				return nil, err
+			}
+
+			actions.ReplaceTables = append(actions.ReplaceTables, TableReplace{
+				Table:              proposedTable,
+				TableReplaceSql:    replaceStatement,
+				ResourceConfigJson: bindingSpec.ResourceConfigJson,
+			})
 		} else if loadedBinding != nil {
 			for _, proposedCol := range proposedTable.Columns() {
 				if !slices.Contains(loadedBinding.FieldSelection.AllFields(), proposedCol.Field) {
@@ -270,7 +283,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		specUpdate.QueryString = fmt.Sprintf(q, queryStringArgs...)
 	}
 
-	action, err := endpoint.Client.Apply(ctx, endpoint, actions, specUpdate, req.DryRun)
+	action, err := endpoint.Client.Apply(ctx, endpoint, req, actions, specUpdate)
 	if err != nil {
 		return nil, fmt.Errorf("applying schema updates: %w", err)
 	}
