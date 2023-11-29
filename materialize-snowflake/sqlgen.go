@@ -143,6 +143,32 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 {{- end}}
 {{ end }}
 
+-- Templated creation or replacement of a target table. It's exactly the
+-- same as createTargetTable, except it uses CREATE OR REPLACE.
+
+{{ define "replaceTargetTable" }}
+CREATE OR REPLACE TABLE {{$.Identifier}} (
+{{- range $ind, $col := $.Columns }}
+{{- if $ind }},{{ end }}
+	{{$col.Identifier}} {{$col.DDL}}
+{{- end }}
+{{- if not $.DeltaUpdates }},
+
+	PRIMARY KEY (
+	{{- range $ind, $key := $.Keys }}
+	{{- if $ind }}, {{end -}}
+	{{$key.Identifier}}
+	{{- end -}}
+)
+{{- end }}
+);
+
+COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
+{{- range $col := .Columns }}
+COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment}};
+{{- end}}
+{{ end }}
+
 -- Templated query which performs table alterations by adding columns and/or
 -- dropping nullability constraints. Snowflake does not allow adding columns and
 -- modifying columns together in the same statement, but either one of those
@@ -270,12 +296,13 @@ END $$;
   `)
 
 	return map[string]*template.Template{
-		"createTargetTable": tplAll.Lookup("createTargetTable"),
-		"alterTableColumns": tplAll.Lookup("alterTableColumns"),
-		"loadQuery":         tplAll.Lookup("loadQuery"),
-		"copyInto":          tplAll.Lookup("copyInto"),
-		"mergeInto":         tplAll.Lookup("mergeInto"),
-		"updateFence":       tplAll.Lookup("updateFence"),
+		"createTargetTable":  tplAll.Lookup("createTargetTable"),
+		"replaceTargetTable": tplAll.Lookup("replaceTargetTable"),
+		"alterTableColumns":  tplAll.Lookup("alterTableColumns"),
+		"loadQuery":          tplAll.Lookup("loadQuery"),
+		"copyInto":           tplAll.Lookup("copyInto"),
+		"mergeInto":          tplAll.Lookup("mergeInto"),
+		"updateFence":        tplAll.Lookup("updateFence"),
 	}
 }
 
