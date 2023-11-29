@@ -152,6 +152,58 @@ func (c *client) createIndex(ctx context.Context, index string, shards *int, rep
 	return nil
 }
 
+// replaceIndex first deletes any existing index by the provided name, then creates it anew.
+func (c *client) replaceIndex(ctx context.Context, index string, shards *int, replicas *int, indexProps map[string]property) error {
+	existResp, err := c.es.Indices.Exists(
+		[]string{index},
+		c.es.Indices.Exists.WithContext(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("checking if index exists: %w", err)
+	}
+	defer existResp.Body.Close()
+
+	if existResp.StatusCode == http.StatusOK {
+		// Index exists, so delete it first.
+		res, err := c.es.Indices.Delete([]string{index})
+		if err != nil {
+			return fmt.Errorf("deleting existing index: %w", err)
+		}
+		defer res.Body.Close()
+		if res.IsError() {
+			return fmt.Errorf("delete index error response [%s] %s", res.Status(), res.String())
+		}
+	} else if existResp.StatusCode != http.StatusNotFound {
+		return fmt.Errorf("index exists unexpected status code: %d", existResp.StatusCode)
+	}
+
+	// Create the index anew.
+	params := createIndexParams{
+		Settings: indexSettings{
+			Shards:   shards,
+			Replicas: replicas,
+		},
+		Mappings: indexMappings{
+			Properties: indexProps,
+		},
+	}
+
+	createResp, err := c.es.Indices.Create(
+		index,
+		c.es.Indices.Create.WithContext(ctx),
+		c.es.Indices.Create.WithBody(esutil.NewJSONReader(params)),
+	)
+	if err != nil {
+		return fmt.Errorf("replaceIndex: %w", err)
+	}
+	defer createResp.Body.Close()
+	if createResp.IsError() {
+		return fmt.Errorf("replaceIndex error response [%s] %s", createResp.Status(), createResp.String())
+	}
+
+	return nil
+}
+
 func (c *client) addMappingToIndex(ctx context.Context, index string, field string, prop property) error {
 	res, err := c.es.Indices.PutMapping(
 		[]string{index},
