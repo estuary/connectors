@@ -676,6 +676,7 @@ func (d *transactor) commit(ctx context.Context) error {
 }
 
 func (d *transactor) Destroy() {
+	d.db.Close()
 	d.load.conn.Close()
 	d.store.conn.Close()
 }
