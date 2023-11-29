@@ -212,6 +212,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		constraints, err := ddbValidator.ValidateBinding(
 			[]string{tableName},
 			res.DeltaUpdates,
+			binding.Backfill,
 			binding.Collection,
 			binding.FieldConfigJsonMap,
 			storedSpec,
@@ -260,7 +261,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	if err != nil {
 		if err == errMetaTableNotFound {
 			if err := doAction(fmt.Sprintf("create table '%s", metaTableName), func() error {
-				return createTable(ctx, req.DryRun, client, metaTableName, metaTableAttrs, metaTableSchema)
+				return createTable(ctx, client, metaTableName, metaTableAttrs, metaTableSchema)
 			}); err != nil {
 				return nil, fmt.Errorf("creating metadata table: %w", err)
 			}
@@ -288,15 +289,25 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		}
 
 		tableName := b.ResourcePath[0]
+		attrs, schema := tableConfigFromBinding(b.Collection.Projections)
 		if found == nil {
 			// This table may not have been created yet, so create it now.
-			attrs, schema := tableConfigFromBinding(b.Collection.Projections)
 			if err := doAction(fmt.Sprintf("create table '%s'", tableName), func() error {
-				return createTable(ctx, req.DryRun, client, tableName, attrs, schema)
+				return createTable(ctx, client, tableName, attrs, schema)
 			}); err != nil {
 				return nil, fmt.Errorf("creating table '%s': %w", tableName, err)
 			}
+		} else if found.Backfill != b.Backfill {
+			// Replace the table.
+			if err := doAction(fmt.Sprintf("replace table '%s'", tableName), func() error {
+				return replaceTable(ctx, client, tableName, attrs, schema)
+			}); err != nil {
+				return nil, fmt.Errorf("replacing table '%s': %w", tableName, err)
+			}
 		}
+		// Note: If the table already exists, we don't need to do anything since the table schema is
+		// only for the key columns, and Flow doesn't allow for changing these or adding additional
+		// key columns.
 	}
 
 	// Update the stored materialization spec now that all of the new tables have been created.
@@ -360,16 +371,11 @@ func resolveResourceConfig(specJson json.RawMessage) (resource, error) {
 
 func createTable(
 	ctx context.Context,
-	dryRun bool,
 	client *client,
 	name string,
 	attrs []types.AttributeDefinition,
 	keySchema []types.KeySchemaElement,
 ) error {
-	if dryRun {
-		return nil
-	}
-
 	input := &dynamodb.CreateTableInput{
 		AttributeDefinitions: attrs,
 		KeySchema:            keySchema,
@@ -411,6 +417,53 @@ func createTable(
 	}
 
 	return fmt.Errorf("table %s was created but did not become ready in time", name)
+}
+
+func replaceTable(
+	ctx context.Context,
+	client *client,
+	name string,
+	attrs []types.AttributeDefinition,
+	keySchema []types.KeySchemaElement,
+) error {
+	var errNotFound *types.ResourceNotFoundException
+
+	if _, err := client.db.DeleteTable(ctx, &dynamodb.DeleteTableInput{
+		TableName: aws.String(name),
+	}); err != nil {
+		if !errors.As(err, &errNotFound) {
+			// Any error other than the table already not existing is a problem.
+			return fmt.Errorf("deleting existing table: %w", err)
+		}
+	}
+
+	// Wait for the table to be fully deleted before creating it anew.
+	attempts := 30
+	for {
+		if attempts < 0 {
+			return fmt.Errorf("table %s did not finish deleting in time", name)
+		}
+
+		d, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+			TableName: aws.String(name),
+		})
+		if err != nil {
+			if errors.As(err, &errNotFound) {
+				break
+			}
+			return fmt.Errorf("waiting for table deletion to finish: %w", err)
+		}
+
+		log.WithFields(log.Fields{
+			"table":      name,
+			"lastStatus": d.Table.TableStatus,
+		}).Debug("waiting for table deletion to complete")
+
+		time.Sleep(1 * time.Second)
+		attempts -= 1
+	}
+
+	return createTable(ctx, client, name, attrs, keySchema)
 }
 
 func tableConfigFromBinding(projections []pf.Projection) ([]types.AttributeDefinition, []types.KeySchemaElement) {
