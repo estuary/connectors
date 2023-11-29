@@ -399,6 +399,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		constraints, err := elasticValidator.ValidateBinding(
 			[]string{indexName},
 			res.DeltaUpdates,
+			binding.Backfill,
 			binding.Collection,
 			binding.FieldConfigJsonMap,
 			storedSpec,
@@ -471,6 +472,13 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		if found == nil {
 			if err := doAction(fmt.Sprintf("create index '%s'", binding.ResourcePath[0]), func() error {
 				return client.createIndex(ctx, binding.ResourcePath[0], res.Shards, cfg.Advanced.Replicas, buildIndexProperties(binding))
+			}); err != nil {
+				return nil, fmt.Errorf("creating index '%s': %w", binding.ResourcePath[0], err)
+			}
+		} else if found.Backfill != binding.Backfill {
+			// Replace the existing index.
+			if err := doAction(fmt.Sprintf("replace index '%s'", binding.ResourcePath[0]), func() error {
+				return client.replaceIndex(ctx, binding.ResourcePath[0], res.Shards, cfg.Advanced.Replicas, buildIndexProperties(binding))
 			}); err != nil {
 				return nil, fmt.Errorf("creating index '%s': %w", binding.ResourcePath[0], err)
 			}
