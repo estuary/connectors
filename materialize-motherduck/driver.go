@@ -171,15 +171,16 @@ func newDuckDriver() *sql.Driver {
 			}
 
 			return &sql.Endpoint{
-				Config:              cfg,
-				Dialect:             duckDialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client{db: db},
-				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
-				Tenant:              tenant,
+				Config:               cfg,
+				Dialect:              duckDialect,
+				MetaSpecs:            &metaSpecs,
+				MetaCheckpoints:      &metaCheckpoints,
+				Client:               client{db: db},
+				CreateTableTemplate:  tplCreateTargetTable,
+				ReplaceTableTemplate: tplReplaceTargetTable,
+				NewResource:          newTableConfig,
+				NewTransactor:        newTransactor,
+				Tenant:               tenant,
 			}, nil
 		},
 	}
@@ -189,7 +190,7 @@ type client struct {
 	db *stdsql.DB
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
 	cfg := ep.Config.(*config)
 
 	db, err := cfg.db(ctx)
@@ -227,9 +228,19 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 		}
 	}
 
+	for _, tr := range resolved.ReplaceTables {
+		statements = append(statements, tr.TableReplaceSql)
+	}
+
 	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if dryRun {
+	if req.DryRun {
 		return action, nil
+	}
+
+	if len(resolved.ReplaceTables) > 0 {
+		if err := sql.StdIncrementFence(ctx, db, ep, req.Materialization.Name.String()); err != nil {
+			return "", err
+		}
 	}
 
 	// Running these serially is going to be pretty slow, but it's currently not beneficial to use
