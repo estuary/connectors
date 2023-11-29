@@ -377,7 +377,8 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 }
 
 type transactor struct {
-	cfg *config
+	cfg    *config
+	tenant string
 	// Variables exclusively used by Load.
 	load struct {
 		conn *stdsql.Conn
@@ -407,6 +408,7 @@ func newTransactor(
 	var d = &transactor{
 		cfg:       cfg,
 		templates: renderTemplates(dialect),
+		tenant:    ep.Tenant,
 	}
 
 	if d.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
@@ -524,7 +526,15 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentLoads)
+	// Used to ensure we have no data-interleaving when calling |loaded|
 	var mutex sync.Mutex
+
+	// In order for the concurrent requests below to be actually run concurrently we need
+	// a separate connection for each
+	db, err := stdsql.Open("snowflake", d.cfg.ToURI(d.tenant))
+	if err != nil {
+		return fmt.Errorf("load stdsql.Open: %w", err)
+	}
 
 	for iLoop, queryLoop := range subqueries {
 		var query = queryLoop
@@ -535,7 +545,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			log.WithField("table", b.target.Identifier).Info("load: starting querying documents")
 			// Issue a join of the target table and (now staged) load keys,
 			// and send results to the |loaded| callback.
-			rows, err := d.load.conn.QueryContext(sf.WithStreamDownloader(groupCtx), query)
+			rows, err := db.QueryContext(sf.WithStreamDownloader(groupCtx), query)
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
@@ -543,6 +553,8 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 
 			var binding int
 			var document stdsql.RawBytes
+
+			log.WithField("table", b.target.Identifier).Info("load: finished querying documents")
 
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -558,7 +570,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 				return fmt.Errorf("querying Loads: %w", err)
 			}
 
-			log.WithField("table", b.target.Identifier).Info("load: finished querying documents")
+			log.WithField("table", b.target.Identifier).Info("load: flushed documents to runtime")
 
 			return nil
 		})
@@ -573,13 +585,10 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return nil
 }
 
-const MaxConcurrentStores = 5
-
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	d.store.round++
 
 	log.Info("store: starting encoding and uploading of files")
-	var idx = 0
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -594,8 +603,6 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		if it.Exists {
 			b.store.mustMerge = true
 		}
-
-		idx = idx + 1
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
@@ -631,42 +638,30 @@ func (d *transactor) commit(ctx context.Context) error {
 		return err
 	}
 
-	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(MaxConcurrentStores)
-
 	log.Info("store: starting copying of files into tables")
-	for _, bLoop := range d.bindings {
-		var b = bLoop
-		group.Go(func() error {
-			if !b.store.stage.started {
-				// No table update required
-			} else if err := b.store.stage.flush(); err != nil {
-				return err
-			} else if !b.store.mustMerge {
-				log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
-				// We can issue a faster COPY INTO the target table.
-				if _, err = txn.ExecContext(groupCtx, b.store.copyInto); err != nil {
-					return fmt.Errorf("copying Store documents into table %q: %w", b.target.Identifier, err)
-				}
-				log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
-			} else {
-				log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
-				// We must MERGE into the target table.
-				if _, err = txn.ExecContext(groupCtx, b.store.mergeInto); err != nil {
-					return fmt.Errorf("merging Store documents into table %q: %w", b.target.Identifier, err)
-				}
-				log.WithField("table", b.target.Identifier).Info("store: finishing merging data into table")
+	for _, b := range d.bindings {
+		if !b.store.stage.started {
+			// No table update required
+		} else if err := b.store.stage.flush(); err != nil {
+			return err
+		} else if !b.store.mustMerge {
+			log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
+			// We can issue a faster COPY INTO the target table.
+			if _, err = txn.ExecContext(ctx, b.store.copyInto); err != nil {
+				return fmt.Errorf("copying Store documents into table %q: %w", b.target.Identifier, err)
 			}
+			log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
+		} else {
+			log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
+			// We must MERGE into the target table.
+			if _, err = txn.ExecContext(ctx, b.store.mergeInto); err != nil {
+				return fmt.Errorf("merging Store documents into table %q: %w", b.target.Identifier, err)
+			}
+			log.WithField("table", b.target.Identifier).Info("store: finishing merging data into table")
+		}
 
-			// Reset for next transaction.
-			b.store.mustMerge = false
-
-			return nil
-		})
-	}
-
-	if err := group.Wait(); err != nil {
-		return err
+		// Reset for next transaction.
+		b.store.mustMerge = false
 	}
 
 	log.Info("store: finished encoding and uploading of files")
