@@ -55,7 +55,7 @@ class CaptureShim(Connector):
             documentationUrl=DOCS_URL if DOCS_URL else "https://docs.estuary.dev",
             configSchema=self.config_schema,
             resourceConfigSchema=resource_config_schema,
-            resourcePathPointers: ["/stream"],
+            resourcePathPointers=["/stream"],
         )
 
         if self.oauth2:
