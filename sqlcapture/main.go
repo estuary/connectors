@@ -134,7 +134,7 @@ func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_S
 		ConfigSchemaJson:         d.ConfigSchema,
 		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
 		DocumentationUrl:         docsURLFromEnv(d.DocumentationURL),
-		ResourcePathPointers:     []string{"/stream", "/namespace"},
+		ResourcePathPointers:     []string{"/namespace", "/stream"},
 	}, nil
 }
 
