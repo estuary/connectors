@@ -7,7 +7,7 @@ from pytest import fixture
 
 @fixture(name="config")
 def config_fixture():
-    return {"credentials": {"personal_access_token": "TOKEN"}}
+    return {"authentication": {"personal_access_token": "TOKEN"}}
 
 
 @fixture(name="mock_response")
