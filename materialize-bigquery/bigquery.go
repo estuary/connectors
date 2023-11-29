@@ -16,6 +16,7 @@ import (
 	storage "cloud.google.com/go/storage"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -183,15 +184,16 @@ func newBigQueryDriver() *sql.Driver {
 			}
 
 			return &sql.Endpoint{
-				Config:              cfg,
-				Dialect:             bqDialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
-				Client:              client,
-				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
-				Tenant:              tenant,
+				Config:               cfg,
+				Dialect:              bqDialect,
+				MetaSpecs:            &metaSpecs,
+				MetaCheckpoints:      &metaCheckpoints,
+				Client:               client,
+				CreateTableTemplate:  tplCreateTargetTable,
+				ReplaceTableTemplate: tplReplaceTargetTable,
+				NewResource:          newTableConfig,
+				NewTransactor:        newTransactor,
+				Tenant:               tenant,
 			}, nil
 		},
 	}
@@ -210,7 +212,7 @@ type columnRow struct {
 	DataType   string `bigquery:"data_Type"`
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
 	client := ep.Client.(*client)
 	cfg := ep.Config.(*config)
 
@@ -286,11 +288,25 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 		statements = append(statements, alterColumnStmt.String())
 	}
 
+	for _, tr := range filtered.ReplaceTables {
+		statements = append(statements, tr.TableReplaceSql)
+	}
+
 	// The spec will get updated last, after all the other actions are complete, but include it in
 	// the description of actions.
 	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if dryRun {
+	if req.DryRun {
 		return action, nil
+	}
+
+	if len(filtered.ReplaceTables) > 0 {
+		if _, err := c.query(ctx, fmt.Sprintf(
+			`UPDATE %s SET fence=fence+1 WHERE materialization = %s`,
+			bqDialect.Identifier(ep.MetaCheckpoints.Path...),
+			bqDialect.Literal(req.Materialization.Name.String()),
+		)); err != nil {
+			return "", fmt.Errorf("incrementing fence: %w", err)
+		}
 	}
 
 	// Execute statements in parallel for efficiency. Each statement acts on a single table, and
