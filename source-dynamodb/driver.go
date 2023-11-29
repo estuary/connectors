@@ -29,6 +29,7 @@ func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec
 		ConfigSchemaJson:         json.RawMessage(endpointSchema),
 		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
 		DocumentationUrl:         "https://go.estuary.dev/source-dynamodb",
+		ResourcePathPointers:     []string{"/table"},
 	}, nil
 }
 

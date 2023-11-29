@@ -75,5 +75,8 @@
     ],
     "title": "Resource"
   },
-  "documentation_url": "https://go.estuary.dev/source-dynamodb"
+  "documentation_url": "https://go.estuary.dev/source-dynamodb",
+  "resource_path_pointers": [
+    "/table"
+  ]
 }
