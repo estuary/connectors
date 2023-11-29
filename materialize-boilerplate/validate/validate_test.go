@@ -246,6 +246,27 @@ func TestValidateSelectedFields(t *testing.T) {
 			require.ErrorContains(t, err, "Field 'intKey' is already being materialized as type 'integer' and cannot be changed to type 'string'")
 		})
 
+		t.Run("unsatisfiable type change for a value with backfill counter increment", func(t *testing.T) {
+			storedSpec := loadSpec(t, "base.flow.proto")
+			newSpec := loadSpec(t, "base.flow.proto")
+			require.Equal(t, "boolVal", newSpec.Bindings[0].Collection.Projections[0].Field)
+			newSpec.Bindings[0].Collection.Projections[0].Inference.Types = []string{pf.JsonTypeObject}
+			newSpec.Bindings[0].Backfill = newSpec.Bindings[0].Backfill + 1
+
+			err := validator.ValidateSelectedFields(newSpec.Bindings[0], storedSpec)
+			require.NoError(t, err)
+		})
+
+		t.Run("backfill counter decrement is not allowed", func(t *testing.T) {
+			storedSpec := loadSpec(t, "base.flow.proto")
+			newSpec := loadSpec(t, "base.flow.proto")
+			storedSpec.Bindings[0].Backfill = 2
+			newSpec.Bindings[0].Backfill = 1
+
+			err := validator.ValidateSelectedFields(newSpec.Bindings[0], storedSpec)
+			require.ErrorContains(t, err, "backfill count 1 for proposed binding of collection key/value is less than previously applied count of 2")
+		})
+
 		t.Run("forbidden type change for a value", func(t *testing.T) {
 			storedSpec := loadSpec(t, "base.flow.proto")
 			newSpec := loadSpec(t, "base.flow.proto")
