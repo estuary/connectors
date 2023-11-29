@@ -18,6 +18,23 @@ CREATE TABLE IF NOT EXISTS projectID.dataset.target_table (
 CLUSTER BY key1, key2, boolean, integer;
 --- End projectID.dataset.target_table createTargetTable ---
 
+--- Begin projectID.dataset.target_table replaceTargetTable ---
+CREATE OR REPLACE TABLE projectID.dataset.target_table (
+		key1 INT64 NOT NULL,
+		key2 BOOL NOT NULL,
+		boolean BOOL NOT NULL,
+		integer INT64 NOT NULL,
+		string STRING NOT NULL,
+		`defAULT` STRING,
+		number FLOAT64,
+		person_place_ STRING,
+		source_name STRING,
+		`with-dash` STRING,
+		flow_document STRING NOT NULL
+)
+CLUSTER BY key1, key2, boolean, integer;
+--- End projectID.dataset.target_table replaceTargetTable ---
+
 --- Begin projectID.dataset.target_table loadQuery ---
 SELECT 0, l.flow_document
 	FROM projectID.dataset.target_table AS l

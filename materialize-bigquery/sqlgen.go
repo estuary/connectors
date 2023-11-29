@@ -129,6 +129,24 @@ CLUSTER BY {{ range $ind, $key := $.Keys }}
 	{{- end}};
 {{ end }}
 
+-- Templated creation or replacement of a target table. It's exactly the
+-- same as createTargetTable, except it uses CREATE OR REPLACE.
+
+{{ define "replaceTargetTable" -}}
+CREATE OR REPLACE TABLE {{$.Identifier}} (
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}} {{$col.DDL}}
+	{{- end }}
+)
+CLUSTER BY {{ range $ind, $key := $.Keys }}
+	{{- if lt $ind 4 -}}
+		{{- if $ind }}, {{end -}}
+			{{$key.Identifier}}
+		{{- end -}}
+	{{- end}};
+{{ end }}
+
 -- Templated query which performs table alterations by adding columns and/or
 -- dropping nullability constraints. BigQuery does not allow adding columns and
 -- modifying columns together in the same statement, but either one of those
@@ -294,12 +312,13 @@ UPDATE {{ Identifier $.TablePath }}
 	AND fence={{ $.Fence }};
 {{ end }}
 `)
-	tplTempTableName     = tplAll.Lookup("tempTableName")
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplInstallFence      = tplAll.Lookup("installFence")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplStoreInsert       = tplAll.Lookup("storeInsert")
-	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
+	tplTempTableName      = tplAll.Lookup("tempTableName")
+	tplCreateTargetTable  = tplAll.Lookup("createTargetTable")
+	tplReplaceTargetTable = tplAll.Lookup("replaceTargetTable")
+	tplAlterTableColumns  = tplAll.Lookup("alterTableColumns")
+	tplInstallFence       = tplAll.Lookup("installFence")
+	tplUpdateFence        = tplAll.Lookup("updateFence")
+	tplLoadQuery          = tplAll.Lookup("loadQuery")
+	tplStoreInsert        = tplAll.Lookup("storeInsert")
+	tplStoreUpdate        = tplAll.Lookup("storeUpdate")
 )

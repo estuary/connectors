@@ -373,6 +373,33 @@
 ]
 --- End remove new binding ---
 
+--- Begin replace original binding table ---
+* Table list: [first-table flow_checkpoints_v1 flow_materializations_v2 second-table]:
+* Schema for estuary-theatre.testing.first-table:
+[
+  {
+    "Name": "flow_document",
+    "Nullable": "NO",
+    "Type": "STRING"
+  },
+  {
+    "Name": "key",
+    "Nullable": "NO",
+    "Type": "STRING"
+  },
+  {
+    "Name": "optionalVal1",
+    "Nullable": "YES",
+    "Type": "INT64"
+  },
+  {
+    "Name": "requiredVal1",
+    "Nullable": "NO",
+    "Type": "STRING"
+  }
+]
+--- End replace original binding table ---
+
 --- Begin remove original binding ---
 * Table list: [first-table flow_checkpoints_v1 flow_materializations_v2 second-table]:
 --- End remove original binding ---
