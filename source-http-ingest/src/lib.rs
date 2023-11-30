@@ -227,6 +227,7 @@ async fn do_validate(
     for ValidateBinding {
         collection,
         resource_config_json,
+        backfill: _,
     } in bindings
     {
         let Some(collection) = collection else {
