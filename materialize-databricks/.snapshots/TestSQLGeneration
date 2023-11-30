@@ -106,6 +106,18 @@ CREATE TABLE IF NOT EXISTS `a-schema`.target_table (
 ) COMMENT 'Generated for materialization test/sqlite of collection key/value';
 --- End `a-schema`.target_table createTargetTable ---
 
+--- Begin `a-schema`.target_table replaceTargetTable ---
+CREATE OR REPLACE TABLE `a-schema`.target_table (
+  key1 BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /key1 with inferred types: [integer]',
+  key2 BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]',
+  boolean BOOLEAN COMMENT 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]',
+  integer BIGINT COMMENT 'auto-generated projection of JSON at: /integer with inferred types: [integer]',
+  number DOUBLE COMMENT 'auto-generated projection of JSON at: /number with inferred types: [number]',
+  string STRING COMMENT 'auto-generated projection of JSON at: /string with inferred types: [string]',
+  flow_document STRING NOT NULL COMMENT 'auto-generated projection of JSON at:  with inferred types: [object]'
+) COMMENT 'Generated for materialization test/sqlite of collection key/value';
+--- End `a-schema`.target_table replaceTargetTable ---
+
 --- Begin `default`.`Delta Updates` createLoadTable ---
 CREATE TABLE IF NOT EXISTS `flow_temp_load_table_shard-range_1_Delta Updates` (
 	`theKey` STRING NOT NULL
@@ -198,6 +210,14 @@ CREATE TABLE IF NOT EXISTS `default`.`Delta Updates` (
 auto-generated projection of JSON at: /aValue with inferred types: [integer]'
 ) COMMENT 'Generated for materialization test/sqlite of collection delta/updates';
 --- End `default`.`Delta Updates` createTargetTable ---
+
+--- Begin `default`.`Delta Updates` replaceTargetTable ---
+CREATE OR REPLACE TABLE `default`.`Delta Updates` (
+  `theKey` STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
+  `aValue` BIGINT COMMENT 'A super-awesome value.
+auto-generated projection of JSON at: /aValue with inferred types: [integer]'
+) COMMENT 'Generated for materialization test/sqlite of collection delta/updates';
+--- End `default`.`Delta Updates` replaceTargetTable ---
 
 --- Begin alter table add columns ---
 ALTER TABLE `a-schema`.target_table ADD COLUMN

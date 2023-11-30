@@ -93,15 +93,16 @@ func newDatabricksDriver() *sql.Driver {
 			var metaSpecs, _ = sql.MetaTables(metaBase)
 
 			return &sql.Endpoint{
-				Config:              cfg,
-				Dialect:             databricksDialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     nil,
-				Client:              client{uri: cfg.ToURI()},
-				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
-				Tenant:              tenant,
+				Config:               cfg,
+				Dialect:              databricksDialect,
+				MetaSpecs:            &metaSpecs,
+				MetaCheckpoints:      nil,
+				Client:               client{uri: cfg.ToURI()},
+				CreateTableTemplate:  tplCreateTargetTable,
+				ReplaceTableTemplate: tplReplaceTargetTable,
+				NewResource:          newTableConfig,
+				NewTransactor:        newTransactor,
+				Tenant:               tenant,
 			}, nil
 		},
 	}
@@ -111,7 +112,7 @@ type client struct {
 	uri string
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate, dryRun bool) (string, error) {
+func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
 	cfg := ep.Config.(*config)
 
 	db, err := stdsql.Open("databricks", c.uri)
@@ -148,8 +149,11 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 			))
 		}
 	}
+	for _, tr := range resolved.ReplaceTables {
+		actionList = append(actionList, tr.TableReplaceSql)
+	}
 	action := strings.Join(append(actionList, updateSpec.QueryString), "\n")
-	if dryRun {
+	if req.DryRun {
 		return action, nil
 	}
 
@@ -192,6 +196,20 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, actions sql.ApplyAc
 				if _, err := db.ExecContext(groupCtx, q); err != nil {
 					return fmt.Errorf("executing table drop not null statement: %w", err)
 				}
+			}
+			return nil
+		})
+	}
+
+	// TODO(whb): There's a chance that if a previous driver checkpoint was persisted before the
+	// actual data load completed, these table replacements will not be compatible with the data
+	// referenced by the persisted driver checkpoint. This is pretty unlikely to happen, and will be
+	// resolved when we incorporate the use of state keys, which incorporate the backfill counter.
+	for _, tr := range resolved.ReplaceTables {
+		tr := tr
+		group.Go(func() error {
+			if _, err := db.ExecContext(groupCtx, tr.TableReplaceSql); err != nil {
+				return fmt.Errorf("executing table create statement: %w", err)
 			}
 			return nil
 		})
