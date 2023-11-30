@@ -384,6 +384,11 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	if d.store.mergeInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, t.templates["mergeInto"]); err != nil {
 		return fmt.Errorf("mergeInto template: %w", err)
 	}
+	if createPipe, err := RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, t.templates["createPipe"]); err != nil {
+		return fmt.Errorf("createPipe template: %w", err)
+	} else if _, err := t.db.ExecContext(sf.WithStreamDownloader(ctx), createPipe); err != nil {
+		return fmt.Errorf("creating pipe for table %q: %w", target.Path, err)
+	}
 
 	t.bindings = append(t.bindings, d)
 	return nil

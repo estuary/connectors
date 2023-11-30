@@ -192,6 +192,28 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{ end -}}
 {{ end }}
 
+
+{{ define "pipe_name" -}}
+`+"`"+`flow_pipe_{{ $.Binding }}_{{ Last $.Path }}`+"`"+`
+{{- end }}
+
+{{ define "createPipe" }}
+CREATE OR REPLACE PIPE {{ template "pipe_name" $.Table }}
+  COMMENT = 'Pipe for table {{ $.Table.Path }}'
+  AS COPY INTO {{ $.Table.Identifier }} (
+	{{ range $ind, $key := $.Table.Columns }}
+		{{- if $ind }}, {{ end -}}
+		{{$key.Identifier -}}
+	{{- end }}
+) FROM (
+	SELECT {{ range $ind, $key := $.Table.Columns }}
+	{{- if $ind }}, {{ end -}}
+	$1[{{$ind}}] AS {{$key.Identifier -}}
+	{{- end }}
+	FROM @flow_v1/{{ $.RandomUUID }}
+);
+{{ end }}
+
 {{ define "copyInto" }}
 COPY INTO {{ $.Table.Identifier }} (
 	{{ range $ind, $key := $.Table.Columns }}
@@ -273,6 +295,7 @@ END $$;
 		"createTargetTable": tplAll.Lookup("createTargetTable"),
 		"alterTableColumns": tplAll.Lookup("alterTableColumns"),
 		"loadQuery":         tplAll.Lookup("loadQuery"),
+		"createPipe":        tplAll.Lookup("createPipe"),
 		"copyInto":          tplAll.Lookup("copyInto"),
 		"mergeInto":         tplAll.Lookup("mergeInto"),
 		"updateFence":       tplAll.Lookup("updateFence"),

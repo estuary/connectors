@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"github.com/iancoleman/orderedmap"
 	"github.com/invopop/jsonschema"
@@ -52,14 +55,26 @@ func (c *config) ToURI(tenant string) string {
 	return dsn
 }
 
+func (c *config) privateKey() (*rsa.PrivateKey, error) {
+	if c.Credentials.AuthType == JWT {
+		var block, _ = pem.Decode([]byte(c.Credentials.PrivateKey))
+		if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err != nil {
+			return nil, fmt.Errorf("parsing private key: %w", err)
+		} else {
+			return key, nil
+		}
+	}
+
+	return nil, fmt.Errorf("only supported with JWT authentication")
+}
+
 func (c *config) asSnowflakeConfig(tenant string) sf.Config {
 	var maxStatementCount string = "0"
 	var json string = "json"
-	return sf.Config{
+
+	var conf = sf.Config{
 		Account:     c.Account,
 		Host:        c.Host,
-		User:        c.User,
-		Password:    c.Password,
 		Database:    c.Database,
 		Schema:      c.Schema,
 		Warehouse:   c.Warehouse,
@@ -73,6 +88,23 @@ func (c *config) asSnowflakeConfig(tenant string) sf.Config {
 			"GO_QUERY_RESULT_FORMAT": &json,
 		},
 	}
+
+	if c.Credentials.AuthType == UserPass {
+		conf.Authenticator = sf.AuthTypeSnowflake
+		conf.User = c.Credentials.User
+		conf.Password = c.Credentials.Password
+	} else if c.Credentials.AuthType == JWT {
+		conf.Authenticator = sf.AuthTypeJwt
+		// We run this as part of validate to ensure that there is no error, so
+		// this is not expected to error here
+		if key, err := c.privateKey(); err != nil {
+			panic(err)
+		} else {
+			conf.PrivateKey = key
+		}
+	}
+
+	return conf
 }
 
 var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)
@@ -121,6 +153,10 @@ func (c *config) Validate() error {
 	}
 
 	if err := c.Credentials.Validate(); err != nil {
+		return err
+	}
+
+	if _, err := c.privateKey(); err != nil {
 		return err
 	}
 
