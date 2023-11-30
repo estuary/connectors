@@ -127,6 +127,8 @@ fn local_capture(binding_name: &str) -> CaptureSpec {
             collection: Some(CollectionSpec {
                 ..Default::default()
             }),
+            backfill: 0,
+            state_key: "".to_string(),
         }],
         connector_type: capture_spec::ConnectorType::Image as i32,
         config_json: config.to_string(),
