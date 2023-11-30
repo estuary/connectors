@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"log"
@@ -38,6 +40,16 @@ func mustDSN() string {
 		{"SNOWFLAKE_WAREHOUSE", &conf.Warehouse},
 	} {
 		*prop.dest = os.Getenv(prop.key)
+	}
+
+	if v := os.Getenv("SNOWFLAKE_PRIVATE_KEY"); v != "" {
+		conf.Authenticator = sf.AuthTypeJwt
+		var block, _ = pem.Decode([]byte(v))
+		if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err != nil {
+			panic(fmt.Errorf("parsing private key: %w", err))
+		} else {
+			conf.PrivateKey = key
+		}
 	}
 
 	dsn, err := sf.DSN(&conf)
