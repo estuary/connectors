@@ -347,7 +347,8 @@ func newTransactor(
 }
 
 type binding struct {
-	target sql.Table
+	target   sql.Table
+	snowPipe bool
 	// Variables exclusively used by Load.
 	load struct {
 		loadQuery string
@@ -384,10 +385,17 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	if d.store.mergeInto, err = RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, t.templates["mergeInto"]); err != nil {
 		return fmt.Errorf("mergeInto template: %w", err)
 	}
-	if createPipe, err := RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, t.templates["createPipe"]); err != nil {
-		return fmt.Errorf("createPipe template: %w", err)
-	} else if _, err := t.db.ExecContext(sf.WithStreamDownloader(ctx), createPipe); err != nil {
-		return fmt.Errorf("creating pipe for table %q: %w", target.Path, err)
+
+	// If this is a delta updates binding and we are using JWT auth type, this binding
+	// can use snowpipe
+	d.snowPipe = target.DeltaUpdates && t.cfg.Credentials.AuthType == JWT
+
+	if d.snowPipe {
+		if createPipe, err := RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, t.templates["createPipe"]); err != nil {
+			return fmt.Errorf("createPipe template: %w", err)
+		} else if _, err := t.db.ExecContext(sf.WithStreamDownloader(ctx), createPipe); err != nil {
+			return fmt.Errorf("creating pipe for table %q: %w", target.Path, err)
+		}
 	}
 
 	t.bindings = append(t.bindings, d)
