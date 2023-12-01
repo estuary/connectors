@@ -1,2 +1,2 @@
-will:secret1234@tcp(example.com:3306)/somedb?multiStatements=true&tls=preferred
+will:secret1234@tcp(example.com:3306)/somedb?tls=preferred
 config valid

@@ -28,8 +28,6 @@ auto-generated projection of JSON at: /aValue with inferred types: [integer]'
 
 --- Begin target_table replaceTargetTable ---
 
-DROP TABLE IF EXISTS target_table;
-
 CREATE TABLE IF NOT EXISTS target_table (
 		key1 BIGINT NOT NULL COMMENT 'Key One Title
 Key One Description
@@ -49,8 +47,6 @@ auto-generated projection of JSON at: /array with inferred types: [array]',
 --- End target_table replaceTargetTable ---
 
 --- Begin `Delta Updates` replaceTargetTable ---
-
-DROP TABLE IF EXISTS `Delta Updates`;
 
 CREATE TABLE IF NOT EXISTS `Delta Updates` (
 		`theKey` VARCHAR(256) NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
