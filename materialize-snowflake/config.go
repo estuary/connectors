@@ -19,7 +19,7 @@ import (
 type config struct {
 	Host      string `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0"`
 	Account   string `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier." jsonschema_extras:"order=1"`
-	User      string `json:"user" jsonschema:"-"`
+	User      string `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=2"`
 	Password  string `json:"password" jsonschema:"-"`
 	Database  string `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=4"`
 	Schema    string `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=5"`
@@ -57,11 +57,14 @@ func (c *config) ToURI(tenant string) string {
 
 func (c *config) privateKey() (*rsa.PrivateKey, error) {
 	if c.Credentials.AuthType == JWT {
-		var block, _ = pem.Decode([]byte(c.Credentials.PrivateKey))
-		if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err != nil {
+		// When providing the PEM file in a JSON file, newlines can't be specified unless
+		// escaped, so here we allow a escape hatch to parse these PEM files
+		var pkString = strings.ReplaceAll(c.Credentials.PrivateKey, "\\n", "\n")
+		var block, _ = pem.Decode([]byte(pkString))
+		if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
 			return nil, fmt.Errorf("parsing private key: %w", err)
 		} else {
-			return key, nil
+			return key.(*rsa.PrivateKey), nil
 		}
 	}
 
@@ -76,6 +79,7 @@ func (c *config) asSnowflakeConfig(tenant string) sf.Config {
 		Account:     c.Account,
 		Host:        c.Host,
 		Database:    c.Database,
+		User:        c.User,
 		Schema:      c.Schema,
 		Warehouse:   c.Warehouse,
 		Role:        c.Role,
@@ -91,7 +95,6 @@ func (c *config) asSnowflakeConfig(tenant string) sf.Config {
 
 	if c.Credentials.AuthType == UserPass {
 		conf.Authenticator = sf.AuthTypeSnowflake
-		conf.User = c.Credentials.User
 		conf.Password = c.Credentials.Password
 	} else if c.Credentials.AuthType == JWT {
 		conf.Authenticator = sf.AuthTypeJwt
@@ -141,14 +144,13 @@ func (c *config) Validate() error {
 		return err
 	}
 
-	if c.User != "" && c.Password != "" {
+	if c.Password != "" {
 		// If they have both old user and password and new ones, ask them to remove the old ones
-		if c.Credentials.AuthType != "" || c.Credentials.User != "" || c.Credentials.Password != "" {
+		if c.Credentials.AuthType != "" || c.Credentials.Password != "" {
 			return fmt.Errorf("User and password in the root config are deprecated, please omit them and use the `credentials` config object only.")
 		}
 
 		c.Credentials.AuthType = UserPass
-		c.Credentials.User = c.User
 		c.Credentials.Password = c.Password
 	}
 
@@ -165,13 +167,12 @@ func (c *config) Validate() error {
 
 const (
 	UserPass = "user_password" // username and password
-	JWT      = "JWT"           // JWT, needs a private key
+	JWT      = "jwt"           // JWT, needs a private key
 )
 
 type credentialConfig struct {
 	AuthType string `json:"auth_type"`
 
-	User     string `json:"user"`
 	Password string `json:"password"`
 
 	PrivateKey string `json:"private_key"`
@@ -189,9 +190,6 @@ func (c *credentialConfig) Validate() error {
 }
 
 func (c *credentialConfig) validateUserPassCreds() error {
-	if c.User == "" {
-		return fmt.Errorf("missing user")
-	}
 	if c.Password == "" {
 		return fmt.Errorf("missing password")
 	}
@@ -216,11 +214,6 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		Type:    "string",
 		Default: UserPass,
 		Const:   UserPass,
-	})
-	uProps.Set("user", &jsonschema.Schema{
-		Title:       "Username",
-		Description: "The Snowflake user login name",
-		Type:        "string",
 	})
 	uProps.Set("password", &jsonschema.Schema{
 		Title:       "Password",
@@ -253,7 +246,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		Default:     map[string]string{"auth_type": UserPass},
 		OneOf: []*jsonschema.Schema{
 			{
-				Title:      "Username & Password",
+				Title:      "User Password",
 				Required:   []string{"auth_type", "user", "password"},
 				Properties: uProps,
 			},

@@ -15,17 +15,17 @@ export SNOWFLAKE_AUTH_TYPE="${SNOWFLAKE_AUTH_TYPE}"
 export SNOWFLAKE_USER="${SNOWFLAKE_USER:-}"
 export SNOWFLAKE_PASSWORD="${SNOWFLAKE_PASSWORD:-}"
 # if auth type is jwt
-export SNOWFLAKE_PRIVATE_KEY="cat ${SNOWFLAKE_PRIVATE_KEY:-}"
+export SNOWFLAKE_PRIVATE_KEY="$(cat ${SNOWFLAKE_PRIVATE_KEY:-} | jq -sR . | sed -e 's/^"//' -e 's/"$//')"
 
 config_json_template='{
    "host":      "$SNOWFLAKE_HOST",
    "account":   "$SNOWFLAKE_ACCOUNT",
    "database":  "$SNOWFLAKE_DATABASE",
    "schema":    "$SNOWFLAKE_SCHEMA",
+   "user": "$SNOWFLAKE_USER",
    "warehouse": "$SNOWFLAKE_WAREHOUSE",
    "credentials": {
      "auth_type": "$SNOWFLAKE_AUTH_TYPE",
-     "user": "$SNOWFLAKE_USER",
      "password": "$SNOWFLAKE_PASSWORD",
      "private_key": "$SNOWFLAKE_PRIVATE_KEY"
    },
