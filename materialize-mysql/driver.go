@@ -178,7 +178,6 @@ func (c *config) ToURI() string {
 	mysqlCfg.User = c.User
 	mysqlCfg.Passwd = c.Password
 	mysqlCfg.DBName = c.Database
-	mysqlCfg.MultiStatements = true
 
 	if c.Advanced.SSLMode != "" {
 		// see https://pkg.go.dev/github.com/go-sql-driver/mysql#section-readme
@@ -378,6 +377,9 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_App
 	}
 
 	for _, tr := range resolved.ReplaceTables {
+		// `TableReplaceSql` is only the "create table" part, and we need to also include the
+		// statement to drop the table first. Also see additional comments in sqlgen.go.
+		statements = append(statements, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tr.Identifier))
 		statements = append(statements, tr.TableReplaceSql)
 	}
 

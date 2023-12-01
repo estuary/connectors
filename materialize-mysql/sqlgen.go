@@ -136,13 +136,16 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin {{- if $.Comment }} COMMENT={{Literal $.Comment}} {{- end }};
 {{ end }}
 
--- Templated replacement of a materialized table. MySQL doesn't support
--- transactional DDL and also doesn't have a CREATE OR REPLACE TABLE
--- type of operation so this is the best we can do.
+-- Templated replacement of a materialized table, sort of. MySQL doesn't
+-- have a CREATE OR REPLACE TABLE operation generally, nor does it support
+-- transactional DDL, and to make matters worse the go driver support for
+-- multi-statement queries is kind of janky. As such, this is only the
+-- "create table" part of the drop & create that is necessary for table
+-- replacement. The logic in Apply for the driver must execute the statement
+-- for dropping the table prior to running this query.
 
 {{ define "replaceTargetTable" }}
-DROP TABLE IF EXISTS {{$.Identifier}};
-{{ template "createTargetTable" . }}
+{{- template "createTargetTable" . }}
 {{ end }}
 
 -- Templated query which performs table alterations by adding columns and/or
