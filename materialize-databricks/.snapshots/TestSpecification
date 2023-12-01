@@ -81,8 +81,7 @@
       "schema": {
         "type": "string",
         "title": "Schema",
-        "description": "Schema where the table resides",
-        "default": "default"
+        "description": "Schema where the table resides"
       },
       "delta_updates": {
         "type": "boolean",
@@ -93,8 +92,7 @@
     },
     "type": "object",
     "required": [
-      "table",
-      "schema"
+      "table"
     ],
     "title": "SQL Table"
   },
