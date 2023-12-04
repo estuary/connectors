@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	sql "github.com/estuary/connectors/materialize-sql"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 var pgDialect = func() sql.Dialect {
@@ -19,16 +18,13 @@ var pgDialect = func() sql.Dialect {
 		sql.BINARY:   sql.NewStaticMapper("BYTEA"),
 		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
 		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter(func(te tuple.TupleElement) (interface{}, error) {
-				s, ok := te.(string)
-				if !ok {
-					return nil, fmt.Errorf("converting string incompatible type: %T", s)
-				}
-
-				// Postgres doesn't allow fields with null bytes, so they must be stripped out if
-				// present.
-				return strings.ReplaceAll(s, "\u0000", ""), nil
-			})),
+			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter(
+				sql.StringCastConverter(func(in string) (interface{}, error) {
+					// Postgres doesn't allow fields with null bytes, so they must be stripped out if
+					// present.
+					return strings.ReplaceAll(in, "\u0000", ""), nil
+				})),
+			),
 			WithFormat: map[string]sql.TypeMapper{
 				"integer": sql.PrimaryKeyMapper{
 					PrimaryKey: sql.NewStaticMapper("TEXT"),
