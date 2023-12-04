@@ -9,6 +9,6 @@ captures:
           - source-zoom
         config:
           access_token: "dadsfads"
-	  env:
-	    LOG_LEVEL: debug
-    binding:
+        env:
+          LOG_LEVEL: debug
+    bindings: []

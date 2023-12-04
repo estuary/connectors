@@ -36,6 +36,23 @@ definitions:
     type: JsonFileSchemaLoader
     file_path: "./source_zoom/schemas/{{ parameters['name'] }}.json"
 
+
+  accounts_stream:
+    schema_loader:
+      $ref: "#/definitions/schema_loader"
+    retriever:
+      paginator:
+        $ref: "#/definitions/zoom_paginator"
+      record_selector:
+        extractor:
+          type: DpathExtractor
+          field_path: ["accounts"]
+      $ref: "#/definitions/retriever"
+    $parameters:
+      name: "accounts"
+      primary_key: "id"
+      path: "/accounts"
+
   users_stream:
     schema_loader:
       $ref: "#/definitions/schema_loader"
