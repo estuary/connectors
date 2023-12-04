@@ -2,17 +2,22 @@ import logging
 import os
 import typing as t
 from airbyte_cdk.sources.source import Source
+from dataclasses import asdict, dataclass
 from airbyte_protocol.models import (
     SyncMode,
     ConfiguredAirbyteCatalog,
     ConfiguredAirbyteStream,
+    AirbyteStateMessage,
+    AirbyteStreamState,
+    AirbyteGlobalState,
+    AirbyteStateType,
     AirbyteStream,
     Status,
     Level as LogLevel,
 )
 
 from .capture import Connector, request, response, Response
-from . import flow, ValidateError, logger 
+from . import flow, ValidateError, logger
 from .logger import init_logger
 
 logger = init_logger()
@@ -24,15 +29,48 @@ logging.getLogger("airbyte").setLevel(logger.level)
 
 DOCS_URL = os.getenv("DOCS_URL")
 
+
+"""
+Airbyte doesn't appear to reduce state like we do. As a result,
+the Airbyte CDK is expecting its state input to look like a list of
+AirbyteStateMessages. Since we _do_ reduce state, what we do here is
+keep track of the latest AirbyteStateMessage for each stream, and then
+just give Airbyte a list of all of the latest state messages on boot.
+"""
+@dataclass
+class State:
+    stream_state: t.Optional[t.Dict[str, AirbyteStateMessage]] = None
+    global_state: t.Optional[AirbyteStateMessage] = None
+
+    def handle_message(self, msg: AirbyteStateMessage):
+        if msg.type == AirbyteStateType.STREAM:
+            if msg.stream == None:
+                raise Exception(
+                    "Got a STREAM-specific state message with no stream-specific state"
+                )
+            if not self.stream_state:
+                self.stream_state = {}
+            self.stream_state[
+                f"{msg.stream.stream_descriptor.name}-{msg.stream.stream_descriptor.namespace}"
+            ] = msg
+        elif msg.type == AirbyteStateType.GLOBAL:
+            self.global_state = msg
+        elif msg.type == AirbyteStateType.LEGACY or msg.type is None:
+            raise Exception("Airbyte LEGACY state is not supported")
+
+    def to_airbyte_input(self):
+        if self.global_state:
+            return [self.global_state]
+        elif self.stream_state:
+            return [msg for k, msg in self.stream_state.items()]
+
+
 class CaptureShim(Connector):
     delegate: Source
     usesSchemaInference: bool
 
     def __init__(
-        self,
-        delegate: Source,
-        oauth2: flow.OAuth2 | None,
-        usesSchemaInference = True
+        self, delegate: Source, oauth2: flow.OAuth2 | None, usesSchemaInference=True
     ):
         super().__init__()
         self.delegate = delegate
@@ -74,7 +112,7 @@ class CaptureShim(Connector):
             }
             if stream.namespace:
                 config["namespace"] = stream.namespace
-            
+
             json_schema = stream.json_schema
 
             if stream.source_defined_primary_key:
@@ -101,7 +139,7 @@ class CaptureShim(Connector):
                 raise RuntimeError(
                     "incremental stream is missing a source-defined primary key",
                     stream.name,
-                )   
+                )
 
             if self.usesSchemaInference:
                 json_schema["x-infer-schema"] = True
@@ -165,22 +203,38 @@ class CaptureShim(Connector):
 
         catalog = ConfiguredAirbyteCatalog(streams=streams)
         config = open["capture"]["config"]
+        state = State(**(open["state"] or {}))
 
         emit(Response(opened=response.Opened(explicitAcknowledgements=False)))
 
-        for message in self.delegate.read(logger, config, catalog):
+        for message in self.delegate.read(
+            logger, config, catalog, state.to_airbyte_input()
+        ):
             if record := message.record:
                 entry = index[(record.namespace, record.stream)]
                 record.data.setdefault("_meta", {})["row_id"] = entry[1]
                 entry[1] += 1
 
-                emit(Response(
-                    captured=response.Captured(binding=entry[0], doc=record.data)
-                ))
+                emit(
+                    Response(
+                        captured=response.Captured(binding=entry[0], doc=record.data)
+                    )
+                )
 
-            elif state := message.state:
-                # TODO(johnny): handle various state types, and mix in next_row_id.
-                raise NotImplemented
+            elif state_msg := message.state:
+                state_msg = t.cast(AirbyteStateMessage, state_msg)
+                logger.info(f"Got a state message: {str(state_msg)}")
+                # TODO(johnny): mix in next_row_id
+                state.handle_message(state_msg)
+                emit(
+                    Response(
+                        checkpoint=response.Checkpoint(
+                            state=flow.ConnectorState(
+                                updated=asdict(state), mergePatch=False
+                            )
+                        )
+                    )
+                )
 
             elif trace := message.trace:
                 if error := trace.error:
@@ -232,6 +286,14 @@ class CaptureShim(Connector):
 
             else:
                 raise RuntimeError("unexpected AirbyteMessage", message)
+        # Emit a final state message
+        emit(
+            Response(
+                checkpoint=response.Checkpoint(
+                    state=flow.ConnectorState(updated=asdict(state), mergePatch=False)
+                )
+            )
+        )
 
 
 class StreamResourceConfig(t.TypedDict):
