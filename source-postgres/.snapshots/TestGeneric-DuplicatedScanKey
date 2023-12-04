@@ -8,5 +8,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_duplicatedscankey_92011048":{"backfilled":4,"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test%2Fgeneric_duplicatedscankey_92011048":{"backfilled":4,"mode":"Active"}}}
 

@@ -29,6 +29,9 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// StateKey is used to key binding-specific state a connector's driver checkpoint.
+type StateKey string
+
 type Connector interface {
 	Spec(context.Context, *pc.Request_Spec) (*pc.Response_Spec, error)
 	Discover(context.Context, *pc.Request_Discover) (*pc.Response_Discovered, error)
@@ -266,7 +269,6 @@ func (out *PullOutput) DocumentsAndCheckpoint(checkpoint json.RawMessage, merge 
 	}
 	return nil
 }
-
 
 func newProtoCodec(ctx context.Context) pc.Connector_CaptureServer {
 	return &protoCodec{

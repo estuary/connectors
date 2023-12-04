@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -16,7 +17,6 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/flow/go/protocols/flow"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -136,7 +136,7 @@ func RestartingBackfillCapture(ctx context.Context, t testing.TB, cs *st.Capture
 	return summary.String(), checkpoints
 }
 
-func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamMatchers ...*regexp.Regexp) []*flow.CaptureSpec_Binding {
+func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamMatchers ...*regexp.Regexp) []*pf.CaptureSpec_Binding {
 	t.Helper()
 	var cs = tb.CaptureSpec(ctx, t)
 
@@ -147,13 +147,14 @@ func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamM
 	}
 
 	// Translate discovery bindings into capture bindings.
-	var bindings []*flow.CaptureSpec_Binding
+	var bindings []*pf.CaptureSpec_Binding
 	for _, b := range discovery {
 		var res sqlcapture.Resource
 		require.NoError(t, json.Unmarshal(b.ResourceConfigJson, &res))
-		bindings = append(bindings, &flow.CaptureSpec_Binding{
+		var path = []string{res.Namespace, res.Stream}
+		bindings = append(bindings, &pf.CaptureSpec_Binding{
 			ResourceConfigJson: b.ResourceConfigJson,
-			Collection: flow.CollectionSpec{
+			Collection: pf.CollectionSpec{
 				Name:           pf.Collection("acmeCo/test/" + b.RecommendedName),
 				ReadSchemaJson: b.DocumentSchemaJson,
 				Key:            b.Key,
@@ -162,11 +163,18 @@ func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamM
 				// MySQL and Postgres.
 				Projections: []pf.Projection{{Ptr: "/_meta/source/txid"}},
 			},
-
-			ResourcePath: []string{res.Namespace, res.Stream},
+			ResourcePath: path,
+			Backfill:     0,
+			StateKey:     StateKey(path),
 		})
 	}
 	return bindings
+}
+
+// StateKey provides an approximation for a runtime-computed state key based on a path, where the
+// path is joined with slashes and then percent encoded.
+func StateKey(path []string) string {
+	return url.QueryEscape(strings.Join(path, "/"))
 }
 
 // BindingReplace returns a copy of a "template" binding with the string substitution
@@ -174,9 +182,9 @@ func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamM
 // This allows tests to exercise missing-table functionality by creating and discovering
 // a table (for instance `foobar_aaa`) and then by string substitution turning that into
 // a binding for table `foobar_bbb` which doesn't actually exist.
-func BindingReplace(b *flow.CaptureSpec_Binding, old, new string) *flow.CaptureSpec_Binding {
+func BindingReplace(b *pf.CaptureSpec_Binding, old, new string) *pf.CaptureSpec_Binding {
 	var x = *b
-	x.Collection.Name = flow.Collection(strings.ReplaceAll(string(x.Collection.Name), old, new))
+	x.Collection.Name = pf.Collection(strings.ReplaceAll(string(x.Collection.Name), old, new))
 	x.ResourceConfigJson = json.RawMessage(strings.ReplaceAll(string(x.ResourceConfigJson), old, new))
 	for idx := range x.ResourcePath {
 		x.ResourcePath[idx] = strings.ReplaceAll(x.ResourcePath[idx], old, new)

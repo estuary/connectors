@@ -504,5 +504,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":"0/1111111","streams":{"test.generic_keylesscapture_91511186":{"backfilled":500,"mode":"Active"}}}
+{"cursor":"0/1111111","streams":{"test%2Fgeneric_keylesscapture_91511186":{"backfilled":500,"mode":"Active"}}}
 

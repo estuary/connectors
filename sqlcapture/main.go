@@ -76,9 +76,11 @@ func (r Resource) Validate() error {
 // SetDefaults fills in the default values for unset optional parameters.
 func (r *Resource) SetDefaults() {}
 
-// Binding represents a capture binding, and includes a Resource config and a binding index.
+// Binding represents a capture binding.
 type Binding struct {
 	Index         uint32
+	StreamID      string
+	StateKey      boilerplate.StateKey
 	Resource      Resource
 	CollectionKey []string // JSON pointers
 }
@@ -255,7 +257,7 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
 
-	var state = &PersistentState{Streams: make(map[string]*TableState)}
+	var state = &PersistentState{Streams: make(map[boilerplate.StateKey]*TableState)}
 	if len(open.StateJson) > 0 {
 		if err := pf.UnmarshalStrict(open.StateJson, state); err != nil {
 			return fmt.Errorf("unable to parse state checkpoint: %w", err)
@@ -296,6 +298,8 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 		bindings[streamID] = &Binding{
 			Index:         uint32(idx),
+			StreamID:      streamID,
+			StateKey:      boilerplate.StateKey(binding.StateKey),
 			Resource:      res,
 			CollectionKey: binding.Collection.Key,
 		}
