@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -32,6 +33,14 @@ func (f *fileBuffer) Close() error {
 		return err
 	}
 	return nil
+}
+
+// we keep track of files we upload so that we can send them to Snowpipe in an
+// insertFiles RPC
+// https://docs.snowflake.com/user-guide/data-load-snowpipe-rest-apis#label-rest-api-insertfiles
+type fileRecord struct {
+	path string
+	size int
 }
 
 // stagedFile manages uploading a sequence of local files produced by reading from Load/Store
@@ -76,6 +85,9 @@ type stagedFile struct {
 	// Index of the current file for this transaction. Starts at 0 and is incremented by 1 for each
 	// new file that is created.
 	fileIdx int
+
+	// List of uploaded files
+	files []fileRecord
 
 	// References to the current file being written.
 	buf     *fileBuffer
@@ -206,6 +218,15 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 			return fmt.Errorf("putWorker PUT to stage: %w", err)
 		} else if !strings.EqualFold("uploaded", status) {
 			return fmt.Errorf("putWorker PUT to stage unexpected upload status: %s", status)
+		}
+
+		if size, err := strconv.Atoi(targetSize); err != nil {
+			return fmt.Errorf("parsing targetSize: %w", err)
+		} else {
+			f.files = append(f.files, fileRecord{
+				path: target,
+				size: size,
+			})
 		}
 
 		// Once the file has been staged to Snowflake we don't need it locally anymore and can

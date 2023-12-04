@@ -58,7 +58,6 @@ func mustDSN() string {
 	}
 
 	dsn, err := sf.DSN(&conf)
-	os.Stderr.WriteString(fmt.Sprintf("%+v\n", conf))
 	if err != nil {
 		panic(err)
 	}

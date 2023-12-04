@@ -275,8 +275,9 @@ func (c client) withDB(fn func(*stdsql.DB) error) error {
 }
 
 type transactor struct {
-	cfg *config
-	db  *stdsql.DB
+	cfg        *config
+	db         *stdsql.DB
+	pipeClient *PipeClient
 	// Variables exclusively used by Load.
 	load struct {
 		conn *stdsql.Conn
@@ -305,13 +306,19 @@ func newTransactor(
 
 	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant))
 	if err != nil {
-		return nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
+		return nil, fmt.Errorf("stdsql.Open: %w", err)
+	}
+
+	pipeClient, err := NewPipeClient(cfg, ep.Tenant)
+	if err != nil {
+		return nil, fmt.Errorf("NewPipeCLient: %w", err)
 	}
 
 	var d = &transactor{
-		cfg:       cfg,
-		templates: renderTemplates(dialect),
-		db:        db,
+		cfg:        cfg,
+		templates:  renderTemplates(dialect),
+		db:         db,
+		pipeClient: pipeClient,
 	}
 
 	if d.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
@@ -348,7 +355,7 @@ func newTransactor(
 
 type binding struct {
 	target   sql.Table
-	snowPipe bool
+	pipeName string
 	// Variables exclusively used by Load.
 	load struct {
 		loadQuery string
@@ -388,13 +395,19 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 
 	// If this is a delta updates binding and we are using JWT auth type, this binding
 	// can use snowpipe
-	d.snowPipe = target.DeltaUpdates && t.cfg.Credentials.AuthType == JWT
+	if target.DeltaUpdates && t.cfg.Credentials.AuthType == JWT {
+		if pipeName, err := sql.RenderTableTemplate(target, t.templates["pipeName"]); err != nil {
+			return fmt.Errorf("pipeName template: %w", err)
+		} else {
+			d.pipeName = fmt.Sprintf("%s.%s.%s", t.cfg.Database, t.cfg.Schema, strings.ToUpper(strings.Trim(pipeName, "`")))
+		}
 
-	if d.snowPipe {
 		if createPipe, err := RenderTableWithRandomUUIDTemplate(target, d.store.stage.uuid, t.templates["createPipe"]); err != nil {
 			return fmt.Errorf("createPipe template: %w", err)
-		} else if _, err := t.db.ExecContext(sf.WithStreamDownloader(ctx), createPipe); err != nil {
+		} else if _, err := t.db.ExecContext(ctx, createPipe); err != nil {
 			return fmt.Errorf("creating pipe for table %q: %w", target.Path, err)
+		} else {
+			log.WithField("q", createPipe).Info("creating pipe")
 		}
 	}
 
@@ -556,6 +569,21 @@ func (d *transactor) commit(ctx context.Context) error {
 			// No table update required
 		} else if err := b.store.stage.flush(); err != nil {
 			return err
+		} else if b.pipeName != "" {
+			var fileRequests = make([]FileRequest, len(b.store.stage.files))
+			for i, f := range b.store.stage.files {
+				fileRequests[i] = FileRequest{
+					Path: f.path,
+					Size: f.size,
+				}
+			}
+
+			if resp, err := d.pipeClient.InsertFiles(b.pipeName, fileRequests); err != nil {
+				return fmt.Errorf("snowpipe insertFiles: %w", err)
+			} else {
+				// TODO: make me DEBUG
+				log.WithField("response", resp).Info("insertFiles sucesssful")
+			}
 		} else if !b.store.mustMerge {
 			log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
 			// We can issue a faster COPY INTO the target table.

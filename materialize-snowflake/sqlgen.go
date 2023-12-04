@@ -194,7 +194,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 
 
 {{ define "pipe_name" -}}
-`+"`"+`flow_pipe_{{ $.Binding }}_{{ Last $.Path }}`+"`"+`
+flow_pipe_{{ $.Binding }}_{{ Last $.Path }}
 {{- end }}
 
 {{ define "createPipe" }}
@@ -292,6 +292,7 @@ END $$;
   `)
 
 	return map[string]*template.Template{
+		"pipeName":          tplAll.Lookup("pipe_name"),
 		"createTargetTable": tplAll.Lookup("createTargetTable"),
 		"alterTableColumns": tplAll.Lookup("alterTableColumns"),
 		"loadQuery":         tplAll.Lookup("loadQuery"),
