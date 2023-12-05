@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"text/template"
@@ -121,9 +122,27 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_App
 	}
 	defer db.Close()
 
-	resolved, err := sql.ResolveActions(ctx, db, actions, databricksDialect, cfg.CatalogName)
+	// Build the list of schemas included in this update.
+	var schemas []string
+	for _, t := range actions.CreateTables {
+		if !slices.Contains(schemas, t.InfoLocation.TableSchema) {
+			schemas = append(schemas, t.InfoLocation.TableSchema)
+		}
+	}
+	for _, t := range actions.AlterTables {
+		if !slices.Contains(schemas, t.InfoLocation.TableSchema) {
+			schemas = append(schemas, t.InfoLocation.TableSchema)
+		}
+	}
+
+	existing, err := fetchExistingColumns(ctx, db, databricksDialect, cfg.CatalogName, schemas)
 	if err != nil {
-		return "", fmt.Errorf("resolving apply actions: %w", err)
+		return "", fmt.Errorf("fetching columns: %w", err)
+	}
+
+	resolved, err := sql.FilterActions(actions, databricksDialect, existing)
+	if err != nil {
+		return "", err
 	}
 
 	// Build up the list of actions for logging. These won't be executed directly, since Databricks
@@ -729,6 +748,72 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 	d.deleteFiles(ctx, cp.ToDelete)
 
 	return nil
+}
+
+// fetchExistingColumns is exactly like sql.FetchExistingColumns, except it queries from
+// `system.information_schema.columns` instead of just `information_schema.columns`, since some
+// deployments of Databricks apparently require this.
+func fetchExistingColumns(
+	ctx context.Context,
+	db *stdsql.DB,
+	dialect sql.Dialect,
+	catalog string, // typically the "database"
+	schemas []string,
+) (*sql.ExistingColumns, error) {
+	existingColumns := &sql.ExistingColumns{}
+
+	if len(schemas) == 0 {
+		return existingColumns, nil
+	}
+
+	// Map the schemas to an appropriate identifier for inclusion in the coming query.
+	for i := range schemas {
+		schemas[i] = dialect.Literal(schemas[i])
+	}
+
+	rows, err := db.QueryContext(ctx, fmt.Sprintf(`
+		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length
+		from system.information_schema.columns
+		where table_catalog = %s
+		and table_schema in (%s);
+		`,
+		dialect.Literal(catalog),
+		strings.Join(schemas, ","),
+	))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type columnRow struct {
+		TableSchema            string
+		TableName              string
+		ColumnName             string
+		IsNullable             string
+		DataType               string
+		CharacterMaximumLength stdsql.NullInt64
+	}
+
+	for rows.Next() {
+		var c columnRow
+		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength); err != nil {
+			return nil, err
+		}
+
+		existingColumns.PushColumn(
+			c.TableSchema,
+			c.TableName,
+			c.ColumnName,
+			strings.EqualFold(c.IsNullable, "yes"),
+			c.DataType,
+			int(c.CharacterMaximumLength.Int64),
+		)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return existingColumns, nil
 }
 
 func (d *transactor) Destroy() {
