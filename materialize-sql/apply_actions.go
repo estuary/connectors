@@ -135,6 +135,13 @@ func (e *ExistingColumns) hasColumn(schema, table, column string) (bool, error) 
 		// This _probably_ shouldn't ever happen, but might if the user dropped a table without
 		// removing the binding for it from their spec *and* is doing something that would require
 		// altering the table.
+		foundTables := []string{}
+		for schema, tableCols := range e.tables {
+			for table := range tableCols {
+				foundTables = append(foundTables, fmt.Sprintf("%s.%s", schema, table))
+			}
+		}
+		log.WithField("foundTables", foundTables).Info("tables found in endpoint")
 		return false, fmt.Errorf("table '%s.%s' not found in destination, but binding still exists", schema, table)
 	}
 
