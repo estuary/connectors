@@ -141,3 +141,38 @@ func TestDateTimeColumn(t *testing.T) {
 	require.Equal(t, "2022-04-04T10:09:08.234567Z", parsed)
 	require.NoError(t, err)
 }
+
+func TestTruncatedIdentifier(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "no truncation",
+			input: "hello",
+			want:  "hello",
+		},
+		{
+			name:  "truncate ASCII",
+			input: strings.Repeat("a", 64),
+			want:  strings.Repeat("a", 63),
+		},
+		{
+			name:  "truncate UTF-8",
+			input: strings.Repeat("a", 61) + "码",
+			want:  strings.Repeat("a", 61),
+		},
+		{
+			name:  "empty input",
+			input: "",
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, truncatedIdentifier(tt.input))
+		})
+	}
+}
