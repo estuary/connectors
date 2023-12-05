@@ -532,6 +532,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
 		log.Info("store: starting commit phase")
+
 		var err error
 		if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
@@ -573,16 +574,18 @@ func (d *transactor) commit(ctx context.Context) error {
 			var fileRequests = make([]FileRequest, len(b.store.stage.files))
 			for i, f := range b.store.stage.files {
 				fileRequests[i] = FileRequest{
-					Path: f.path,
+					Path: "/" + f.path,
 					Size: f.size,
 				}
 			}
 
 			if resp, err := d.pipeClient.InsertFiles(b.pipeName, fileRequests); err != nil {
 				return fmt.Errorf("snowpipe insertFiles: %w", err)
+			} else if report, err := d.pipeClient.InsertReport(b.pipeName, ""); err != nil {
+				return fmt.Errorf("snowpipe insertReports: %w", err)
 			} else {
 				// TODO: make me DEBUG
-				log.WithField("response", resp).Info("insertFiles sucesssful")
+				log.WithField("response", resp).Info(fmt.Sprintf("insertFiles sucesssful %+v", report))
 			}
 		} else if !b.store.mustMerge {
 			log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")

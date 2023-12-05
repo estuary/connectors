@@ -12,6 +12,7 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -219,6 +220,14 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 		} else if !strings.EqualFold("uploaded", status) {
 			return fmt.Errorf("putWorker PUT to stage unexpected upload status: %s", status)
 		}
+
+		log.WithFields(log.Fields{
+			"source":     source,
+			"target":     target,
+			"targetSize": targetSize,
+			"file":       file,
+			"uuid":       f.uuid,
+		}).Info("uploading file")
 
 		if size, err := strconv.Atoi(targetSize); err != nil {
 			return fmt.Errorf("parsing targetSize: %w", err)
