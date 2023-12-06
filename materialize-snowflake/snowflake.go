@@ -649,30 +649,50 @@ func (d *transactor) commit(ctx context.Context) error {
 		return err
 	}
 
-	log.Info("store: starting copying of files into tables")
-	for _, b := range d.bindings {
-		if !b.store.stage.started {
-			// No table update required
-		} else if err := b.store.stage.flush(); err != nil {
-			return err
-		} else if !b.store.mustMerge {
-			log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
-			// We can issue a faster COPY INTO the target table.
-			if _, err = txn.ExecContext(ctx, b.store.copyInto); err != nil {
-				return fmt.Errorf("copying Store documents into table %q: %w", b.target.Identifier, err)
-			}
-			log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
-		} else {
-			log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
-			// We must MERGE into the target table.
-			if _, err = txn.ExecContext(ctx, b.store.mergeInto); err != nil {
-				return fmt.Errorf("merging Store documents into table %q: %w", b.target.Identifier, err)
-			}
-			log.WithField("table", b.target.Identifier).Info("store: finishing merging data into table")
-		}
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(MaxConcurrentLoads)
+	// Enable asynchronous queries for Snowflake
+	// Note that when using asynchronous mode, we must call a function such as
+	// RowsAffected to block until the query has actually be executed to completion
+	txCtx := sf.WithAsyncMode(groupCtx)
 
-		// Reset for next transaction.
-		b.store.mustMerge = false
+	log.Info("store: starting copying of files into tables")
+	for _, bLoop := range d.bindings {
+		var b = bLoop
+		group.Go(func() error {
+			if !b.store.stage.started {
+				// No table update required
+			} else if err := b.store.stage.flush(); err != nil {
+				return err
+			} else if !b.store.mustMerge {
+				log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
+				// We can issue a faster COPY INTO the target table.
+				if result, err := txn.ExecContext(txCtx, b.store.copyInto); err != nil {
+					return fmt.Errorf("copying Store documents into table %q: %w", b.target.Identifier, err)
+				} else if _, err := result.RowsAffected(); err != nil {
+					return fmt.Errorf("copying Store documents into table %q: %w", b.target.Identifier, err)
+				}
+				log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
+			} else {
+				log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
+				// We must MERGE into the target table.
+				if result, err := txn.ExecContext(txCtx, b.store.mergeInto); err != nil {
+					return fmt.Errorf("merging Store documents into table %q: %w", b.target.Identifier, err)
+				} else if _, err := result.RowsAffected(); err != nil {
+					return fmt.Errorf("merging Store documents into table %q: %w", b.target.Identifier, err)
+				}
+				log.WithField("table", b.target.Identifier).Info("store: finishing merging data into table")
+			}
+
+			// Reset for next transaction.
+			b.store.mustMerge = false
+
+			return nil
+		})
+	}
+
+	if err = group.Wait(); err != nil {
+		return fmt.Errorf("group.Wait: %w", err)
 	}
 
 	log.Info("store: finished encoding and uploading of files")
