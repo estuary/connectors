@@ -32,6 +32,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
+
+	// Imported for side-effects (registers the required stdsql driver)
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 const (
