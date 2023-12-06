@@ -14,6 +14,7 @@ All connectors in this repository are dual licensed under MIT or Apache 2.0 at y
 There are some things to consider and some tips here for developing a new connector.
 
 - [ ] Writing integration tests is highly recommended, it can help us avoid regressions as we develop connectors. See the [tests](https://github.com/estuary/connectors/tree/main/tests) directly for more information and examples.
+  - [ ] Try to be comprehensive in the tests to include edge cases, such as different data types, different types of tables, hitting certain limits of your connector (e.g. maximum character limits, etc.)
 - [ ] You can use the [base-image](https://github.com/estuary/connectors/tree/main/base-image) provided for your connector Docker images.
 
 ## Capture connectors
