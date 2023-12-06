@@ -158,10 +158,11 @@ func (e *ExistingColumns) nullable(schema, table, column string) (bool, error) {
 		return false, fmt.Errorf("unable to determine nullability of column %q: %w", column, err)
 	}
 	if !exists {
-		// Similar to the comment in `hasColumn`, the only way this could happen is if a column was
-		// dropped in a bound table without removing that field from the materialization, which is
-		// pretty unlikely.
-		return false, fmt.Errorf("could not find column %q in table '%s.%s' in existing tables, but field is still part of the materialization", column, schema, table)
+		// TODO(whb): Consider returning an error here instead of claiming that a non-existent
+		// column is nullable. This will require more sophistication around what we do when a
+		// binding is applied to a pre-existing table without all of the columns included in the
+		// field selection.
+		return true, nil
 	}
 
 	nullable := slices.ContainsFunc(e.tables[schema][table], func(ec ExistingColumn) bool {
@@ -181,12 +182,12 @@ func FilterActions(in ApplyActions, dialect Dialect, existing *ExistingColumns) 
 		ReplaceTables: in.ReplaceTables, // Always replace (or create) tables; there's no way to filter these out.
 	}
 
-	// Only create tables that don't already exist. TODO(whb): Consider checking the existence of
-	// columns, nullability, and data types of columns for tables that do already exist where the
-	// spec proposes creating the table. It would be nice to at least give a descriptive error
-	// message if the existing table isn't compatible with the materialization, and perhaps even
-	// transform the table creation action into table alteration actions to make the table
-	// compatible.
+	// Only create tables that don't already exist.
+	// TODO(whb): Consider checking the existence of columns, nullability, and data types of columns
+	// for tables that do already exist where the spec proposes creating the table. It would be nice
+	// to at least give a descriptive error message if the existing table isn't compatible with the
+	// materialization, and perhaps even transform the table creation action into table alteration
+	// actions to make the table compatible.
 	for _, tc := range in.CreateTables {
 		if !existing.hasTable(tc.InfoLocation.TableSchema, tc.InfoLocation.TableName) {
 			out.CreateTables = append(out.CreateTables, tc)

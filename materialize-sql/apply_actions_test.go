@@ -188,7 +188,7 @@ func TestFilterActions(t *testing.T) {
 				},
 			},
 			want:    ApplyActions{},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "alter table drop nullability on a table that doesn't exist",
