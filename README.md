@@ -22,6 +22,7 @@ There are some things to consider and some tips here for developing a new connec
 - [ ] Check out the protocol definitions of Flow, they include a lot of comments explaining the various interfaces and messages used to communicate between your connector and Flow runtime: [capture.proto](https://github.com/estuary/flow/blob/master/go/protocols/capture/capture.proto)
 - [ ] For connectors that work on files or file-like objects, the [filesource](https://github.com/estuary/connectors/tree/main/filesource) provides abstractions to reduce boilerplate work. For an example of a connector implemented using this library see [source-http-file](https://github.com/estuary/connectors/tree/main/source-http-file).
 - [ ] For SQL captures, you can use the [sqlcapture](https://github.com/estuary/connectors/tree/main/sqlcapture) library. For an example, see [source-postgres](https://github.com/estuary/connectors/tree/main/source-postgres).
+- [ ] When emitting date-time values, if the discovered schema of the connector emits `format: date-time`, the value must be RFC3339 compliant, or otherwise parsing of the value will fail.
 
 ## Materialization Connectors
 
