@@ -6,7 +6,7 @@ authors = []
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "3.11.6"
+python = "<3.12,>=3.11"
 singer-sdk = "^0.33.0"
 flow-sdk = {path="../python", develop=true}
 tap-shopify = { path = "source_shopify", develop=true }
