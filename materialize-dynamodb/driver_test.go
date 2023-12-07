@@ -13,7 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/bradleyjkemp/cupaloy"
-	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
+
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
@@ -61,7 +62,7 @@ func TestApply(t *testing.T) {
 	client, err := cfg.client(ctx)
 	require.NoError(t, err)
 
-	bp_test.RunApplyTestCases(
+	boilerplate.RunApplyTestCases(
 		t,
 		driver{},
 		configJson,
@@ -121,7 +122,7 @@ func TestApply(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	bp_test.RunValidateTestCases(t, ddbValidator, ".snapshots")
+	boilerplate.RunValidateTestCases(t, ddbValidator, ".snapshots")
 }
 
 func TestSpec(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bradleyjkemp/cupaloy"
-	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
@@ -162,7 +162,7 @@ func TestApply(t *testing.T) {
 	secondResourceJson, err := json.Marshal(secondResource)
 	require.NoError(t, err)
 
-	bp_test.RunApplyTestCases(
+	boilerplate.RunApplyTestCases(
 		t,
 		newBigQueryDriver(),
 		configJson,

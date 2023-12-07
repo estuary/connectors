@@ -1,4 +1,4 @@
-package validate
+package boilerplate
 
 import (
 	"embed"
@@ -13,18 +13,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:generate ../testing/generate-spec-proto.sh testdata/base.flow.yaml
-//go:generate ../testing/generate-spec-proto.sh testdata/alternate-root-projection.flow.yaml
-//go:generate ../testing/generate-spec-proto.sh testdata/multiple-root-projections.flow.yaml
-//go:generate ../testing/generate-spec-proto.sh testdata/new-binding.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_selected_fields/base.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_selected_fields/alternate-root-projection.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_selected_fields/multiple-root-projections.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_selected_fields/new-binding.flow.yaml
 
-//go:embed testdata/generated_specs
+//go:embed testdata/validate_selected_fields/generated_specs
 var specFs embed.FS
 
-func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
+func loadSelectedFieldsSpec(t *testing.T, path string) *pf.MaterializationSpec {
 	t.Helper()
 
-	specBytes, err := specFs.ReadFile(filepath.Join("testdata/generated_specs", path))
+	specBytes, err := specFs.ReadFile(filepath.Join("testdata/validate_selected_fields/generated_specs", path))
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
 	require.NoError(t, spec.Unmarshal(specBytes))
@@ -46,7 +46,7 @@ func TestValidateSelectedFields(t *testing.T) {
 		{
 			name:       "new materialization",
 			storedSpec: nil,
-			newSpec:    loadSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
@@ -57,8 +57,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		},
 		{
 			name:       "binding update with no changes",
-			storedSpec: loadSpec(t, "base.flow.proto"),
-			newSpec:    loadSpec(t, "base.flow.proto"),
+			storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
@@ -69,8 +69,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		},
 		{
 			name:       "recommend fields not included is allowed",
-			storedSpec: loadSpec(t, "base.flow.proto"),
-			newSpec:    loadSpec(t, "base.flow.proto"),
+			storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"locRequiredVal"},
@@ -81,8 +81,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		},
 		{
 			name:       "missing key",
-			storedSpec: loadSpec(t, "base.flow.proto"),
-			newSpec:    loadSpec(t, "base.flow.proto"),
+			storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
@@ -93,8 +93,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		},
 		{
 			name:       "missing required non-key, non-document location",
-			storedSpec: loadSpec(t, "base.flow.proto"),
-			newSpec:    loadSpec(t, "base.flow.proto"),
+			storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal"},
@@ -105,8 +105,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		},
 		{
 			name:       "standard updates with no root document",
-			storedSpec: loadSpec(t, "base.flow.proto"),
-			newSpec:    loadSpec(t, "base.flow.proto"),
+			storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
@@ -117,8 +117,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		},
 		{
 			name:       "delta updates with no root document is allowed",
-			storedSpec: loadSpec(t, "base.flow.proto"),
-			newSpec:    loadSpec(t, "base.flow.proto"),
+			storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
@@ -129,8 +129,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		},
 		{
 			name:       "forbidden field selected",
-			storedSpec: loadSpec(t, "base.flow.proto"),
-			newSpec:    loadSpec(t, "base.flow.proto"),
+			storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal", "nullVal"},
@@ -141,8 +141,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		},
 		{
 			name:       "non-existent field selected",
-			storedSpec: loadSpec(t, "base.flow.proto"),
-			newSpec:    loadSpec(t, "base.flow.proto"),
+			storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal", "bogus"},
@@ -153,8 +153,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		},
 		{
 			name:       "root document projection change is not allowed for standard updates",
-			storedSpec: loadSpec(t, "base.flow.proto"),
-			newSpec:    loadSpec(t, "alternate-root-projection.flow.proto"),
+			storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "alternate-root-projection.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
@@ -165,8 +165,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		},
 		{
 			name:       "root document projection change is allowed for delta updates",
-			storedSpec: loadSpec(t, "base.flow.proto"),
-			newSpec:    loadSpec(t, "alternate-root-projection.flow.proto"),
+			storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "alternate-root-projection.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
@@ -178,7 +178,7 @@ func TestValidateSelectedFields(t *testing.T) {
 		{
 			name:       "can't select multiple root projections for standard updates",
 			storedSpec: nil,
-			newSpec:    loadSpec(t, "multiple-root-projections.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "multiple-root-projections.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal", "second_root"},
@@ -190,7 +190,7 @@ func TestValidateSelectedFields(t *testing.T) {
 		{
 			name:       "can select multiple root projections for delta updates",
 			storedSpec: nil,
-			newSpec:    loadSpec(t, "multiple-root-projections.flow.proto"),
+			newSpec:    loadSelectedFieldsSpec(t, "multiple-root-projections.flow.proto"),
 			fieldSelection: pf.FieldSelection{
 				Keys:     []string{"stringKey", "intKey"},
 				Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal", "second_root"},
@@ -218,17 +218,17 @@ func TestValidateSelectedFields(t *testing.T) {
 
 	t.Run("additional tests", func(t *testing.T) {
 		t.Run("delta updates to standard updates is not allowed", func(t *testing.T) {
-			storedSpec := loadSpec(t, "base.flow.proto")
+			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
 			storedSpec.Bindings[0].DeltaUpdates = true
-			newSpec := loadSpec(t, "base.flow.proto")
+			newSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
 
 			err := validator.ValidateSelectedFields(newSpec.Bindings[0], storedSpec)
 			require.ErrorContains(t, err, "from delta updates to standard updates is not allowed")
 		})
 
 		t.Run("unsatisfiable type change for a value", func(t *testing.T) {
-			storedSpec := loadSpec(t, "base.flow.proto")
-			newSpec := loadSpec(t, "base.flow.proto")
+			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
+			newSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
 			require.Equal(t, "boolVal", newSpec.Bindings[0].Collection.Projections[0].Field)
 			newSpec.Bindings[0].Collection.Projections[0].Inference.Types = []string{pf.JsonTypeObject}
 
@@ -237,8 +237,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		})
 
 		t.Run("unsatisfiable type change for a key", func(t *testing.T) {
-			storedSpec := loadSpec(t, "base.flow.proto")
-			newSpec := loadSpec(t, "base.flow.proto")
+			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
+			newSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
 			require.Equal(t, "intKey", newSpec.Bindings[0].Collection.Projections[3].Field)
 			newSpec.Bindings[0].Collection.Projections[3].Inference.Types = []string{pf.JsonTypeString}
 
@@ -247,8 +247,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		})
 
 		t.Run("unsatisfiable type change for a value with backfill counter increment", func(t *testing.T) {
-			storedSpec := loadSpec(t, "base.flow.proto")
-			newSpec := loadSpec(t, "base.flow.proto")
+			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
+			newSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
 			require.Equal(t, "boolVal", newSpec.Bindings[0].Collection.Projections[0].Field)
 			newSpec.Bindings[0].Collection.Projections[0].Inference.Types = []string{pf.JsonTypeObject}
 			newSpec.Bindings[0].Backfill = newSpec.Bindings[0].Backfill + 1
@@ -258,8 +258,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		})
 
 		t.Run("backfill counter decrement is not allowed", func(t *testing.T) {
-			storedSpec := loadSpec(t, "base.flow.proto")
-			newSpec := loadSpec(t, "base.flow.proto")
+			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
+			newSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
 			storedSpec.Bindings[0].Backfill = 2
 			newSpec.Bindings[0].Backfill = 1
 
@@ -268,8 +268,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		})
 
 		t.Run("forbidden type change for a value", func(t *testing.T) {
-			storedSpec := loadSpec(t, "base.flow.proto")
-			newSpec := loadSpec(t, "base.flow.proto")
+			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
+			newSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
 			require.Equal(t, "boolVal", newSpec.Bindings[0].Collection.Projections[0].Field)
 			newSpec.Bindings[0].Collection.Projections[0].Inference.Types = []string{pf.JsonTypeNull}
 
@@ -278,8 +278,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		})
 
 		t.Run("projection is removed", func(t *testing.T) {
-			storedSpec := loadSpec(t, "base.flow.proto")
-			newSpec := loadSpec(t, "base.flow.proto")
+			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
+			newSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
 			require.Equal(t, "boolVal", newSpec.Bindings[0].Collection.Projections[0].Field)
 			newSpec.Bindings[0].Collection.Projections = newSpec.Bindings[0].Collection.Projections[1:]
 			newSpec.Bindings[0].FieldSelection = pf.FieldSelection{
@@ -293,8 +293,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		})
 
 		t.Run("target conflict", func(t *testing.T) {
-			storedSpec := loadSpec(t, "base.flow.proto")
-			newSpec := loadSpec(t, "base.flow.proto")
+			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
+			newSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
 			newSpec.Bindings[0].Collection.Name = pf.Collection("other")
 
 			err := validator.ValidateSelectedFields(newSpec.Bindings[0], storedSpec)
@@ -302,8 +302,8 @@ func TestValidateSelectedFields(t *testing.T) {
 		})
 
 		t.Run("new binding to existing materialization", func(t *testing.T) {
-			storedSpec := loadSpec(t, "base.flow.proto")
-			newSpec := loadSpec(t, "new-binding.flow.proto")
+			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
+			newSpec := loadSelectedFieldsSpec(t, "new-binding.flow.proto")
 			require.Equal(t, "extra/collection", newSpec.Bindings[1].Collection.Name.String())
 
 			err := validator.ValidateSelectedFields(newSpec.Bindings[1], storedSpec)

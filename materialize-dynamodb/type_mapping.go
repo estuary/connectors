@@ -9,7 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/estuary/connectors/materialize-boilerplate/validate"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -44,7 +44,7 @@ func mapType(p *pf.Projection) mappedType {
 		field: p.Field,
 	}
 
-	if _, ok := validate.AsFormattedNumeric(p); ok {
+	if _, ok := boilerplate.AsFormattedNumeric(p); ok {
 		// A string field formatted as an integer or number, with a possible additional
 		// corresponding integer or number type.
 		out.converter = convertNumeric
@@ -180,7 +180,7 @@ func convertBase64(te tuple.TupleElement) (any, error) {
 	return bytes, nil
 }
 
-var ddbValidator = validate.NewValidator(constrainter{})
+var ddbValidator = boilerplate.NewValidator(constrainter{})
 
 type constrainter struct{}
 

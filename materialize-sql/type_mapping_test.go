@@ -4,13 +4,12 @@ import (
 	"math/big"
 	"testing"
 
-	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
-	"github.com/estuary/connectors/materialize-boilerplate/validate"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/stretchr/testify/require"
 )
 
 func TestValidate(t *testing.T) {
-	bp_test.RunValidateTestCases(t, validate.NewValidator(constrainter{
+	boilerplate.RunValidateTestCases(t, boilerplate.NewValidator(constrainter{
 		dialect: newTestDialect(),
 	}), ".snapshots")
 }
