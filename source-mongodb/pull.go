@@ -542,6 +542,10 @@ func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 			case float64:
 				if math.IsNaN(v) {
 					doc[key] = "NaN"
+				} else if math.IsInf(v, +1) {
+					doc[key] = "Infinity"
+				} else if math.IsInf(v, -1) {
+					doc[key] = "-Infinity"
 				}
 			case map[string]interface{}:
 			case primitive.M:
