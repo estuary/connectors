@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/estuary/connectors/materialize-boilerplate/validate"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -92,7 +92,7 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 
 	// Compatible numeric formatted strings can be materialized as either integers or numbers,
 	// depending on the format string.
-	if _, ok := validate.AsFormattedNumeric(&p.Projection); ok && !p.IsPrimaryKey {
+	if _, ok := boilerplate.AsFormattedNumeric(&p.Projection); ok && !p.IsPrimaryKey {
 		return STRING, mustExist
 	}
 
@@ -479,7 +479,7 @@ type constrainter struct {
 }
 
 func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, isNumeric := validate.AsFormattedNumeric(p)
+	_, isNumeric := boilerplate.AsFormattedNumeric(p)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
@@ -516,9 +516,9 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 }
 
 func (c constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
-	var numericCompatibilities = map[validate.StringWithNumericFormat][]string{
-		validate.StringFormatInteger: {pf.JsonTypeInteger, pf.JsonTypeNull},
-		validate.StringFormatNumber:  {pf.JsonTypeNumber, pf.JsonTypeNull},
+	var numericCompatibilities = map[boilerplate.StringWithNumericFormat][]string{
+		boilerplate.StringFormatInteger: {pf.JsonTypeInteger, pf.JsonTypeNull},
+		boilerplate.StringFormatNumber:  {pf.JsonTypeNumber, pf.JsonTypeNull},
 	}
 
 	typesMatch := func(actual, allowed []string) bool {
@@ -538,11 +538,11 @@ func (c constrainter) Compatible(existing *pf.Projection, proposed *pf.Projectio
 	// because it's far more common for a pure integer field to have a string formatted as an
 	// integer show up later on in the collection's life and we don't want to always require
 	// re-versioning/recreating tables when this happens.
-	if format, ok := validate.AsFormattedNumeric(existing); ok {
+	if format, ok := boilerplate.AsFormattedNumeric(existing); ok {
 		if typesMatch(proposed.Inference.Types, numericCompatibilities[format]) {
 			return true, nil
 		}
-	} else if format, ok := validate.AsFormattedNumeric(proposed); ok {
+	} else if format, ok := boilerplate.AsFormattedNumeric(proposed); ok {
 		if typesMatch(existing.Inference.Types, numericCompatibilities[format]) {
 			return true, nil
 		}

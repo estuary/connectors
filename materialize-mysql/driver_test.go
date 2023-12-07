@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
@@ -82,7 +82,7 @@ func TestApply(t *testing.T) {
 	secondResourceJson, err := json.Marshal(secondResource)
 	require.NoError(t, err)
 
-	bp_test.RunApplyTestCases(
+	boilerplate.RunApplyTestCases(
 		t,
 		newMysqlDriver(),
 		configJson,
