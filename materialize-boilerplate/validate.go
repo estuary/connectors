@@ -1,4 +1,4 @@
-package validate
+package boilerplate
 
 import (
 	"encoding/json"

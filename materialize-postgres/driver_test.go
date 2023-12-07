@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/stretchr/testify/require"
@@ -95,7 +95,7 @@ func TestApply(t *testing.T) {
 	secondResourceJson, err := json.Marshal(secondResource)
 	require.NoError(t, err)
 
-	bp_test.RunApplyTestCases(
+	boilerplate.RunApplyTestCases(
 		t,
 		newPostgresDriver(),
 		configJson,
