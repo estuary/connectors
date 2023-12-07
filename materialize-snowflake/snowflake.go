@@ -700,10 +700,31 @@ func renderWithDir(tpl string, dir string) string {
 	return fmt.Sprintf(tpl, dir)
 }
 
+func skipRecoveryError(err error) error {
+	var sfError *sf.SnowflakeError
+	if errors.As(err, &sfError) {
+		log.WithField("n", sfError.Number).WithField("sqlstate", sfError.SQLState).Warn("error")
+		switch sfError.Number {
+		case 1757:
+			// This error happens if the target table has been dropped. This can happen
+			// if the target table is dropped by the user
+			if sfError.SQLState == "42S02" {
+				return nil
+			}
+		}
+	}
+
+	return err
+}
+
 // applyCheckpoint merges data from temporary table to main table
 func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
 	var asyncCtx = sf.WithAsyncMode(ctx)
 	log.Info("store: starting committing changes")
+
+	if !recovery {
+		return fmt.Errorf("artificial error")
+	}
 
 	var results = make(map[string]stdsql.Result)
 	for _, q := range cp.Queries {
@@ -711,11 +732,12 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
 			// it is okay to skip them in this case
 			if recovery {
-				if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
-					continue
+				if err := skipRecoveryError(err); err != nil {
+					return fmt.Errorf("query %q failed: %w", q, err)
 				}
+			} else {
+				return fmt.Errorf("query %q failed: %w", q, err)
 			}
-			return fmt.Errorf("query %q failed: %w", q, err)
 		} else {
 			results[q] = result
 		}
@@ -723,7 +745,15 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 
 	for q, r := range results {
 		if _, err := r.RowsAffected(); err != nil {
-			return fmt.Errorf("query %q failed: %w", q, err)
+			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
+			// it is okay to skip them in this case
+			if recovery {
+				if err := skipRecoveryError(err); err != nil {
+					return fmt.Errorf("query %q failed: %w", q, err)
+				}
+			} else {
+				return fmt.Errorf("query %q failed: %w", q, err)
+			}
 		}
 	}
 	log.Info("store: finished committing changes")
