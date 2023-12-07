@@ -198,16 +198,18 @@ func newSnowflakeDriver() *sql.Driver {
 			}).Info("opening Snowflake")
 
 			var metaBase sql.TablePath
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
+			var metaSpecs, _ = sql.MetaTables(metaBase)
 
 			var dialect = snowflakeDialect(parsed.Schema)
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
-				Config:               parsed,
-				Dialect:              dialect,
-				MetaSpecs:            &metaSpecs,
-				MetaCheckpoints:      &metaCheckpoints,
+				Config:    parsed,
+				Dialect:   dialect,
+				MetaSpecs: &metaSpecs,
+				// Snowflake does not use the checkpoint table, instead we use the recovery log
+				// as the authoritative checkpoint and idempotent apply pattern
+				MetaCheckpoints:      nil,
 				NewClient:            newClient,
 				CreateTableTemplate:  templates["createTargetTable"],
 				ReplaceTableTemplate: templates["replaceTargetTable"],
@@ -276,6 +278,17 @@ func newTransactor(
 		return nil, fmt.Errorf("store stdsql.Open: %w", err)
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("store db.Conn: %w", err)
+	}
+
+	var cp checkpoint
+	if open.StateJson != nil {
+		if err := json.Unmarshal(open.StateJson, &cp); err != nil {
+			return nil, fmt.Errorf("parsing driver config: %w", err)
+		}
+	}
+
+	if err = d.applyCheckpoint(ctx, cp, true); err != nil {
+		return nil, fmt.Errorf("applying recovered checkpoint: %w", err)
 	}
 
 	// Create stage for file-based transfers.
@@ -360,10 +373,10 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	for i, b := range d.bindings {
 		if !b.load.stage.started {
 			// Pass.
-		} else if err := b.load.stage.flush(); err != nil {
+		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
-			subqueries[i] = b.load.loadQuery
+			subqueries[i] = renderWithDir(b.load.loadQuery, dir)
 		}
 	}
 
@@ -430,6 +443,13 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return nil
 }
 
+type checkpoint struct {
+	Queries []string
+
+	// List of files to cleanup after committing the queries
+	ToDelete []string
+}
+
 func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	d.store.round++
 
@@ -450,73 +470,113 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		log.Info("store: starting commit phase")
-		var err error
-		if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
-		}
-
-		return nil, sql.CommitWithDelay(ctx, d.store.round, d.updateDelay, it.Total, d.commit)
-	}, nil
-}
-
-func (d *transactor) commit(ctx context.Context) error {
-	var txn, err = d.store.conn.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("store.conn.BeginTx: %w", err)
-	}
-	defer txn.Rollback()
-
-	// First we must validate the fence has not been modified.
-	var fenceUpdate strings.Builder
-	if err := d.templates["updateFence"].Execute(&fenceUpdate, d.store.fence); err != nil {
-		return fmt.Errorf("evaluating fence template: %w", err)
-	} else if _, err = txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-		err = fmt.Errorf("txn.Exec: %w", err)
-
-		// Give recommendation to user for resolving timeout issues
-		if strings.Contains(err.Error(), "timeout") {
-			return fmt.Errorf("fence.Update: %w  (ensure LOCK_TIMEOUT and STATEMENT_TIMEOUT_IN_SECONDS are at least ten minutes)", err)
-		}
-
-		return err
-	}
+	// Upload the staged files and build a list of merge and copy into queries that need to be run
+	// to effectively commit the files into destination tables. These queries are stored
+	// in the checkpoint so that if the connector is restarted in middle of a commit
+	// it can run the same queries on the next startup. This is the pattern for
+	// recovery log being authoritative and the connector idempotently applies a commit
+	var queries []string
+	// all files uploaded across bindings
+	var toDelete []string
+	// mutex to ensure safety of updating these variables
+	m := sync.Mutex{}
 
 	log.Info("store: starting copying of files into tables")
 	for _, b := range d.bindings {
 		if !b.store.stage.started {
-			// No table update required
-		} else if err := b.store.stage.flush(); err != nil {
-			return err
-		} else if !b.store.mustMerge {
-			log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
+			continue
+		}
+
+		dir, err := b.store.stage.flush()
+		if err != nil {
+			return nil, err
+		}
+
+		if !b.store.mustMerge {
 			// We can issue a faster COPY INTO the target table.
-			if _, err = txn.ExecContext(ctx, b.store.copyInto); err != nil {
-				return fmt.Errorf("copying Store documents into table %q: %w", b.target.Identifier, err)
-			}
-			log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
+			m.Lock()
+			queries = append(queries, renderWithDir(b.store.copyInto, dir))
+			toDelete = append(toDelete, fmt.Sprintf("@flow_v1/%s", dir))
+			m.Unlock()
 		} else {
-			log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
 			// We must MERGE into the target table.
-			if _, err = txn.ExecContext(ctx, b.store.mergeInto); err != nil {
-				return fmt.Errorf("merging Store documents into table %q: %w", b.target.Identifier, err)
-			}
-			log.WithField("table", b.target.Identifier).Info("store: finishing merging data into table")
+			m.Lock()
+			queries = append(queries, renderWithDir(b.store.mergeInto, dir))
+			toDelete = append(toDelete, fmt.Sprintf("@flow_v1/%s", dir))
+			m.Unlock()
 		}
 
 		// Reset for next transaction.
 		b.store.mustMerge = false
 	}
 
-	log.Info("store: finished encoding and uploading of files")
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+		var cp = checkpoint{Queries: queries, ToDelete: toDelete}
 
-	if err = txn.Commit(); err != nil {
-		return fmt.Errorf("txn.Commit: %w", err)
+		var checkpointJSON, err = json.Marshal(cp)
+		if err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+		}
+		var commitOp = pf.RunAsyncOperation(func() error {
+			select {
+			case <-runtimeAckCh:
+				return d.applyCheckpoint(ctx, cp, false)
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		})
+
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, commitOp
+	}, nil
+}
+
+func renderWithDir(tpl string, dir string) string {
+	return fmt.Sprintf(tpl, dir)
+}
+
+// applyCheckpoint merges data from temporary table to main table
+func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
+	var asyncCtx = sf.WithAsyncMode(ctx)
+	log.Info("store: starting committing changes")
+
+	var results = make(map[string]stdsql.Result)
+	for _, q := range cp.Queries {
+		if result, err := d.store.conn.ExecContext(asyncCtx, q); err != nil {
+			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
+			// it is okay to skip them in this case
+			if recovery {
+				if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
+					continue
+				}
+			}
+			return fmt.Errorf("query %q failed: %w", q, err)
+		} else {
+			results[q] = result
+		}
 	}
-	log.Info("store: finished commit")
+
+	for q, r := range results {
+		if _, err := r.RowsAffected(); err != nil {
+			return fmt.Errorf("query %q failed: %w", q, err)
+		}
+	}
+	log.Info("store: finished committing changes")
+
+	// Cleanup files and tables
+	d.deleteFiles(ctx, cp.ToDelete)
 
 	return nil
+}
+
+func (d *transactor) deleteFiles(ctx context.Context, files []string) {
+	for _, f := range files {
+		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("REMOVE %s", f)); err != nil {
+			log.WithFields(log.Fields{
+				"file": f,
+				"err":  err,
+			}).Debug("deleteFiles failed")
+		}
+	}
 }
 
 func (d *transactor) Destroy() {
