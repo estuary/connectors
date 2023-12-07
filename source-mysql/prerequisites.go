@@ -19,7 +19,7 @@ func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 	// Our version checking may have been overly conservative, so let's err in the
 	// other direction for a while and disengage the check entirely.
 	if err := db.prerequisiteVersion(ctx); err != nil {
-		logrus.WithField("err", err).Warn("database version may be insufficient")
+		logrus.WithField("err", err).Debug("database version may be insufficient")
 	}
 
 	for _, prereq := range []func(ctx context.Context) error{
