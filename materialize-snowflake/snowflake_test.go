@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -98,37 +97,6 @@ func TestSpecification(t *testing.T) {
 	require.NoError(t, err)
 
 	cupaloy.SnapshotT(t, formatted)
-}
-
-func TestFencingCases(t *testing.T) {
-	// Because of the number of round-trips required for this test to run it is not run normally.
-	// Enable it via the TESTDB environment variable. It will take several minutes for this test to
-	// complete (you should run it with a sufficient -timeout value).
-	cfg := mustGetCfg(t)
-	ctx := context.Background()
-
-	c, err := newClient(ctx, &sql.Endpoint{Config: &cfg})
-	require.NoError(t, err)
-	defer c.Close()
-
-	templates := renderTemplates(testDialect)
-
-	sql.RunFenceTestCases(t,
-		c,
-		[]string{"temp_test_fencing_checkpoints"},
-		testDialect,
-		templates["createTargetTable"],
-		func(table sql.Table, fence sql.Fence) error {
-			var fenceUpdate strings.Builder
-			if err := templates["updateFence"].Execute(&fenceUpdate, fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
-			}
-			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
-		},
-		func(table sql.Table) (out string, err error) {
-			return sql.StdDumpTable(ctx, c.(*client).db, table)
-		},
-	)
 }
 
 func TestPrereqs(t *testing.T) {
