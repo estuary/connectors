@@ -17,12 +17,12 @@
     "state": {
       "updated": {
         "Queries": [
-          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT, date::DATE, datetime::TIMESTAMP, flow_published_at::TIMESTAMP, int_and_str::BIGINT, int_str::BIGINT, num_and_str::DOUBLE, num_str::DOUBLE, time::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "\n\tCOPY INTO `default`.multiple_types FROM (\n    SELECT\n\t\tid::BIGINT, array_int::STRING, bool_field::BOOLEAN, float_field::DOUBLE, flow_published_at::TIMESTAMP, multiple::STRING, nested::STRING, nullable_int::BIGINT, str_field::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_standard FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT, canary::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.multiple_types FROM (\n    SELECT\n\t\tid::BIGINT, array_int::STRING, bool_field::BOOLEAN, float_field::DOUBLE, flow_published_at::TIMESTAMP, multiple::STRING, nested::STRING, nullable_int::BIGINT, str_field::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n"
+          "\n\tCOPY INTO `default`.duplicate_keys_standard FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n"
         ],
         "ToDelete": [
           "/Volumes/main/default/flow_staging/flow_temp_tables/<uuid>",
@@ -232,9 +232,9 @@
       "updated": {
         "Queries": [
           "\n\tCOPY INTO `default`.formatted_strings FROM (\n    SELECT\n\t\tid::BIGINT, date::DATE, datetime::TIMESTAMP, flow_published_at::TIMESTAMP, int_and_str::BIGINT, int_str::BIGINT, num_and_str::DOUBLE, num_str::DOUBLE, time::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
-          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "\n\tCOPY INTO `default`.duplicate_keys_delta FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "\n\tCOPY INTO `default`.simple FROM (\n    SELECT\n\t\tid::BIGINT, canary::STRING, flow_published_at::TIMESTAMP, flow_document::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
+          "\n\tCOPY INTO `default`.duplicate_keys_delta_exclude_flow_doc FROM (\n    SELECT\n\t\tid::BIGINT, flow_published_at::TIMESTAMP, int::BIGINT, str::STRING\n  FROM '/Volumes/main/default/flow_staging/flow_temp_tables'\n\t)\n  FILEFORMAT = JSON\n  FILES = ('<uuid>')\n  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )\n\tCOPY_OPTIONS ( 'mergeSchema' = 'true' )\n  ;\n",
           "\n\tMERGE INTO `default`.duplicate_keys_standard AS l\n\tUSING `flow_temp_store_table_00000000_00000000_1_duplicate_keys_standard` AS r\n\tON l.id = r.id::BIGINT\n\tAND r._metadata_file_name IN ('<uuid>')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.flow_published_at = r.flow_published_at::TIMESTAMP, l.int = r.int::BIGINT, l.str = r.str::STRING, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, flow_published_at, int, str, flow_document)\n\t\tVALUES (r.id::BIGINT, r.flow_published_at::TIMESTAMP, r.int::BIGINT, r.str::STRING, r.flow_document::STRING);\n",
           "\nDROP TABLE IF EXISTS `flow_temp_store_table_00000000_00000000_1_duplicate_keys_standard`\n",
           "\n\tMERGE INTO `default`.multiple_types AS l\n\tUSING `flow_temp_store_table_00000000_00000000_4_multiple_types` AS r\n\tON l.id = r.id::BIGINT\n\tAND r._metadata_file_name IN ('<uuid>')\n\tWHEN MATCHED AND r.flow_document <=> NULL THEN\n\t\tDELETE\n\tWHEN MATCHED THEN\n\t\tUPDATE SET l.array_int = r.array_int::STRING, l.bool_field = r.bool_field::BOOLEAN, l.float_field = r.float_field::DOUBLE, l.flow_published_at = r.flow_published_at::TIMESTAMP, l.multiple = r.multiple::STRING, l.nested = r.nested::STRING, l.nullable_int = r.nullable_int::BIGINT, l.str_field = r.str_field::STRING, l.flow_document = r.flow_document\n\tWHEN NOT MATCHED THEN\n\t\tINSERT (id, array_int, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\t\tVALUES (r.id::BIGINT, r.array_int::STRING, r.bool_field::BOOLEAN, r.float_field::DOUBLE, r.flow_published_at::TIMESTAMP, r.multiple::STRING, r.nested::STRING, r.nullable_int::BIGINT, r.str_field::STRING, r.flow_document::STRING);\n",
@@ -397,56 +397,6 @@
 }
 {
   "row": {
-    "flow_document": "{\"_meta\":{\"uuid\":\"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int\":1,\"str\":\"str 1\"}",
-    "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
-    "id": 1,
-    "int": 1,
-    "str": "str 1"
-  },
-  "table": "`main`.default.duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_document": "{\"_meta\":{\"uuid\":\"7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":2,\"int\":2,\"str\":\"str 2\"}",
-    "flow_published_at": "2023-07-12 18:18:24.946758+00:00",
-    "id": 2,
-    "int": 2,
-    "str": "str 2"
-  },
-  "table": "`main`.default.duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_document": "{\"_meta\":{\"uuid\":\"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":3,\"int\":3,\"str\":\"str 3\"}",
-    "flow_published_at": "2023-07-12 18:18:48.441281+00:00",
-    "id": 3,
-    "int": 3,
-    "str": "str 3"
-  },
-  "table": "`main`.default.duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_document": "{\"_meta\":{\"uuid\":\"9b994ae4-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":4,\"int\":4,\"str\":\"str 4\"}",
-    "flow_published_at": "2023-07-12 18:19:15.034186+00:00",
-    "id": 4,
-    "int": 4,
-    "str": "str 4"
-  },
-  "table": "`main`.default.duplicate_keys_delta"
-}
-{
-  "row": {
-    "flow_document": "{\"_meta\":{\"uuid\":\"bcef4bc6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":5,\"int\":5,\"str\":\"str 5\"}",
-    "flow_published_at": "2023-07-12 18:20:10.962631+00:00",
-    "id": 5,
-    "int": 5,
-    "str": "str 5"
-  },
-  "table": "`main`.default.duplicate_keys_delta"
-}
-{
-  "row": {
     "flow_document": "{\"_meta\":{\"uuid\":\"8de85150-20e1-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int\":6,\"str\":\"str 6\"}",
     "flow_published_at": "2023-07-12 18:26:01.560712+00:00",
     "id": 1,
@@ -497,48 +447,53 @@
 }
 {
   "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"75c06bd6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":1,\"int\":1,\"str\":\"str 1\"}",
     "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
     "id": 1,
     "int": 1,
     "str": "str 1"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.default.duplicate_keys_delta"
 }
 {
   "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"7dbe8ebc-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":2,\"int\":2,\"str\":\"str 2\"}",
     "flow_published_at": "2023-07-12 18:18:24.946758+00:00",
     "id": 2,
     "int": 2,
     "str": "str 2"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.default.duplicate_keys_delta"
 }
 {
   "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"8bbf898a-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":3,\"int\":3,\"str\":\"str 3\"}",
     "flow_published_at": "2023-07-12 18:18:48.441281+00:00",
     "id": 3,
     "int": 3,
     "str": "str 3"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.default.duplicate_keys_delta"
 }
 {
   "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"9b994ae4-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":4,\"int\":4,\"str\":\"str 4\"}",
     "flow_published_at": "2023-07-12 18:19:15.034186+00:00",
     "id": 4,
     "int": 4,
     "str": "str 4"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.default.duplicate_keys_delta"
 }
 {
   "row": {
+    "flow_document": "{\"_meta\":{\"uuid\":\"bcef4bc6-20e0-11ee-990b-ffd12dfcd47f\"},\"id\":5,\"int\":5,\"str\":\"str 5\"}",
     "flow_published_at": "2023-07-12 18:20:10.962631+00:00",
     "id": 5,
     "int": 5,
     "str": "str 5"
   },
-  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
+  "table": "`main`.default.duplicate_keys_delta"
 }
 {
   "row": {
@@ -587,78 +542,48 @@
 }
 {
   "row": {
-    "array_int": "[61,62]",
-    "bool_field": "True",
-    "float_field": 66.66,
-    "flow_document": "{\"_meta\":{\"uuid\":\"e4b646c2-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}",
-    "flow_published_at": "2023-07-12 18:28:27.194541+00:00",
-    "id": 6,
-    "multiple": "[\"one\",2,true]",
-    "nested": "{\"id\":\"i6\"}",
-    "nullable_int": 6,
-    "str_field": "str6 v2"
+    "flow_published_at": "2023-07-12 18:18:11.537199+00:00",
+    "id": 1,
+    "int": 1,
+    "str": "str 1"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
-    "array_int": "[71,72]",
-    "bool_field": "False",
-    "float_field": 77.77,
-    "flow_document": "{\"_meta\":{\"uuid\":\"eb40dafc-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}",
-    "flow_published_at": "2023-07-12 18:28:38.169062+00:00",
-    "id": 7,
-    "multiple": "{\"object\":\"seven\"}",
-    "nested": "{\"id\":\"i7\"}",
-    "nullable_int": "",
-    "str_field": "str7 v2"
+    "flow_published_at": "2023-07-12 18:18:24.946758+00:00",
+    "id": 2,
+    "int": 2,
+    "str": "str 2"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
-    "array_int": "[81,82]",
-    "bool_field": "True",
-    "float_field": 88.88,
-    "flow_document": "{\"_meta\":{\"uuid\":\"f163eef6-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}",
-    "flow_published_at": "2023-07-12 18:28:48.465279+00:00",
-    "id": 8,
-    "multiple": "",
-    "nested": "{\"id\":\"i8\"}",
-    "nullable_int": 8,
-    "str_field": "str8 v2"
+    "flow_published_at": "2023-07-12 18:18:48.441281+00:00",
+    "id": 3,
+    "int": 3,
+    "str": "str 3"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
-    "array_int": "[91,92]",
-    "bool_field": "False",
-    "float_field": 99.99,
-    "flow_document": "{\"_meta\":{\"uuid\":\"f5b064a8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[91,92],\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}",
-    "flow_published_at": "2023-07-12 18:28:55.677252+00:00",
-    "id": 9,
-    "multiple": "",
-    "nested": "{\"id\":\"i9\"}",
-    "nullable_int": "",
-    "str_field": "str9 v2"
+    "flow_published_at": "2023-07-12 18:19:15.034186+00:00",
+    "id": 4,
+    "int": 4,
+    "str": "str 4"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
-    "array_int": "[1,2]",
-    "bool_field": "True",
-    "float_field": 1010.101,
-    "flow_document": "{\"_meta\":{\"uuid\":\"fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[1,2],\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}",
-    "flow_published_at": "2023-07-12 18:29:04.671352+00:00",
-    "id": 10,
-    "multiple": "",
-    "nested": "{\"id\":\"i10\"}",
-    "nullable_int": 10,
-    "str_field": "str10 v2"
+    "flow_published_at": "2023-07-12 18:20:10.962631+00:00",
+    "id": 5,
+    "int": 5,
+    "str": "str 5"
   },
-  "table": "`main`.default.multiple_types"
+  "table": "`main`.default.duplicate_keys_delta_exclude_flow_doc"
 }
 {
   "row": {
@@ -732,6 +657,81 @@
     "nested": "{\"id\":\"i5\"}",
     "nullable_int": "",
     "str_field": "str5"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[61,62]",
+    "bool_field": "True",
+    "float_field": 66.66,
+    "flow_document": "{\"_meta\":{\"uuid\":\"e4b646c2-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}",
+    "flow_published_at": "2023-07-12 18:28:27.194541+00:00",
+    "id": 6,
+    "multiple": "[\"one\",2,true]",
+    "nested": "{\"id\":\"i6\"}",
+    "nullable_int": 6,
+    "str_field": "str6 v2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[71,72]",
+    "bool_field": "False",
+    "float_field": 77.77,
+    "flow_document": "{\"_meta\":{\"uuid\":\"eb40dafc-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}",
+    "flow_published_at": "2023-07-12 18:28:38.169062+00:00",
+    "id": 7,
+    "multiple": "{\"object\":\"seven\"}",
+    "nested": "{\"id\":\"i7\"}",
+    "nullable_int": "",
+    "str_field": "str7 v2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[81,82]",
+    "bool_field": "True",
+    "float_field": 88.88,
+    "flow_document": "{\"_meta\":{\"uuid\":\"f163eef6-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}",
+    "flow_published_at": "2023-07-12 18:28:48.465279+00:00",
+    "id": 8,
+    "multiple": "",
+    "nested": "{\"id\":\"i8\"}",
+    "nullable_int": 8,
+    "str_field": "str8 v2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[91,92]",
+    "bool_field": "False",
+    "float_field": 99.99,
+    "flow_document": "{\"_meta\":{\"uuid\":\"f5b064a8-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[91,92],\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}",
+    "flow_published_at": "2023-07-12 18:28:55.677252+00:00",
+    "id": 9,
+    "multiple": "",
+    "nested": "{\"id\":\"i9\"}",
+    "nullable_int": "",
+    "str_field": "str9 v2"
+  },
+  "table": "`main`.default.multiple_types"
+}
+{
+  "row": {
+    "array_int": "[1,2]",
+    "bool_field": "True",
+    "float_field": 1010.101,
+    "flow_document": "{\"_meta\":{\"uuid\":\"fb0cc8b0-20e1-11ee-990b-ffd12dfcd47f\"},\"array_int\":[1,2],\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}",
+    "flow_published_at": "2023-07-12 18:29:04.671352+00:00",
+    "id": 10,
+    "multiple": "",
+    "nested": "{\"id\":\"i10\"}",
+    "nullable_int": 10,
+    "str_field": "str10 v2"
   },
   "table": "`main`.default.multiple_types"
 }
