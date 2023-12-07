@@ -63,8 +63,11 @@ func (f *fileBuffer) Close() error {
 // - flush: Sends the current & final local file to the worker for staging and waits for the worker
 // to complete before returning.
 type stagedFile struct {
-	// Random string that will serve as the directory for local files of this binding.
+	// Random string that will serve as the directory for local and remote files of this binding.
 	uuid string
+
+	// temporary directory to store local files
+	tempdir string
 
 	// The full directory path of local files for this binding formed by joining tempdir and uuid.
 	dir string
@@ -73,9 +76,9 @@ type stagedFile struct {
 	// start() and `false` by flush().
 	started bool
 
-	// Index of the current file for this transaction. Starts at 0 and is incremented by 1 for each
-	// new file that is created.
-	fileIdx int
+	// List of file names uploaded during the current transaction for transaction data, not
+	// including the manifest file name itself. These data file names randomly generated UUIDs.
+	uploaded []string
 
 	// References to the current file being written.
 	buf     *fileBuffer
@@ -88,11 +91,8 @@ type stagedFile struct {
 }
 
 func newStagedFile(tempdir string) *stagedFile {
-	uuid := uuid.NewString()
-
 	return &stagedFile{
-		uuid: uuid,
-		dir:  filepath.Join(tempdir, uuid),
+		tempdir: tempdir,
 	}
 }
 
@@ -103,6 +103,8 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 		return nil
 	}
 	f.started = true
+	f.uuid = uuid.NewString()
+	f.dir = filepath.Join(f.tempdir, f.uuid)
 
 	// Create the local working directory for this binding. As a simplification we will always
 	// remove and re-create the directory since it will already exist for transactions beyond the
@@ -131,7 +133,7 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 	}
 
 	// Reset values used per-transaction.
-	f.fileIdx = 0
+	f.uploaded = []string{}
 	f.group, f.groupCtx = errgroup.WithContext(ctx)
 	f.putFiles = make(chan string)
 
@@ -169,16 +171,21 @@ func (f *stagedFile) encodeRow(row []interface{}) error {
 	return nil
 }
 
-func (f *stagedFile) flush() error {
+func (f *stagedFile) remoteFilePath(file string) string {
+	return filepath.Join(f.uuid, file)
+}
+
+func (f *stagedFile) flush() (string, error) {
 	if err := f.putFile(); err != nil {
-		return fmt.Errorf("flush putFile: %w", err)
+		return "", fmt.Errorf("flush putFile: %w", err)
 	}
+	var dir = f.uuid
 
 	close(f.putFiles)
 	f.started = false
 
 	// Wait for all outstanding PUT requests to complete.
-	return f.group.Wait()
+	return dir, f.group.Wait()
 }
 
 func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-chan string) error {
@@ -217,7 +224,8 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 }
 
 func (f *stagedFile) newFile() error {
-	filePath := filepath.Join(f.dir, fmt.Sprintf("%d", f.fileIdx))
+	var fName = uuid.NewString()
+	filePath := filepath.Join(f.dir, fName)
 
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -229,7 +237,7 @@ func (f *stagedFile) newFile() error {
 		file: file,
 	}
 	f.encoder = sql.NewCountingEncoder(f.buf, true, nil)
-	f.fileIdx += 1
+	f.uploaded = append(f.uploaded, fName)
 
 	return nil
 }

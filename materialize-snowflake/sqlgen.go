@@ -207,7 +207,7 @@ SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Ident
 		{{- if $ind }}, {{ end -}}
 		$1[{{$ind}}] AS {{$key.Identifier -}}
 		{{- end }}
-		FROM @flow_v1/{{ $.RandomUUID }}
+		FROM @flow_v1/%s
 	) AS r
 	ON {{ range $ind, $key := $.Table.Keys }}
 	{{- if $ind }} AND {{ end -}}
@@ -229,8 +229,9 @@ COPY INTO {{ $.Table.Identifier }} (
 	{{- if $ind }}, {{ end -}}
 	$1[{{$ind}}] AS {{$key.Identifier -}}
 	{{- end }}
-	FROM @flow_v1/{{ $.RandomUUID }}
-);
+	FROM @flow_v1/%s
+)
+;
 {{ end }}
 
 
@@ -241,7 +242,7 @@ USING (
 		{{- if $ind }}, {{ end -}}
 		$1[{{$ind}}] AS {{$key.Identifier -}}
 	{{- end }}
-	FROM @flow_v1/{{ $.RandomUUID }}
+	FROM @flow_v1/%s
 ) AS r
 ON {{ range $ind, $key := $.Table.Keys }}
 	{{- if $ind }} AND {{ end -}}
