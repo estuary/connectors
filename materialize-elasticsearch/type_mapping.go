@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/estuary/connectors/materialize-boilerplate/validate"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
@@ -34,13 +34,13 @@ func propForField(field string, binding *pf.MaterializationSpec_Binding) propert
 	return propForProjection(binding.Collection.GetProjection(field))
 }
 
-var numericStringTypes = map[validate.StringWithNumericFormat]elasticPropertyType{
-	validate.StringFormatInteger: elasticTypeLong,
-	validate.StringFormatNumber:  elasticTypeDouble,
+var numericStringTypes = map[boilerplate.StringWithNumericFormat]elasticPropertyType{
+	boilerplate.StringFormatInteger: elasticTypeLong,
+	boilerplate.StringFormatNumber:  elasticTypeDouble,
 }
 
 func propForProjection(p *pf.Projection) property {
-	if numericString, ok := validate.AsFormattedNumeric(p); ok {
+	if numericString, ok := boilerplate.AsFormattedNumeric(p); ok {
 		return property{Type: numericStringTypes[numericString], Coerce: true}
 	}
 
@@ -110,12 +110,12 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
-var elasticValidator = validate.NewValidator(constrainter{})
+var elasticValidator = boilerplate.NewValidator(constrainter{})
 
 type constrainter struct{}
 
 func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, isNumeric := validate.AsFormattedNumeric(p)
+	_, isNumeric := boilerplate.AsFormattedNumeric(p)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
