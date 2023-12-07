@@ -241,8 +241,7 @@ COPY INTO {{ $.Table.Identifier }} (
 	$1[{{$ind}}] AS {{$key.Identifier -}}
 	{{- end }}
 	FROM @flow_v1/%s
-)
-;
+);
 {{ end }}
 
 
