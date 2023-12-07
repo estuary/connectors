@@ -79,7 +79,9 @@ func (c *config) Validate() error {
 func (c *config) client(ctx context.Context) (*client, error) {
 	var clientOpts []option.ClientOption
 
-	clientOpts = append(clientOpts, option.WithCredentialsJSON(decodeCredentials(c.CredentialsJSON)))
+	clientOpts = append(clientOpts,
+		option.WithCredentialsJSON(decodeCredentials(c.CredentialsJSON)),
+		option.WithUserAgent("Estuary Technologies"))
 
 	// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
 	var billingProjectID = c.BillingProjectID
