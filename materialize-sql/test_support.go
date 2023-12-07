@@ -9,8 +9,7 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
-	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
-	"github.com/estuary/connectors/materialize-boilerplate/validate"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +22,7 @@ var snapshotPath = "../materialize-sql/.snapshots"
 func RunValidateTestCases(t *testing.T, dialect Dialect) {
 	t.Helper()
 
-	bp_test.RunValidateTestCases(t, validate.NewValidator(constrainter{
+	boilerplate.RunValidateTestCases(t, boilerplate.NewValidator(constrainter{
 		dialect: dialect,
 	}), snapshotPath)
 }

@@ -9,7 +9,8 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	bp_test "github.com/estuary/connectors/materialize-boilerplate/testing"
+
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -57,7 +58,7 @@ func TestApply(t *testing.T) {
 	client, err := cfg.toClient(false)
 	require.NoError(t, err)
 
-	bp_test.RunApplyTestCases(
+	boilerplate.RunApplyTestCases(
 		t,
 		driver{},
 		configJson,
@@ -103,7 +104,7 @@ func TestApply(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	bp_test.RunValidateTestCases(t, elasticValidator, ".snapshots")
+	boilerplate.RunValidateTestCases(t, elasticValidator, ".snapshots")
 }
 
 func TestDriverSpec(t *testing.T) {

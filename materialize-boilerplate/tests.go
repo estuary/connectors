@@ -1,4 +1,4 @@
-package testing
+package boilerplate
 
 import (
 	"context"
@@ -11,30 +11,28 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	"github.com/estuary/connectors/materialize-boilerplate/validate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
 
-//go:generate ./generate-spec-proto.sh testdata/apply/base.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/apply/remove-required.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/apply/remove-optional.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/apply/add-new-required.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/apply/add-new-optional.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/apply/add-new-binding.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/apply/remove-original-binding.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/apply/replace-original-binding.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/validate/base.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/validate/unsatisfiable.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/validate/forbidden.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/validate/alternate-root-projection.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/validate/remove-format.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/validate/more-multiple.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/validate/object-to-array.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/validate/numeric-string-to-numeric.flow.yaml
-//go:generate ./generate-spec-proto.sh testdata/validate/nullability.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/base.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/remove-required.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/remove-optional.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/add-new-required.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/add-new-optional.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/add-new-binding.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/remove-original-binding.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/replace-original-binding.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/base.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/unsatisfiable.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/forbidden.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/alternate-root-projection.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/remove-format.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/more-multiple.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/object-to-array.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/numeric-string-to-numeric.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/nullability.flow.yaml
 
 //go:embed testdata/apply/generated_specs
 var applyFs embed.FS
@@ -60,7 +58,7 @@ func loadSpec(t *testing.T, fs embed.FS, path string) *pf.MaterializationSpec {
 
 func RunApplyTestCases(
 	t *testing.T,
-	driver boilerplate.Connector,
+	driver Connector,
 	configJson json.RawMessage,
 	resourceJsons [2]json.RawMessage,
 	resourcePaths [2][]string,
@@ -168,7 +166,7 @@ func RunApplyTestCases(
 	cupaloy.SnapshotT(t, snap.String())
 }
 
-func RunValidateTestCases(t *testing.T, v validate.Validator, snapshotPath string) {
+func RunValidateTestCases(t *testing.T, v Validator, snapshotPath string) {
 	t.Helper()
 
 	tests := []struct {

@@ -12,7 +12,6 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	"github.com/estuary/connectors/materialize-boilerplate/validate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"go.gazette.dev/core/consumer/protocol"
@@ -81,7 +80,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
 
-	validator := validate.NewValidator(constrainter{dialect: endpoint.Dialect})
+	validator := boilerplate.NewValidator(constrainter{dialect: endpoint.Dialect})
 
 	// Produce constraints for each request binding, in turn.
 	for _, bindingSpec := range req.Bindings {
@@ -156,7 +155,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		})
 	}
 
-	validator := validate.NewValidator(constrainter{dialect: endpoint.Dialect})
+	validator := boilerplate.NewValidator(constrainter{dialect: endpoint.Dialect})
 
 	for bindingIndex, bindingSpec := range req.Materialization.Bindings {
 		addColumns := []Column{}
@@ -175,7 +174,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 			return nil, err
 		}
 
-		loadedBinding, err := validate.FindExistingBinding(resource.Path(), bindingSpec.Collection.Name, loadedSpec)
+		loadedBinding, err := boilerplate.FindExistingBinding(resource.Path(), bindingSpec.Collection.Name, loadedSpec)
 		if err != nil {
 			return nil, err
 		} else if err = validator.ValidateSelectedFields(bindingSpec, loadedSpec); err != nil {

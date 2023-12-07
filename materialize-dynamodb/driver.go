@@ -17,7 +17,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	"github.com/estuary/connectors/materialize-boilerplate/validate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
@@ -283,7 +282,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 			return nil, err
 		}
 
-		found, err := validate.FindExistingBinding(b.ResourcePath, b.Collection.Name, storedSpec)
+		found, err := boilerplate.FindExistingBinding(b.ResourcePath, b.Collection.Name, storedSpec)
 		if err != nil {
 			return nil, err
 		}
