@@ -78,7 +78,7 @@ func main() {
 		fmt.Printf("dropped table %s\n", tables[0])
 		os.Exit(0)
 	} else if *deleteSpecs {
-		query := "delete from FLOW_CHECKPOINTS_V1 where MATERIALIZATION='tests/materialize-snowflake/materialize';delete from FLOW_MATERIALIZATIONS_V2 where MATERIALIZATION='tests/materialize-snowflake/materialize';"
+		query := "delete from FLOW_MATERIALIZATIONS_V2 where MATERIALIZATION='tests/materialize-snowflake/materialize';"
 		if _, err := db.ExecContext(ctx, query); err != nil {
 			fmt.Println(fmt.Errorf("could not delete stored materialization spec/checkpoint: %w", err))
 		}
