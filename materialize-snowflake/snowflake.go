@@ -280,6 +280,11 @@ func newTransactor(
 		return nil, fmt.Errorf("store db.Conn: %w", err)
 	}
 
+	// Create stage for file-based transfers.
+	if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
+		return nil, fmt.Errorf("creating transfer stage : %w", err)
+	}
+
 	var cp checkpoint
 	if open.StateJson != nil {
 		if err := json.Unmarshal(open.StateJson, &cp); err != nil {
@@ -289,11 +294,6 @@ func newTransactor(
 
 	if err = d.applyCheckpoint(ctx, cp, true); err != nil {
 		return nil, fmt.Errorf("applying recovered checkpoint: %w", err)
-	}
-
-	// Create stage for file-based transfers.
-	if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
-		return nil, fmt.Errorf("creating transfer stage : %w", err)
 	}
 
 	for _, binding := range bindings {
@@ -370,6 +370,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	}
 
 	var subqueries = make(map[int]string)
+	var toDelete []string
 	for i, b := range d.bindings {
 		if !b.load.stage.started {
 			// Pass.
@@ -377,8 +378,10 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
 			subqueries[i] = renderWithDir(b.load.loadQuery, dir)
+			toDelete = append(toDelete, dir)
 		}
 	}
+	defer d.deleteFiles(ctx, toDelete)
 
 	log.Info("load: finished encoding and uploading of files")
 
@@ -478,8 +481,6 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	var queries []string
 	// all files uploaded across bindings
 	var toDelete []string
-	// mutex to ensure safety of updating these variables
-	m := sync.Mutex{}
 
 	log.Info("store: starting copying of files into tables")
 	for _, b := range d.bindings {
@@ -494,16 +495,12 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 		if !b.store.mustMerge {
 			// We can issue a faster COPY INTO the target table.
-			m.Lock()
 			queries = append(queries, renderWithDir(b.store.copyInto, dir))
 			toDelete = append(toDelete, fmt.Sprintf("@flow_v1/%s", dir))
-			m.Unlock()
 		} else {
 			// We must MERGE into the target table.
-			m.Lock()
 			queries = append(queries, renderWithDir(b.store.mergeInto, dir))
 			toDelete = append(toDelete, fmt.Sprintf("@flow_v1/%s", dir))
-			m.Unlock()
 		}
 
 		// Reset for next transaction.
@@ -536,15 +533,11 @@ func renderWithDir(tpl string, dir string) string {
 
 func skipRecoveryError(err error) error {
 	var sfError *sf.SnowflakeError
+	// During recovery we may want to allow certain errors, e.g. if the source files
+	// have been deleted from the stage, we can take that as a sign that the file has
+	// already been processed
 	if errors.As(err, &sfError) {
-		log.WithField("n", sfError.Number).WithField("sqlstate", sfError.SQLState).Warn("error")
 		switch sfError.Number {
-		case 1757:
-			// This error happens if the target table has been dropped. This can happen
-			// if the target table is dropped by the user
-			if sfError.SQLState == "42S02" {
-				return nil
-			}
 		}
 	}
 
@@ -553,18 +546,18 @@ func skipRecoveryError(err error) error {
 
 // applyCheckpoint merges data from temporary table to main table
 func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
+	defer d.deleteFiles(ctx, cp.ToDelete)
+
 	var asyncCtx = sf.WithAsyncMode(ctx)
 	log.Info("store: starting committing changes")
 
-	if !recovery {
-		return fmt.Errorf("artificial error")
-	}
-
+	// Run the queries using AsyncMode, which means that `ExecContext` will not block
+	// until the query is successful, rather we will store the results of these queries
+	// in a map so that we can then call `RowsAffected` on them, blocking until
+	// the queries are actually executed and done
 	var results = make(map[string]stdsql.Result)
 	for _, q := range cp.Queries {
 		if result, err := d.store.conn.ExecContext(asyncCtx, q); err != nil {
-			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
-			// it is okay to skip them in this case
 			if recovery {
 				if err := skipRecoveryError(err); err != nil {
 					return fmt.Errorf("query %q failed: %w", q, err)
@@ -579,8 +572,6 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 
 	for q, r := range results {
 		if _, err := r.RowsAffected(); err != nil {
-			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
-			// it is okay to skip them in this case
 			if recovery {
 				if err := skipRecoveryError(err); err != nil {
 					return fmt.Errorf("query %q failed: %w", q, err)
@@ -592,19 +583,19 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 	}
 	log.Info("store: finished committing changes")
 
-	// Cleanup files and tables
-	d.deleteFiles(ctx, cp.ToDelete)
-
 	return nil
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 	for _, f := range files {
+		log.WithFields(log.Fields{
+			"file": f,
+		}).Info("deleting file")
 		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("REMOVE %s", f)); err != nil {
 			log.WithFields(log.Fields{
 				"file": f,
 				"err":  err,
-			}).Debug("deleteFiles failed")
+			}).Warn("deleteFiles failed")
 		}
 	}
 }
