@@ -378,7 +378,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
 			subqueries[i] = renderWithDir(b.load.loadQuery, dir)
-			toDelete = append(toDelete, dir)
+			toDelete = append(toDelete, fmt.Sprintf("@flow_v1/%s", dir))
 		}
 	}
 	defer d.deleteFiles(ctx, toDelete)
@@ -496,12 +496,12 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		if !b.store.mustMerge {
 			// We can issue a faster COPY INTO the target table.
 			queries = append(queries, renderWithDir(b.store.copyInto, dir))
-			toDelete = append(toDelete, fmt.Sprintf("@flow_v1/%s", dir))
 		} else {
 			// We must MERGE into the target table.
 			queries = append(queries, renderWithDir(b.store.mergeInto, dir))
-			toDelete = append(toDelete, fmt.Sprintf("@flow_v1/%s", dir))
 		}
+
+		toDelete = append(toDelete, fmt.Sprintf("@flow_v1/%s", dir))
 
 		// Reset for next transaction.
 		b.store.mustMerge = false
@@ -531,19 +531,6 @@ func renderWithDir(tpl string, dir string) string {
 	return fmt.Sprintf(tpl, dir)
 }
 
-func skipRecoveryError(err error) error {
-	var sfError *sf.SnowflakeError
-	// During recovery we may want to allow certain errors, e.g. if the source files
-	// have been deleted from the stage, we can take that as a sign that the file has
-	// already been processed
-	if errors.As(err, &sfError) {
-		switch sfError.Number {
-		}
-	}
-
-	return err
-}
-
 // applyCheckpoint merges data from temporary table to main table
 func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recovery bool) error {
 	defer d.deleteFiles(ctx, cp.ToDelete)
@@ -558,13 +545,7 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 	var results = make(map[string]stdsql.Result)
 	for _, q := range cp.Queries {
 		if result, err := d.store.conn.ExecContext(asyncCtx, q); err != nil {
-			if recovery {
-				if err := skipRecoveryError(err); err != nil {
-					return fmt.Errorf("query %q failed: %w", q, err)
-				}
-			} else {
-				return fmt.Errorf("query %q failed: %w", q, err)
-			}
+			return fmt.Errorf("query %q failed: %w", q, err)
 		} else {
 			results[q] = result
 		}
@@ -572,13 +553,7 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 
 	for q, r := range results {
 		if _, err := r.RowsAffected(); err != nil {
-			if recovery {
-				if err := skipRecoveryError(err); err != nil {
-					return fmt.Errorf("query %q failed: %w", q, err)
-				}
-			} else {
-				return fmt.Errorf("query %q failed: %w", q, err)
-			}
+			return fmt.Errorf("query %q failed: %w", q, err)
 		}
 	}
 	log.Info("store: finished committing changes")
@@ -588,14 +563,11 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 	for _, f := range files {
-		log.WithFields(log.Fields{
-			"file": f,
-		}).Info("deleting file")
 		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("REMOVE %s", f)); err != nil {
 			log.WithFields(log.Fields{
 				"file": f,
 				"err":  err,
-			}).Warn("deleteFiles failed")
+			}).Debug("deleteFiles failed")
 		}
 	}
 }
