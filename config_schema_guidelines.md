@@ -268,9 +268,9 @@ Example 1:
 }
 ```
 
-### Use `sshEndpoint` when you want the UI to show the IP that needs to be whitelisted
+### Use `sshEndpoint` when you want the UI to show informational section about IP Address
 
-The UI detects if a section contains the properti `sshEndpoint` and then displays an information section telling the user what IP address they will need to whitelist. It does not need to be required or any other special cases. 
+The UI detects if a section contains the property `sshEndpoint` and then displays an information section telling the user what IP address they will need to allow through. It does not need to be required or any other special cases. 
 
 Keep in mind - it will display at the top of the group that contains the property and not directly next to the field.
 
