@@ -76,8 +76,8 @@ type stagedFile struct {
 	// start() and `false` by flush().
 	started bool
 
-	// List of file names uploaded during the current transaction for transaction data, not
-	// including the manifest file name itself. These data file names randomly generated UUIDs.
+	// List of file names uploaded during the current transaction for transaction data
+	// These data file names randomly generated UUIDs.
 	uploaded []string
 
 	// References to the current file being written.
@@ -179,13 +179,11 @@ func (f *stagedFile) flush() (string, error) {
 	if err := f.putFile(); err != nil {
 		return "", fmt.Errorf("flush putFile: %w", err)
 	}
-	var dir = f.uuid
-
 	close(f.putFiles)
 	f.started = false
 
 	// Wait for all outstanding PUT requests to complete.
-	return dir, f.group.Wait()
+	return f.uuid, f.group.Wait()
 }
 
 func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-chan string) error {
