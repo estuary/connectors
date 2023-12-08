@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flow-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Joseph Shearer <joseph@estuary.dev>", "Johnny Graettinger <johnny@estuary.dev>"]
 readme = "README.md"
@@ -9,8 +9,8 @@ readme = "README.md"
 jsonlines = "^4.0.0"
 mypy = "^1.5"
 orjson = "^3.9.7"
-pydantic = "1.10.12"
-python = "^3.11"
+pydantic = "^2.4"
+python = "<3.12,>=3.11"
 requests = "^2.31.0"
 types-requests = "^2.31"
 pytest = "^7.4.3"
