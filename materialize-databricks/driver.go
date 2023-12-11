@@ -370,9 +370,12 @@ type transactor struct {
 	}
 	// Variables exclusively used by Store.
 	store struct {
-		conn *stdsql.Conn
+		conn  *stdsql.Conn
+		round int
 	}
 	bindings []*binding
+
+	updateDelay time.Duration
 }
 
 func (t transactor) Context(ctx context.Context) context.Context {
@@ -398,6 +401,10 @@ func newTransactor(
 	}
 
 	var d = &transactor{cfg: cfg, wsClient: wsClient}
+
+	if d.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+		return nil, err
+	}
 
 	// Establish connections.
 	if db, err := stdsql.Open("databricks", cfg.ToURI()); err != nil {
@@ -643,6 +650,7 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 }
 
 func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
+	d.store.round++
 	ctx := it.Context()
 
 	log.Info("store: starting file upload and copies")
@@ -736,16 +744,16 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		if err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-		var commitOp = pf.RunAsyncOperation(func() error {
+		var commitOp = func(ctx context.Context) error {
 			select {
 			case <-runtimeAckCh:
 				return d.applyCheckpoint(ctx, cp, false)
 			case <-ctx.Done():
 				return ctx.Err()
 			}
-		})
+		}
 
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, commitOp
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, sql.CommitWithDelay(ctx, d.store.round, d.updateDelay, it.Total, commitOp)
 	}, nil
 }
 
