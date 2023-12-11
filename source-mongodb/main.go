@@ -112,7 +112,9 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	}
 
 	if retention, err := oplogMinRetentionHours(ctx, client); err != nil || retention == 0 {
-		log.WithField("err", err).Warn("checking oplogMinRetentionHours failed, using an alternative method to approximate oplog size, this might not be accurate.")
+		// We want to avoid the Info log being interpreted as an error by users
+		log.WithField("error", err).Debug("oplog retention check failed (this is usually OK)")
+		log.Infof("falling back to less accurate oplog size estimation")
 
 		if diff, err := oplogTimeDifference(ctx, client); err != nil {
 			return nil, fmt.Errorf("could not read oplog, access to oplog is necessary. Consider giving the user access to read the local database https://go.estuary.dev/NurkrE: %w", err)
