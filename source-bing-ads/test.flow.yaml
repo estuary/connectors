@@ -1,0 +1,17 @@
+---
+captures:
+  acmeCo/source-bing-ads:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-bing-ads
+        config:
+          auth_method: oauth2.0
+          client_id: 54b30172-7b39-4c00-9b12-d625384e211e
+          tenant_id: f8cdef31-a31e-4b4a-93e4-5f571e91255a
+          client_secret: 93h8Q~lRJzAVhBhuNDP5IS.mcC3qIVUuGZmZsbnO
+          developer_token: 1072JQDAYU870189
+          redirect_uri: https://login.microsoftonline.com/common/oauth2/nativeclient
+    bindings: []
