@@ -280,6 +280,11 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 			errs.Err(fmt.Errorf("The selected SQL Warehouse is stopping, please start the SQL warehouse and try again."))
 		}
 
+		if res.AutoStopMins >= 15 {
+			log.Warn(fmt.Sprintf("Auto-stop is configured to be %d minutes for this warehouse, disabling update delay. To save costs you can reduce the auto-stop idle configuration and tune the update delay config of this connector. See docs for more information: https://go.estuary.dev/materialize-databricks", res.AutoStopMins))
+
+			cfg.Advanced.UpdateDelay = "0s"
+		}
 	}
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
@@ -407,6 +412,19 @@ func newTransactor(
 
 	if d.updateDelay, err = sql.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
 		return nil, err
+	}
+
+	// If the warehouse has auto-stop configured to be longer than 15 minutes, disable update delay
+	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
+	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
+	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
+		return nil, fmt.Errorf("get warehouse %q details: %w", warehouseId, err)
+	} else {
+		if res.AutoStopMins >= 15 {
+			log.Info(fmt.Sprintf("Auto-stop is configured to be %d minutes for this warehouse, disabling update delay. To save costs you can reduce the auto-stop idle configuration and tune the update delay config of this connector. See docs for more information: https://go.estuary.dev/materialize-databricks", res.AutoStopMins))
+
+			d.updateDelay, _ = time.ParseDuration("0s")
+		}
 	}
 
 	// Establish connections.
