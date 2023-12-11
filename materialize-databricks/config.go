@@ -16,6 +16,12 @@ type config struct {
 	SchemaName  string `json:"schema_name" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default"`
 
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+}
+
+type advancedConfig struct {
+	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active warehouse time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
 }
 
 const (
