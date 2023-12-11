@@ -388,7 +388,7 @@ const (
 	SortDescending = -1
 )
 
-func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted, client *mongo.Client, binding int, res resource, state resourceState) error {
+func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted, client *mongo.Client, binding int, res resource, state resourceState) (_err error) {
 	var db = client.Database(res.Database)
 	var collection = db.Collection(res.Collection)
 
@@ -414,26 +414,46 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 		filter = bson.D{{idProperty, bson.D{{"$gt", v}}}}
 	}
 
+	var documentCount = 0
+	// Acquire a semaphore position before we start
+	if err := sp.Acquire(ctx, 1); err != nil {
+		return fmt.Errorf("semaphore acquisition ctx cancelled: %w", err)
+	}
+	// We need to track whether we currently hold the semaphore because we're going
+	// to be releasing and re-acquiring it over the course of the backfill. If there's
+	// a context cancellation, then acquiring the semaphore can return an error, and
+	// this state is needed to avoid releasing more than was acquired in that case.
+	var semaphoreHeld = true
+	defer func() {
+		if semaphoreHeld {
+			sp.Release(1)
+		}
+		var fields = log.Fields{
+			"mongoCollection": res.Collection,
+			"documentCount":   documentCount,
+		}
+		if _err == nil {
+			log.WithFields(fields).Info("finished backfill of collection")
+		} else {
+			fields["error"] = _err
+			log.WithFields(fields).Errorf("failed to backfill collection")
+		}
+	}()
+
 	log.WithFields(log.Fields{
-		"collection": res.Collection,
-		"opts":       opts,
-		"filter":     filter,
-	}).Info("backfilling documents in collection")
+		"mongoCollection": res.Collection,
+		"opts":            opts,
+		"filter":          filter,
+	}).Info("starting backfill of collection")
 
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
 		return fmt.Errorf("could not run find query on collection %s: %w", res.Collection, err)
 	}
-
 	defer cursor.Close(ctx)
 
-	// Acquire a semaphore position before we start
-	if err := sp.Acquire(ctx, 1); err != nil {
-		return fmt.Errorf("semaphore acquisition ctx cancelled: %w", err)
-	}
-	var i = 0
 	for cursor.Next(ctx) {
-		i += 1
+		documentCount += 1
 
 		// We decode once into a map of RawValues so we can keep the _id as a
 		// RawValue. This allows us to marshal it as an encoded byte array along
@@ -484,10 +504,14 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 				return fmt.Errorf("output checkpoint failed: %w", err)
 			}
 
+			// Release and immediately re-acquire the semaphore in order to give other bindings
+			// the opportunity to make some progress on their backfills.
 			sp.Release(1)
+			semaphoreHeld = false
 			if err := sp.Acquire(ctx, 1); err != nil {
 				return fmt.Errorf("semaphore acquisition ctx cancelled: %w", err)
 			}
+			semaphoreHeld = true
 		}
 	}
 
