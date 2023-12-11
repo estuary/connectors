@@ -1,7 +1,7 @@
-properties:
+credentials:
     auth_method: oauth2.0
-    client_id_sops: ENC[AES256_GCM,data:HAm44ScaEdcMPgzWbxQR3L31HydSm/vkTE8TlKp4IqkX0GZA,iv:niFLn72cO9Wclx9f1m4jynX8qW8GAoF3QeiCKj3zHlk=,tag:cr1bBuIIkQi9Vh7hXPWexQ==,type:str]
-    client_secret_sops: ENC[AES256_GCM,data:W2EHgzMCotmEsbmw1xKL/UjC9Cp6zMs6ksTA66uJQB2MaieXAZukHg==,iv:vmrIc4YnSVqZwG5uS97+XzVlGPwKUrhtq0Gd9nxZHmk=,tag:ARCvpUI5uhnxRPZyCiehcQ==,type:str]
+    client_id_sops: ENC[AES256_GCM,data:3nndJkjHvaslFFHzMNO2mIARTk/eNhlCmq3oXGGMyRkz1J9O,iv:6zJ2yoxivuSqkfyEWTq1mMJsNUggroq5l1cgjuS5a80=,tag:dqV9JXRe1sV6UqqIrhwIAQ==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:1Pyk8eLTm9podLQ9bBlCG7pyN9Pqj7qWB8iWrz8alAa0rXfmPVRs2Q==,iv:kkQKCsVMOyb8FTN1wnHD8sG7SoBbtdGLFvGDWniOXyo=,tag:lBwi8yEsfiQ+HZZF9ge99Q==,type:str]
     tenant_id: f8cdef31-a31e-4b4a-93e4-5f571e91255a
     developer_token: 1072JQDAYU870189
 sops:
@@ -13,8 +13,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2023-12-08T19:05:08Z"
-    mac: ENC[AES256_GCM,data:RkBp/FsDjzOtAweUDhqVbzClsbHQkTi3wm0hIqd4SBse6vzoXayzEhpN0tHX1PeRvor54fLFU5/lY6Gla47BKp9UdkJcqcNcSLWktAlNcuuRyGcrxwA/VawsgzM4EPTyeCQvLSNHd2xx2smJtG0TA0HkFAM/L2jeCZqwHTPeZu4=,iv:DzSouR8cCTitTJpnJsQ8cTu61QG57fYp3yTF4d2fxPU=,tag:1L9psPIGuoqFx5Y4MH4iOQ==,type:str]
+    lastmodified: "2023-12-11T15:53:47Z"
+    mac: ENC[AES256_GCM,data:1hHjwan7olA3M3eg6CC5/6y/C7azaLXMRoTTl68pYLn+x5FtJf/QNRDG+5erHPQybObi4rskJxxZfF5OPHxUtxrO6Mik5/Chal+J07Xb9WtpJobYjdrBTCYf1HIlg+o9ECE4c4EfG57EgUoHq4uZXVLio1wUpo8YpJWTTl5SEjM=,iv:JEafcsj26m+9gK63RZaQ3ShNOIGtap08U+XLYUqo1jw=,tag:NmlzfZOiu6amyAAQ4apx5w==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

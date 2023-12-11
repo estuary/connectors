@@ -8,7 +8,7 @@ import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
-from typing import Any, Iterator, List, Mapping, Optional, Union
+from typing import Any, Iterator, List, Mapping, Optional, Union, TypedDict
 from urllib.error import URLError
 
 import backoff
@@ -27,6 +27,13 @@ from suds import WebFault, sudsobject
 
 FILE_TYPE = "Csv"
 TIMEOUT_IN_MILLISECONDS = 3_600_000
+
+class Credentials(TypedDict):
+    tenant_id: str
+    developer_token: str = None
+    client_id: str = None
+    client_secret: str = None
+    refresh_token: str = None
 
 
 class Client:
@@ -53,21 +60,17 @@ class Client:
 
     def __init__(
         self,
-        tenant_id: str,
+        credentials: Credentials = None,
         reports_start_date: str = None,
-        developer_token: str = None,
-        client_id: str = None,
-        client_secret: str = None,
-        refresh_token: str = None,
         **kwargs: Mapping[str, Any],
     ) -> None:
-        self.refresh_token = refresh_token
-        self.developer_token = developer_token
+        self.refresh_token = credentials.refresh_token
+        self.developer_token = credentials.developer_token
 
-        self.client_id = client_id
-        self.client_secret = client_secret
+        self.client_id = credentials.client_id
+        self.client_secret = credentials.client_secret
 
-        self.authentication = self._get_auth_client(client_id, tenant_id, client_secret)
+        self.authentication = self._get_auth_client(self.client_id, self.tenant_id, self.client_secret)
         self.oauth: OAuthTokens = self._get_access_token()
         if reports_start_date:
             self.reports_start_date = pendulum.parse(reports_start_date).astimezone(tz=timezone.utc)

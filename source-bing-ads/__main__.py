@@ -16,6 +16,9 @@ def wrap_with_braces(body: str, count: int):
 def urlencode_field(field: str):
     return f"{wrap_with_braces('#urlencode',2)}{wrap_with_braces(field,3)}{wrap_with_braces('/urlencode',2)}"
 
+def urlencode_raw(raw: str):
+    return f"{wrap_with_braces('#urlencode',2)}{raw}{wrap_with_braces('/urlencode',2)}"
+
 shim_airbyte_cdk.CaptureShim(
     delegate=SourceBingAds(),
     oauth2=
@@ -23,7 +26,7 @@ shim_airbyte_cdk.CaptureShim(
         "provider": "microsoft",
         "accessTokenBody": (
             f"client_id={urlencode_field('client_id')}&"
-            f"scope={scopes}&"
+            f"scope={urlencode_raw(scopes)}&"
             f"code={urlencode_field('code')}&"
             f"grant_type=authorization_code&"
             f"redirect_uri={urlencode_field('redirect_uri')}&"
@@ -32,21 +35,21 @@ shim_airbyte_cdk.CaptureShim(
         "authUrlTemplate": (
             f"https://login.microsoftonline.com/common/oauth2/v2.0/authorize?"
             f"client_id={urlencode_field('client_id')}&"
-            f"scope={urlencode_field(scopes)}&"
+            f"scope={urlencode_raw(scopes)}&"
             f"response_type=code&"
             f"redirect_uri={urlencode_field('redirect_uri')}&"
             f"state={urlencode_field('state')}&"
-            f"response_type=query&"
             f"prompt=login"
         ),
         "accessTokenHeaders": {
             "content-type": "application/x-www-form-urlencoded"
         },
         "accessTokenResponseMap": {
+            "access_token": "/access_token",
             "refresh_token": "/refresh_token",
         },
         "accessTokenUrlTemplate": (
-            f"https://login.microsoftonline.com/common/oauth2/v2.0/token"
+            f"https://login.microsoftonline.com/common/oauth2/v2.0/token?"
             f"client_id={urlencode_field('client_id')}&"
             f"scope={urlencode_field(scopes)}&"
             f"code={urlencode_field('code')}&"
