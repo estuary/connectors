@@ -5,20 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"time"
 	"slices"
+	"time"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 
-	"golang.org/x/sync/semaphore"
-	"golang.org/x/sync/errgroup"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 // Limit the number of backfills running concurrently to avoid
@@ -55,7 +55,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}()
 
 	var c = capture{
-		cfg: cfg,
+		cfg:    cfg,
 		Output: stream,
 	}
 
@@ -129,7 +129,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 }
 
 type capture struct {
-	cfg config
+	cfg    config
 	Output *boilerplate.PullOutput
 }
 
@@ -148,8 +148,8 @@ func (s *captureState) Validate() error {
 type backfillState struct {
 	Done bool `json:"done,omitempty"`
 
-	StartedAt time.Time `json:"started_at,omitempty"`
-	LastId bson.RawValue `json:"last_id,omitempty"`
+	StartedAt time.Time     `json:"started_at,omitempty"`
+	LastId    bson.RawValue `json:"last_id,omitempty"`
 }
 
 type resourceState struct {
@@ -160,7 +160,7 @@ type docKey struct {
 	Id interface{} `bson:"_id"`
 }
 type namespace struct {
-	Database string `bson:"db"`
+	Database   string `bson:"db"`
 	Collection string `bson:"coll"`
 }
 type changeEvent struct {
@@ -383,8 +383,8 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 const BackfillBatchSize = 50000
 
 const (
-	NaturalSort = "$natural"
-	SortAscending = 1
+	NaturalSort    = "$natural"
+	SortAscending  = 1
 	SortDescending = -1
 )
 
@@ -416,8 +416,8 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 
 	log.WithFields(log.Fields{
 		"collection": res.Collection,
-		"opts": opts,
-		"filter": filter,
+		"opts":       opts,
+		"filter":     filter,
 	}).Info("backfilling documents in collection")
 
 	cursor, err := collection.Find(ctx, filter, opts)
@@ -520,6 +520,7 @@ func resourceId(res resource) string {
 func eventResourceId(ev changeEvent) string {
 	return fmt.Sprintf("%s.%s", ev.Ns.Database, ev.Ns.Collection)
 }
+
 // MongoDB considers datetimes outside of the 0-9999 year range to be _unsafe_
 // so we enforce this constraint in our connector.
 // see https://www.mongodb.com/docs/manual/reference/method/Date/#behavior
