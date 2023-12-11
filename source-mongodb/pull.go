@@ -18,7 +18,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 )
 
 // Limit the number of backfills running concurrently to avoid
@@ -98,10 +97,9 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	// Run backfills concurrently and wait until they are done before we start
 	// the change stream
 	eg, egCtx := errgroup.WithContext(ctx)
+	eg.SetLimit(ConcurrentBackfillLimit)
 
 	var resources = make([]resource, len(open.Capture.Bindings))
-
-	var backfillSemaphore = semaphore.NewWeighted(ConcurrentBackfillLimit)
 
 	// Capture each binding.
 	for idx, binding := range open.Capture.Bindings {
@@ -116,7 +114,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 		if !resState.Backfill.Done {
 			eg.Go(func() error {
-				return c.BackfillCollection(egCtx, backfillSemaphore, client, idx, res, resState)
+				return c.BackfillCollection(egCtx, client, idx, res, resState)
 			})
 		}
 	}
@@ -388,7 +386,7 @@ const (
 	SortDescending = -1
 )
 
-func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted, client *mongo.Client, binding int, res resource, state resourceState) (_err error) {
+func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding int, res resource, state resourceState) (_err error) {
 	var db = client.Database(res.Database)
 	var collection = db.Collection(res.Collection)
 
@@ -413,24 +411,17 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 		}
 		filter = bson.D{{idProperty, bson.D{{"$gt", v}}}}
 	}
+	log.WithFields(log.Fields{
+		"mongoCollection": res.Collection,
+		"opts":            opts,
+		"filter":          filter,
+	}).Info("starting backfill of collection")
 
 	var documentCount = 0
-	// Acquire a semaphore position before we start
-	if err := sp.Acquire(ctx, 1); err != nil {
-		return fmt.Errorf("semaphore acquisition ctx cancelled: %w", err)
-	}
-	// We need to track whether we currently hold the semaphore because we're going
-	// to be releasing and re-acquiring it over the course of the backfill. If there's
-	// a context cancellation, then acquiring the semaphore can return an error, and
-	// this state is needed to avoid releasing more than was acquired in that case.
-	var semaphoreHeld = true
 	defer func() {
-		if semaphoreHeld {
-			sp.Release(1)
-		}
 		var fields = log.Fields{
-			"mongoCollection": res.Collection,
-			"documentCount":   documentCount,
+			"mongoCollection":         res.Collection,
+			"backfilledDocumentCount": documentCount,
 		}
 		if _err == nil {
 			log.WithFields(fields).Info("finished backfill of collection")
@@ -439,12 +430,6 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 			log.WithFields(fields).Errorf("failed to backfill collection")
 		}
 	}()
-
-	log.WithFields(log.Fields{
-		"mongoCollection": res.Collection,
-		"opts":            opts,
-		"filter":          filter,
-	}).Info("starting backfill of collection")
 
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
@@ -485,9 +470,8 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 		}
 
 		// This means the next call to cursor.Next() will trigger a new network
-		// request. Before we do that, we checkpoint and release our acquired semaphore and try to
-		// acquire a new one, to give chance to other bindings to progress in their
-		// backfill
+		// request. Before we do that, we checkpoint so that we can resume from this
+		// point after a failure.
 		if cursor.RemainingBatchLength() == 0 {
 			var checkpoint = captureState{
 				Resources: map[string]resourceState{
@@ -503,15 +487,6 @@ func (c *capture) BackfillCollection(ctx context.Context, sp *semaphore.Weighted
 			if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
 				return fmt.Errorf("output checkpoint failed: %w", err)
 			}
-
-			// Release and immediately re-acquire the semaphore in order to give other bindings
-			// the opportunity to make some progress on their backfills.
-			sp.Release(1)
-			semaphoreHeld = false
-			if err := sp.Acquire(ctx, 1); err != nil {
-				return fmt.Errorf("semaphore acquisition ctx cancelled: %w", err)
-			}
-			semaphoreHeld = true
 		}
 	}
 
