@@ -12,24 +12,24 @@ import (
 
 func TestDatabricksConfig(t *testing.T) {
 	var validConfig = config{
-		Address:  "db-something.cloud.databricks.com:400",
+		Address:     "db-something.cloud.databricks.com:400",
 		CatalogName: "mycatalog",
-		HTTPPath: "/sql/1.0/warehouses/someid",
+		HTTPPath:    "/sql/1.0/warehouses/someid",
 		Credentials: credentialConfig{
-			AuthType: "PAT",
+			AuthType:            "PAT",
 			PersonalAccessToken: "secret",
 		},
 		SchemaName: "default",
 	}
 	require.NoError(t, validConfig.Validate())
 	var uri = validConfig.ToURI()
-	require.Equal(t, "token:secret@db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?catalog=mycatalog&userAgentEntry=Estuary+Technologies+Flow", uri)
+	require.Equal(t, "token:secret@db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?catalog=mycatalog&schema=default&userAgentEntry=Estuary+Technologies+Flow", uri)
 
 	var noPort = validConfig
 	noPort.Address = "db-something.cloud.databricks.com"
 	require.NoError(t, noPort.Validate())
 	uri = noPort.ToURI()
-	require.Equal(t, "token:secret@db-something.cloud.databricks.com:443/sql/1.0/warehouses/someid?catalog=mycatalog&userAgentEntry=Estuary+Technologies+Flow", uri)
+	require.Equal(t, "token:secret@db-something.cloud.databricks.com:443/sql/1.0/warehouses/someid?catalog=mycatalog&schema=default&userAgentEntry=Estuary+Technologies+Flow", uri)
 
 	var noAddress = validConfig
 	noAddress.Address = ""
