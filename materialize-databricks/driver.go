@@ -16,10 +16,12 @@ import (
 
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
+	"github.com/databricks/databricks-sdk-go/logger"
 	databricksSql "github.com/databricks/databricks-sdk-go/service/sql"
 	_ "github.com/databricks/databricks-sql-go"
 	driverctx "github.com/databricks/databricks-sql-go/driverctx"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
+	dbsqllog "github.com/databricks/databricks-sql-go/logger"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -277,6 +279,7 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 		case databricksSql.StateStopping:
 			errs.Err(fmt.Errorf("The selected SQL Warehouse is stopping, please start the SQL warehouse and try again."))
 		}
+
 	}
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
@@ -860,5 +863,10 @@ func (d *transactor) Destroy() {
 }
 
 func main() {
+	logger.DefaultLogger = &NoOpLogger{}
+	if err := dbsqllog.SetLogLevel("disabled"); err != nil {
+		panic(err)
+	}
+
 	boilerplate.RunMain(newDatabricksDriver())
 }
