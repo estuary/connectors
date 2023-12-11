@@ -16,6 +16,7 @@ import (
 
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
+	databricksSql "github.com/databricks/databricks-sdk-go/service/sql"
 	_ "github.com/databricks/databricks-sql-go"
 	driverctx "github.com/databricks/databricks-sql-go/driverctx"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
@@ -250,11 +251,40 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	cfg := ep.Config.(*config)
 	errs := &sql.PrereqErr{}
 
+	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
+		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+		Token:       cfg.Credentials.PersonalAccessToken,
+		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+	})
+	if err != nil {
+		errs.Err(err)
+	}
+
+	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
+	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
+	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
+		errs.Err(err)
+	} else {
+		switch res.State {
+		case databricksSql.StateDeleted:
+			errs.Err(fmt.Errorf("The selected SQL Warehouse is deleted, please use an active SQL warehouse."))
+		case databricksSql.StateDeleting:
+			errs.Err(fmt.Errorf("The selected SQL Warehouse is being deleted, please use an active SQL warehouse."))
+		case databricksSql.StateStarting:
+			errs.Err(fmt.Errorf("The selected SQL Warehouse is starting, please wait a couple of minutes before trying again."))
+		case databricksSql.StateStopped:
+			errs.Err(fmt.Errorf("The selected SQL Warehouse is stopped, please start the SQL warehouse and try again."))
+		case databricksSql.StateStopping:
+			errs.Err(fmt.Errorf("The selected SQL Warehouse is stopping, please start the SQL warehouse and try again."))
+		}
+	}
+
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
-	// bail out well before then. Note that this should be long enough to allow
-	// for an automatically shut down instance to be started up again
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	// bail out well before then. Note that it is normal for Databricks warehouses to go offline
+	// after inactivity, and this attempt to connect to the warehouse will initiate their boot-up process
+	// however we don't want to wait 5 minutes as that does not create a good UX for the user in the UI
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	if db, err := stdsql.Open("databricks", c.uri); err != nil {
