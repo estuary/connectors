@@ -9,9 +9,7 @@ captures:
           - python
           - "-m"
           - source-asana
-        config:
-          authentication:
-            personal_access_token: "2/1205846172619387/1205961971802604:2732de6298d59fd0d4ef056a028a9fce"
+        config: connector_config.yaml
     bindings:
       # - resource:
       #     stream: attachments_compact
