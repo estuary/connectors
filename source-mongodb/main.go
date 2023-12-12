@@ -111,6 +111,10 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		return nil, err
 	}
 
+	if err = client.Ping(ctx, nil); err != nil {
+		return nil, fmt.Errorf("cannot connect to MongoDB server: %w", err)
+	}
+
 	if retention, err := oplogMinRetentionHours(ctx, client); err != nil || retention == 0 {
 		// We want to avoid the Info log being interpreted as an error by users
 		log.WithField("error", err).Debug("oplog retention check failed (this is usually OK)")
