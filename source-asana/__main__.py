@@ -16,7 +16,7 @@ shim_airbyte_cdk.CaptureShim(
         "authUrlTemplate": (
             f"https://app.asana.com/-/oauth_authorize?"
             f"client_id={wrap_with_braces('client_id',3)}&"
-            f"redirect_uri={wrap_with_braces('redirect_uri',3)}&"
+            f"redirect_uri={urlencode_field('redirect_uri')}&"
             f"response_type=code&"
             f"state={urlencode_field('state')}&"
             f"scope=default"
@@ -24,14 +24,15 @@ shim_airbyte_cdk.CaptureShim(
         ),
         "accessTokenUrlTemplate": (
             f"https://app.asana.com/-/oauth_token?"
-            f"grant_type=authorzation_code&"
+            f"grant_type=authorization_code&"
             f"client_id={wrap_with_braces('client_id',3)}&"
             f"client_secret={wrap_with_braces('client_secret',3)}&"
-            f"redirect_uri={wrap_with_braces('redirect_uri',3)}&"
+            f"redirect_uri={urlencode_field('redirect_uri')}&"
             f"code={urlencode_field('code')}"
         ),
         "accessTokenResponseMap": {
-            "access_token": "/access_token"
+            "access_token": "/access_token",
+            "refresh_token": "/refresh_token"
         }
     }
 ).main()
