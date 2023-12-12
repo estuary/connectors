@@ -30,7 +30,7 @@ shim_airbyte_cdk.CaptureShim(
             f"redirect_uri={wrap_with_braces('redirect_uri',3)}&"
             f"code={urlencode_field('code')}"
         ),
-        "accessTokenReponseMap": {
+        "accessTokenResponseMap": {
             "access_token": "/access_token"
         }
     }
