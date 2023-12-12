@@ -1,5 +1,6 @@
-client_id: 1206051774640962
-client_secret_sops: ENC[AES256_GCM,data:WxBywR8JysOxuEodIXUz3UpSi3KqiYh4rZKlY0DqMEs=,iv:Q4ngbLjS/0NGlfq3aw13suNSauXE66r8vNjjhkIfePg=,tag:tfIkqAFW2P/J/GWdGeUAvw==,type:str]
+credentials:
+    client_id: 1206051774640962
+    client_secret_sops: ENC[AES256_GCM,data:Z98pdnbQnXYKgxypuTpbLjqgktpA5qLtubE943kqnHU=,iv:fNyu4eB75NuiwG4LrJvbjTmcxJb2vJ12D+T6MD0eml0=,tag:kWgL3UN09E1T8WWRwkfMmQ==,type:str]
 sops:
     kms: []
     gcp_kms:
@@ -9,8 +10,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2023-11-28T23:38:43Z"
-    mac: ENC[AES256_GCM,data:P+ARKW1N9yRU2sppBEHW+53oV3qq5l5FQCF1GSQMH19zZbsiRO0fsVm3coOaxo0Pk/2TaJruMhOHCfPpUEBNCr1LJe8E+x68MZ2VG9ys9h7/T0wI9comT3/oY21rrc2oM8oMw6ICSFiIoC29JUkMr7sJFsl7R6lgSvQKlFEH0N0=,iv:XYulV3EqzCyWLw47tdEsEjuFUroct/jpRK5UHn3H5aA=,tag:n/rB5tHbnsX6erYvbdnsKA==,type:str]
+    lastmodified: "2023-12-12T16:17:06Z"
+    mac: ENC[AES256_GCM,data:1SRSC0FMK5ECu8LufxQMU2/tvR+FLbTrf2KqXFPuM0WhpSUTBsOe1BF3fDANDp7nUryF8//Gzkohjy+6L+N0Wt1ySPZ+ea0/bOFMX3ljIylg8UDcHTYQeo3m8aakOMbb0R4OVo5ageT3AHnnLDCAdnGzUAzcHuqiEy3nXbHorg4=,iv:VdUmnRnGZ5rH5BDHK5v59fPPIvhoxupbSOKDT9VcQiQ=,tag:fwuViOEQdnWFOIsc3TnxGA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
