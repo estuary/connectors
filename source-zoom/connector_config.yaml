@@ -1,0 +1,19 @@
+credentials:
+    client_secret_sops: ENC[AES256_GCM,data:ijDU+F5fbh1gX/Qf2lElH1Dn+BtwI41pfFGdNvvI0eo=,iv:spuzDLqBgZkaMndRt3bf09pPKUuOrFDri0H3vrIW3Wc=,tag:8RFMFeOswhk8f5vLx9l2KA==,type:str]
+    authorization_endpoint: https://zoom.us/oauth/token
+    client_id: aF1_kb6YR3iNp5HkhRV23A
+account_id: afdsaf
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow
+          created_at: "2023-12-12T20:14:02Z"
+          enc: CiQAW8BC2OzDaKKtm8zMjItUBjJQtYqREnBYSfylkxcHo5G+bQkSSQD00UdDsXRuXWefsumfRSQcy5hCrs20m+X9aE7yMmfBQJRWesgghg9f0RmablDPAZqn8iuIsx4xpu/tl4LY1Se2qHKTr7ZyZTg=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2023-12-12T20:51:35Z"
+    mac: ENC[AES256_GCM,data:3FiAzJWs0HP0DmfoVo9X+b7s1VEtx8gnz60NS/jdz71sk4mPU3xnZoqzHWwzZoObT5ommrIgRK4yyalCBcIzl3zQMu5+VLTIXQS3OkXEwtLhlqoomgoEL6aOm/lS/7iypWLVOpg6thio+HHJ1ISS705xCSqc3or+ffycUuexam4=,iv:tE2yV5Svi8XY98RIi+I76XdUUrp2LnyMbjc7PQ+TSbM=,tag:h8bgh993BfXTjfw7pmqlWg==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1

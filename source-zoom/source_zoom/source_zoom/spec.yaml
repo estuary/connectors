@@ -4,16 +4,13 @@ connectionSpecification:
   title: Zoom Spec
   type: object
   required:
+    - credentials
     - account_id
     - client_id
     - client_secret
     - authorization_endpoint
   additionalProperties: true
   properties:
-    account_id:
-      type: string
-      order: 0
-      description: 'The account ID for your Zoom account. You can find this in the Zoom Marketplace under the "Manage" tab for your app.'
     client_id:
       type: string
       order: 1
@@ -27,3 +24,7 @@ connectionSpecification:
       type: string
       order: 3
       default: "https://zoom.us/oauth/token"
+    account_id:
+        type: string
+        order: 0
+        description: 'The account ID for your Zoom account. You can find this in the Zoom Marketplace under the "Manage" tab for your app.'
