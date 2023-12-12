@@ -1,5 +1,6 @@
 credentials:
     client_id: 1206051774640962
+    refresh_token: 2/1205846172619387/1206051774640962:9036d277cf22eee315ad8c0cff4386b4
     client_secret_sops: ENC[AES256_GCM,data:Z98pdnbQnXYKgxypuTpbLjqgktpA5qLtubE943kqnHU=,iv:fNyu4eB75NuiwG4LrJvbjTmcxJb2vJ12D+T6MD0eml0=,tag:kWgL3UN09E1T8WWRwkfMmQ==,type:str]
 sops:
     kms: []
@@ -10,8 +11,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2023-12-12T16:17:06Z"
-    mac: ENC[AES256_GCM,data:1SRSC0FMK5ECu8LufxQMU2/tvR+FLbTrf2KqXFPuM0WhpSUTBsOe1BF3fDANDp7nUryF8//Gzkohjy+6L+N0Wt1ySPZ+ea0/bOFMX3ljIylg8UDcHTYQeo3m8aakOMbb0R4OVo5ageT3AHnnLDCAdnGzUAzcHuqiEy3nXbHorg4=,iv:VdUmnRnGZ5rH5BDHK5v59fPPIvhoxupbSOKDT9VcQiQ=,tag:fwuViOEQdnWFOIsc3TnxGA==,type:str]
+    lastmodified: "2023-12-12T21:54:43Z"
+    mac: ENC[AES256_GCM,data:lBAyacheeGS1WPBqIUyT3XIQJkuB9w8xyZqUguT7F4Tjv3LNxqrzxpQfGyC7X/G2PR3ILMLm+slARo2h7mKZ6W8T7o4eGVXLkY5WEl3kmtz8eVhxOF0ONUHQ/2WPPtwG0U1dTqP+CBgMVb5ADqtwomJ2IQUotfjYdEcPy4sl1sA=,iv:80a1aTdyFVXskYf0mBf3MaMmxPzLy30yvQyHWixEsck=,tag:Y90gGtxdWEdQw8QOlBHXZA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

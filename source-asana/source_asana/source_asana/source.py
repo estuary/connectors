@@ -50,7 +50,7 @@ class SourceAsana(AbstractSource):
             # Before Oauth we had Person Access Token stored under "access_token"
             # config field, this code here is for backward compatibility
             return TokenAuthenticator(token=config["access_token"])
-        creds = config.get("authentication")
+        creds = config.get("credentials")
         if "personal_access_token" in creds:
             return TokenAuthenticator(token=creds["personal_access_token"])
         else:
