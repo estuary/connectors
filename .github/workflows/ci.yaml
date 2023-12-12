@@ -72,6 +72,7 @@ jobs:
       matrix:
         connector:
           - source-alpaca
+          - source-asana
           - source-bigquery-batch
           - source-criteo
           - source-dynamodb
@@ -117,6 +118,9 @@ jobs:
             connector_type: capture
             python: true
           - connector: source-shopify
+            connector_type: capture
+            python: true
+          - connector: source-asana
             connector_type: capture
             python: true
 
