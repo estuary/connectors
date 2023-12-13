@@ -1,16 +1,18 @@
+use std::error::Error as StdError;
 use std::time::Duration;
 
 use proto_flow::capture::{request, response, Response};
 use proto_flow::flow::capture_spec::Binding;
-use rdkafka::consumer::{BaseConsumer, Consumer};
+use rdkafka::consumer::{BaseConsumer, Consumer, ConsumerContext};
 use rdkafka::error::KafkaError;
 use rdkafka::message::BorrowedMessage;
 use rdkafka::metadata::{Metadata, MetadataPartition, MetadataTopic};
 use rdkafka::{ClientConfig, Message, TopicPartitionList};
+use rdkafka::client::{OAuthToken, ClientContext};
 use serde_json::json;
 
 use crate::catalog::Resource;
-use crate::configuration::Configuration;
+use crate::configuration::{Configuration, Authentication};
 use crate::{catalog, state};
 
 const KAFKA_TIMEOUT: Duration = Duration::from_secs(5);
@@ -33,7 +35,29 @@ pub enum Error {
     Read(#[source] KafkaError),
 }
 
-pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsumer, Error> {
+pub struct FlowConsumerContext {
+    auth: Option<Authentication>,
+}
+
+impl ClientContext for FlowConsumerContext {
+    const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
+
+    fn generate_oauth_token(&self, _oauthbearer_config: Option<&str>) -> Result<OAuthToken, Box<dyn StdError>>  {
+        if let Some(Authentication::AWS { region, access_key_id, secret_access_key }) = &self.auth {
+            let (token, lifetime_ms) = crate::msk_oauthbearer::token(region, access_key_id, secret_access_key)?;
+            return Ok(OAuthToken {
+                principal_name: "flow".to_string(),
+                token,
+                lifetime_ms,
+            })
+        } else {
+            return Err(anyhow::anyhow!("generate_oauth_token called without AWS credentials").into())
+        }
+    }
+}
+impl ConsumerContext for FlowConsumerContext {}
+
+pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsumer<FlowConsumerContext>, Error> {
     let mut config = ClientConfig::new();
 
     config.set("bootstrap.servers", configuration.brokers());
@@ -50,16 +74,20 @@ pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsume
 
     config.set("security.protocol", configuration.security_protocol());
 
-    if let Some(ref auth) = configuration.authentication {
-        config.set("sasl.mechanism", auth.mechanism.to_string());
-        config.set("sasl.username", &auth.username);
-        config.set("sasl.password", &auth.password);
+    let ctx = FlowConsumerContext { auth: configuration.authentication.clone() };
+
+    if let Some(Authentication::UserPassword { mechanism, username, password }) = &configuration.authentication {
+        config.set("sasl.mechanism", mechanism.to_string());
+        config.set("sasl.username", username);
+        config.set("sasl.password", password);
+    } else if let Some(Authentication::AWS { .. }) = &configuration.authentication {
+        config.set("sasl.mechanism", "OAUTHBEARER");
     }
 
-    config.create().map_err(Error::Config)
+    config.create_with_context(ctx).map_err(Error::Config)
 }
 
-pub fn test_connection<C: Consumer>(
+pub fn test_connection<C: Consumer<FlowConsumerContext>>(
     configuration: &Configuration,
     consumer: &C,
     bindings: Vec<request::validate::Binding>,
@@ -86,7 +114,7 @@ pub fn test_connection<C: Consumer>(
     })
 }
 
-pub fn fetch_metadata<C: Consumer>(
+pub fn fetch_metadata<C: Consumer<FlowConsumerContext>>(
     configuration: &Configuration,
     consumer: &C,
 ) -> Result<Metadata, Error> {
@@ -147,7 +175,7 @@ pub fn find_topic<'m>(metadata: &'m Metadata, needle: &str) -> Option<&'m Metada
 ///
 /// **Warning**: This will _unsubscribe_ the consumer from any previous topic partitions.
 pub fn subscribe(
-    consumer: &BaseConsumer,
+    consumer: &BaseConsumer<FlowConsumerContext>,
     checkpoints: &state::CheckpointSet,
 ) -> Result<TopicPartitionList, Error> {
     let mut topic_partition_list = TopicPartitionList::new();
@@ -169,7 +197,7 @@ pub fn subscribe(
 }
 
 pub fn high_watermarks(
-    consumer: &BaseConsumer,
+    consumer: &BaseConsumer<FlowConsumerContext>,
     checkpoints: &state::CheckpointSet,
 ) -> Result<state::CheckpointSet, Error> {
     let mut watermarks = state::CheckpointSet::default();
