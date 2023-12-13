@@ -1,0 +1,18 @@
+import:
+  - _base-collection-extra-nullable.flow.yaml
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: false
+          include:
+            key: {}
+            requiredVal1: {}
+            optionalVal1: {}
