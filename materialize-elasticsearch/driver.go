@@ -383,6 +383,12 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, fmt.Errorf("getting spec: %w", err)
 	}
 
+	is, err := client.infoSchema(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting infoSchema for validate: %w", err)
+	}
+	validator := boilerplate.NewValidator(constrainter{}, is)
+
 	var out []*pm.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 		var res resource
@@ -395,7 +401,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			return nil, fmt.Errorf("index name '%s' is invalid: must contain at least 1 character that is not '.', '-', or '-'", res.Index)
 		}
 
-		constraints, err := elasticValidator.ValidateBinding(
+		constraints, err := validator.ValidateBinding(
 			[]string{indexName},
 			res.DeltaUpdates,
 			binding.Backfill,
@@ -453,13 +459,19 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		return nil, fmt.Errorf("getting spec: %w", err)
 	}
 
+	is, err := client.infoSchema(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
+	}
+	validator := boilerplate.NewValidator(constrainter{}, is)
+
 	for _, binding := range req.Materialization.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		if err := elasticValidator.ValidateSelectedFields(binding, storedSpec); err != nil {
+		if err := validator.ValidateSelectedFields(binding, storedSpec); err != nil {
 			return nil, fmt.Errorf("validating selected fields: %w", err)
 		}
 

@@ -185,11 +185,32 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		return nil, err
 	}
 
+	tableNames := make([]string, 0, len(req.Bindings))
+	for _, binding := range req.Bindings {
+		res, err := resolveResourceConfig(binding.ResourceConfigJson)
+		if err != nil {
+			return nil, fmt.Errorf("building resource for binding %v: %w", binding.Collection.Name.String(), err)
+		}
+
+		tableName, err := normalizeTableName(res.Table)
+		if err != nil {
+			return nil, err
+		}
+
+		tableNames = append(tableNames, tableName)
+	}
+
+	is, err := infoSchema(ctx, client.db, tableNames)
+	if err != nil {
+		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
+	}
+	validator := boilerplate.NewValidator(constrainter{}, is)
+
 	var bindings = []*pm.Response_Validated_Binding{}
 	for i, binding := range req.Bindings {
 		res, err := resolveResourceConfig(binding.ResourceConfigJson)
 		if err != nil {
-			return nil, fmt.Errorf("building resource for binding %v: %w", i, err)
+			return nil, fmt.Errorf("building resource for binding %v: %w", binding.Collection.Name.String(), err)
 		}
 
 		// The primary key for a DynamoDB table is the partition key, and an optional sort key. For
@@ -203,13 +224,8 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			)
 		}
 
-		tableName, err := normalizeTableName(res.Table)
-		if err != nil {
-			return nil, err
-		}
-
-		constraints, err := ddbValidator.ValidateBinding(
-			[]string{tableName},
+		constraints, err := validator.ValidateBinding(
+			[]string{tableNames[i]},
 			res.DeltaUpdates,
 			binding.Backfill,
 			binding.Collection,
@@ -222,7 +238,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 
 		bindings = append(bindings, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
-			ResourcePath: []string{tableName},
+			ResourcePath: []string{tableNames[i]},
 			DeltaUpdates: res.DeltaUpdates,
 		})
 	}
@@ -269,6 +285,17 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		}
 	}
 
+	tableNames := make([]string, 0, len(req.Materialization.Bindings))
+	for _, binding := range req.Materialization.Bindings {
+		tableNames = append(tableNames, binding.ResourcePath[0])
+	}
+
+	is, err := infoSchema(ctx, client.db, tableNames)
+	if err != nil {
+		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
+	}
+	validator := boilerplate.NewValidator(constrainter{}, is)
+
 	for _, b := range req.Materialization.Bindings {
 		if len(b.Collection.Key) > 2 {
 			return nil, fmt.Errorf(
@@ -278,7 +305,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 			)
 		}
 
-		if err := ddbValidator.ValidateSelectedFields(b, storedSpec); err != nil {
+		if err := validator.ValidateSelectedFields(b, storedSpec); err != nil {
 			return nil, err
 		}
 
