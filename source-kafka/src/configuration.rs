@@ -76,38 +76,79 @@ impl JsonSchema for Configuration {
                     "title": "Authentication",
                     "description": "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments.",
                     "type": "object",
-                    "properties": {
-                        "mechanism": {
-                            "default": "PLAIN",
-                            "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
-                            "enum": [
-                                "PLAIN",
-                                "SCRAM-SHA-256",
-                                "SCRAM-SHA-512"
-                            ],
-                            "title": "SASL Mechanism",
-                            "type": "string",
-                            "order": 0
-                        },
-                        "password": {
-                            "order": 2,
-                            "secret": true,
-                            "title": "Password",
-                            "type": "string"
-                        },
-                        "username": {
-                            "order": 1,
-                            "secret": true,
-                            "title": "Username",
-                            "type": "string"
-                        }
+                    "order": 1,
+                    "discriminator": {
+                        "propertyName": "auth_type"
                     },
-                    "required": [
-                        "mechanism",
-                        "password",
-                        "username"
-                    ],
-                    "order": 1
+                    "oneOf": [{
+                        "properties": {
+                            "auth_type": {
+                                "type": "string",
+                                "default": "UserPassword",
+                                "const": "UserPassword"
+                            },
+                            "mechanism": {
+                                "default": "PLAIN",
+                                "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
+                                "enum": [
+                                    "PLAIN",
+                                    "SCRAM-SHA-256",
+                                    "SCRAM-SHA-512"
+                                ],
+                                "title": "SASL Mechanism",
+                                "type": "string",
+                                "order": 0
+                            },
+                            "password": {
+                                "order": 2,
+                                "secret": true,
+                                "title": "Password",
+                                "type": "string"
+                            },
+                            "username": {
+                                "order": 1,
+                                "secret": true,
+                                "title": "Username",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "auth_type",
+                            "mechanism",
+                            "password",
+                            "username"
+                        ]
+                    }, {
+                        "properties": {
+                            "auth_type": {
+                                "type": "string",
+                                "default": "AWS",
+                                "const": "AWS"
+                            },
+                            "aws_access_key_id": {
+                                "title": "AWS Access Key ID",
+                                "type": "string",
+                                "order": 0
+                            },
+                            "aws_secret_access_key": {
+                                "order": 1,
+                                "secret": true,
+                                "title": "AWS Secret Access Key",
+                                "type": "string"
+                            },
+                            "region": {
+                                "order": 2,
+                                "title": "AWS Region",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "auth_type",
+                            "aws_access_key_id",
+                            "aws_secret_access_key",
+                            "region"
+                        ]
+                    }]
                 },
                 "bootstrap_servers": {
                     "title": "Bootstrap Servers",
@@ -231,7 +272,7 @@ impl<'de> Visitor<'de> for BootstrapServerVisitor {
 /// For more information about Salted Challenge Response Authentication
 /// Mechanism (SCRAM), see RFC 7677.
 /// https://datatracker.ietf.org/doc/html/rfc7677
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING-KEBAB-CASE")]
 pub enum SaslMechanism {
     /// The username and password are sent to the server in the clear.
@@ -257,14 +298,23 @@ impl Display for SaslMechanism {
 /// # Authentication
 ///
 /// The information necessary to connect to Kafka.
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Authentication {
-    /// # Sasl Mechanism
-    pub mechanism: SaslMechanism,
-    /// # Username
-    pub username: String,
-    /// # Password
-    pub password: String,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag="auth_type")]
+pub enum Authentication {
+    UserPassword {
+        /// # Sasl Mechanism
+        mechanism: SaslMechanism,
+        /// # Username
+        username: String,
+        /// # Password
+        password: String,
+    },
+
+    AWS {
+        access_key_id: String,
+        secret_access_key: String,
+        region: String,
+    }
 }
 
 /// # TLS Settings
