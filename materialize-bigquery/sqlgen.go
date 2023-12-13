@@ -9,6 +9,7 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 // Identifiers matching the this pattern do not need to be quoted. See
@@ -81,7 +82,7 @@ var bqDialect = func() sql.Dialect {
 	}
 
 	return sql.Dialect{
-		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
 				TableSchema: path[1],
 				TableName:   translateFlowIdentifier(path[2]),
@@ -102,8 +103,33 @@ var bqDialect = func() sql.Dialect {
 			return "?"
 		}),
 		TypeMapper: mapper,
+		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
+			"string":         stringCompatible,
+			"bool":           sql.BooleanCompatible,
+			"int64":          sql.IntegerCompatible,
+			"float64":        sql.NumberCompatible,
+			"json":           sql.MultipleCompatible,
+			"bignumeric":     sql.IntegerCompatible,
+			"bignumeric(38)": sql.IntegerCompatible,
+			"date":           sql.DateCompatible,
+			"timestamp":      sql.DateTimeCompatible,
+		},
 	}
 }()
+
+// stringCompatible allow strings of any format, arrays, or objects to be materialized since they
+// are all converted to strings.
+func stringCompatible(p pf.Projection) bool {
+	if sql.StringCompatible(p) {
+		return true
+	} else if sql.TypesOrNull(p.Inference.Types, []string{"array"}) {
+		return true
+	} else if sql.TypesOrNull(p.Inference.Types, []string{"object"}) {
+		return true
+	}
+
+	return false
+}
 
 var (
 	tplAll = sql.MustParseTemplate(bqDialect, "root", `

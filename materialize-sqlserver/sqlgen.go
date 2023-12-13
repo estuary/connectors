@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
 	"time"
 
-	"slices"
-
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 // strToInt is used for sqlserver specific conversion from an integer-formatted string or integer to
@@ -92,7 +92,7 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 	}
 
 	return sql.Dialect{
-		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
 				TableSchema: schemaName,
 				TableName:   path[0],
@@ -112,7 +112,22 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 			return fmt.Sprintf("@p%d", index+1)
 		}),
 		TypeMapper: mapper,
+		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
+			stringType:  stringCompatible,
+			"bit":       sql.BooleanCompatible,
+			"bigint":    sql.IntegerCompatible,
+			"float":     sql.NumberCompatible,
+			"date":      sql.DateCompatible,
+			"datetime2": sql.DateTimeCompatible,
+			"time":      sql.TimeCompatible,
+		},
 	}
+}
+
+// stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
+// be materialized since they are all converted to strings.
+func stringCompatible(p pf.Projection) bool {
+	return sql.StringCompatible(p) || sql.JsonCompatible(p)
 }
 
 func rfc3339ToUTC() sql.ElementConverter {

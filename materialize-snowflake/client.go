@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -17,6 +18,29 @@ import (
 
 type client struct {
 	uri string
+}
+
+func (c client) InfoSchema(ctx context.Context, ep *sql.Endpoint, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
+	cfg := ep.Config.(*config)
+
+	if err := c.withDB(func(db *stdsql.DB) error {
+		// Currently the "catalog" is always the database value from the endpoint configuration in all
+		// capital letters. It is possible to connect to Snowflake databases that aren't in all caps by
+		// quoting the database name. We don't do that currently and it's hard to say if we ever will
+		// need to, although that means we can't connect to databases that aren't in the Snowflake
+		// default ALL CAPS format. The practical implications are that if somebody puts in a database
+		// like "database", we'll actually connect to the database "DATABASE", and so we can't rely on
+		// the endpoint configuration value entirely and will query it here to be future-proof.
+		var catalog string
+		if err := db.QueryRowContext(ctx, "SELECT CURRENT_DATABASE()").Scan(&catalog); err != nil {
+			return fmt.Errorf("querying for connected database: %w", err)
+		}
+		is, err = sql.StdFetchInfoSchema(ctx, db, ep.Dialect, catalog, cfg.Schema, resourcePaths)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return
 }
 
 func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {

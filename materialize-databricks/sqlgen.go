@@ -9,6 +9,7 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
+	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
@@ -71,7 +72,7 @@ var databricksDialect = func() sql.Dialect {
 	}
 
 	return sql.Dialect{
-		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
 				// Object names (including schemas and table names) are lowercased in Databricks.
 				// Column names are case-sensitive though.
@@ -93,8 +94,22 @@ var databricksDialect = func() sql.Dialect {
 			return "?"
 		}),
 		TypeMapper: mapper,
+		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
+			"string":    stringCompatible,
+			"date":      sql.DateCompatible,
+			"timestamp": sql.DateTimeCompatible,
+			"long":      sql.IntegerCompatible,
+			"double":    sql.NumberCompatible,
+			"boolean":   sql.BooleanCompatible,
+		},
 	}
 }()
+
+// stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
+// be materialized since they are all converted to strings.
+func stringCompatible(p pf.Projection) bool {
+	return sql.StringCompatible(p) || sql.JsonCompatible(p)
+}
 
 // TODO: use create table USING location instead of copying data into temporary table
 var (

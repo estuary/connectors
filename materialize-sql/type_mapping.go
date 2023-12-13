@@ -386,7 +386,7 @@ type StringTypeMapper struct {
 
 var _ TypeMapper = StringTypeMapper{}
 
-func (m StringTypeMapper) MapType(p *Projection) (MappedType, error) {
+func maybeStripStringFormat(p *pf.Projection, rawFieldConfigJson json.RawMessage) (*pf.Projection, error) {
 	// TODO(whb): This bit of hackery is to provide backwards compatibility for materializations
 	// that use numeric-as-string fields with numeric formats which were created before support for
 	// materializing these fields as numeric values was added. It provides an escape hatch via the
@@ -398,17 +398,25 @@ func (m StringTypeMapper) MapType(p *Projection) (MappedType, error) {
 	type fieldConfigOptions struct {
 		IgnoreStringFormat bool `json:"ignoreStringFormat"`
 	}
-	if p.RawFieldConfig != nil {
+	if rawFieldConfigJson != nil {
 		var options fieldConfigOptions
-		if err := json.Unmarshal(p.RawFieldConfig, &options); err != nil {
-			ErrorMapper{}.MapType(p)
+		if err := json.Unmarshal(rawFieldConfigJson, &options); err != nil {
+			return nil, err
 		} else if options.IgnoreStringFormat {
 			log.WithFields(log.Fields{
 				"field":  p.Field,
-				"format": p.Projection.Inference.String_.Format,
+				"format": p.Inference.String_.Format,
 			}).Info("ignoring string format for field")
-			p.Projection.Inference.String_.Format = ""
+			p.Inference.String_.Format = ""
 		}
+	}
+
+	return p, nil
+}
+
+func (m StringTypeMapper) MapType(p *Projection) (MappedType, error) {
+	if _, err := maybeStripStringFormat(&p.Projection, p.RawFieldConfig); err != nil {
+		return MappedType{}, fmt.Errorf("unable to map field %s with type %s", p.Field, p.Inference.Types)
 	}
 
 	if flat, _ := p.AsFlatType(); flat != STRING && m.Fallback == nil {
@@ -515,56 +523,19 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (c constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
-	var numericCompatibilities = map[boilerplate.StringWithNumericFormat][]string{
-		boilerplate.StringFormatInteger: {pf.JsonTypeInteger, pf.JsonTypeNull},
-		boilerplate.StringFormatNumber:  {pf.JsonTypeNumber, pf.JsonTypeNull},
-	}
-
-	typesMatch := func(actual, allowed []string) bool {
-		for _, t := range actual {
-			if !slices.Contains(allowed, t) {
-				return false
-			}
-		}
-		return true
-	}
-
-	// Special case: Strings formatted as integers or numbers are compatible with the integer or
-	// number JSON type, even though a string formatted integer or number may result in a different
-	// column type than a pure integer or number. This may result in breakage of the materialization
-	// if, for example, a pure integer field is changed to a string formatted as an integer and the
-	// collection gets a very large integer (formatted as a string) added to it. This is allowed
-	// because it's far more common for a pure integer field to have a string formatted as an
-	// integer show up later on in the collection's life and we don't want to always require
-	// re-versioning/recreating tables when this happens.
-	if format, ok := boilerplate.AsFormattedNumeric(existing); ok {
-		if typesMatch(proposed.Inference.Types, numericCompatibilities[format]) {
-			return true, nil
-		}
-	} else if format, ok := boilerplate.AsFormattedNumeric(proposed); ok {
-		if typesMatch(existing.Inference.Types, numericCompatibilities[format]) {
-			return true, nil
-		}
-	}
-
-	existingMapped, err := c.dialect.MapType(&Projection{
-		Projection:     *existing,
-		RawFieldConfig: rawFieldConfig,
-	})
+func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+	p, err := maybeStripStringFormat(proposed, rawFieldConfig)
 	if err != nil {
 		return false, err
 	}
 
-	proposedMapped, err := c.dialect.MapType(&Projection{
-		Projection:     *proposed,
-		RawFieldConfig: rawFieldConfig,
-	})
-	if err != nil {
-		return false, err
+	for t, c := range c.dialect.ColumnCompatibilities {
+		if strings.EqualFold(existing.Type, t) {
+			return c(*p), nil
+		}
 	}
 
-	return existingMapped.NullableDDL == proposedMapped.NullableDDL, nil
+	return false, fmt.Errorf("no comparer for existing type %q", existing.Type)
 }
 
 func (constrainter) DescriptionForType(p *pf.Projection) string {
@@ -583,4 +554,113 @@ func (constrainter) DescriptionForType(p *pf.Projection) string {
 	}
 
 	return desc
+}
+
+type EndpointTypeComparer func(pf.Projection) bool
+
+func JsonCompatible(p pf.Projection) bool {
+	if TypesOrNull(p.Inference.Types, []string{"array"}) ||
+		TypesOrNull(p.Inference.Types, []string{"object"}) {
+		return true
+	}
+
+	return MultipleCompatible(p)
+}
+
+func MultipleCompatible(p pf.Projection) bool {
+	if _, ok := boilerplate.AsFormattedNumeric(&p); ok {
+		return false
+	}
+
+	nonNullTypes := 0
+	for _, t := range p.Inference.Types {
+		if t == "null" {
+			continue
+		}
+		nonNullTypes += 1
+	}
+
+	return nonNullTypes > 1
+}
+
+// BinaryCompatible is compatible with base64-encoded strings.
+func BinaryCompatible(p pf.Projection) bool {
+	return TypesOrNull(p.Inference.Types, []string{"string"}) &&
+		p.Inference.String_.ContentEncoding == "base64"
+}
+
+// BooleanCompatible is compatible with booleans.
+func BooleanCompatible(p pf.Projection) bool {
+	return TypesOrNull(p.Inference.Types, []string{"boolean"})
+}
+
+// StringCompatible is compatible with strings of any format.
+func StringCompatible(p pf.Projection) bool {
+	return TypesOrNull(p.Inference.Types, []string{"string"})
+}
+
+// NumberCompatible is compatible with integers or numbers, and strings formatted as these.
+func NumberCompatible(p pf.Projection) bool {
+	if _, ok := boilerplate.AsFormattedNumeric(&p); ok {
+		return true
+	}
+
+	return TypesOrNull(p.Inference.Types, []string{"number", "integer"})
+}
+
+func IntegerCompatible(p pf.Projection) bool {
+	if f, ok := boilerplate.AsFormattedNumeric(&p); ok {
+		return f == boilerplate.StringFormatInteger
+	}
+
+	return TypesOrNull(p.Inference.Types, []string{"integer"})
+}
+
+func DateCompatible(p pf.Projection) bool {
+	return stringWithFormat(p, "date")
+}
+
+func DateTimeCompatible(p pf.Projection) bool {
+	return stringWithFormat(p, "date-time")
+}
+
+func DurationCompatible(p pf.Projection) bool {
+	return stringWithFormat(p, "duration")
+}
+
+func IPv4or6Compatible(p pf.Projection) bool {
+	return stringWithFormat(p, "ipv4") || stringWithFormat(p, "ipv6")
+}
+
+func MacAddrCompatible(p pf.Projection) bool {
+	return stringWithFormat(p, "macaddr")
+}
+
+func MacAddr8Compatible(p pf.Projection) bool {
+	return stringWithFormat(p, "macaddr8")
+}
+
+func TimeCompatible(p pf.Projection) bool {
+	return stringWithFormat(p, "time")
+}
+
+func UuidCompatible(p pf.Projection) bool {
+	return stringWithFormat(p, "uuid")
+}
+
+func TypesOrNull(actual, allowed []string) bool {
+	for _, t := range actual {
+		if t == "null" {
+			continue
+		} else if !slices.Contains(allowed, t) {
+			return false
+		}
+	}
+	return true
+}
+
+func stringWithFormat(p pf.Projection, format string) bool {
+	return TypesOrNull(p.Inference.Types, []string{"string"}) &&
+		p.Inference.String_ != nil &&
+		p.Inference.String_.Format == format
 }

@@ -144,7 +144,7 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 	var table = Table{
 		TableShape:   shape,
 		Identifier:   dialect.Identifier(shape.Path...),
-		InfoLocation: dialect.TableLocator(shape.Path...),
+		InfoLocation: dialect.TableLocator(shape.Path),
 	}
 
 	for _, key := range shape.Keys {
