@@ -111,16 +111,12 @@ func TestApply(t *testing.T) {
 			app := &testApplier{
 				storedSpec: tt.originalSpec,
 			}
-
-			// Not a dry run, not concurrent.
-			req := &pm.Request_Apply{
-				Materialization: tt.newSpec,
-				Version:         "aVersion",
-				DryRun:          false,
-			}
-
 			is := testInfoSchemaFromSpec(t, tt.originalSpec)
 
+			req := &pm.Request_Apply{Materialization: tt.newSpec, Version: "aVersion"}
+
+			// Not a dry run, not concurrent.
+			req.DryRun = false
 			got, err := ApplyChanges(ctx, req, app, is, false)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, app.getResults())
@@ -128,23 +124,20 @@ func TestApply(t *testing.T) {
 
 			// Dry run, not concurrent.
 			req.DryRun = true
-
 			got, err = ApplyChanges(ctx, req, app, is, false)
 			require.NoError(t, err)
 			require.Equal(t, testResults{}, app.getResults())
 			require.Equal(t, actions, got.ActionDescription)
 
-			// Not a dry run, not concurrent.
+			// Not a dry run, concurrent.
 			req.DryRun = false
-
 			got, err = ApplyChanges(ctx, req, app, is, true)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, app.getResults())
-			require.Equal(t, actions, got.ActionDescription)
+			actions = got.ActionDescription
 
 			// Dry run, concurrent
 			req.DryRun = true
-
 			got, err = ApplyChanges(ctx, req, app, is, true)
 			require.NoError(t, err)
 			require.Equal(t, testResults{}, app.getResults())

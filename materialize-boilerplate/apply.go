@@ -63,7 +63,7 @@ type Applier interface {
 
 	// UpdateResource updates an existing resource. The `BindingUpdate` contains specific
 	// information about what is changing for the resource. `NewProjections` are assured to not
-	// already exist in the destination, and `NewlyNullableFields` are assured to non-nullable in
+	// already exist in the destination, and `NewlyNullableFields` are assured to be non-nullable in
 	// the destination. It's called for every binding, although it may not have any `BindingUpdate`
 	// parameters. This is to allow materializations to perform additional specific actions on
 	// binding changes that are not covered by the general cases of the `BindingUpdate` parameters.
@@ -71,7 +71,7 @@ type Applier interface {
 }
 
 // ApplyChanges applies changes to an endpoint. It computes these changes from the apply request and
-// the state of the endpoint per the `*InfoSchema`. The `Applier` executes the resulting actions,
+// the state of the endpoint per the `InfoSchema`. The `Applier` executes the resulting actions,
 // optionally with a concurrent scatter/gather for expedience on endpoints that would benefit from
 // that sort of thing.
 func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, is *InfoSchema, concurrent bool) (*pm.Response_Applied, error) {
