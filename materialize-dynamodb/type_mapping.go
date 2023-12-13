@@ -1,19 +1,23 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	log "github.com/sirupsen/logrus"
 )
 
 func mapFields(spec *pf.MaterializationSpec_Binding) []mappedType {
@@ -180,8 +184,6 @@ func convertBase64(te tuple.TupleElement) (any, error) {
 	return bytes, nil
 }
 
-var ddbValidator = boilerplate.NewValidator(constrainter{})
-
 type constrainter struct{}
 
 func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
@@ -208,23 +210,15 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
 	// Non-key fields have no compatibility restrictions and can be changed in any way at any time.
-	if !existing.IsPrimaryKey && !proposed.IsPrimaryKey {
+	// This relies on the assumption that the key of an establish Flow collection cannot be changed
+	// after the fact.
+	if !proposed.IsPrimaryKey {
 		return true, nil
 	}
 
-	if existing.IsPrimaryKey != proposed.IsPrimaryKey {
-		// This should not be possible given our constraints.
-		log.WithFields(log.Fields{
-			"existing":             existing.Field,
-			"existingIsPrimaryKey": existing.IsPrimaryKey,
-			"proposed":             proposed.Field,
-			"proposedIsPrimaryKey": proposed.IsPrimaryKey,
-		}).Warn("constrainter asked to compare a collection key with a non-key field")
-	}
-
-	return mapType(existing).ddbScalarType == mapType(proposed).ddbScalarType, nil
+	return strings.EqualFold(existing.Type, string(mapType(proposed).ddbScalarType)), nil
 }
 
 func (constrainter) DescriptionForType(p *pf.Projection) string {
@@ -239,4 +233,41 @@ func (constrainter) DescriptionForType(p *pf.Projection) string {
 	}
 
 	return out
+}
+
+func infoSchema(ctx context.Context, db *dynamodb.Client, tableNames []string) (*boilerplate.InfoSchema, error) {
+	is := boilerplate.NewInfoSchema(
+		func(rp []string) []string {
+			// Pass-through the index name as-is, since it is the only component of the resource
+			// path and the required transformations are assumed to already be done as part of the
+			// Validate response.
+			return rp
+		},
+		func(f string) string { return f },
+	)
+
+	for _, t := range tableNames {
+		d, err := db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+			TableName: aws.String(t),
+		})
+		if err != nil {
+			var errNotFound *types.ResourceNotFoundException
+			if errors.As(err, &errNotFound) {
+				// Table hasn't been created yet.
+				continue
+			}
+			return nil, fmt.Errorf("describing table %q: %w", t, err)
+		}
+
+		for _, def := range d.Table.AttributeDefinitions {
+			is.PushField(boilerplate.EndpointField{
+				Name:               *def.AttributeName,
+				Nullable:           false,                     // Table keys can never be nullable.
+				Type:               string(def.AttributeType), // "B", "S", or "N".
+				CharacterMaxLength: 0,
+			}, t)
+		}
+	}
+
+	return is, nil
 }

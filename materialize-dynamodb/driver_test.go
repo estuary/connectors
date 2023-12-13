@@ -121,10 +121,6 @@ func TestApply(t *testing.T) {
 	)
 }
 
-func TestValidate(t *testing.T) {
-	boilerplate.RunValidateTestCases(t, ddbValidator, ".snapshots")
-}
-
 func TestSpec(t *testing.T) {
 	t.Parallel()
 
