@@ -189,8 +189,6 @@ func newSnowflakeDriver() *sql.Driver {
 				return nil, fmt.Errorf("parsing Snowflake configuration: %w", err)
 			}
 
-			var dsn = parsed.ToURI(tenant)
-
 			log.WithFields(log.Fields{
 				"host":     parsed.Host,
 				"user":     parsed.User,
@@ -210,12 +208,13 @@ func newSnowflakeDriver() *sql.Driver {
 				Dialect:              dialect,
 				MetaSpecs:            &metaSpecs,
 				MetaCheckpoints:      &metaCheckpoints,
-				Client:               client{uri: dsn},
+				NewClient:            newClient,
 				CreateTableTemplate:  templates["createTargetTable"],
 				ReplaceTableTemplate: templates["replaceTargetTable"],
 				NewResource:          newTableConfig,
 				NewTransactor:        newTransactor,
 				Tenant:               tenant,
+				ConcurrentApply:      true,
 			}, nil
 		},
 	}

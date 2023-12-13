@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
@@ -66,15 +67,25 @@ func TestSQLGeneration(t *testing.T) {
 		{Identifier: "first_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
 		{Identifier: "second_new_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
 	}
-	dropNotNulls := []sqlDriver.Column{
-		{Identifier: "first_required_column", MappedType: sqlDriver.MappedType{NullableDDL: "STRING"}},
-		{Identifier: "second_required_column", MappedType: sqlDriver.MappedType{NullableDDL: "BOOL"}},
+	dropNotNulls := []boilerplate.EndpointField{
+		{
+			Name:               "first_required_column",
+			Nullable:           true,
+			Type:               "STRING",
+			CharacterMaxLength: 0,
+		},
+		{
+			Name:               "second_required_column",
+			Nullable:           true,
+			Type:               "BOOL",
+			CharacterMaxLength: 0,
+		},
 	}
 
 	for _, testcase := range []struct {
 		name         string
 		addColumns   []sqlDriver.Column
-		dropNotNulls []sqlDriver.Column
+		dropNotNulls []boilerplate.EndpointField
 	}{
 		{
 			name:         "alter table add columns and drop not nulls",
