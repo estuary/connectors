@@ -151,7 +151,7 @@ func (a *sqlApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, 
 	if a.endpoint.MetaSpecs != nil {
 		// Insert or update the materialization specification. Both parameterized queries and
 		// literal query strings are supported. A parameterized query is generally preferable, but
-		// some a.endpoints don't have support for those.
+		// some endpoints don't have support for those.
 		var paramArgs = []interface{}{
 			a.endpoint.Identifier(a.endpoint.MetaSpecs.Path...),
 			a.endpoint.Placeholder(0),
