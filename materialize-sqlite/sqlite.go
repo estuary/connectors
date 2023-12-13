@@ -79,70 +79,72 @@ func NewSQLiteDriver() *sql.Driver {
 				Dialect:             sqliteDialect,
 				MetaSpecs:           nil,
 				MetaCheckpoints:     nil,
-				Client:              client{path: path},
+				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
 				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
+				ConcurrentApply:     false,
 			}, nil
 		},
 	}
 }
 
 type client struct {
-	path string
+	db *stdsql.DB
 }
 
-func (c client) InfoSchema(ctx context.Context, ep *sql.Endpoint, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
+func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
+	db, err := stdsql.Open("sqlite3", databasePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return &client{db: db}, nil
+}
+
+func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
 	return &boilerplate.InfoSchema{}, nil
 }
 
-func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
+func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	return &sql.PrereqErr{}
 }
 
-// Apply for sqlite will always create new tables, since no materialization spec is persisted and
-// all tables must be created every time the connector starts.
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
-	db, err := stdsql.Open("sqlite3", c.path)
-	if err != nil {
-		return "", err
-	}
-	defer db.Close()
+func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
+	return "", nil, nil
+}
 
-	actionList := []string{}
-	for _, tc := range actions.CreateTables {
-		actionList = append(actionList, tc.TableCreateSql)
-		if _, err := db.ExecContext(ctx, tc.TableCreateSql); err != nil {
-			return "", err
-		}
-	}
+func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
+	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	return err
+}
 
-	return strings.Join(actionList, "\n"), nil
+func (c *client) ReplaceTable(ctx context.Context, tr sql.TableReplace) (string, boilerplate.ActionApplyFn, error) {
+	return "", nil, nil
 }
 
 // We don't use specs table for sqlite since it is ephemeral and won't be
 // persisted between ApplyUpsert and Transactions calls
-func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
+func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
 	return "", "", stdsql.ErrNoRows
 }
 
-func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
+func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
+	return nil
+}
+
+func (c *client) ExecStatements(ctx context.Context, statements []string) error {
+	return sql.StdSQLExecStatements(ctx, c.db, statements)
 }
 
 // We don't need a fence since there is only going to be a single sqlite
 // materialization instance writing to the file, and it's ephemeral
-func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
+func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	return sql.Fence{}, nil
 }
 
-func (c client) withDB(fn func(*stdsql.DB) error) error {
-	var db, err = stdsql.Open("sqlite3", c.path)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	return fn(db)
+func (c *client) Close() {
+	c.db.Close()
 }
 
 func newTransactor(
@@ -183,17 +185,14 @@ func newTransactor(
 	}
 
 	// Since sqlite is ephemeral, we have to re-create tables before transactions
-	var statements []string
 	for _, table := range bindings {
 		if statement, err := sql.RenderTableTemplate(table, ep.CreateTableTemplate); err != nil {
 			return nil, err
 		} else {
-			statements = append(statements, statement)
+			if _, err := d.store.conn.ExecContext(ctx, statement); err != nil {
+				return nil, fmt.Errorf("applying schema updates: %w", err)
+			}
 		}
-	}
-
-	if err = ep.Client.ExecStatements(ctx, statements); err != nil {
-		return nil, fmt.Errorf("applying schema updates: %w", err)
 	}
 
 	// Build a query which unions the results of each load subquery.

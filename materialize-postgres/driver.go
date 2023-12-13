@@ -16,9 +16,10 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jackc/pgx/v4"
-	_ "github.com/jackc/pgx/v4/stdlib"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 const (
@@ -197,12 +198,13 @@ func newPostgresDriver() *sql.Driver {
 				Dialect:              pgDialect,
 				MetaSpecs:            &metaSpecs,
 				MetaCheckpoints:      &metaCheckpoints,
-				Client:               client{uri: cfg.ToURI()},
+				NewClient:            newClient,
 				CreateTableTemplate:  tplCreateTargetTable,
 				ReplaceTableTemplate: tplReplaceTargetTable,
 				NewResource:          newTableConfig,
 				NewTransactor:        newTransactor,
 				Tenant:               tenant,
+				ConcurrentApply:      false,
 			}, nil
 		},
 	}

@@ -160,22 +160,18 @@ func newDuckDriver() *sql.Driver {
 
 			metaSpecs, metaCheckpoints := sql.MetaTables([]string{cfg.Database, cfg.Schema})
 
-			db, err := cfg.db(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("opening database: %w", err)
-			}
-
 			return &sql.Endpoint{
 				Config:               cfg,
 				Dialect:              duckDialect,
 				MetaSpecs:            &metaSpecs,
 				MetaCheckpoints:      &metaCheckpoints,
-				Client:               client{db: db},
+				NewClient:            newClient,
 				CreateTableTemplate:  tplCreateTargetTable,
 				ReplaceTableTemplate: tplReplaceTargetTable,
 				NewResource:          newTableConfig,
 				NewTransactor:        newTransactor,
 				Tenant:               tenant,
+				ConcurrentApply:      false,
 			}, nil
 		},
 	}
@@ -204,7 +200,12 @@ func newTransactor(
 		return nil, err
 	}
 
-	storeConn, err := ep.Client.(client).db.Conn(ctx)
+	db, err := cfg.db(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	storeConn, err := db.Conn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating store connection: %w", err)
 	}

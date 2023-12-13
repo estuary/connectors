@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// snapshotPath is a common set of test snapshots that may be used by SQL materialization connectors
+// that produce standard snapshots.
+var snapshotPath = "../materialize-sql/.snapshots"
+
 // RunFenceTestCases is a generalized form of test cases over fencing behavior,
 // which ought to function with any Client implementation.
 func RunFenceTestCases(
@@ -93,7 +97,7 @@ func RunFenceTestCases(
 		dump3, err := dumpTable(metaTable)
 		require.NoError(t, err)
 
-		snapshotter := cupaloy.New(cupaloy.SnapshotSubdirectory(".snapshots"))
+		snapshotter := cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath))
 
 		snapshotter.SnapshotT(t,
 			"After installing fixtures:\n"+dump1+

@@ -16,38 +16,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func testConfig() *config {
+	return &config{
+		Address:  "localhost:1433",
+		User:     "sa",
+		Password: "!Flow1234",
+		Database: "flow",
+	}
+}
+
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 	var dialect = testDialect
 	var templates = renderTemplates(dialect)
-	var client = client{uri: "sqlserver://sa:!Flow1234@localhost:1433/flow", dialect: dialect}
+
+	c, err := newClient(ctx, &sql.Endpoint{Config: testConfig(), Dialect: dialect})
+	require.NoError(t, err)
+	defer c.Close()
+
 	sql.RunFenceTestCases(t,
-		client,
+		c,
 		[]string{"temp_test_fencing_checkpoints"},
 		dialect,
 		templates["createTargetTable"],
 		func(table sql.Table, fence sql.Fence) error {
-			var err = client.withDB(func(db *stdsql.DB) error {
-				var fenceUpdate strings.Builder
-				if err := templates["updateFence"].Execute(&fenceUpdate, fence); err != nil {
-					return fmt.Errorf("evaluating fence template: %w", err)
-				}
-				var _, err = db.Exec(fenceUpdate.String())
-
-				return err
-			})
-			return err
+			var fenceUpdate strings.Builder
+			if err := templates["updateFence"].Execute(&fenceUpdate, fence); err != nil {
+				return fmt.Errorf("evaluating fence template: %w", err)
+			}
+			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
 		},
 		func(table sql.Table) (out string, err error) {
-			err = client.withDB(func(db *stdsql.DB) error {
-				out, err = sql.StdDumpTable(ctx, db, table)
-				// SQLServer quotes "checkpoint" because it is a reserved word. The
-				// snapshots for the test expect a checkpoint without quotes, so this is
-				// a hack to allow this test to proceed
-				out = strings.Replace(out, "\"checkpoint\"", "checkpoint", 1)
-				return err
-			})
-			return
+			out, err = sql.StdDumpTable(ctx, c.(*client).db, table)
+			// SQLServer quotes "checkpoint" because it is a reserved word. The
+			// snapshots for the test expect a checkpoint without quotes, so this is
+			// a hack to allow this test to proceed
+			return strings.Replace(out, "\"checkpoint\"", "checkpoint", 1), err
 		},
 	)
 }
@@ -55,12 +59,7 @@ func TestFencingCases(t *testing.T) {
 func TestApply(t *testing.T) {
 	ctx := context.Background()
 
-	cfg := config{
-		Address:  "localhost:1433",
-		User:     "sa",
-		Password: "!Flow1234",
-		Database: "flow",
-	}
+	cfg := testConfig()
 
 	configJson, err := json.Marshal(cfg)
 	require.NoError(t, err)
@@ -130,12 +129,7 @@ func TestApply(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
-	cfg := config{
-		Address:  "localhost:1433",
-		User:     "sa",
-		Password: "!Flow1234",
-		Database: "flow",
-	}
+	cfg := testConfig()
 
 	tests := []struct {
 		name string
@@ -181,14 +175,17 @@ func TestPrereqs(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg(cfg)
-			client := client{uri: cfg.ToURI()}
-			var actual = client.PreReqs(context.Background(), &sql.Endpoint{
-				Config: cfg,
-				Tenant: "tenant",
-			}).Unwrap()
+			cfg := tt.cfg(*cfg)
+
+			c, err := newClient(ctx, &sql.Endpoint{Config: cfg})
+			require.NoError(t, err)
+			defer c.Close()
+
+			var actual = c.PreReqs(ctx).Unwrap()
 
 			require.Equal(t, len(tt.want), len(actual))
 			for i := 0; i < len(tt.want); i++ {

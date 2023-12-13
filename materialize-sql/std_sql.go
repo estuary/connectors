@@ -62,27 +62,6 @@ func StdSQLExecStatements(ctx context.Context, db *sql.DB, statements []string) 
 	return conn.Close() // Release to pool.
 }
 
-// StdIncrementFence increments the value for the fence for all checkpoints of the provided
-// materialization.
-func StdIncrementFence(ctx context.Context, db *sql.DB, ep *Endpoint, materialization string) error {
-	resolved, err := ResolveTable(*ep.MetaCheckpoints, ep.Dialect)
-	if err != nil {
-		return fmt.Errorf("resolving checkpoints table for fence increment: %w", err)
-	}
-
-	if _, err := db.ExecContext(ctx, fmt.Sprintf(
-		`UPDATE %s SET fence=fence+1 WHERE materialization=%s;`,
-		resolved.Identifier,
-		resolved.Keys[0].Placeholder,
-	),
-		materialization,
-	); err != nil {
-		return fmt.Errorf("incrementing fence: %w", err)
-	}
-
-	return nil
-}
-
 // StdInstallFence is a convenience for Client implementations which
 // use Go's standard `sql.DB` type under the hood.
 func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence Fence, decodeFence func(string) ([]byte, error)) (Fence, error) {
@@ -391,7 +370,6 @@ func StdFetchInfoSchema(
 	db *sql.DB,
 	dialect Dialect,
 	catalog string, // typically the "database"
-	metaSchema string,
 	resourcePaths [][]string,
 ) (*boilerplate.InfoSchema, error) {
 	is := boilerplate.NewInfoSchema(
@@ -399,8 +377,13 @@ func StdFetchInfoSchema(
 		dialect.ColumnLocator,
 	)
 
+	// Nothing to do if the materialization has no bindings.
+	if len(resourcePaths) == 0 {
+		return is, nil
+	}
+
 	// Map the resource paths to an appropriate identifier for inclusion in the coming query.
-	schemas := []string{dialect.Literal(metaSchema)}
+	schemas := make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
 		loc := dialect.TableLocator(p)
 		schemas = append(schemas, dialect.Literal(loc.TableSchema))

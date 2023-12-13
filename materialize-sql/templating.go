@@ -12,8 +12,9 @@ import (
 // installs common functions for accessing Dialect behavior.
 func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 	var tpl = template.New(name).Funcs(template.FuncMap{
-		"Literal":   dialect.Literal,
-		"Base64Std": base64.StdEncoding.EncodeToString,
+		"Literal":          dialect.Literal,
+		"Base64Std":        base64.StdEncoding.EncodeToString,
+		"ColumnIdentifier": dialect.Identifier,
 		// Tweak signature slightly to take TablePath, as dynamic slicing is a bit tricky
 		// in templates and this is most-frequently used with TablePath.Base().
 		"Identifier": func(p TablePath) string { return dialect.Identifier(p...) },
@@ -21,7 +22,7 @@ func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 		"Repeat":     func(n int) []bool { return make([]bool, n) },
 		"Add":        func(a, b int) int { return a + b },
 		"Contains":   func(s string, substr string) bool { return strings.Contains(s, substr) },
-		"Last":       func(s []string) string { return s[len(s) - 1] },
+		"Last":       func(s []string) string { return s[len(s)-1] },
 	})
 	return template.Must(tpl.Parse(body))
 }
