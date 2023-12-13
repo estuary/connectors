@@ -13,6 +13,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -96,8 +97,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		return nil, fmt.Errorf("connecting to database: %w", err)
 	}
 
-	// MongoDB supports arbitrary JSON documents so there are no constraints on
-	// any fields and all fields are marked as "recommended"
+	// MongoDB always materializes the full root document.
 	var out []*pm.Response_Validated_Binding
 	for _, b := range req.Bindings {
 		res, err := resolveResourceConfig(b.ResourceConfigJson)
@@ -134,26 +134,26 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-// Apply checks for bindings that have been removed by comparing them with
-// previously persisted spec, and deletes the corresponding collection
 func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	}
-
 	cfg, err := resolveEndpointConfig(req.Materialization.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
 
-	err = d.WriteSpec(ctx, cfg, req.Materialization, req.Version)
+	client, err := d.connect(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("writing spec: %w", err)
+		return nil, err
 	}
 
-	return &pm.Response_Applied{
-		ActionDescription: "",
-	}, nil
+	is, err := infoSchema(ctx, client.Database(cfg.Database))
+	if err != nil {
+		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
+	}
+
+	return boilerplate.ApplyChanges(ctx, req, &mongoApplier{
+		client: client,
+		cfg:    cfg,
+	}, is, true)
 }
 
 func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
@@ -203,6 +203,26 @@ func resolveResourceConfig(specJson json.RawMessage) (resource, error) {
 	}
 
 	return res, nil
+}
+
+// infoSchema for MongoDB just includes an empty field for each collection in the configured
+// database.
+func infoSchema(ctx context.Context, db *mongo.Database) (*boilerplate.InfoSchema, error) {
+	is := boilerplate.NewInfoSchema(
+		func(rp []string) []string { return rp },
+		func(f string) string { return f },
+	)
+
+	collections, err := db.ListCollectionSpecifications(ctx, bson.D{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range collections {
+		is.PushField(boilerplate.EndpointField{}, db.Name(), c.Name) // NB: ResourcePath includes the database name.
+	}
+
+	return is, nil
 }
 
 func main() {
