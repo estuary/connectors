@@ -14,7 +14,6 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	log "github.com/sirupsen/logrus"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -111,36 +110,17 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		return nil, err
 	}
 
-	if err = client.Ping(ctx, nil); err != nil {
-		return nil, fmt.Errorf("cannot connect to MongoDB server: %w", err)
-	}
-
-	if retention, err := oplogMinRetentionHours(ctx, client); err != nil || retention == 0 {
-		// We want to avoid the Info log being interpreted as an error by users
-		log.WithField("error", err).Debug("oplog retention check failed (this is usually OK)")
-		log.Infof("falling back to less accurate oplog size estimation")
-
-		if diff, err := oplogTimeDifference(ctx, client); err != nil {
-			return nil, fmt.Errorf("could not read oplog, access to oplog is necessary. Consider giving the user access to read the local database https://go.estuary.dev/NurkrE: %w", err)
-		} else {
-			if diff < minOplogTimediffSeconds {
-				log.Warn(fmt.Sprintf("the current time difference between oldest and newest records in your oplog is %d seconds. This is smaller than the minimum of 24 hours. This is an approximation and might not be representative of your oplog size. Please ensure your oplog is sufficiently large to be able to safely capture data from your database: https://go.estuary.dev/NurkrE", diff))
-			}
-		}
-	} else if retention < minOplogTimediffHours {
-		return nil, fmt.Errorf("oplog retention period is lower than 24 hours, please consider setting your oplog minimum retention period to a minimum of 24 hours, and ideally more: https://go.estuary.dev/NurkrE")
-	}
-
 	// Any error other than an authentication error will result in the call to Ping hanging until it
-	// times out due to the way the mongo client handles retries. The flow control plane will cancel
+	// times out due to the way the mongo client handles retries. The flow control plane will pingCancel
 	// any RPC after ~30 seconds, so we'll timeout ahead of that in order to produce a more useful
 	// error message.
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
+	pingCtx, pingCancel := context.WithTimeout(ctx, 15*time.Second)
+	defer pingCancel()
 
 	// Ping the primary
-	if err := client.Ping(ctx, readpref.Primary()); err != nil {
+	if err := client.Ping(pingCtx, readpref.Primary()); err != nil {
 		var mongoErr mongoDriver.Error
+		client.Disconnect(ctx) // ignore error result
 
 		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", cfg.Address))
@@ -198,6 +178,10 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			panic(err)
 		}
 	}()
+
+	if _, err = checkOplog(ctx, client); err != nil {
+		return nil, err
+	}
 
 	existingDatabases, err := client.ListDatabaseNames(ctx, bson.D{})
 	if err != nil {
