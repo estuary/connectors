@@ -25,6 +25,7 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/apply/add-new-binding.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/apply/remove-original-binding.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/apply/replace-original-binding.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/make-nullable.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/base.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/unsatisfiable.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/forbidden.flow.yaml
