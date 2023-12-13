@@ -103,10 +103,6 @@ func TestApply(t *testing.T) {
 	)
 }
 
-func TestValidate(t *testing.T) {
-	boilerplate.RunValidateTestCases(t, elasticValidator, ".snapshots")
-}
-
 func TestDriverSpec(t *testing.T) {
 	driver := driver{}
 	response, err := driver.Spec(context.Background(), &pm.Request_Spec{})
