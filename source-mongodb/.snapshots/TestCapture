@@ -46,5 +46,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"resources":{"test.collectionOne":{"backfill":{"done":true,"last_id":{"Type":2,"Value":"CQAAAHBrIHZhbCA0AA=="},"started_at":"<TIMESTAMP>"}},"test.collectionThree":{"backfill":{"done":true,"last_id":{"Type":5,"Value":"CAAAAABwayB2YWwgNA=="},"started_at":"<TIMESTAMP>"}},"test.collectionTwo":{"backfill":{"done":true,"last_id":{"Type":16,"Value":"BAAAAA=="},"started_at":"<TIMESTAMP>"}}},"stream_resume_token":"<STREAM_RESUME_TOKEN>"}
+{"oplog_empty_before_backfill":false,"resources":{"test.collectionOne":{"backfill":{"done":true,"last_id":{"Type":2,"Value":"CQAAAHBrIHZhbCA0AA=="},"started_at":"<TIMESTAMP>"}},"test.collectionThree":{"backfill":{"done":true,"last_id":{"Type":5,"Value":"CAAAAABwayB2YWwgNA=="},"started_at":"<TIMESTAMP>"}},"test.collectionTwo":{"backfill":{"done":true,"last_id":{"Type":16,"Value":"BAAAAA=="},"started_at":"<TIMESTAMP>"}}},"stream_resume_token":"<STREAM_RESUME_TOKEN>"}
 
