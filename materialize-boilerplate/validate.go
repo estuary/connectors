@@ -16,10 +16,9 @@ type Constrainter interface {
 	// materialization.
 	NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint
 
-	// Compatible reports whether two projections are compatible. Generally this would mean they are
-	// the same non-null JSON types(s), but can be more forgiving for endpoints that do not impose
-	// strict requirements on the structure of materialized fields.
-	Compatible(existing *pf.Projection, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error)
+	// Compatible reports whether an existing materialized field in a destination system (such as a
+	// column in a table) is compatible with a proposed projection.
+	Compatible(existing EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error)
 
 	// DescriptionForType produces a human-readable description for a type, which is used in
 	// constraint descriptions when there is an incompatible type change.
@@ -28,12 +27,14 @@ type Constrainter interface {
 
 // Validator performs validation of a materialization binding.
 type Validator struct {
-	c Constrainter
+	c  Constrainter
+	is *InfoSchema
 }
 
-func NewValidator(c Constrainter) Validator {
+func NewValidator(c Constrainter, is *InfoSchema) Validator {
 	return Validator{
-		c: c,
+		c:  c,
+		is: is,
 	}
 }
 
@@ -61,7 +62,7 @@ func (v Validator) ValidateSelectedFields(
 		storedSpec,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("validating binding for collection '%s': %w", binding.Collection.Name.String(), err)
 	}
 
 	// Does each field in the materialization have an allowable constraint?
@@ -140,22 +141,21 @@ func (v Validator) ValidateBinding(
 	if existingBinding != nil && existingBinding.Backfill > backfill {
 		// Sanity check: Don't allow backfill counters to decrease.
 		return nil, fmt.Errorf(
-			"backfill count %d for proposed binding of collection %s is less than previously applied count of %d",
+			"backfill count %d is less than previously applied count of %d",
 			backfill,
-			existingBinding.Collection.Name.String(),
 			existingBinding.Backfill,
 		)
 	}
 
 	var constraints map[string]*pm.Response_Validated_Constraint
-	if existingBinding == nil || backfill != existingBinding.Backfill {
+	if !v.is.HasResource(path) || backfill != existingBinding.Backfill {
 		constraints = v.validateNewBinding(boundCollection, deltaUpdates)
 	} else {
 		if existingBinding.DeltaUpdates && !deltaUpdates {
 			// We allow a binding to switch from standard => delta updates but not the other
 			// way. This is because a standard materialization is trivially a valid
 			// delta-updates materialization.
-			return nil, fmt.Errorf("changing binding of collection %s from delta updates to standard updates is not allowed", existingBinding.Collection.Name.String())
+			return nil, fmt.Errorf("changing from delta updates to standard updates is not allowed")
 		}
 		constraints, err = v.validateMatchesExistingBinding(existingBinding, boundCollection, deltaUpdates, fieldConfigJsonMap)
 		if err != nil {
@@ -182,32 +182,41 @@ func (v Validator) validateMatchesExistingBinding(
 ) (map[string]*pm.Response_Validated_Constraint, error) {
 	constraints := make(map[string]*pm.Response_Validated_Constraint)
 
-	for _, field := range append(existing.FieldSelection.Keys, existing.FieldSelection.Values...) {
+	fields, err := v.is.FieldsForResource(existing.ResourcePath)
+	if err != nil {
+		// This should never error, since it has previously been established that the resource does
+		// exist in the destination system.
+		return nil, fmt.Errorf("getting fields for existing resource: %w", err)
+	}
+
+	for _, f := range fields {
 		constraint := new(pm.Response_Validated_Constraint)
 
-		existingProjection := existing.Collection.GetProjection(field)
-		proposedProjection := boundCollection.GetProjection(field)
+		proposedProjection, inFieldSelection, err := v.is.ExtractProjection(f.Name, boundCollection)
+		if err != nil {
+			return nil, fmt.Errorf("extracting projection for existing endpoint field %q: %w", f.Name, err)
+		}
+		existingProjection := existing.Collection.GetProjection(proposedProjection.Field)
 
-		if proposedProjection == nil {
-			// A value field has been removed, so no constraint is needed. Key fields cannot be
-			// removed from an established collection.
+		if !inFieldSelection {
+			// A field that exists in the destination but not in the field selection is not a
+			// problem, but Apply may need to make the destination field not required later.
+			continue
+		} else if !deltaUpdates && proposedProjection.IsRootDocumentProjection() {
+			// Root document constraints are handled as a separate loop, further down.
 			continue
 		}
 
 		// Is the proposed type completely disallowed by the materialization? This differs from
 		// being UNSATISFIABLE, which implies that re-creating the materialization could resolve the
 		// difference.
-		if c := v.c.NewConstraints(proposedProjection, deltaUpdates); c.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN {
-			constraints[field] = c
+		if c := v.c.NewConstraints(&proposedProjection, deltaUpdates); c.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN {
+			constraints[proposedProjection.Field] = c
 			continue
 		}
 
-		// We match on the endpoint-specific type here and not just the JSON type to account for
-		// incompatible changes to string format fields, such as removing a numeric format. This
-		// would imply that the field is no longer a numeric value, which would be incompatible with
-		// the materialized mapping and should trigger an evolution of the materialization.
-		if compatible, err := v.c.Compatible(existingProjection, proposedProjection, fieldConfigJsonMap[field]); err != nil {
-			return nil, fmt.Errorf("validating binding for collection '%s': %w", boundCollection.Name.String(), err)
+		if compatible, err := v.c.Compatible(f, &proposedProjection, fieldConfigJsonMap[proposedProjection.Field]); err != nil {
+			return nil, fmt.Errorf("determining compatibility for endpoint field %q vs. selected field %q: %w", f.Name, proposedProjection.Field, err)
 		} else if compatible {
 			if existingProjection.IsPrimaryKey {
 				constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
@@ -222,14 +231,14 @@ func (v Validator) validateMatchesExistingBinding(
 		} else {
 			constraint.Type = pm.Response_Validated_Constraint_UNSATISFIABLE
 			constraint.Reason = fmt.Sprintf(
-				"Field '%s' is already being materialized as type '%s' and cannot be changed to type '%s'",
-				field,
-				v.c.DescriptionForType(existingProjection),
-				v.c.DescriptionForType(proposedProjection),
+				"Field '%s' is already being materialized as endpoint type '%s' and cannot be changed to type '%s'",
+				proposedProjection.Field,
+				f.Type,
+				v.c.DescriptionForType(&proposedProjection),
 			)
 		}
 
-		constraints[field] = constraint
+		constraints[proposedProjection.Field] = constraint
 	}
 
 	docFields := []string{}
