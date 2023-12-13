@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"slices"
 	"strings"
 	"time"
 
@@ -424,9 +423,6 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 }
 
 func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	}
 	var cfg config
 	if err := pf.UnmarshalStrict(req.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
@@ -437,87 +433,15 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		return nil, fmt.Errorf("creating client: %w", err)
 	}
 
-	actions := []string{}
-	doAction := func(desc string, fn func() error) error {
-		if !req.DryRun {
-			actions = append(actions, "- "+desc)
-			return fn()
-		}
-		actions = append(actions, "- "+desc+" (skipping due to dry-run)")
-		return nil
-	}
-
-	if err := doAction(fmt.Sprintf("create index '%s'", defaultFlowMaterializations), func() error {
-		return client.createMetaIndex(ctx, cfg.Advanced.Replicas)
-	},
-	); err != nil {
-		return nil, fmt.Errorf("creating metadata index: %w", err)
-	}
-
-	storedSpec, err := client.getSpec(ctx, req.Materialization.Name)
-	if err != nil {
-		return nil, fmt.Errorf("getting spec: %w", err)
-	}
-
 	is, err := client.infoSchema(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
 	}
-	validator := boilerplate.NewValidator(constrainter{}, is)
 
-	for _, binding := range req.Materialization.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		if err := validator.ValidateSelectedFields(binding, storedSpec); err != nil {
-			return nil, fmt.Errorf("validating selected fields: %w", err)
-		}
-
-		found, err := boilerplate.FindExistingBinding(binding.ResourcePath, binding.Collection.Name, storedSpec)
-		if err != nil {
-			return nil, err
-		}
-
-		if found == nil {
-			if err := doAction(fmt.Sprintf("create index '%s'", binding.ResourcePath[0]), func() error {
-				return client.createIndex(ctx, binding.ResourcePath[0], res.Shards, cfg.Advanced.Replicas, buildIndexProperties(binding))
-			}); err != nil {
-				return nil, fmt.Errorf("creating index '%s': %w", binding.ResourcePath[0], err)
-			}
-		} else if found.Backfill != binding.Backfill {
-			// Replace the existing index.
-			if err := doAction(fmt.Sprintf("replace index '%s'", binding.ResourcePath[0]), func() error {
-				return client.replaceIndex(ctx, binding.ResourcePath[0], res.Shards, cfg.Advanced.Replicas, buildIndexProperties(binding))
-			}); err != nil {
-				return nil, fmt.Errorf("creating index '%s': %w", binding.ResourcePath[0], err)
-			}
-		} else {
-			// Map any new fields in the index.
-			existingFields := found.FieldSelection.AllFields()
-			for _, newField := range binding.FieldSelection.AllFields() {
-				if slices.Contains(existingFields, newField) {
-					continue
-				}
-
-				prop := propForField(newField, binding)
-				if err := doAction(fmt.Sprintf("add mapping '%s' to index '%s' with type '%s'", newField, binding.ResourcePath[0], prop.Type), func() error {
-					return client.addMappingToIndex(ctx, binding.ResourcePath[0], newField, prop)
-				}); err != nil {
-					return nil, fmt.Errorf("adding mapping for field %q to index %q: %w", newField, binding.ResourcePath[0], err)
-				}
-			}
-		}
-	}
-
-	if err := doAction(fmt.Sprintf("update stored materialization spec and set version = %s", req.Version), func() error {
-		return client.putSpec(ctx, req.Materialization, req.Version)
-	}); err != nil {
-		return nil, fmt.Errorf("updating stored materialization spec: %w", err)
-	}
-
-	return &pm.Response_Applied{ActionDescription: strings.Join(actions, "\n")}, nil
+	return boilerplate.ApplyChanges(ctx, req, &elasticApplier{
+		client: client,
+		cfg:    cfg,
+	}, is, true)
 }
 
 func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {

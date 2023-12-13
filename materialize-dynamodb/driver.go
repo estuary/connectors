@@ -3,23 +3,18 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
-	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	log "github.com/sirupsen/logrus"
 )
 
 type config struct {
@@ -181,7 +176,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 	}
 
 	storedSpec, err := getSpec(ctx, client, req.Name.String())
-	if err != nil && err != errMetaTableNotFound {
+	if err != nil {
 		return nil, err
 	}
 
@@ -248,10 +243,6 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 }
 
 func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	}
-
 	cfg, err := resolveEndpointConfig(req.Materialization.ConfigJson)
 	if err != nil {
 		return nil, err
@@ -262,90 +253,20 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		return nil, err
 	}
 
-	actions := []string{}
-	doAction := func(desc string, fn func() error) error {
-		if !req.DryRun {
-			actions = append(actions, "- "+desc)
-			return fn()
-		}
-		actions = append(actions, "- "+desc+" (skipping due to dry-run)")
-		return nil
-	}
-
-	storedSpec, err := getSpec(ctx, client, req.Materialization.Name.String())
-	if err != nil {
-		if err == errMetaTableNotFound {
-			if err := doAction(fmt.Sprintf("create table '%s", metaTableName), func() error {
-				return createTable(ctx, client, metaTableName, metaTableAttrs, metaTableSchema)
-			}); err != nil {
-				return nil, fmt.Errorf("creating metadata table: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("getting stored spec: %w", err)
-		}
-	}
-
 	tableNames := make([]string, 0, len(req.Materialization.Bindings))
 	for _, binding := range req.Materialization.Bindings {
-		tableNames = append(tableNames, binding.ResourcePath[0])
+		tableNames = append(tableNames, binding.ResourcePath[0]) // Table names are already normalized in the Validate response.
 	}
 
 	is, err := infoSchema(ctx, client.db, tableNames)
 	if err != nil {
 		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
 	}
-	validator := boilerplate.NewValidator(constrainter{}, is)
 
-	for _, b := range req.Materialization.Bindings {
-		if len(b.Collection.Key) > 2 {
-			return nil, fmt.Errorf(
-				"cannot materialize collection '%s' because it has more than 2 keys (has %d keys)'",
-				b.Collection.Name.String(),
-				len(b.Collection.Key),
-			)
-		}
-
-		if err := validator.ValidateSelectedFields(b, storedSpec); err != nil {
-			return nil, err
-		}
-
-		found, err := boilerplate.FindExistingBinding(b.ResourcePath, b.Collection.Name, storedSpec)
-		if err != nil {
-			return nil, err
-		}
-
-		tableName := b.ResourcePath[0]
-		attrs, schema := tableConfigFromBinding(b.Collection.Projections)
-		if found == nil {
-			// This table may not have been created yet, so create it now.
-			if err := doAction(fmt.Sprintf("create table '%s'", tableName), func() error {
-				return createTable(ctx, client, tableName, attrs, schema)
-			}); err != nil {
-				return nil, fmt.Errorf("creating table '%s': %w", tableName, err)
-			}
-		} else if found.Backfill != b.Backfill {
-			// Replace the table.
-			if err := doAction(fmt.Sprintf("replace table '%s'", tableName), func() error {
-				return replaceTable(ctx, client, tableName, attrs, schema)
-			}); err != nil {
-				return nil, fmt.Errorf("replacing table '%s': %w", tableName, err)
-			}
-		}
-		// Note: If the table already exists, we don't need to do anything since the table schema is
-		// only for the key columns, and Flow doesn't allow for changing these or adding additional
-		// key columns.
-	}
-
-	// Update the stored materialization spec now that all of the new tables have been created.
-	if err := doAction(fmt.Sprintf("update stored materialization spec and set version = %s", req.Version), func() error {
-		return putSpec(ctx, client, req.Materialization, req.Version)
-	}); err != nil {
-		return nil, fmt.Errorf("updating stored materialization spec: %w", err)
-	}
-
-	return &pm.Response_Applied{
-		ActionDescription: strings.Join(actions, "\n"),
-	}, nil
+	return boilerplate.ApplyChanges(ctx, req, &ddbApplier{
+		client: client,
+		cfg:    cfg,
+	}, is, true)
 }
 
 func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
@@ -393,129 +314,4 @@ func resolveResourceConfig(specJson json.RawMessage) (resource, error) {
 	}
 
 	return res, nil
-}
-
-func createTable(
-	ctx context.Context,
-	client *client,
-	name string,
-	attrs []types.AttributeDefinition,
-	keySchema []types.KeySchemaElement,
-) error {
-	input := &dynamodb.CreateTableInput{
-		AttributeDefinitions: attrs,
-		KeySchema:            keySchema,
-		TableName:            aws.String(name),
-		BillingMode:          types.BillingModePayPerRequest,
-	}
-
-	_, err := client.db.CreateTable(ctx, input)
-	if err != nil {
-		var errInUse *types.ResourceInUseException
-		// Any error other than an "already exists" error is a more serious problem. Usually we
-		// should not be trying to create tables that already exist, so emit a warning log if that
-		// ever occurs.
-		if !errors.As(err, &errInUse) {
-			return fmt.Errorf("create table %s: %w", name, err)
-		}
-		log.WithField("table", name).Warn("table already exists")
-	}
-
-	// Wait for the table to be in an "active" state.
-	maxAttempts := 30
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		d, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-			TableName: aws.String(name),
-		})
-		if err != nil {
-			return err
-		}
-
-		if d.Table.TableStatus == types.TableStatusActive {
-			return nil
-		}
-
-		log.WithFields(log.Fields{
-			"table":      name,
-			"lastStatus": d.Table.TableStatus,
-		}).Debug("waiting for table to become ready")
-		time.Sleep(1 * time.Second)
-	}
-
-	return fmt.Errorf("table %s was created but did not become ready in time", name)
-}
-
-func replaceTable(
-	ctx context.Context,
-	client *client,
-	name string,
-	attrs []types.AttributeDefinition,
-	keySchema []types.KeySchemaElement,
-) error {
-	var errNotFound *types.ResourceNotFoundException
-
-	if _, err := client.db.DeleteTable(ctx, &dynamodb.DeleteTableInput{
-		TableName: aws.String(name),
-	}); err != nil {
-		if !errors.As(err, &errNotFound) {
-			// Any error other than the table already not existing is a problem.
-			return fmt.Errorf("deleting existing table: %w", err)
-		}
-	}
-
-	// Wait for the table to be fully deleted before creating it anew.
-	attempts := 30
-	for {
-		if attempts < 0 {
-			return fmt.Errorf("table %s did not finish deleting in time", name)
-		}
-
-		d, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-			TableName: aws.String(name),
-		})
-		if err != nil {
-			if errors.As(err, &errNotFound) {
-				break
-			}
-			return fmt.Errorf("waiting for table deletion to finish: %w", err)
-		}
-
-		log.WithFields(log.Fields{
-			"table":      name,
-			"lastStatus": d.Table.TableStatus,
-		}).Debug("waiting for table deletion to complete")
-
-		time.Sleep(1 * time.Second)
-		attempts -= 1
-	}
-
-	return createTable(ctx, client, name, attrs, keySchema)
-}
-
-func tableConfigFromBinding(projections []pf.Projection) ([]types.AttributeDefinition, []types.KeySchemaElement) {
-	mappedKeys := []mappedType{}
-	for _, p := range projections {
-		if p.IsPrimaryKey {
-			mappedKeys = append(mappedKeys, mapType(&p))
-		}
-	}
-
-	// The collection keys will be used as the partition key and sort key, respectively.
-	keyTypes := [2]types.KeyType{types.KeyTypeHash, types.KeyTypeRange}
-
-	attrs := []types.AttributeDefinition{}
-	schema := []types.KeySchemaElement{}
-
-	for idx, k := range mappedKeys {
-		attrs = append(attrs, types.AttributeDefinition{
-			AttributeName: aws.String(k.field),
-			AttributeType: k.ddbScalarType,
-		})
-		schema = append(schema, types.KeySchemaElement{
-			AttributeName: aws.String(k.field),
-			KeyType:       keyTypes[idx],
-		})
-	}
-
-	return attrs, schema
 }
