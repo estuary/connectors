@@ -83,6 +83,10 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		}
 	}()
 
+	if _, err = checkOplog(ctx, client); err != nil {
+		return nil, err
+	}
+
 	var systemDatabases = []string{"config", "local"}
 
 	var databaseNames []string

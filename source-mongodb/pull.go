@@ -39,6 +39,15 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 
+	var resources = make([]resource, len(open.Capture.Bindings))
+	for idx, binding := range open.Capture.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return fmt.Errorf("parsing resource config: %w", err)
+		}
+		resources[idx] = res
+	}
+
 	var ctx = stream.Context()
 
 	client, err := d.Connect(ctx, cfg)
@@ -53,6 +62,13 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}()
 
+	// Ensure that we're able to query the oplog, and get the timestamp of the oldest entry
+	// so that we can check for the possibility that we've missed events during downtime.
+	oldestOplogTime, err := checkOplog(ctx, client)
+	if err != nil {
+		return err
+	}
+
 	var c = capture{
 		cfg:    cfg,
 		Output: stream,
@@ -64,11 +80,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	// Remove bindings from the checkpoint that are no longer part of the spec.
 	activeBindings := make(map[string]struct{})
-	for _, binding := range open.Capture.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return fmt.Errorf("parsing resource config: %w", err)
-		}
+	for _, res := range resources {
 		activeBindings[resourceId(res)] = struct{}{}
 	}
 	emitCheckpoint := false
@@ -81,49 +93,93 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	// if all bindings are removed, reset the state
-	if len(activeBindings) < 1 {
+	if len(activeBindings) == 0 {
 		prevState = captureState{}
 		emitCheckpoint = true
 	}
 	if emitCheckpoint {
-		cp, err := json.Marshal(prevState)
-		if err != nil {
-			return fmt.Errorf("marshalling checkpoint for syncing removed bindings: %w", err)
-		} else if err = c.Output.Checkpoint(cp, false); err != nil {
-			return fmt.Errorf("updating checkpoint for removed bindings: %w", err)
+		if err = c.outputCheckpoint(&prevState, false); err != nil {
+			return err
 		}
 	}
 
-	// Run backfills concurrently and wait until they are done before we start
-	// the change stream
+	if !prevState.isBackfillComplete(resources) {
+		var stateUpdated, restartReason = checkBackfillState(&prevState, oldestOplogTime)
+		if restartReason != "" {
+			return c.startOverDueToConsistencyLoss(restartReason)
+		} else if stateUpdated {
+			c.outputCheckpoint(&prevState, false)
+		}
+
+		if err = c.backfillAllCollections(ctx, resources, &prevState, client); err != nil {
+			return fmt.Errorf("backfilling: %w", err)
+		}
+		var totalBackfillTime = time.Now().UTC().Sub(prevState.getBackfillStartTime())
+		log.WithField("totalBackfillTime", totalBackfillTime).Info("completed backfill")
+
+		// Update the timestamp of the oldest oplog entry now that we've finished the backfill
+		oldestOplogTime, err = oldestOplogEntry(ctx, client)
+		if err == mongo.ErrNoDocuments && prevState.wasChangeStreamEmptyBeforeBackfill() {
+			log.Info("ignoring empty oplog error because the oplog was empty before the backfill started")
+		} else if err == mongo.ErrNoDocuments {
+			// We had previously observed events in the oplog, but now there are none.
+			// This means we have now way of knowing whether we've missed any of the
+			// events, and we'll need to bail out.
+			return fmt.Errorf("the oplog is now empty, but had previously contained entries")
+		} else {
+			log.WithField("oldestOplogEntry", oldestOplogTime).Info("fetched oldest oplog time after completing backfill")
+		}
+	}
+
+	// Once we finish the backfill (which may have been completed by a previous instance of the
+	// connector), check to make sure we can start reading the change stream before we started
+	// the backfill. Skip this check if we've already started reading the change stream, or if
+	// we'd only observed an empty change stream before completing the backfill.
+	if len(prevState.StreamResumeToken) == 0 && !prevState.wasChangeStreamEmptyBeforeBackfill() {
+		if _, restartReason := checkBackfillState(&prevState, oldestOplogTime); restartReason != "" {
+			// Automatically restarting the backfill is probably not the best failure mode when
+			// we weren't able to finish the first backfill in time. But until we update this to
+			// work with StateKey (and thus the backfill counter), users won't have an easy way
+			// to do this manually.
+			c.startOverDueToConsistencyLoss(restartReason)
+		}
+	}
+
+	return c.ChangeStream(ctx, client, resources, prevState)
+}
+
+func (c *capture) outputCheckpoint(state *captureState, merge bool) error {
+	cp, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("marshalling checkpoint: %w", err)
+	} else if err = c.Output.Checkpoint(cp, merge); err != nil {
+		return fmt.Errorf("outputting checkpoint: %w", err)
+	}
+	return nil
+}
+
+func (c *capture) backfillAllCollections(ctx context.Context, resources []resource, state *captureState, client *mongo.Client) error {
+
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.SetLimit(ConcurrentBackfillLimit)
 
-	var resources = make([]resource, len(open.Capture.Bindings))
-
-	// Capture each binding.
-	for idx, binding := range open.Capture.Bindings {
+	for idx, resource := range resources {
 		idx := idx
+		resource := resource
 
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return fmt.Errorf("parsing resource config: %w", err)
-		}
-		resources[idx] = res
-		var resState, _ = prevState.Resources[resourceId(res)]
+		var resState = state.Resources[resourceId(resource)]
 
 		if !resState.Backfill.Done {
 			eg.Go(func() error {
-				return c.BackfillCollection(egCtx, client, idx, res, resState)
+				return c.BackfillCollection(egCtx, client, idx, resource, resState)
 			})
 		}
 	}
 
-	if err = eg.Wait(); err != nil {
+	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("backfill: %w", err)
 	}
-
-	return c.ChangeStream(ctx, client, resources, prevState)
+	return nil
 }
 
 type capture struct {
@@ -134,9 +190,44 @@ type capture struct {
 type captureState struct {
 	Resources map[string]resourceState `json:"resources,omitempty"`
 
+	// OplogEmptyBeforeBackfill indicates whether the connector has observed
+	// an empty oplog before starting the backfill, and on every subsequent
+	// startup before the backfill is completed. If, and only if, the oplog has
+	// been observed to be empty the entire time before the backfill completes,
+	// then it is allowed to still be empty after it completes. Otherwise,
+	// the connector expects at least one entry in the oplog, so that it can
+	// use its timestamp to ensure we haven't missed any events while backfilling.
+	OplogEmptyBeforeBackfill *bool `json:"oplog_empty_before_backfill,omitempty"`
+
 	// Resume token used to continue change stream from where we last left off,
 	// see https://www.mongodb.com/docs/manual/changeStreams/#resume-tokens-from-change-events
 	StreamResumeToken bson.Raw `json:"stream_resume_token,omitempty"`
+}
+
+func (s *captureState) wasChangeStreamEmptyBeforeBackfill() bool {
+	if s.OplogEmptyBeforeBackfill != nil {
+		return *s.OplogEmptyBeforeBackfill
+	}
+	return false
+}
+
+func (s *captureState) getBackfillStartTime() time.Time {
+	var start time.Time
+	for _, r := range s.Resources {
+		if start.IsZero() || start.After(r.Backfill.StartedAt) {
+			start = r.Backfill.StartedAt
+		}
+	}
+	return start
+}
+
+func (s *captureState) isBackfillComplete(resources []resource) bool {
+	for _, r := range resources {
+		if !s.Resources[resourceId(r)].Backfill.Done {
+			return false
+		}
+	}
+	return len(s.Resources) > 0
 }
 
 func (s *captureState) Validate() error {
@@ -181,18 +272,8 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	// otherwise, we look at Backfill.StartedAt of all resources and use the
 	// minimum value to start our change stream from
 	var streamStartAt time.Time
-	if len(state.StreamResumeToken) < 1 {
-		for _, res := range resources {
-			var resState = state.Resources[resourceId(res)]
-
-			if !resState.Backfill.StartedAt.IsZero() {
-				if streamStartAt.IsZero() {
-					streamStartAt = resState.Backfill.StartedAt
-				} else if resState.Backfill.StartedAt.Before(streamStartAt) {
-					streamStartAt = resState.Backfill.StartedAt
-				}
-			}
-		}
+	if len(state.StreamResumeToken) == 0 {
+		streamStartAt = state.getBackfillStartTime()
 	}
 
 	var collectionBindingIndex = make(map[string]int)
@@ -372,6 +453,53 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	return nil
 }
 
+func checkBackfillState(state *captureState, oldestOplogEntry time.Time) (stateUpdated bool, restartReason string) {
+	// Check and update the ChangeStreamEmptyBeforeBackfill property if necessary
+	var backfillStartTime = state.getBackfillStartTime()
+
+	log.WithFields(log.Fields{
+		"resumingInProgressBackfill": !backfillStartTime.IsZero(),
+		"backfillStartTime":          backfillStartTime,
+		"oldestOplogEntry":           oldestOplogEntry,
+	}).Debug("checking backfill state")
+
+	if backfillStartTime.IsZero() {
+		// We're starting a new backfill, so emit a state update indicating
+		// whether we've observed events in the oplog.
+		var isEmpty = oldestOplogEntry.IsZero()
+		state.OplogEmptyBeforeBackfill = &isEmpty
+		return true, ""
+	} else if state.wasChangeStreamEmptyBeforeBackfill() && !oldestOplogEntry.IsZero() {
+		// We're resuming an in-progress backfill and there is now an event
+		// that's been observed in the change stream. Update the state accordingly
+		var superHighTechFalse = false
+		state.OplogEmptyBeforeBackfill = &superHighTechFalse
+		return true, ""
+	} else if !state.wasChangeStreamEmptyBeforeBackfill() && oldestOplogEntry.IsZero() {
+		// We're in a bad state. We've already started a backfill, which we're resuming.
+		// We'd previously observed that there were events in the change stream, but now
+		// there's no documents in the change stream, and so it's impossible for us to tell
+		// if we'll be able to transition to reading the change stream without having missed
+		// data. So we bail out and re-start the backfill.
+		return false, "previously non-empty change stream is now empty"
+	} else if backfillStartTime.Before(oldestOplogEntry) {
+		return false, fmt.Sprintf("the oldest event in the mongodb oplog (%s) is more recent than the starting time of the backfill", oldestOplogEntry)
+	}
+	return false, ""
+}
+
+// startOverDueToConsistencyLoss outputs an empty checkpoint and completely overwrites the state
+// of the capture, so that it can start over from the beginning. It always returns a non-nil
+// error, which the caller should bubble up directly in order to terminate the connector.
+func (c *capture) startOverDueToConsistencyLoss(detail string) error {
+	log.WithField("detail", detail).Warn("re-starting due to possible loss of consistency")
+	var emptyCP = captureState{}
+	if cpErr := c.outputCheckpoint(&emptyCP, false); cpErr != nil {
+		return fmt.Errorf("resetting state: %w", cpErr)
+	}
+	return fmt.Errorf("exiting in order to re-start backfill")
+}
+
 // We use a very large batch size here, however the go mongo driver will
 // automatically use a smaller batch size capped at 16mb, as BSON documents have
 // a 16mb size limit which restricts the size of a response from mongodb as
@@ -479,13 +607,8 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 				},
 			}
 
-			checkpointJson, err := json.Marshal(checkpoint)
-			if err != nil {
-				return fmt.Errorf("encoding checkpoint to json failed: %w", err)
-			}
-
-			if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
-				return fmt.Errorf("output checkpoint failed: %w", err)
+			if err = c.outputCheckpoint(&checkpoint, true); err != nil {
+				return err
 			}
 		}
 	}
@@ -501,12 +624,8 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		},
 	}
 
-	checkpointJson, err := json.Marshal(checkpoint)
-	if err != nil {
-		return fmt.Errorf("encoding checkpoint to json failed: %w", err)
-	}
-	if err = c.Output.Checkpoint(checkpointJson, true); err != nil {
-		return fmt.Errorf("sending checkpoint failed: %w", err)
+	if err = c.outputCheckpoint(&checkpoint, true); err != nil {
+		return err
 	}
 
 	return nil
