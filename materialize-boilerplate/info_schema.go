@@ -117,7 +117,7 @@ func (i *InfoSchema) FieldsForResource(resourcePath []string) ([]EndpointField, 
 	return i.resources[rk], nil
 }
 
-// Has resource reports whether the Flow resource path exists in the InfoSchema.
+// HasResource reports whether the Flow resource path exists in the InfoSchema.
 func (i *InfoSchema) HasResource(resourcePath []string) bool {
 	rk := joinPath(i.locatePath(resourcePath))
 	_, ok := i.resources[rk]
@@ -144,6 +144,9 @@ func (i *InfoSchema) ExtractProjection(efn string, collection pf.CollectionSpec)
 	return out, found, nil
 }
 
+// InSelectedFields returns true if the provided endpoint field name (as reported by the endpoint)
+// exists in the field selection for a materialization. It does a similar translation of fields from
+// the field selection as ExtractProjection in order to do this matching.
 func (i *InfoSchema) InSelectedFields(efn string, fs pf.FieldSelection) (bool, error) {
 	var found bool
 
