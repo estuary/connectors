@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -166,7 +167,7 @@ func RunApplyTestCases(
 	cupaloy.SnapshotT(t, snap.String())
 }
 
-func RunValidateTestCases(t *testing.T, v Validator, snapshotPath string) {
+func RunValidateTestCases(t *testing.T, makeValidator func(*testing.T, *pf.MaterializationSpec) Validator, snapshotPath string) {
 	t.Helper()
 
 	tests := []struct {
@@ -258,7 +259,7 @@ func RunValidateTestCases(t *testing.T, v Validator, snapshotPath string) {
 	var snap strings.Builder
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs, err := v.ValidateBinding([]string{"key_value"}, tt.deltaUpdates, 0, tt.newSpec.Bindings[0].Collection, nil, tt.existingSpec)
+			cs, err := makeValidator(t, tt.existingSpec).ValidateBinding([]string{"key_value"}, tt.deltaUpdates, 0, tt.newSpec.Bindings[0].Collection, nil, tt.existingSpec)
 			require.NoError(t, err)
 
 			j, err := json.MarshalIndent(cs, "", "\t")
@@ -274,7 +275,7 @@ func RunValidateTestCases(t *testing.T, v Validator, snapshotPath string) {
 		existingSpec := loadSpec(t, validateFs, "base.flow.proto")
 		newSpec := loadSpec(t, validateFs, "unsatisfiable.flow.proto")
 
-		cs, err := v.ValidateBinding([]string{"key_value"}, false, 1, newSpec.Bindings[0].Collection, nil, existingSpec)
+		cs, err := makeValidator(t, existingSpec).ValidateBinding([]string{"key_value"}, false, 1, newSpec.Bindings[0].Collection, nil, existingSpec)
 		require.NoError(t, err)
 
 		j, err := json.MarshalIndent(cs, "", "\t")
@@ -286,4 +287,43 @@ func RunValidateTestCases(t *testing.T, v Validator, snapshotPath string) {
 	})
 
 	cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath)).SnapshotT(t, snap.String())
+}
+
+// BasicInfoFromSpec creates a vanilla InfoSchema from a Flow MaterializationSpec which may be
+// useful for testing scenarios that do not require the use of a specific endpoint's type system.
+func BasicInfoFromSpec(t *testing.T, spec *pf.MaterializationSpec, mapType func(*pf.Projection) (string, bool)) *InfoSchema {
+	is := NewInfoSchema(
+		func(in []string) []string { return in },
+		func(in string) string { return in },
+	)
+
+	if spec != nil {
+		for _, b := range spec.Bindings {
+			selectedFields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
+			if b.FieldSelection.Document != "" {
+				selectedFields = append(selectedFields, b.FieldSelection.Document)
+			}
+
+			for _, f := range selectedFields {
+				p := b.Collection.GetProjection(f)
+				mapped, mustExist := mapType(p)
+
+				is.PushField(EndpointField{
+					Name:     f,
+					Nullable: !mustExist,
+					Type:     mapped,
+				}, b.ResourcePath...)
+			}
+		}
+	}
+
+	return is
+}
+
+func testMapType(p *pf.Projection) (string, bool) {
+	mustExist := p.Inference.Exists == pf.Inference_MUST
+	if slices.Contains(p.Inference.Types, "null") {
+		mustExist = false
+	}
+	return strings.Join(p.Inference.Types, ","), mustExist
 }
