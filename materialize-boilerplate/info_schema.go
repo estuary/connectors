@@ -134,7 +134,7 @@ func (i *InfoSchema) ExtractProjection(efn string, collection pf.CollectionSpec)
 	for idx := range collection.Projections {
 		matches := i.translateField(collection.Projections[idx].Field) == efn
 		if found && matches {
-			return pf.Projection{}, false, fmt.Errorf("ambiguous endpoint field name when looking for projection: %q", efn)
+			return pf.Projection{}, false, fmt.Errorf("ambiguous endpoint field name when looking for projection %q", efn)
 		} else if matches {
 			found = true
 			out = collection.Projections[idx]
@@ -142,6 +142,21 @@ func (i *InfoSchema) ExtractProjection(efn string, collection pf.CollectionSpec)
 	}
 
 	return out, found, nil
+}
+
+func (i *InfoSchema) InSelectedFields(efn string, fs pf.FieldSelection) (bool, error) {
+	var found bool
+
+	for _, f := range fs.AllFields() {
+		matches := i.translateField(f) == efn
+		if found && matches {
+			return false, fmt.Errorf("ambiguous endpoint field name when looking for selected field %q", efn)
+		} else if matches {
+			found = true
+		}
+	}
+
+	return found, nil
 }
 
 func joinPath(in []string) string {
