@@ -34,7 +34,7 @@ func newTestDialect() Dialect {
 	}
 
 	return Dialect{
-		TableLocatorer: TableLocatorFn(func(path ...string) InfoTableLocation {
+		TableLocatorer: TableLocatorFn(func(path []string) InfoTableLocation {
 			return InfoTableLocation{TableSchema: path[1], TableName: path[2]}
 		}),
 		ColumnLocatorer: ColumnLocatorFn(func(field string) string { return field }),
@@ -50,6 +50,16 @@ func newTestDialect() Dialect {
 			return fmt.Sprintf("$%d", index+1)
 		}),
 		TypeMapper: mapper,
+		ColumnCompatibilities: map[string]EndpointTypeComparer{
+			"json":             JsonCompatible,
+			"boolean":          BooleanCompatible,
+			"bigint":           IntegerCompatible,
+			"numeric":          IntegerCompatible,
+			"double precision": NumberCompatible,
+			"decimal":          NumberCompatible,
+			"date-time":        DateTimeCompatible,
+			"text":             StringCompatible,
+		},
 	}
 }
 

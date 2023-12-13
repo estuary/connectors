@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/sirupsen/logrus"
 )
@@ -381,4 +382,82 @@ func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string
 	}
 
 	return string(b), nil
+}
+
+// StdFetchInfoSchema returns the existing columns for implementations that use a standard *sql.DB
+// and make a compliant INFORMATION_SCHEMA view available.
+func StdFetchInfoSchema(
+	ctx context.Context,
+	db *sql.DB,
+	dialect Dialect,
+	catalog string, // typically the "database"
+	metaSchema string,
+	resourcePaths [][]string,
+) (*boilerplate.InfoSchema, error) {
+	is := boilerplate.NewInfoSchema(
+		ToLocatePathFn(dialect.TableLocator),
+		dialect.ColumnLocator,
+	)
+
+	// Map the resource paths to an appropriate identifier for inclusion in the coming query.
+	schemas := []string{dialect.Literal(metaSchema)}
+	for _, p := range resourcePaths {
+		loc := dialect.TableLocator(p)
+		schemas = append(schemas, dialect.Literal(loc.TableSchema))
+	}
+
+	slices.Sort(schemas)
+	schemas = slices.Compact(schemas)
+
+	rows, err := db.QueryContext(ctx, fmt.Sprintf(`
+		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length
+		from information_schema.columns
+		where table_catalog = %s
+		and table_schema in (%s);
+		`,
+		dialect.Literal(catalog),
+		strings.Join(schemas, ","),
+	))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type columnRow struct {
+		TableSchema            string
+		TableName              string
+		ColumnName             string
+		IsNullable             string
+		DataType               string
+		CharacterMaximumLength sql.NullInt64
+	}
+
+	for rows.Next() {
+		var c columnRow
+		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength); err != nil {
+			return nil, err
+		}
+
+		is.PushField(boilerplate.EndpointField{
+			Name:               c.ColumnName,
+			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
+			Type:               c.DataType,
+			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
+		}, c.TableSchema, c.TableName)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return is, nil
+}
+
+func ToLocatePathFn(fn TableLocatorFn) boilerplate.LocatePathFn {
+	return func(in []string) []string {
+		loc := fn(in)
+		return []string{
+			loc.TableSchema,
+			loc.TableName,
+		}
+	}
 }

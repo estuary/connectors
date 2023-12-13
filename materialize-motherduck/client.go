@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -22,6 +23,18 @@ import (
 
 type client struct {
 	db *stdsql.DB
+}
+
+func (c client) InfoSchema(ctx context.Context, ep *sql.Endpoint, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
+	cfg := ep.Config.(*config)
+
+	if err := c.withDB(func(db *stdsql.DB) error {
+		is, err = sql.StdFetchInfoSchema(ctx, db, ep.Dialect, cfg.Database, cfg.Schema, resourcePaths)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return
 }
 
 func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {

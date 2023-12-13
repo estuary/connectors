@@ -168,11 +168,6 @@ func TestPrereqs(t *testing.T) {
 		})
 	}
 }
-
-func TestValidate(t *testing.T) {
-	sql.RunValidateTestCases(t, duckDialect)
-}
-
 func TestApply(t *testing.T) {
 	cfg := mustGetCfg(t)
 	ctx := context.Background()

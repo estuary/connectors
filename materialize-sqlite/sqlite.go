@@ -92,6 +92,10 @@ type client struct {
 	path string
 }
 
+func (c client) InfoSchema(ctx context.Context, ep *sql.Endpoint, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
+	return &boilerplate.InfoSchema{}, nil
+}
+
 func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	return &sql.PrereqErr{}
 }

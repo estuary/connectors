@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -19,6 +20,32 @@ import (
 
 type client struct {
 	uri string
+}
+
+func (c client) InfoSchema(ctx context.Context, ep *sql.Endpoint, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
+	cfg := ep.Config.(*config)
+
+	if err := c.withDB(func(db *stdsql.DB) error {
+		catalog := cfg.Database
+		if catalog == "" {
+			// An endpoint-level database configuration is not required, so query for the active
+			// database if that's the case.
+			if err := db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
+				return fmt.Errorf("querying for connected database: %w", err)
+			}
+		}
+
+		baseSchema := cfg.Schema
+		if baseSchema == "" {
+			baseSchema = "public"
+		}
+
+		is, err = sql.StdFetchInfoSchema(ctx, db, pgDialect, catalog, baseSchema, resourcePaths)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return
 }
 
 func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {

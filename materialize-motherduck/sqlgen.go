@@ -43,7 +43,7 @@ var duckDialect = func() sql.Dialect {
 	}
 
 	return sql.Dialect{
-		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
 		}),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
@@ -59,6 +59,19 @@ var duckDialect = func() sql.Dialect {
 			return "?"
 		}),
 		TypeMapper: mapper,
+		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
+			"bigint":                   sql.IntegerCompatible,
+			"double":                   sql.NumberCompatible,
+			"boolean":                  sql.BooleanCompatible,
+			"json":                     sql.JsonCompatible,
+			"varchar":                  sql.StringCompatible,
+			"hugeint":                  sql.IntegerCompatible,
+			"date":                     sql.DateCompatible,
+			"timestamp with time zone": sql.DateTimeCompatible,
+			"interval":                 sql.DurationCompatible,
+			"time":                     sql.TimeCompatible,
+			"uuid":                     sql.UuidCompatible,
+		},
 	}
 }()
 

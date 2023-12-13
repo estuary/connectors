@@ -8,6 +8,7 @@ import (
 	"strings"
 	"text/template"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/sirupsen/logrus"
@@ -29,6 +30,8 @@ type Client interface {
 	// possible. The returned PrereqErr can include multiple separate errors if it possible to
 	// determine that there is more than one issue that needs corrected.
 	PreReqs(ctx context.Context, ep *Endpoint) *PrereqErr
+
+	InfoSchema(ctx context.Context, ep *Endpoint, resourcePaths [][]string) (*boilerplate.InfoSchema, error)
 }
 
 // Resource is a driver-provided type which represents the SQL resource

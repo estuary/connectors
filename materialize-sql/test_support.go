@@ -9,23 +9,8 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/stretchr/testify/require"
 )
-
-// snapshotPath is a common set of test snapshots that may be used by SQL materialization connectors
-// that produce standard snapshots, which they currently all do.
-var snapshotPath = "../materialize-sql/.snapshots"
-
-// RunValidateTestsCases uses a SQL materialization dialect to run the standard set of validate
-// cases to ensure consistent constraints are produced.
-func RunValidateTestCases(t *testing.T, dialect Dialect) {
-	t.Helper()
-
-	boilerplate.RunValidateTestCases(t, boilerplate.NewValidator(constrainter{
-		dialect: dialect,
-	}), snapshotPath)
-}
 
 // RunFenceTestCases is a generalized form of test cases over fencing behavior,
 // which ought to function with any Client implementation.
@@ -108,7 +93,7 @@ func RunFenceTestCases(
 		dump3, err := dumpTable(metaTable)
 		require.NoError(t, err)
 
-		snapshotter := cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath))
+		snapshotter := cupaloy.New(cupaloy.SnapshotSubdirectory(".snapshots"))
 
 		snapshotter.SnapshotT(t,
 			"After installing fixtures:\n"+dump1+

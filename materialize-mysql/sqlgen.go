@@ -54,7 +54,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 	}
 
 	return sql.Dialect{
-		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			// For MySQL, the table_catalog is always "def", and table_schema is the name of the
 			// database. This is sort of weird, since in most other systems the table_catalog is the
 			// name of the database.
@@ -73,6 +73,18 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 			return "?"
 		}),
 		TypeMapper: mapper,
+		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
+			"bigint":   sql.IntegerCompatible,
+			"double":   sql.NumberCompatible,
+			"tinyint":  sql.BooleanCompatible, // Booleans are either 1 or 0 in MySQL.
+			"json":     sql.JsonCompatible,
+			"varchar":  sql.StringCompatible,
+			"longtext": sql.StringCompatible,
+			"decimal":  sql.NumberCompatible,
+			"date":     sql.DateCompatible,
+			"datetime": sql.DateTimeCompatible,
+			"time":     sql.TimeCompatible,
+		},
 	}
 }
 

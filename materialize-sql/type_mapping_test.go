@@ -5,13 +5,26 @@ import (
 	"testing"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
 
 func TestValidate(t *testing.T) {
-	boilerplate.RunValidateTestCases(t, boilerplate.NewValidator(constrainter{
-		dialect: newTestDialect(),
-	}), ".snapshots")
+	dialect := newTestDialect()
+
+	boilerplate.RunValidateTestCases(t, func(t *testing.T, spec *pf.MaterializationSpec) boilerplate.Validator {
+		return boilerplate.NewValidator(
+			constrainter{dialect: dialect},
+			boilerplate.BasicInfoFromSpec(t, spec, func(p *pf.Projection) (string, bool) {
+				sqlProj := Projection{Projection: *p}
+				mapped, err := dialect.MapType(&sqlProj)
+				require.NoError(t, err)
+				_, mustExist := sqlProj.AsFlatType()
+
+				return mapped.NullableDDL, mustExist
+			}),
+		)
+	}, ".snapshots")
 }
 
 func TestStdStrToInt(t *testing.T) {
