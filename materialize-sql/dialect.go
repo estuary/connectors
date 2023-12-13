@@ -13,11 +13,15 @@ type Dialect struct {
 	Literaler
 	Placeholderer
 	TypeMapper
+	// ColumnCompatibilities provides a lookup for a column name as reported by the endpoint to an
+	// EndpointTypeComparer, which is a function that determines if a Flow projection is compatible
+	// with that materialized column.
+	ColumnCompatibilities map[string]EndpointTypeComparer
 }
 
 // TableLocatorer produces an InfoTableLocation for a given path.
 type TableLocatorer interface {
-	TableLocator(path ...string) InfoTableLocation
+	TableLocator(path []string) InfoTableLocation
 }
 
 // InfoTableLocation represents how to find a table in the INFORMATION_SCHEMA view for the endpoint.
@@ -68,9 +72,9 @@ type TypeMapper interface {
 }
 
 // TableLocatorFn is a function that implements TableLocatorer.
-type TableLocatorFn func(path ...string) InfoTableLocation
+type TableLocatorFn func(path []string) InfoTableLocation
 
-func (f TableLocatorFn) TableLocator(path ...string) InfoTableLocation { return f(path...) }
+func (f TableLocatorFn) TableLocator(path []string) InfoTableLocation { return f(path) }
 
 // ColumnLocatorFn is a function that implements ColumnLocatorer.
 type ColumnLocatorFn func(field string) string
@@ -100,7 +104,7 @@ func (f TypeMapperFn) MapType(p *Projection) (MappedType, error) { return f(p) }
 // Compile-time check that wrapping functions with typed  Fn() implementations
 // can be used to build a Dialect.
 var _ = Dialect{
-	TableLocatorer:  TableLocatorFn(func(path ...string) InfoTableLocation { return InfoTableLocation{} }),
+	TableLocatorer:  TableLocatorFn(func(path []string) InfoTableLocation { return InfoTableLocation{} }),
 	ColumnLocatorer: ColumnLocatorFn(func(field string) string { return field }),
 	Placeholderer:   PlaceholderFn(func(index int) string { return "" }),
 	Literaler:       LiteralFn(func(s string) string { return "" }),

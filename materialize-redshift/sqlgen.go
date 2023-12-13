@@ -88,7 +88,7 @@ var rsDialect = func() sql.Dialect {
 	}
 
 	return sql.Dialect{
-		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any resource, and if its
 				// empty the default Redshift schema "public" will implicitly be used. Also note
@@ -119,6 +119,16 @@ var rsDialect = func() sql.Dialect {
 		// create columns as nullable to preserve the ability to change collection schema fields from
 		// required to not required or remove fields from the materialization.
 		TypeMapper: mapper,
+		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
+			"bigint":                   sql.IntegerCompatible,
+			"double precision":         sql.NumberCompatible,
+			"boolean":                  sql.BooleanCompatible,
+			"super":                    sql.JsonCompatible,
+			"character varying":        sql.StringCompatible,
+			"numeric":                  sql.NumberCompatible,
+			"date":                     sql.DateCompatible,
+			"timestamp with time zone": sql.DateTimeCompatible,
+		},
 	}
 }()
 

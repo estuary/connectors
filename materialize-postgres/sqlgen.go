@@ -53,7 +53,7 @@ var pgDialect = func() sql.Dialect {
 	}
 
 	return sql.Dialect{
-		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any resource, and if its empty the
 				// default postgres schema "public" will implicitly be used.
@@ -76,6 +76,21 @@ var pgDialect = func() sql.Dialect {
 			return fmt.Sprintf("$%d", index+1)
 		}),
 		TypeMapper: mapper,
+		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
+			"bigint":                   sql.IntegerCompatible,
+			"double precision":         sql.NumberCompatible,
+			"boolean":                  sql.BooleanCompatible,
+			"json":                     sql.JsonCompatible,
+			"text":                     sql.StringCompatible,
+			"numeric":                  sql.NumberCompatible,
+			"date":                     sql.DateCompatible,
+			"timestamp with time zone": sql.DateTimeCompatible,
+			"interval":                 sql.DurationCompatible,
+			"cidr":                     sql.IPv4or6Compatible,
+			"macaddr":                  sql.MacAddrCompatible,
+			"macaddr8":                 sql.MacAddr8Compatible,
+			"time without time zone":   sql.TimeCompatible,
+		},
 	}
 }()
 
