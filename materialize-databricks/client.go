@@ -14,212 +14,157 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
-	"golang.org/x/sync/errgroup"
+
+	_ "github.com/databricks/databricks-sql-go"
 )
 
 type client struct {
-	uri string
+	db  *stdsql.DB
+	cfg *config
+	ep  *sql.Endpoint
 }
 
-func (c client) InfoSchema(ctx context.Context, ep *sql.Endpoint, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
+func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	cfg := ep.Config.(*config)
 
-	schemaLiterals := []string{ep.Dialect.Literal(cfg.SchemaName)}
-	for _, p := range resourcePaths {
-		loc := ep.Dialect.TableLocator(p)
-		schemaLiterals = append(schemaLiterals, ep.Dialect.Literal(loc.TableSchema))
-	}
-
-	slices.Sort(schemaLiterals)
-	schemaLiterals = slices.Compact(schemaLiterals)
-
-	is = boilerplate.NewInfoSchema(
-		sql.ToLocatePathFn(ep.Dialect.TableLocator),
-		ep.Dialect.ColumnLocator,
-	)
-
-	if err := c.withDB(func(db *stdsql.DB) error {
-		rows, err := db.QueryContext(ctx, fmt.Sprintf(`
-			select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length
-			from system.information_schema.columns
-			where table_catalog = %s
-			and table_schema in (%s);
-			`,
-			ep.Dialect.Literal(cfg.CatalogName),
-			strings.Join(schemaLiterals, ","),
-		))
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-
-		type columnRow struct {
-			TableSchema            string
-			TableName              string
-			ColumnName             string
-			IsNullable             string
-			DataType               string
-			CharacterMaximumLength stdsql.NullInt64
-		}
-
-		for rows.Next() {
-			var c columnRow
-			if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength); err != nil {
-				return err
-			}
-
-			is.PushField(boilerplate.EndpointField{
-				Name:               c.ColumnName,
-				Nullable:           strings.EqualFold(c.IsNullable, "yes"),
-				Type:               c.DataType,
-				CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
-			}, c.TableSchema, c.TableName)
-		}
-
-		return rows.Err()
-	}); err != nil {
+	db, err := stdsql.Open("databricks", cfg.ToURI())
+	if err != nil {
 		return nil, err
 	}
 
-	return
+	return &client{
+		db:  db,
+		cfg: cfg,
+		ep:  ep,
+	}, nil
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
-	cfg := ep.Config.(*config)
+// InfoSchema for materialize-databricks is almost exactly the same as StdFetchInfoSchema, but
+// Databricks requires the information_schema view to be qualified with "system", at least on
+// some deployments.
+// TODO(whb): This should likely be refactored to use the Databricks WorkspaceClient, since queries
+// to the information_schema view will be non-responsive if the warehouse has gone to sleep -
+// assuming, of course, the WorkspaceClient is not also non-responsive if the warehouse is asleep.
+func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
+	is := boilerplate.NewInfoSchema(
+		sql.ToLocatePathFn(c.ep.Dialect.TableLocator),
+		c.ep.Dialect.ColumnLocator,
+	)
 
-	db, err := stdsql.Open("databricks", c.uri)
+	// Nothing to do if the materialization has no bindings.
+	if len(resourcePaths) == 0 {
+		return is, nil
+	}
+
+	schemas := make([]string, 0, len(resourcePaths))
+	for _, p := range resourcePaths {
+		loc := c.ep.Dialect.TableLocator(p)
+		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
+	}
+
+	slices.Sort(schemas)
+	schemas = slices.Compact(schemas)
+
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length
+		from system.information_schema.columns
+		where table_catalog = %s
+		and table_schema in (%s);
+	`,
+		c.ep.Dialect.Literal(c.cfg.CatalogName),
+		strings.Join(schemas, ","),
+	))
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("querying system.information_schema.columns: %w", err)
 	}
-	defer db.Close()
+	defer rows.Close()
 
-	// Build the list of schemas included in this update.
-	var schemas []string
-	for _, t := range actions.CreateTables {
-		if !slices.Contains(schemas, t.InfoLocation.TableSchema) {
-			schemas = append(schemas, t.InfoLocation.TableSchema)
+	type columnRow struct {
+		TableSchema            string
+		TableName              string
+		ColumnName             string
+		IsNullable             string
+		DataType               string
+		CharacterMaximumLength stdsql.NullInt64
+	}
+
+	for rows.Next() {
+		var c columnRow
+		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength); err != nil {
+			return nil, fmt.Errorf("scanning column row: %w", err)
 		}
-	}
-	for _, t := range actions.AlterTables {
-		if !slices.Contains(schemas, t.InfoLocation.TableSchema) {
-			schemas = append(schemas, t.InfoLocation.TableSchema)
-		}
+
+		is.PushField(boilerplate.EndpointField{
+			Name:               c.ColumnName,
+			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
+			Type:               c.DataType,
+			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
+		}, c.TableSchema, c.TableName)
 	}
 
-	existing, err := fetchExistingColumns(ctx, db, databricksDialect, cfg.CatalogName, schemas)
-	if err != nil {
-		return "", fmt.Errorf("fetching columns: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows.Err(): %w", err)
 	}
 
-	resolved, err := sql.FilterActions(actions, databricksDialect, existing)
-	if err != nil {
-		return "", err
-	}
+	return is, nil
+}
 
-	// Build up the list of actions for logging. These won't be executed directly, since Databricks
-	// apparently doesn't support multi-statement queries or dropping nullability for multiple
-	// columns in a single statement, and throws errors on concurrent table updates.
-	actionList := []string{}
-	for _, tc := range resolved.CreateTables {
-		actionList = append(actionList, tc.TableCreateSql)
-	}
-	for _, ta := range resolved.AlterTables {
-		if len(ta.AddColumns) > 0 {
-			var addColumnsStmt strings.Builder
-			if err := tplAlterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
-				return "", fmt.Errorf("rendering alter table columns statement: %w", err)
-			}
-			actionList = append(actionList, addColumnsStmt.String())
-		}
-		for _, dn := range ta.DropNotNulls {
-			actionList = append(actionList, fmt.Sprintf(
-				"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
-				ta.Identifier,
-				dn.Identifier,
-			))
-		}
-	}
-	for _, tr := range resolved.ReplaceTables {
-		actionList = append(actionList, tr.TableReplaceSql)
-	}
-	action := strings.Join(append(actionList, updateSpec.QueryString), "\n")
-	if req.DryRun {
-		return action, nil
-	}
+func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
+	_, err := c.db.ExecContext(ctx, updateSpec.QueryString)
+	return err
+}
 
-	// Execute actions for each table involved separately. Concurrent actions can't be done on the
-	// same table without throwing errors, so each goroutine handles the actions only for that
-	// table, looping over them if needed until they are done. This is going to look pretty similar
-	// to building the actions list, except this time we are actually running the queries.
-	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(5)
+func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
+	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	return err
+}
 
-	for _, tc := range resolved.CreateTables {
-		tc := tc
-		group.Go(func() error {
-			if _, err := db.ExecContext(groupCtx, tc.TableCreateSql); err != nil {
-				return fmt.Errorf("executing table create statement: %w", err)
-			}
-			return nil
-		})
-	}
-
-	for _, ta := range resolved.AlterTables {
-		ta := ta
-
-		group.Go(func() error {
-			if len(ta.AddColumns) > 0 {
-				var addColumnsStmt strings.Builder
-				if err := tplAlterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
-					return fmt.Errorf("rendering alter table columns statement: %w", err)
-				}
-				if _, err := db.ExecContext(groupCtx, addColumnsStmt.String()); err != nil {
-					return fmt.Errorf("executing table add columns statement: %w", err)
-				}
-			}
-			for _, dn := range ta.DropNotNulls {
-				q := fmt.Sprintf(
-					"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
-					ta.Identifier,
-					dn.Identifier,
-				)
-				if _, err := db.ExecContext(groupCtx, q); err != nil {
-					return fmt.Errorf("executing table drop not null statement: %w", err)
-				}
-			}
-			return nil
-		})
-	}
-
+func (c *client) ReplaceTable(ctx context.Context, tr sql.TableReplace) (string, boilerplate.ActionApplyFn, error) {
 	// TODO(whb): There's a chance that if a previous driver checkpoint was persisted before the
 	// actual data load completed, these table replacements will not be compatible with the data
 	// referenced by the persisted driver checkpoint. This is pretty unlikely to happen, and will be
 	// resolved when we incorporate the use of state keys, which incorporate the backfill counter.
-	for _, tr := range resolved.ReplaceTables {
-		tr := tr
-		group.Go(func() error {
-			if _, err := db.ExecContext(groupCtx, tr.TableReplaceSql); err != nil {
-				return fmt.Errorf("executing table create statement: %w", err)
-			}
-			return nil
-		})
-	}
-
-	if err := group.Wait(); err != nil {
-		return "", err
-	}
-
-	// Once all the table actions are done, we can update the stored spec.
-	if _, err := db.ExecContext(ctx, updateSpec.QueryString); err != nil {
-		return "", fmt.Errorf("executing spec update statement: %w", err)
-	}
-
-	return action, nil
+	return tr.TableReplaceSql, func(ctx context.Context) error {
+		_, err := c.db.ExecContext(ctx, tr.TableReplaceSql)
+		return err
+	}, nil
 }
 
-func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
-	cfg := ep.Config.(*config)
+func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
+	var stmts []string
+
+	// Databricks doesn't support multi-statement queries with the driver we are using, and also
+	// doesn't support dropping nullability for multiple columns in a single statement. Multiple
+	// columns can be added in a single statement though.
+	if len(ta.AddColumns) > 0 {
+		var addColumnsStmt strings.Builder
+		if err := tplAlterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
+			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
+		}
+		stmts = append(stmts, addColumnsStmt.String())
+	}
+	for _, f := range ta.DropNotNulls {
+		stmts = append(stmts, fmt.Sprintf(
+			"ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL;",
+			ta.Identifier,
+			c.ep.Dialect.Identifier(f.Name),
+		))
+	}
+
+	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		for _, stmt := range stmts {
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, nil
+}
+
+// TODO(whb): Consider using a WorkspaceClient here to check what we can, assuming it does not
+// depend on an awake warehouse. Otherwise these checks fail if the warehouse is asleep when a
+// validate RPC is called.
+func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
@@ -229,9 +174,7 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	if db, err := stdsql.Open("databricks", c.uri); err != nil {
-		errs.Err(err)
-	} else if err := db.PingContext(ctx); err != nil {
+	if err := c.db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var execErr dbsqlerr.DBExecutionError
 		var netConnErr *net.DNSError
@@ -244,56 +187,46 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 			}
 		} else if errors.As(err, &netConnErr) {
 			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
+				err = fmt.Errorf("host at address %q cannot be found", c.cfg.Address)
 			}
 		} else if errors.As(err, &netOpErr) {
 			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
+				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", c.cfg.Address)
 			}
 		}
 
 		errs.Err(err)
-	} else {
-		db.Close()
 	}
 
 	return errs
 }
 
-func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
-	err = c.withDB(func(db *stdsql.DB) error {
-		// Fail-fast: surface a connection issue.
-		if err = db.PingContext(ctx); err != nil {
-			return fmt.Errorf("connecting to DB: %w", err)
-		}
-		err = db.QueryRowContext(
-			ctx,
-			fmt.Sprintf(
-				"SELECT version, spec FROM %s WHERE materialization = %s;",
-				specs.Identifier,
-				databricksDialect.Literal(materialization.String()),
-			),
-		).Scan(&version, &specB64)
+func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {
+	var version, spec string
 
-		return err
-	})
-	return
+	if err := c.db.QueryRowContext(
+		ctx,
+		fmt.Sprintf(
+			"SELECT version, spec FROM %s WHERE materialization = %s;",
+			specs.Identifier,
+			databricksDialect.Literal(materialization.String()),
+		),
+	).Scan(&version, &spec); err != nil {
+		return "", "", err
+	}
+
+	return spec, version, nil
 }
 
-// ExecStatements is used for the DDL statements of ApplyUpsert and ApplyDelete.
-func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
+func (c *client) ExecStatements(ctx context.Context, statements []string) error {
+	return sql.StdSQLExecStatements(ctx, c.db, statements)
 }
 
-func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
+// InstallFence is a no-op since materialize-databricks doesn't use fencing.
+func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	return sql.Fence{}, nil
 }
 
-func (c client) withDB(fn func(*stdsql.DB) error) error {
-	var db, err = stdsql.Open("databricks", c.uri)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	return fn(db)
+func (c *client) Close() {
+	c.db.Close()
 }

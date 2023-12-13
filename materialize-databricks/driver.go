@@ -64,10 +64,6 @@ func (c tableConfig) Path() sql.TablePath {
 	return []string{c.Schema, c.Table}
 }
 
-func (c tableConfig) GetAdditionalSql() string {
-	return ""
-}
-
 func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
@@ -97,12 +93,13 @@ func newDatabricksDriver() *sql.Driver {
 				Dialect:              databricksDialect,
 				MetaSpecs:            &metaSpecs,
 				MetaCheckpoints:      nil,
-				Client:               client{uri: cfg.ToURI()},
+				NewClient:            newClient,
 				CreateTableTemplate:  tplCreateTargetTable,
 				ReplaceTableTemplate: tplReplaceTargetTable,
 				NewResource:          newTableConfig,
 				NewTransactor:        newTransactor,
 				Tenant:               tenant,
+				ConcurrentApply:      true,
 			}, nil
 		},
 	}
@@ -551,72 +548,6 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 	d.deleteFiles(ctx, cp.ToDelete)
 
 	return nil
-}
-
-// fetchExistingColumns is exactly like sql.FetchExistingColumns, except it queries from
-// `system.information_schema.columns` instead of just `information_schema.columns`, since some
-// deployments of Databricks apparently require this.
-func fetchExistingColumns(
-	ctx context.Context,
-	db *stdsql.DB,
-	dialect sql.Dialect,
-	catalog string, // typically the "database"
-	schemas []string,
-) (*sql.ExistingColumns, error) {
-	existingColumns := &sql.ExistingColumns{}
-
-	if len(schemas) == 0 {
-		return existingColumns, nil
-	}
-
-	// Map the schemas to an appropriate identifier for inclusion in the coming query.
-	for i := range schemas {
-		schemas[i] = dialect.Literal(schemas[i])
-	}
-
-	rows, err := db.QueryContext(ctx, fmt.Sprintf(`
-		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length
-		from system.information_schema.columns
-		where table_catalog = %s
-		and table_schema in (%s);
-		`,
-		dialect.Literal(catalog),
-		strings.Join(schemas, ","),
-	))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	type columnRow struct {
-		TableSchema            string
-		TableName              string
-		ColumnName             string
-		IsNullable             string
-		DataType               string
-		CharacterMaximumLength stdsql.NullInt64
-	}
-
-	for rows.Next() {
-		var c columnRow
-		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength); err != nil {
-			return nil, err
-		}
-
-		existingColumns.PushColumn(
-			c.TableSchema,
-			c.TableName,
-			c.ColumnName,
-			strings.EqualFold(c.IsNullable, "yes"),
-			c.DataType,
-			int(c.CharacterMaximumLength.Int64),
-		)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return existingColumns, nil
 }
 
 func (d *transactor) Destroy() {

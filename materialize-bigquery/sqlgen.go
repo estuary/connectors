@@ -194,7 +194,7 @@ ALTER TABLE {{$.Identifier}}
 ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.DropNotNulls }}
 	{{- if $ind }},{{ end }}
-	ALTER COLUMN {{$col.Identifier}} DROP NOT NULL
+	ALTER COLUMN {{ ColumnIdentifier $col.Name }} DROP NOT NULL
 {{- end }};
 {{- end }}
 {{ end }}

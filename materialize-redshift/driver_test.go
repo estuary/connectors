@@ -57,28 +57,26 @@ func TestFencingCases(t *testing.T) {
 	// complete (you should run it with a sufficient -timeout value).
 	cfg := mustGetCfg(t)
 
-	client := client{uri: cfg.toURI()}
-
 	ctx := context.Background()
 
+	c, err := newClient(ctx, &sql.Endpoint{Config: &cfg})
+	require.NoError(t, err)
+	defer c.Close()
+
 	sql.RunFenceTestCases(t,
-		client,
+		c,
 		[]string{"temp_test_fencing_checkpoints"},
 		rsDialect,
 		tplCreateTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
-			var err = client.withDB(func(db *stdsql.DB) error {
-				var fenceUpdate strings.Builder
-				if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
-					return fmt.Errorf("evaluating fence template: %w", err)
-				}
-				var _, err = db.Exec(fenceUpdate.String())
-				return err
-			})
-			return err
+			var fenceUpdate strings.Builder
+			if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+				return fmt.Errorf("evaluating fence template: %w", err)
+			}
+			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
 		},
 		func(table sql.Table) (out string, err error) {
-			err = client.withDB(func(db *stdsql.DB) error {
+			err = c.(*client).withDB(func(db *stdsql.DB) error {
 				out, err = sql.StdDumpTable(ctx, db, table)
 				return err
 			})
@@ -89,6 +87,7 @@ func TestFencingCases(t *testing.T) {
 
 func TestApply(t *testing.T) {
 	cfg := mustGetCfg(t)
+
 	ctx := context.Background()
 
 	configJson, err := json.Marshal(cfg)
@@ -249,14 +248,17 @@ func TestPrereqs(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := tt.cfg(cfg)
-			client := client{uri: cfg.toURI()}
-			require.Equal(t, tt.want, client.PreReqs(context.Background(), &sql.Endpoint{
-				Config: cfg,
-				Tenant: "tenant",
-			}).Unwrap())
+
+			client, err := newClient(ctx, &sql.Endpoint{Config: cfg})
+			require.NoError(t, err)
+			defer client.Close()
+
+			require.Equal(t, tt.want, client.PreReqs(ctx).Unwrap())
 		})
 	}
 }
