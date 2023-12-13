@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -110,8 +111,6 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
-var elasticValidator = boilerplate.NewValidator(constrainter{})
-
 type constrainter struct{}
 
 func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
@@ -146,8 +145,23 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (constrainter) Compatible(existing *pf.Projection, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
-	return propForProjection(existing).Type == propForProjection(proposed).Type, nil
+func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+	prop := propForProjection(proposed).Type
+
+	if strings.EqualFold(existing.Type, string(elasticTypeText)) {
+		// Allow any of the "formatted string" types to be materialized into an existing text
+		// mapping.
+		return slices.Contains([]elasticPropertyType{
+			elasticTypeText,
+			elasticTypeKeyword,
+			elasticTypeBinary,
+			elasticTypeDate,
+			elasticTypeIp,
+		}, prop), nil
+	}
+
+	// Otherwise, require that the types match.
+	return strings.EqualFold(existing.Type, string(prop)), nil
 }
 
 func (constrainter) DescriptionForType(p *pf.Projection) string {

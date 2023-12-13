@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/tidwall/gjson"
 )
@@ -208,4 +210,52 @@ func (c *client) addMappingToIndex(ctx context.Context, index string, field stri
 	}
 
 	return nil
+}
+
+type indexMetaResponse struct {
+	Mappings struct {
+		Properties map[string]property `json:"properties"`
+	} `json:"mappings"`
+}
+
+func (c *client) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, error) {
+	res, err := c.es.Indices.Get(
+		[]string{"*"}, // Get info for all indices the connector has access to.
+		c.es.Indices.Get.WithContext(ctx),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("getting index metadata: %w", err)
+	}
+	defer res.Body.Close()
+	if res.IsError() {
+		return nil, fmt.Errorf("getting index metadata error response [%s] %s", res.Status(), res.String())
+	}
+
+	is := boilerplate.NewInfoSchema(
+		func(rp []string) []string {
+			// Pass-through the index name as-is, since it is the only component of the resource
+			// path and the required transformations are assumed to already be done as part of the
+			// Validate response.
+			return rp
+		},
+		func(f string) string { return f },
+	)
+
+	var indexMeta map[string]indexMetaResponse
+	if err := json.NewDecoder(res.Body).Decode(&indexMeta); err != nil {
+		return nil, fmt.Errorf("decoding index metadata response: %w", err)
+	}
+
+	for index, meta := range indexMeta {
+		for field, prop := range meta.Mappings.Properties {
+			is.PushField(boilerplate.EndpointField{
+				Name:               field,
+				Nullable:           true,
+				Type:               string(prop.Type),
+				CharacterMaxLength: 0,
+			}, index)
+		}
+	}
+
+	return is, nil
 }

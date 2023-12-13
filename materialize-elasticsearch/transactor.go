@@ -138,12 +138,12 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			}
 		},
 		// Makes sure the changes are propagated to all replica shards.
-		// TODO(whb): I'm totally convinced we need to always be requiring this. It may only really
-		// be applicable to case where there is a single replica shard and Elasticsearch considers a
-		// quorum to be possible by writing only to the primary shard, which could result in data
-		// loss if there is then a hardware failure on that single primary shard. At the very least
-		// we could consider making this an advanced configuration option in the future if it is
-		// problematic.
+		// TODO(whb): I'm not totally convinced we need to always be requiring this. It may only
+		// really be applicable to case where there is a single replica shard and Elasticsearch
+		// considers a quorum to be possible by writing only to the primary shard, which could
+		// result in data loss if there is then a hardware failure on that single primary shard. At
+		// the very least we could consider making this an advanced configuration option in the
+		// future if it is problematic.
 		WaitForActiveShards: "all",
 	})
 	if err != nil {
