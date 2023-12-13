@@ -11,6 +11,7 @@ import (
 	"time"
 
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -19,6 +20,69 @@ import (
 
 type client struct {
 	uri string
+}
+
+func (c client) InfoSchema(ctx context.Context, ep *sql.Endpoint, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
+	cfg := ep.Config.(*config)
+
+	schemaLiterals := []string{ep.Dialect.Literal(cfg.SchemaName)}
+	for _, p := range resourcePaths {
+		loc := ep.Dialect.TableLocator(p)
+		schemaLiterals = append(schemaLiterals, ep.Dialect.Literal(loc.TableSchema))
+	}
+
+	slices.Sort(schemaLiterals)
+	schemaLiterals = slices.Compact(schemaLiterals)
+
+	is = boilerplate.NewInfoSchema(
+		sql.ToLocatePathFn(ep.Dialect.TableLocator),
+		ep.Dialect.ColumnLocator,
+	)
+
+	if err := c.withDB(func(db *stdsql.DB) error {
+		rows, err := db.QueryContext(ctx, fmt.Sprintf(`
+			select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length
+			from system.information_schema.columns
+			where table_catalog = %s
+			and table_schema in (%s);
+			`,
+			ep.Dialect.Literal(cfg.CatalogName),
+			strings.Join(schemaLiterals, ","),
+		))
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		type columnRow struct {
+			TableSchema            string
+			TableName              string
+			ColumnName             string
+			IsNullable             string
+			DataType               string
+			CharacterMaximumLength stdsql.NullInt64
+		}
+
+		for rows.Next() {
+			var c columnRow
+			if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength); err != nil {
+				return err
+			}
+
+			is.PushField(boilerplate.EndpointField{
+				Name:               c.ColumnName,
+				Nullable:           strings.EqualFold(c.IsNullable, "yes"),
+				Type:               c.DataType,
+				CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
+			}, c.TableSchema, c.TableName)
+		}
+
+		return rows.Err()
+	}); err != nil {
+		return nil, err
+	}
+
+	return
 }
 
 func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {

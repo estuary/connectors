@@ -45,10 +45,6 @@ func mustGetCfg(t *testing.T) config {
 	return out
 }
 
-func TestValidate(t *testing.T) {
-	sql.RunValidateTestCases(t, databricksDialect)
-}
-
 func TestApply(t *testing.T) {
 	cfg := mustGetCfg(t)
 	ctx := context.Background()

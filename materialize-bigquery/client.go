@@ -13,6 +13,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -27,6 +28,67 @@ type client struct {
 	bigqueryClient     *bigquery.Client
 	cloudStorageClient *storage.Client
 	config             config
+}
+
+func (c client) InfoSchema(ctx context.Context, ep *sql.Endpoint, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
+	cfg := ep.Config.(*config)
+
+	// Query the information schema for all the datasets we care about to build up a list of
+	// existing tables and columns. The datasets we care about are the dataset configured for the
+	// overall endpoint, as well as any distinct datasets configured for any of the bindings.
+	datasets := []string{cfg.Dataset}
+	for _, p := range resourcePaths {
+		datasets = append(datasets, p[1]) // Dataset is always the second element of the path.
+	}
+
+	slices.Sort(datasets)
+	datasets = slices.Compact(datasets)
+
+	is := boilerplate.NewInfoSchema(
+		sql.ToLocatePathFn(ep.Dialect.TableLocator),
+		ep.Dialect.ColumnLocator,
+	)
+
+	for _, ds := range datasets {
+		job, err := c.query(ctx, fmt.Sprintf(
+			"select table_schema, table_name, column_name, is_nullable, data_type from %s.INFORMATION_SCHEMA.COLUMNS;",
+			bqDialect.Identifier(ds),
+		))
+		if err != nil {
+			return nil, fmt.Errorf("querying INFORMATION_SCHEMA.COLUMNS for dataset %q: %w", ds, err)
+		}
+
+		it, err := job.Read(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("reading job: %w", err)
+		}
+
+		type columnRow struct {
+			TableSchema string `bigquery:"table_schema"`
+			TableName   string `bigquery:"table_name"`
+			ColumnName  string `bigquery:"column_name"`
+			IsNullable  string `bigquery:"is_nullable"` // string YES or NO
+			DataType    string `bigquery:"data_Type"`
+		}
+
+		for {
+			var c columnRow
+			if err = it.Next(&c); err == iterator.Done {
+				break
+			} else if err != nil {
+				return nil, fmt.Errorf("columnRow read: %w", err)
+			}
+
+			is.PushField(boilerplate.EndpointField{
+				Name:               c.ColumnName,
+				Nullable:           strings.EqualFold(c.IsNullable, "yes"),
+				Type:               c.DataType,
+				CharacterMaxLength: 0, // BigQuery does not have a character_maximum_length in its INFORMATION_SCHEMA.COLUMNS view.
+			}, c.TableSchema, c.TableName)
+		}
+	}
+
+	return is, nil
 }
 
 func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {

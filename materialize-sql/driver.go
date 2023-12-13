@@ -80,14 +80,26 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
 
-	validator := boilerplate.NewValidator(constrainter{dialect: endpoint.Dialect})
+	resources := make([]Resource, 0, len(req.Bindings))
+	resourcePaths := make([][]string, 0, len(req.Bindings))
+	for _, b := range req.Bindings {
+		res := endpoint.NewResource(endpoint)
+		if err = pf.UnmarshalStrict(b.ResourceConfigJson, res); err != nil {
+			return nil, fmt.Errorf("unmarshalling resource binding for collection %q: %w", b.Collection.Name.String(), err)
+		}
+		resources = append(resources, res)
+		resourcePaths = append(resourcePaths, res.Path())
+	}
+
+	is, err := endpoint.Client.InfoSchema(ctx, endpoint, resourcePaths)
+	if err != nil {
+		return nil, err
+	}
+	validator := boilerplate.NewValidator(constrainter{dialect: endpoint.Dialect}, is)
 
 	// Produce constraints for each request binding, in turn.
-	for _, bindingSpec := range req.Bindings {
-		res := endpoint.NewResource(endpoint)
-		if err = pf.UnmarshalStrict(bindingSpec.ResourceConfigJson, res); err != nil {
-			return nil, fmt.Errorf("unmarshalling resource binding for collection %q: %w", bindingSpec.Collection.Name.String(), err)
-		}
+	for idx, bindingSpec := range req.Bindings {
+		res := resources[idx]
 
 		constraints, err := validator.ValidateBinding(
 			res.Path(),
@@ -155,7 +167,16 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		})
 	}
 
-	validator := boilerplate.NewValidator(constrainter{dialect: endpoint.Dialect})
+	resourcePaths := make([][]string, 0, len(req.Materialization.Bindings))
+	for _, b := range req.Materialization.Bindings {
+		resourcePaths = append(resourcePaths, b.ResourcePath)
+	}
+
+	is, err := endpoint.Client.InfoSchema(ctx, endpoint, resourcePaths)
+	if err != nil {
+		return nil, err
+	}
+	validator := boilerplate.NewValidator(constrainter{dialect: endpoint.Dialect}, is)
 
 	for bindingIndex, bindingSpec := range req.Materialization.Bindings {
 		addColumns := []Column{}

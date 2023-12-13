@@ -79,7 +79,7 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 	}
 
 	return sql.Dialect{
-		TableLocatorer: sql.TableLocatorFn(func(path ...string) sql.InfoTableLocation {
+		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				// A schema isn't required to be set on any resource, but the endpoint configuration
 				// will always have one set. Also, as a matter of backwards compatibility, if a
@@ -109,6 +109,15 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 			return "?"
 		}),
 		TypeMapper: mapper,
+		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
+			"text":          sql.StringCompatible,
+			"timestamp_ntz": sql.DateTimeCompatible,
+			"boolean":       sql.BooleanCompatible,
+			"float":         sql.NumberCompatible,
+			"number":        sql.IntegerCompatible,
+			"variant":       sql.JsonCompatible,
+			"date":          sql.DateCompatible,
+		},
 	}
 }
 

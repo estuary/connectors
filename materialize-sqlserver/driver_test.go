@@ -52,10 +52,6 @@ func TestFencingCases(t *testing.T) {
 	)
 }
 
-func TestValidate(t *testing.T) {
-	sql.RunValidateTestCases(t, testDialect)
-}
-
 func TestApply(t *testing.T) {
 	ctx := context.Background()
 
