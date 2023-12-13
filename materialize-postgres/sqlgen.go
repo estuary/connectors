@@ -146,7 +146,7 @@ ALTER TABLE {{$.Identifier}}
 {{- if and $.DropNotNulls $.AddColumns}},{{ end }}
 {{- range $ind, $col := $.DropNotNulls }}
 	{{- if $ind }},{{ end }}
-	ALTER COLUMN {{$col.Identifier}} DROP NOT NULL
+	ALTER COLUMN {{ ColumnIdentifier $col.Name }} DROP NOT NULL
 {{- end }};
 {{ end }}
 

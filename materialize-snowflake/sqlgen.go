@@ -199,7 +199,7 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 ALTER TABLE {{$.Identifier}} ALTER COLUMN
 {{- range $ind, $col := $.DropNotNulls }}
 	{{- if $ind }},{{ end }}
-	{{$col.Identifier}} DROP NOT NULL
+	{{ ColumnIdentifier $col.Name }} DROP NOT NULL
 {{- end }};
 {{- end }}
 {{ end }}

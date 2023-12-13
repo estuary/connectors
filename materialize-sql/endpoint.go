@@ -2,8 +2,6 @@ package sql
 
 import (
 	"context"
-	"database/sql"
-	"encoding/base64"
 	"fmt"
 	"strings"
 	"text/template"
@@ -11,7 +9,6 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/sirupsen/logrus"
 )
 
 type Client interface {
@@ -21,17 +18,36 @@ type Client interface {
 	ExecStatements(ctx context.Context, statements []string) error
 	InstallFence(ctx context.Context, checkpoints Table, fence Fence) (Fence, error)
 
-	// Apply performs the driver-specific table creation or alteration actions to achieve
-	// consistency with the proposed specification.
-	Apply(ctx context.Context, ep *Endpoint, req *pm.Request_Apply, actions ApplyActions, updateSpec MetaSpecsUpdate) (string, error)
-
 	// PreReqs performs verification checks that the provided configuration can be used to interact
 	// with the endpoint to the degree required by the connector, to as much of an extent as
 	// possible. The returned PrereqErr can include multiple separate errors if it possible to
 	// determine that there is more than one issue that needs corrected.
-	PreReqs(ctx context.Context, ep *Endpoint) *PrereqErr
+	PreReqs(ctx context.Context) *PrereqErr
 
-	InfoSchema(ctx context.Context, ep *Endpoint, resourcePaths [][]string) (*boilerplate.InfoSchema, error)
+	// InfoSchema returns a populated *boilerplate.InfoSchema containing the state of the actual
+	// materialized tables in the schemas referenced by the resourcePaths. It doesn't necessarily
+	// need to include all tables in the entire destination system, but must include all tables in
+	// the relevant schemas.
+	InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error)
+
+	// PutSpec executes the MetaSpecsUpdate to upsert the spec into the metadata table.
+	PutSpec(ctx context.Context, spec MetaSpecsUpdate) error
+
+	// CreateTable creates a table in the destination system.
+	CreateTable(ctx context.Context, tc TableCreate) error
+
+	// Replace table replaces a table, using a CREATE OR REPLACE type of statement, or by dropping
+	// and creating the table anew (preferably within a transaction). It should return a string
+	// describing the action (the SQL statements it will run) and a callback function to execute in
+	// order to complete the action.
+	ReplaceTable(ctx context.Context, tr TableReplace) (string, boilerplate.ActionApplyFn, error)
+
+	// AlterTable takes the actions needed per the TableAlter. Like ReplaceTable, it should return a
+	// description of the action in the form of SQL statements, and a callback to do the action.
+	AlterTable(ctx context.Context, ta TableAlter) (string, boilerplate.ActionApplyFn, error)
+
+	// Close is called to free up any resources held by the Client.
+	Close()
 }
 
 // Resource is a driver-provided type which represents the SQL resource
@@ -78,9 +94,9 @@ type Endpoint struct {
 	// MetaCheckpoints is the checkpoints meta-table of the Endpoint.
 	// It's optional, and won't be created or used if it's nil.
 	MetaCheckpoints *TableShape
-	// Client provides Endpoint-specific methods for performing basic operations with the Endpoint
-	// store.
-	Client Client
+	// NewClient creates a client, which provides Endpoint-specific methods for performing
+	// operations with the Endpoint store.
+	NewClient func(context.Context, *Endpoint) (Client, error)
 	// CreateTableTemplate evaluates a Table into an endpoint statement which creates it.
 	CreateTableTemplate *template.Template
 	// ReplaceTableTemplate evaluates a Table into an endpoint statement which creates or replaces it.
@@ -92,6 +108,9 @@ type Endpoint struct {
 	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open) (pm.Transactor, error)
 	// Tenant owning this task, as determined from the task name.
 	Tenant string
+	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy
+	// for changing many tables in a single publication.
+	ConcurrentApply bool
 }
 
 // PrereqErr is a wrapper for recording accumulated errors during prerequisite checking and
@@ -121,40 +140,4 @@ func (e *PrereqErr) Error() string {
 		b.WriteString(err.Error())
 	}
 	return b.String()
-}
-
-// loadSpec loads the named MaterializationSpec and its version that's stored within the Endpoint, if any.
-func loadSpec(ctx context.Context, endpoint *Endpoint, materialization pf.Materialization) (*pf.MaterializationSpec, string, error) {
-	var (
-		err              error
-		metaSpecs        Table
-		spec             = new(pf.MaterializationSpec)
-		specB64, version string
-	)
-
-	if endpoint.MetaSpecs == nil {
-		return nil, "", nil
-	}
-	if metaSpecs, err = ResolveTable(*endpoint.MetaSpecs, endpoint.Dialect); err != nil {
-		return nil, "", fmt.Errorf("resolving specifications table: %w", err)
-	}
-	specB64, version, err = endpoint.Client.FetchSpecAndVersion(ctx, metaSpecs, materialization)
-
-	if err == sql.ErrNoRows {
-		return nil, "", nil
-	} else if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"table": endpoint.MetaSpecs.Path,
-			"err":   err,
-		}).Info("failed to query materialization spec (the table may not be initialized?)")
-		return nil, "", nil
-	} else if specBytes, err := base64.StdEncoding.DecodeString(specB64); err != nil {
-		return nil, version, fmt.Errorf("base64.Decode: %w", err)
-	} else if err = spec.Unmarshal(specBytes); err != nil {
-		return nil, version, fmt.Errorf("spec.Unmarshal: %w", err)
-	} else if err = spec.Validate(); err != nil {
-		return nil, version, fmt.Errorf("validating spec: %w", err)
-	}
-
-	return spec, version, nil
 }

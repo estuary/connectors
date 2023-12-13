@@ -183,12 +183,13 @@ func newSqlServerDriver() *sql.Driver {
 				Dialect:              dialect,
 				MetaSpecs:            &metaSpecs,
 				MetaCheckpoints:      &metaCheckpoints,
-				Client:               client{uri: cfg.ToURI(), dialect: dialect},
+				NewClient:            newClient,
 				CreateTableTemplate:  templates["createTargetTable"],
 				ReplaceTableTemplate: templates["replaceTargetTable"],
 				NewResource:          newTableConfig,
 				NewTransactor:        prepareNewTransactor(templates),
 				Tenant:               tenant,
+				ConcurrentApply:      false,
 			}, nil
 		},
 	}

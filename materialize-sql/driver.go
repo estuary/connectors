@@ -2,11 +2,9 @@ package sql
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -66,6 +64,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	var (
 		err        error
 		endpoint   *Endpoint
+		client     Client
 		loadedSpec *pf.MaterializationSpec
 		resp       = new(pm.Response_Validated)
 	)
@@ -74,11 +73,14 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, fmt.Errorf("validating request: %w", err)
 	} else if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson, mustGetTenantNameFromTaskName(req.Name.String())); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if prereqErrs := endpoint.Client.PreReqs(ctx, endpoint); prereqErrs.Len() != 0 {
+	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
+		return nil, fmt.Errorf("creating client: %w", err)
+	} else if prereqErrs := client.PreReqs(ctx); prereqErrs.Len() != 0 {
 		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
-	} else if loadedSpec, _, err = loadSpec(ctx, endpoint, req.Name); err != nil {
+	} else if loadedSpec, _, err = loadSpec(ctx, client, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
+	defer client.Close()
 
 	resources := make([]Resource, 0, len(req.Bindings))
 	resourcePaths := make([][]string, 0, len(req.Bindings))
@@ -91,7 +93,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		resourcePaths = append(resourcePaths, res.Path())
 	}
 
-	is, err := endpoint.Client.InfoSchema(ctx, endpoint, resourcePaths)
+	is, err := client.InfoSchema(ctx, resourcePaths)
 	if err != nil {
 		return nil, err
 	}
@@ -126,204 +128,49 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 // ApplyUpsert implements the DriverServer interface.
 func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	var (
-		endpoint   *Endpoint
-		loadedSpec *pf.MaterializationSpec
-		specBytes  []byte
-		err        error
+		endpoint *Endpoint
+		client   Client
+		err      error
 	)
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson, mustGetTenantNameFromTaskName(req.Materialization.String())); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if loadedSpec, _, err = loadSpec(ctx, endpoint, req.Materialization.Name); err != nil {
-		return nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
-	} else if specBytes, err = req.Materialization.Marshal(); err != nil {
-		panic(err) // Cannot fail to marshal.
+	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
+		return nil, fmt.Errorf("creating client: %w", err)
 	}
-
-	actions := ApplyActions{}
-
-	// The Materialization specifications meta table is almost always required. It is only not
-	// required if the database is ephemeral (i.e. sqlite). The Checkpoints table is optional;
-	// include it if set by the Endpoint.
-	for _, meta := range []*TableShape{endpoint.MetaSpecs, endpoint.MetaCheckpoints} {
-		if meta == nil {
-			continue
-		}
-		resolved, err := ResolveTable(*meta, endpoint.Dialect)
-		if err != nil {
-			return nil, err
-		}
-		createStatement, err := RenderTableTemplate(resolved, endpoint.CreateTableTemplate)
-		if err != nil {
-			return nil, err
-		}
-
-		actions.CreateTables = append(actions.CreateTables, TableCreate{
-			Table:              resolved,
-			TableCreateSql:     createStatement,
-			ResourceConfigJson: nil, // not applicable for meta tables
-		})
-	}
+	defer client.Close()
 
 	resourcePaths := make([][]string, 0, len(req.Materialization.Bindings))
 	for _, b := range req.Materialization.Bindings {
 		resourcePaths = append(resourcePaths, b.ResourcePath)
 	}
 
-	is, err := endpoint.Client.InfoSchema(ctx, endpoint, resourcePaths)
+	is, err := client.InfoSchema(ctx, resourcePaths)
 	if err != nil {
 		return nil, err
 	}
-	validator := boilerplate.NewValidator(constrainter{dialect: endpoint.Dialect}, is)
 
-	for bindingIndex, bindingSpec := range req.Materialization.Bindings {
-		addColumns := []Column{}
-		dropNotNulls := []Column{}
-
-		resource := endpoint.NewResource(endpoint)
-		if err = pf.UnmarshalStrict(bindingSpec.ResourceConfigJson, resource); err != nil {
-			return nil, fmt.Errorf("unmarshalling resource binding for collection %q: %w", bindingSpec.Collection.Name.String(), err)
-		}
-
-		var collection = bindingSpec.Collection.Name
-		var tableShape = BuildTableShape(req.Materialization, bindingIndex, resource)
-
-		proposedTable, err := ResolveTable(tableShape, endpoint.Dialect)
-		if err != nil {
-			return nil, err
-		}
-
-		loadedBinding, err := boilerplate.FindExistingBinding(resource.Path(), bindingSpec.Collection.Name, loadedSpec)
-		if err != nil {
-			return nil, err
-		} else if err = validator.ValidateSelectedFields(bindingSpec, loadedSpec); err != nil {
-			// The applied binding is not a valid solution for its own constraints.
-			return nil, fmt.Errorf("binding for %s: %w", collection, err)
-		} else if loadedBinding != nil && bindingSpec.Backfill != loadedBinding.Backfill {
-			// Replace the exiting table.
-			replaceStatement, err := RenderTableTemplate(proposedTable, endpoint.ReplaceTableTemplate)
-			if err != nil {
-				return nil, err
-			}
-
-			actions.ReplaceTables = append(actions.ReplaceTables, TableReplace{
-				Table:              proposedTable,
-				TableReplaceSql:    replaceStatement,
-				ResourceConfigJson: bindingSpec.ResourceConfigJson,
-			})
-		} else if loadedBinding != nil {
-			for _, proposedCol := range proposedTable.Columns() {
-				if !slices.Contains(loadedBinding.FieldSelection.AllFields(), proposedCol.Field) {
-					// The proposed column does not exist in the current table.
-					addColumns = append(addColumns, *proposedCol)
-				} else {
-					// The new column is part of the existing table.
-					previousProjection := loadedBinding.Collection.GetProjection(proposedCol.Field)
-					previousNullable := previousProjection.Inference.Exists != pf.Inference_MUST || slices.Contains(previousProjection.Inference.Types, "null")
-
-					// The column was previously created as not nullable, but the new specification
-					// indicates that it now nullable. Drop the "NOT NULL" constraint on the table.
-					if !previousNullable && !proposedCol.MustExist {
-						dropNotNulls = append(dropNotNulls, *proposedCol)
-					}
-				}
-			}
-
-			var allNewFields = bindingSpec.FieldSelection.AllFields()
-
-			// Mark columns that have been removed from field selection as nullable
-			for _, field := range loadedBinding.FieldSelection.AllFields() {
-				// If the projection is part of the new field selection, just skip
-				if slices.Contains(allNewFields, field) {
-					continue
-				}
-				proj := Projection{Projection: *loadedBinding.Collection.GetProjection(field)}
-				removedColumn, err := ResolveColumn(0, &proj, endpoint.Dialect)
-				if err != nil {
-					return nil, fmt.Errorf("resolving removed column %s of %s: %w", field, tableShape.Path, err)
-				}
-
-				dropNotNulls = append(dropNotNulls, removedColumn)
-			}
-
-			actions.AlterTables = append(actions.AlterTables, TableAlter{
-				Table:        proposedTable,
-				AddColumns:   addColumns,
-				DropNotNulls: dropNotNulls,
-			})
-		} else {
-			// Create a new table.
-			createStatement, err := RenderTableTemplate(proposedTable, endpoint.CreateTableTemplate)
-			if err != nil {
-				return nil, err
-			}
-
-			actions.CreateTables = append(actions.CreateTables, TableCreate{
-				Table:              proposedTable,
-				TableCreateSql:     createStatement,
-				ResourceConfigJson: bindingSpec.ResourceConfigJson,
-			})
-		}
-	}
-
-	var specUpdate MetaSpecsUpdate
-	if endpoint.MetaSpecs != nil {
-		// Insert or update the materialization specification. Both parameterized queries and
-		// literal query strings are supported. A parameterized query is generally preferable, but
-		// some endpoints don't have support for those.
-		var paramArgs = []interface{}{
-			endpoint.Identifier(endpoint.MetaSpecs.Path...),
-			endpoint.Placeholder(0),
-			endpoint.Placeholder(1),
-			endpoint.Placeholder(2),
-		}
-		var params = []interface{}{
-			req.Version,
-			base64.StdEncoding.EncodeToString(specBytes),
-			req.Materialization.Name.String(),
-		}
-		var queryStringArgs = []interface{}{
-			paramArgs[0],
-			endpoint.Literal(params[0].(string)),
-			endpoint.Literal(params[1].(string)),
-			endpoint.Literal(params[2].(string)),
-		}
-
-		var q string
-		if loadedSpec == nil {
-			q = "INSERT INTO %[1]s (version, spec, materialization) VALUES (%[2]s, %[3]s, %[4]s);"
-		} else {
-			q = "UPDATE %[1]s SET version = %[2]s, spec = %[3]s WHERE materialization = %[4]s;"
-		}
-
-		specUpdate.ParameterizedQuery = fmt.Sprintf(q, paramArgs...)
-		specUpdate.Parameters = params
-		specUpdate.QueryString = fmt.Sprintf(q, queryStringArgs...)
-	}
-
-	action, err := endpoint.Client.Apply(ctx, endpoint, req, actions, specUpdate)
-	if err != nil {
-		return nil, fmt.Errorf("applying schema updates: %w", err)
-	}
-
-	// Build and return a description of what happened (or would have happened).
-	return &pm.Response_Applied{
-		ActionDescription: action,
-	}, nil
+	return boilerplate.ApplyChanges(ctx, req, newSqlApplier(client, is, endpoint), is, endpoint.ConcurrentApply)
 }
 
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
 	var loadedVersion string
 
-	var endpoint, err = d.NewEndpoint(ctx, open.Materialization.ConfigJson, mustGetTenantNameFromTaskName(open.Materialization.String()))
+	endpoint, err := d.NewEndpoint(ctx, open.Materialization.ConfigJson, mustGetTenantNameFromTaskName(open.Materialization.String()))
 	if err != nil {
 		return nil, nil, fmt.Errorf("building endpoint: %w", err)
 	}
 
+	client, err := endpoint.NewClient(ctx, endpoint)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating client: %w", err)
+	}
+	defer client.Close()
+
 	if endpoint.MetaSpecs != nil {
-		if _, loadedVersion, err = loadSpec(ctx, endpoint, open.Materialization.Name); err != nil {
+		if _, loadedVersion, err = loadSpec(ctx, client, endpoint, open.Materialization.Name); err != nil {
 			return nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
 		} else if loadedVersion == "" {
 			return nil, nil, fmt.Errorf("materialization has not been applied")
@@ -372,7 +219,7 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tr
 		fence.TablePath = endpoint.MetaCheckpoints.Path
 		fence.Checkpoint = pm.ExplicitZeroCheckpoint
 
-		fence, err = endpoint.Client.InstallFence(ctx, metaCheckpoints, fence)
+		fence, err = client.InstallFence(ctx, metaCheckpoints, fence)
 		if err != nil {
 			return nil, nil, fmt.Errorf("installing checkpoints fence: %w", err)
 		}

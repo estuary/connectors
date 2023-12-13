@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -234,12 +235,13 @@ func newRedshiftDriver() *sql.Driver {
 				Dialect:              rsDialect,
 				MetaSpecs:            &metaSpecs,
 				MetaCheckpoints:      &metaCheckpoints,
-				Client:               client{uri: cfg.toURI()},
+				NewClient:            newClient,
 				CreateTableTemplate:  tplCreateTargetTable,
 				ReplaceTableTemplate: tplReplaceTargetTable,
 				NewResource:          newTableConfig,
 				NewTransactor:        newTransactor,
 				Tenant:               tenant,
+				ConcurrentApply:      true,
 			}, nil
 		},
 	}
@@ -298,8 +300,11 @@ func newTransactor(
 			return nil, fmt.Errorf("querying for connected database: %w", err)
 		}
 	}
-
-	existingColumns, err := sql.FetchExistingColumns(ctx, db, rsDialect, catalog, schemas)
+	resourcePaths := make([][]string, 0, len(open.Materialization.Bindings))
+	for _, b := range open.Materialization.Bindings {
+		resourcePaths = append(resourcePaths, b.ResourcePath)
+	}
+	is, err := sql.StdFetchInfoSchema(ctx, db, rsDialect, catalog, resourcePaths)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +315,7 @@ func newTransactor(
 			idx,
 			target,
 			s3client,
-			existingColumns,
+			is,
 		); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 		}
@@ -346,7 +351,7 @@ func (t *transactor) addBinding(
 	bindingIdx int,
 	target sql.Table,
 	client *s3.Client,
-	existingColumns *sql.ExistingColumns,
+	is *boilerplate.InfoSchema,
 ) error {
 	var b = &binding{
 		target:    target,
@@ -405,11 +410,7 @@ func (t *transactor) addBinding(
 	allColumns := target.Columns()
 	columnMetas := make([]varcharColumnMeta, len(allColumns))
 	for idx, col := range allColumns {
-		existing, err := existingColumns.GetColumn(
-			target.InfoLocation.TableSchema,
-			target.InfoLocation.TableName,
-			rsDialect.ColumnLocator(col.Field),
-		)
+		existing, err := is.GetField(target.Path, col.Field)
 		if err != nil {
 			return fmt.Errorf("getting existing column metadata: %w", err)
 		}
