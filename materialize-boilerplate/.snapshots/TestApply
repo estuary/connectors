@@ -1,0 +1,24 @@
+* new materialization:
+create meta tables
+create resource for collection "key/value"
+put spec with version "aVersion"
+
+* remove required field:
+update resource for collection "key/value" [new projections: 0, newly nullable fields: 1, newly delta updates: false]
+put spec with version "aVersion"
+
+* add required field:
+update resource for collection "key/value" [new projections: 1, newly nullable fields: 0, newly delta updates: false]
+put spec with version "aVersion"
+
+* add binding:
+create resource for collection "extra/collection"
+put spec with version "aVersion"
+
+* replace binding:
+replace resource for collection "key/value"
+put spec with version "aVersion"
+
+* field is newly nullable:
+update resource for collection "key/value" [new projections: 0, newly nullable fields: 1, newly delta updates: false]
+put spec with version "aVersion"
