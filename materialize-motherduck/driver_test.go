@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	stdsql "database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -51,32 +50,25 @@ func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 
 	var cfg = mustGetCfg(t)
-	db, err := cfg.db(ctx)
+
+	c, err := newClient(ctx, &sql.Endpoint{Config: &cfg})
 	require.NoError(t, err)
-	var client = client{db: db}
+	defer c.Close()
 
 	sql.RunFenceTestCases(t,
-		client,
+		c,
 		[]string{cfg.Database, cfg.Schema, "temp_test_fencing_checkpoints"},
 		duckDialect,
 		tplCreateTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
-			var err = client.withDB(func(db *stdsql.DB) error {
-				var fenceUpdate strings.Builder
-				if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
-					return fmt.Errorf("evaluating fence template: %w", err)
-				}
-				var _, err = db.Exec(fenceUpdate.String())
-				return err
-			})
-			return err
+			var fenceUpdate strings.Builder
+			if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+				return fmt.Errorf("evaluating fence template: %w", err)
+			}
+			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
 		},
 		func(table sql.Table) (out string, err error) {
-			err = client.withDB(func(db *stdsql.DB) error {
-				out, err = sql.StdDumpTable(ctx, db, table)
-				return err
-			})
-			return
+			return sql.StdDumpTable(ctx, c.(*client).db, table)
 		},
 	)
 }
@@ -155,16 +147,17 @@ func TestPrereqs(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := tt.cfg(cfg)
-			db, err := cfg.db(context.Background())
+
+			client, err := newClient(ctx, &sql.Endpoint{Config: cfg})
 			require.NoError(t, err)
-			client := client{db: db}
-			require.Equal(t, tt.want, client.PreReqs(context.Background(), &sql.Endpoint{
-				Config: cfg,
-				Tenant: "tenant",
-			}).Unwrap())
+			defer client.Close()
+
+			require.Equal(t, tt.want, client.PreReqs(ctx).Unwrap())
 		})
 	}
 }

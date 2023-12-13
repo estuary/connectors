@@ -91,7 +91,7 @@ func (c *config) client(ctx context.Context) (*client, error) {
 	return &client{
 		bigqueryClient:     bigqueryClient,
 		cloudStorageClient: cloudStorageClient,
-		config:             *c,
+		cfg:                *c,
 	}, nil
 }
 
@@ -170,22 +170,18 @@ func newBigQueryDriver() *sql.Driver {
 			var metaBase sql.TablePath = []string{cfg.ProjectID, cfg.Dataset}
 			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
-			client, err := cfg.client(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("creating client: %w", err)
-			}
-
 			return &sql.Endpoint{
 				Config:               cfg,
 				Dialect:              bqDialect,
 				MetaSpecs:            &metaSpecs,
 				MetaCheckpoints:      &metaCheckpoints,
-				Client:               client,
+				NewClient:            newClient,
 				CreateTableTemplate:  tplCreateTargetTable,
 				ReplaceTableTemplate: tplReplaceTargetTable,
 				NewResource:          newTableConfig,
 				NewTransactor:        newTransactor,
 				Tenant:               tenant,
+				ConcurrentApply:      true,
 			}, nil
 		},
 	}

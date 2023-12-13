@@ -16,35 +16,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func testConfig() *config {
+	return &config{
+		Address:  "localhost:3306",
+		User:     "flow",
+		Password: "flow",
+		Database: "flow",
+		Timezone: "UTC",
+	}
+}
+
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 	var dialect = testDialect
 	var templates = renderTemplates(dialect)
-	var client = client{uri: "flow:flow@tcp(localhost:3306)/flow"}
+
+	c, err := newClient(ctx, &sql.Endpoint{Config: testConfig()})
+	require.NoError(t, err)
+	defer c.Close()
+
 	sql.RunFenceTestCases(t,
-		client,
+		c,
 		[]string{"temp_test_fencing_checkpoints"},
 		dialect,
 		templates["createTargetTable"],
 		func(table sql.Table, fence sql.Fence) error {
-			var err = client.withDB(func(db *stdsql.DB) error {
-				// Option 1: Update using template.
-				var fenceUpdate strings.Builder
-				if err := templates["updateFence"].Execute(&fenceUpdate, fence); err != nil {
-					return fmt.Errorf("evaluating fence template: %w", err)
-				}
-				var _, err = db.Exec(fenceUpdate.String())
-
-				return err
-			})
-			return err
+			var fenceUpdate strings.Builder
+			if err := templates["updateFence"].Execute(&fenceUpdate, fence); err != nil {
+				return fmt.Errorf("evaluating fence template: %w", err)
+			}
+			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
 		},
 		func(table sql.Table) (out string, err error) {
-			err = client.withDB(func(db *stdsql.DB) error {
-				out, err = sql.StdDumpTable(ctx, db, table)
-				return err
-			})
-			return
+			return sql.StdDumpTable(ctx, c.(*client).db, table)
 		},
 	)
 }
@@ -52,13 +56,7 @@ func TestFencingCases(t *testing.T) {
 func TestApply(t *testing.T) {
 	ctx := context.Background()
 
-	cfg := config{
-		Address:  "localhost:3306",
-		User:     "flow",
-		Password: "flow",
-		Database: "flow",
-		Timezone: "UTC",
-	}
+	cfg := testConfig()
 
 	configJson, err := json.Marshal(cfg)
 	require.NoError(t, err)
@@ -128,12 +126,7 @@ func TestApply(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
-	cfg := config{
-		Address:  "localhost:3306",
-		User:     "flow",
-		Password: "flow",
-		Database: "flow",
-	}
+	cfg := testConfig()
 
 	tests := []struct {
 		name string
@@ -179,14 +172,17 @@ func TestPrereqs(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg(cfg)
-			client := client{uri: cfg.ToURI()}
-			var actual = client.PreReqs(context.Background(), &sql.Endpoint{
-				Config: cfg,
-				Tenant: "tenant",
-			}).Unwrap()
+			cfg := tt.cfg(*cfg)
+
+			client, err := newClient(ctx, &sql.Endpoint{Config: cfg})
+			require.NoError(t, err)
+			defer client.Close()
+
+			var actual = client.PreReqs(ctx).Unwrap()
 
 			require.Equal(t, len(tt.want), len(actual))
 			for i := 0; i < len(tt.want); i++ {

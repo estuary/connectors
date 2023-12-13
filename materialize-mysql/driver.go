@@ -318,12 +318,13 @@ func newMysqlDriver() *sql.Driver {
 				Dialect:              dialect,
 				MetaSpecs:            &metaSpecs,
 				MetaCheckpoints:      &metaCheckpoints,
-				Client:               client{uri: cfg.ToURI()},
+				NewClient:            newClient,
 				CreateTableTemplate:  templates["createTargetTable"],
 				ReplaceTableTemplate: templates["replaceTargetTable"],
 				NewResource:          newTableConfig,
 				NewTransactor:        prepareNewTransactor(dialect, templates),
 				Tenant:               tenant,
+				ConcurrentApply:      false,
 			}, nil
 		},
 	}
@@ -395,13 +396,17 @@ func prepareNewTransactor(
 		}
 		defer db.Close()
 
-		existingColumns, err := sql.FetchExistingColumns(ctx, db, dialect, "def", []string{cfg.Database})
+		resourcePaths := make([][]string, 0, len(open.Materialization.Bindings))
+		for _, b := range open.Materialization.Bindings {
+			resourcePaths = append(resourcePaths, b.ResourcePath)
+		}
+		is, err := sql.StdFetchInfoSchema(ctx, db, ep.Dialect, "def", resourcePaths)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, binding := range bindings {
-			if err = d.addBinding(ctx, binding, existingColumns); err != nil {
+			if err = d.addBinding(ctx, binding, is); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
@@ -444,7 +449,7 @@ type binding struct {
 	updateTruncateSQL string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, existingColumns *sql.ExistingColumns) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
 	var b = &binding{target: target}
 
 	for _, m := range []struct {
@@ -474,11 +479,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, existingC
 	allColumns := target.Columns()
 	columnMetas := make([]varcharColumnMeta, len(allColumns))
 	for idx, col := range allColumns {
-		existing, err := existingColumns.GetColumn(
-			target.InfoLocation.TableSchema,
-			target.InfoLocation.TableName,
-			t.dialect.ColumnLocator(col.Field),
-		)
+		existing, err := is.GetField(target.Path, col.Field)
 		if err != nil {
 			return fmt.Errorf("getting existing column metadata: %w", err)
 		}

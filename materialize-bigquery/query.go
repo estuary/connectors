@@ -29,7 +29,7 @@ func (c client) newQuery(queryString string, parameters ...interface{}) *bigquer
 
 	// Create the query
 	query := c.bigqueryClient.Query(queryString)
-	query.Location = c.config.Region
+	query.Location = c.cfg.Region
 	// Add parameters
 	for _, p := range parameters {
 		query.Parameters = append(query.Parameters, bigquery.QueryParameter{Value: p})

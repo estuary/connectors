@@ -173,7 +173,7 @@ ALTER TABLE {{$.Identifier}}
 {{- if and $.DropNotNulls $.AddColumns}},{{ end }}
 {{- range $ind, $col := $.DropNotNulls }}
 	{{- if $ind }},{{ end }}
-	MODIFY {{$col.Identifier}} {{$col.NullableDDL}}
+	MODIFY {{ ColumnIdentifier $col.Name }} {{$col.Type}}
 {{- end }};
 {{ end }}
 

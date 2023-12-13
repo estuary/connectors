@@ -7,109 +7,38 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/estuary/flow/go/protocols/flow"
 	mssqldb "github.com/microsoft/go-mssqldb"
 )
 
 type client struct {
-	uri     string
-	dialect sql.Dialect
+	db  *stdsql.DB
+	cfg *config
+	ep  *sql.Endpoint
 }
 
-func (c client) InfoSchema(ctx context.Context, ep *sql.Endpoint, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
+func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	cfg := ep.Config.(*config)
 
-	if err := c.withDB(func(db *stdsql.DB) error {
-		var baseSchema string
-		if err := db.QueryRowContext(ctx, "select schema_name()").Scan(&baseSchema); err != nil {
-			return fmt.Errorf("querying schema for current user: %w", err)
-		}
-
-		is, err = sql.StdFetchInfoSchema(ctx, db, ep.Dialect, cfg.Database, baseSchema, resourcePaths)
-		return err
-	}); err != nil {
+	db, err := stdsql.Open("sqlserver", cfg.ToURI())
+	if err != nil {
 		return nil, err
 	}
-	return
+
+	return &client{
+		db:  db,
+		cfg: cfg,
+		ep:  ep,
+	}, nil
 }
 
-func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_Apply, actions sql.ApplyActions, updateSpec sql.MetaSpecsUpdate) (string, error) {
-	cfg := ep.Config.(*config)
-
-	db, err := stdsql.Open("sqlserver", c.uri)
-	if err != nil {
-		return "", err
-	}
-	defer db.Close()
-
-	resolved, err := sql.ResolveActions(ctx, db, actions, ep.Dialect, cfg.Database)
-	if err != nil {
-		return "", fmt.Errorf("resolving apply actions: %w", err)
-	}
-
-	statements := []string{}
-	for _, tc := range resolved.CreateTables {
-		statements = append(statements, tc.TableCreateSql)
-	}
-
-	for _, ta := range resolved.AlterTables {
-		// SQL Server supports adding multiple columns in a single statement, but only a single
-		// modification per statement.
-		if len(ta.AddColumns) > 0 {
-			var addColumnsStmt strings.Builder
-			if err := renderTemplates(c.dialect)["alterTableColumns"].Execute(&addColumnsStmt, ta); err != nil {
-				return "", fmt.Errorf("rendering alter table columns statement: %w", err)
-			}
-			statements = append(statements, addColumnsStmt.String())
-		}
-
-		for _, dn := range ta.DropNotNulls {
-			statements = append(statements, fmt.Sprintf(
-				"ALTER TABLE %s ALTER COLUMN %s %s;",
-				ta.Identifier,
-				dn.Identifier,
-				dn.NullableDDL,
-			))
-		}
-	}
-
-	for _, tr := range resolved.ReplaceTables {
-		statements = append(statements, tr.TableReplaceSql)
-	}
-
-	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if req.DryRun {
-		return action, nil
-	}
-
-	if len(resolved.ReplaceTables) > 0 {
-		if err := sql.StdIncrementFence(ctx, db, ep, req.Materialization.Name.String()); err != nil {
-			return "", err
-		}
-	}
-
-	for _, s := range statements {
-		if _, err := db.ExecContext(ctx, s); err != nil {
-			return "", fmt.Errorf("executing statement: %w", err)
-		}
-	}
-
-	// Once all the table actions are done, we can update the stored spec.
-	if _, err := db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...); err != nil {
-		return "", fmt.Errorf("executing spec update statement: %w", err)
-	}
-
-	return action, nil
-}
-
-func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
-	cfg := ep.Config.(*config)
+func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
@@ -118,9 +47,7 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if db, err := stdsql.Open("sqlserver", cfg.ToURI()); err != nil {
-		errs.Err(err)
-	} else if err := db.PingContext(ctx); err != nil {
+	if err := c.db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var sqlServerErr *mssqldb.Error
 		var netConnErr *net.DNSError
@@ -132,48 +59,99 @@ func (c client) PreReqs(ctx context.Context, ep *sql.Endpoint) *sql.PrereqErr {
 			}
 		} else if errors.As(err, &netConnErr) {
 			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
+				err = fmt.Errorf("host at address %q cannot be found", c.cfg.Address)
 			}
 		} else if errors.As(err, &netOpErr) {
 			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
+				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", c.cfg.Address)
 			}
 		}
 
 		errs.Err(err)
-	} else {
-		db.Close()
 	}
 
 	return errs
 }
 
-func (c client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
-	err = c.withDB(func(db *stdsql.DB) error {
-		specB64, version, err = sql.StdFetchSpecAndVersion(ctx, db, specs, materialization)
-		return err
-	})
-	return
+func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
+	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, resourcePaths)
 }
 
-func (c client) ExecStatements(ctx context.Context, statements []string) error {
-	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
-}
+func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
+	var statements []string
 
-func (c client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	var err = c.withDB(func(db *stdsql.DB) error {
-		var err error
-		fence, err = installFence(ctx, c.dialect, db, checkpoints, fence, base64.StdEncoding.DecodeString)
-		return err
-	})
-	return fence, err
-}
-
-func (c client) withDB(fn func(*stdsql.DB) error) error {
-	var db, err = stdsql.Open("sqlserver", c.uri)
-	if err != nil {
-		return err
+	// SQL Server supports adding multiple columns in a single statement, but only a single
+	// modification per statement.
+	if len(ta.AddColumns) > 0 {
+		var addColumnsStmt strings.Builder
+		if err := renderTemplates(c.ep.Dialect)["alterTableColumns"].Execute(&addColumnsStmt, ta); err != nil {
+			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
+		}
+		statements = append(statements, addColumnsStmt.String())
 	}
-	defer db.Close()
-	return fn(db)
+
+	// Dropping a NOT NULL constraint requires re-stating the full field definition without the NOT
+	// NULL part. The `data_type` from the information_schema.columns can mostly be used as the
+	// column's definition, except for some column types that have a length component. These must be
+	// augmented with the `character_maximum_length`.
+	typesWithLengths := []string{"VARCHAR", "NVARCHAR", "VARBINARY"}
+	for _, dn := range ta.DropNotNulls {
+		ddl := strings.ToUpper(dn.Type)
+		if slices.Contains(typesWithLengths, ddl) {
+			if dn.CharacterMaxLength == -1 {
+				ddl = fmt.Sprintf("%s(MAX)", ddl)
+			} else {
+				ddl = fmt.Sprintf("%s(%d)", ddl, dn.CharacterMaxLength)
+			}
+		}
+
+		statements = append(statements, fmt.Sprintf(
+			"ALTER TABLE %s ALTER COLUMN %s %s;",
+			ta.Identifier,
+			c.ep.Dialect.Identifier(dn.Name),
+			ddl,
+		))
+	}
+
+	return strings.Join(statements, "\n"), func(ctx context.Context) error {
+		for _, stmt := range statements {
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, nil
+}
+
+func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
+	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	return err
+}
+
+func (c *client) ReplaceTable(ctx context.Context, tr sql.TableReplace) (string, boilerplate.ActionApplyFn, error) {
+	return tr.TableReplaceSql, func(ctx context.Context) error {
+		_, err := c.db.ExecContext(ctx, tr.TableReplaceSql)
+		return err
+	}, nil
+}
+
+func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
+	_, err := c.db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...)
+	return err
+}
+
+func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
+	return installFence(ctx, c.ep.Dialect, c.db, checkpoints, fence, base64.StdEncoding.DecodeString)
+}
+
+func (c *client) ExecStatements(ctx context.Context, statements []string) error {
+	return sql.StdSQLExecStatements(ctx, c.db, statements)
+}
+
+func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization flow.Materialization) (string, string, error) {
+	return sql.StdFetchSpecAndVersion(ctx, c.db, specs, materialization)
+}
+
+func (c *client) Close() {
+	c.db.Close()
 }

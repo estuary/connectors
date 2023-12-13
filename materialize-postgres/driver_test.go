@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -17,45 +16,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func testConfig() *config {
+	return &config{
+		Address:  "localhost:5432",
+		User:     "postgres",
+		Password: "postgres",
+		Schema:   "public",
+	}
+}
+
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
-	var client = client{uri: "postgresql://postgres:postgres@localhost:5432/postgres"}
+
+	c, err := newClient(ctx, &sql.Endpoint{Config: testConfig()})
+	require.NoError(t, err)
+	defer c.Close()
+
 	sql.RunFenceTestCases(t,
-		client,
+		c,
 		[]string{"temp_test_fencing_checkpoints"},
 		pgDialect,
 		tplCreateTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
-			var err = client.withDB(func(db *stdsql.DB) error {
-				// Pick a path randomly to ensure both are exercised and correct.
-				if time.Now().Unix()%2 == 0 {
-
-					// Option 1: Update using template.
-					var fenceUpdate strings.Builder
-					if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
-						return fmt.Errorf("evaluating fence template: %w", err)
-					}
-					var _, err = db.Exec(fenceUpdate.String())
-					return err
-				}
-
-				// Option 2: Update using StdUpdateFence.
-				var tx, err = db.BeginTx(ctx, nil)
-				if err != nil {
-					return err
-				} else if err = sql.StdUpdateFence(ctx, tx, table, fence); err != nil {
-					return err
-				}
-				return tx.Commit()
-			})
-			return err
+			var fenceUpdate strings.Builder
+			if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+				return fmt.Errorf("evaluating fence template: %w", err)
+			}
+			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
 		},
 		func(table sql.Table) (out string, err error) {
-			err = client.withDB(func(db *stdsql.DB) error {
-				out, err = sql.StdDumpTable(ctx, db, table)
-				return err
-			})
-			return
+			return sql.StdDumpTable(ctx, c.(*client).db, table)
 		},
 	)
 }
@@ -63,12 +53,7 @@ func TestFencingCases(t *testing.T) {
 func TestApply(t *testing.T) {
 	ctx := context.Background()
 
-	cfg := config{
-		Address:  "localhost:5432",
-		User:     "postgres",
-		Password: "postgres",
-		Schema:   "public",
-	}
+	cfg := testConfig()
 	catalog := "postgres"
 
 	configJson, err := json.Marshal(cfg)
@@ -141,12 +126,7 @@ func TestApply(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
-	cfg := config{
-		Address:  "localhost:5432",
-		User:     "postgres",
-		Password: "postgres",
-		Database: "postgres",
-	}
+	cfg := testConfig()
 
 	tests := []struct {
 		name string
@@ -192,14 +172,17 @@ func TestPrereqs(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg(cfg)
-			client := client{uri: cfg.ToURI()}
-			require.Equal(t, tt.want, client.PreReqs(context.Background(), &sql.Endpoint{
-				Config: cfg,
-				Tenant: "tenant",
-			}).Unwrap())
+			cfg := tt.cfg(*cfg)
+
+			client, err := newClient(ctx, &sql.Endpoint{Config: cfg})
+			require.NoError(t, err)
+			defer client.Close()
+
+			require.Equal(t, tt.want, client.PreReqs(context.Background()).Unwrap())
 		})
 	}
 }
