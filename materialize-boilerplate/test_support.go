@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -16,25 +15,6 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
-
-//go:generate ./testdata/generate-spec-proto.sh testdata/apply/base.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/apply/remove-required.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/apply/remove-optional.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/apply/add-new-required.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/apply/add-new-optional.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/apply/add-new-binding.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/apply/remove-original-binding.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/apply/replace-original-binding.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/apply/make-nullable.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate/base.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate/unsatisfiable.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate/forbidden.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate/alternate-root-projection.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate/remove-format.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate/more-multiple.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate/object-to-array.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate/numeric-string-to-numeric.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate/nullability.flow.yaml
 
 //go:embed testdata/apply/generated_specs
 var applyFs embed.FS
@@ -288,43 +268,4 @@ func RunValidateTestCases(t *testing.T, makeValidator func(*testing.T, *pf.Mater
 	})
 
 	cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath)).SnapshotT(t, snap.String())
-}
-
-// BasicInfoFromSpec creates a vanilla InfoSchema from a Flow MaterializationSpec which may be
-// useful for testing scenarios that do not require the use of a specific endpoint's type system.
-func BasicInfoFromSpec(t *testing.T, spec *pf.MaterializationSpec, mapType func(*pf.Projection) (string, bool)) *InfoSchema {
-	is := NewInfoSchema(
-		func(in []string) []string { return in },
-		func(in string) string { return in },
-	)
-
-	if spec != nil {
-		for _, b := range spec.Bindings {
-			selectedFields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
-			if b.FieldSelection.Document != "" {
-				selectedFields = append(selectedFields, b.FieldSelection.Document)
-			}
-
-			for _, f := range selectedFields {
-				p := b.Collection.GetProjection(f)
-				mapped, mustExist := mapType(p)
-
-				is.PushField(EndpointField{
-					Name:     f,
-					Nullable: !mustExist,
-					Type:     mapped,
-				}, b.ResourcePath...)
-			}
-		}
-	}
-
-	return is
-}
-
-func testMapType(p *pf.Projection) (string, bool) {
-	mustExist := p.Inference.Exists == pf.Inference_MUST
-	if slices.Contains(p.Inference.Types, "null") {
-		mustExist = false
-	}
-	return strings.Join(p.Inference.Types, ","), mustExist
 }
