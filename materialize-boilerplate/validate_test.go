@@ -39,6 +39,7 @@ func TestValidate(t *testing.T) {
 		name              string
 		deltaUpdates      bool
 		specForInfoSchema *pf.MaterializationSpec
+		existingSpec      *pf.MaterializationSpec
 		proposedSpec      *pf.MaterializationSpec
 	}
 
@@ -47,55 +48,78 @@ func TestValidate(t *testing.T) {
 			name:              "new materialization - standard updates",
 			deltaUpdates:      false,
 			specForInfoSchema: nil,
+			existingSpec:      nil,
 			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
 		},
 		{
 			name:              "same binding again - standard updates",
 			deltaUpdates:      false,
 			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
 		},
 		{
 			name:              "new materialization - delta updates",
 			deltaUpdates:      true,
 			specForInfoSchema: nil,
+			existingSpec:      nil,
 			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
 		},
 		{
 			name:              "same binding again - delta updates",
 			deltaUpdates:      true,
 			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
 		},
 		{
 			name:              "binding update with incompatible changes",
 			deltaUpdates:      false,
 			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:      loadValidateSpec(t, "incompatible-changes.flow.proto"),
 		},
 		{
 			name:              "fields exist in destination but not in collection",
 			deltaUpdates:      false,
 			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:      loadValidateSpec(t, "fewer-fields.flow.proto"),
 		},
 		{
 			name:              "change root document projection for standard updates",
 			deltaUpdates:      false,
 			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:      loadValidateSpec(t, "alternate-root.flow.proto"),
 		},
 		{
 			name:              "change root document projection for delta updates",
 			deltaUpdates:      true,
 			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:      loadValidateSpec(t, "alternate-root.flow.proto"),
 		},
 		{
 			name:              "increment backfill counter",
 			deltaUpdates:      false,
 			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:      loadValidateSpec(t, "base.flow.proto"),
 			proposedSpec:      loadValidateSpec(t, "increment-backfill.flow.proto"),
+		},
+		{
+			name:              "table already exists with identical spec",
+			deltaUpdates:      false,
+			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:      nil,
+			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
+		},
+		{
+			name:              "table already exists with incompatible proposed spec",
+			deltaUpdates:      false,
+			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:      nil,
+			proposedSpec:      loadValidateSpec(t, "incompatible-changes.flow.proto"),
 		},
 	}
 
@@ -111,7 +135,7 @@ func TestValidate(t *testing.T) {
 				tt.proposedSpec.Bindings[0].Backfill,
 				tt.proposedSpec.Bindings[0].Collection,
 				tt.proposedSpec.Bindings[0].FieldSelection.FieldConfigJsonMap,
-				tt.specForInfoSchema,
+				tt.existingSpec,
 			)
 			require.NoError(t, err)
 

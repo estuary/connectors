@@ -48,13 +48,15 @@ func (v Validator) ValidateBinding(
 	fieldConfigJsonMap map[string]json.RawMessage,
 	storedSpec *pf.MaterializationSpec,
 ) (map[string]*pm.Response_Validated_Constraint, error) {
-	existingBinding, err := FindExistingBinding(path, boundCollection.Name, storedSpec)
+	existingBinding, err := findExistingBinding(path, boundCollection.Name, storedSpec)
 	if err != nil {
 		return nil, err
 	}
 
 	if existingBinding != nil && existingBinding.Backfill > backfill {
 		// Sanity check: Don't allow backfill counters to decrease.
+		// TODO(whb): This check will soon be moved to the control plane, and then can be removed
+		// from here.
 		return nil, fmt.Errorf(
 			"backfill count %d is less than previously applied count of %d",
 			backfill,
@@ -63,16 +65,19 @@ func (v Validator) ValidateBinding(
 	}
 
 	var constraints map[string]*pm.Response_Validated_Constraint
-	if !v.is.HasResource(path) || backfill != existingBinding.Backfill {
+	if !v.is.HasResource(path) || (existingBinding != nil && backfill != existingBinding.Backfill) {
+		// Always validate as a new table if the existing table doesn't exist, since there is no
+		// existing table to be incompatible with. Also validate as a new table if we are going to
+		// be replacing the table.
 		constraints = v.validateNewBinding(boundCollection, deltaUpdates)
 	} else {
-		if existingBinding.DeltaUpdates && !deltaUpdates {
+		if existingBinding != nil && existingBinding.DeltaUpdates && !deltaUpdates {
 			// We allow a binding to switch from standard => delta updates but not the other
 			// way. This is because a standard materialization is trivially a valid
 			// delta-updates materialization.
 			return nil, fmt.Errorf("changing from delta updates to standard updates is not allowed")
 		}
-		constraints, err = v.validateMatchesExistingBinding(existingBinding, boundCollection, deltaUpdates, fieldConfigJsonMap)
+		constraints, err = v.validateMatchesExistingBinding(existingBinding, path, boundCollection, deltaUpdates, fieldConfigJsonMap)
 		if err != nil {
 			return nil, err
 		}
@@ -105,13 +110,14 @@ func (v Validator) validateNewBinding(boundCollection pf.CollectionSpec, deltaUp
 
 func (v Validator) validateMatchesExistingBinding(
 	existing *pf.MaterializationSpec_Binding,
+	path []string,
 	boundCollection pf.CollectionSpec,
 	deltaUpdates bool,
 	fieldConfigJsonMap map[string]json.RawMessage,
 ) (map[string]*pm.Response_Validated_Constraint, error) {
 	constraints := make(map[string]*pm.Response_Validated_Constraint)
 
-	fields, err := v.is.FieldsForResource(existing.ResourcePath)
+	fields, err := v.is.FieldsForResource(path)
 	if err != nil {
 		// This should never error, since it has previously been established that the resource does
 		// exist in the destination system.
@@ -125,7 +131,6 @@ func (v Validator) validateMatchesExistingBinding(
 		if err != nil {
 			return nil, fmt.Errorf("extracting projection for existing endpoint field %q: %w", f.Name, err)
 		}
-		existingProjection := existing.Collection.GetProjection(proposedProjection.Field)
 
 		if !inCollection {
 			// A field that exists in the destination but not in the collection is not a problem,
@@ -147,7 +152,7 @@ func (v Validator) validateMatchesExistingBinding(
 		if compatible, err := v.c.Compatible(f, &proposedProjection, fieldConfigJsonMap[proposedProjection.Field]); err != nil {
 			return nil, fmt.Errorf("determining compatibility for endpoint field %q vs. selected field %q: %w", f.Name, proposedProjection.Field, err)
 		} else if compatible {
-			if existingProjection.IsPrimaryKey {
+			if proposedProjection.IsPrimaryKey {
 				constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
 				constraint.Reason = "This field is a key in the current materialization"
 			} else {
@@ -175,8 +180,9 @@ func (v Validator) validateMatchesExistingBinding(
 		if !deltaUpdates && p.IsRootDocumentProjection() {
 			docFields = append(docFields, p.Field)
 			// Only the originally selected root document projection is allowed to be selected for
-			// changes to a standard updates materialization.
-			if p.Field == existing.FieldSelection.Document {
+			// changes to a standard updates materialization. If there is no previously persisted
+			// spec, the first root document projection is selected as the root document.
+			if (existing != nil && p.Field == existing.FieldSelection.Document) || (existing == nil && len(docFields) == 1) {
 				constraints[p.Field] = &pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 					Reason: "This field is the document in the current materialization",
@@ -187,7 +193,13 @@ func (v Validator) validateMatchesExistingBinding(
 					Reason: fmt.Sprintf(
 						"Cannot materialize root document projection '%s' because field '%s' is already being materialized as the document",
 						p.Field,
-						existing.FieldSelection.Document,
+						func() string {
+							if existing != nil {
+								return existing.FieldSelection.Document
+							} else {
+								return docFields[0]
+							}
+						}(),
 					),
 				}
 			}
@@ -199,10 +211,10 @@ func (v Validator) validateMatchesExistingBinding(
 		}
 	}
 
-	if !deltaUpdates && !slices.Contains(docFields, existing.FieldSelection.Document) {
-		// For standard updates, the proposed binding must still have the original document field.
-		// If it doesn't, make sure to fail the build with a constraint on a root document
-		// projection that it does have.
+	if existing != nil && !deltaUpdates && !slices.Contains(docFields, existing.FieldSelection.Document) {
+		// For standard updates, the proposed binding must still have the original document field
+		// from a prior specification, if that's known. If it doesn't, make sure to fail the build
+		// with a constraint on a root document projection that it does have.
 		constraints[docFields[0]] = &pm.Response_Validated_Constraint{
 			Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
 			Reason: fmt.Sprintf(
@@ -247,9 +259,9 @@ func (v Validator) forbidAmbiguousFields(constraints map[string]*pm.Response_Val
 	return constraints
 }
 
-// FindExistingBinding locates a binding within an existing stored specification, and verifies that
+// findExistingBinding locates a binding within an existing stored specification, and verifies that
 // there are no target path conflicts with a proposed binding that does not already exist.
-func FindExistingBinding(
+func findExistingBinding(
 	resourcePath []string,
 	proposedCollection pf.Collection,
 	storedSpec *pf.MaterializationSpec,
