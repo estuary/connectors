@@ -1,0 +1,386 @@
+--- Begin new materialization - standard updates ---
+{
+	"flow_document": {
+		"type": 2,
+		"reason": "The root document is required for a standard updates materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 2,
+		"reason": "All Locations that are part of the collections key are required"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"second_root": {
+		"type": 5,
+		"reason": "Only a single root document projection can be materialized for standard updates"
+	}
+}
+--- End new materialization - standard updates ---
+
+--- Begin same binding again - standard updates ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"second_root": {
+		"type": 5,
+		"reason": "Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"
+	}
+}
+--- End same binding again - standard updates ---
+
+--- Begin new materialization - delta updates ---
+{
+	"flow_document": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 2,
+		"reason": "All Locations that are part of the collections key are required"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"second_root": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	}
+}
+--- End new materialization - delta updates ---
+
+--- Begin same binding again - delta updates ---
+{
+	"flow_document": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"second_root": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	}
+}
+--- End same binding again - delta updates ---
+
+--- Begin binding update with incompatible changes ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 6,
+		"reason": "Field 'nonScalarValue' is already being materialized as endpoint type 'object' and cannot be changed to type 'string'"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"second_root": {
+		"type": 5,
+		"reason": "Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"
+	}
+}
+--- End binding update with incompatible changes ---
+
+--- Begin fields exist in destination but not in collection ---
+{
+	"flow_document": {
+		"type": 1,
+		"reason": "This field is the document in the current materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"second_root": {
+		"type": 5,
+		"reason": "Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"
+	}
+}
+--- End fields exist in destination but not in collection ---
+
+--- Begin change root document projection for standard updates ---
+{
+	"flow_published_at": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"second_root": {
+		"type": 6,
+		"reason": "The root document must be materialized as field 'flow_document'"
+	}
+}
+--- End change root document projection for standard updates ---
+
+--- Begin change root document projection for delta updates ---
+{
+	"flow_published_at": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"key": {
+		"type": 1,
+		"reason": "This field is a key in the current materialization"
+	},
+	"multiple": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nonScalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"optional": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "This location is part of the current materialization"
+	},
+	"second_root": {
+		"type": 3,
+		"reason": "The root document should usually be materialized"
+	}
+}
+--- End change root document projection for delta updates ---
+
+--- Begin increment backfill counter ---
+{
+	"flow_document": {
+		"type": 2,
+		"reason": "The root document is required for a standard updates materialization"
+	},
+	"flow_published_at": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"key": {
+		"type": 2,
+		"reason": "All Locations that are part of the collections key are required"
+	},
+	"multiple": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nonScalarValue": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"nullValue": {
+		"type": 5,
+		"reason": "Cannot materialize this field"
+	},
+	"numericString": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"optional": {
+		"type": 4,
+		"reason": "This field is able to be materialized"
+	},
+	"scalarValue": {
+		"type": 3,
+		"reason": "The projection has a single scalar type"
+	},
+	"second_root": {
+		"type": 5,
+		"reason": "Only a single root document projection can be materialized for standard updates"
+	}
+}
+--- End increment backfill counter ---
+
+

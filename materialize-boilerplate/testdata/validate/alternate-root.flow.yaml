@@ -13,7 +13,6 @@ collections:
       required: [key, scalarValue]
     key: [/key]
     projections:
-      flow_document: ""
       second_root: ""
 
 materializations:

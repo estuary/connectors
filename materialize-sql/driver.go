@@ -99,6 +99,15 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	}
 	validator := boilerplate.NewValidator(constrainter{dialect: endpoint.Dialect}, is)
 
+	if p := is.AmbiguousResourcePaths(resourcePaths); len(p) > 0 {
+		// This is mostly a sanity-check since it is very unlikely to happen, given that Flow
+		// collection names don't allow for collections that are identical other than
+		// capitalization. It's still technically possible though if a user configures a different
+		// destination table name than the default, or the materialize connector does something
+		// weird with transforming table names (ex: materialize-bigquery).
+		return nil, fmt.Errorf("cannot materialize ambigous resource paths: [%s]", p)
+	}
+
 	// Produce constraints for each request binding, in turn.
 	for idx, bindingSpec := range req.Bindings {
 		res := resources[idx]
