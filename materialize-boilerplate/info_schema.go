@@ -79,13 +79,17 @@ func (i *InfoSchema) GetField(resourcePath []string, fieldName string) (Endpoint
 		return EndpointField{}, fmt.Errorf("resourceKey %q not found", rk)
 	}
 
+	if !i.HasField(resourcePath, fieldName) {
+		return EndpointField{}, fmt.Errorf("field %q does not exist in resourceKey %q", rk, fieldName)
+	}
+
 	for _, f := range i.resources[rk] {
 		if f.Name == i.translateField(fieldName) {
 			return f, nil
 		}
 	}
 
-	return EndpointField{}, fmt.Errorf("field %q does not exist in resourceKey %q", rk, fieldName)
+	panic("not reached")
 }
 
 // HasField reports whether a Flow field exists in the InfoSchema under the given Flow resource
@@ -134,6 +138,8 @@ func (i *InfoSchema) ExtractProjection(efn string, collection pf.CollectionSpec)
 	for idx := range collection.Projections {
 		matches := i.translateField(collection.Projections[idx].Field) == efn
 		if found && matches {
+			// This should never happen since the standard constraints from `Validator` forbid it,
+			// but I'm leaving it here as a sanity check just in case.
 			return pf.Projection{}, false, fmt.Errorf("ambiguous endpoint field name when looking for projection %q", efn)
 		} else if matches {
 			found = true
@@ -153,6 +159,8 @@ func (i *InfoSchema) InSelectedFields(efn string, fs pf.FieldSelection) (bool, e
 	for _, f := range fs.AllFields() {
 		matches := i.translateField(f) == efn
 		if found && matches {
+			// This should never happen since the standard constraints from `Validator` forbid it,
+			// but I'm leaving it here as a sanity check just in case.
 			return false, fmt.Errorf("ambiguous endpoint field name when looking for selected field %q", efn)
 		} else if matches {
 			found = true
@@ -160,6 +168,35 @@ func (i *InfoSchema) InSelectedFields(efn string, fs pf.FieldSelection) (bool, e
 	}
 
 	return found, nil
+}
+
+// AmbiguousResourcePaths is a utility for determining if a resource path could be ambiguous when
+// materialized to the destination system. This should only be possible if the destination system
+// (or the connector) transforms resource paths in some way that could result in conflicts. Usually
+// the connector should take this into consideration when producing the resource path with its
+// `Validate` response, but we haven't always done a good job with that.
+func (i *InfoSchema) AmbiguousResourcePaths(resourcePaths [][]string) [][]string {
+	seenPaths := make(map[string][][]string)
+
+	for _, rp := range resourcePaths {
+		rk := joinPath(i.locatePath(rp))
+		seenPaths[rk] = append(seenPaths[rk], rp)
+	}
+
+	var out [][]string
+	for _, p := range seenPaths {
+		if len(p) > 1 {
+			out = append(out, p...)
+		}
+	}
+
+	// Sort the output to make it a little more clear which paths are ambiguous if there are a lot
+	// of them.
+	slices.SortFunc(out, func(a, b []string) int {
+		return strings.Compare(joinPath(i.locatePath(a)), joinPath(i.locatePath(b)))
+	})
+
+	return out
 }
 
 func joinPath(in []string) string {

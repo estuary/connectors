@@ -4,17 +4,17 @@ collections:
       type: object
       properties:
         key: { type: string }
-        # This field is now a "null" instead of an integer (see base.flow.yaml), which will
-        # typically result in a "forbidden" constraint, unless the connector does not forbid fields
-        # where the only type is "null".
-        scalarValue: { type: "null" }
+        scalarValue: { type: "null" } # Changed to a "forbidden"
         numericString: { type: [integer, string], format: integer }
-        nonScalarValue: { type: object }
+        nonScalarValue: { type: string } # Changed to an "unsatisfiable"
         multiple: { type: [integer, string, boolean] }
         nullValue: { type: "null" }
         optional: { type: object }
       required: [key, scalarValue]
     key: [/key]
+    projections:
+      flow_document: ""
+      second_root: ""
 
 materializations:
   test/sqlite:
@@ -26,12 +26,11 @@ materializations:
       - source: key/value
         resource: { table: key_value }
         fields:
-          recommended: false
+          recommended: true
           include:
-            key: {}
-            numericString: {}
-            # Note: scalarValue not included, since the materialize-sqlite stand-in connector
-            # forbids it.
+            nonScalarValue: {}
+            multiple: {}
+            optional: {}
 
 storageMappings:
   "": { stores: [{ provider: S3, bucket: a-bucket }] }
