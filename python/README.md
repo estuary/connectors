@@ -387,6 +387,9 @@ By convention we have picked the field `credentials` to receive injected OAuth v
 }
 ```
 
+In addition to configuring the endpoint config, for imported connectors you will also probably have to modify the config-reading logic to read OAuth data out of the `credentials` field specifically. 
+> **Note:** Also, don't forget to make `credentials` a required field!
+
 ### Debugging
 You can test the OAuth flow using `flowctl raw oauth`. Make sure that you have a local stack set up and running, as the intent is to emulate the production behavior as closely as possible. 
 
