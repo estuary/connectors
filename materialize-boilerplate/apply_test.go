@@ -2,7 +2,6 @@ package boilerplate
 
 import (
 	"context"
-	"crypto/sha256"
 	"embed"
 	"fmt"
 	"path/filepath"
@@ -16,6 +15,13 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
+
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/base.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/remove-required.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/add-new-required.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/add-new-binding.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/replace-original-binding.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/apply/make-nullable.flow.yaml
 
 //go:embed testdata/apply/generated_specs
 var applyFS embed.FS
@@ -257,9 +263,7 @@ func testInfoSchemaFromSpec(t *testing.T, s *pf.MaterializationSpec) *InfoSchema
 	// Hypothetical one-way transformation of path components and field names. I really hope no
 	// system we ever materialize to actually does this.
 	transform := func(in string) string {
-		h := sha256.New()
-		h.Write([]byte(in))
-		return fmt.Sprintf("%x", h.Sum(nil))
+		return in + "_transformed"
 	}
 	transformPath := func(in []string) []string {
 		out := make([]string, 0, len(in))

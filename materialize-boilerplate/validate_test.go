@@ -8,24 +8,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bradleyjkemp/cupaloy"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
 
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_selected_fields/base.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_selected_fields/base-with-extra-field.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_selected_fields/alternate-root-projection.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_selected_fields/multiple-root-projections.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_selected_fields/new-binding.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/base.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/incompatible-changes.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/fewer-fields.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/alternate-root.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/increment-backfill.flow.yaml
 
-//go:embed testdata/validate_selected_fields/generated_specs
-var specFs embed.FS
+//go:embed testdata/validate/generated_specs
+var validateFS embed.FS
 
-func loadSelectedFieldsSpec(t *testing.T, path string) *pf.MaterializationSpec {
+func loadValidateSpec(t *testing.T, path string) *pf.MaterializationSpec {
 	t.Helper()
 
-	specBytes, err := specFs.ReadFile(filepath.Join("testdata/validate_selected_fields/generated_specs", path))
+	specBytes, err := validateFS.ReadFile(filepath.Join("testdata/validate/generated_specs", path))
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
 	require.NoError(t, spec.Unmarshal(specBytes))
@@ -33,329 +34,176 @@ func loadSelectedFieldsSpec(t *testing.T, path string) *pf.MaterializationSpec {
 	return &spec
 }
 
-func TestValidateSelectedFields(t *testing.T) {
-	t.Run("field selection changes", func(t *testing.T) {
-		tests := []struct {
-			name           string
-			storedSpec     *pf.MaterializationSpec
-			newSpec        *pf.MaterializationSpec
-			fieldSelection pf.FieldSelection
-			deltaUpdates   bool
-			wantErr        string
-		}{
-			{
-				name:       "new materialization",
-				storedSpec: nil,
-				newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
-					Document: "flow_document",
-				},
-				deltaUpdates: false,
-				wantErr:      "",
-			},
-			{
-				name:       "binding update with no changes",
-				storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
-				newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
-					Document: "flow_document",
-				},
-				deltaUpdates: false,
-				wantErr:      "",
-			},
-			{
-				name:       "recommend fields not included is allowed",
-				storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
-				newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"locRequiredVal"},
-					Document: "flow_document",
-				},
-				deltaUpdates: false,
-				wantErr:      "",
-			},
-			{
-				name:       "missing key",
-				storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
-				newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
-					Document: "flow_document",
-				},
-				deltaUpdates: false,
-				wantErr:      "This field is a key in the current materialization",
-			},
-			{
-				name:       "missing required non-key, non-document location",
-				storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
-				newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal"},
-					Document: "flow_document",
-				},
-				deltaUpdates: false,
-				wantErr:      "This location is required to be materialized",
-			},
-			{
-				name:       "standard updates with no root document",
-				storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
-				newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
-					Document: "",
-				},
-				deltaUpdates: false,
-				wantErr:      "This field is the document in the current materialization",
-			},
-			{
-				name:       "delta updates with no root document is allowed",
-				storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
-				newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
-					Document: "",
-				},
-				deltaUpdates: true,
-				wantErr:      "",
-			},
-			{
-				name:       "forbidden field selected",
-				storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
-				newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal", "nullVal"},
-					Document: "flow_document",
-				},
-				deltaUpdates: false,
-				wantErr:      "Cannot materialize this field",
-			},
-			{
-				name:       "non-existent field selected",
-				storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
-				newSpec:    loadSelectedFieldsSpec(t, "base.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal", "bogus"},
-					Document: "flow_document",
-				},
-				deltaUpdates: false,
-				wantErr:      "no such projection for field 'bogus'",
-			},
-			{
-				name:       "root document projection change is not allowed for standard updates",
-				storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
-				newSpec:    loadSelectedFieldsSpec(t, "alternate-root-projection.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
-					Document: "alternate_root",
-				},
-				deltaUpdates: false,
-				wantErr:      "The root document must be materialized as field 'flow_document'",
-			},
-			{
-				name:       "root document projection change is allowed for delta updates",
-				storedSpec: loadSelectedFieldsSpec(t, "base.flow.proto"),
-				newSpec:    loadSelectedFieldsSpec(t, "alternate-root-projection.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal"},
-					Document: "alternate_root",
-				},
-				deltaUpdates: true,
-				wantErr:      "",
-			},
-			{
-				name:       "can't select multiple root projections for standard updates",
-				storedSpec: nil,
-				newSpec:    loadSelectedFieldsSpec(t, "multiple-root-projections.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal", "second_root"},
-					Document: "first_root",
-				},
-				deltaUpdates: false,
-				wantErr:      "only a single root document projection can be included in the field selection for a standard updates materialization",
-			},
-			{
-				name:       "can select multiple root projections for delta updates",
-				storedSpec: nil,
-				newSpec:    loadSelectedFieldsSpec(t, "multiple-root-projections.flow.proto"),
-				fieldSelection: pf.FieldSelection{
-					Keys:     []string{"stringKey", "intKey"},
-					Values:   []string{"stringFormatIntVal", "boolVal", "locRequiredVal", "second_root"},
-					Document: "first_root",
-				},
-				deltaUpdates: true,
-				wantErr:      "",
-			},
-		}
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				validator := NewValidator(testConstrainter{}, BasicInfoFromSpec(t, tt.storedSpec, testMapType))
-				newSpec := tt.newSpec
-				newSpec.Bindings[0].DeltaUpdates = tt.deltaUpdates
-				newBinding := newSpec.Bindings[0]
-				newBinding.FieldSelection = tt.fieldSelection
+func TestValidate(t *testing.T) {
+	type testCase struct {
+		name              string
+		deltaUpdates      bool
+		specForInfoSchema *pf.MaterializationSpec
+		proposedSpec      *pf.MaterializationSpec
+	}
 
-				err := validator.ValidateSelectedFields(newBinding, tt.storedSpec)
-				if tt.wantErr == "" {
-					require.NoError(t, err)
-				} else {
-					require.ErrorContains(t, err, tt.wantErr)
-				}
-			})
-		}
-	})
+	tests := []testCase{
+		{
+			name:              "new materialization - standard updates",
+			deltaUpdates:      false,
+			specForInfoSchema: nil,
+			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
+		},
+		{
+			name:              "same binding again - standard updates",
+			deltaUpdates:      false,
+			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
+		},
+		{
+			name:              "new materialization - delta updates",
+			deltaUpdates:      true,
+			specForInfoSchema: nil,
+			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
+		},
+		{
+			name:              "same binding again - delta updates",
+			deltaUpdates:      true,
+			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:      loadValidateSpec(t, "base.flow.proto"),
+		},
+		{
+			name:              "binding update with incompatible changes",
+			deltaUpdates:      false,
+			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:      loadValidateSpec(t, "incompatible-changes.flow.proto"),
+		},
+		{
+			name:              "fields exist in destination but not in collection",
+			deltaUpdates:      false,
+			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:      loadValidateSpec(t, "fewer-fields.flow.proto"),
+		},
+		{
+			name:              "change root document projection for standard updates",
+			deltaUpdates:      false,
+			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:      loadValidateSpec(t, "alternate-root.flow.proto"),
+		},
+		{
+			name:              "change root document projection for delta updates",
+			deltaUpdates:      true,
+			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:      loadValidateSpec(t, "alternate-root.flow.proto"),
+		},
+		{
+			name:              "increment backfill counter",
+			deltaUpdates:      false,
+			specForInfoSchema: loadValidateSpec(t, "base.flow.proto"),
+			proposedSpec:      loadValidateSpec(t, "increment-backfill.flow.proto"),
+		},
+	}
 
-	t.Run("other kinds of changes", func(t *testing.T) {
-		tests := []struct {
-			name        string
-			mutateSpecs func(stored, new *pf.MaterializationSpec) (*pf.MaterializationSpec, *pf.MaterializationSpec)
-			wantErr     string
-		}{
-			{
-				name: "delta updates to standard updates is not allowed",
-				mutateSpecs: func(stored, new *pf.MaterializationSpec) (*pf.MaterializationSpec, *pf.MaterializationSpec) {
-					stored.Bindings[0].DeltaUpdates = true
-					return stored, new
-				},
-				wantErr: "from delta updates to standard updates is not allowed",
-			},
-			{
-				name: "unsatisfiable type change for a value",
-				mutateSpecs: func(stored, new *pf.MaterializationSpec) (*pf.MaterializationSpec, *pf.MaterializationSpec) {
-					require.Equal(t, "boolVal", new.Bindings[0].Collection.Projections[0].Field)
-					new.Bindings[0].Collection.Projections[0].Inference.Types = []string{pf.JsonTypeObject}
-					return stored, new
-				},
-				wantErr: "Field 'boolVal' is already being materialized as endpoint type 'boolean' and cannot be changed to type 'object'",
-			},
-			{
-				name: "unsatisfiable type change for a key",
-				mutateSpecs: func(stored, new *pf.MaterializationSpec) (*pf.MaterializationSpec, *pf.MaterializationSpec) {
-					require.Equal(t, "intKey", new.Bindings[0].Collection.Projections[3].Field)
-					new.Bindings[0].Collection.Projections[3].Inference.Types = []string{pf.JsonTypeString}
-					return stored, new
-				},
-				wantErr: "Field 'intKey' is already being materialized as endpoint type 'integer' and cannot be changed to type 'string'",
-			},
-			{
-				name: "unsatisfiable type change for a value with backfill counter increment",
-				mutateSpecs: func(stored, new *pf.MaterializationSpec) (*pf.MaterializationSpec, *pf.MaterializationSpec) {
-					require.Equal(t, "boolVal", new.Bindings[0].Collection.Projections[0].Field)
-					new.Bindings[0].Collection.Projections[0].Inference.Types = []string{pf.JsonTypeObject}
-					new.Bindings[0].Backfill = new.Bindings[0].Backfill + 1
-					return stored, new
-				},
-				wantErr: "",
-			},
-			{
-				name: "backfill counter decrement is not allowed",
-				mutateSpecs: func(stored, new *pf.MaterializationSpec) (*pf.MaterializationSpec, *pf.MaterializationSpec) {
-					stored.Bindings[0].Backfill = 2
-					new.Bindings[0].Backfill = 1
-					return stored, new
-				},
-				wantErr: "validating binding for collection 'key/value': backfill count 1 is less than previously applied count of 2",
-			},
-			{
-				name: "forbidden type change for a value",
-				mutateSpecs: func(stored, new *pf.MaterializationSpec) (*pf.MaterializationSpec, *pf.MaterializationSpec) {
-					require.Equal(t, "boolVal", new.Bindings[0].Collection.Projections[0].Field)
-					new.Bindings[0].Collection.Projections[0].Inference.Types = []string{pf.JsonTypeNull}
-					return stored, new
-				},
-				wantErr: "Cannot materialize this field",
-			},
-			{
-				name: "projection is removed from field selection",
-				mutateSpecs: func(stored, new *pf.MaterializationSpec) (*pf.MaterializationSpec, *pf.MaterializationSpec) {
-					require.Equal(t, "boolVal", new.Bindings[0].Collection.Projections[0].Field)
-					new.Bindings[0].Collection.Projections = new.Bindings[0].Collection.Projections[1:]
-					new.Bindings[0].FieldSelection = pf.FieldSelection{
-						Keys:     []string{"stringKey", "intKey"},
-						Values:   []string{"stringFormatIntVal", "locRequiredVal"}, // Removed boolVal
-						Document: "flow_document",
-					}
-					return stored, new
-				},
-				wantErr: "",
-			},
-			{
-				name: "target conflict",
-				mutateSpecs: func(stored, new *pf.MaterializationSpec) (*pf.MaterializationSpec, *pf.MaterializationSpec) {
-					new.Bindings[0].Collection.Name = pf.Collection("other")
-					return stored, new
-				},
-				wantErr: "cannot add a new binding to materialize collection 'other' to '[key_value]' because an existing binding for collection 'key/value' is already materializing to '[key_value]'",
-			},
-		}
+	var snap strings.Builder
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema)
+			validator := NewValidator(testConstrainter{}, is)
 
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				storedSpec, newSpec := tt.mutateSpecs(loadSelectedFieldsSpec(t, "base.flow.proto"), loadSelectedFieldsSpec(t, "base.flow.proto"))
-				validator := NewValidator(testConstrainter{}, BasicInfoFromSpec(t, storedSpec, testMapType))
-
-				err := validator.ValidateSelectedFields(newSpec.Bindings[0], storedSpec)
-				if tt.wantErr == "" {
-					require.NoError(t, err)
-				} else {
-					require.ErrorContains(t, err, tt.wantErr)
-				}
-			})
-		}
-	})
-
-	t.Run("modified destination tests", func(t *testing.T) {
-		// These tests use a different spec for the InfoSchema, as a proxy for representing a
-		// materialized destination resource that is different than the field selection in some way.
-		t.Run("projection is removed from destination but not field selection", func(t *testing.T) {
-			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
-			newSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
-			isSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
-			require.Equal(t, "boolVal", isSpec.Bindings[0].Collection.Projections[0].Field)
-			isSpec.Bindings[0].Collection.Projections = isSpec.Bindings[0].Collection.Projections[1:]
-			isSpec.Bindings[0].FieldSelection = pf.FieldSelection{
-				Keys:     []string{"stringKey", "intKey"},
-				Values:   []string{"stringFormatIntVal", "locRequiredVal"}, // Removed boolVal
-				Document: "flow_document",
-			}
-
-			validator := NewValidator(testConstrainter{}, BasicInfoFromSpec(t, isSpec, testMapType))
-			err := validator.ValidateSelectedFields(newSpec.Bindings[0], storedSpec)
+			cs, err := validator.ValidateBinding(
+				[]string{"key_value"},
+				tt.deltaUpdates,
+				tt.proposedSpec.Bindings[0].Backfill,
+				tt.proposedSpec.Bindings[0].Collection,
+				tt.proposedSpec.Bindings[0].FieldSelection.FieldConfigJsonMap,
+				tt.specForInfoSchema,
+			)
 			require.NoError(t, err)
-		})
 
-		t.Run("field exists in destination but not in field selection", func(t *testing.T) {
-			storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
-			newSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
-			isSpec := loadSelectedFieldsSpec(t, "base-with-extra-field.flow.proto")
-
-			validator := NewValidator(testConstrainter{}, BasicInfoFromSpec(t, isSpec, testMapType))
-			err := validator.ValidateSelectedFields(newSpec.Bindings[0], storedSpec)
+			j, err := json.MarshalIndent(cs, "", "\t")
 			require.NoError(t, err)
+
+			snap.WriteString("--- Begin " + tt.name + " ---\n")
+			snap.WriteString(string(j))
+			snap.WriteString("\n--- End " + tt.name + " ---\n\n")
 		})
+	}
+	cupaloy.SnapshotT(t, snap.String())
+
+	t.Run("can't decrement backfill counter", func(t *testing.T) {
+		existing := loadValidateSpec(t, "increment-backfill.flow.proto")
+		proposed := loadValidateSpec(t, "base.flow.proto")
+		is := testInfoSchemaFromSpec(t, existing)
+		validator := NewValidator(testConstrainter{}, is)
+
+		_, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			existing,
+		)
+
+		require.ErrorContains(t, err, "backfill count 0 is less than previously applied count of 1")
 	})
 
-	t.Run("new binding to existing materialization", func(t *testing.T) {
-		storedSpec := loadSelectedFieldsSpec(t, "base.flow.proto")
-		newSpec := loadSelectedFieldsSpec(t, "new-binding.flow.proto")
-		require.Equal(t, "extra/collection", newSpec.Bindings[1].Collection.Name.String())
+	t.Run("can't switch from delta to standard updates", func(t *testing.T) {
+		existing := loadValidateSpec(t, "base.flow.proto")
+		proposed := loadValidateSpec(t, "base.flow.proto")
 
-		validator := NewValidator(testConstrainter{}, BasicInfoFromSpec(t, storedSpec, testMapType))
-		err := validator.ValidateSelectedFields(newSpec.Bindings[1], storedSpec)
+		existing.Bindings[0].DeltaUpdates = true
+
+		is := testInfoSchemaFromSpec(t, existing)
+		validator := NewValidator(testConstrainter{}, is)
+
+		_, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			existing,
+		)
+
+		require.ErrorContains(t, err, "changing from delta updates to standard updates is not allowed")
+	})
+
+	t.Run("can switch from delta updates to standard updates", func(t *testing.T) {
+		existing := loadValidateSpec(t, "base.flow.proto")
+		proposed := loadValidateSpec(t, "base.flow.proto")
+
+		proposed.Bindings[0].DeltaUpdates = true
+
+		is := testInfoSchemaFromSpec(t, existing)
+		validator := NewValidator(testConstrainter{}, is)
+
+		_, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			true,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			existing,
+		)
+
 		require.NoError(t, err)
+	})
+
+	t.Run("can't materialize two collections to the same target", func(t *testing.T) {
+		existing := loadValidateSpec(t, "base.flow.proto")
+		proposed := loadValidateSpec(t, "base.flow.proto")
+
+		proposed.Bindings[0].Collection.Name = pf.Collection("other")
+
+		is := testInfoSchemaFromSpec(t, existing)
+		validator := NewValidator(testConstrainter{}, is)
+
+		_, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			existing,
+		)
+
+		require.ErrorContains(t, err, "cannot add a new binding to materialize collection 'other' to '[key_value]' because an existing binding for collection 'key/value' is already materializing to '[key_value]'")
 	})
 }
 
@@ -524,6 +372,43 @@ func TestAsFormattedNumeric(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestForbidAmbiguousFields(t *testing.T) {
+	translate := func(in string) string {
+		return strings.ToLower(in)
+	}
+
+	v := Validator{
+		is: NewInfoSchema(
+			func(in []string) []string {
+				out := make([]string, 0, len(in))
+				for _, i := range in {
+					out = append(out, translate(i))
+				}
+				return out
+			},
+			translate,
+		),
+	}
+
+	originalConstraints := map[string]*pm.Response_Validated_Constraint{
+		"onlyOne":        {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is ok"},
+		"notGood":        {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "shouldn't be allowed"},
+		"NotGood":        {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "shouldn't be allowed"},
+		"somethingelse":  {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is ok"},
+		"something_else": {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is also ok"},
+	}
+
+	want := map[string]*pm.Response_Validated_Constraint{
+		"onlyOne":        {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is ok"},
+		"notGood":        {Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN, Reason: "Flow collection field 'notGood' would be materialized `notgood`, which is ambiguous with the materializations for other Flow collection fields [notGood,NotGood]. Consider using an alternate, unambiguous projection of this field to allow it to be materialized."},
+		"NotGood":        {Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN, Reason: "Flow collection field 'NotGood' would be materialized `notgood`, which is ambiguous with the materializations for other Flow collection fields [notGood,NotGood]. Consider using an alternate, unambiguous projection of this field to allow it to be materialized."},
+		"somethingelse":  {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is ok"},
+		"something_else": {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is also ok"},
+	}
+
+	require.Equal(t, want, v.forbidAmbiguousFields(originalConstraints))
 }
 
 type testConstrainter struct{}
