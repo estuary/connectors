@@ -3,16 +3,15 @@ collections:
     schema:
       type: object
       properties:
-        stringKey: { type: string }
-        intKey: { type: integer }
-        stringFormatIntVal: { type: string, format: integer }
-        boolVal: { type: boolean }
-        nullVal: { type: "null" }
-        locRequiredVal: { type: "string" }
-      required: [stringKey, intKey]
-    key: [/stringKey, /intKey]
+        key: { type: string }
+        scalarValue: { type: "string" }
+        numericString: { type: [integer, string], format: integer }
+        nullValue: { type: "null" }
+      required: [key, scalarValue]
+    key: [/key]
     projections:
-      alternate_root: ""
+      flow_document: ""
+      second_root: ""
 
 materializations:
   test/sqlite:

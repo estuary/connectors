@@ -31,6 +31,7 @@ materializations:
             nonScalarValue: {}
             multiple: {}
             optional: {}
+        backfill: 1
 
 storageMappings:
   "": { stores: [{ provider: S3, bucket: a-bucket }] }
