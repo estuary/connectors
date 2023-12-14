@@ -5,7 +5,7 @@ definitions:
   requester:
     url_base: "https://api.zoom.us/v2"
     http_method: "GET"
-    authenticator:
+    credentials:
       class_name: source_zoom.components.ServerToServerOauthAuthenticator
       client_id: "{{ config['client_id'] }}"
       account_id: "{{ config['account_id'] }}"
