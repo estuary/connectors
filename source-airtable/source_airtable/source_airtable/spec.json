@@ -69,7 +69,8 @@
           }
         ]
       }
-    }
+    },
+    "required": ["credentials"]
   },
   "advanced_auth": {
     "auth_flow_type": "oauth2.0",

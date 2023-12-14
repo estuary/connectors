@@ -1,0 +1,17 @@
+credentials:
+    api_key_sops: ENC[AES256_GCM,data:qfX9QAZgDMKJmmyELrzOVAoCRWcU6C8RiLDz5VLJGEqvKRE6OxJDi5DA8YYym7U+WgJH0Z2STm3+YJBYHr9RdElBLX95DXILQIZF/l1kHtAY6Q==,iv:TidCX9dCW7G0gkM6TV9nQOVjdhaB4u242w9JRKVAgq8=,tag:ReXjUzGaId61f/9ks+tSfQ==,type:str]
+    auth_method: api_key
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow
+          created_at: "2023-12-02T16:10:35Z"
+          enc: CiQAW8BC2Pi9uzReinT3A/UgbviqUnit4C69wsa7GvQDN1jKQdoSSQD00UdD5z1t8FJRGDObdrbAvoEU8/Uc8oM98zfer516OlsFj8LdIAYHc171iBTwkcqGNy6a7+avj8qJmhFNNJiTVXH146RnuLo=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2023-12-02T16:10:36Z"
+    mac: ENC[AES256_GCM,data:WGih3Gp1wV1WYLvT4NfrrgR4httEiDxyh/p4/M41dJS7NZVVvthY+axxnkAMXCtcCyEIjXxCIutF/oBYP9rKUUXxw0z3VJtJqcU6WUACxWcKIbYv7Sb7DyyULmvy4D8GvLDPfFhgwtXntia7voy9S5AkdPjSpWJ1SBWQiB2bZrs=,iv:cgY5zngindKu68GYdH6oTmrO06E6ZVNXgZRtMatPZuo=,tag:ewOm5HbA6DDdQbKYNArUdw==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3
