@@ -1,0 +1,92 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        key: { type: string }
+        intField: { type: string }
+        boolField: { type: integer }
+        stringField: { type: integer }
+        numField: { type: boolean }
+        objField: { type: string } # This may be interesting for endpoints that materialize objects as strings.
+        arrayField: { type: object } # This may be interesting for endpoints that materialize arrays and objects as the same thing.
+        nullField: { type: ["null", object] }
+        multipleField: { type: [string, integer, object, boolean] }
+        # All of the "format" modifiers have been removed from the rest of these.
+        stringDateField: { type: string }
+        stringDateTimeField: { type: string }
+        stringTimeField: { type: string }
+        stringNumberField: { type: string }
+        stringIntegerField: { type: string }
+        stringDurationField: { type: string }
+        stringIpv4Field: { type: string }
+        stringIpv6Field: { type: string }
+        stringMacAddrField: { type: string }
+        stringMacAddr8Field: { type: string }
+        stringUuidField: { type: string }
+        stringEmailField: { type: string }
+        stringHostnameField: { type: string }
+        stringUriField: { type: string }
+        stringUriReferenceField: { type: string }
+        stringUriTemplateField: { type: string }
+        stringJsonPointerField: { type: string }
+        stringRelativeJsonPointerField: { type: string }
+        stringRegexField: { type: string }
+        stringUint32Field: { type: string }
+        stringUint64Field: { type: string }
+        stringIdnHostnameField: { type: string }
+        stringIdnEmailField: { type: string }
+        stringIriField: { type: string }
+        stringIriReferenceField: { type: string }
+      required: [
+          key,
+          intField,
+          boolField,
+          stringField,
+          numField,
+          objField,
+          arrayField,
+          nullField,
+          multipleField,
+          stringDateField,
+          stringDateTimeField,
+          stringTimeField,
+          stringNumberField,
+          stringIntegerField,
+          stringDurationField,
+          stringIpv4Field,
+          stringIpv6Field,
+          stringMacAddrField,
+          stringMacAddr8Field,
+          stringUuidField,
+          stringEmailField,
+          stringHostnameField,
+          stringUriField,
+          stringUriReferenceField,
+          stringUriTemplateField,
+          stringJsonPointerField,
+          stringRelativeJsonPointerField,
+          stringRegexField,
+          stringUint32Field,
+          stringUint64Field,
+          stringIdnHostnameField,
+          stringIdnEmailField,
+          stringIriField,
+          stringIriReferenceField,
+        ]
+    key: [/key]
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: true
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }
