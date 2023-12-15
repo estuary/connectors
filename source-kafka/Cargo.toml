@@ -12,7 +12,6 @@ doctest = false
 proto-flow = { git = "https://github.com/estuary/flow", version = "0.0.0" }
 
 chrono = { version = "0.4.19", features = ["serde"] }
-anyhow = "1.0.75"
 eyre = "0.6.5"
 base64 = "0.21.5"
 highway = "0.6.4"
