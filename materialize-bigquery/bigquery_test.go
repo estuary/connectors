@@ -14,6 +14,7 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -46,6 +47,84 @@ func mustGetCfg(t *testing.T) config {
 	}
 
 	return out
+}
+
+func TestValidateAndApply(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := mustGetCfg(t)
+
+	resourceConfig := tableConfig{
+		Table:     "target",
+		Dataset:   cfg.Dataset,
+		projectID: cfg.ProjectID,
+	}
+
+	client, err := cfg.client(ctx)
+	require.NoError(t, err)
+	defer client.Close()
+
+	boilerplate.RunValidateAndApplyTestCases(
+		t,
+		newBigQueryDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			job, err := client.query(ctx, fmt.Sprintf(
+				"select column_name, is_nullable, data_type from %s where table_name = %s;",
+				bqDialect.Identifier(cfg.Dataset, "INFORMATION_SCHEMA", "COLUMNS"),
+				bqDialect.Literal(resourceConfig.Table),
+			))
+			require.NoError(t, err)
+
+			it, err := job.Read(ctx)
+			require.NoError(t, err)
+
+			type foundColumn struct {
+				Name     string `bigquery:"column_name"`
+				Nullable string `bigquery:"is_nullable"`
+				Type     string `bigquery:"data_Type"`
+			}
+
+			cols := []foundColumn{}
+			for {
+				var c foundColumn
+				if err = it.Next(&c); err == iterator.Done {
+					break
+				} else if err != nil {
+					require.NoError(t, err)
+				}
+				cols = append(cols, c)
+			}
+
+			slices.SortFunc(cols, func(a, b foundColumn) int {
+				return strings.Compare(a.Name, b.Name)
+			})
+
+			var out strings.Builder
+			enc := json.NewEncoder(&out)
+			for _, c := range cols {
+				require.NoError(t, enc.Encode(c))
+			}
+
+			return out.String()
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = client.query(ctx, fmt.Sprintf(
+				"drop table %s;",
+				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
+			))
+
+			_, _ = client.query(ctx, fmt.Sprintf(
+				"delete from %s where materialization = 'test/sqlite'",
+				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, sql.DefaultFlowMaterializations),
+			))
+		},
+	)
 }
 
 func TestFencingCases(t *testing.T) {
@@ -128,137 +207,6 @@ func TestFencingCases(t *testing.T) {
 			}
 
 			return b.String(), nil
-		},
-	)
-}
-
-func TestApply(t *testing.T) {
-	cfg := mustGetCfg(t)
-	ctx := context.Background()
-
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
-
-	firstTable := "first-table"
-	secondTable := "second-table"
-
-	firstResource := tableConfig{
-		Table:     firstTable,
-		Dataset:   cfg.Dataset,
-		projectID: cfg.ProjectID,
-	}
-	firstResourceJson, err := json.Marshal(firstResource)
-	require.NoError(t, err)
-
-	secondResource := tableConfig{
-		Table:     secondTable,
-		Dataset:   cfg.Dataset,
-		projectID: cfg.ProjectID,
-	}
-	secondResourceJson, err := json.Marshal(secondResource)
-	require.NoError(t, err)
-
-	boilerplate.RunApplyTestCases(
-		t,
-		newBigQueryDriver(),
-		configJson,
-		[2]json.RawMessage{firstResourceJson, secondResourceJson},
-		[2][]string{firstResource.Path(), secondResource.Path()},
-		func(t *testing.T) []string {
-			t.Helper()
-
-			client, err := cfg.client(ctx)
-			require.NoError(t, err)
-
-			job, err := client.query(ctx, fmt.Sprintf(
-				"select table_name from `%s`.INFORMATION_SCHEMA.TABLES;",
-				cfg.Dataset,
-			))
-			require.NoError(t, err)
-
-			it, err := job.Read(ctx)
-			require.NoError(t, err)
-
-			out := []string{}
-			for {
-				var row []bigquery.Value
-				if err = it.Next(&row); err == iterator.Done {
-					break
-				} else if err != nil {
-					require.NoError(t, err)
-				}
-				out = append(out, row[0].(string))
-			}
-
-			slices.Sort(out)
-
-			return out
-		},
-		func(t *testing.T, resourcePath []string) string {
-			t.Helper()
-
-			client, err := cfg.client(ctx)
-			require.NoError(t, err)
-
-			job, err := client.query(ctx, fmt.Sprintf(
-				"select column_name, is_nullable, data_type from `%s`.INFORMATION_SCHEMA.COLUMNS where table_name = '%s';",
-				resourcePath[1],
-				resourcePath[2],
-			))
-			require.NoError(t, err)
-
-			it, err := job.Read(ctx)
-			require.NoError(t, err)
-
-			type foundColumn struct {
-				Name     string `bigquery:"column_name"`
-				Nullable string `bigquery:"is_nullable"`
-				Type     string `bigquery:"data_Type"`
-			}
-
-			cols := []foundColumn{}
-			for {
-				var c foundColumn
-				if err = it.Next(&c); err == iterator.Done {
-					break
-				} else if err != nil {
-					require.NoError(t, err)
-				}
-				cols = append(cols, c)
-			}
-
-			slices.SortFunc(cols, func(a, b foundColumn) int {
-				if a.Name < b.Name {
-					return -1
-				} else if a.Name > b.Name {
-					return 1
-				} else {
-					return 0
-				}
-			})
-
-			b, err := json.MarshalIndent(cols, "", "  ")
-			require.NoError(t, err)
-
-			return string(b)
-		},
-		func(t *testing.T) {
-			t.Helper()
-
-			client, err := cfg.client(ctx)
-			require.NoError(t, err)
-
-			for _, tbl := range []string{firstTable, secondTable} {
-				_, _ = client.query(ctx, fmt.Sprintf(
-					"drop table %s;",
-					bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, tbl),
-				))
-			}
-
-			_, _ = client.query(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, "flow_materializations_v2"),
-			))
 		},
 	)
 }

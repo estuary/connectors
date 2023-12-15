@@ -10,13 +10,14 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
-	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 func mustGetCfg(t *testing.T) config {
@@ -51,6 +52,47 @@ func mustGetCfg(t *testing.T) config {
 	return out
 }
 
+func TestValidateAndApply(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := mustGetCfg(t)
+
+	resourceConfig := tableConfig{
+		Table:  "target",
+		Schema: "public",
+	}
+
+	db, err := stdsql.Open("pgx", cfg.toURI())
+	require.NoError(t, err)
+	defer db.Close()
+
+	boilerplate.RunValidateAndApplyTestCases(
+		t,
+		newRedshiftDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", rsDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = %s",
+				rsDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
+				rsDialect.Literal(materialization.String()),
+			))
+		},
+	)
+}
+
 func TestFencingCases(t *testing.T) {
 	// Because of the number of round-trips required for this test to run it is not run normally.
 	// Enable it via the TESTDB environment variable. It will take several minutes for this test to
@@ -81,80 +123,6 @@ func TestFencingCases(t *testing.T) {
 				return err
 			})
 			return
-		},
-	)
-}
-
-func TestApply(t *testing.T) {
-	cfg := mustGetCfg(t)
-
-	ctx := context.Background()
-
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
-
-	firstTable := "first-table"
-	secondTable := "second-table"
-
-	firstResource := tableConfig{
-		Table:  firstTable,
-		Schema: cfg.Schema,
-	}
-	firstResourceJson, err := json.Marshal(firstResource)
-	require.NoError(t, err)
-
-	secondResource := tableConfig{
-		Table:  secondTable,
-		Schema: cfg.Schema,
-	}
-	secondResourceJson, err := json.Marshal(secondResource)
-	require.NoError(t, err)
-
-	boilerplate.RunApplyTestCases(
-		t,
-		newRedshiftDriver(),
-		configJson,
-		[2]json.RawMessage{firstResourceJson, secondResourceJson},
-		[2][]string{firstResource.Path(), secondResource.Path()},
-		func(t *testing.T) []string {
-			t.Helper()
-
-			db, err := stdsql.Open("pgx", cfg.toURI())
-			require.NoError(t, err)
-
-			rows, err := sql.StdListTables(ctx, db, cfg.Database, cfg.Schema)
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T, resourcePath []string) string {
-			t.Helper()
-
-			db, err := stdsql.Open("pgx", cfg.toURI())
-			require.NoError(t, err)
-
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourcePath[0], resourcePath[1])
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-
-			db, err := stdsql.Open("pgx", cfg.toURI())
-			require.NoError(t, err)
-
-			for _, tbl := range []string{firstTable, secondTable} {
-				_, _ = db.ExecContext(ctx, fmt.Sprintf(
-					"drop table %s",
-					rsDialect.Identifier(cfg.Schema, tbl),
-				))
-			}
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				rsDialect.Identifier(cfg.Schema, "flow_materializations_v2"),
-			))
 		},
 	)
 }

@@ -1,0 +1,36 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        key: { type: string }
+        requiredString: { type: string }
+        requiredInteger: { type: integer }
+        requiredBoolean: { type: boolean }
+        requiredObject: { type: object }
+        optionalString: { type: string }
+        optionalInteger: { type: integer }
+        optionalBoolean: { type: boolean }
+        optionalObject: { type: object }
+        addedOptionalString: { type: string }
+      required:
+        [key, requiredString, requiredInteger, requiredBoolean, requiredObject]
+    key: [/key]
+    projections:
+      flow_document: ""
+      second_root: ""
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: true
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }

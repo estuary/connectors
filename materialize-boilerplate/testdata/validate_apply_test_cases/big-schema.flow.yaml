@@ -1,0 +1,91 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        key: { type: string }
+        intField: { type: integer }
+        boolField: { type: boolean }
+        stringField: { type: string }
+        numField: { type: number }
+        objField: { type: object }
+        arrayField: { type: array }
+        nullField: { type: "null" }
+        multipleField: { type: [string, integer, object] }
+        stringDateField: { type: string, format: date }
+        stringDateTimeField: { type: string, format: date-time }
+        stringTimeField: { type: string, format: time }
+        stringNumberField: { type: string, format: number }
+        stringIntegerField: { type: string, format: integer }
+        stringDurationField: { type: string, format: duration }
+        stringIpv4Field: { type: string, format: ipv4 }
+        stringIpv6Field: { type: string, format: ipv6 }
+        stringMacAddrField: { type: string, format: macaddr }
+        stringMacAddr8Field: { type: string, format: macaddr8 }
+        stringUuidField: { type: string, format: uuid }
+        stringEmailField: { type: string, format: email }
+        stringHostnameField: { type: string, format: hostname }
+        stringUriField: { type: string, format: uri }
+        stringUriReferenceField: { type: string, format: uri-reference }
+        stringUriTemplateField: { type: string, format: uri-template }
+        stringJsonPointerField: { type: string, format: json-pointer }
+        stringRelativeJsonPointerField: { type: string, format: relative-json-pointer }
+        stringRegexField: { type: string, format: regex }
+        stringUint32Field: { type: string, format: uint32 }
+        stringUint64Field: { type: string, format: uint64 }
+        stringIdnHostnameField: { type: string, format: idn-hostname }
+        stringIdnEmailField: { type: string, format: idn-email }
+        stringIriField: { type: string, format: iri }
+        stringIriReferenceField: { type: string, format: iri-reference }
+      required: [
+          key,
+          intField,
+          boolField,
+          stringField,
+          numField,
+          objField,
+          arrayField,
+          nullField,
+          multipleField,
+          stringDateField,
+          stringDateTimeField,
+          stringTimeField,
+          stringNumberField,
+          stringIntegerField,
+          stringDurationField,
+          stringIpv4Field,
+          stringIpv6Field,
+          stringMacAddrField,
+          stringMacAddr8Field,
+          stringUuidField,
+          stringEmailField,
+          stringHostnameField,
+          stringUriField,
+          stringUriReferenceField,
+          stringUriTemplateField,
+          stringJsonPointerField,
+          stringRelativeJsonPointerField,
+          stringRegexField,
+          stringUint32Field,
+          stringUint64Field,
+          stringIdnHostnameField,
+          stringIdnEmailField,
+          stringIriField,
+          stringIriReferenceField,
+        ]
+    key: [/key]
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: true
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }

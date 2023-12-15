@@ -272,38 +272,6 @@ func (col anyColumn) String() string {
 	return string(col)
 }
 
-// StdListTables is a convenience function for getting a list of tables for Client implementations
-// which use Go's standard `sql.DB` type and systems with an information_schema schema.
-func StdListTables(ctx context.Context, db *sql.DB, catalog string, schema string) ([]string, error) {
-	rows, err := db.QueryContext(
-		ctx,
-		fmt.Sprintf(
-			"select table_name from information_schema.tables where table_catalog = '%s' and table_schema = '%s';",
-			catalog,
-			schema,
-		))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := []string{}
-	for rows.Next() {
-		var tableName string
-		if err := rows.Scan(&tableName); err != nil {
-			return nil, err
-		}
-		out = append(out, tableName)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	slices.Sort(out)
-
-	return out, nil
-}
-
 // StdGetSchema is a convenience function for getting a formatted schema for a table for Client
 // implementations which use Go's standard `sql.DB` type and systems with an information_schema
 // schema.
@@ -346,21 +314,18 @@ func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string
 	}
 
 	slices.SortFunc(cols, func(a, b foundColumn) int {
-		if a.Name < b.Name {
-			return -1
-		} else if a.Name > b.Name {
-			return 1
-		} else {
-			return 0
-		}
+		return strings.Compare(a.Name, b.Name)
 	})
 
-	b, err := json.MarshalIndent(cols, "", "  ")
-	if err != nil {
-		return "", err
+	var out strings.Builder
+	enc := json.NewEncoder(&out)
+	for _, c := range cols {
+		if err := enc.Encode(c); err != nil {
+			return "", err
+		}
 	}
 
-	return string(b), nil
+	return out.String(), nil
 }
 
 // StdFetchInfoSchema returns the existing columns for implementations that use a standard *sql.DB

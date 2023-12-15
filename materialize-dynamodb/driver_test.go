@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -15,82 +16,65 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	accessKeyId     = flag.String("awsAccessKeyId", "keyid", "AWS Access Key ID for materializing to DynamoDB.")
-	secretAccessKey = flag.String("awsSecretAccessKey", "secret", "AWS Secret Access Key for materializing to DynamoDB.")
-	region          = flag.String("region", "region", "Region of the materialized tables.")
-	endpoint        = flag.String("endpoint", "http://localhost:8000", "The AWS endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS.")
-)
-
-func TestApply(t *testing.T) {
-	ctx := context.Background()
-	flag.Parse()
-
-	cfg := config{
-		AWSAccessKeyID:     *accessKeyId,
-		AWSSecretAccessKey: *secretAccessKey,
-		Region:             *region,
+func testConfig() *config {
+	return &config{
+		AWSAccessKeyID:     "anything",
+		AWSSecretAccessKey: "anything",
+		Region:             "anything",
 		Advanced: advancedConfig{
-			Endpoint: *endpoint,
+			Endpoint: "http://localhost:8000",
 		},
 	}
+}
 
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
+func TestValidateAndApply(t *testing.T) {
+	ctx := context.Background()
 
-	firstTable := "first-table"
-	secondTable := "second-table"
+	flag.Parse()
 
-	firstResource := resource{
-		Table:        firstTable,
-		DeltaUpdates: false,
+	cfg := testConfig()
+
+	resourceConfig := resource{
+		Table: "target",
 	}
-	firstResourceJson, err := json.Marshal(firstResource)
-	require.NoError(t, err)
-
-	secondResource := resource{
-		Table:        secondTable,
-		DeltaUpdates: false,
-	}
-	secondResourceJson, err := json.Marshal(secondResource)
-	require.NoError(t, err)
 
 	client, err := cfg.client(ctx)
 	require.NoError(t, err)
 
-	boilerplate.RunApplyTestCases(
+	boilerplate.RunValidateAndApplyTestCases(
 		t,
 		driver{},
-		configJson,
-		[2]json.RawMessage{firstResourceJson, secondResourceJson},
-		[2][]string{{firstTable}, {secondTable}},
-		func(t *testing.T) []string {
-			listing, err := client.db.ListTables(ctx, &dynamodb.ListTablesInput{})
-			require.NoError(t, err)
-
-			return listing.TableNames
-		},
-		func(t *testing.T, resourcePath []string) string {
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
 			t.Helper()
 
 			d, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-				TableName: aws.String(resourcePath[0]),
+				TableName: aws.String(resourceConfig.Table),
 			})
 			require.NoError(t, err)
 
-			b, err := json.MarshalIndent(d.Table.AttributeDefinitions, "", "  ")
-			require.NoError(t, err)
+			slices.SortFunc(d.Table.AttributeDefinitions, func(i, j types.AttributeDefinition) int {
+				return strings.Compare(*i.AttributeName, *j.AttributeName)
+			})
 
-			return string(b)
+			var out strings.Builder
+			enc := json.NewEncoder(&out)
+			for _, r := range d.Table.AttributeDefinitions {
+				require.NoError(t, enc.Encode(r))
+			}
+
+			return out.String()
 		},
-		func(t *testing.T) {
+		func(t *testing.T, materialization pf.Materialization) {
 			t.Helper()
 
-			deleteTable := func(table string) {
+			for _, table := range []string{resourceConfig.Table, metaTableName} {
 				_, err := client.db.DeleteTable(ctx, &dynamodb.DeleteTableInput{
 					TableName: aws.String(table),
 				})
@@ -113,10 +97,6 @@ func TestApply(t *testing.T) {
 					time.Sleep(5 * time.Millisecond)
 				}
 			}
-
-			deleteTable(firstTable)
-			deleteTable(secondTable)
-			deleteTable(metaTableName)
 		},
 	)
 }

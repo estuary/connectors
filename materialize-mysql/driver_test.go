@@ -7,14 +7,22 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	_ "github.com/go-sql-driver/mysql"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/go-sql-driver/mysql"
 )
+
+//go:generate ../materialize-boilerplate/testdata/generate-spec-proto.sh testdata/apply-changes.flow.yaml
 
 func testConfig() *config {
 	return &config{
@@ -24,6 +32,126 @@ func testConfig() *config {
 		Database: "flow",
 		Timezone: "UTC",
 	}
+}
+
+func TestValidateAndApply(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := testConfig()
+
+	resourceConfig := tableConfig{
+		Table: "target",
+	}
+
+	db, err := stdsql.Open("mysql", cfg.ToURI())
+	require.NoError(t, err)
+	defer db.Close()
+
+	boilerplate.RunValidateAndApplyTestCases(
+		t,
+		newMysqlDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := sql.StdGetSchema(ctx, db, "def", cfg.Database, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = 'test/sqlite'",
+				testDialect.Identifier(sql.DefaultFlowMaterializations),
+			))
+		},
+	)
+}
+
+func TestApplyChanges(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := testConfig()
+	configJson, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	resourceConfig := tableConfig{
+		Table: "data_types",
+	}
+	resourceConfigJson, err := json.Marshal(resourceConfig)
+	require.NoError(t, err)
+
+	db, err := stdsql.Open("mysql", cfg.ToURI())
+	require.NoError(t, err)
+	defer db.Close()
+
+	cleanup := func() {
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", testDialect.Identifier(resourceConfig.Table)))
+	}
+	cleanup()
+	defer cleanup()
+
+	// These data types are somewhat interesting as test-cases to make sure we don't lose anything
+	// about them when dropping nullability constraints, since we must re-state the column
+	// definition when doing that.
+	q := fmt.Sprintf(`
+	CREATE TABLE %s(
+		vc123 VARCHAR(123) NOT NULL,
+		vc256 VARCHAR(256) NOT NULL,
+		t TEXT NOT NULL,
+		lt LONGTEXT NOT NULL,
+		n60 NUMERIC(65,0) NOT NULL,
+		d DECIMAL NOT NULL,
+		n NUMERIC NOT NULL,
+		mn NUMERIC(30,5) NOT NULL,
+		b123 BINARY(123) NOT NULL,
+		vb123 VARBINARY(123) NOT NULL
+	);
+	`,
+		testDialect.Identifier(resourceConfig.Table),
+	)
+
+	_, err = db.ExecContext(ctx, q)
+	require.NoError(t, err)
+
+	// Initial snapshot of the table, as created.
+	original, err := snapshotTable(ctx, db, "def", cfg.Database, resourceConfig.Table)
+	require.NoError(t, err)
+
+	// Apply the spec, which will drop the nullability constraints because none of the fields are in
+	// the materialized collection.
+
+	specBytes, err := os.ReadFile("testdata/generated_specs/apply-changes.flow.proto")
+	require.NoError(t, err)
+	var spec pf.MaterializationSpec
+	require.NoError(t, spec.Unmarshal(specBytes))
+
+	spec.ConfigJson = configJson
+	spec.Bindings[0].ResourceConfigJson = resourceConfigJson
+	spec.Bindings[0].ResourcePath = resourceConfig.Path()
+
+	_, err = newMysqlDriver().Apply(ctx, &pm.Request_Apply{
+		Materialization: &spec,
+		Version:         "",
+		DryRun:          false,
+	})
+	require.NoError(t, err)
+
+	// Snapshot of the table after our apply.
+	new, err := snapshotTable(ctx, db, "def", cfg.Database, resourceConfig.Table)
+	require.NoError(t, err)
+
+	var snap strings.Builder
+	snap.WriteString("Pre-Apply Table Schema:\n")
+	snap.WriteString(original)
+	snap.WriteString("\nPost-Apply Table Schema:\n")
+	snap.WriteString(new)
+	cupaloy.SnapshotT(t, snap.String())
 }
 
 func TestFencingCases(t *testing.T) {
@@ -49,78 +177,6 @@ func TestFencingCases(t *testing.T) {
 		},
 		func(table sql.Table) (out string, err error) {
 			return sql.StdDumpTable(ctx, c.(*client).db, table)
-		},
-	)
-}
-
-func TestApply(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
-
-	firstTable := "first-table"
-	secondTable := "second-table"
-
-	firstResource := tableConfig{
-		Table: firstTable,
-	}
-	firstResourceJson, err := json.Marshal(firstResource)
-	require.NoError(t, err)
-
-	secondResource := tableConfig{
-		Table: secondTable,
-	}
-	secondResourceJson, err := json.Marshal(secondResource)
-	require.NoError(t, err)
-
-	boilerplate.RunApplyTestCases(
-		t,
-		newMysqlDriver(),
-		configJson,
-		[2]json.RawMessage{firstResourceJson, secondResourceJson},
-		[2][]string{firstResource.Path(), secondResource.Path()},
-		func(t *testing.T) []string {
-			t.Helper()
-
-			db, err := stdsql.Open("mysql", cfg.ToURI())
-			require.NoError(t, err)
-
-			rows, err := sql.StdListTables(ctx, db, "def", cfg.Database)
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T, resourcePath []string) string {
-			t.Helper()
-
-			db, err := stdsql.Open("mysql", cfg.ToURI())
-			require.NoError(t, err)
-
-			sch, err := sql.StdGetSchema(ctx, db, "def", cfg.Database, resourcePath[0])
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-
-			db, err := stdsql.Open("mysql", cfg.ToURI())
-			require.NoError(t, err)
-
-			for _, tbl := range []string{firstTable, secondTable} {
-				_, _ = db.ExecContext(ctx, fmt.Sprintf(
-					"drop table %s",
-					testDialect.Identifier(tbl),
-				))
-			}
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				testDialect.Identifier("flow_materializations_v2"),
-			))
 		},
 	)
 }
@@ -190,4 +246,58 @@ func TestPrereqs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func snapshotTable(ctx context.Context, db *stdsql.DB, catalog string, schema string, name string) (string, error) {
+	q := fmt.Sprintf(`
+	select column_name, is_nullable, data_type, column_type
+	from information_schema.columns
+	where 
+		table_catalog = '%s' 
+		and table_schema = '%s'
+		and table_name = '%s';
+`,
+		catalog,
+		schema,
+		name,
+	)
+
+	rows, err := db.QueryContext(ctx, q)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	type foundColumn struct {
+		Name       string
+		Nullable   string
+		Type       string
+		ColumnType string
+	}
+
+	cols := []foundColumn{}
+	for rows.Next() {
+		var c foundColumn
+		if err := rows.Scan(&c.Name, &c.Nullable, &c.Type, &c.ColumnType); err != nil {
+			return "", err
+		}
+		cols = append(cols, c)
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+
+	slices.SortFunc(cols, func(a, b foundColumn) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	var out strings.Builder
+	enc := json.NewEncoder(&out)
+	for _, c := range cols {
+		if err := enc.Encode(c); err != nil {
+			return "", err
+		}
+	}
+
+	return out.String(), nil
 }
