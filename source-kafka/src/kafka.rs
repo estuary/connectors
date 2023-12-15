@@ -43,12 +43,14 @@ impl ClientContext for FlowConsumerContext {
     const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
 
     fn generate_oauth_token(&self, _oauthbearer_config: Option<&str>) -> Result<OAuthToken, Box<dyn StdError>>  {
+        eprintln!("generate_oauth_token {:?}", self.auth);
         if let Some(Authentication::AWS { region, access_key_id, secret_access_key }) = &self.auth {
             let (token, lifetime_ms) = crate::msk_oauthbearer::token(region, access_key_id, secret_access_key)?;
+            eprintln!("generate_oauth_token {}, {}", token, lifetime_ms);
             return Ok(OAuthToken {
-                principal_name: "flow".to_string(),
+                principal_name: "kafka-cluster".to_string(),
                 token,
-                lifetime_ms,
+                lifetime_ms: lifetime_ms.try_into()?,
             })
         } else {
             return Err(anyhow::anyhow!("generate_oauth_token called without AWS credentials").into())
@@ -60,6 +62,7 @@ impl ConsumerContext for FlowConsumerContext {}
 pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsumer<FlowConsumerContext>, Error> {
     let mut config = ClientConfig::new();
 
+    config.set("debug", "all");
     config.set("bootstrap.servers", configuration.brokers());
 
     // We want to avoid writing ConsumerGroup commits back to Kafka. We manage
