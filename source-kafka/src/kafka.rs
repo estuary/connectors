@@ -12,7 +12,7 @@ use rdkafka::client::{OAuthToken, ClientContext};
 use serde_json::json;
 
 use crate::catalog::Resource;
-use crate::configuration::{Configuration, Authentication};
+use crate::configuration::{Configuration, Credentials};
 use crate::{catalog, state};
 
 const KAFKA_TIMEOUT: Duration = Duration::from_secs(5);
@@ -36,14 +36,14 @@ pub enum Error {
 }
 
 pub struct FlowConsumerContext {
-    auth: Option<Authentication>,
+    auth: Option<Credentials>,
 }
 
 impl ClientContext for FlowConsumerContext {
     const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
 
     fn generate_oauth_token(&self, _oauthbearer_config: Option<&str>) -> Result<OAuthToken, Box<dyn StdError>>  {
-        if let Some(Authentication::AWS { region, access_key_id, secret_access_key }) = &self.auth {
+        if let Some(Credentials::AWS { region, access_key_id, secret_access_key }) = &self.auth {
             let (token, lifetime_ms) = crate::msk_oauthbearer::token(region, access_key_id, secret_access_key)?;
             return Ok(OAuthToken {
                 principal_name: "flow-kafka-capture".to_string(),
@@ -74,13 +74,13 @@ pub fn consumer_from_config(configuration: &Configuration) -> eyre::Result<BaseC
 
     config.set("security.protocol", configuration.security_protocol());
 
-    let ctx = FlowConsumerContext { auth: configuration.authentication.clone() };
+    let ctx = FlowConsumerContext { auth: configuration.credentials.clone() };
 
-    if let Some(Authentication::UserPassword { mechanism, username, password }) = &configuration.authentication {
+    if let Some(Credentials::UserPassword { mechanism, username, password }) = &configuration.credentials {
         config.set("sasl.mechanism", mechanism.to_string());
         config.set("sasl.username", username);
         config.set("sasl.password", password);
-    } else if let Some(Authentication::AWS { .. }) = &configuration.authentication {
+    } else if let Some(Credentials::AWS { .. }) = &configuration.credentials {
         config.set("sasl.mechanism", "OAUTHBEARER");
 
         if configuration.security_protocol() != "SASL_SSL" {
@@ -90,7 +90,7 @@ pub fn consumer_from_config(configuration: &Configuration) -> eyre::Result<BaseC
 
     let consumer: BaseConsumer<FlowConsumerContext> = config.create_with_context(ctx).map_err(Error::Config)?;
 
-    if let Some(Authentication::AWS { .. }) = &configuration.authentication {
+    if let Some(Credentials::AWS { .. }) = &configuration.credentials {
         // In order to generate an initial OAuth Bearer token to be used by the consumer
         // we need to call poll once.
         // See https://docs.confluent.io/platform/current/clients/librdkafka/html/classRdKafka_1_1OAuthBearerTokenRefreshCb.html
