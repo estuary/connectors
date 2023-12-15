@@ -375,7 +375,13 @@ func (s columnSchema) toType() *jsonschema.Schema {
 
 var snowflakeTypeToJSON = map[string]columnSchema{
 	// "NUMBER":  {jsonType: "number"}, // The 'NUMBER' column type is handled in code
-	"TEXT":    {jsonType: "string"},
-	"FLOAT":   {jsonType: "number"},
-	"BOOLEAN": {jsonType: "boolean"},
+	"TEXT":          {jsonType: "string"},
+	"FLOAT":         {jsonType: "number"},
+	"BOOLEAN":       {jsonType: "boolean"},
+	"BINARY":        {jsonType: "string", contentEncoding: "base64"},
+	"TIME":          {jsonType: "string", format: "date-time"},
+	"DATE":          {jsonType: "string", format: "date-time"},
+	"TIMESTAMP_TZ":  {jsonType: "string", format: "date-time"},
+	"TIMESTAMP_NTZ": {jsonType: "string", format: "date-time"},
+	"TIMESTAMP_LTZ": {jsonType: "string", format: "date-time"},
 }
