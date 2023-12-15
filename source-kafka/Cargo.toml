@@ -16,10 +16,14 @@ anyhow = "1.0.75"
 eyre = "0.6.5"
 base64 = "0.21.5"
 highway = "0.6.4"
+http = "*"
+aws-sdk-iam = "1.7.0"
+aws-smithy-runtime-api = "1.1.1"
+aws-sigv4 = { version = "1.1.1", features = ["sign-http", "http0-compat"] }
 rdkafka = { version = "0.36", features = ["cmake-build", "gssapi", "libz", "sasl", "ssl"], default-features = false }
 #rdkafka = { version = "0.36", features = ["dynamic-linking", "gssapi", "libz", "sasl", "ssl"], default-features = false }
+#sasl2-sys = { version = "0.1.14", features = ["vendored" ] }
 reqwest = { version = "0.11.22", features = ["json", "blocking"] }
-aws-sign-v4 = "0.2.0"
 schemars = "0.8.3"
 serde = { version = "1.0.96", features = ["derive"] }
 serde_json = "1.0.96"
@@ -28,7 +32,6 @@ structopt = "0.3.22"
 thiserror = "1.0.26"
 tracing = "0.1.25"
 tracing-subscriber = "0.2.19"
-#sasl2-sys = { version = "0.1.14", features = ["vendored" ] }
 
 [dev-dependencies]
 insta = { version = "1.8.0", features = ["redactions", "yaml"] }
