@@ -5,14 +5,16 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
-	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/databricks/databricks-sql-go"
 )
 
 func mustGetCfg(t *testing.T) config {
@@ -45,74 +47,42 @@ func mustGetCfg(t *testing.T) config {
 	return out
 }
 
-func TestApply(t *testing.T) {
-	cfg := mustGetCfg(t)
+func TestValidateAndApply(t *testing.T) {
 	ctx := context.Background()
 
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
+	cfg := mustGetCfg(t)
 
-	firstTable := "first-table"
-	secondTable := "second-table"
-
-	firstResource := tableConfig{
-		Table:  firstTable,
+	resourceConfig := tableConfig{
+		Table:  "target",
 		Schema: cfg.SchemaName,
 	}
-	firstResourceJson, err := json.Marshal(firstResource)
-	require.NoError(t, err)
 
-	secondResource := tableConfig{
-		Table:  secondTable,
-		Schema: cfg.SchemaName,
-	}
-	secondResourceJson, err := json.Marshal(secondResource)
+	db, err := stdsql.Open("databricks", cfg.ToURI())
 	require.NoError(t, err)
+	defer db.Close()
 
-	boilerplate.RunApplyTestCases(
+	boilerplate.RunValidateAndApplyTestCases(
 		t,
 		newDatabricksDriver(),
-		configJson,
-		[2]json.RawMessage{firstResourceJson, secondResourceJson},
-		[2][]string{firstResource.Path(), secondResource.Path()},
-		func(t *testing.T) []string {
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
 			t.Helper()
 
-			db, err := stdsql.Open("databricks", cfg.ToURI())
-			require.NoError(t, err)
-
-			rows, err := sql.StdListTables(ctx, db, cfg.CatalogName, cfg.SchemaName)
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T, resourcePath []string) string {
-			t.Helper()
-
-			db, err := stdsql.Open("databricks", cfg.ToURI())
-			require.NoError(t, err)
-
-			sch, err := sql.StdGetSchema(ctx, db, cfg.CatalogName, resourcePath[0], resourcePath[1])
+			sch, err := sql.StdGetSchema(ctx, db, cfg.CatalogName, resourceConfig.Schema, resourceConfig.Table)
 			require.NoError(t, err)
 
 			return sch
 		},
-		func(t *testing.T) {
+		func(t *testing.T, materialization pf.Materialization) {
 			t.Helper()
 
-			db, err := stdsql.Open("databricks", cfg.ToURI())
-			require.NoError(t, err)
-
-			for _, tbl := range []string{firstTable, secondTable} {
-				_, _ = db.ExecContext(ctx, fmt.Sprintf(
-					"drop table %s",
-					databricksDialect.Identifier([]string{cfg.CatalogName, cfg.SchemaName, tbl}...),
-				))
-			}
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", databricksDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
 
 			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				databricksDialect.Identifier([]string{cfg.CatalogName, cfg.SchemaName, "flow_materializations_v2"}...),
+				"delete from %s where materialization = %s",
+				databricksDialect.Identifier(cfg.SchemaName, sql.DefaultFlowMaterializations),
+				databricksDialect.Literal(materialization.String()),
 			))
 		},
 	)

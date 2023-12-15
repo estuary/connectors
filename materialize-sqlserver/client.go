@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -90,27 +91,36 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		statements = append(statements, addColumnsStmt.String())
 	}
 
-	// Dropping a NOT NULL constraint requires re-stating the full field definition without the NOT
-	// NULL part. The `data_type` from the information_schema.columns can mostly be used as the
-	// column's definition, except for some column types that have a length component. These must be
-	// augmented with the `character_maximum_length`.
-	typesWithLengths := []string{"VARCHAR", "NVARCHAR", "VARBINARY"}
-	for _, dn := range ta.DropNotNulls {
-		ddl := strings.ToUpper(dn.Type)
-		if slices.Contains(typesWithLengths, ddl) {
-			if dn.CharacterMaxLength == -1 {
-				ddl = fmt.Sprintf("%s(MAX)", ddl)
-			} else {
-				ddl = fmt.Sprintf("%s(%d)", ddl, dn.CharacterMaxLength)
-			}
+	if len(ta.DropNotNulls) > 0 {
+		// Dropping a NOT NULL constraint requires re-stating the full field definition without the
+		// NOT NULL part. The `data_type` from the information_schema.columns can mostly be used as
+		// the column's definition. Some columns have a length component which must be included, and
+		// string-type columns also have an collation that needs to be considered. Flow will create
+		// new string-type columns with a selected collation, but won't change the collation for
+		// pre-existing columns.
+		tableDetails, err := tableDetails(ctx, c.db, c.ep.Dialect, c.cfg.Database, ta.InfoLocation.TableSchema, ta.InfoLocation.TableName)
+		if err != nil {
+			return "", nil, fmt.Errorf("getting table details: %w", err)
 		}
 
-		statements = append(statements, fmt.Sprintf(
-			"ALTER TABLE %s ALTER COLUMN %s %s;",
-			ta.Identifier,
-			c.ep.Dialect.Identifier(dn.Name),
-			ddl,
-		))
+		for _, dn := range ta.DropNotNulls {
+			col, ok := tableDetails[dn.Name]
+			if !ok {
+				return "", nil, fmt.Errorf("could not find column info for %q", dn.Name)
+			}
+
+			ddl, err := col.nullableDDL()
+			if err != nil {
+				return "", nil, err
+			}
+
+			statements = append(statements, fmt.Sprintf(
+				"ALTER TABLE %s ALTER COLUMN %s %s;",
+				ta.Identifier,
+				c.ep.Dialect.Identifier(dn.Name),
+				ddl,
+			))
+		}
 	}
 
 	return strings.Join(statements, "\n"), func(ctx context.Context) error {
@@ -154,4 +164,70 @@ func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, mater
 
 func (c *client) Close() {
 	c.db.Close()
+}
+
+func tableDetails(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, catalog string, tableSchema string, tableName string) (map[string]foundColumn, error) {
+	columns := make(map[string]foundColumn)
+
+	rows, err := db.QueryContext(ctx, fmt.Sprintf(`
+		select column_name, is_nullable, data_type, character_maximum_length, collation_name, numeric_precision, numeric_scale, datetime_precision
+		from information_schema.columns where table_catalog=%s and table_schema=%s and table_name=%s
+		`,
+		dialect.Literal(catalog),
+		dialect.Literal(tableSchema),
+		dialect.Literal(tableName),
+	))
+	if err != nil {
+		return nil, fmt.Errorf("querying table %q in schema %q for table details: %w", tableSchema, tableName, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var col foundColumn
+		if err := rows.Scan(&col.Name, &col.Nullable, &col.Type, &col.CharacterMaximumLength, &col.CollationName, &col.NumericPrecision, &col.NumericScale, &col.DatetimePrecision); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+		columns[col.Name] = col
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("closing rows: %w", err)
+	}
+
+	return columns, nil
+}
+
+type foundColumn struct {
+	Name                   string
+	Nullable               string
+	Type                   string
+	CollationName          stdsql.NullString
+	CharacterMaximumLength stdsql.NullInt64
+	NumericPrecision       stdsql.NullInt64
+	NumericScale           stdsql.NullInt64
+	DatetimePrecision      stdsql.NullInt64
+}
+
+func (c foundColumn) nullableDDL() (string, error) {
+	ddl := strings.ToUpper(c.Type)
+
+	intOrMax := func(i int64) string {
+		if i == -1 {
+			return "MAX"
+		}
+		return strconv.Itoa(int(i))
+	}
+
+	if slices.Contains([]string{"DECIMAL", "NUMERIC"}, ddl) { // Precision and scale.
+		ddl += fmt.Sprintf("(%d,%d)", c.NumericPrecision.Int64, c.NumericScale.Int64)
+	} else if slices.Contains([]string{"TIME", "DATETIME2", "DATETIMEOFFSET"}, ddl) { // Datetime precision.
+		ddl += fmt.Sprintf("(%d)", c.DatetimePrecision.Int64)
+	} else if c.CharacterMaximumLength.Valid && ddl != "TEXT" { // TEXT always uses the maximum allowable length.
+		ddl += fmt.Sprintf("(%s)", intOrMax(c.CharacterMaximumLength.Int64))
+	}
+
+	if c.CollationName.Valid {
+		ddl += fmt.Sprintf(" COLLATE %s", c.CollationName.String)
+	}
+
+	return ddl, nil
 }

@@ -10,11 +10,13 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/snowflakedb/gosnowflake"
 )
 
 func mustGetCfg(t *testing.T) config {
@@ -44,6 +46,47 @@ func mustGetCfg(t *testing.T) config {
 	}
 
 	return out
+}
+
+func TestValidateAndApply(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := mustGetCfg(t)
+
+	resourceConfig := tableConfig{
+		Table:  "TARGET",
+		Schema: "PUBLIC",
+	}
+
+	db, err := stdsql.Open("snowflake", cfg.ToURI("testing"))
+	require.NoError(t, err)
+	defer db.Close()
+
+	boilerplate.RunValidateAndApplyTestCases(
+		t,
+		newSnowflakeDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = %s",
+				testDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
+				testDialect.Literal(materialization.String()),
+			))
+		},
+	)
 }
 
 func TestSpecification(t *testing.T) {
@@ -84,81 +127,6 @@ func TestFencingCases(t *testing.T) {
 		},
 		func(table sql.Table) (out string, err error) {
 			return sql.StdDumpTable(ctx, c.(*client).db, table)
-		},
-	)
-}
-
-func TestApply(t *testing.T) {
-	cfg := mustGetCfg(t)
-	ctx := context.Background()
-
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
-
-	firstTable := "first-table"
-	secondTable := "second-table"
-
-	firstResource := tableConfig{
-		Table:          firstTable,
-		Schema:         cfg.Schema,
-		endpointSchema: cfg.Schema,
-	}
-	firstResourceJson, err := json.Marshal(firstResource)
-	require.NoError(t, err)
-
-	secondResource := tableConfig{
-		Table:          secondTable,
-		Schema:         cfg.Schema,
-		endpointSchema: cfg.Schema,
-	}
-	secondResourceJson, err := json.Marshal(secondResource)
-	require.NoError(t, err)
-
-	boilerplate.RunApplyTestCases(
-		t,
-		newSnowflakeDriver(),
-		configJson,
-		[2]json.RawMessage{firstResourceJson, secondResourceJson},
-		[2][]string{firstResource.Path(), secondResource.Path()},
-		func(t *testing.T) []string {
-			t.Helper()
-
-			db, err := stdsql.Open("snowflake", cfg.ToURI("testing"))
-			require.NoError(t, err)
-
-			rows, err := sql.StdListTables(ctx, db, cfg.Database, cfg.Schema)
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T, resourcePath []string) string {
-			t.Helper()
-
-			db, err := stdsql.Open("snowflake", cfg.ToURI("testing"))
-			require.NoError(t, err)
-
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, cfg.Schema, resourcePath[0])
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-
-			db, err := stdsql.Open("snowflake", cfg.ToURI("testing"))
-			require.NoError(t, err)
-
-			for _, tbl := range []string{firstTable, secondTable} {
-				_, _ = db.ExecContext(ctx, fmt.Sprintf(
-					"drop table %s",
-					testDialect.Identifier(cfg.Schema, tbl),
-				))
-			}
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				testDialect.Identifier(cfg.Schema, "flow_materializations_v2"),
-			))
 		},
 	)
 }
