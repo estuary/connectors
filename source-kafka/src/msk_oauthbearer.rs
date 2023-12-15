@@ -49,12 +49,10 @@ pub fn token(region: &str, access_key_id: &str, secret_access_key: &str) -> anyh
 
     // Sign and then apply the signature to the request
     let (signing_instructions, _signature) = sign(signable_request, &signing_params)?.into_parts();
-    eprintln!("{:#?}, {:#?}", signing_instructions, _signature);
     signing_instructions.apply_to_request_http0x(&mut signed_req);
 
     let signed_url = format!("{}&User-Agent=EstuaryFlowCapture", signed_req.uri().to_string());
 
-    eprintln!("signed request {:#?}", signed_url);
     let token = BASE64_URL_SAFE_NO_PAD.encode(signed_url);
     let expires_in = (now + expiry_duration).duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
 
