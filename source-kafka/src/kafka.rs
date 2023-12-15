@@ -51,13 +51,13 @@ impl ClientContext for FlowConsumerContext {
                 lifetime_ms: lifetime_ms.try_into()?,
             })
         } else {
-            return Err(anyhow::anyhow!("generate_oauth_token called without AWS credentials").into())
+            return Err(eyre::eyre!("generate_oauth_token called without AWS credentials").into())
         }
     }
 }
 impl ConsumerContext for FlowConsumerContext {}
 
-pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsumer<FlowConsumerContext>, Error> {
+pub fn consumer_from_config(configuration: &Configuration) -> eyre::Result<BaseConsumer<FlowConsumerContext>> {
     let mut config = ClientConfig::new();
 
     config.set("bootstrap.servers", configuration.brokers());
@@ -82,6 +82,10 @@ pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsume
         config.set("sasl.password", password);
     } else if let Some(Authentication::AWS { .. }) = &configuration.authentication {
         config.set("sasl.mechanism", "OAUTHBEARER");
+
+        if configuration.security_protocol() != "SASL_SSL" {
+            return Err(eyre::eyre!("must use tls=system_certificates for AWS").into())
+        }
     }
 
     let consumer: BaseConsumer<FlowConsumerContext> = config.create_with_context(ctx).map_err(Error::Config)?;
