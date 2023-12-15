@@ -81,6 +81,7 @@ impl JsonSchema for Configuration {
                         "propertyName": "auth_type"
                     },
                     "oneOf": [{
+                        "title": "SASL (User & Password)",
                         "properties": {
                             "auth_type": {
                                 "type": "string",
@@ -120,6 +121,7 @@ impl JsonSchema for Configuration {
                         ]
                     }, {
                         "properties": {
+                            "title": "AWS MSK IAM",
                             "auth_type": {
                                 "type": "string",
                                 "default": "AWS",
@@ -379,6 +381,7 @@ mod test {
         {
             "bootstrap_servers": ["localhost:9093"],
             "credentials": {
+                "auth_type": "UserPassword",
                 "mechanism": "SCRAM-SHA-256",
                 "username": "user",
                 "password": "password"

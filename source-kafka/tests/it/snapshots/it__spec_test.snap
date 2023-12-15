@@ -6,36 +6,6 @@ spec:
   configSchema:
     $schema: "http://json-schema.org/draft-07/schema#"
     properties:
-      authentication:
-        description: "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments."
-        order: 1
-        properties:
-          mechanism:
-            default: PLAIN
-            description: The SASL Mechanism describes how to exchange and authenticate clients/servers.
-            enum:
-              - PLAIN
-              - SCRAM-SHA-256
-              - SCRAM-SHA-512
-            order: 0
-            title: SASL Mechanism
-            type: string
-          password:
-            order: 2
-            secret: true
-            title: Password
-            type: string
-          username:
-            order: 1
-            secret: true
-            title: Username
-            type: string
-        required:
-          - mechanism
-          - password
-          - username
-        title: Authentication
-        type: object
       bootstrap_servers:
         default:
           - "localhost:9092"
@@ -45,6 +15,69 @@ spec:
         order: 0
         title: Bootstrap Servers
         type: array
+      credentials:
+        description: "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments."
+        discriminator:
+          propertyName: auth_type
+        oneOf:
+          - title: SASL (User & Password)
+            properties:
+              auth_type:
+                const: UserPassword
+                default: UserPassword
+                type: string
+              mechanism:
+                default: PLAIN
+                description: The SASL Mechanism describes how to exchange and authenticate clients/servers.
+                enum:
+                  - PLAIN
+                  - SCRAM-SHA-256
+                  - SCRAM-SHA-512
+                order: 0
+                title: SASL Mechanism
+                type: string
+              password:
+                order: 2
+                secret: true
+                title: Password
+                type: string
+              username:
+                order: 1
+                secret: true
+                title: Username
+                type: string
+            required:
+              - auth_type
+              - mechanism
+              - password
+              - username
+          - title: AWS MSK IAM
+            properties:
+              auth_type:
+                const: AWS
+                default: AWS
+                type: string
+              aws_access_key_id:
+                order: 0
+                title: AWS Access Key ID
+                type: string
+              aws_secret_access_key:
+                order: 1
+                secret: true
+                title: AWS Secret Access Key
+                type: string
+              region:
+                order: 2
+                title: AWS Region
+                type: string
+            required:
+              - auth_type
+              - aws_access_key_id
+              - aws_secret_access_key
+              - region
+        order: 1
+        title: Credentials
+        type: object
       tls:
         default: system_certificates
         description: Controls how should TLS certificates be found or used.
@@ -54,8 +87,8 @@ spec:
         title: TLS Settings
         type: string
     required:
-      - authentication
       - bootstrap_servers
+      - credentials
     title: Kafka Source Configuration
     type: object
   documentationUrl: "https://go.estuary.dev/source-kafka"
