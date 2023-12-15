@@ -117,9 +117,6 @@ func snowflakeTestBackend(t *testing.T) *testBackend {
 
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
-	for k, v := range st.DefaultSanitizers {
-		sanitizers[k] = v
-	}
 	sanitizers[`"rowid":"ffffffffffffffffffffffffffffffffffffffff"`] = regexp.MustCompile(`"rowid":"[0-9a-fA-F]{32,}"`)
 
 	var cfg = tb.config
