@@ -43,12 +43,10 @@ impl ClientContext for FlowConsumerContext {
     const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
 
     fn generate_oauth_token(&self, _oauthbearer_config: Option<&str>) -> Result<OAuthToken, Box<dyn StdError>>  {
-        eprintln!("generate_oauth_token {:?}", self.auth);
         if let Some(Authentication::AWS { region, access_key_id, secret_access_key }) = &self.auth {
             let (token, lifetime_ms) = crate::msk_oauthbearer::token(region, access_key_id, secret_access_key)?;
-            eprintln!("generate_oauth_token {}, {}", token, lifetime_ms);
             return Ok(OAuthToken {
-                principal_name: "kafka-cluster".to_string(),
+                principal_name: "flow-kafka-capture".to_string(),
                 token,
                 lifetime_ms: lifetime_ms.try_into()?,
             })
@@ -62,7 +60,6 @@ impl ConsumerContext for FlowConsumerContext {}
 pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsumer<FlowConsumerContext>, Error> {
     let mut config = ClientConfig::new();
 
-    config.set("debug", "all");
     config.set("bootstrap.servers", configuration.brokers());
 
     // We want to avoid writing ConsumerGroup commits back to Kafka. We manage
@@ -87,7 +84,16 @@ pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsume
         config.set("sasl.mechanism", "OAUTHBEARER");
     }
 
-    config.create_with_context(ctx).map_err(Error::Config)
+    let consumer: BaseConsumer<FlowConsumerContext> = config.create_with_context(ctx).map_err(Error::Config)?;
+
+    if let Some(Authentication::AWS { .. }) = &configuration.authentication {
+        // In order to generate an initial OAuth Bearer token to be used by the consumer
+        // we need to call poll once.
+        // See https://docs.confluent.io/platform/current/clients/librdkafka/html/classRdKafka_1_1OAuthBearerTokenRefreshCb.html
+        let _ = consumer.poll(KAFKA_TIMEOUT);
+    }
+
+    Ok(consumer)
 }
 
 pub fn test_connection<C: Consumer<FlowConsumerContext>>(
