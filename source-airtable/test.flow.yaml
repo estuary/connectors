@@ -1,4 +1,6 @@
 ---
+import:
+  - acmeCo/flow.yaml
 captures:
   acmeCo/source-airtable:
     endpoint:
@@ -8,4 +10,8 @@ captures:
           - "-m"
           - source-airtable
         config: config.yaml
-    bindings: []
+    bindings:
+      - resource:
+          stream: test_base/pizzas/tblY71QcPfB7SjY1f
+          syncMode: full_refresh
+        target: acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f

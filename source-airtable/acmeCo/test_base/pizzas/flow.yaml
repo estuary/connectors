@@ -1,0 +1,42 @@
+---
+collections:
+  acmeCo/test_base/pizzas/tblY71QcPfB7SjY1f:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      properties:
+        _airtable_id:
+          type:
+            - "null"
+            - string
+        _airtable_created_time:
+          type:
+            - "null"
+            - string
+        _airtable_table_name:
+          type:
+            - "null"
+            - string
+        name:
+          type:
+            - "null"
+            - string
+        status:
+          type:
+            - "null"
+            - string
+        cost:
+          type:
+            - "null"
+            - number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /_meta/row_id
