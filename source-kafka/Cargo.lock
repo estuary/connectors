@@ -1787,7 +1787,6 @@ dependencies = [
 name = "source-kafka"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aws-sdk-iam",
  "aws-sigv4",
  "aws-smithy-runtime-api",
