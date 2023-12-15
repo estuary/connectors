@@ -139,6 +139,13 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
 	}
+	for streamID, discoveryInfo := range c.discovery {
+		logrus.WithFields(logrus.Fields{
+			"table":      streamID,
+			"primaryKey": discoveryInfo.PrimaryKey,
+			"columns":    discoveryInfo.Columns,
+		}).Debug("discovered table")
+	}
 
 	if err := c.updateState(ctx); err != nil {
 		return fmt.Errorf("error updating capture state: %w", err)
