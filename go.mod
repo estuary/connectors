@@ -38,7 +38,7 @@ require (
 	github.com/jackc/pgtype v1.11.0
 	github.com/jackc/pgx/v4 v4.16.1
 	github.com/klauspost/compress v1.17.2
-	github.com/marcboeker/go-duckdb v1.5.1
+	github.com/marcboeker/go-duckdb v1.5.4
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/microsoft/go-mssqldb v0.19.0
 	github.com/minio/highwayhash v1.0.2

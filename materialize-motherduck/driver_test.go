@@ -10,12 +10,14 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/marcboeker/go-duckdb"
 )
 
 func mustGetCfg(t *testing.T) config {
@@ -44,6 +46,51 @@ func mustGetCfg(t *testing.T) config {
 	require.NoError(t, out.Validate())
 
 	return out
+}
+
+func TestValidateAndApply(t *testing.T) {
+	t.Skip("tests currently disabled because of a MotherDuck/DuckDB bug that makes it impossible to add columns with JSON types to existing tables")
+
+	ctx := context.Background()
+
+	cfg := mustGetCfg(t)
+
+	resourceConfig := tableConfig{
+		Table:    "target",
+		Schema:   cfg.Schema,
+		Delta:    true,
+		database: cfg.Database,
+	}
+
+	db, err := cfg.db(ctx)
+	require.NoError(t, err)
+	defer db.Close()
+
+	boilerplate.RunValidateAndApplyTestCases(
+		t,
+		newDuckDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", duckDialect.Identifier(cfg.Database, resourceConfig.Schema, resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = %s",
+				duckDialect.Identifier(cfg.Database, cfg.Schema, sql.DefaultFlowMaterializations),
+				duckDialect.Literal(materialization.String()),
+			))
+		},
+	)
 }
 
 func TestFencingCases(t *testing.T) {
@@ -160,82 +207,6 @@ func TestPrereqs(t *testing.T) {
 			require.Equal(t, tt.want, client.PreReqs(ctx).Unwrap())
 		})
 	}
-}
-func TestApply(t *testing.T) {
-	cfg := mustGetCfg(t)
-	ctx := context.Background()
-
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
-
-	firstTable := "first-table"
-	secondTable := "second-table"
-
-	firstResource := tableConfig{
-		Table:    firstTable,
-		Schema:   cfg.Schema,
-		Delta:    true,
-		database: cfg.Database,
-	}
-	firstResourceJson, err := json.Marshal(firstResource)
-	require.NoError(t, err)
-
-	secondResource := tableConfig{
-		Table:    secondTable,
-		Schema:   cfg.Schema,
-		Delta:    true,
-		database: cfg.Database,
-	}
-	secondResourceJson, err := json.Marshal(secondResource)
-	require.NoError(t, err)
-
-	boilerplate.RunApplyTestCases(
-		t,
-		newDuckDriver(),
-		configJson,
-		[2]json.RawMessage{firstResourceJson, secondResourceJson},
-		[2][]string{firstResource.Path(), secondResource.Path()},
-		func(t *testing.T) []string {
-			t.Helper()
-
-			db, err := cfg.db(ctx)
-			require.NoError(t, err)
-
-			rows, err := sql.StdListTables(ctx, db, cfg.Database, cfg.Schema)
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T, resourcePath []string) string {
-			t.Helper()
-
-			db, err := cfg.db(ctx)
-			require.NoError(t, err)
-
-			sch, err := sql.StdGetSchema(ctx, db, resourcePath[0], resourcePath[1], resourcePath[2])
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-
-			db, err := cfg.db(ctx)
-			require.NoError(t, err)
-
-			for _, tbl := range []string{firstTable, secondTable} {
-				_, _ = db.ExecContext(ctx, fmt.Sprintf(
-					"drop table %s",
-					duckDialect.Identifier(cfg.Database, cfg.Schema, tbl),
-				))
-			}
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				duckDialect.Identifier(cfg.Schema, "flow_materializations_v2"),
-			))
-		},
-	)
 }
 
 func TestSpecification(t *testing.T) {
