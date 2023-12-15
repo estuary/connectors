@@ -1,0 +1,9 @@
+# ================================
+# Collection "acmeCo/test/test_basicdatatypes_77528227": 1 Documents
+# ================================
+{"BDATA":"7loRpQ==","BIT":false,"DATA":"DCBA","FDATA":2.64,"HMS":"0001-01-01T06:13:44Z","ID":"1","TSNTZ":"1991-11-25T06:13:44Z","TSTZ":"1991-11-25T06:13:44Z","YMD":"1991-11-25T00:00:00Z","_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_BasicDatatypes_77528227","seq":2,"off":0}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"streams":{"PUBLIC/test_BasicDatatypes_77528227":{"off":0,"seq":3}}}
+
