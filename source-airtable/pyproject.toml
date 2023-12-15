@@ -12,6 +12,10 @@ debugpy = "^1.8.0"
 source_airtable = { path = "source_airtable", develop=true }
 flow-sdk = {path="../python", develop=true}
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-insta = "^0.2.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

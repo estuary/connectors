@@ -15,6 +15,7 @@ connector
 
 # Python type-checkingr, virtual environment, and cached bytecode.
 /.mypy_cache
+.pytest_cache
 .venv/
 __pycache__
 # Currently-active pyproject, which is overwritten by ./python/activate.sh
