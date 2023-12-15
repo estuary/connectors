@@ -101,8 +101,8 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 		rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
 			"select column_name, column_type from information_schema.columns where table_schema=%s and table_name=%s;",
-			ta.InfoLocation.TableSchema,
-			ta.InfoLocation.TableName,
+			c.ep.Dialect.Literal(ta.InfoLocation.TableSchema),
+			c.ep.Dialect.Literal(ta.InfoLocation.TableName),
 		))
 		if err != nil {
 			return "", nil, fmt.Errorf("querying table %q in schema %q for column_type: %w", ta.InfoLocation.TableName, ta.InfoLocation.TableSchema, err)

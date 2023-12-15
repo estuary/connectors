@@ -1,0 +1,27 @@
+Pre-Apply Table Schema:
+{"Name":"b123","Nullable":"NO","Type":"binary","ColumnType":"binary(123)"}
+{"Name":"d","Nullable":"NO","Type":"decimal","ColumnType":"decimal(10,0)"}
+{"Name":"lt","Nullable":"NO","Type":"longtext","ColumnType":"longtext"}
+{"Name":"mn","Nullable":"NO","Type":"decimal","ColumnType":"decimal(30,5)"}
+{"Name":"n","Nullable":"NO","Type":"decimal","ColumnType":"decimal(10,0)"}
+{"Name":"n60","Nullable":"NO","Type":"decimal","ColumnType":"decimal(65,0)"}
+{"Name":"t","Nullable":"NO","Type":"text","ColumnType":"text"}
+{"Name":"vb123","Nullable":"NO","Type":"varbinary","ColumnType":"varbinary(123)"}
+{"Name":"vc123","Nullable":"NO","Type":"varchar","ColumnType":"varchar(123)"}
+{"Name":"vc256","Nullable":"NO","Type":"varchar","ColumnType":"varchar(256)"}
+
+Post-Apply Table Schema:
+{"Name":"b123","Nullable":"YES","Type":"binary","ColumnType":"binary(123)"}
+{"Name":"d","Nullable":"YES","Type":"decimal","ColumnType":"decimal(10,0)"}
+{"Name":"flow_document","Nullable":"YES","Type":"json","ColumnType":"json"}
+{"Name":"flow_published_at","Nullable":"YES","Type":"datetime","ColumnType":"datetime(6)"}
+{"Name":"key","Nullable":"YES","Type":"varchar","ColumnType":"varchar(256)"}
+{"Name":"lt","Nullable":"YES","Type":"longtext","ColumnType":"longtext"}
+{"Name":"mn","Nullable":"YES","Type":"decimal","ColumnType":"decimal(30,5)"}
+{"Name":"n","Nullable":"YES","Type":"decimal","ColumnType":"decimal(10,0)"}
+{"Name":"n60","Nullable":"YES","Type":"decimal","ColumnType":"decimal(65,0)"}
+{"Name":"t","Nullable":"YES","Type":"text","ColumnType":"text"}
+{"Name":"vb123","Nullable":"YES","Type":"varbinary","ColumnType":"varbinary(123)"}
+{"Name":"vc123","Nullable":"YES","Type":"varchar","ColumnType":"varchar(123)"}
+{"Name":"vc256","Nullable":"YES","Type":"varchar","ColumnType":"varchar(256)"}
+

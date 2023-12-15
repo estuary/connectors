@@ -5,15 +5,16 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	_ "github.com/jackc/pgx/v4/stdlib"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 func testConfig() *config {
@@ -23,6 +24,47 @@ func testConfig() *config {
 		Password: "postgres",
 		Schema:   "public",
 	}
+}
+
+func TestValidateAndApply(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := testConfig()
+
+	resourceConfig := tableConfig{
+		Table:  "target",
+		Schema: "public",
+	}
+
+	db, err := stdsql.Open("pgx", cfg.ToURI())
+	require.NoError(t, err)
+	defer db.Close()
+
+	boilerplate.RunValidateAndApplyTestCases(
+		t,
+		newPostgresDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := sql.StdGetSchema(ctx, db, "postgres", resourceConfig.Schema, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = %s",
+				pgDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
+				pgDialect.Literal(materialization.String()),
+			))
+		},
+	)
 }
 
 func TestFencingCases(t *testing.T) {
@@ -46,81 +88,6 @@ func TestFencingCases(t *testing.T) {
 		},
 		func(table sql.Table) (out string, err error) {
 			return sql.StdDumpTable(ctx, c.(*client).db, table)
-		},
-	)
-}
-
-func TestApply(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-	catalog := "postgres"
-
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
-
-	firstTable := "first-table"
-	secondTable := "second-table"
-
-	firstResource := tableConfig{
-		Table:  firstTable,
-		Schema: cfg.Schema,
-	}
-	firstResourceJson, err := json.Marshal(firstResource)
-	require.NoError(t, err)
-
-	secondResource := tableConfig{
-		Table:  secondTable,
-		Schema: cfg.Schema,
-	}
-	secondResourceJson, err := json.Marshal(secondResource)
-	require.NoError(t, err)
-
-	boilerplate.RunApplyTestCases(
-		t,
-		newPostgresDriver(),
-		configJson,
-		[2]json.RawMessage{firstResourceJson, secondResourceJson},
-		[2][]string{firstResource.Path(), secondResource.Path()},
-		func(t *testing.T) []string {
-			t.Helper()
-
-			db, err := stdsql.Open("pgx", cfg.ToURI())
-			require.NoError(t, err)
-
-			rows, err := sql.StdListTables(ctx, db, catalog, cfg.Schema)
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T, resourcePath []string) string {
-			t.Helper()
-
-			db, err := stdsql.Open("pgx", cfg.ToURI())
-			require.NoError(t, err)
-
-			sch, err := sql.StdGetSchema(ctx, db, catalog, resourcePath[0], resourcePath[1])
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-
-			db, err := stdsql.Open("pgx", cfg.ToURI())
-			require.NoError(t, err)
-
-			for _, tbl := range []string{firstTable, secondTable} {
-				_, _ = db.ExecContext(ctx, fmt.Sprintf(
-					"drop table %s",
-					pgDialect.Identifier(cfg.Schema, tbl),
-				))
-			}
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				pgDialect.Identifier(cfg.Schema, "flow_materializations_v2"),
-			))
 		},
 	)
 }

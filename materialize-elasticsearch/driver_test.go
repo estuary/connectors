@@ -6,98 +6,86 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
 
-var (
-	username = flag.String("username", "elastic", "Username to use with the elasticsearch API")
-	password = flag.String("password", "elastic", "Password for the user")
-	apiKey   = flag.String("apiKey", "", "API key for authenticating with the elasticsearch API")
-	endpoint = flag.String("endpoint", "http://localhost:9200", "Endpoint host or URL. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT")
-)
-
-func TestApply(t *testing.T) {
-	flag.Parse()
-
-	cfg := config{
-		Endpoint: *endpoint,
+func testConfig() *config {
+	return &config{
+		Endpoint: "http://localhost:9200",
 		Credentials: credentials{
-			Username: *username,
-			Password: *password,
-			ApiKey:   *apiKey,
+			Username: "elastic",
+			Password: "elastic",
 		},
 	}
+}
 
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
+func TestValidateAndApply(t *testing.T) {
+	flag.Parse()
 
-	firstIndex := "first-index"
-	secondIndex := "second-index"
+	cfg := testConfig()
 
-	firstResource := resource{
-		Index:        firstIndex,
-		DeltaUpdates: false,
+	resourceConfig := resource{
+		Index: "target",
 	}
-	firstResourceJson, err := json.Marshal(firstResource)
-	require.NoError(t, err)
-
-	secondResource := resource{
-		Index:        secondIndex,
-		DeltaUpdates: false,
-	}
-	secondResourceJson, err := json.Marshal(secondResource)
-	require.NoError(t, err)
 
 	client, err := cfg.toClient(false)
 	require.NoError(t, err)
 
-	boilerplate.RunApplyTestCases(
+	boilerplate.RunValidateAndApplyTestCases(
 		t,
 		driver{},
-		configJson,
-		[2]json.RawMessage{firstResourceJson, secondResourceJson},
-		[2][]string{{firstIndex}, {secondIndex}},
-		func(t *testing.T) []string {
-			resp, err := client.es.Cat.Indices(client.es.Cat.Indices.WithFormat("json"))
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			resp, err := client.es.Indices.Get([]string{resourceConfig.Index})
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			bb, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 
-			var got []map[string]string
-			require.NoError(t, json.Unmarshal(bb, &got))
+			props := gjson.GetBytes(bb, fmt.Sprintf("%s.mappings.properties", resourceConfig.Index)).Map()
 
-			indices := []string{}
-			for _, i := range got {
-				indices = append(indices, i["index"])
+			type row struct {
+				Field string
+				Type  string
+			}
+			rows := make([]row, 0, len(props))
+			for f, p := range props {
+				rows = append(rows, row{
+					Field: f,
+					Type:  p.Get("type").Str,
+				})
 			}
 
-			return indices
+			slices.SortFunc(rows, func(i, j row) int {
+				return strings.Compare(i.Field, j.Field)
+			})
+
+			var out strings.Builder
+			enc := json.NewEncoder(&out)
+			for _, r := range rows {
+				require.NoError(t, enc.Encode(r))
+			}
+
+			return out.String()
 		},
-		func(t *testing.T, resourcePath []string) string {
+		func(t *testing.T, materialization pf.Materialization) {
 			t.Helper()
 
-			resp, err := client.es.Indices.Get([]string{resourcePath[0]})
-			require.NoError(t, err)
-			defer resp.Body.Close()
-
-			bb, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-
-			return gjson.GetBytes(bb, fmt.Sprintf("%s.mappings.properties", resourcePath[0])).String()
-		},
-		func(t *testing.T) {
-			t.Helper()
-
-			_, err := client.es.Indices.Delete([]string{defaultFlowMaterializations, firstIndex, secondIndex})
+			_, err := client.es.Indices.Delete([]string{defaultFlowMaterializations, resourceConfig.Index})
 			require.NoError(t, err)
 		},
 	)

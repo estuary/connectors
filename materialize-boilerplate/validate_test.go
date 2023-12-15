@@ -139,12 +139,8 @@ func TestValidate(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			j, err := json.MarshalIndent(cs, "", "\t")
-			require.NoError(t, err)
-
-			snap.WriteString("--- Begin " + tt.name + " ---\n")
-			snap.WriteString(string(j))
-			snap.WriteString("\n--- End " + tt.name + " ---\n\n")
+			snap.WriteString(tt.name + ":\n")
+			snap.WriteString(snapshotConstraints(t, cs) + "\n")
 		})
 	}
 	cupaloy.SnapshotT(t, snap.String())

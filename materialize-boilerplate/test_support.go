@@ -4,9 +4,8 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
-	"fmt"
-	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,21 +15,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed testdata/apply/generated_specs
-var applyFs embed.FS
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/add-and-remove-many.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/add-single-optional.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/base.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/big-schema-changed.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/big-schema-nullable.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/big-schema.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/remove-single-optional.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/remove-single-required.flow.yaml
 
-//go:embed testdata/validate/generated_specs
-var validateFs embed.FS
+//go:embed testdata/validate_apply_test_cases/generated_specs
+var applyValidateFs embed.FS
 
-func loadSpec(t *testing.T, fs embed.FS, path string) *pf.MaterializationSpec {
+func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
 	t.Helper()
 
-	dirs := map[embed.FS]string{
-		applyFs:    "testdata/apply/generated_specs",
-		validateFs: "testdata/validate/generated_specs",
-	}
-
-	specBytes, err := fs.ReadFile(filepath.Join(dirs[fs], path))
+	specBytes, err := applyValidateFs.ReadFile(filepath.Join("testdata/validate_apply_test_cases/generated_specs", path))
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
 	require.NoError(t, spec.Unmarshal(specBytes))
@@ -38,234 +38,224 @@ func loadSpec(t *testing.T, fs embed.FS, path string) *pf.MaterializationSpec {
 	return &spec
 }
 
-func RunApplyTestCases(
+func RunValidateAndApplyTestCases(
 	t *testing.T,
 	driver Connector,
-	configJson json.RawMessage,
-	resourceJsons [2]json.RawMessage,
-	resourcePaths [2][]string,
-	listTables func(t *testing.T) []string,
-	dumpSchema func(t *testing.T, resourcePath []string) string,
-	cleanup func(t *testing.T),
+	config any,
+	resourceConfig any,
+	dumpSchema func(t *testing.T) string,
+	cleanup func(t *testing.T, materialization pf.Materialization),
 ) {
-	t.Helper()
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
-	}
-
-	defer cleanup(t)
-
-	tests := []struct {
-		name string
-		spec *pf.MaterializationSpec
-	}{
-		{
-			name: "base",
-			spec: loadSpec(t, applyFs, "base.flow.proto"),
-		},
-		{
-			name: "remove original required field",
-			spec: loadSpec(t, applyFs, "remove-required.flow.proto"),
-		},
-		{
-			name: "re-add removed original required field",
-			spec: loadSpec(t, applyFs, "base.flow.proto"),
-		},
-		{
-			name: "remove original optional field",
-			spec: loadSpec(t, applyFs, "remove-optional.flow.proto"),
-		},
-		{
-			name: "re-add removed original optional field",
-			spec: loadSpec(t, applyFs, "base.flow.proto"),
-		},
-		{
-			name: "add new required field",
-			spec: loadSpec(t, applyFs, "add-new-required.flow.proto"),
-		},
-		{
-			name: "remove new required field",
-			spec: loadSpec(t, applyFs, "base.flow.proto"),
-		},
-		{
-			name: "add new optional field",
-			spec: loadSpec(t, applyFs, "add-new-optional.flow.proto"),
-		},
-		{
-			name: "remove new optional field",
-			spec: loadSpec(t, applyFs, "base.flow.proto"),
-		},
-		{
-			name: "add new binding",
-			spec: loadSpec(t, applyFs, "add-new-binding.flow.proto"),
-		},
-		{
-			name: "remove new binding",
-			spec: loadSpec(t, applyFs, "base.flow.proto"),
-		},
-		{
-			name: "replace original binding table",
-			spec: loadSpec(t, applyFs, "replace-original-binding.flow.proto"),
-		},
-		{
-			name: "remove original binding",
-			spec: loadSpec(t, applyFs, "remove-original-binding.flow.proto"),
-		},
-	}
-
 	ctx := context.Background()
-
 	var snap strings.Builder
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			spec := tt.spec
-			spec.ConfigJson = configJson
-			for idx := range spec.Bindings {
-				spec.Bindings[idx].ResourceConfigJson = resourceJsons[idx]
-				spec.Bindings[idx].ResourcePath = resourcePaths[idx]
-			}
 
-			_, err := driver.Apply(ctx, &pm.Request_Apply{
-				Materialization: spec,
-				Version:         "",
-				DryRun:          false,
+	configJson, err := json.Marshal(config)
+	require.NoError(t, err)
+
+	resourceConfigJson, err := json.Marshal(resourceConfig)
+	require.NoError(t, err)
+
+	t.Run("validate and apply many different types of fields", func(t *testing.T) {
+		defer cleanup(t, pf.Materialization("test/sqlite"))
+
+		fixture := loadSpec(t, "big-schema.flow.proto")
+
+		// Initial validation with no previously existing table.
+		validateRes, err := driver.Validate(ctx, validateReq(fixture, configJson, resourceConfigJson))
+		require.NoError(t, err)
+
+		snap.WriteString("Big Schema Initial Constraints:\n")
+		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+		// Initial apply with no previously existing table.
+		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes))
+		require.NoError(t, err)
+
+		sch := dumpSchema(t)
+
+		// Validate again.
+		validateRes, err = driver.Validate(ctx, validateReq(fixture, configJson, resourceConfigJson))
+		require.NoError(t, err)
+
+		snap.WriteString("\nBig Schema Re-validated Constraints:\n")
+		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+		// Apply again - this should be a no-op.
+		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes))
+		require.NoError(t, err)
+		require.Equal(t, sch, dumpSchema(t))
+
+		// Validate with most of the field types changed somewhat randomly.
+		changed := loadSpec(t, "big-schema-changed.flow.proto")
+		validateRes, err = driver.Validate(ctx, validateReq(changed, configJson, resourceConfigJson))
+		require.NoError(t, err)
+
+		snap.WriteString("\nBig Schema Changed Types Constraints:\n")
+		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+		snap.WriteString("\nBig Schema Materialized Resource Schema With All Fields Required:\n")
+		snap.WriteString(sch)
+
+		// Validate and apply the schema with all fields removed from required and snapshot the
+		// table output.
+		nullable := loadSpec(t, "big-schema-nullable.flow.proto")
+		validateRes, err = driver.Validate(ctx, validateReq(nullable, configJson, resourceConfigJson))
+		require.NoError(t, err)
+
+		_, err = driver.Apply(ctx, applyReq(nullable, configJson, resourceConfigJson, validateRes))
+		require.NoError(t, err)
+
+		// A second apply of the nullable schema should be a no-op.
+		sch = dumpSchema(t)
+		_, err = driver.Apply(ctx, applyReq(nullable, configJson, resourceConfigJson, validateRes))
+		require.NoError(t, err)
+		require.Equal(t, sch, dumpSchema(t))
+
+		snap.WriteString("\nBig Schema Materialized Resource Schema With No Fields Required:\n")
+		snap.WriteString(sch + "\n")
+	})
+
+	t.Run("add and remove fields", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			newSpec *pf.MaterializationSpec
+		}{
+			{
+				name:    "add a single field",
+				newSpec: loadSpec(t, "add-single-optional.flow.proto"),
+			},
+			{
+				name:    "remove a single optional field",
+				newSpec: loadSpec(t, "remove-single-optional.flow.proto"),
+			},
+			{
+				name:    "remove a single required field",
+				newSpec: loadSpec(t, "remove-single-required.flow.proto"),
+			},
+			{
+				name:    "add and remove many fields",
+				newSpec: loadSpec(t, "add-and-remove-many.flow.proto"),
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				defer cleanup(t, pf.Materialization("test/sqlite"))
+
+				initial := loadSpec(t, "base.flow.proto")
+
+				// Validate and Apply the base spec.
+				validateRes, err := driver.Validate(ctx, validateReq(initial, configJson, resourceConfigJson))
+				require.NoError(t, err)
+				_, err = driver.Apply(ctx, applyReq(initial, configJson, resourceConfigJson, validateRes))
+				require.NoError(t, err)
+
+				// Validate and Apply the updated spec.
+				validateRes, err = driver.Validate(ctx, validateReq(tt.newSpec, configJson, resourceConfigJson))
+				require.NoError(t, err)
+				_, err = driver.Apply(ctx, applyReq(tt.newSpec, configJson, resourceConfigJson, validateRes))
+				require.NoError(t, err)
+
+				snap.WriteString(tt.name + ":\n")
+				snap.WriteString(string(dumpSchema(t)) + "\n")
 			})
-			require.NoError(t, err)
+		}
+	})
 
-			snap.WriteString("--- Begin " + tt.name + " ---\n")
-			snap.WriteString(fmt.Sprintf("* Table list: %s:", listTables(t)))
-
-			if len(spec.Bindings) > 0 {
-				for idx := range spec.Bindings {
-					snap.WriteString(fmt.Sprintf("\n* Schema for %s:\n", strings.Join(spec.Bindings[idx].ResourcePath, ".")))
-					snap.WriteString(dumpSchema(t, spec.Bindings[idx].ResourcePath))
-				}
-			}
-
-			snap.WriteString("\n--- End " + tt.name + " ---\n\n")
-		})
-	}
 	cupaloy.SnapshotT(t, snap.String())
 }
 
-func RunValidateTestCases(t *testing.T, makeValidator func(*testing.T, *pf.MaterializationSpec) Validator, snapshotPath string) {
-	t.Helper()
-
-	tests := []struct {
-		name         string
-		existingSpec *pf.MaterializationSpec
-		newSpec      *pf.MaterializationSpec
-		deltaUpdates bool
-	}{
-		{
-			name:         "new binding - standard updates",
-			existingSpec: nil,
-			newSpec:      loadSpec(t, validateFs, "base.flow.proto"),
-			deltaUpdates: false,
-		},
-		{
-			name:         "new binding - delta updates",
-			existingSpec: nil,
-			newSpec:      loadSpec(t, validateFs, "base.flow.proto"),
-			deltaUpdates: true,
-		},
-		{
-			name:         "with existing binding - standard updates",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "base.flow.proto"),
-			deltaUpdates: false,
-		},
-		{
-			name:         "with existing binding - delta updates",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "base.flow.proto"),
-			deltaUpdates: true,
-		},
-		{
-			name:         "[field: numericString] remove numeric string format",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "remove-format.flow.proto"),
-			deltaUpdates: false,
-		},
-		{
-			name:         "[field: scalarValue and numericString] numeric and numeric format string interactions",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "numeric-string-to-numeric.flow.proto"),
-			deltaUpdates: false,
-		},
-		{
-			name:         "[field: key] unsatisfiable type change",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "unsatisfiable.flow.proto"),
-			deltaUpdates: false,
-		},
-		{
-			name:         "[field: multiple] add even more types",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "more-multiple.flow.proto"),
-			deltaUpdates: false,
-		},
-		{
-			name:         "[field: nonScalarValue] change type from object to array",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "object-to-array.flow.proto"),
-			deltaUpdates: false,
-		},
-		{
-			name:         "[field: scalarValue] forbidden type change",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "forbidden.flow.proto"),
-			deltaUpdates: false,
-		},
-		{
-			name:         "[field: scalarValue] remove from list of required fields",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "nullability.flow.proto"),
-			deltaUpdates: false,
-		},
-		{
-			name:         "root document projection change - standard updates",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "alternate-root-projection.flow.proto"),
-			deltaUpdates: false,
-		},
-		{
-			name:         "root document projection change - delta updates",
-			existingSpec: loadSpec(t, validateFs, "base.flow.proto"),
-			newSpec:      loadSpec(t, validateFs, "alternate-root-projection.flow.proto"),
-			deltaUpdates: true,
-		},
+// validateReq makes a mock Validate request object from a built spec fixture. It only works with a
+// single binding.
+func validateReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage) *pm.Request_Validate {
+	req := &pm.Request_Validate{
+		Name:          spec.Name,
+		ConnectorType: spec.ConnectorType,
+		ConfigJson:    config,
+		Bindings: []*pm.Request_Validate_Binding{{
+			ResourceConfigJson: resourceConfig,
+			Collection:         spec.Bindings[0].Collection,
+			FieldConfigJsonMap: spec.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			Backfill:           spec.Bindings[0].Backfill,
+		}},
 	}
 
-	var snap strings.Builder
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cs, err := makeValidator(t, tt.existingSpec).ValidateBinding([]string{"key_value"}, tt.deltaUpdates, 0, tt.newSpec.Bindings[0].Collection, nil, tt.existingSpec)
-			require.NoError(t, err)
+	return req
+}
 
-			j, err := json.MarshalIndent(cs, "", "\t")
-			require.NoError(t, err)
+// applyReq conjures a pm.Request_Apply from a spec and validate response.
+func applyReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage, validateRes *pm.Response_Validated) *pm.Request_Apply {
+	spec.ConfigJson = config
+	spec.Bindings[0].ResourceConfigJson = resourceConfig
+	spec.Bindings[0].ResourcePath = validateRes.Bindings[0].ResourcePath
+	spec.Bindings[0].DeltaUpdates = validateRes.Bindings[0].DeltaUpdates
+	spec.Bindings[0].FieldSelection = selectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection)
 
-			snap.WriteString("--- Begin " + tt.name + " ---\n")
-			snap.WriteString(string(j))
-			snap.WriteString("\n--- End " + tt.name + " ---\n\n")
+	req := &pm.Request_Apply{
+		Materialization: spec,
+		Version:         "someVersion",
+		DryRun:          false,
+	}
+
+	return req
+}
+
+// selectedFields creates a field selection that includes all possible fields.
+func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec) pf.FieldSelection {
+	out := pf.FieldSelection{}
+
+	for field, constraint := range binding.Constraints {
+		if constraint.Type.IsForbidden() {
+			continue
+		}
+
+		proj := collection.GetProjection(field)
+		if proj.IsPrimaryKey {
+			out.Keys = append(out.Keys, field)
+		} else if proj.IsRootDocumentProjection() {
+			out.Document = field
+		} else {
+			out.Values = append(out.Values, field)
+		}
+	}
+
+	slices.Sort(out.Keys)
+	slices.Sort(out.Values)
+
+	return out
+}
+
+// snapshotConstraints makes a compact string representation of a set of constraints, with one
+// constraint printed per line.
+func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Constraint) string {
+	t.Helper()
+
+	type constraintRow struct {
+		Field      string
+		Type       int
+		TypeString string
+		Reason     string
+	}
+
+	rows := make([]constraintRow, 0, len(cs))
+	for f, c := range cs {
+		rows = append(rows, constraintRow{
+			Field:      f,
+			Type:       int(c.Type),
+			TypeString: c.Type.String(),
+			Reason:     c.Reason,
 		})
 	}
 
-	t.Run("[field: key] unsatisfiable type change with backfill counter increment", func(t *testing.T) {
-		existingSpec := loadSpec(t, validateFs, "base.flow.proto")
-		newSpec := loadSpec(t, validateFs, "unsatisfiable.flow.proto")
-
-		cs, err := makeValidator(t, existingSpec).ValidateBinding([]string{"key_value"}, false, 1, newSpec.Bindings[0].Collection, nil, existingSpec)
-		require.NoError(t, err)
-
-		j, err := json.MarshalIndent(cs, "", "\t")
-		require.NoError(t, err)
-
-		snap.WriteString("--- Begin [field: key] unsatisfiable type change with backfill counter increment ---\n")
-		snap.WriteString(string(j))
-		snap.WriteString("\n--- End [field: key] unsatisfiable type change with backfill counter increment ---\n\n")
+	slices.SortFunc(rows, func(i, j constraintRow) int {
+		return strings.Compare(i.Field, j.Field)
 	})
 
-	cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath)).SnapshotT(t, snap.String())
+	var out strings.Builder
+	enc := json.NewEncoder(&out)
+	for _, r := range rows {
+		require.NoError(t, enc.Encode(r))
+	}
+
+	return out.String()
 }
