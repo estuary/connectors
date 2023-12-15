@@ -6,7 +6,7 @@ use http;
 use std::time::{SystemTime, Duration};
 
 const DEFAULT_EXPIRY_SECONDS: u64 = 900;
-pub fn token(region: &str, access_key_id: &str, secret_access_key: &str) -> anyhow::Result::<(String, u128)> {
+pub fn token(region: &str, access_key_id: &str, secret_access_key: &str) -> eyre::Result::<(String, u128)> {
     let endpoint = format!("https://kafka.{}.amazonaws.com/?Action=kafka-cluster%3AConnect", region);
     let expiry_duration = Duration::new(DEFAULT_EXPIRY_SECONDS, 0);
     let now = SystemTime::now();
