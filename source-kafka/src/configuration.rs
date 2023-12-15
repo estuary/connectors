@@ -27,12 +27,12 @@ pub struct Configuration {
     /// one of these nodes.
     pub bootstrap_servers: Vec<BootstrapServer>,
 
-    /// # Authentication
+    /// # Credentials
     ///
     /// The connection details for authenticating a client connection to Kafka via SASL.
     /// When not provided, the client connection will attempt to use PLAINTEXT
     /// (insecure) protocol. This must only be used in dev/test environments.
-    pub authentication: Option<Authentication>,
+    pub credentials: Option<Credentials>,
 
     /// # TLS connection settings.
     pub tls: Option<TlsSettings>,
@@ -48,7 +48,7 @@ impl Configuration {
     }
 
     pub fn security_protocol(&self) -> &'static str {
-        match (&self.authentication, &self.tls) {
+        match (&self.credentials, &self.tls) {
             (None, Some(TlsSettings::SystemCertificates)) => "SSL",
             (None, None) => "PLAINTEXT",
             (Some(_), Some(TlsSettings::SystemCertificates)) => "SASL_SSL",
@@ -69,11 +69,11 @@ impl JsonSchema for Configuration {
             "type": "object",
             "required": [
                 "bootstrap_servers",
-                "authentication"
+                "credentials"
             ],
             "properties": {
-                "authentication": {
-                    "title": "Authentication",
+                "credentials": {
+                    "title": "Credentials",
                     "description": "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments.",
                     "type": "object",
                     "order": 1,
@@ -295,12 +295,12 @@ impl Display for SaslMechanism {
     }
 }
 
-/// # Authentication
+/// # Credentials
 ///
 /// The information necessary to connect to Kafka.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag="auth_type")]
-pub enum Authentication {
+pub enum Credentials {
     UserPassword {
         /// # Sasl Mechanism
         mechanism: SaslMechanism,
@@ -378,7 +378,7 @@ mod test {
         let input = r#"
         {
             "bootstrap_servers": ["localhost:9093"],
-            "authentication": {
+            "credentials": {
                 "mechanism": "SCRAM-SHA-256",
                 "username": "user",
                 "password": "password"
