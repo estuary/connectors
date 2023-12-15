@@ -1,0 +1,143 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "type": "object",
+      "properties": {
+        "credentials": {
+          "type": "object",
+          "description": "Credentials for connecting to the Shopify API",
+          "discriminator": {
+            "propertyName": "auth_type"
+          },
+          "oneOf": [
+            {
+              "type": "object",
+              "title": "Shopify OAuth",
+              "x-oauth2-provider": "shopify",
+              "properties": {
+                "auth_type": {
+                  "type": "string",
+                  "const": "oauth",
+                  "description": "Discriminator for object of type 'oauth'."
+                },
+                "client_id": {
+                  "type": "string",
+                  "secret": true
+                },
+                "client_secret": {
+                  "type": "string",
+                  "secret": true
+                },
+                "access_token": {
+                  "type": "string",
+                  "secret": true
+                }
+              },
+              "required": [
+                "auth_type",
+                "client_id",
+                "client_secret",
+                "access_token"
+              ]
+            },
+            {
+              "type": "object",
+              "title": "Access Token",
+              "properties": {
+                "auth_type": {
+                  "type": "string",
+                  "const": "access_token",
+                  "description": "Discriminator for object of type 'access_token'."
+                },
+                "access_token": {
+                  "type": [
+                    "string"
+                  ],
+                  "description": "The access token to authenticate with the Shopify API",
+                  "secret": true
+                }
+              },
+              "required": [
+                "auth_type",
+                "access_token"
+              ]
+            }
+          ]
+        },
+        "store": {
+          "type": [
+            "string"
+          ],
+          "description": "Shopify store id, use the prefix of your admin url e.g. https://[your store].myshopify.com/admin"
+        },
+        "start_date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "description": "The earliest record date to sync"
+        },
+        "admin_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The Admin url for your Shopify store (overrides 'store' property)"
+        },
+        "is_plus_account": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Enabled Shopify plus account endpoints.)"
+        }
+      },
+      "required": [
+        "credentials",
+        "store"
+      ]
+    },
+    "resourceConfigSchema": {
+      "type": "object",
+      "properties": {
+        "stream": {
+          "type": "string"
+        },
+        "syncMode": {
+          "type": "string",
+          "enum": [
+            "incremental",
+            "full_refresh"
+          ]
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "cursorField": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "stream",
+        "syncMode"
+      ]
+    },
+    "documentationUrl": "https://docs.estuary.dev",
+    "oauth2": {
+      "provider": "shopify",
+      "authUrlTemplate": "https://{{{config.store}}}.myshopify.com/admin/oauth/authorize?client_id={{{client_id}}}&scope=read_locales,read_products,read_orders,read_checkouts,read_locations,read_inventory,read_fulfillments,read_customers&redirect_uri={{{redirect_uri}}}&state={{#urlencode}}{{{state}}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://{{{config.store}}}.myshopify.com/admin/oauth/access_token?client_id={{{client_id}}}&client_secret={{{client_secret}}}&code={{#urlencode}}{{{code}}}{{/urlencode}}",
+      "accessTokenResponseMap": {
+        "access_token": "/access_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/stream"
+    ]
+  }
+]
