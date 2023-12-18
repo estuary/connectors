@@ -12,6 +12,10 @@ flow-sdk = {path="../python", develop=true}
 tap-criteo = { path = "source_criteo", develop=true }
 debugpy = "^1.8.0"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-insta = "^0.2.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
