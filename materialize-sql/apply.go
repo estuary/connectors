@@ -75,6 +75,13 @@ func newSqlApplier(client Client, is *boilerplate.InfoSchema, endpoint *Endpoint
 }
 
 func (a *sqlApplier) CreateMetaTables(ctx context.Context, spec *pf.MaterializationSpec) (string, boilerplate.ActionApplyFn, error) {
+	if (a.endpoint.MetaCheckpoints == nil || a.is.HasResource(a.endpoint.MetaCheckpoints.Path)) &&
+		(a.endpoint.MetaSpecs == nil || a.is.HasResource(a.endpoint.MetaSpecs.Path)) {
+		// If this materialization does not use the checkpoints or specs table OR it does and
+		// they already exist, there is nothing more to do here.
+		return "", nil, nil
+	}
+
 	var creates []TableCreate
 	var actionDesc []string
 

@@ -80,7 +80,6 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	} else if loadedSpec, _, err = loadSpec(ctx, client, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
-	defer client.Close()
 
 	resources := make([]Resource, 0, len(req.Bindings))
 	resourcePaths := make([][]string, 0, len(req.Bindings))

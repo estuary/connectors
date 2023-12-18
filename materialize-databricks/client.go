@@ -54,12 +54,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		c.ep.Dialect.ColumnLocator,
 	)
 
-	// Nothing to do if the materialization has no bindings.
-	if len(resourcePaths) == 0 {
-		return is, nil
-	}
-
-	schemas := make([]string, 0, len(resourcePaths))
+	schemas := []string{c.ep.Dialect.Literal(c.cfg.SchemaName)}
 	for _, p := range resourcePaths {
 		loc := c.ep.Dialect.TableLocator(p)
 		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
