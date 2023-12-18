@@ -75,7 +75,14 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 }
 
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, resourcePaths)
+	// We don't (yet) allow setting a schema for the endpoint or resources, so we need to get the
+	// default schema for the configured user.
+	var schema string
+	if err := c.db.QueryRowContext(ctx, "select schema_name()").Scan(&schema); err != nil {
+		return nil, fmt.Errorf("querying schema for current user: %w", err)
+	}
+
+	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, schema, resourcePaths)
 }
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
