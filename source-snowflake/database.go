@@ -68,12 +68,6 @@ func (t snowflakeObject) MarshalText() ([]byte, error) {
 	return []byte(escapeTildes(t.Schema) + "/" + escapeTildes(t.Name)), nil
 }
 
-func escapeTildes(x string) string {
-	x = strings.ReplaceAll(x, "~", "~0")
-	x = strings.ReplaceAll(x, "/", "~1")
-	return x
-}
-
 func (t *snowflakeObject) UnmarshalText(text []byte) error {
 	var bits = strings.Split(string(text), "/")
 	if len(bits) != 2 {
@@ -84,6 +78,15 @@ func (t *snowflakeObject) UnmarshalText(text []byte) error {
 	return nil
 }
 
+// escapeTildes escapes '~' and '/' characters into '~0' and '~1' respectively. This is
+// the JSON Pointer (RFC 6901) token escaping rule.
+func escapeTildes(x string) string {
+	x = strings.ReplaceAll(x, "~", "~0")
+	x = strings.ReplaceAll(x, "/", "~1")
+	return x
+}
+
+// unescapeTildes unescapes encoded '~0' and '~1' values back into '~' and '/' respectively.
 func unescapeTildes(x string) string {
 	x = strings.ReplaceAll(x, "~1", "/")
 	x = strings.ReplaceAll(x, "~0", "~")
