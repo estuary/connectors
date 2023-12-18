@@ -529,13 +529,7 @@ func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *p
 		return false, err
 	}
 
-	for t, c := range c.dialect.ColumnCompatibilities {
-		if strings.EqualFold(existing.Type, t) {
-			return c(*p), nil
-		}
-	}
-
-	return false, fmt.Errorf("no comparer for existing type %q", existing.Type)
+	return c.dialect.ValidateColumn(existing, *p)
 }
 
 func (constrainter) DescriptionForType(p *pf.Projection) string {
@@ -554,113 +548,4 @@ func (constrainter) DescriptionForType(p *pf.Projection) string {
 	}
 
 	return desc
-}
-
-type EndpointTypeComparer func(pf.Projection) bool
-
-func JsonCompatible(p pf.Projection) bool {
-	if TypesOrNull(p.Inference.Types, []string{"array"}) ||
-		TypesOrNull(p.Inference.Types, []string{"object"}) {
-		return true
-	}
-
-	return MultipleCompatible(p)
-}
-
-func MultipleCompatible(p pf.Projection) bool {
-	if _, ok := boilerplate.AsFormattedNumeric(&p); ok {
-		return false
-	}
-
-	nonNullTypes := 0
-	for _, t := range p.Inference.Types {
-		if t == "null" {
-			continue
-		}
-		nonNullTypes += 1
-	}
-
-	return nonNullTypes > 1
-}
-
-// BinaryCompatible is compatible with base64-encoded strings.
-func BinaryCompatible(p pf.Projection) bool {
-	return TypesOrNull(p.Inference.Types, []string{"string"}) &&
-		p.Inference.String_.ContentEncoding == "base64"
-}
-
-// BooleanCompatible is compatible with booleans.
-func BooleanCompatible(p pf.Projection) bool {
-	return TypesOrNull(p.Inference.Types, []string{"boolean"})
-}
-
-// StringCompatible is compatible with strings of any format.
-func StringCompatible(p pf.Projection) bool {
-	return TypesOrNull(p.Inference.Types, []string{"string"})
-}
-
-// NumberCompatible is compatible with integers or numbers, and strings formatted as these.
-func NumberCompatible(p pf.Projection) bool {
-	if _, ok := boilerplate.AsFormattedNumeric(&p); ok {
-		return true
-	}
-
-	return TypesOrNull(p.Inference.Types, []string{"number", "integer"})
-}
-
-func IntegerCompatible(p pf.Projection) bool {
-	if f, ok := boilerplate.AsFormattedNumeric(&p); ok {
-		return f == boilerplate.StringFormatInteger
-	}
-
-	return TypesOrNull(p.Inference.Types, []string{"integer"})
-}
-
-func DateCompatible(p pf.Projection) bool {
-	return stringWithFormat(p, "date")
-}
-
-func DateTimeCompatible(p pf.Projection) bool {
-	return stringWithFormat(p, "date-time")
-}
-
-func DurationCompatible(p pf.Projection) bool {
-	return stringWithFormat(p, "duration")
-}
-
-func IPv4or6Compatible(p pf.Projection) bool {
-	return stringWithFormat(p, "ipv4") || stringWithFormat(p, "ipv6")
-}
-
-func MacAddrCompatible(p pf.Projection) bool {
-	return stringWithFormat(p, "macaddr")
-}
-
-func MacAddr8Compatible(p pf.Projection) bool {
-	return stringWithFormat(p, "macaddr8")
-}
-
-func TimeCompatible(p pf.Projection) bool {
-	return stringWithFormat(p, "time")
-}
-
-func UuidCompatible(p pf.Projection) bool {
-	return stringWithFormat(p, "uuid")
-}
-
-func TypesOrNull(actual, allowed []string) bool {
-	for _, t := range actual {
-		if t == "null" {
-			continue
-		} else if !slices.Contains(allowed, t) {
-			return false
-		}
-	}
-	return true
-}
-
-func stringWithFormat(p pf.Projection, format string) bool {
-	return TypesOrNull(p.Inference.Types, []string{"string"}) &&
-		p.Inference.String_ != nil &&
-		p.Inference.String_.Format == format
 }

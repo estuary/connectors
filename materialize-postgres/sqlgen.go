@@ -52,6 +52,21 @@ var pgDialect = func() sql.Dialect {
 		Delegate:    mapper,
 	}
 
+	columnValidator := sql.NewColumnValidator(
+		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"double precision", "numeric"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
+		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
+		sql.ColValidation{Types: []string{"text"}, Validate: sql.StringCompatible},
+		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
+		sql.ColValidation{Types: []string{"timestamp with time zone"}, Validate: sql.DateTimeCompatible},
+		sql.ColValidation{Types: []string{"interval"}, Validate: sql.DurationCompatible},
+		sql.ColValidation{Types: []string{"cidr"}, Validate: sql.IPv4or6Compatible},
+		sql.ColValidation{Types: []string{"macaddr"}, Validate: sql.MacAddrCompatible},
+		sql.ColValidation{Types: []string{"macaddr8"}, Validate: sql.MacAddr8Compatible},
+		sql.ColValidation{Types: []string{"time without time zone"}, Validate: sql.TimeCompatible},
+	)
+
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -75,22 +90,8 @@ var pgDialect = func() sql.Dialect {
 			// parameterIndex starts at 0, but postgres parameters start at $1
 			return fmt.Sprintf("$%d", index+1)
 		}),
-		TypeMapper: mapper,
-		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
-			"bigint":                   sql.IntegerCompatible,
-			"double precision":         sql.NumberCompatible,
-			"boolean":                  sql.BooleanCompatible,
-			"json":                     sql.JsonCompatible,
-			"text":                     sql.StringCompatible,
-			"numeric":                  sql.NumberCompatible,
-			"date":                     sql.DateCompatible,
-			"timestamp with time zone": sql.DateTimeCompatible,
-			"interval":                 sql.DurationCompatible,
-			"cidr":                     sql.IPv4or6Compatible,
-			"macaddr":                  sql.MacAddrCompatible,
-			"macaddr8":                 sql.MacAddr8Compatible,
-			"time without time zone":   sql.TimeCompatible,
-		},
+		TypeMapper:      mapper,
+		ColumnValidator: columnValidator,
 	}
 }()
 

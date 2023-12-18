@@ -91,6 +91,16 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 		Delegate:    mapper,
 	}
 
+	columnValidator := sql.NewColumnValidator(
+		sql.ColValidation{Types: []string{stringType}, Validate: stringCompatible},
+		sql.ColValidation{Types: []string{"bit"}, Validate: sql.BooleanCompatible},
+		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"float"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
+		sql.ColValidation{Types: []string{"datetime2"}, Validate: sql.DateTimeCompatible},
+		sql.ColValidation{Types: []string{"time"}, Validate: sql.TimeCompatible},
+	)
+
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -111,21 +121,13 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 			// parameterIndex starts at 0, but sqlserver parameters start at @p1
 			return fmt.Sprintf("@p%d", index+1)
 		}),
-		TypeMapper: mapper,
-		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
-			stringType:  stringCompatible,
-			"bit":       sql.BooleanCompatible,
-			"bigint":    sql.IntegerCompatible,
-			"float":     sql.NumberCompatible,
-			"date":      sql.DateCompatible,
-			"datetime2": sql.DateTimeCompatible,
-			"time":      sql.TimeCompatible,
-		},
+		TypeMapper:      mapper,
+		ColumnValidator: columnValidator,
 	}
 }
 
 // stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
-// be materialized since they are all converted to strings.
+// be materialized.
 func stringCompatible(p pf.Projection) bool {
 	return sql.StringCompatible(p) || sql.JsonCompatible(p)
 }

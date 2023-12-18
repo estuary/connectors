@@ -71,6 +71,15 @@ var databricksDialect = func() sql.Dialect {
 		Delegate:    mapper,
 	}
 
+	columnValidator := sql.NewColumnValidator(
+		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
+		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
+		sql.ColValidation{Types: []string{"long"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
+		sql.ColValidation{Types: []string{"timestamp"}, Validate: sql.DateTimeCompatible},
+	)
+
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -93,15 +102,8 @@ var databricksDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper: mapper,
-		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
-			"string":    stringCompatible,
-			"date":      sql.DateCompatible,
-			"timestamp": sql.DateTimeCompatible,
-			"long":      sql.IntegerCompatible,
-			"double":    sql.NumberCompatible,
-			"boolean":   sql.BooleanCompatible,
-		},
+		TypeMapper:      mapper,
+		ColumnValidator: columnValidator,
 	}
 }()
 
