@@ -20,6 +20,8 @@ import (
 const (
 	initialCloneSequenceNumber = 0
 
+	metadataProperty = "_meta"
+
 	// Emit a checkpoint after every N change documents, so that partial
 	// progress can be made across connector restarts.
 	partialProgressCheckpointSpacing = 50000
@@ -66,13 +68,31 @@ func (snowflakeDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutpu
 		}
 		res.SetDefaults()
 
+		var orderColumns []string
+		for _, keyElem := range binding.Collection.Key {
+			keyElem = strings.TrimPrefix(keyElem, "/") // Trim the leading slash
+
+			// The collection key can only be converted into a list of ordering columns
+			// if the key pointers all reference top-level properties which aren't `_meta`.
+			if strings.Contains(keyElem, "/") || keyElem == metadataProperty {
+				orderColumns = nil
+				break
+			}
+
+			orderColumns = append(orderColumns, unescapeTildes(keyElem))
+		}
+
 		var table = snowflakeObject{res.Schema, res.Table}
 		log.WithField("table", table.String()).Info("configured binding")
 		if err := setupTablePrerequisites(ctx, cfg, db, table); err != nil {
 			prerequisiteErrs = append(prerequisiteErrs, err)
 			continue
 		}
-		bindings[table] = &captureBinding{Index: idx, Table: table}
+		bindings[table] = &captureBinding{
+			Index:        idx,
+			Table:        table,
+			OrderColumns: orderColumns,
+		}
 	}
 	if len(prerequisiteErrs) > 0 {
 		return cerrors.NewUserError(nil, (&prerequisitesError{prerequisiteErrs}).Error())
@@ -97,8 +117,9 @@ type capture struct {
 }
 
 type captureBinding struct {
-	Index int
-	Table snowflakeObject
+	Index        int
+	Table        snowflakeObject
+	OrderColumns []string
 }
 
 type captureState struct {
@@ -130,6 +151,11 @@ func (c *capture) Run(ctx context.Context) error {
 	}
 
 	for table, streamState := range c.State.Streams {
+		var binding = c.Bindings[table]
+		if binding == nil {
+			return fmt.Errorf("internal error: unknown binding for table %q", table.String())
+		}
+
 		// For each stream, we decide what our target sequence number is. In the overwhelmingly
 		// more common case this will just be the sequence number from the checkpoint state,
 		// but it is possible to end up with some "leftover" staging tables and in these cases
@@ -143,7 +169,7 @@ func (c *capture) Run(ctx context.Context) error {
 		// The captureStagingTable() operation will be responsible for updating the stream
 		// state when done, since it's already handling checkpoints and partial progress.
 		for streamState.SequenceNumber <= targetSeq {
-			if err := c.captureStagingTable(ctx, table); err != nil {
+			if err := c.captureStagingTable(ctx, table, binding.OrderColumns); err != nil {
 				return fmt.Errorf("error capturing staging table %d: %w", streamState.SequenceNumber, err)
 			}
 		}
@@ -278,7 +304,7 @@ func (c *capture) pruneStagingTables(ctx context.Context) (map[snowflakeObject]i
 	return highestStaged, nil
 }
 
-func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject) error {
+func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject, orderColumns []string) error {
 	var streamState = c.State.Streams[table]
 	var stagingName = stagingTableName(c.Config, table, streamState.SequenceNumber)
 	var logEntry = log.WithFields(log.Fields{
@@ -292,9 +318,21 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 		return err
 	}
 
+	// Generate a query to read the staging table contents.
+	var quotedOrderColumns []string
+	for _, orderColumn := range orderColumns {
+		quotedOrderColumns = append(quotedOrderColumns, quoteSnowflakeIdentifier(orderColumn))
+	}
+	var queryBuf = new(strings.Builder)
+	fmt.Fprintf(queryBuf, "SELECT * FROM %s", stagingName.QuotedName())
+	if len(quotedOrderColumns) > 0 {
+		fmt.Fprintf(queryBuf, " ORDER BY %s", strings.Join(quotedOrderColumns, ", "))
+	}
+	fmt.Fprintf(queryBuf, " LIMIT NULL OFFSET %d", streamState.TableOffset)
+	var readStagingTableQuery = queryBuf.String()
+
 	// Read contents of staging table and output to Flow.
-	logEntry.WithField("off", streamState.TableOffset).Info("querying staging table")
-	var readStagingTableQuery = fmt.Sprintf(`SELECT * FROM %s LIMIT NULL OFFSET %d;`, stagingName.QuotedName(), streamState.TableOffset)
+	logEntry.WithField("query", readStagingTableQuery).Info("querying staging table")
 	rows, err := c.DB.QueryContext(ctx, readStagingTableQuery)
 	if err != nil {
 		return fmt.Errorf("error querying staging table %q: %w", stagingName.String(), err)
@@ -319,6 +357,10 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 	// The paired rows changes should normally be located one after the other so
 	// this buffer should only hold one row-value at any given time.
 	var updatesBuffer = make(map[string]map[string]any)
+
+	// We emit "partial progress" checkpoints periodically when processing large
+	// result sets, but only when certain conditions are met.
+	var documentsSinceLastCheckpoint int
 
 	for rows.Next() {
 		if err := rows.Scan(vptrs...); err != nil {
@@ -412,21 +454,32 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 			logEntry.WithField("op", operation).Warn("change event data map is nil")
 			document = make(map[string]interface{})
 		}
-		document["_meta"] = &meta
+		document[metadataProperty] = &meta
+
+		// TODO(wgd): Need to only emit partial-progress checkpoints when the current
+		// document's collection key differs from the previous one.
+		//
+		// Note that while our definition of "the same collection key" is based on
+		// JSON serialization, we can avoid doing this work whenever we're below the
+		// 'partial progress checkpoint spacing' threshold, so it should be very cheap
+		// in the common case where we only compute these serializations or hashes for
+		// two out of every K rows.
+		if documentsSinceLastCheckpoint >= partialProgressCheckpointSpacing {
+			var shouldEmitCheckpoint = true
+			if shouldEmitCheckpoint {
+				if err := c.emitCheckpoint(ctx, table, streamState); err != nil {
+					return err
+				}
+				documentsSinceLastCheckpoint = 0
+			}
+		}
 
 		if err := c.emitDocument(ctx, table, document); err != nil {
 			return err
 		}
 
-		// TODO(wgd): Need to only emit partial-progress checkpoints when the current
-		// document's collection key differs from the previous one.
 		streamState.TableOffset++
-		if streamState.TableOffset%partialProgressCheckpointSpacing == 0 {
-			if err := c.emitCheckpoint(ctx, table, streamState); err != nil {
-				return err
-			}
-		}
-
+		documentsSinceLastCheckpoint++
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("error querying staging table %q: %w", stagingName.String(), err)
@@ -442,8 +495,8 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 }
 
 func (c *capture) emitDocument(ctx context.Context, table snowflakeObject, document any) error {
-	var binding, ok = c.Bindings[table]
-	if !ok {
+	var binding = c.Bindings[table]
+	if binding == nil {
 		return fmt.Errorf("internal error: unknown binding for table %q", table.String())
 	}
 	var bs, err = json.Marshal(document)
