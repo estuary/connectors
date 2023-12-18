@@ -145,7 +145,7 @@ jobs:
           echo "${PWD}/flow-bin" >> $GITHUB_PATH
 
       - name: Set up Cloud SDK
-        if: matrix.connector == 'source-gcs'
+        if: matrix.connector == 'source-gcs' || matrix.python
         uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
