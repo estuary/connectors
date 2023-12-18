@@ -22,6 +22,7 @@ def test_capture(request, snapshot):
 
     for l in lines:
         l[1]["ts"] = "redacted-timestamp"
+        l[1]["_meta"]["row_id"] = "redacted-rowid"
 
     assert snapshot("capture.stdout.json") == lines
 
