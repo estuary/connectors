@@ -212,11 +212,7 @@ func catalogFromDiscovery(cfg *config, info *snowflakeDiscoveryResults) ([]*pc.R
 // primaryKeyToCollectionKey converts a database primary key column name into a Flow collection key
 // JSON pointer with escaping for '~' and '/' applied per RFC6901.
 func primaryKeyToCollectionKey(key string) string {
-	// Any encoded '~' must be escaped first to prevent a second escape on escaped '/' values as
-	// '~1'.
-	key = strings.ReplaceAll(key, "~", "~0")
-	key = strings.ReplaceAll(key, "/", "~1")
-	return "/" + key
+	return "/" + escapeTildes(key)
 }
 
 func schemaFromDiscovery(info *snowflakeDiscoveryInfo) (json.RawMessage, error) {
@@ -272,7 +268,7 @@ func schemaFromDiscovery(info *snowflakeDiscoveryInfo) (json.RawMessage, error) 
 			{
 				Extras: map[string]interface{}{
 					"properties": map[string]*jsonschema.Schema{
-						"_meta": {
+						metadataProperty: {
 							Type: "object",
 							Extras: map[string]interface{}{
 								"properties": map[string]*jsonschema.Schema{
@@ -302,7 +298,7 @@ func schemaFromDiscovery(info *snowflakeDiscoveryInfo) (json.RawMessage, error) 
 						"strategy": "merge",
 					},
 				},
-				Required: []string{"_meta"},
+				Required: []string{metadataProperty},
 			},
 			{Ref: "#" + anchor},
 		},
