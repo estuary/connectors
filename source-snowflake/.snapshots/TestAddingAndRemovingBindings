@@ -1,0 +1,38 @@
+// Just A
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_66311983":{"seq":0,"off":0}}}
+{"DATA":"Zero","ID":"0","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_66311983","seq":0,"off":0}}}
+{"DATA":"One","ID":"1","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_66311983","seq":0,"off":1}}}
+{"DATA":"Two","ID":"2","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_66311983","seq":0,"off":2}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_66311983":{"off":0,"seq":1}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_66311983":{"off":0,"seq":2}}}
+
+// Just B
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_21819672":{"off":0,"seq":0}}}
+{"DATA":"Three","ID":"3","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_21819672","seq":0,"off":0}}}
+{"DATA":"Four","ID":"4","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_21819672","seq":0,"off":1}}}
+{"DATA":"Five","ID":"5","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_21819672","seq":0,"off":2}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_21819672":{"off":0,"seq":1}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_21819672":{"off":0,"seq":2}}}
+
+// Both A and C
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_47715271":{"off":0,"seq":0},"PUBLIC/test_AddingAndRemovingBindings_66311983":{"off":0,"seq":0}}}
+{"DATA":"Six","ID":"6","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_47715271","seq":0,"off":0}}}
+{"DATA":"Seven","ID":"7","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_47715271","seq":0,"off":1}}}
+{"DATA":"Eight","ID":"8","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_47715271","seq":0,"off":2}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_47715271":{"off":0,"seq":1},"PUBLIC/test_AddingAndRemovingBindings_66311983":{"off":0,"seq":0}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_47715271":{"off":0,"seq":2},"PUBLIC/test_AddingAndRemovingBindings_66311983":{"off":0,"seq":0}}}
+{"DATA":"Zero","ID":"0","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_66311983","seq":0,"off":0}}}
+{"DATA":"One","ID":"1","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_66311983","seq":0,"off":1}}}
+{"DATA":"Two","ID":"2","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_66311983","seq":0,"off":2}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_47715271":{"off":0,"seq":2},"PUBLIC/test_AddingAndRemovingBindings_66311983":{"off":0,"seq":1}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_47715271":{"off":0,"seq":2},"PUBLIC/test_AddingAndRemovingBindings_66311983":{"off":0,"seq":2}}}
+
+// Both B and C
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_21819672":{"off":0,"seq":0},"PUBLIC/test_AddingAndRemovingBindings_47715271":{"off":0,"seq":2}}}
+{"DATA":"Three","ID":"3","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_21819672","seq":0,"off":0}}}
+{"DATA":"Four","ID":"4","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_21819672","seq":0,"off":1}}}
+{"DATA":"Five","ID":"5","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_AddingAndRemovingBindings_21819672","seq":0,"off":2}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_21819672":{"off":0,"seq":1},"PUBLIC/test_AddingAndRemovingBindings_47715271":{"off":0,"seq":2}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_21819672":{"off":0,"seq":2},"PUBLIC/test_AddingAndRemovingBindings_47715271":{"off":0,"seq":2}}}
+{"streams":{"PUBLIC/test_AddingAndRemovingBindings_21819672":{"off":0,"seq":2},"PUBLIC/test_AddingAndRemovingBindings_47715271":{"off":0,"seq":3}}}
+
