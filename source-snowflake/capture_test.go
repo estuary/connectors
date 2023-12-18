@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/stretchr/testify/require"
 )
 
 func verifiedCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
@@ -64,4 +67,93 @@ func TestBasicDatatypes(t *testing.T) {
 	var y = "1991-11-25T06:13:44Z"
 	tb.Insert(ctx, t, tableName, [][]interface{}{{1, "DCBA", []byte{0xEE, 0x5A, 0x11, 0xA5}, 2.64, false, "1991-11-25", "06:13:44", y, y}})
 	t.Run("main", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
+}
+
+func TestLargeCapture(t *testing.T) {
+	var ctx, tb = context.Background(), snowflakeTestBackend(t)
+	var uniqueID = "63855638"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	// Helper operations to make the sequence of test manipulations cleaner
+	var insertRows = func(ctx context.Context, lo, hi int) {
+		var rows [][]any
+		for i := lo; i < hi; i++ {
+			rows = append(rows, []any{i, fmt.Sprintf("Row #%d", i)})
+		}
+		tb.Insert(ctx, t, tableName, rows)
+	}
+	var rewindCheckpoint = func(cs *st.CaptureSpec, seq, off int) error {
+		var checkpoint captureState
+		if err := json.Unmarshal(cs.Checkpoint, &checkpoint); err != nil {
+			return err
+		}
+		for _, streamState := range checkpoint.Streams {
+			streamState.SequenceNumber = seq
+			streamState.TableOffset = off
+		}
+		var err error
+		cs.Checkpoint, err = json.Marshal(checkpoint)
+		return err
+	}
+
+	var summary = new(strings.Builder)
+
+	// Insert 100 rows and then run the first capture
+	insertRows(ctx, 0, 100)
+	fmt.Fprintf(summary, "// =================================\n")
+	fmt.Fprintf(summary, "// Initial Capture\n")
+	fmt.Fprintf(summary, "// =================================\n")
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	// Manually reset the state checkpoint back to (0, 70) which is 70% of the way
+	// through the initial backfill, then run another capture. This simulates the
+	// capture getting killed and restarted partway through the initial backfill.
+	require.NoError(t, rewindCheckpoint(cs, 0, 70))
+	fmt.Fprintf(summary, "\n")
+	fmt.Fprintf(summary, "// =================================\n")
+	fmt.Fprintf(summary, "// Backfill Capture Rewound to %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// =================================\n")
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	// Insert another 100 rows and run a subsequent capture
+	insertRows(ctx, 100, 200)
+	fmt.Fprintf(summary, "\n")
+	fmt.Fprintf(summary, "// =================================\n")
+	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// =================================\n")
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	// Reset the subsequent capture back to (3, 60) to simulate killing and restarting
+	// the capture partway through a large chunk of staged stream changes.
+	require.NoError(t, rewindCheckpoint(cs, 3, 60))
+	fmt.Fprintf(summary, "\n")
+	fmt.Fprintf(summary, "// =================================\n")
+	fmt.Fprintf(summary, "// Subsequent Capture Rewound to %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// =================================\n")
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	// Run another capture which shouldn't observe any changes
+	fmt.Fprintf(summary, "\n")
+	fmt.Fprintf(summary, "// =================================\n")
+	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// =================================\n")
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	// Do it again to observe that the sequence numbers are ticking over nicely
+	fmt.Fprintf(summary, "\n")
+	fmt.Fprintf(summary, "// =================================\n")
+	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// =================================\n")
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	// Insert another 51 rows and observe those the next time the capture runs
+	insertRows(ctx, 200, 251)
+	fmt.Fprintf(summary, "\n")
+	fmt.Fprintf(summary, "// =================================\n")
+	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(cs.Checkpoint))
+	fmt.Fprintf(summary, "// =================================\n")
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	cupaloy.SnapshotT(t, summary.String())
 }
