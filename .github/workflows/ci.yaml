@@ -217,6 +217,10 @@ jobs:
         if: ${{matrix.python}}
         with:
           python-version: '3.11' 
+      
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
       - name: Python connector ${{ matrix.connector }} snapshot tests
         if: ${{matrix.python}}
         run: |
