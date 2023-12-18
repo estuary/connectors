@@ -125,7 +125,6 @@ func TestApplyChanges(t *testing.T) {
 
 	// Apply the spec, which will drop the nullability constraints because none of the fields are in
 	// the materialized collection.
-
 	specBytes, err := os.ReadFile("testdata/generated_specs/apply-changes.flow.proto")
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
