@@ -1,5 +1,5 @@
 {
-  "bootstrap_servers": ["localhost:9092"],
+  "bootstrap_servers": "localhost:9092",
   "credentials": {
     "auth_type": "UserPassword",
     "mechanism": "SCRAM-SHA-256",
