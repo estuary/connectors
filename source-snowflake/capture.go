@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -142,20 +143,34 @@ func (c *capture) Run(ctx context.Context) error {
 	log.WithField("name", c.Name).Info("started capture")
 
 	log.Debug("processing added/removed bindings")
-	if err := c.updateState(ctx); err != nil {
+	var removedStreams, err = c.updateState(ctx)
+	if err != nil {
 		return fmt.Errorf("error processing added/removed bindings: %w", err)
 	}
 
-	if err := c.pruneDeletedStreams(ctx); err != nil {
+	if err := c.pruneDeletedStreams(ctx, removedStreams); err != nil {
 		return fmt.Errorf("error pruning deleted streams: %w", err)
 	}
 
-	var highestStaged, err = c.pruneStagingTables(ctx)
+	highestStaged, err := c.pruneStagingTables(ctx, removedStreams)
 	if err != nil {
 		return fmt.Errorf("error pruning staging tables: %w", err)
 	}
 
-	for table, streamState := range c.State.Streams {
+	// Sort the list of streams so that we can capture each of them in a deterministic order.
+	var tables []snowflakeObject
+	for table := range c.State.Streams {
+		tables = append(tables, table)
+	}
+	slices.SortFunc(tables, func(a, b snowflakeObject) int {
+		if a.Schema != b.Schema {
+			return strings.Compare(a.Schema, b.Schema)
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	for _, table := range tables {
+		var streamState = c.State.Streams[table]
 		var binding = c.Bindings[table]
 		if binding == nil {
 			return fmt.Errorf("internal error: unknown binding for table %q", table.String())
@@ -182,8 +197,9 @@ func (c *capture) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *capture) updateState(ctx context.Context) error {
+func (c *capture) updateState(ctx context.Context) ([]snowflakeObject, error) {
 	var updatedStreams = make(map[snowflakeObject]*streamState)
+	var removedStreams []snowflakeObject
 
 	// Prune deleted streams from the state.
 	for table := range c.State.Streams {
@@ -191,6 +207,7 @@ func (c *capture) updateState(ctx context.Context) error {
 			log.WithField("table", table.String()).Info("binding removed")
 			delete(c.State.Streams, table)
 			updatedStreams[table] = nil
+			removedStreams = append(removedStreams, table)
 		}
 	}
 
@@ -201,13 +218,13 @@ func (c *capture) updateState(ctx context.Context) error {
 
 			streamName, err := createChangeStream(ctx, c.Config, c.DB, c.Name, binding.Table)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			log.WithField("stream", streamName.String()).Debug("created change stream")
 
 			stagingName, err := createInitialCloneTable(ctx, c.Config, c.DB, c.Name, binding.Table, initialCloneSequenceNumber)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			log.WithField("staged", stagingName.String()).Debug("cloned into staging table")
 
@@ -220,19 +237,63 @@ func (c *capture) updateState(ctx context.Context) error {
 	// Emit a new checkpoint patch reflecting these deletions and initializations.
 	if len(updatedStreams) > 0 {
 		if updateCheckpoint, err := json.Marshal(&captureState{Streams: updatedStreams}); err != nil {
-			return fmt.Errorf("error marshalling checkpoint: %w", err)
+			return nil, fmt.Errorf("error marshalling checkpoint: %w", err)
 		} else if err := c.Output.Checkpoint(updateCheckpoint, true); err != nil {
-			return fmt.Errorf("error emitting checkpoint: %w", err)
+			return nil, fmt.Errorf("error emitting checkpoint: %w", err)
 		}
 	}
-	return nil
+	return removedStreams, nil
 }
 
-func (c *capture) pruneDeletedStreams(ctx context.Context) error {
-	// TODO(wgd): Enable this bit of pruning once we can guarantee that only streams
-	// from bindings which were removed in the current task invocation will be deleted.
+func (c *capture) pruneDeletedStreams(ctx context.Context, removedStreams []snowflakeObject) error {
+	log.WithField("flowSchema", c.Config.Advanced.FlowSchema).Info("pruning deleted streams")
 
-	// log.WithField("flowSchema", c.Config.Advanced.FlowSchema).Info("pruning deleted streams")
+	// Build a mapping from unique ID strings to deletion status. The function from table name
+	// to ID is one-way, so we have to build the inverse mapping from known table names here.
+	var idToRemovedStatus = make(map[string]bool)
+	for _, table := range removedStreams {
+		idToRemovedStatus[table.UniqueID(c.Name)] = true
+	}
+
+	// Enumerate streams in the appropriate schema
+	var xdb = sqlx.NewDb(c.DB, "snowflake").Unsafe()
+	var changeStreams []*struct {
+		Schema string `db:"schema_name"`
+		Name   string `db:"name"`
+	}
+	var changeStreamsQuery = fmt.Sprintf("SHOW STREAMS IN SCHEMA %s STARTS WITH 'flow_stream_';", c.Config.Advanced.FlowSchema)
+	if err := xdb.Select(&changeStreams, changeStreamsQuery); err != nil {
+		return fmt.Errorf("error listing change streams: %w", err)
+	}
+
+	// Iterate over the list of streams and make a list of ones needing deletion.
+	var needsDeletion []string
+	for _, changeStream := range changeStreams {
+		// Split the name on underscores and extract the unique ID portion, and
+		// queue for deletion any change streams whose ID corresponds to a newly
+		// deleted binding.
+		var bits = strings.SplitN(changeStream.Name, "_", 3)
+		if len(bits) != 3 {
+			continue
+		}
+		var uniqueID = bits[2]
+
+		if idToRemovedStatus[uniqueID] {
+			log.WithField("name", changeStream.Name).Info("will prune change stream of removed binding")
+			needsDeletion = append(needsDeletion, changeStream.Name)
+			continue
+		}
+	}
+
+	// Actually perform deletion of no-longer-needed streams.
+	for _, deleteStream := range needsDeletion {
+		log.WithField("stream", deleteStream).Info("pruning change stream")
+		var dropStreamQuery = fmt.Sprintf("DROP STREAM IF EXISTS %s;", snowflakeObject{c.Config.Advanced.FlowSchema, deleteStream}.QuotedName())
+		if _, err := c.DB.ExecContext(ctx, dropStreamQuery); err != nil {
+			return fmt.Errorf("error dropping change stream %q: %w", deleteStream, err)
+		}
+	}
+
 	return nil
 }
 
@@ -245,13 +306,20 @@ func (c *capture) pruneDeletedStreams(ctx context.Context) error {
 //
 // Since newly-added bindings have their initial table snapshot cloned before the stream
 // state is initialized, that snapshot can be viewed as just another staging table here.
-func (c *capture) pruneStagingTables(ctx context.Context) (map[snowflakeObject]int, error) {
+func (c *capture) pruneStagingTables(ctx context.Context, removedStreams []snowflakeObject) (map[snowflakeObject]int, error) {
 	log.WithField("flowSchema", c.Config.Advanced.FlowSchema).Info("pruning staging tables")
 
-	// Build a mapping from unique ID strings to the corresponding table name
+	// Build mappings from unique ID strings to the corresponding table name
+	// (for active bindings) and removed status (for bindings removed in this
+	// connector invocation). The function from table name to ID is one-way, so
+	// we have to build the inverse mapping from known table names here.
 	var idToSourceTable = make(map[string]snowflakeObject)
 	for table := range c.State.Streams {
 		idToSourceTable[table.UniqueID(c.Name)] = table
+	}
+	var idToRemovedStatus = make(map[string]bool)
+	for _, table := range removedStreams {
+		idToRemovedStatus[table.UniqueID(c.Name)] = true
 	}
 
 	// Enumerate staging tables in the appropriate schema
@@ -279,15 +347,17 @@ func (c *capture) pruneStagingTables(ctx context.Context) (map[snowflakeObject]i
 
 		log.WithField("uid", uniqueID).WithField("seq", sequenceNumber).Debug("found staging table")
 
-		// A staging table should be dropped if there is no known source table to which it
-		// corresponds (because the binding must have been deleted) or if its sequence number
-		// is less than the current sequence number for that stream.
+		// A staging table should be dropped if the source table to which it corresponds
+		// has just been deleted, or if it corresponds to an active binding and its sequence
+		// number is less than the current acknowledged sequence number of that stream.
+		if idToRemovedStatus[uniqueID] {
+			log.WithField("name", stagingTable.Name).Info("will prune staging table of removed binding")
+			needsDeletion = append(needsDeletion, stagingTable.Name)
+			continue
+		}
 		var sourceTable, sourceTableKnown = idToSourceTable[uniqueID]
 		if !sourceTableKnown {
-			// TODO(wgd): Enable this bit of pruning once we can ensure that only staging tables
-			// from bindings which were removed in the current task invocation will be deleted.
-			log.WithField("name", stagingTable.Name).Debug("will not prune staging table from unknown binding")
-			//needsDeletion = append(needsDeletion, stagingTable.Name)
+			log.WithField("name", stagingTable.Name).Debug("will not prune staging table of unknown binding")
 			continue
 		}
 		var streamState = c.State.Streams[sourceTable]
