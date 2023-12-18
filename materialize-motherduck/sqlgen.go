@@ -42,6 +42,19 @@ var duckDialect = func() sql.Dialect {
 		Delegate:    mapper,
 	}
 
+	columnValidator := sql.NewColumnValidator(
+		sql.ColValidation{Types: []string{"bigint", "hugeint"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
+		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
+		sql.ColValidation{Types: []string{"varchar"}, Validate: sql.StringCompatible},
+		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
+		sql.ColValidation{Types: []string{"timestamp with time zone"}, Validate: sql.DateTimeCompatible},
+		sql.ColValidation{Types: []string{"interval"}, Validate: sql.DurationCompatible},
+		sql.ColValidation{Types: []string{"time"}, Validate: sql.TimeCompatible},
+		sql.ColValidation{Types: []string{"uuid"}, Validate: sql.UuidCompatible},
+	)
+
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
@@ -58,20 +71,8 @@ var duckDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return "?"
 		}),
-		TypeMapper: mapper,
-		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
-			"bigint":                   sql.IntegerCompatible,
-			"double":                   sql.NumberCompatible,
-			"boolean":                  sql.BooleanCompatible,
-			"json":                     sql.JsonCompatible,
-			"varchar":                  sql.StringCompatible,
-			"hugeint":                  sql.IntegerCompatible,
-			"date":                     sql.DateCompatible,
-			"timestamp with time zone": sql.DateTimeCompatible,
-			"interval":                 sql.DurationCompatible,
-			"time":                     sql.TimeCompatible,
-			"uuid":                     sql.UuidCompatible,
-		},
+		TypeMapper:      mapper,
+		ColumnValidator: columnValidator,
 	}
 }()
 

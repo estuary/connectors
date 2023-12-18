@@ -53,6 +53,17 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 		Delegate:    mapper,
 	}
 
+	columnValidator := sql.NewColumnValidator(
+		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"double", "decimal"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"tinyint"}, Validate: sql.BooleanCompatible},
+		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
+		sql.ColValidation{Types: []string{"varchar", "longtext"}, Validate: sql.StringCompatible},
+		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
+		sql.ColValidation{Types: []string{"datetime"}, Validate: sql.DateTimeCompatible},
+		sql.ColValidation{Types: []string{"time"}, Validate: sql.TimeCompatible},
+	)
+
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			// For MySQL, the table_catalog is always "def", and table_schema is the name of the
@@ -72,19 +83,8 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return "?"
 		}),
-		TypeMapper: mapper,
-		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
-			"bigint":   sql.IntegerCompatible,
-			"double":   sql.NumberCompatible,
-			"tinyint":  sql.BooleanCompatible, // Booleans are either 1 or 0 in MySQL.
-			"json":     sql.JsonCompatible,
-			"varchar":  sql.StringCompatible,
-			"longtext": sql.StringCompatible,
-			"decimal":  sql.NumberCompatible,
-			"date":     sql.DateCompatible,
-			"datetime": sql.DateTimeCompatible,
-			"time":     sql.TimeCompatible,
-		},
+		TypeMapper:      mapper,
+		ColumnValidator: columnValidator,
 	}
 }
 
