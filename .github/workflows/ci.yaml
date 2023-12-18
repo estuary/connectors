@@ -6,7 +6,8 @@ concurrency:
 
 on:
   push:
-    branches: [main]
+    # TODO: Remove jshearer/python_connector_testing before merging
+    branches: [main, jshearer/python_connector_testing]
   pull_request:
     branches: [main]
 
@@ -119,6 +120,9 @@ jobs:
           - connector: source-shopify
             connector_type: capture
             python: true
+          - connector: source-airtable
+            connector_type: capture
+            python: true
 
     steps:
       - uses: actions/checkout@v2
@@ -207,6 +211,17 @@ jobs:
             CONNECTOR_NAME=${{matrix.connector}}
             CONNECTOR_TYPE=${{matrix.connector_type}}
           tags: ghcr.io/estuary/${{ matrix.connector }}:local
+
+      - name: Setup Python for ${{ matrix.connector }}
+        uses: actions/setup-python@v5
+        if: ${{matrix.python}}
+        with:
+          python-version: '3.11' 
+      - name: Python connector ${{ matrix.connector }} snapshot tests
+        if: ${{matrix.python}}
+        run: |
+          ./python/activate.sh ${{matrix.connector}};
+          pytest ${{matrix.connector}}/tests
 
       - name: Start Dockerized test infrastructure
         if: matrix.connector == 'source-kafka'
