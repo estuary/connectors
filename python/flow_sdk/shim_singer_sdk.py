@@ -6,7 +6,7 @@ from singer_sdk.streams import Stream
 import typing as t
 
 from .capture import Connector, request, response, Response
-from . import flow, init_logger
+from . import flow, ValidateError, init_logger
 
 logger = init_logger()
 
@@ -29,18 +29,21 @@ class Config(t.TypedDict):
 class State(t.TypedDict):
     pass
 
+
+class DelegateFactoryCallable(t.Protocol):
+    def __call__(self, config: Config, catalog: singer.Catalog | None = None, state: State | None = None) -> singer_sdk.Tap:
+        ...
+
 class CaptureShim(Connector):
     config_schema: dict
-    delegate_factory: t.Callable[[Config, singer.Catalog | None, State | None], singer_sdk.Tap]
+    delegate_factory: DelegateFactoryCallable
     usesSchemaInference: bool
     oauth2: flow.OAuth2 | None
 
     def __init__(
         self,
         config_schema: dict,
-        delegate_factory: t.Callable[
-            [Config, singer.Catalog | None, State | None], singer_sdk.Tap
-        ],
+        delegate_factory: DelegateFactoryCallable,
         usesSchemaInference = True,
         oauth2: flow.OAuth2 | None = None
     ):
@@ -122,6 +125,14 @@ class CaptureShim(Connector):
             entry = singer.CatalogEntry.from_dict(binding["resourceConfig"])
             entry.schema = singer.Schema.from_dict(binding["collection"]["writeSchema"])
             catalog[entry.tap_stream_id] = entry
+
+            # It looks[1] like it's incorrect to "upgrade" a stream that does not
+            # have a `replication_key` to use `INCREMENTAL` mode, but it should
+            # be possible to "downgrade" an INCREMENTAL stream to FULL_TABLE
+            # [1]: https://github.com/meltano/sdk/blob/main/singer_sdk/streams/core.py#L751-L756
+
+            if entry.replication_method == "INCREMENTAL" and entry.replication_key is None:
+                raise ValidateError(f"{entry.stream} does not support {entry.replication_method} replication.")
 
             bindings.append(
                 response.ValidatedBinding(resourcePath=[entry.tap_stream_id])
@@ -240,12 +251,7 @@ resource_config_schema = {
     "type": "object",
     "properties": {
         "stream": {"type": "string"},
-        "syncMode": {"type": "string", "enum": ["incremental", "full_refresh"]},
-        "namespace": {"type": "string"},
-        "cursorField": {
-            "type": "array",
-            "items": {"type": "string"},
-        },
+        "replication_mode": {"type": "string", "enum": ["INCREMENTAL", "FULL_TABLE"]},
     },
     "required": ["stream", "syncMode"],
 }
