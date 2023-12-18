@@ -7,14 +7,10 @@ spec:
     $schema: "http://json-schema.org/draft-07/schema#"
     properties:
       bootstrap_servers:
-        default:
-          - "localhost:9092"
-        description: The initial servers in the Kafka cluster to initially connect to. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.
-        items:
-          type: string
+        description: The initial servers in the Kafka cluster to initially connect to, separated by commas. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.
         order: 0
         title: Bootstrap Servers
-        type: array
+        type: string
       credentials:
         description: "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments."
         discriminator:

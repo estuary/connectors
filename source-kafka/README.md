@@ -46,7 +46,7 @@ Example:
 
 ```json
 {
-  "bootstrap_servers": ["localhost:9092"]
+  "bootstrap_servers": "localhost:9092"
 }
 ```
 
