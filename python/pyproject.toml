@@ -4,6 +4,7 @@ version = "0.1.4"
 description = ""
 authors = ["Joseph Shearer <joseph@estuary.dev>", "Johnny Graettinger <johnny@estuary.dev>"]
 readme = "README.md"
+homepage = "https://github.com/estuary/connectors/tree/main/python"
 
 [tool.poetry.dependencies]
 jsonlines = "^4.0.0"
