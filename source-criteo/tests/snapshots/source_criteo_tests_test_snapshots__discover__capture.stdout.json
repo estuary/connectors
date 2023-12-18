@@ -1,0 +1,1375 @@
+[
+  {
+    "recommendedName": "audiences",
+    "resourceConfig": {
+      "tap_stream_id": "audiences",
+      "replication_method": "FULL_TABLE",
+      "key_properties": [
+        "id"
+      ],
+      "stream": "audiences",
+      "metadata": [
+        {
+          "breadcrumb": [
+            "properties",
+            "type"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "id"
+          ],
+          "metadata": {
+            "inclusion": "automatic"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "attributes"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "table-key-properties": [
+              "id"
+            ]
+          }
+        }
+      ]
+    },
+    "documentSchema": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "attributes": {
+          "properties": {
+            "advertiserId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "created": {
+              "type": "string"
+            },
+            "updated": {
+              "type": "string"
+            },
+            "nbLines": {
+              "type": "integer"
+            },
+            "nbLinesEmail": {
+              "type": "integer"
+            },
+            "nbMatchesEmail": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "advertisers",
+    "resourceConfig": {
+      "tap_stream_id": "advertisers",
+      "replication_method": "FULL_TABLE",
+      "key_properties": [
+        "id"
+      ],
+      "stream": "advertisers",
+      "metadata": [
+        {
+          "breadcrumb": [
+            "properties",
+            "id"
+          ],
+          "metadata": {
+            "inclusion": "automatic"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "type"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "attributes"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "table-key-properties": [
+              "id"
+            ]
+          }
+        }
+      ]
+    },
+    "documentSchema": {
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "attributes": {
+          "properties": {
+            "advertiserName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "meta": {
+              "properties": {},
+              "type": [
+                "object",
+                "null"
+              ]
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "ad_sets",
+    "resourceConfig": {
+      "tap_stream_id": "ad_sets",
+      "replication_method": "FULL_TABLE",
+      "key_properties": [
+        "id"
+      ],
+      "stream": "ad_sets",
+      "metadata": [
+        {
+          "breadcrumb": [
+            "properties",
+            "id"
+          ],
+          "metadata": {
+            "inclusion": "automatic"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "type"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "attributes"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "table-key-properties": [
+              "id"
+            ]
+          }
+        }
+      ]
+    },
+    "documentSchema": {
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "attributes": {
+          "properties": {
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "advertiserId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "campaignId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "destinationEnvironment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "schedule": {
+              "properties": {
+                "startDate": {
+                  "properties": {
+                    "value": {
+                      "format": "date-time",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": "object"
+                },
+                "endDate": {
+                  "properties": {
+                    "value": {
+                      "format": "date-time",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": "object"
+                },
+                "activationStatus": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "deliveryStatus": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "bidding": {
+              "properties": {
+                "bidAmount": {
+                  "properties": {
+                    "value": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "bidStrategy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "costController": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "targeting": {
+              "properties": {
+                "deliveryLimitations": {
+                  "properties": {
+                    "environments": {
+                      "items": {
+                        "type": [
+                          "string"
+                        ]
+                      },
+                      "type": [
+                        "array",
+                        "null"
+                      ]
+                    },
+                    "devices": {
+                      "items": {
+                        "type": [
+                          "string"
+                        ]
+                      },
+                      "type": [
+                        "array",
+                        "null"
+                      ]
+                    },
+                    "operatingSystems": {
+                      "items": {
+                        "type": [
+                          "string"
+                        ]
+                      },
+                      "type": [
+                        "array",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "geoLocation": {
+                  "properties": {
+                    "countries": {
+                      "properties": {
+                        "value": {
+                          "properties": {
+                            "operand": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "values": {
+                              "items": {
+                                "type": [
+                                  "string"
+                                ]
+                              },
+                              "type": [
+                                "array",
+                                "null"
+                              ]
+                            }
+                          },
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "subdivisions": {
+                      "properties": {
+                        "value": {
+                          "properties": {
+                            "operand": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "values": {
+                              "items": {
+                                "type": [
+                                  "string"
+                                ]
+                              },
+                              "type": [
+                                "array",
+                                "null"
+                              ]
+                            }
+                          },
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "zipCodes": {
+                      "properties": {
+                        "value": {
+                          "properties": {
+                            "operand": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "values": {
+                              "items": {
+                                "type": [
+                                  "string"
+                                ]
+                              },
+                              "type": [
+                                "array",
+                                "null"
+                              ]
+                            }
+                          },
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      },
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                }
+              },
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "budget": {
+              "properties": {
+                "budgetStrategy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetRenewal": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetDeliverySmoothing": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetDeliveryWeek": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetAmount": {
+                  "properties": {
+                    "value": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                }
+              },
+              "type": [
+                "object",
+                "null"
+              ]
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "campaigns",
+    "resourceConfig": {
+      "tap_stream_id": "campaigns",
+      "replication_method": "FULL_TABLE",
+      "key_properties": [
+        "id"
+      ],
+      "stream": "campaigns",
+      "metadata": [
+        {
+          "breadcrumb": [
+            "properties",
+            "id"
+          ],
+          "metadata": {
+            "inclusion": "automatic"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "type"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "attributes"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "table-key-properties": [
+              "id"
+            ]
+          }
+        }
+      ]
+    },
+    "documentSchema": {
+      "properties": {
+        "id": {
+          "title": "Campaign ID",
+          "type": "string"
+        },
+        "type": {
+          "title": "Object type",
+          "type": "string"
+        },
+        "attributes": {
+          "properties": {
+            "name": {
+              "title": "Campaign Name",
+              "type": "string"
+            },
+            "advertiserId": {
+              "title": "Advertiser ID",
+              "type": "string"
+            },
+            "objective": {
+              "title": "Campaign objective",
+              "type": "string"
+            },
+            "spendLimit": {
+              "properties": {
+                "spendLimitType": {
+                  "title": "Spend limit type",
+                  "type": "string"
+                },
+                "spendLimitRenewal": {
+                  "title": "Spend limit renewal period",
+                  "type": "string"
+                },
+                "spendLimitAmount": {
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    }
+                  },
+                  "title": "Spend limit amount",
+                  "type": "object",
+                  "required": [
+                    "value"
+                  ]
+                }
+              },
+              "title": "Campaign's spend limit",
+              "type": "object",
+              "required": [
+                "spendLimitType",
+                "spendLimitRenewal",
+                "spendLimitAmount"
+              ]
+            }
+          },
+          "type": "object",
+          "required": [
+            "name",
+            "advertiserId",
+            "objective",
+            "spendLimit"
+          ]
+        }
+      },
+      "title": "Campaign",
+      "description": "A campaign object.",
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "attributes"
+      ],
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "legacy_audiences",
+    "resourceConfig": {
+      "tap_stream_id": "legacy_audiences",
+      "replication_method": "FULL_TABLE",
+      "key_properties": [
+        "id"
+      ],
+      "stream": "legacy_audiences",
+      "metadata": [
+        {
+          "breadcrumb": [
+            "properties",
+            "id"
+          ],
+          "metadata": {
+            "inclusion": "automatic"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "advertiserId"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "name"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "description"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "created"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "updated"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "nbLines"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "nbLinesEmail"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "nbMatchesEmail"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "table-key-properties": [
+              "id"
+            ]
+          }
+        }
+      ]
+    },
+    "documentSchema": {
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "advertiserId": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "created": {
+          "type": "integer"
+        },
+        "updated": {
+          "type": "integer"
+        },
+        "nbLines": {
+          "type": "integer"
+        },
+        "nbLinesEmail": {
+          "type": "integer"
+        },
+        "nbMatchesEmail": {
+          "type": "integer"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "legacy_campaigns",
+    "resourceConfig": {
+      "tap_stream_id": "legacy_campaigns",
+      "replication_method": "FULL_TABLE",
+      "key_properties": [
+        "id"
+      ],
+      "stream": "legacy_campaigns",
+      "metadata": [
+        {
+          "breadcrumb": [
+            "properties",
+            "campaignType"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "advertiserName"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "categories"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "budgetId"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "campaignId"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "campaignName"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "advertiserId"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "campaignStatus"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "campaignBid"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "table-key-properties": [
+              "id"
+            ]
+          }
+        }
+      ]
+    },
+    "documentSchema": {
+      "properties": {
+        "campaignType": {
+          "type": "string"
+        },
+        "advertiserName": {
+          "type": "string"
+        },
+        "categories": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "budgetId": {
+          "type": "integer"
+        },
+        "campaignId": {
+          "type": "integer"
+        },
+        "campaignName": {
+          "type": "string"
+        },
+        "advertiserId": {
+          "type": "integer"
+        },
+        "campaignStatus": {
+          "type": "string"
+        },
+        "campaignBid": {
+          "properties": {
+            "bidValue": {
+              "type": "integer"
+            },
+            "bidCurrency": {
+              "type": "string"
+            },
+            "bidType": {
+              "type": "string"
+            },
+            "bidIsPending": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "legacy_categories",
+    "resourceConfig": {
+      "tap_stream_id": "legacy_categories",
+      "replication_method": "FULL_TABLE",
+      "key_properties": [
+        "id"
+      ],
+      "stream": "legacy_categories",
+      "metadata": [
+        {
+          "breadcrumb": [
+            "properties",
+            "categoryHashCode"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "categoryName"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "catalogId"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "catalogName"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "advertiserId"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "advertiserName"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "campaignId"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "campaignName"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "averagePrice"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "numberOfProducts"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "categoryBid"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "enabled"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "table-key-properties": [
+              "id"
+            ]
+          }
+        }
+      ]
+    },
+    "documentSchema": {
+      "properties": {
+        "categoryHashCode": {
+          "type": "integer"
+        },
+        "categoryName": {
+          "type": "string"
+        },
+        "catalogId": {
+          "type": "integer"
+        },
+        "catalogName": {
+          "type": "string"
+        },
+        "advertiserId": {
+          "type": "integer"
+        },
+        "advertiserName": {
+          "type": "string"
+        },
+        "campaignId": {
+          "type": "integer"
+        },
+        "campaignName": {
+          "type": "string"
+        },
+        "averagePrice": {
+          "type": "integer"
+        },
+        "numberOfProducts": {
+          "type": "integer"
+        },
+        "categoryBid": {
+          "properties": {
+            "bidValue": {
+              "type": "integer"
+            },
+            "bidCurrency": {
+              "type": "string"
+            },
+            "bidType": {
+              "type": "string"
+            },
+            "bidIsPending": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "MyReport",
+    "resourceConfig": {
+      "tap_stream_id": "MyReport",
+      "replication_method": "FULL_TABLE",
+      "key_properties": [
+        "Day",
+        "Campaign",
+        "CampaignId"
+      ],
+      "stream": "MyReport",
+      "metadata": [
+        {
+          "breadcrumb": [
+            "properties",
+            "Currency"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "AdvertiserCost"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "Clicks"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "Displays"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "Visits"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "Day"
+          ],
+          "metadata": {
+            "inclusion": "automatic"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "Campaign"
+          ],
+          "metadata": {
+            "inclusion": "automatic"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "CampaignId"
+          ],
+          "metadata": {
+            "inclusion": "automatic"
+          }
+        },
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "table-key-properties": [
+              "Day",
+              "Campaign",
+              "CampaignId"
+            ]
+          }
+        }
+      ]
+    },
+    "documentSchema": {
+      "properties": {
+        "Currency": {
+          "type": "string"
+        },
+        "AdvertiserCost": {
+          "format": "number",
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "Clicks": {
+          "type": "integer"
+        },
+        "Displays": {
+          "type": "integer"
+        },
+        "Visits": {
+          "type": "integer"
+        },
+        "Day": {
+          "format": "date",
+          "type": "string"
+        },
+        "Campaign": {
+          "type": "string"
+        },
+        "CampaignId": {
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Day",
+      "/Campaign",
+      "/CampaignId"
+    ]
+  }
+]
