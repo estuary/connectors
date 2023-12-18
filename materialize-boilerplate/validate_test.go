@@ -422,8 +422,8 @@ func TestForbidAmbiguousFields(t *testing.T) {
 
 	want := map[string]*pm.Response_Validated_Constraint{
 		"onlyOne":        {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is ok"},
-		"notGood":        {Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN, Reason: "Flow collection field 'notGood' would be materialized `notgood`, which is ambiguous with the materializations for other Flow collection fields [notGood,NotGood]. Consider using an alternate, unambiguous projection of this field to allow it to be materialized."},
-		"NotGood":        {Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN, Reason: "Flow collection field 'NotGood' would be materialized `notgood`, which is ambiguous with the materializations for other Flow collection fields [notGood,NotGood]. Consider using an alternate, unambiguous projection of this field to allow it to be materialized."},
+		"notGood":        {Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN, Reason: "Flow collection field 'notGood' would be materialized `notgood`, which is ambiguous with the materializations for other Flow collection fields [NotGood,notGood]. Consider using an alternate, unambiguous projection of this field to allow it to be materialized."},
+		"NotGood":        {Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN, Reason: "Flow collection field 'NotGood' would be materialized `notgood`, which is ambiguous with the materializations for other Flow collection fields [NotGood,notGood]. Consider using an alternate, unambiguous projection of this field to allow it to be materialized."},
 		"somethingelse":  {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is ok"},
 		"something_else": {Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL, Reason: "this is also ok"},
 	}

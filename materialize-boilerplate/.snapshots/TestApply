@@ -4,21 +4,26 @@ create resource for collection "key/value"
 put spec with version "aVersion"
 
 * remove required field:
+create meta tables
 update resource for collection "key/value" [new projections: 0, newly nullable fields: 1, newly delta updates: false]
 put spec with version "aVersion"
 
 * add required field:
+create meta tables
 update resource for collection "key/value" [new projections: 1, newly nullable fields: 0, newly delta updates: false]
 put spec with version "aVersion"
 
 * add binding:
+create meta tables
 create resource for collection "extra/collection"
 put spec with version "aVersion"
 
 * replace binding:
+create meta tables
 replace resource for collection "key/value"
 put spec with version "aVersion"
 
 * field is newly nullable:
+create meta tables
 update resource for collection "key/value" [new projections: 0, newly nullable fields: 1, newly delta updates: false]
 put spec with version "aVersion"

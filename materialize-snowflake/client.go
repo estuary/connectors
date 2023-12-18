@@ -48,7 +48,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 		return nil, fmt.Errorf("querying for connected database: %w", err)
 	}
 
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, resourcePaths)
+	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, c.cfg.Schema, resourcePaths)
 }
 
 func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {

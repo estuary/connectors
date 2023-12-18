@@ -94,17 +94,16 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		}
 	}
 
-	// Only attempt to create meta tables if the storedSpec was `nil`, which suggests that the meta
-	// tables don't yet exist.
 	// TODO(whb): We will eventually stop persisting specs for materializations, and instead include
-	// the previous spec as part of the protocol. When that happens this will need updated.
-	if storedSpec == nil {
-		desc, action, err := applier.CreateMetaTables(ctx, req.Materialization)
-		if err != nil {
-			return nil, fmt.Errorf("getting CreateMetaTables action: %w", err)
-		}
-		addAction(desc, action)
+	// the previous spec as part of the protocol. When that happens this can go away. Then, if
+	// individual materializations still need individual metadata tables (ex: SQL materializations),
+	// they should create them as needed separately from the Applier. For now, we always call
+	// CreateMetaTables, and materializations are free to either create them or not.
+	desc, action, err := applier.CreateMetaTables(ctx, req.Materialization)
+	if err != nil {
+		return nil, fmt.Errorf("getting CreateMetaTables action: %w", err)
 	}
+	addAction(desc, action)
 
 	for bindingIdx, binding := range req.Materialization.Bindings {
 		// The existing binding spec is used to extract various properties that can't be learned
@@ -211,7 +210,7 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 
 	// Only update the spec after all other actions have completed successfully.
 	actions = actions[:0]
-	desc, action, err := applier.PutSpec(ctx, req.Materialization, req.Version, storedSpec != nil)
+	desc, action, err = applier.PutSpec(ctx, req.Materialization, req.Version, storedSpec != nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting PutSpec action: %w", err)
 	}

@@ -335,6 +335,7 @@ func StdFetchInfoSchema(
 	db *sql.DB,
 	dialect Dialect,
 	catalog string, // typically the "database"
+	metaSchema string, // usually from the endpoint configuration; this is the schema where the metadata tables are
 	resourcePaths [][]string,
 ) (*boilerplate.InfoSchema, error) {
 	is := boilerplate.NewInfoSchema(
@@ -342,13 +343,8 @@ func StdFetchInfoSchema(
 		dialect.ColumnLocator,
 	)
 
-	// Nothing to do if the materialization has no bindings.
-	if len(resourcePaths) == 0 {
-		return is, nil
-	}
-
 	// Map the resource paths to an appropriate identifier for inclusion in the coming query.
-	schemas := make([]string, 0, len(resourcePaths))
+	schemas := []string{dialect.Literal(metaSchema)}
 	for _, p := range resourcePaths {
 		loc := dialect.TableLocator(p)
 		schemas = append(schemas, dialect.Literal(loc.TableSchema))
