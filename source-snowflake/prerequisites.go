@@ -98,7 +98,6 @@ func prerequisiteFlowSchema(ctx context.Context, cfg *config, db *sql.DB) error 
 func setupTablePrerequisites(ctx context.Context, cfg *config, db *sql.DB, table snowflakeObject) error {
 	for _, prereq := range []func(ctx context.Context, cfg *config, db *sql.DB, table snowflakeObject) error{
 		prerequisiteTableReadable,
-		prerequisiteTableChangeStream,
 	} {
 		if err := prereq(ctx, cfg, db, table); err != nil {
 			return err
@@ -113,21 +112,6 @@ func prerequisiteTableReadable(ctx context.Context, cfg *config, db *sql.DB, tab
 	log.WithField("query", testReadQuery).Debug("verifying that table is readable")
 	if _, err := db.ExecContext(ctx, testReadQuery); err != nil {
 		return fmt.Errorf("unable to read from table %s: %w", quotedTableName, err)
-	}
-	return nil
-}
-
-func prerequisiteTableChangeStream(ctx context.Context, cfg *config, db *sql.DB, table snowflakeObject) error {
-	var tableName = table.QuotedName()
-	var changeStreamName = changeStreamName(cfg, table).QuotedName()
-	var createStreamQuery = fmt.Sprintf(
-		`CREATE STREAM IF NOT EXISTS %s ON TABLE %s;`,
-		changeStreamName,
-		tableName,
-	)
-	log.WithField("query", createStreamQuery).Info("ensuring change stream exists")
-	if _, err := db.ExecContext(ctx, createStreamQuery); err != nil {
-		return fmt.Errorf("error creating stream %s for table %s: %w", changeStreamName, tableName, err)
 	}
 	return nil
 }
