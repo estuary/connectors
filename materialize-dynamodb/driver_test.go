@@ -83,7 +83,7 @@ func TestValidateAndApply(t *testing.T) {
 
 				if err != nil {
 					require.ErrorAs(t, err, &errNotFound)
-					return
+					continue
 				}
 
 				for {
@@ -92,7 +92,7 @@ func TestValidateAndApply(t *testing.T) {
 					})
 					if err != nil {
 						require.ErrorAs(t, err, &errNotFound)
-						return
+						break
 					}
 					time.Sleep(5 * time.Millisecond)
 				}

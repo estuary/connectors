@@ -69,6 +69,16 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 		Delegate:    mapper,
 	}
 
+	columnValidator := sql.NewColumnValidator(
+		sql.ColValidation{Types: []string{"text"}, Validate: sql.StringCompatible},
+		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
+		sql.ColValidation{Types: []string{"float"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"number"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"variant"}, Validate: sql.JsonCompatible},
+		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
+		sql.ColValidation{Types: []string{"timestamp_ntz"}, Validate: sql.DateTimeCompatible},
+	)
+
 	translateIdentifier := func(in string) string {
 		if isSimpleIdentifier(in) {
 			// Snowflake uppercases all identifiers unless they are quoted. We don't quote identifiers if
@@ -108,16 +118,8 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper: mapper,
-		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
-			"text":          sql.StringCompatible,
-			"timestamp_ntz": sql.DateTimeCompatible,
-			"boolean":       sql.BooleanCompatible,
-			"float":         sql.NumberCompatible,
-			"number":        sql.IntegerCompatible,
-			"variant":       sql.JsonCompatible,
-			"date":          sql.DateCompatible,
-		},
+		TypeMapper:      mapper,
+		ColumnValidator: columnValidator,
 	}
 }
 
