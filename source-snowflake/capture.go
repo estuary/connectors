@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -19,13 +20,13 @@ import (
 
 const (
 	initialCloneSequenceNumber = 0
-
-	metadataProperty = "_meta"
-
-	// Emit a checkpoint after every N change documents, so that partial
-	// progress can be made across connector restarts.
-	partialProgressCheckpointSpacing = 50000
+	metadataProperty           = "_meta"
 )
+
+// Emit a checkpoint after every N change documents, so that partial
+// progress can be made across connector restarts. This is a tuning
+// constant which is only a variable so it can be lowered for tests.
+var partialProgressCheckpointSpacing = 10000
 
 type snowflakeSourceMetadata struct {
 	sqlcapture.SourceCommon
@@ -361,6 +362,7 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 	// We emit "partial progress" checkpoints periodically when processing large
 	// result sets, but only when certain conditions are met.
 	var documentsSinceLastCheckpoint int
+	var previousDocumentKeyHash string
 
 	for rows.Next() {
 		if err := rows.Scan(vptrs...); err != nil {
@@ -452,26 +454,71 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 		}
 		if document == nil {
 			logEntry.WithField("op", operation).Warn("change event data map is nil")
-			document = make(map[string]interface{})
+			document = make(map[string]any)
 		}
 		document[metadataProperty] = &meta
 
-		// TODO(wgd): Need to only emit partial-progress checkpoints when the current
-		// document's collection key differs from the previous one.
-		//
-		// Note that while our definition of "the same collection key" is based on
-		// JSON serialization, we can avoid doing this work whenever we're below the
-		// 'partial progress checkpoint spacing' threshold, so it should be very cheap
-		// in the common case where we only compute these serializations or hashes for
-		// two out of every K rows.
-		if documentsSinceLastCheckpoint >= partialProgressCheckpointSpacing {
-			var shouldEmitCheckpoint = true
-			if shouldEmitCheckpoint {
+		// Emit partial-progress checkpoints, once enough documents have been emitted since
+		// the previous checkpoint, and (if relevant) the row keys differ.
+		if len(orderColumns) == 0 {
+			// When we don't have a usable list of ordering columns, just unconditionally emit
+			// a partial-progress checkpoint between every K documents.
+			if documentsSinceLastCheckpoint >= partialProgressCheckpointSpacing {
 				if err := c.emitCheckpoint(ctx, table, streamState); err != nil {
 					return err
 				}
 				documentsSinceLastCheckpoint = 0
 			}
+		} else {
+			// The document key hash is only relevant when we've exceeded the minimum spacing,
+			// however we'll need to compute the hash value for the K-1th row before we start
+			// comparing hashes at row K.
+			var currentDocumentKeyHash = ""
+			if documentsSinceLastCheckpoint >= partialProgressCheckpointSpacing-1 {
+				var keysDocument = make(map[string]any)
+				for _, orderColumn := range orderColumns {
+					var val, ok = document[orderColumn]
+					if !ok {
+						return fmt.Errorf("ordering column %q not present in document", orderColumn)
+					}
+					keysDocument[orderColumn] = val
+				}
+				var hasher = sha256.New()
+				var encoder = json.NewEncoder(hasher)
+				if err := encoder.Encode(keysDocument); err != nil {
+					return fmt.Errorf("internal error: failed to serialize keys document: %w", err)
+				}
+				currentDocumentKeyHash = string(hasher.Sum(nil))
+			}
+
+			// Emit a checkpoint in between rows with different collection keys (as determined
+			// by comparing the computed key hashes) once K or more documents have been processed
+			// since the previous checkpoint.
+			//
+			// The keys being different is important. Since we're requesting that Snowflake
+			// order the result rows by that same set of columns but it's *not guaranteed* that
+			// rows will be unique in those columns, we could see results with inconsistent row
+			// ordering within the set of rows with a particular value, but *groups* of rows with
+			// particular ordering-column values must occur in a consistent sequence, so by checking
+			// and only emitting checkpoints between rows with different values for the `ORDER BY`
+			// columns we guarantee that after a restart we can always pick up exactly where we left
+			// off.
+			//
+			// And since the ordering key is just the columns corresponding to the Flow collection
+			// key, it doesn't matter how many documents have the same key because Flow will reduce
+			// them all together in memory as soon as they arrive.
+			//
+			// In the common case this is a bunch of unnecessary complexity and each row will have a
+			// unique value for the ordering columns so we'll emit a checkpoint as soon as we reach
+			// the minimum spacing. But doing it this way means that things should work correctly
+			// even on atypical datasets.
+			if documentsSinceLastCheckpoint >= partialProgressCheckpointSpacing && currentDocumentKeyHash != previousDocumentKeyHash {
+				if err := c.emitCheckpoint(ctx, table, streamState); err != nil {
+					return err
+				}
+				documentsSinceLastCheckpoint = 0
+			}
+			previousDocumentKeyHash = currentDocumentKeyHash
 		}
 
 		if err := c.emitDocument(ctx, table, document); err != nil {
