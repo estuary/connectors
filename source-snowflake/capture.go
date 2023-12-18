@@ -100,6 +100,7 @@ func (snowflakeDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutpu
 	}
 
 	var c = &capture{
+		Name:     string(open.Capture.Name),
 		Config:   cfg,
 		DB:       db,
 		State:    checkpoint,
@@ -110,6 +111,7 @@ func (snowflakeDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutpu
 }
 
 type capture struct {
+	Name     string
 	Config   *config
 	DB       *sql.DB
 	State    *captureState
@@ -137,7 +139,9 @@ type streamState struct {
 }
 
 func (c *capture) Run(ctx context.Context) error {
-	log.Info("processing added/removed bindings")
+	log.WithField("name", c.Name).Info("started capture")
+
+	log.Debug("processing added/removed bindings")
 	if err := c.updateState(ctx); err != nil {
 		return fmt.Errorf("error processing added/removed bindings: %w", err)
 	}
@@ -194,11 +198,19 @@ func (c *capture) updateState(ctx context.Context) error {
 	for _, binding := range c.Bindings {
 		if _, ok := c.State.Streams[binding.Table]; !ok {
 			log.WithField("table", binding.Table.String()).Info("binding added")
-			var stagingName, err = createInitialCloneTable(ctx, c.Config, c.DB, binding.Table, initialCloneSequenceNumber)
+
+			streamName, err := createChangeStream(ctx, c.Config, c.DB, c.Name, binding.Table)
+			if err != nil {
+				return err
+			}
+			log.WithField("stream", streamName.String()).Debug("created change stream")
+
+			stagingName, err := createInitialCloneTable(ctx, c.Config, c.DB, c.Name, binding.Table, initialCloneSequenceNumber)
 			if err != nil {
 				return err
 			}
 			log.WithField("staged", stagingName.String()).Debug("cloned into staging table")
+
 			var state = &streamState{SequenceNumber: initialCloneSequenceNumber}
 			c.State.Streams[binding.Table] = state
 			updatedStreams[binding.Table] = state
@@ -217,13 +229,8 @@ func (c *capture) updateState(ctx context.Context) error {
 }
 
 func (c *capture) pruneDeletedStreams(ctx context.Context) error {
-	// TODO(wgd): Add pruning of deleted streams, after contemplating whether it
-	// should be possible to have multiple capture tasks from the same Snowflake
-	// database and whether it's acceptable to only prune them when the binding
-	// is removed.
-	//
-	// Optionally, we might just not bother with this and leave the stream around
-	// when a binding is disabled.
+	// TODO(wgd): Enable this bit of pruning once we can guarantee that only streams
+	// from bindings which were removed in the current task invocation will be deleted.
 
 	// log.WithField("flowSchema", c.Config.Advanced.FlowSchema).Info("pruning deleted streams")
 	return nil
@@ -244,7 +251,7 @@ func (c *capture) pruneStagingTables(ctx context.Context) (map[snowflakeObject]i
 	// Build a mapping from unique ID strings to the corresponding table name
 	var idToSourceTable = make(map[string]snowflakeObject)
 	for table := range c.State.Streams {
-		idToSourceTable[table.UniqueID()] = table
+		idToSourceTable[table.UniqueID(c.Name)] = table
 	}
 
 	// Enumerate staging tables in the appropriate schema
@@ -277,8 +284,10 @@ func (c *capture) pruneStagingTables(ctx context.Context) (map[snowflakeObject]i
 		// is less than the current sequence number for that stream.
 		var sourceTable, sourceTableKnown = idToSourceTable[uniqueID]
 		if !sourceTableKnown {
-			log.WithField("name", stagingTable.Name).Debug("will prune staging table from disabled binding")
-			needsDeletion = append(needsDeletion, stagingTable.Name)
+			// TODO(wgd): Enable this bit of pruning once we can ensure that only staging tables
+			// from bindings which were removed in the current task invocation will be deleted.
+			log.WithField("name", stagingTable.Name).Debug("will not prune staging table from unknown binding")
+			//needsDeletion = append(needsDeletion, stagingTable.Name)
 			continue
 		}
 		var streamState = c.State.Streams[sourceTable]
@@ -309,7 +318,7 @@ func (c *capture) pruneStagingTables(ctx context.Context) (map[snowflakeObject]i
 
 func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject, orderColumns []string) error {
 	var streamState = c.State.Streams[table]
-	var stagingName = stagingTableName(c.Config, table, streamState.SequenceNumber)
+	var stagingName = stagingTableName(c.Config, c.Name, table, streamState.SequenceNumber)
 	var logEntry = log.WithFields(log.Fields{
 		"table": table.String(),
 		"seq":   streamState.SequenceNumber,
@@ -317,7 +326,7 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 
 	// Ensure that the staging table exists by creating it if necessary. Since
 	// the creation is done IF NOT EXISTS this is a no-op if it already does.
-	if _, err := createStagingTable(ctx, c.Config, c.DB, table, streamState.SequenceNumber); err != nil {
+	if _, err := createStagingTable(ctx, c.Config, c.DB, c.Name, table, streamState.SequenceNumber); err != nil {
 		return err
 	}
 
