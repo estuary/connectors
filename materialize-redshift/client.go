@@ -56,7 +56,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		}
 	}
 
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, resourcePaths)
+	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, c.cfg.metaSchema(), resourcePaths)
 }
 
 func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
