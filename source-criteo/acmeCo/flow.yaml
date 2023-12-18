@@ -6,7 +6,10 @@ collections:
         Currency:
           type: string
         AdvertiserCost:
-          type: number
+          format: number
+          type:
+            - number
+            - string
         Clicks:
           type: integer
         Displays:
