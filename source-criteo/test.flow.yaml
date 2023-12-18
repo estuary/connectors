@@ -13,5 +13,5 @@ captures:
         env:
           LOG_LEVEL: debug
     bindings:
-      - resource: acmeCo/criteo-stats.config.yaml
+      - resource: acmeCo/source-criteo.MyReport.config.yaml
         target: acmeCo/MyReport

@@ -1,0 +1,120 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": [
+            "string"
+          ],
+          "secret": true,
+          "writeOnly": true
+        },
+        "client_secret": {
+          "type": [
+            "string"
+          ],
+          "secret": true,
+          "writeOnly": true
+        },
+        "advertiser_ids": {
+          "type": "array",
+          "items": {
+            "type": [
+              "string"
+            ]
+          }
+        },
+        "start_date": {
+          "type": [
+            "string"
+          ],
+          "format": "date-time"
+        },
+        "reports": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": [
+                  "string"
+                ]
+              },
+              "dimensions": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "string"
+                  ]
+                }
+              },
+              "metrics": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "string"
+                  ]
+                }
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "default": "USD"
+              }
+            },
+            "required": [
+              "name",
+              "dimensions",
+              "metrics"
+            ]
+          }
+        }
+      },
+      "required": [
+        "client_id",
+        "client_secret",
+        "advertiser_ids",
+        "start_date"
+      ]
+    },
+    "resourceConfigSchema": {
+      "type": "object",
+      "properties": {
+        "stream": {
+          "type": "string"
+        },
+        "syncMode": {
+          "type": "string",
+          "enum": [
+            "incremental",
+            "full_refresh"
+          ]
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "cursorField": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "stream",
+        "syncMode"
+      ]
+    },
+    "documentationUrl": "https://docs.estuary.dev",
+    "resourcePathPointers": [
+      "/stream"
+    ]
+  }
+]
