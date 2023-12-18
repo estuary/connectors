@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use schemars::JsonSchema;
-use serde::{de::Visitor, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::connector;
 
@@ -25,7 +25,7 @@ pub struct Configuration {
     /// The initial servers in the Kafka cluster to initially connect to. The Kafka
     /// client will be informed of the rest of the cluster nodes by connecting to
     /// one of these nodes.
-    pub bootstrap_servers: Vec<BootstrapServer>,
+    pub bootstrap_servers: String,
 
     /// # Credentials
     ///
@@ -40,11 +40,7 @@ pub struct Configuration {
 
 impl Configuration {
     pub fn brokers(&self) -> String {
-        self.bootstrap_servers
-            .iter()
-            .map(|url| url.to_string())
-            .collect::<Vec<String>>()
-            .join(",")
+        self.bootstrap_servers.clone()
     }
 
     pub fn security_protocol(&self) -> &'static str {
@@ -154,12 +150,8 @@ impl JsonSchema for Configuration {
                 },
                 "bootstrap_servers": {
                     "title": "Bootstrap Servers",
-                    "description": "The initial servers in the Kafka cluster to initially connect to. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "default": ["localhost:9092"],
+                    "description": "The initial servers in the Kafka cluster to initially connect to, separated by commas. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.",
+                    "type": "string",
                     "order": 0
                 },
                 "tls": {
@@ -189,77 +181,6 @@ impl connector::ConnectorConfig for Configuration {
         }
 
         Ok(configuration)
-    }
-}
-
-// Note: The Rust `url` crate doesn't like `ip:port` pairs without a scheme.
-// Kafka doesn't specify a scheme for the `bootstrap_servers` values, so
-// expecting anyone to add one is really odd. Thus, we parse these values
-// ourselves.
-#[derive(Debug)]
-pub struct BootstrapServer {
-    host: String,
-    port: u16,
-}
-
-impl BootstrapServer {
-    pub fn new(host: impl Into<String>, port: u16) -> Self {
-        Self {
-            host: host.into(),
-            port,
-        }
-    }
-}
-
-impl Display for BootstrapServer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", &self.host, self.port)
-    }
-}
-
-impl Serialize for BootstrapServer {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for BootstrapServer {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_str(BootstrapServerVisitor)
-    }
-}
-
-struct BootstrapServerVisitor;
-
-impl<'de> Visitor<'de> for BootstrapServerVisitor {
-    type Value = BootstrapServer;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "a host and a port, split by a `:`")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        if let Some((host, port)) = v.split_once(':') {
-            if let Ok(port_num) = port.parse::<u16>() {
-                Ok(BootstrapServer::new(host, port_num))
-            } else {
-                Err(E::custom(format!(
-                    "expected the port to be a u16. got: `{}`",
-                    port
-                )))
-            }
-        } else {
-            Err(E::custom(format!("expected to find a colon. got: `{}`", v)))
-        }
     }
 }
 
@@ -350,11 +271,7 @@ mod test {
     fn many_brokers_test() {
         let config: Configuration = serde_json::from_str(
             r#"{
-            "bootstrap_servers": [
-                "localhost:9092",
-                "172.22.36.2:9093",
-                "localhost:9094"
-            ],
+            "bootstrap_servers": "localhost:9092,172.22.36.2:9093,localhost:9094",
             "tls": "system_certificates"
         }"#,
         )
@@ -370,7 +287,7 @@ mod test {
 
         let input = r#"
         {
-            "bootstrap_servers": ["localhost:9093"],
+            "bootstrap_servers": "localhost:9093",
             "tls": "system_certificates"
         }
         "#;
@@ -379,7 +296,7 @@ mod test {
 
         let input = r#"
         {
-            "bootstrap_servers": ["localhost:9093"],
+            "bootstrap_servers": "localhost:9093",
             "credentials": {
                 "auth_type": "UserPassword",
                 "mechanism": "SCRAM-SHA-256",
