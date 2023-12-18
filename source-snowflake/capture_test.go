@@ -10,6 +10,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/stretchr/testify/require"
 )
 
@@ -153,6 +154,37 @@ func TestLargeCapture(t *testing.T) {
 	fmt.Fprintf(summary, "// =================================\n")
 	fmt.Fprintf(summary, "// Subsequent Capture Resuming at %s\n", string(cs.Checkpoint))
 	fmt.Fprintf(summary, "// =================================\n")
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	cupaloy.SnapshotT(t, summary.String())
+}
+
+func TestAddingAndRemovingBindings(t *testing.T) {
+	var ctx, tb = context.Background(), snowflakeTestBackend(t)
+	var uniqueA, uniqueB, uniqueC = "66311983", "21819672", "47715271"
+	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableC = tb.CreateTable(ctx, t, uniqueC, "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, tableA, [][]any{{0, "Zero"}, {1, "One"}, {2, "Two"}})
+	tb.Insert(ctx, t, tableB, [][]any{{3, "Three"}, {4, "Four"}, {5, "Five"}})
+	tb.Insert(ctx, t, tableC, [][]any{{6, "Six"}, {7, "Seven"}, {8, "Eight"}})
+
+	var summary = new(strings.Builder)
+
+	fmt.Fprintf(summary, "// Just A\n")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA))
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	fmt.Fprintf(summary, "\n// Just B\n")
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueB))
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	fmt.Fprintf(summary, "\n// Both A and C\n")
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueC))
+	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
+
+	fmt.Fprintf(summary, "\n// Both B and C\n")
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueB), regexp.MustCompile(uniqueC))
 	cs.Capture(ctx, t, func(data json.RawMessage) { fmt.Fprintf(summary, "%s\n", string(data)) })
 
 	cupaloy.SnapshotT(t, summary.String())

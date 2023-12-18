@@ -64,7 +64,7 @@ func (cs *CaptureSpec) Validate(ctx context.Context, t testing.TB) ([]*pc.Respon
 	}
 
 	validation, err := cs.Driver.Validate(ctx, &pc.Request_Validate{
-		Name:       testCaptureName(t),
+		Name:       "acmeCo/test-capture/source-something",
 		ConfigJson: endpointSpecJSON,
 		Bindings:   bindings,
 	})
@@ -139,10 +139,6 @@ func matchesAny(matchers []*regexp.Regexp, text string) bool {
 	return false
 }
 
-func testCaptureName(t testing.TB) flow.Capture {
-	return flow.Capture("acmeCo/" + strings.Replace(t.Name(), "/", "-", -1) + "capture")
-}
-
 // Capture performs data capture from the target database into the associated CaptureValidator,
 // updating the state checkpoint and accumulating errors as appropriate.
 func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(data json.RawMessage)) *CaptureSpec {
@@ -161,7 +157,7 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 		Open: &pc.Request_Open{
 			StateJson: cs.Checkpoint,
 			Capture: &flow.CaptureSpec{
-				Name:       testCaptureName(t),
+				Name:       "acmeCo/test-capture/source-something",
 				ConfigJson: endpointSpecJSON,
 				Bindings:   cs.Bindings,
 			},
