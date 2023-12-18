@@ -207,7 +207,22 @@ func (v Validator) validateMatchesExistingBinding(
 
 		// Build constraints for new projections of the binding.
 		if _, ok := constraints[p.Field]; !ok {
-			constraints[p.Field] = v.c.NewConstraints(&p, deltaUpdates)
+			c := v.c.NewConstraints(&p, deltaUpdates)
+
+			// Continue to recommended any optional fields that were included in a prior spec's
+			// field selection, even if the materialized field no longer exists in the destination.
+			// This is usually functionally the same as validating the projection as a new
+			// constraint since if it was recommended before it will be recommended again, but may
+			// be useful to preserve legacy field selections if the definition of what the
+			// recommended fields are changes for a materialization.
+			if existing != nil &&
+				c.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL &&
+				slices.Contains(existing.FieldSelection.AllFields(), p.Field) {
+				c.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+				c.Reason = "This location is part of the current materialization"
+			}
+
+			constraints[p.Field] = c
 		}
 	}
 

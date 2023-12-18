@@ -158,8 +158,8 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 				}
 			}
 
-			// Fields that existing in the endpoint as non-nullable but aren't in the field
-			// selection need to be made nullable too.
+			// Fields that exist in the endpoint as non-nullable but aren't in the field selection
+			// need to be made nullable too.
 			existingFields, err := is.FieldsForResource(binding.ResourcePath)
 			if err != nil {
 				return nil, fmt.Errorf("getting list of existing fields for resource %s: %w", binding.ResourcePath, err)
@@ -184,6 +184,8 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		}
 	}
 
+	// TODO(whb): DryRun as a concept will no longer exist after async applies are active in the
+	// runtime.
 	if !req.DryRun {
 		if concurrent {
 			group, groupCtx := errgroup.WithContext(ctx)
@@ -216,6 +218,8 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 	}
 	addAction(desc, action)
 
+	// TODO(whb): DryRun as a concept will no longer exist after async applies are active in the
+	// runtime.
 	if !req.DryRun {
 		for _, a := range actions {
 			if err := a(ctx); err != nil {
