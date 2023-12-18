@@ -49,6 +49,9 @@ func TestMain(m *testing.M) {
 		log.SetLevel(log.DebugLevel)
 	}
 
+	// Lower checkpoint spacing constant so tests can exercise this more easily
+	partialProgressCheckpointSpacing = 10
+
 	os.Exit(m.Run())
 }
 
