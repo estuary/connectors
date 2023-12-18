@@ -206,10 +206,12 @@ func (c *capture) updateState(ctx context.Context) error {
 	}
 
 	// Emit a new checkpoint patch reflecting these deletions and initializations.
-	if updateCheckpoint, err := json.Marshal(&captureState{Streams: updatedStreams}); err != nil {
-		return fmt.Errorf("error marshalling checkpoint: %w", err)
-	} else if err := c.Output.Checkpoint(updateCheckpoint, true); err != nil {
-		return fmt.Errorf("error emitting checkpoint: %w", err)
+	if len(updatedStreams) > 0 {
+		if updateCheckpoint, err := json.Marshal(&captureState{Streams: updatedStreams}); err != nil {
+			return fmt.Errorf("error marshalling checkpoint: %w", err)
+		} else if err := c.Output.Checkpoint(updateCheckpoint, true); err != nil {
+			return fmt.Errorf("error emitting checkpoint: %w", err)
+		}
 	}
 	return nil
 }
