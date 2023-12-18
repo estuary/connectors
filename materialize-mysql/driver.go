@@ -400,7 +400,7 @@ func prepareNewTransactor(
 		for _, b := range open.Materialization.Bindings {
 			resourcePaths = append(resourcePaths, b.ResourcePath)
 		}
-		is, err := sql.StdFetchInfoSchema(ctx, db, ep.Dialect, "def", resourcePaths)
+		is, err := sql.StdFetchInfoSchema(ctx, db, ep.Dialect, "def", cfg.Database, resourcePaths)
 		if err != nil {
 			return nil, err
 		}

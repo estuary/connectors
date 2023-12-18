@@ -63,7 +63,7 @@ func TestApply(t *testing.T) {
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "remove-required.flow.proto"),
 			want: testResults{
-				createdMetaTables:    false,
+				createdMetaTables:    true,
 				putSpec:              true,
 				nullabledProjections: 1,
 			},
@@ -73,7 +73,7 @@ func TestApply(t *testing.T) {
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "add-new-required.flow.proto"),
 			want: testResults{
-				createdMetaTables: false,
+				createdMetaTables: true,
 				putSpec:           true,
 				addedProjections:  1,
 			},
@@ -83,7 +83,7 @@ func TestApply(t *testing.T) {
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "add-new-binding.flow.proto"),
 			want: testResults{
-				createdMetaTables: false,
+				createdMetaTables: true,
 				putSpec:           true,
 				createdResources:  1,
 			},
@@ -93,7 +93,7 @@ func TestApply(t *testing.T) {
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "replace-original-binding.flow.proto"),
 			want: testResults{
-				createdMetaTables: false,
+				createdMetaTables: true,
 				putSpec:           true,
 				replaceResources:  1,
 			},
@@ -103,7 +103,7 @@ func TestApply(t *testing.T) {
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "make-nullable.flow.proto"),
 			want: testResults{
-				createdMetaTables:    false,
+				createdMetaTables:    true,
 				putSpec:              true,
 				nullabledProjections: 1,
 			},

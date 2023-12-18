@@ -39,7 +39,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		bqDialect.ColumnLocator,
 	)
 
-	datasets := make([]string, 0, len(resourcePaths))
+	datasets := []string{c.cfg.Dataset}
 	for _, p := range resourcePaths {
 		datasets = append(datasets, p[1]) // Dataset is always the second element of the path.
 	}

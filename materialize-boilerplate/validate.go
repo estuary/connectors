@@ -244,6 +244,7 @@ func (v Validator) forbidAmbiguousFields(constraints map[string]*pm.Response_Val
 			continue
 		}
 
+		slices.Sort(flowFields)
 		for _, f := range flowFields {
 			constraints[f] = &pm.Response_Validated_Constraint{
 				Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
