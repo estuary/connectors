@@ -112,7 +112,21 @@ func RunValidateAndApplyTestCases(
 		require.Equal(t, sch, dumpSchema(t))
 
 		snap.WriteString("\nBig Schema Materialized Resource Schema With No Fields Required:\n")
-		snap.WriteString(sch + "\n")
+		snap.WriteString(sch)
+
+		// Apply the spec with the randomly changed types, but this time with a backfill that will
+		// cause the table to be replaced.
+		changed.Bindings[0].Backfill = 1
+		validateRes, err = driver.Validate(ctx, validateReq(changed, configJson, resourceConfigJson))
+		require.NoError(t, err)
+
+		snap.WriteString("\nBig Schema Changed Types With Table Replacement Constraints:\n")
+		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+		_, err = driver.Apply(ctx, applyReq(changed, configJson, resourceConfigJson, validateRes))
+		require.NoError(t, err)
+		snap.WriteString("\nBig Schema Materialized Resource Schema Changed Types With Table Replacement:\n")
+		snap.WriteString(dumpSchema(t) + "\n")
 	})
 
 	t.Run("add and remove fields", func(t *testing.T) {

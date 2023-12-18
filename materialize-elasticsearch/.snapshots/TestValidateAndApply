@@ -182,6 +182,81 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Field":"stringUriTemplateField","Type":"text"}
 {"Field":"stringUuidField","Type":"text"}
 
+Big Schema Changed Types With Table Replacement Constraints:
+{"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field is able to be materialized"}
+{"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document is required for a standard updates materialization"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"Primary key locations are required"}
+{"Field":"multipleField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
+{"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field is able to be materialized"}
+{"Field":"numField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"objField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringDateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIntegerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIpv4Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIpv6Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringMacAddr8Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringMacAddrField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringNumberField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUint32Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUint64Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+
+Big Schema Materialized Resource Schema Changed Types With Table Replacement:
+{"Field":"arrayField","Type":"flattened"}
+{"Field":"boolField","Type":"long"}
+{"Field":"flow_document","Type":"flattened"}
+{"Field":"flow_published_at","Type":"date"}
+{"Field":"intField","Type":"text"}
+{"Field":"key","Type":"keyword"}
+{"Field":"nullField","Type":"flattened"}
+{"Field":"numField","Type":"boolean"}
+{"Field":"objField","Type":"text"}
+{"Field":"stringDateField","Type":"text"}
+{"Field":"stringDateTimeField","Type":"text"}
+{"Field":"stringDurationField","Type":"text"}
+{"Field":"stringEmailField","Type":"text"}
+{"Field":"stringField","Type":"long"}
+{"Field":"stringHostnameField","Type":"text"}
+{"Field":"stringIdnEmailField","Type":"text"}
+{"Field":"stringIdnHostnameField","Type":"text"}
+{"Field":"stringIntegerField","Type":"text"}
+{"Field":"stringIpv4Field","Type":"text"}
+{"Field":"stringIpv6Field","Type":"text"}
+{"Field":"stringIriField","Type":"text"}
+{"Field":"stringIriReferenceField","Type":"text"}
+{"Field":"stringJsonPointerField","Type":"text"}
+{"Field":"stringMacAddr8Field","Type":"text"}
+{"Field":"stringMacAddrField","Type":"text"}
+{"Field":"stringNumberField","Type":"text"}
+{"Field":"stringRegexField","Type":"text"}
+{"Field":"stringRelativeJsonPointerField","Type":"text"}
+{"Field":"stringTimeField","Type":"text"}
+{"Field":"stringUint32Field","Type":"text"}
+{"Field":"stringUint64Field","Type":"text"}
+{"Field":"stringUriField","Type":"text"}
+{"Field":"stringUriReferenceField","Type":"text"}
+{"Field":"stringUriTemplateField","Type":"text"}
+{"Field":"stringUuidField","Type":"text"}
+
 add a single field:
 {"Field":"addedOptionalString","Type":"text"}
 {"Field":"flow_document","Type":"flattened"}
