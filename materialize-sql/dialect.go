@@ -13,10 +13,7 @@ type Dialect struct {
 	Literaler
 	Placeholderer
 	TypeMapper
-	// ColumnCompatibilities provides a lookup for a column name as reported by the endpoint to an
-	// EndpointTypeComparer, which is a function that determines if a Flow projection is compatible
-	// with that materialized column.
-	ColumnCompatibilities map[string]EndpointTypeComparer
+	ColumnValidator
 }
 
 // TableLocatorer produces an InfoTableLocation for a given path.
@@ -110,6 +107,7 @@ var _ = Dialect{
 	Literaler:       LiteralFn(func(s string) string { return "" }),
 	Identifierer:    IdentifierFn(func(path ...string) string { return "" }),
 	TypeMapper:      &NullableMapper{},
+	ColumnValidator: ColumnValidator{},
 }
 
 // PassThroughTransform returns a function that evaluates `if_` over its input

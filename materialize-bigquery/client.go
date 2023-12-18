@@ -77,6 +77,13 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 				return nil, fmt.Errorf("columnRow read: %w", err)
 			}
 
+			if strings.HasPrefix(c.DataType, "BIGNUMERIC") {
+				// BigQuery includes the precision of BIGNUMERIC columns in the DataType string. We
+				// want to treat all pre-existing BIGNUMERIC columns the same, so that is stripped
+				// out here.
+				c.DataType = "BIGNUMERIC"
+			}
+
 			is.PushField(boilerplate.EndpointField{
 				Name:               c.ColumnName,
 				Nullable:           strings.EqualFold(c.IsNullable, "yes"),

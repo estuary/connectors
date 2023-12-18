@@ -87,6 +87,17 @@ var rsDialect = func() sql.Dialect {
 		},
 	}
 
+	columnValidator := sql.NewColumnValidator(
+		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"double precision"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
+		sql.ColValidation{Types: []string{"super"}, Validate: sql.JsonCompatible},
+		sql.ColValidation{Types: []string{"character varying"}, Validate: sql.StringCompatible},
+		sql.ColValidation{Types: []string{"numeric"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
+		sql.ColValidation{Types: []string{"timestamp with time zone"}, Validate: sql.DateTimeCompatible},
+	)
+
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -118,17 +129,8 @@ var rsDialect = func() sql.Dialect {
 		// necessary because Redshift does not support dropping a NOT NULL constraint, so we need to
 		// create columns as nullable to preserve the ability to change collection schema fields from
 		// required to not required or remove fields from the materialization.
-		TypeMapper: mapper,
-		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
-			"bigint":                   sql.IntegerCompatible,
-			"double precision":         sql.NumberCompatible,
-			"boolean":                  sql.BooleanCompatible,
-			"super":                    sql.JsonCompatible,
-			"character varying":        sql.StringCompatible,
-			"numeric":                  sql.NumberCompatible,
-			"date":                     sql.DateCompatible,
-			"timestamp with time zone": sql.DateTimeCompatible,
-		},
+		TypeMapper:      mapper,
+		ColumnValidator: columnValidator,
 	}
 }()
 

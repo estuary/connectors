@@ -81,6 +81,17 @@ var bqDialect = func() sql.Dialect {
 		Delegate:    mapper,
 	}
 
+	columnValidator := sql.NewColumnValidator(
+		sql.ColValidation{Types: []string{"string"}, Validate: stringCompatible},
+		sql.ColValidation{Types: []string{"bool"}, Validate: sql.BooleanCompatible},
+		sql.ColValidation{Types: []string{"int64"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"float64"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"json"}, Validate: sql.MultipleCompatible},
+		sql.ColValidation{Types: []string{"bignumeric"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
+		sql.ColValidation{Types: []string{"timestamp"}, Validate: sql.DateTimeCompatible},
+	)
+
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -102,23 +113,12 @@ var bqDialect = func() sql.Dialect {
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
-		TypeMapper: mapper,
-		ColumnCompatibilities: map[string]sql.EndpointTypeComparer{
-			"string":         stringCompatible,
-			"bool":           sql.BooleanCompatible,
-			"int64":          sql.IntegerCompatible,
-			"float64":        sql.NumberCompatible,
-			"json":           sql.MultipleCompatible,
-			"bignumeric":     sql.IntegerCompatible,
-			"bignumeric(38)": sql.IntegerCompatible,
-			"date":           sql.DateCompatible,
-			"timestamp":      sql.DateTimeCompatible,
-		},
+		TypeMapper:      mapper,
+		ColumnValidator: columnValidator,
 	}
 }()
 
-// stringCompatible allow strings of any format, arrays, or objects to be materialized since they
-// are all converted to strings.
+// stringCompatible allow strings of any format, arrays, or objects to be materialized.
 func stringCompatible(p pf.Projection) bool {
 	if sql.StringCompatible(p) {
 		return true
