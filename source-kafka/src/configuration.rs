@@ -85,7 +85,6 @@ impl JsonSchema for Configuration {
                                 "const": "UserPassword"
                             },
                             "mechanism": {
-                                "default": "PLAIN",
                                 "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
                                 "enum": [
                                     "PLAIN",
