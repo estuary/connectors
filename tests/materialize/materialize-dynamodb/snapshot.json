@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "- create table 'flow_materializations_v2\n- create table 'simple'\n- create table 'duplicated-keys-standard'\n- create table 'duplicated-keys-delta'\n- create table 'duplicated-keys-delta-exclude-flow-doc'\n- create table 'multiple-types'\n- create table 'formatted-strings'\n- update stored materialization spec and set version = test"
+    "actionDescription": "create table \"flow_materializations_v2\"\ncreate table \"simple\"\ncreate table \"duplicated-keys-standard\"\ncreate table \"duplicated-keys-delta\"\ncreate table \"duplicated-keys-delta-exclude-flow-doc\"\ncreate table \"multiple-types\"\ncreate table \"formatted-strings\"\nupdate stored materialization spec and set version = test"
   }
 }
 {
@@ -2130,7 +2130,7 @@
 }
 {
   "applied": {
-    "actionDescription": "- update stored materialization spec and set version = test"
+    "actionDescription": "create table \"flow_materializations_v2\"\nupdate stored materialization spec and set version = test"
   }
 }
 {

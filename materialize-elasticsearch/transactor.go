@@ -34,6 +34,11 @@ type binding struct {
 	// to build the JSON document to be stored Elasticsearch.
 	fields []string
 
+	// Index of fields that are Float values, materialized as ElasticSearch "double" mappings, that
+	// must be checked for special +/-Infinity & NaN string values, as ElasticSearch does not handle
+	// these and we'll replace them with NULL.
+	floatFields []bool
+
 	// Present if the binding includes the root document, empty if not. This is usually the default
 	// "flow_document" but may have an alternate user-defined projection name.
 	docField string
@@ -183,6 +188,12 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 				// An object or array field is received as raw JSON bytes. We currently only support
 				// objects.
 				v = json.RawMessage(b)
+			}
+			if s, ok := v.(string); b.floatFields[idx] && ok {
+				// ElasticSearch does not supporting indexing these special Float values.
+				if s == "Infinity" || s == "-Infinity" || s == "NaN" {
+					v = nil
+				}
 			}
 
 			doc[b.fields[idx]] = v
