@@ -1,5 +1,7 @@
 {
-  "applied": {}
+  "applied": {
+    "actionDescription": "update persisted spec"
+  }
 }
 {
   "opened": {}
@@ -316,7 +318,9 @@
   ]
 }
 {
-  "applied": {}
+  "applied": {
+    "actionDescription": "update persisted spec"
+  }
 }
 {
   "opened": {}
