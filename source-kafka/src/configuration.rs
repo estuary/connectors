@@ -234,7 +234,9 @@ pub enum Credentials {
     },
 
     AWS {
+        #[serde(rename="aws_access_key_id")]
         access_key_id: String,
+        #[serde(rename="aws_secret_access_key")]
         secret_access_key: String,
         region: String,
     }
