@@ -46,9 +46,11 @@ impl ClientContext for FlowConsumerContext {
         if let Some(Credentials::AWS { region, access_key_id, secret_access_key }) = &self.auth {
             let (token, lifetime_ms) = crate::msk_oauthbearer::token(region, access_key_id, secret_access_key)?;
             return Ok(OAuthToken {
+                // This is just a descriptive name of the principal which is accessing
+                // the resource, not a specific constant
                 principal_name: "flow-kafka-capture".to_string(),
                 token,
-                lifetime_ms: lifetime_ms.try_into()?,
+                lifetime_ms,
             })
         } else {
             return Err(eyre::eyre!("generate_oauth_token called without AWS credentials").into())
