@@ -1,6 +1,6 @@
 {
   "applied": {
-    "actionDescription": "- create index 'flow_materializations_v2'\n- create index 'index-simple'\n- create index 'index-duplicated-keys-standard'\n- create index 'index-duplicated-keys-delta'\n- create index 'index-duplicated-keys-delta-exclude-flow-doc'\n- create index 'index-multiple-data-types'\n- create index 'index-formatted-strings'\n- update stored materialization spec and set version = test"
+    "actionDescription": "create index \"flow_materializations_v2\"\ncreate index \"index-simple\"\ncreate index \"index-duplicated-keys-standard\"\ncreate index \"index-duplicated-keys-delta\"\ncreate index \"index-duplicated-keys-delta-exclude-flow-doc\"\ncreate index \"index-multiple-data-types\"\ncreate index \"index-formatted-strings\"\nupdate stored materialization spec and set version = test"
   }
 }
 {
@@ -1042,12 +1042,66 @@
       "num_and_str": "5.1",
       "num_str": "50.1",
       "time": "23:59:59Z"
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_document": {
+        "_meta": {
+          "uuid": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+        },
+        "id": 8,
+        "num_str": "NaN"
+      },
+      "flow_published_at": "2023-07-12T18:27:25.889321Z",
+      "id": 8,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_document": {
+        "_meta": {
+          "uuid": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+        },
+        "id": 9,
+        "num_str": "Infinity"
+      },
+      "flow_published_at": "2023-07-12T18:27:25.889321Z",
+      "id": 9,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_document": {
+        "_meta": {
+          "uuid": "c02bd79a-20e1-11ee-990b-ffd12dfcd47f"
+        },
+        "id": 10,
+        "num_str": "-Infinity"
+      },
+      "flow_published_at": "2023-07-12T18:27:25.889321Z",
+      "id": 10,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
     }
   ]
 }
 {
   "applied": {
-    "actionDescription": "- create index 'flow_materializations_v2'\n- update stored materialization spec and set version = test"
+    "actionDescription": "create index \"flow_materializations_v2\"\nupdate stored materialization spec and set version = test"
   }
 }
 {
