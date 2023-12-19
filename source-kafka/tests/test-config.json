@@ -1,6 +1,7 @@
 {
-  "bootstrap_servers": ["localhost:9092"],
-  "authentication": {
+  "bootstrap_servers": "localhost:9092",
+  "credentials": {
+    "auth_type": "UserPassword",
     "mechanism": "SCRAM-SHA-256",
     "username": "alice",
     "password": "alice-pass"

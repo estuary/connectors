@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use schemars::JsonSchema;
-use serde::{de::Visitor, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::connector;
 
@@ -25,14 +25,14 @@ pub struct Configuration {
     /// The initial servers in the Kafka cluster to initially connect to. The Kafka
     /// client will be informed of the rest of the cluster nodes by connecting to
     /// one of these nodes.
-    pub bootstrap_servers: Vec<BootstrapServer>,
+    pub bootstrap_servers: String,
 
-    /// # Authentication
+    /// # Credentials
     ///
     /// The connection details for authenticating a client connection to Kafka via SASL.
     /// When not provided, the client connection will attempt to use PLAINTEXT
     /// (insecure) protocol. This must only be used in dev/test environments.
-    pub authentication: Option<Authentication>,
+    pub credentials: Option<Credentials>,
 
     /// # TLS connection settings.
     pub tls: Option<TlsSettings>,
@@ -40,15 +40,11 @@ pub struct Configuration {
 
 impl Configuration {
     pub fn brokers(&self) -> String {
-        self.bootstrap_servers
-            .iter()
-            .map(|url| url.to_string())
-            .collect::<Vec<String>>()
-            .join(",")
+        self.bootstrap_servers.clone()
     }
 
     pub fn security_protocol(&self) -> &'static str {
-        match (&self.authentication, &self.tls) {
+        match (&self.credentials, &self.tls) {
             (None, Some(TlsSettings::SystemCertificates)) => "SSL",
             (None, None) => "PLAINTEXT",
             (Some(_), Some(TlsSettings::SystemCertificates)) => "SASL_SSL",
@@ -69,54 +65,93 @@ impl JsonSchema for Configuration {
             "type": "object",
             "required": [
                 "bootstrap_servers",
-                "authentication"
+                "credentials"
             ],
             "properties": {
-                "authentication": {
-                    "title": "Authentication",
+                "credentials": {
+                    "title": "Credentials",
                     "description": "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments.",
                     "type": "object",
-                    "properties": {
-                        "mechanism": {
-                            "default": "PLAIN",
-                            "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
-                            "enum": [
-                                "PLAIN",
-                                "SCRAM-SHA-256",
-                                "SCRAM-SHA-512"
-                            ],
-                            "title": "SASL Mechanism",
-                            "type": "string",
-                            "order": 0
-                        },
-                        "password": {
-                            "order": 2,
-                            "secret": true,
-                            "title": "Password",
-                            "type": "string"
-                        },
-                        "username": {
-                            "order": 1,
-                            "secret": true,
-                            "title": "Username",
-                            "type": "string"
-                        }
+                    "order": 1,
+                    "discriminator": {
+                        "propertyName": "auth_type"
                     },
-                    "required": [
-                        "mechanism",
-                        "password",
-                        "username"
-                    ],
-                    "order": 1
+                    "oneOf": [{
+                        "title": "SASL (User & Password)",
+                        "properties": {
+                            "auth_type": {
+                                "type": "string",
+                                "default": "UserPassword",
+                                "const": "UserPassword"
+                            },
+                            "mechanism": {
+                                "default": "PLAIN",
+                                "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
+                                "enum": [
+                                    "PLAIN",
+                                    "SCRAM-SHA-256",
+                                    "SCRAM-SHA-512"
+                                ],
+                                "title": "SASL Mechanism",
+                                "type": "string",
+                                "order": 0
+                            },
+                            "password": {
+                                "order": 2,
+                                "secret": true,
+                                "title": "Password",
+                                "type": "string"
+                            },
+                            "username": {
+                                "order": 1,
+                                "secret": true,
+                                "title": "Username",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "auth_type",
+                            "mechanism",
+                            "password",
+                            "username"
+                        ]
+                    }, {
+                        "properties": {
+                            "title": "AWS MSK IAM",
+                            "auth_type": {
+                                "type": "string",
+                                "default": "AWS",
+                                "const": "AWS"
+                            },
+                            "aws_access_key_id": {
+                                "title": "AWS Access Key ID",
+                                "type": "string",
+                                "order": 0
+                            },
+                            "aws_secret_access_key": {
+                                "order": 1,
+                                "secret": true,
+                                "title": "AWS Secret Access Key",
+                                "type": "string"
+                            },
+                            "region": {
+                                "order": 2,
+                                "title": "AWS Region",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "auth_type",
+                            "aws_access_key_id",
+                            "aws_secret_access_key",
+                            "region"
+                        ]
+                    }]
                 },
                 "bootstrap_servers": {
                     "title": "Bootstrap Servers",
-                    "description": "The initial servers in the Kafka cluster to initially connect to. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "default": ["localhost:9092"],
+                    "description": "The initial servers in the Kafka cluster to initially connect to, separated by commas. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.",
+                    "type": "string",
                     "order": 0
                 },
                 "tls": {
@@ -149,77 +184,6 @@ impl connector::ConnectorConfig for Configuration {
     }
 }
 
-// Note: The Rust `url` crate doesn't like `ip:port` pairs without a scheme.
-// Kafka doesn't specify a scheme for the `bootstrap_servers` values, so
-// expecting anyone to add one is really odd. Thus, we parse these values
-// ourselves.
-#[derive(Debug)]
-pub struct BootstrapServer {
-    host: String,
-    port: u16,
-}
-
-impl BootstrapServer {
-    pub fn new(host: impl Into<String>, port: u16) -> Self {
-        Self {
-            host: host.into(),
-            port,
-        }
-    }
-}
-
-impl Display for BootstrapServer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", &self.host, self.port)
-    }
-}
-
-impl Serialize for BootstrapServer {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for BootstrapServer {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_str(BootstrapServerVisitor)
-    }
-}
-
-struct BootstrapServerVisitor;
-
-impl<'de> Visitor<'de> for BootstrapServerVisitor {
-    type Value = BootstrapServer;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "a host and a port, split by a `:`")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        if let Some((host, port)) = v.split_once(':') {
-            if let Ok(port_num) = port.parse::<u16>() {
-                Ok(BootstrapServer::new(host, port_num))
-            } else {
-                Err(E::custom(format!(
-                    "expected the port to be a u16. got: `{}`",
-                    port
-                )))
-            }
-        } else {
-            Err(E::custom(format!("expected to find a colon. got: `{}`", v)))
-        }
-    }
-}
-
 /// # SASL Mechanism
 ///
 /// The SASL Mechanism describes _how_ to exchange and authenticate
@@ -231,7 +195,7 @@ impl<'de> Visitor<'de> for BootstrapServerVisitor {
 /// For more information about Salted Challenge Response Authentication
 /// Mechanism (SCRAM), see RFC 7677.
 /// https://datatracker.ietf.org/doc/html/rfc7677
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING-KEBAB-CASE")]
 pub enum SaslMechanism {
     /// The username and password are sent to the server in the clear.
@@ -254,17 +218,26 @@ impl Display for SaslMechanism {
     }
 }
 
-/// # Authentication
+/// # Credentials
 ///
 /// The information necessary to connect to Kafka.
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Authentication {
-    /// # Sasl Mechanism
-    pub mechanism: SaslMechanism,
-    /// # Username
-    pub username: String,
-    /// # Password
-    pub password: String,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag="auth_type")]
+pub enum Credentials {
+    UserPassword {
+        /// # Sasl Mechanism
+        mechanism: SaslMechanism,
+        /// # Username
+        username: String,
+        /// # Password
+        password: String,
+    },
+
+    AWS {
+        access_key_id: String,
+        secret_access_key: String,
+        region: String,
+    }
 }
 
 /// # TLS Settings
@@ -298,11 +271,7 @@ mod test {
     fn many_brokers_test() {
         let config: Configuration = serde_json::from_str(
             r#"{
-            "bootstrap_servers": [
-                "localhost:9092",
-                "172.22.36.2:9093",
-                "localhost:9094"
-            ],
+            "bootstrap_servers": "localhost:9092,172.22.36.2:9093,localhost:9094",
             "tls": "system_certificates"
         }"#,
         )
@@ -318,7 +287,7 @@ mod test {
 
         let input = r#"
         {
-            "bootstrap_servers": ["localhost:9093"],
+            "bootstrap_servers": "localhost:9093",
             "tls": "system_certificates"
         }
         "#;
@@ -327,8 +296,9 @@ mod test {
 
         let input = r#"
         {
-            "bootstrap_servers": ["localhost:9093"],
-            "authentication": {
+            "bootstrap_servers": "localhost:9093",
+            "credentials": {
+                "auth_type": "UserPassword",
                 "mechanism": "SCRAM-SHA-256",
                 "username": "user",
                 "password": "password"

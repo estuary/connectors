@@ -1,16 +1,18 @@
+use std::error::Error as StdError;
 use std::time::Duration;
 
 use proto_flow::capture::{request, response, Response};
 use proto_flow::flow::capture_spec::Binding;
-use rdkafka::consumer::{BaseConsumer, Consumer};
+use rdkafka::consumer::{BaseConsumer, Consumer, ConsumerContext};
 use rdkafka::error::KafkaError;
 use rdkafka::message::BorrowedMessage;
 use rdkafka::metadata::{Metadata, MetadataPartition, MetadataTopic};
 use rdkafka::{ClientConfig, Message, TopicPartitionList};
+use rdkafka::client::{OAuthToken, ClientContext};
 use serde_json::json;
 
 use crate::catalog::Resource;
-use crate::configuration::Configuration;
+use crate::configuration::{Configuration, Credentials};
 use crate::{catalog, state};
 
 const KAFKA_TIMEOUT: Duration = Duration::from_secs(5);
@@ -33,7 +35,31 @@ pub enum Error {
     Read(#[source] KafkaError),
 }
 
-pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsumer, Error> {
+pub struct FlowConsumerContext {
+    auth: Option<Credentials>,
+}
+
+impl ClientContext for FlowConsumerContext {
+    const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
+
+    fn generate_oauth_token(&self, _oauthbearer_config: Option<&str>) -> Result<OAuthToken, Box<dyn StdError>>  {
+        if let Some(Credentials::AWS { region, access_key_id, secret_access_key }) = &self.auth {
+            let (token, lifetime_ms) = crate::msk_oauthbearer::token(region, access_key_id, secret_access_key)?;
+            return Ok(OAuthToken {
+                // This is just a descriptive name of the principal which is accessing
+                // the resource, not a specific constant
+                principal_name: "flow-kafka-capture".to_string(),
+                token,
+                lifetime_ms,
+            })
+        } else {
+            return Err(eyre::eyre!("generate_oauth_token called without AWS credentials").into())
+        }
+    }
+}
+impl ConsumerContext for FlowConsumerContext {}
+
+pub fn consumer_from_config(configuration: &Configuration) -> eyre::Result<BaseConsumer<FlowConsumerContext>> {
     let mut config = ClientConfig::new();
 
     config.set("bootstrap.servers", configuration.brokers());
@@ -50,16 +76,35 @@ pub fn consumer_from_config(configuration: &Configuration) -> Result<BaseConsume
 
     config.set("security.protocol", configuration.security_protocol());
 
-    if let Some(ref auth) = configuration.authentication {
-        config.set("sasl.mechanism", auth.mechanism.to_string());
-        config.set("sasl.username", &auth.username);
-        config.set("sasl.password", &auth.password);
+    let ctx = FlowConsumerContext { auth: configuration.credentials.clone() };
+
+    if let Some(Credentials::UserPassword { mechanism, username, password }) = &configuration.credentials {
+        config.set("sasl.mechanism", mechanism.to_string());
+        config.set("sasl.username", username);
+        config.set("sasl.password", password);
+    } else if let Some(Credentials::AWS { .. }) = &configuration.credentials {
+        config.set("sasl.mechanism", "OAUTHBEARER");
+
+        if configuration.security_protocol() != "SASL_SSL" {
+            return Err(eyre::eyre!("must use tls=system_certificates for AWS").into())
+        }
     }
 
-    config.create().map_err(Error::Config)
+    let consumer: BaseConsumer<FlowConsumerContext> = config.create_with_context(ctx).map_err(Error::Config)?;
+
+    if let Some(Credentials::AWS { .. }) = &configuration.credentials {
+        // In order to generate an initial OAuth Bearer token to be used by the consumer
+        // we need to call poll once.
+        // See https://docs.confluent.io/platform/current/clients/librdkafka/html/classRdKafka_1_1OAuthBearerTokenRefreshCb.html
+        // Note that this is expected to return an error since we have no topic assignments yet
+        // hence the ignoring of the result
+        let _ = consumer.poll(KAFKA_TIMEOUT);
+    }
+
+    Ok(consumer)
 }
 
-pub fn test_connection<C: Consumer>(
+pub fn test_connection<C: Consumer<FlowConsumerContext>>(
     configuration: &Configuration,
     consumer: &C,
     bindings: Vec<request::validate::Binding>,
@@ -86,7 +131,7 @@ pub fn test_connection<C: Consumer>(
     })
 }
 
-pub fn fetch_metadata<C: Consumer>(
+pub fn fetch_metadata<C: Consumer<FlowConsumerContext>>(
     configuration: &Configuration,
     consumer: &C,
 ) -> Result<Metadata, Error> {
@@ -147,7 +192,7 @@ pub fn find_topic<'m>(metadata: &'m Metadata, needle: &str) -> Option<&'m Metada
 ///
 /// **Warning**: This will _unsubscribe_ the consumer from any previous topic partitions.
 pub fn subscribe(
-    consumer: &BaseConsumer,
+    consumer: &BaseConsumer<FlowConsumerContext>,
     checkpoints: &state::CheckpointSet,
 ) -> Result<TopicPartitionList, Error> {
     let mut topic_partition_list = TopicPartitionList::new();
@@ -169,7 +214,7 @@ pub fn subscribe(
 }
 
 pub fn high_watermarks(
-    consumer: &BaseConsumer,
+    consumer: &BaseConsumer<FlowConsumerContext>,
     checkpoints: &state::CheckpointSet,
 ) -> Result<state::CheckpointSet, Error> {
     let mut watermarks = state::CheckpointSet::default();
