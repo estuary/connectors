@@ -72,7 +72,17 @@ DATA_PLANE_PID=$!
 trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID}" EXIT
 
 # Get the spec from the connector and ensure it's valid json.
-flowctl-go api spec --image "${CONNECTOR_IMAGE}" | jq -cM || bail "failed to validate spec"
+cat > "$TESTDIR/spec.yaml" << EOF
+captures:
+  tests/${CONNECTOR}/from-source:
+    endpoint:
+      connector:
+        image: "${CONNECTOR_IMAGE}"
+        config: {}
+    bindings: []
+EOF
+
+flowctl raw spec --source "$TESTDIR/spec.yaml" | jq -cM || bail "failed to validate spec"
 
 # Execute test-specific setup steps.
 echo -e "\nexecuting setup"
