@@ -218,7 +218,6 @@ jobs:
           docker compose --file infra/docker-compose.yaml up --wait
 
       - name: Source connector ${{ matrix.connector }} integration tests
-        # TODO: re-enable source-kafka after fixing the tests
         if: |
           contains(fromJson('[
             "source-dynamodb",
@@ -226,6 +225,7 @@ jobs:
             "source-kinesis",
             "source-mysql",
             "source-postgres",
+            "source-kafka",
             "source-s3",
             "source-sftp",
             "source-sqlserver"

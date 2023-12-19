@@ -116,8 +116,8 @@ impl JsonSchema for Configuration {
                             "username"
                         ]
                     }, {
+                        "title": "AWS MSK IAM",
                         "properties": {
-                            "title": "AWS MSK IAM",
                             "auth_type": {
                                 "type": "string",
                                 "default": "AWS",

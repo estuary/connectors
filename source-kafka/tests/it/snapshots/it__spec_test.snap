@@ -7,7 +7,7 @@ spec:
     $schema: "http://json-schema.org/draft-07/schema#"
     properties:
       bootstrap_servers:
-        description: The initial servers in the Kafka cluster to initially connect to, separated by commas. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.
+        description: "The initial servers in the Kafka cluster to initially connect to, separated by commas. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes."
         order: 0
         title: Bootstrap Servers
         type: string
@@ -16,8 +16,7 @@ spec:
         discriminator:
           propertyName: auth_type
         oneOf:
-          - title: SASL (User & Password)
-            properties:
+          - properties:
               auth_type:
                 const: UserPassword
                 default: UserPassword
@@ -47,8 +46,8 @@ spec:
               - mechanism
               - password
               - username
-          - title: AWS MSK IAM
-            properties:
+            title: SASL (User & Password)
+          - properties:
               auth_type:
                 const: AWS
                 default: AWS
@@ -71,6 +70,7 @@ spec:
               - aws_access_key_id
               - aws_secret_access_key
               - region
+            title: AWS MSK IAM
         order: 1
         title: Credentials
         type: object
