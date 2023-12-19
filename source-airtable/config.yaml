@@ -1,17 +1,17 @@
 credentials:
-    api_key_sops: ENC[AES256_GCM,data:qfX9QAZgDMKJmmyELrzOVAoCRWcU6C8RiLDz5VLJGEqvKRE6OxJDi5DA8YYym7U+WgJH0Z2STm3+YJBYHr9RdElBLX95DXILQIZF/l1kHtAY6Q==,iv:TidCX9dCW7G0gkM6TV9nQOVjdhaB4u242w9JRKVAgq8=,tag:ReXjUzGaId61f/9ks+tSfQ==,type:str]
+    api_key_sops: ENC[AES256_GCM,data:IIURp1Gaf5+THmZF1B0AKhptbcTPCeS9/7xw+8SFxBzMi984PUOM3Nncq3acPC/RvgIWrCT4pdzSHcB1R/zNNl8ws4PEDW+ODnXUtWCBx2x6Bw==,iv:PhI5ttX1IW1AWRRs90U/M+HqbnmmXlA62JY3xznrKR4=,tag:NfuJ+ymeguV7MzZrkns5hQ==,type:str]
     auth_method: api_key
 sops:
     kms: []
     gcp_kms:
-        - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow
-          created_at: "2023-12-02T16:10:35Z"
-          enc: CiQAW8BC2Pi9uzReinT3A/UgbviqUnit4C69wsa7GvQDN1jKQdoSSQD00UdD5z1t8FJRGDObdrbAvoEU8/Uc8oM98zfer516OlsFj8LdIAYHc171iBTwkcqGNy6a7+avj8qJmhFNNJiTVXH146RnuLo=
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2023-12-19T15:07:57Z"
+          enc: CiQAdmEdwqyda0b+TYLkO3MQoGSlmy8yry6FvqHyPpYpQBQt9pcSSQCVvC1zYTvAhOKj0x78KcFbarVr3Q7hucNSkES9WdDQZbOEeuMKWyGunxkZZhDhdGqcc/Jenu34yluHmICLDSVSMvtpgkmFO6A=
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2023-12-02T16:10:36Z"
-    mac: ENC[AES256_GCM,data:WGih3Gp1wV1WYLvT4NfrrgR4httEiDxyh/p4/M41dJS7NZVVvthY+axxnkAMXCtcCyEIjXxCIutF/oBYP9rKUUXxw0z3VJtJqcU6WUACxWcKIbYv7Sb7DyyULmvy4D8GvLDPfFhgwtXntia7voy9S5AkdPjSpWJ1SBWQiB2bZrs=,iv:cgY5zngindKu68GYdH6oTmrO06E6ZVNXgZRtMatPZuo=,tag:ewOm5HbA6DDdQbKYNArUdw==,type:str]
+    lastmodified: "2023-12-19T15:07:59Z"
+    mac: ENC[AES256_GCM,data:8/Ax5IKxPZbU85vpz14Mu1TB/PzhnbVhrIVCAEbB4P2GQ5b3++G2V9XV461KvzasN+13GEw3lxmkpwHsJFlfHgS9Vpj469a57iWiNt4zkW5ehUJuiWRRXAFknjkaAZ/+oTyAygPJaVnncSadKzp+7LrCKeoAG7EkNBIHxfx0cuw=,iv:E7fqz4t2dD8LeReXcBOzK6lioG5TbK36+KJaTZ68PwA=,tag:p7GmQIgtNp1WgtYEu1kA9Q==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.7.3
