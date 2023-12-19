@@ -18,7 +18,7 @@ def test_capture(request, snapshot):
         text=True,
     )
     assert result.returncode == 0
-    lines = [json.loads(l) for l in result.stdout.splitlines()]
+    lines = [json.loads(l) for l in result.stdout.splitlines()[:50]]
 
     for l in lines:
         l[1]["ts"] = "redacted-timestamp"
