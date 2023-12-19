@@ -54,7 +54,8 @@ var pgDialect = func() sql.Dialect {
 
 	columnValidator := sql.NewColumnValidator(
 		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double precision", "numeric"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"double precision"}, Validate: sql.NumberCompatible},
+		sql.ColValidation{Types: []string{"numeric"}, Validate: sql.NumericCompatible},
 		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
 		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
 		sql.ColValidation{Types: []string{"text"}, Validate: sql.StringCompatible},

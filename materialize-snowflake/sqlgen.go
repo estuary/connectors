@@ -73,7 +73,7 @@ var snowflakeDialect = func(configSchema string) sql.Dialect {
 		sql.ColValidation{Types: []string{"text"}, Validate: sql.StringCompatible},
 		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
 		sql.ColValidation{Types: []string{"float"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"number"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"number"}, Validate: sql.IntegerCompatible}, // "number" is what Snowflake calls INTEGER.
 		sql.ColValidation{Types: []string{"variant"}, Validate: sql.JsonCompatible},
 		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
 		sql.ColValidation{Types: []string{"timestamp_ntz"}, Validate: sql.DateTimeCompatible},
