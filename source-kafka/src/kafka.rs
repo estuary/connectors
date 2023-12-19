@@ -46,9 +46,11 @@ impl ClientContext for FlowConsumerContext {
         if let Some(Credentials::AWS { region, access_key_id, secret_access_key }) = &self.auth {
             let (token, lifetime_ms) = crate::msk_oauthbearer::token(region, access_key_id, secret_access_key)?;
             return Ok(OAuthToken {
+                // This is just a descriptive name of the principal which is accessing
+                // the resource, not a specific constant
                 principal_name: "flow-kafka-capture".to_string(),
                 token,
-                lifetime_ms: lifetime_ms.try_into()?,
+                lifetime_ms,
             })
         } else {
             return Err(eyre::eyre!("generate_oauth_token called without AWS credentials").into())
@@ -94,6 +96,8 @@ pub fn consumer_from_config(configuration: &Configuration) -> eyre::Result<BaseC
         // In order to generate an initial OAuth Bearer token to be used by the consumer
         // we need to call poll once.
         // See https://docs.confluent.io/platform/current/clients/librdkafka/html/classRdKafka_1_1OAuthBearerTokenRefreshCb.html
+        // Note that this is expected to return an error since we have no topic assignments yet
+        // hence the ignoring of the result
         let _ = consumer.poll(KAFKA_TIMEOUT);
     }
 
