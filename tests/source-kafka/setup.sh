@@ -7,8 +7,9 @@ export RESOURCE="{ \"stream\": \"${TEST_STREAM}\", \"syncMode\": \"incremental\"
 # Because Flow uses network=host, the port exposed to Flow is different than the
 # one we use when running `docker exec` below.
 export CONNECTOR_CONFIG='{
-  "bootstrap_servers": ["infra-kafka-1.flow-test:9092"],
-  "authentication": {
+  "bootstrap_servers": "infra-kafka-1.flow-test:9092",
+  "credentials": {
+    "auth_type": "UserPassword",
     "mechanism": "SCRAM-SHA-256",
     "username": "alice",
     "password": "alice-pass"
