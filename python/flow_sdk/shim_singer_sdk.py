@@ -251,7 +251,8 @@ resource_config_schema = {
     "type": "object",
     "properties": {
         "stream": {"type": "string"},
-        "replication_mode": {"type": "string", "enum": ["INCREMENTAL", "FULL_TABLE"]},
+        "replication_method": {"type": "string", "enum": ["INCREMENTAL", "FULL_TABLE"]},
+        "replication_key": {"type": "string"}
     },
-    "required": ["stream", "syncMode"],
+    "required": ["stream", "replication_method"]
 }
