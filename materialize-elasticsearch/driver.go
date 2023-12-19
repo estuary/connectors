@@ -463,11 +463,20 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Tra
 			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
+		fields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
+		floatFields := make([]bool, len(fields))
+		for idx := range fields {
+			if propForField(fields[idx], b).Type == elasticTypeDouble {
+				floatFields[idx] = true
+			}
+		}
+
 		indexToBinding[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
 			index:        b.ResourcePath[0],
 			deltaUpdates: res.DeltaUpdates,
-			fields:       append(b.FieldSelection.Keys, b.FieldSelection.Values...),
+			fields:       fields,
+			floatFields:  floatFields,
 			docField:     b.FieldSelection.Document,
 		})
 	}
