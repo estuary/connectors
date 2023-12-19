@@ -54,8 +54,9 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 	}
 
 	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double", "decimal"}, Validate: sql.NumberCompatible},
+		// "decimal" is for NUMERIC(65,0) that is used for { type: string, format: integer }
+		sql.ColValidation{Types: []string{"bigint", "decimal"}, Validate: sql.IntegerCompatible},
+		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
 		sql.ColValidation{Types: []string{"tinyint"}, Validate: sql.BooleanCompatible},
 		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
 		sql.ColValidation{Types: []string{"varchar", "longtext"}, Validate: sql.StringCompatible},

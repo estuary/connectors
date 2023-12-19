@@ -104,23 +104,27 @@ func StringCompatible(p pf.Projection) bool {
 	return TypesOrNull(p.Inference.Types, []string{"string"})
 }
 
-// NumberCompatible is compatible with integers or numbers, and strings formatted as these.
+// NumberCompatible is compatible with number, and strings formatted as numbers.
 func NumberCompatible(p pf.Projection) bool {
-	if _, ok := boilerplate.AsFormattedNumeric(&p); ok {
-		return true
+	if f, ok := boilerplate.AsFormattedNumeric(&p); ok {
+		return f == boilerplate.StringFormatNumber
 	}
 
-	return TypesOrNull(p.Inference.Types, []string{"number", "integer"})
+	return TypesOrNull(p.Inference.Types, []string{"number"})
 }
 
-// IntegerCompatible is compatible with integers, and strings formatted as integers. Note that
-// numbers are not compatible with integers.
+// IntegerCompatible is compatible with integers, and strings formatted as integers.
 func IntegerCompatible(p pf.Projection) bool {
 	if f, ok := boilerplate.AsFormattedNumeric(&p); ok {
 		return f == boilerplate.StringFormatInteger
 	}
 
 	return TypesOrNull(p.Inference.Types, []string{"integer"})
+}
+
+// NumericCompatible is compatible with integers or numbers, and strings formatted as either one of those.
+func NumericCompatible(p pf.Projection) bool {
+	return NumberCompatible(p) || IntegerCompatible(p)
 }
 
 // DateCompatible is compatible with strings with format: date.
