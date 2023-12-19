@@ -103,7 +103,10 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 }
 
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
-	return &boilerplate.InfoSchema{}, nil
+	return boilerplate.NewInfoSchema(
+		func(in []string) []string { return in },
+		func(in string) string { return in },
+	), nil
 }
 
 func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
