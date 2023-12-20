@@ -28,10 +28,11 @@ func TestCapture(t *testing.T) {
 		Bindings: []*flow.CaptureSpec_Binding{
 			{
 				ResourceConfigJson: resourceBytes,
-				ResourcePath:       []string{"hellCollection"},
+				ResourcePath:       []string{"helloCollection"},
 				Collection: flow.CollectionSpec{
-					Name: "hellCollection",
+					Name: "helloCollection",
 				},
+				StateKey: "helloStateKey",
 			},
 		},
 		Validator:  &st.SortedCaptureValidator{},
