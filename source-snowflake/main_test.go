@@ -26,7 +26,7 @@ var (
 	dbName      = flag.String("db_name", "CONNECTOR_TESTING", "The database to use for tests")
 	dbWarehouse = flag.String("db_warehouse", "COMPUTE_WH", "The warehouse to execute test queries in")
 
-	dbCaptureUser = flag.String("db_capture_user", "WILLD", "The user to perform captures as")
+	dbCaptureUser = flag.String("db_capture_user", "USERNAME", "The user to perform captures as")
 	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
 	dbControlUser = flag.String("db_control_user", "", "The user for test setup/control operations, if different from the capture user")
 	dbControlPass = flag.String("db_control_pass", "", "The password the the test setup/control user, if different from the capture password")

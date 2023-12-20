@@ -44,7 +44,8 @@ func (snowflakeDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutpu
 		if err := pf.UnmarshalStrict(open.StateJson, checkpoint); err != nil {
 			return fmt.Errorf("unable to parse state checkpoint: %w", err)
 		}
-	} else {
+	}
+	if checkpoint.Streams == nil {
 		checkpoint.Streams = make(map[snowflakeObject]*streamState)
 	}
 
@@ -141,6 +142,11 @@ type streamState struct {
 
 func (c *capture) Run(ctx context.Context) error {
 	log.WithField("name", c.Name).Info("started capture")
+
+	// Notify Flow that we're ready and don't want to receive acknowledgements.
+	if err := c.Output.Ready(false); err != nil {
+		return err
+	}
 
 	log.Debug("processing added/removed bindings")
 	var removedStreams, err = c.updateState(ctx)

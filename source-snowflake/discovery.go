@@ -1,10 +1,12 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -32,12 +34,12 @@ func (snowflakeDriver) Discover(ctx context.Context, req *pc.Request_Discover) (
 
 	discoveryResults, err := performSnowflakeDiscovery(ctx, cfg, db)
 	if err != nil {
-		log.WithField("err", err).Fatal("error discovering snowflake collections")
+		return nil, fmt.Errorf("error discovering snowflake collections: %w", err)
 	}
 
 	bindings, err := catalogFromDiscovery(cfg, discoveryResults)
 	if err != nil {
-		log.WithField("err", err).Fatal("error converting discovery info to bindings")
+		return nil, fmt.Errorf("error converting discovery info to bindings: %w", err)
 	}
 
 	return &pc.Response_Discovered{Bindings: bindings}, nil
@@ -81,14 +83,20 @@ type snowflakeDiscoveryPrimaryKey struct {
 func performSnowflakeDiscovery(ctx context.Context, cfg *config, db *sql.DB) (*snowflakeDiscoveryResults, error) {
 	log.Debug("performing discovery")
 
-	// We have to use `SHOW FOO` queries to get some of the information we need, such
-	// as primary keys. But there's no simple way to select just the columns we need
-	// from these nonstandard not-a-table queries, and that makes them unstable if
-	// new columns were to be added in the future.
+	// We are forced to use an inconsistent mix of `SELECT ... FROM information_schema` and
+	// `SHOW FOO` queries to gather required discovery information, because:
 	//
-	// So we wrap the database connection with SQLX and use its struct-tag reflection
-	// to select the columns of interest *by name*, and set Unsafe() so that it will
-	// ignore unmatched columns.
+	//   1. The query `SHOW COLUMNS` doesn't give us all the information we need,
+	//      so we're forced to query 'information_schema.columns' for that.
+	//   2. There is no 'information_schema' source from which we can discover the
+	//      list of primary-key columns corresponding to a table, so we're forced
+	//      to use `SHOW PRIMARY KEYS` for that info.
+	//
+	// In principle the list of tables names could be gotten either way and the choice to
+	// use `SHOW TABLES` is entirely arbitrary.
+	//
+	// We wrap the database with SQLX so we can use convenient struct-tag reflection rather
+	// than hard-coded tuple indices to translate query results into lists-of-structs.
 	var xdb = sqlx.NewDb(db, "snowflake").Unsafe()
 	var tables []*snowflakeDiscoveryTable
 	if err := xdb.Select(&tables, "SHOW TABLES;"); err != nil {
@@ -98,12 +106,17 @@ func performSnowflakeDiscovery(ctx context.Context, cfg *config, db *sql.DB) (*s
 	if err := xdb.Select(&columns, "SELECT * FROM information_schema.columns;"); err != nil {
 		return nil, fmt.Errorf("error listing columns: %w", err)
 	}
-
 	var primaryKeysQuery = fmt.Sprintf("SHOW PRIMARY KEYS IN DATABASE %s;", quoteSnowflakeIdentifier(cfg.Database))
 	var primaryKeys []*snowflakeDiscoveryPrimaryKey
 	if err := xdb.Select(&primaryKeys, primaryKeysQuery); err != nil {
 		return nil, fmt.Errorf("error listing primaryKeys: %w", err)
 	}
+	// The results of `SHOW PRIMARY KEYS` are not guaranteed to be sequential in
+	// key order (empirically they appear to be in sequential *table* order), so
+	// we have to sort that ourselves before processing.
+	slices.SortStableFunc(primaryKeys, func(a, b *snowflakeDiscoveryPrimaryKey) int {
+		return cmp.Compare(a.KeySeq, b.KeySeq)
+	})
 	return &snowflakeDiscoveryResults{
 		Tables:      tables,
 		Columns:     columns,
