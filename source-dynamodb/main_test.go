@@ -331,6 +331,8 @@ func bindings(t *testing.T, tableNames ...string) []*flow.CaptureSpec_Binding {
 			ResourceConfigJson: resourceSpecJson(t, resource{Table: tbl, RcuAllocation: 1000}),
 			ResourcePath:       []string{tbl},
 			Collection:         flow.CollectionSpec{Name: flow.Collection(fmt.Sprintf("acmeCo/test/%s", tbl))},
+			Backfill:           0,
+			StateKey:           tbl,
 		})
 	}
 

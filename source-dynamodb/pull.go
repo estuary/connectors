@@ -9,7 +9,6 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -40,6 +39,7 @@ const (
 
 type table struct {
 	tableName      string
+	stateKey       boilerplate.StateKey
 	bindingIdx     int
 	keyFields      []string // Ordered as partition key followed by sort key (if there is a sort key)
 	activeSegments chan int
@@ -73,7 +73,12 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		}
 	} else {
 		// Capture has never emitted a checkpoint.
-		checkpoint.Tables = make(map[string]tableState)
+		checkpoint.Tables = make(map[boilerplate.StateKey]tableState)
+	}
+
+	migrated, err := migrateState(&checkpoint, open.Capture.Bindings)
+	if err != nil {
+		return err
 	}
 
 	c := capture{
@@ -83,7 +88,6 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		state:  checkpoint,
 	}
 
-	activeBindings := make(map[string]struct{})
 	tables := []*table{}
 	for idx, binding := range open.Capture.Bindings {
 		var res resource
@@ -91,9 +95,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		activeBindings[res.Table] = struct{}{}
-
-		t, err := c.initializeTable(ctx, idx, res.Table, res.RcuAllocation)
+		t, err := c.initializeTable(ctx, idx, res.Table, boilerplate.StateKey(binding.StateKey), res.RcuAllocation)
 		if err != nil {
 			return fmt.Errorf("initializing table: %w", err)
 		}
@@ -107,20 +109,9 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 
 	eg, groupCtx := errgroup.WithContext(ctx)
 
-	// Remove tables from the persisted state that are no longer included as bindings in the
-	// catalog. This allows for removing and re-adding an individual binding to restart a backfill
-	// of a table from scratch.
-	removedBindings := false
-	for checkpointTable := range c.state.Tables {
-		if _, ok := activeBindings[checkpointTable]; !ok {
-			log.WithField("table", checkpointTable).Info("table removed from catalog")
-			delete(c.state.Tables, checkpointTable)
-			removedBindings = true
-		}
-	}
-	if removedBindings {
+	if migrated {
 		if err := c.checkpoint(); err != nil {
-			return fmt.Errorf("updating checkpoint for removed tables: %w", err)
+			return fmt.Errorf("updating migrated checkpoint: %w", err)
 		}
 	}
 
