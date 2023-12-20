@@ -10,4 +10,20 @@ captures:
           - "-m"
           - source-asana
         config: connector_config.yaml
-    bindings: []
+    bindings:
+      - resource:
+          stream: projects
+          syncMode: full_refresh
+        target: acmeCo/projects
+      - resource:
+          stream: sections
+          syncMode: full_refresh
+        target: acmeCo/sections
+      - resource:
+          stream: stories
+          syncMode: full_refresh
+        target: acmeCo/stories
+      - resource:
+          stream: tasks
+          syncMode: full_refresh
+        target: acmeCo/tasks
