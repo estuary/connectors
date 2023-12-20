@@ -51,10 +51,16 @@ mkdir -p "${TESTDIR}"
 # Map to an absolute directory.
 export TESTDIR=$(realpath ${TESTDIR})
 
+export TMPDIR="/tmp/test"
+if [[ -d "${TMPDIR}" ]]; then
+  rm -r ${TMPDIR}
+fi
+mkdir -p "${TMPDIR}"
+
 # `flowctl-go` commands which interact with the data plane look for *_ADDRESS
 # variables, which are created by the temp-data-plane we're about to start.
-export BROKER_ADDRESS=unix://localhost${TESTDIR}/gazette.sock
-export CONSUMER_ADDRESS=unix://localhost${TESTDIR}/consumer.sock
+export BROKER_ADDRESS=unix://localhost${TMPDIR}/gazette.sock
+export CONSUMER_ADDRESS=unix://localhost${TMPDIR}/consumer.sock
 
 # Start an empty local data plane within our TESTDIR as a background job.
 # --sigterm to verify we cleanly tear down the test catalog (otherwise it hangs).
@@ -64,7 +70,7 @@ flowctl-go temp-data-plane \
   --log.level info \
   --sigterm \
   --network "flow-test" \
-  --tempdir ${TESTDIR} \
+  --tempdir ${TMPDIR} \
   --unix-sockets \
   &
 DATA_PLANE_PID=$!
@@ -72,7 +78,7 @@ DATA_PLANE_PID=$!
 trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID}" EXIT
 
 # Get the spec from the connector and ensure it's valid json.
-cat > "$TESTDIR/spec.yaml" << EOF
+cat >"$TESTDIR/spec.yaml" <<EOF
 captures:
   tests/${CONNECTOR}/from-source:
     endpoint:
@@ -123,7 +129,7 @@ cat tests/template.flow.yaml | envsubst >"${CATALOG_SOURCE}"
 # Build the catalog.
 flowctl-go api build \
   --build-id test-build-id \
-  --build-db ${TESTDIR}/builds/test-build-id \
+  --build-db ${TMPDIR}/builds/test-build-id \
   --source ${CATALOG_SOURCE} \
   --network "flow-test" ||
   bail "Build failed."
