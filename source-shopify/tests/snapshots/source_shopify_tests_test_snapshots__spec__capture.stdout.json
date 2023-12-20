@@ -105,26 +105,20 @@
         "stream": {
           "type": "string"
         },
-        "syncMode": {
+        "replication_method": {
           "type": "string",
           "enum": [
-            "incremental",
-            "full_refresh"
+            "INCREMENTAL",
+            "FULL_TABLE"
           ]
         },
-        "namespace": {
+        "replication_key": {
           "type": "string"
-        },
-        "cursorField": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       },
       "required": [
         "stream",
-        "syncMode"
+        "replication_method"
       ]
     },
     "documentationUrl": "https://docs.estuary.dev",

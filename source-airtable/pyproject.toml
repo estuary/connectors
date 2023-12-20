@@ -7,7 +7,7 @@ authors = ["Joseph Shearer <joseph@estuary.dev>"]
 [tool.poetry.dependencies]
 airbyte-cdk = "0.51.14"
 mypy = "^1.5"
-python = "^3.11"
+python = ">=3.11,<3.12"
 debugpy = "^1.8.0"
 source_airtable = { path = "source_airtable", develop=true }
 flow-sdk = {path="../python", develop=true}

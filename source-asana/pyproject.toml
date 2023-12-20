@@ -12,10 +12,14 @@ jsonlines = "^4.0.0"
 mypy = "^1.5"
 orjson = "^3.9.7"
 pydantic = "1.10.12"
-python = "^3.11"
+python = ">=3.11,<3.12"
 requests = "^2.31.0"
 types-requests = "^2.31"
 pytest = "^7.4.3"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-insta = "^0.2.0"
 
 [build-system]
 requires = ["poetry-core"]
