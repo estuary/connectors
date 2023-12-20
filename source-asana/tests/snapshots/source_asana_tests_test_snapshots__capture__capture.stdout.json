@@ -1,0 +1,446 @@
+[
+  [
+    "acmeCo/projects",
+    {
+      "_meta": {
+        "row_id": 1
+      },
+      "archived": false,
+      "color": "dark-teal",
+      "created_at": "2023-10-31T15:29:13.337Z",
+      "current_status": null,
+      "custom_fields": [],
+      "default_view": "list",
+      "due_date": null,
+      "due_on": null,
+      "followers": [
+        {
+          "gid": "1205846102972015"
+        },
+        {
+          "gid": "1205846171870447"
+        },
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "gid": "1205846048939069",
+      "html_notes": "<body></body>",
+      "icon": "list",
+      "members": [
+        {
+          "gid": "1205846102972015"
+        },
+        {
+          "gid": "1205846171870447"
+        },
+        {
+          "gid": "1205846172619387"
+        }
+      ],
+      "modified_at": "2023-10-31T15:29:14.059Z",
+      "name": "estuary",
+      "notes": "",
+      "owner": {
+        "gid": "1205846102972015"
+      },
+      "permalink_url": "https://app.asana.com/0/1205846048939069/1205846048939069",
+      "public": true,
+      "resource_type": "project",
+      "start_on": null,
+      "team": {
+        "gid": "1205846104557048"
+      },
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/sections",
+    {
+      "_meta": {
+        "row_id": 1
+      },
+      "created_at": "2023-10-31T15:29:13.654Z",
+      "gid": "1205846055668611",
+      "name": "To do",
+      "project": {
+        "gid": "1205846048939069"
+      },
+      "resource_type": "section",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/sections",
+    {
+      "_meta": {
+        "row_id": 2
+      },
+      "created_at": "2023-10-31T15:29:14.200Z",
+      "gid": "1205846055668613",
+      "name": "Doing",
+      "project": {
+        "gid": "1205846048939069"
+      },
+      "resource_type": "section",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/sections",
+    {
+      "_meta": {
+        "row_id": 3
+      },
+      "created_at": "2023-10-31T15:29:14.281Z",
+      "gid": "1205846055668614",
+      "name": "Done",
+      "project": {
+        "gid": "1205846048939069"
+      },
+      "resource_type": "section",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "row_id": 1
+      },
+      "created_at": "2023-10-31T15:29:15.274Z",
+      "created_by": {
+        "gid": "1205846102972015"
+      },
+      "gid": "1205846052317288",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> assigned to David Yaffe",
+      "is_editable": false,
+      "resource_subtype": "assigned",
+      "resource_type": "story",
+      "text": "David Yaffe assigned to David Yaffe",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "row_id": 2
+      },
+      "created_at": "2023-10-31T15:29:15.480Z",
+      "created_by": {
+        "gid": "1205846102972015"
+      },
+      "gid": "1205846052317290",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> added to <a href=\"https://app.asana.com/0/1205846048939069/1205846048939069\">estuary</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "David Yaffe added to estuary",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "row_id": 4
+      },
+      "created_at": "2023-10-31T15:29:15.685Z",
+      "created_by": {
+        "gid": "1205846102972015"
+      },
+      "gid": "1205846052317292",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> assigned to David Yaffe",
+      "is_editable": false,
+      "resource_subtype": "assigned",
+      "resource_type": "story",
+      "text": "David Yaffe assigned to David Yaffe",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "row_id": 5
+      },
+      "created_at": "2023-10-31T15:29:15.754Z",
+      "created_by": {
+        "gid": "1205846102972015"
+      },
+      "gid": "1205846052317294",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> added to <a href=\"https://app.asana.com/0/1205846048939069/1205846048939069\">estuary</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "David Yaffe added to estuary",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "row_id": 7
+      },
+      "created_at": "2023-10-31T15:29:15.903Z",
+      "created_by": {
+        "gid": "1205846102972015"
+      },
+      "gid": "1205846058555971",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> added to <a href=\"https://app.asana.com/0/1205846048939069/1205846048939069\">estuary</a>",
+      "is_editable": false,
+      "resource_subtype": "added_to_project",
+      "resource_type": "story",
+      "text": "David Yaffe added to estuary",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "row_id": 3
+      },
+      "created_at": "2023-10-31T15:29:17.590Z",
+      "created_by": {
+        "gid": "1205846102972015"
+      },
+      "gid": "1205846058555984",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> changed the due date to Nov 2",
+      "is_editable": false,
+      "resource_subtype": "due_date_changed",
+      "resource_type": "story",
+      "text": "David Yaffe changed the due date to Nov 2",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "row_id": 6
+      },
+      "created_at": "2023-10-31T15:29:17.705Z",
+      "created_by": {
+        "gid": "1205846102972015"
+      },
+      "gid": "1205846058555985",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> changed the due date to Nov 3",
+      "is_editable": false,
+      "resource_subtype": "due_date_changed",
+      "resource_type": "story",
+      "text": "David Yaffe changed the due date to Nov 3",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/stories",
+    {
+      "_meta": {
+        "row_id": 8
+      },
+      "created_at": "2023-10-31T15:29:17.808Z",
+      "created_by": {
+        "gid": "1205846102972015"
+      },
+      "gid": "1205846058555986",
+      "html_text": "<b><a href=\"https://app.asana.com/0/profile/1205846104557056\">David Yaffe</a></b> changed the due date to Nov 6",
+      "is_editable": false,
+      "resource_subtype": "due_date_changed",
+      "resource_type": "story",
+      "text": "David Yaffe changed the due date to Nov 6",
+      "type": "system",
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "row_id": 1
+      },
+      "assignee": {
+        "gid": "1205846102972015"
+      },
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2023-10-31T15:29:15.067Z",
+      "due_at": null,
+      "due_on": "2023-11-02",
+      "followers": [
+        {
+          "gid": "1205846102972015"
+        }
+      ],
+      "gid": "1205846055668625",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1205846048939069"
+          },
+          "section": {
+            "gid": "1205846055668611"
+          }
+        }
+      ],
+      "modified_at": "2023-11-02T04:46:16.928Z",
+      "name": "Draft project brief",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1205846048939069/1205846055668625",
+      "projects": [
+        {
+          "gid": "1205846048939069"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": "2023-10-31",
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "row_id": 2
+      },
+      "assignee": {
+        "gid": "1205846102972015"
+      },
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2023-10-31T15:29:15.562Z",
+      "due_at": null,
+      "due_on": "2023-11-03",
+      "followers": [
+        {
+          "gid": "1205846102972015"
+        }
+      ],
+      "gid": "1205846055668627",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1205846048939069"
+          },
+          "section": {
+            "gid": "1205846055668611"
+          }
+        }
+      ],
+      "modified_at": "2023-11-03T05:19:34.769Z",
+      "name": "Schedule kickoff meeting",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1205846048939069/1205846055668627",
+      "projects": [
+        {
+          "gid": "1205846048939069"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": "2023-11-01",
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "row_id": 3
+      },
+      "assignee": null,
+      "completed": false,
+      "completed_at": null,
+      "completed_by": null,
+      "created_at": "2023-10-31T15:29:15.822Z",
+      "due_at": null,
+      "due_on": "2023-11-06",
+      "followers": [
+        {
+          "gid": "1205846102972015"
+        }
+      ],
+      "gid": "1205846055668629",
+      "hearted": false,
+      "hearts": [],
+      "html_notes": "<body></body>",
+      "is_rendered_as_separator": false,
+      "liked": false,
+      "likes": [],
+      "memberships": [
+        {
+          "project": {
+            "gid": "1205846048939069"
+          },
+          "section": {
+            "gid": "1205846055668611"
+          }
+        }
+      ],
+      "modified_at": "2023-10-31T15:29:17.833Z",
+      "name": "Share timeline with teammates",
+      "notes": "",
+      "num_hearts": 0,
+      "num_likes": 0,
+      "num_subtasks": 0,
+      "parent": null,
+      "permalink_url": "https://app.asana.com/0/1205846048939069/1205846055668629",
+      "projects": [
+        {
+          "gid": "1205846048939069"
+        }
+      ],
+      "resource_subtype": "default_task",
+      "resource_type": "task",
+      "start_on": "2023-11-02",
+      "tags": [],
+      "workspace": {
+        "gid": "1205846104557046"
+      },
+      "ts": "redacted-timestamp"
+    }
+  ]
+]
