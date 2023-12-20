@@ -312,7 +312,7 @@ fn parse_message<'m>(msg: &'m BorrowedMessage<'m>) -> Result<serde_json::Value, 
     })
 }
 
-static KAFKA_INTERNAL_TOPICS: [&str; 1] = ["__consumer_offsets"];
+static KAFKA_INTERNAL_TOPICS: [&str; 2] = ["__consumer_offsets", "__amazon_msk_canary"];
 
 fn reject_internal_topics(topic: &&MetadataTopic) -> bool {
     !KAFKA_INTERNAL_TOPICS.contains(&topic.name())

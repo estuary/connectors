@@ -85,7 +85,6 @@ impl JsonSchema for Configuration {
                                 "const": "UserPassword"
                             },
                             "mechanism": {
-                                "default": "PLAIN",
                                 "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
                                 "enum": [
                                     "PLAIN",
@@ -234,7 +233,9 @@ pub enum Credentials {
     },
 
     AWS {
+        #[serde(rename="aws_access_key_id")]
         access_key_id: String,
+        #[serde(rename="aws_secret_access_key")]
         secret_access_key: String,
         region: String,
     }
