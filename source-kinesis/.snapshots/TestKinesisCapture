@@ -14,5 +14,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"test-stream-1":{"shardId-000000000000":"<SEQUENCE_NUM>","shardId-000000000001":"<SEQUENCE_NUM>"},"test-stream-2":{"shardId-000000000000":"<SEQUENCE_NUM>","shardId-000000000001":"<SEQUENCE_NUM>"}}
+{"bindingStateV1":{"test-stream-1":{"shardId-000000000000":"<SEQUENCE_NUM>","shardId-000000000001":"<SEQUENCE_NUM>"},"test-stream-2":{}}}
 

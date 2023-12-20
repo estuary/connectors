@@ -210,6 +210,7 @@ func TestKinesisCapture(t *testing.T) {
 		bindings = append(bindings, &pf.CaptureSpec_Binding{
 			ResourceConfigJson: resourceJson,
 			ResourcePath:       []string{s},
+			StateKey:           s,
 		})
 
 	}
