@@ -54,7 +54,7 @@ func (c *capture) streamTable(ctx context.Context, t *table) error {
 				}
 			}
 
-			if err := c.pruneShards(t.tableName, currentShards); err != nil {
+			if err := c.pruneShards(t, currentShards); err != nil {
 				return fmt.Errorf("pruning shards: %w", err)
 			}
 
@@ -102,7 +102,7 @@ func (c *capture) catchupStreams(ctx context.Context, t *table, horizon time.Dur
 		return fmt.Errorf("listing shards: %w", err)
 	}
 
-	if err := c.pruneShards(t.tableName, currentShards); err != nil {
+	if err := c.pruneShards(t, currentShards); err != nil {
 		return fmt.Errorf("pruning shards: %w", err)
 	}
 
@@ -122,18 +122,18 @@ func (c *capture) catchupStreams(ctx context.Context, t *table, horizon time.Dur
 // pruneShards removes any shards from the capture state that we have completely read and do not
 // still exist in the shard listing. This is done to keep the checkpoint from endlessly growing as
 // stream shards are cycled through.
-func (c *capture) pruneShards(tableName string, activeShards map[string]streamTypes.Shard) error {
+func (c *capture) pruneShards(table *table, activeShards map[string]streamTypes.Shard) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	prune := []string{}
-	for id, state := range c.state.Tables[tableName].Shards {
+	for id, state := range c.state.Tables[table.stateKey].Shards {
 		if _, ok := activeShards[id]; !ok {
 			// This is a shard we previously saw but now do not. Was it completely read?
 			if state.FinishedReading {
 				// Shard is gone but was completely read, so prune it from our list.
 				log.WithFields(log.Fields{
-					"table":   tableName,
+					"table":   table.tableName,
 					"shardId": id,
 				}).Debug("pruning fully-read shard from capture state since it no longer exists")
 				prune = append(prune, id)
@@ -147,7 +147,7 @@ func (c *capture) pruneShards(tableName string, activeShards map[string]streamTy
 	}
 	if len(prune) > 0 {
 		for _, p := range prune {
-			delete(c.state.Tables[tableName].Shards, p)
+			delete(c.state.Tables[table.stateKey].Shards, p)
 		}
 
 		if err := c.checkpoint(); err != nil {
@@ -212,7 +212,7 @@ func (c *capture) readShard(
 	workersStop <-chan struct{},
 	horizon time.Duration,
 ) error {
-	state := c.getSequenceState(t.tableName, *shard.ShardId)
+	state := c.getSequenceState(t.stateKey, *shard.ShardId)
 	if state.FinishedReading {
 		// Don't re-read already fully read shards.
 		return nil
@@ -298,7 +298,7 @@ func (c *capture) readShard(
 				FinishedReading:  recs.NextShardIterator == nil,
 			}
 
-			if err := c.emitStream(t.bindingIdx, t.tableName, *shard.ShardId, newState, recs.Records[:lastItemIdx], t.keyFields); err != nil {
+			if err := c.emitStream(t.bindingIdx, t.stateKey, *shard.ShardId, newState, recs.Records[:lastItemIdx], t.keyFields); err != nil {
 				return fmt.Errorf("emitting stream documents for table '%s': %w", t.tableName, err)
 			}
 		}

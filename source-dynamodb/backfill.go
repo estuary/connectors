@@ -46,7 +46,7 @@ func (c *capture) backfill(ctx context.Context, t *table, dur time.Duration) err
 	// is best to distribute read load across the table's partitions.
 	t.activeSegments = make(chan int, t.totalBackfillSegments)
 	for segment := 0; segment < t.totalBackfillSegments; segment++ {
-		if c.getSegmentState(t.tableName, segment).FinishedAt.IsZero() {
+		if c.getSegmentState(t.stateKey, segment).FinishedAt.IsZero() {
 			t.activeSegments <- segment
 		}
 	}
@@ -83,9 +83,9 @@ func (c *capture) backfill(ctx context.Context, t *table, dur time.Duration) err
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	tableState := c.state.Tables[t.tableName]
+	tableState := c.state.Tables[t.stateKey]
 	tableState.BackfillFinishedAt = finished
-	c.state.Tables[t.tableName] = tableState
+	c.state.Tables[t.stateKey] = tableState
 	t.backfillComplete = true
 
 	if err := c.checkpoint(); err != nil {
@@ -124,7 +124,7 @@ func (c *capture) backfillWorker(ctx context.Context, t *table, scanLimit *int32
 			"segment": segment,
 		}).Debug("backfilling segment")
 
-		state := c.getSegmentState(t.tableName, segment)
+		state := c.getSegmentState(t.stateKey, segment)
 
 		startKey, err := decodeKey(t.keyFields, state.ExclusiveStartKey)
 		if err != nil {
@@ -150,7 +150,7 @@ func (c *capture) backfillWorker(ctx context.Context, t *table, scanLimit *int32
 			newState.ExclusiveStartKey = newStartKey
 		}
 
-		if err := c.emitBackfill(t.bindingIdx, t.tableName, segment, newState, scanned.Items, t.keyFields); err != nil {
+		if err := c.emitBackfill(t.bindingIdx, t.stateKey, segment, newState, scanned.Items, t.keyFields); err != nil {
 			return fmt.Errorf("emitting backfill documents for segment %d of table %s: %w", segment, t.tableName, err)
 		}
 

@@ -12,13 +12,56 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	streamTypes "github.com/aws/aws-sdk-go-v2/service/dynamodbstreams/types"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 )
 
 // captureState is the persistent state for the entire capture, which consists of one or more table
 // states.
 type captureState struct {
-	Tables map[string]tableState `json:"tables,omitempty"`
+	Tables    map[boilerplate.StateKey]tableState `json:"bindingStateV1,omitempty"`
+	OldTables map[string]tableState               `json:"tables,omitempty"` // TODO(whb): Remove once all captures have migrated.
+}
+
+func migrateState(state *captureState, bindings []*pf.CaptureSpec_Binding) (bool, error) {
+	if state.Tables != nil && state.OldTables != nil {
+		return false, fmt.Errorf("application error: both Tables and OldTables were non-nil")
+	} else if state.Tables != nil {
+		log.Info("skipping state migration since it's already done")
+		return false, nil
+	}
+
+	state.Tables = make(map[boilerplate.StateKey]tableState)
+
+	for _, b := range bindings {
+		if b.StateKey == "" {
+			return false, fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
+		}
+
+		var res resource
+		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
+			return false, fmt.Errorf("parsing resource config: %w", err)
+		}
+
+		ll := log.WithFields(log.Fields{
+			"stateKey": b.StateKey,
+			"table":    res.Table,
+		})
+
+		stateFromOldTables, ok := state.OldTables[res.Table]
+		if !ok {
+			// This may happen if the connector has never emitted any checkpoints.
+			ll.Warn("no state found for binding while migrating state")
+			continue
+		}
+
+		state.Tables[boilerplate.StateKey(b.StateKey)] = stateFromOldTables
+		ll.Info("migrated binding state")
+	}
+
+	state.OldTables = nil
+
+	return true, nil
 }
 
 type tableState struct {
@@ -50,23 +93,24 @@ type capture struct {
 	state captureState
 }
 
-func (c *capture) getSegmentState(table string, segment int) segmentState {
+func (c *capture) getSegmentState(sk boilerplate.StateKey, segment int) segmentState {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	return c.state.Tables[table].BackfillSegmentProgress[segment]
+	return c.state.Tables[sk].BackfillSegmentProgress[segment]
 }
 
-func (c *capture) getSequenceState(table string, shardId string) shardState {
+func (c *capture) getSequenceState(sk boilerplate.StateKey, shardId string) shardState {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	return c.state.Tables[table].Shards[shardId]
+	return c.state.Tables[sk].Shards[shardId]
 }
 
-func (c *capture) initializeTable(ctx context.Context, binding int, tableName string, configuredRcus int) (*table, error) {
+func (c *capture) initializeTable(ctx context.Context, binding int, tableName string, sk boilerplate.StateKey, configuredRcus int) (*table, error) {
 	t := &table{
 		tableName:  tableName,
+		stateKey:   sk,
 		bindingIdx: binding,
 	}
 
@@ -93,7 +137,7 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 		log.WithField("table", tableName).Info("no RCU limit set for the table and no provisioned limit detected; backfills will use unlimited RCUs")
 	}
 
-	tableState := c.state.Tables[t.tableName]
+	tableState := c.state.Tables[sk]
 
 	if tableState.Shards == nil {
 		// Never emitted a document from reading a shard.
@@ -170,7 +214,7 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 		t.scanLimitFromConfig = c.config.Advanced.ScanLimit
 	}
 
-	c.state.Tables[t.tableName] = tableState
+	c.state.Tables[sk] = tableState
 
 	return t, nil
 }
@@ -290,7 +334,7 @@ var dynamoOpsToChangeOps = map[streamTypes.OperationType]string{
 
 func (c *capture) emitBackfill(
 	binding int,
-	tableName string,
+	sk boilerplate.StateKey,
 	segment int,
 	segmentState segmentState,
 	records []map[string]types.AttributeValue,
@@ -320,7 +364,7 @@ func (c *capture) emitBackfill(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.state.Tables[tableName].BackfillSegmentProgress[segment] = segmentState
+	c.state.Tables[sk].BackfillSegmentProgress[segment] = segmentState
 
 	if err := c.stream.Documents(binding, docs...); err != nil {
 		return fmt.Errorf("outputting backfill documents: %w", err)
@@ -333,7 +377,7 @@ func (c *capture) emitBackfill(
 
 func (c *capture) emitStream(
 	binding int,
-	tableName string,
+	sk boilerplate.StateKey,
 	shardId string,
 	shardState shardState,
 	records []streamTypes.Record,
@@ -413,7 +457,7 @@ func (c *capture) emitStream(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.state.Tables[tableName].Shards[shardId] = shardState
+	c.state.Tables[sk].Shards[shardId] = shardState
 
 	if err := c.stream.Documents(binding, docs...); err != nil {
 		return fmt.Errorf("outputting stream documents: %w", err)
