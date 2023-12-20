@@ -77,6 +77,9 @@ func (c *config) SetDefaults() {
 
 // ToURI converts the Config to a DSN string.
 func (c *config) ToURI() string {
+	var trueString = "true"
+	var jsonString = "json"
+
 	// Build a DSN connection string.
 	var cfg = &sf.Config{
 		Account:   c.Account,
@@ -85,13 +88,15 @@ func (c *config) ToURI() string {
 		Password:  c.Password,
 		Database:  c.Database,
 		Warehouse: c.Warehouse,
-		Params:    make(map[string]*string),
+		Params: map[string]*string{
+			// client_session_keep_alive causes the driver to issue a periodic keepalive request.
+			// Without this, the authentication token will expire after 4 hours of inactivity.
+			"client_session_keep_alive": &trueString,
+			// Return query results as individual JSON documents representing rows rather than
+			// as *batches* of Arrow records.
+			"GO_QUERY_RESULT_FORMAT": &jsonString,
+		},
 	}
-
-	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
-	// Without this, the authentication token will expire after 4 hours of inactivity.
-	var trueString = "true"
-	cfg.Params["client_session_keep_alive"] = &trueString
 
 	dsn, err := sf.DSN(cfg)
 	if err != nil {
