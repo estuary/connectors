@@ -1,5 +1,5 @@
 {
-  "type": ["null", "object"],
+  "type": ["object"],
   "properties": {
     "user": {
       "type": ["null", "object"],
@@ -23,8 +23,7 @@
       "type": ["null", "object"],
       "properties": {
         "gid": { "type": ["null", "string"] },
-        "resource_type": { "type": ["null", "string"] },
-        "name": "Bug Task"
+        "resource_type": { "type": ["null", "string"] }
       }
     },
     "created_at": { "type": ["null", "string"], "format": "date-time" },

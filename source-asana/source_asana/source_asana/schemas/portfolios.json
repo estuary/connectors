@@ -1,5 +1,5 @@
 {
-  "type": ["null", "object"],
+  "type": ["object"],
   "properties": {
     "gid": { "type": ["null", "string"] },
     "resource_type": { "type": ["null", "string"] },
