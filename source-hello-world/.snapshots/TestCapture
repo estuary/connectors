@@ -1,5 +1,5 @@
 # ================================
-# Collection "hellCollection": 6 Documents
+# Collection "helloCollection": 6 Documents
 # ================================
 {"ts":"<TIMESTAMP>","message":"Hello 0"}
 {"ts":"<TIMESTAMP>","message":"Hello 1"}
@@ -10,5 +10,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"cursor":6}
+{"bindingStateV1":{"helloStateKey":6}}
 
