@@ -17,10 +17,53 @@ import (
 
 type captureState struct {
 	// Mapping of binding names to how far along they have read.
-	BackfilledUntil map[string]time.Time `json:"backfilledUntil,omitempty"`
+	BackfilledUntil    map[boilerplate.StateKey]time.Time `json:"bindingStateV1,omitempty"`
+	OldBackfilledUntil map[string]time.Time               `json:"backfilledUntil,omitempty"` // TODO(whb): Remove once all captures have migrated.
+}
+
+func migrateState(state *captureState, bindings []*pf.CaptureSpec_Binding) (bool, error) {
+	if state.BackfilledUntil != nil && state.OldBackfilledUntil != nil {
+		return false, fmt.Errorf("application error: both BackfilledUntil and OldBackfilledUntil were non-nil")
+	} else if state.BackfilledUntil != nil {
+		log.Info("skipping state migration since it's already done")
+		return false, nil
+	}
+
+	state.BackfilledUntil = make(map[boilerplate.StateKey]time.Time)
+
+	for _, b := range bindings {
+		if b.StateKey == "" {
+			return false, fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
+		}
+
+		var res resource
+		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
+			return false, fmt.Errorf("parsing resource config: %w", err)
+		}
+
+		ll := log.WithFields(log.Fields{
+			"stateKey": b.StateKey,
+			"name":     res.Name,
+		})
+
+		stateFromOld, ok := state.OldBackfilledUntil[res.Name]
+		if !ok {
+			// This may happen if the connector has never emitted any checkpoints.
+			ll.Warn("no state found for binding while migrating state")
+			continue
+		}
+
+		state.BackfilledUntil[boilerplate.StateKey(b.StateKey)] = stateFromOld
+		ll.Info("migrated binding state")
+	}
+
+	state.OldBackfilledUntil = nil
+
+	return true, nil
 }
 
 type resourceState struct {
+	stateKey     boilerplate.StateKey
 	startDate    time.Time
 	bindingIndex int
 }
@@ -40,6 +83,11 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		}
 	}
 
+	migrated, err := migrateState(&checkpoint, open.Capture.Bindings)
+	if err != nil {
+		return err
+	}
+
 	resourceStates := make(map[string]*resourceState)
 	for idx, binding := range open.Capture.Bindings {
 		var res resource
@@ -48,13 +96,14 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		}
 
 		resourceState := &resourceState{
+			stateKey:     boilerplate.StateKey(binding.StateKey),
 			bindingIndex: idx,
 			startDate:    cfg.StartDate,
 		}
 
 		// If we have persisted a checkpoint indicating progress for this resource, use that instead
 		// of the configured startDate.
-		if got, ok := checkpoint.BackfilledUntil[res.Name]; ok {
+		if got, ok := checkpoint.BackfilledUntil[boilerplate.StateKey(binding.StateKey)]; ok {
 			resourceState.startDate = got
 			log.WithFields(log.Fields{
 				"Name":      res.Name,
@@ -63,6 +112,18 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		}
 
 		resourceStates[res.Name] = resourceState
+	}
+
+	if err := stream.Ready(false); err != nil {
+		return err
+	}
+
+	if migrated {
+		if cp, err := json.Marshal(checkpoint); err != nil {
+			return fmt.Errorf("error serializing checkpoint %q: %w", checkpoint, err)
+		} else if err := stream.Checkpoint(cp, false); err != nil {
+			return fmt.Errorf("updating migrated checkpoint: %w", err)
+		}
 	}
 
 	var capture = &capture{
@@ -82,11 +143,6 @@ type capture struct {
 }
 
 func (c *capture) Run() error {
-	// Notify Flow that we're starting.
-	if err := c.stream.Ready(false); err != nil {
-		return err
-	}
-
 	var eg, ctx = errgroup.WithContext(c.stream.Context())
 
 	// Capture each resource.
@@ -120,6 +176,7 @@ func (c *capture) captureResource(ctx context.Context, name string, r *resourceS
 		symbols:      c.config.GetSymbols(),
 		feed:         c.config.Feed,
 		freePlan:     c.config.Advanced.IsFreePlan,
+		stateKey:     r.stateKey,
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)

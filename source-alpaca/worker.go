@@ -42,6 +42,7 @@ type alpacaWorker struct {
 	symbols      []string
 	feed         string
 	freePlan     bool
+	stateKey     boilerplate.StateKey
 }
 
 func (c *alpacaWorker) handleDocuments(docs <-chan tradeDocument, checkpointJSON []byte) error {
@@ -242,8 +243,8 @@ func (c *alpacaWorker) doBackfill(ctx context.Context, startLimit, endLimit time
 		eg := errgroup.Group{}
 		eg.Go(func() error {
 			checkpoint := captureState{
-				BackfilledUntil: map[string]time.Time{
-					c.resourceName: end,
+				BackfilledUntil: map[boilerplate.StateKey]time.Time{
+					c.stateKey: end,
 				},
 			}
 

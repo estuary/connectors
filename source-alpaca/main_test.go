@@ -148,8 +148,7 @@ func TestCaptureMultipleBindings(t *testing.T) {
 
 	capture := captureSpec(t,
 		[]string{"first", "second"},
-		// BRK-B does not have trades in this time period.
-		[]string{"AAPL", "MSFT", "AMZN", "BRK-B"},
+		[]string{"AAPL", "MSFT", "AMZN"},
 		start,
 		end,
 		&st.SortedCaptureValidator{},
@@ -267,6 +266,8 @@ func makeBindings(t testing.TB, names []string, start, end time.Time) []*flow.Ca
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
 			ResourceConfigJson: json.RawMessage(specBytes),
 			ResourcePath:       []string{name},
+			Collection:         flow.CollectionSpec{Name: flow.Collection(fmt.Sprintf("acmeCo/test/%s", name))},
+			StateKey:           name,
 		})
 	}
 	return bindings
