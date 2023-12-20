@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"sync"
@@ -114,11 +115,14 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("parsing config json: %w", err)
 	}
 
-	var stateMap = make(stateMap)
+	var state captureState
 	if open.StateJson != nil {
-		if err := pf.UnmarshalStrict(open.StateJson, &stateMap); err != nil {
+		if err := json.Unmarshal(open.StateJson, &state); err != nil {
 			return fmt.Errorf("parsing state file: %w", err)
 		}
+	}
+	if state.Streams == nil {
+		state.Streams = make(map[boilerplate.StateKey]map[string]string)
 	}
 
 	client, err := connect(&config)
@@ -139,18 +143,22 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		shardRange.KeyEnd = math.MaxUint32
 	}
 
+	stateKeys := make([]boilerplate.StateKey, len(open.Capture.Bindings))
 	var waitGroup = new(sync.WaitGroup)
 	for i, binding := range open.Capture.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("error parsing resource config: %w", err)
 		}
-		streamState, err := copyStreamState(stateMap, res.Stream)
-		if err != nil {
-			return fmt.Errorf("invalid state for stream %s: %w", res.Stream, err)
+
+		sk := boilerplate.StateKey(binding.StateKey)
+		if _, ok := state.Streams[sk]; !ok {
+			state.Streams[sk] = make(map[string]string)
 		}
+		stateKeys[i] = sk
+
 		waitGroup.Add(1)
-		go readStream(ctx, shardRange, client, i, res.Stream, streamState, dataCh, waitGroup)
+		go readStream(ctx, shardRange, client, i, res.Stream, maps.Clone(state.Streams[sk]), dataCh, waitGroup)
 	}
 
 	go closeChannelWhenDone(dataCh, waitGroup)
@@ -172,9 +180,11 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 				break
 			}
 		}
-		updateState(stateMap, next.source, next.sequenceNumber)
 
-		stateRaw, err := json.Marshal(stateMap)
+		sk := stateKeys[next.source.bindingIndex]
+		state.Streams[sk][next.source.shardID] = next.sequenceNumber
+
+		stateRaw, err := json.Marshal(state)
 		if err != nil {
 			break
 		}
@@ -199,34 +209,12 @@ func main() {
 	boilerplate.RunMain(new(driver))
 }
 
-func updateState(state map[string]map[string]string, source *recordSource, sequenceNumber string) {
-	var streamMap, ok = state[source.stream]
-	if !ok {
-		streamMap = make(map[string]string)
-		state[source.stream] = streamMap
-	}
-	streamMap[source.shardID] = sequenceNumber
-}
-
-func copyStreamState(state map[string]map[string]string, stream string) (map[string]string, error) {
-	var dest = make(map[string]string)
-	// Is there an entry for this stream
-	if ss, ok := state[stream]; ok {
-		for k, v := range ss {
-			dest[k] = v
-		}
-	}
-	return dest, nil
-}
-
 func closeChannelWhenDone(dataCh chan readResult, waitGroup *sync.WaitGroup) {
 	waitGroup.Wait()
 	log.Info("All reads have completed")
 	close(dataCh)
 }
 
-type stateMap map[string]map[string]string
-
-func (s stateMap) Validate() error {
-	return nil // No-op.
+type captureState struct {
+	Streams map[boilerplate.StateKey]map[string]string `json:"bindingStateV1,omitempty"`
 }
