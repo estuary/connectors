@@ -391,6 +391,15 @@ func (c *capture) emitStream(
 			}
 		}
 
+		// Map an explicit NULL for any fields that existed in the prior record but are now absent
+		// in the current record. This is to allow a top-level merge reduction strategy in the
+		// output documents to appropriately represent deleted fields.
+		for field := range beforeRecord {
+			if _, ok := doc[field]; !ok {
+				doc[field] = nil
+			}
+		}
+
 		doc["_meta"] = meta
 
 		raw, err := json.Marshal(doc)
