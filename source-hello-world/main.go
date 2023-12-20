@@ -45,14 +45,19 @@ type message struct {
 }
 
 type state struct {
-	Cursor int `json:"cursor"` // The last message generated
+	Cursors map[boilerplate.StateKey]int `json:"bindingStateV1,omitempty"` // The last message generated for each binding.
 }
 
 type capture struct {
 	Stream   *boilerplate.PullOutput
-	Bindings []resource
+	Bindings []binding
 	Config   config
 	State    state
+}
+
+type binding struct {
+	res      resource
+	stateKey boilerplate.StateKey
 }
 
 type driver struct{}
@@ -140,19 +145,25 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 			return fmt.Errorf("parsing driver checkpoint: %w", err)
 		}
 	}
+	if checkpoint.Cursors == nil {
+		checkpoint.Cursors = make(map[boilerplate.StateKey]int)
+	}
 
-	var resources []resource
-	for _, binding := range open.Capture.Bindings {
+	var bindings []binding
+	for _, b := range open.Capture.Bindings {
 		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
-		resources = append(resources, res)
+		bindings = append(bindings, binding{
+			res:      res,
+			stateKey: boilerplate.StateKey(b.StateKey),
+		})
 	}
 
 	var capture = &capture{
 		Stream:   stream,
-		Bindings: resources,
+		Bindings: bindings,
 		Config:   cfg,
 		State:    checkpoint,
 	}
@@ -174,7 +185,8 @@ func (c *capture) Run() error {
 		}
 
 		for idx, binding := range c.Bindings {
-			var text = strings.Replace(binding.Prefix, "{}", strconv.Itoa(c.State.Cursor), -1)
+			var cursor = c.State.Cursors[binding.stateKey]
+			var text = strings.Replace(binding.res.Prefix, "{}", strconv.Itoa(cursor), -1)
 			var doc = &message{
 				Timestamp: time.Now(),
 				Message:   text,
@@ -185,8 +197,8 @@ func (c *capture) Run() error {
 			} else if err := c.Stream.Documents(idx, json.RawMessage(bs)); err != nil {
 				return err
 			}
+			c.State.Cursors[binding.stateKey]++
 		}
-		c.State.Cursor++
 
 		checkpointJsonBytes, err := json.Marshal(c.State)
 		if err != nil {
