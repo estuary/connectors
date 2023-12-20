@@ -5,7 +5,7 @@
 {"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"pk":"backfill","string":"value"}
 {"_meta":{"eventId":"<UUID>","op":"c","approximateCreationDateTime":"<TIMESTAMP>"},"pk":"stream","string":"initial"}
 {"_meta":{"eventId":"<UUID>","op":"u","approximateCreationDateTime":"<TIMESTAMP>","before":{"pk":"stream","string":"initial"}},"pk":"stream","string":"updated"}
-{"_meta":{"eventId":"<UUID>","op":"d","approximateCreationDateTime":"<TIMESTAMP>","before":{"pk":"stream","string":"updated"}},"pk":"stream"}
+{"_meta":{"eventId":"<UUID>","op":"d","approximateCreationDateTime":"<TIMESTAMP>","before":{"pk":"stream","string":"updated"}},"pk":"stream","string":null}
 # ================================
 # Final State Checkpoint
 # ================================
