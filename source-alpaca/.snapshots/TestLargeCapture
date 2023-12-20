@@ -5,5 +5,5 @@ Checksum: 964cc712661bab9ddb51fae85cd841cc55405ec46db8cd7b476887c130752af6
 # ================================
 # Final State Checkpoint
 # ================================
-{"backfilledUntil":{"trades":"2022-12-17T00:00:00Z"}}
+{"bindingStateV1":{"trades":"2022-12-17T00:00:00Z"}}
 
