@@ -4,9 +4,13 @@ connectionSpecification:
   title: Zoom Spec
   type: object
   required:
-    - client_id
-    - client_secret
     - credentials
+  properties:
+    credentials:
+      - account_id
+      - client_id
+      - client_secret
+      - authorization_endpoint
   additionalProperties: true
   properties:
       client_id:
