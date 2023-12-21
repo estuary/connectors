@@ -49,7 +49,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		// removed once the database-specific discovery code in MySQL and SQL Server
 		// connectors can safely filter these out at the source.
 		if !table.BaseTable {
-			logEntry.Warn("ignoring view or other non-BASE TABLE entity in discovery")
+			logEntry.Info("excluding view or other non-BASE TABLE entity from catalog discovery")
 			continue
 		}
 
@@ -57,7 +57,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		// tables to be filtered out of discovered catalogs while still allowing other
 		// connector-internal uses of the data to see the tables.
 		if table.OmitBinding {
-			logEntry.Warn("ignoring table because OmitBinding is set")
+			logEntry.Debug("excluding table from catalog discovery because OmitBinding is set")
 			continue
 		}
 
@@ -69,13 +69,12 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		for _, column := range table.Columns {
 			var jsonType, err = db.TranslateDBToJSONType(column)
 			if err != nil {
+				// Unhandled types are translated to the catch-all schema {} but with
+				// a description clarifying that we don't have a better translation.
 				logrus.WithFields(logrus.Fields{
 					"error": err,
 					"type":  column.DataType,
-				}).Warn("error translating column type to JSON schema")
-
-				// Logging an error from the connector is nice, but can be swallowed by `flowctl-go`.
-				// Putting an error in the generated schema is ugly, but makes the failure visible.
+				}).Debug("error translating column type to JSON schema")
 				properties[column.Name] = &jsonschema.Schema{
 					Description: fmt.Sprintf("using catch-all schema: %v", err),
 				}
