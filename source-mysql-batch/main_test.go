@@ -183,6 +183,7 @@ func discoverStreams(ctx context.Context, t testing.TB, cs *st.CaptureSpec, matc
 				Key:            discovered.Key,
 			},
 			ResourcePath: []string{res.Name},
+			StateKey:     res.Name,
 		})
 	}
 	return bindings
