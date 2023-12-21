@@ -438,6 +438,10 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 	for idx := range vals {
 		vptrs[idx] = &vals[idx]
 	}
+	ctypes, err := rows.ColumnTypes()
+	if err != nil {
+		return err
+	}
 
 	// Snowflake represents a row update as a pair of an insert and a delete with
 	// the same `METADATA$ROW_ID` value and `METADATA$ISUPDATE` set to true. This
@@ -458,7 +462,11 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 		}
 		var fields = make(map[string]any)
 		for idx, name := range cnames {
-			fields[name] = vals[idx]
+			var val, err = translateFieldValue(vals[idx], ctypes[idx])
+			if err != nil {
+				return fmt.Errorf("error translating field %q: %w", name, err)
+			}
+			fields[name] = val
 		}
 		logEntry.WithField("fields", fields).Trace("got change")
 
@@ -627,6 +635,40 @@ func (c *capture) captureStagingTable(ctx context.Context, table snowflakeObject
 		return err
 	}
 	return nil
+}
+
+func translateFieldValue(x any, ctype *sql.ColumnType) (any, error) {
+	var dbType = ctype.DatabaseTypeName()
+	switch x := x.(type) {
+	case string:
+		switch dbType {
+		case "FIXED":
+			_, scale, ok := ctype.DecimalSize()
+			if !ok {
+				return nil, fmt.Errorf("internal error: decimal size unknown")
+			}
+			if scale == 0 {
+				return strconv.ParseInt(x, 10, 64)
+			}
+			return strconv.ParseFloat(x, 64)
+		case "BOOLEAN":
+			if x == "0" {
+				return false, nil
+			} else if x == "1" {
+				return true, nil
+			} else {
+				return nil, fmt.Errorf("unexpected boolean value %#v", x)
+			}
+		case "REAL":
+			return strconv.ParseFloat(x, 64)
+		case "VARIANT", "OBJECT", "ARRAY":
+			if json.Valid([]byte(x)) {
+				return json.RawMessage(x), nil
+			}
+			return x, nil
+		}
+	}
+	return x, nil
 }
 
 func (c *capture) emitDocument(ctx context.Context, table snowflakeObject, document any) error {
