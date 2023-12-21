@@ -2,11 +2,98 @@ package filesource
 
 import (
 	"encoding/json"
+	"net/url"
 	"testing"
 	"time"
 
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
+
+func TestUnmarshalState(t *testing.T) {
+	mustMarshal := func(t *testing.T, in any) json.RawMessage {
+		t.Helper()
+		bytes, err := json.Marshal(in)
+		require.NoError(t, err)
+		return bytes
+	}
+
+	mustParseTime := func(t *testing.T, in string) *time.Time {
+		t.Helper()
+		parsed, err := time.Parse(time.RFC3339Nano, in)
+		require.NoError(t, err)
+		return &parsed
+	}
+
+	easyResource := resource{Stream: "easy"}
+	easyBinding := &pf.CaptureSpec_Binding{
+		ResourceConfigJson: mustMarshal(t, easyResource),
+		ResourcePath:       []string{easyResource.Stream},
+		StateKey:           url.QueryEscape(easyResource.Stream),
+	}
+
+	normalResource := resource{Stream: "/some/path/to/data"}
+	normalBinding := &pf.CaptureSpec_Binding{
+		ResourceConfigJson: mustMarshal(t, normalResource),
+		ResourcePath:       []string{normalResource.Stream},
+		StateKey:           url.QueryEscape(normalResource.Stream),
+	}
+
+	hardResource := resource{Stream: ` Cr@\/z/Y-_-Inp3#t!1! 😼 `}
+	hardBinding := &pf.CaptureSpec_Binding{
+		ResourceConfigJson: mustMarshal(t, hardResource),
+		ResourcePath:       []string{hardResource.Stream},
+		StateKey:           url.QueryEscape(hardResource.Stream),
+	}
+
+	bindings := []*pf.CaptureSpec_Binding{easyBinding, normalBinding, hardBinding}
+
+	originalState := map[string]State{
+		easyResource.Stream: {
+			MinBound: *mustParseTime(t, "2023-02-03T04:05:06Z"),
+			MaxBound: nil,
+			MaxMod:   nil,
+			Path:     "/some/path",
+			Records:  10,
+			Complete: false,
+		},
+		normalResource.Stream: {
+			MinBound: *mustParseTime(t, "2022-02-03T04:05:06Z"),
+			MaxBound: mustParseTime(t, "2023-02-03T07:08:09Z"),
+			MaxMod:   mustParseTime(t, "2023-02-03T07:08:08Z"),
+			Path:     "/another/path",
+			Records:  20,
+			Complete: true,
+		},
+		hardResource.Stream: {
+			MinBound: *mustParseTime(t, "2021-02-03T04:05:06Z"),
+			MaxBound: nil,
+			MaxMod:   nil,
+			Path:     "",
+			Records:  0,
+			Complete: false,
+		},
+	}
+
+	want := CaptureState{
+		States: map[boilerplate.StateKey]State{
+			boilerplate.StateKey(easyBinding.StateKey):   originalState[easyResource.Stream],
+			boilerplate.StateKey(normalBinding.StateKey): originalState[normalResource.Stream],
+			boilerplate.StateKey(hardBinding.StateKey):   originalState[hardResource.Stream],
+		},
+	}
+
+	initial, migrated, err := unmarshalState(mustMarshal(t, originalState), bindings)
+	require.NoError(t, err)
+	require.True(t, migrated)
+	require.Equal(t, want, initial)
+
+	next, migrated, err := unmarshalState(mustMarshal(t, initial), bindings)
+	require.NoError(t, err)
+	require.False(t, migrated)
+	require.Equal(t, want, next)
+}
 
 func TestNoFiles(t *testing.T) {
 	var s State
