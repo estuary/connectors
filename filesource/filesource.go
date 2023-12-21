@@ -244,9 +244,11 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 
 	var conn = connector{config: cfg, store: store}
 
-	var states = make(States)
+	var captureState CaptureState
+	var migrated bool
 	if open.StateJson != nil {
-		if err := pf.UnmarshalStrict(open.StateJson, &states); err != nil {
+		captureState, migrated, err = unmarshalState(open.StateJson, open.Capture.Bindings)
+		if err != nil {
 			return fmt.Errorf("parsing state checkpoint: %w", err)
 		}
 	}
@@ -265,6 +267,14 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 		return err
 	}
 
+	if migrated {
+		if encodedCheckpoint, err := json.Marshal(captureState); err != nil {
+			return err
+		} else if err := stream.Checkpoint(encodedCheckpoint, false); err != nil {
+			return err
+		}
+	}
+
 	grp, ctx := errgroup.WithContext(ctx)
 	for i, binding := range open.Capture.Bindings {
 		// Stream names represent an absolute path prefix to capture.
@@ -272,8 +282,9 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("error parsing resource config: %w", err)
 		}
+		var sk = boilerplate.StateKey(binding.StateKey)
 		var prefix = res.Stream
-		var state = states[prefix]
+		var state = captureState.States[sk]
 
 		state.startSweep(horizon)
 
@@ -283,6 +294,7 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 			stream:    stream,
 			pathRe:    pathRe,
 			prefix:    prefix,
+			stateKey:  sk,
 			schema:    binding.Collection.WriteSchemaJson,
 			state:     state,
 			range_:    open.Range,
@@ -310,13 +322,14 @@ func (src *Source) Main() {
 type reader struct {
 	*connector
 
-	pathRe  *regexp.Regexp
-	prefix  string
-	schema  json.RawMessage
-	state   State
-	binding int
-	stream  *boilerplate.PullOutput
-	range_  *pf.RangeSpec
+	pathRe   *regexp.Regexp
+	prefix   string
+	stateKey boilerplate.StateKey
+	schema   json.RawMessage
+	state    State
+	binding  int
+	stream   *boilerplate.PullOutput
+	range_   *pf.RangeSpec
 }
 
 func (r *reader) sweep(ctx context.Context) error {
@@ -454,8 +467,10 @@ func (r *reader) emit(lines []json.RawMessage) error {
 		}
 	}
 
-	var statePatch = map[string]State{
-		r.prefix: r.state,
+	var statePatch = CaptureState{
+		States: map[boilerplate.StateKey]State{
+			r.stateKey: r.state,
+		},
 	}
 
 	if encodedCheckpoint, err := json.Marshal(statePatch); err != nil {
