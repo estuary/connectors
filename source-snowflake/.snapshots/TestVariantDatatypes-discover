@@ -1,56 +1,26 @@
 Binding 0:
 {
-    "recommended_name": "test_basicdatatypes_77528227",
+    "recommended_name": "test_variantdatatypes_13308929",
     "resource_config_json": {
       "schema": "PUBLIC",
-      "table": "test_BasicDatatypes_77528227"
+      "table": "test_VariantDatatypes_13308929"
     },
     "document_schema_json": {
       "$defs": {
-        "Test_BasicDatatypes_77528227": {
+        "Test_VariantDatatypes_13308929": {
           "type": "object",
-          "required": [
-            "ID"
-          ],
-          "$anchor": "Test_BasicDatatypes_77528227",
+          "$anchor": "Test_VariantDatatypes_13308929",
           "properties": {
-            "BDATA": {
-              "contentEncoding": "base64",
+            "A": {},
+            "B": {
               "type": [
-                "string",
+                "object",
                 "null"
               ]
             },
-            "BIT": {
+            "C": {
               "type": [
-                "boolean",
-                "null"
-              ]
-            },
-            "DATA": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "FDATA": {
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "ID": {
-              "type": "integer"
-            },
-            "X": {
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "Y": {
-              "type": [
-                "number",
+                "array",
                 "null"
               ]
             }
@@ -71,7 +41,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#Test_BasicDatatypes_77528227",
+                  "$ref": "#Test_VariantDatatypes_13308929",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -132,12 +102,9 @@ Binding 0:
           }
         },
         {
-          "$ref": "#Test_BasicDatatypes_77528227"
+          "$ref": "#Test_VariantDatatypes_13308929"
         }
       ]
-    },
-    "key": [
-      "/ID"
-    ]
+    }
   }
 

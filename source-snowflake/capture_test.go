@@ -27,10 +27,10 @@ func TestSimpleCapture(t *testing.T) {
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
-	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
+	tb.Insert(ctx, t, tableName, [][]any{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	t.Run("init", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
 
-	tb.Insert(ctx, t, tableName, [][]interface{}{{6, "F"}, {7, "ggg"}, {8, "QRSTUVWXYZ"}, {9, "Ten"}, {10, "11"}})
+	tb.Insert(ctx, t, tableName, [][]any{{6, "F"}, {7, "ggg"}, {8, "QRSTUVWXYZ"}, {9, "Ten"}, {10, "11"}})
 	t.Run("main", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
 }
 
@@ -46,28 +46,63 @@ func TestLongTableNames(t *testing.T) {
 	var tableName = tb.CreateTable(ctx, t, tableSuffix, "(id INTEGER PRIMARY KEY, data TEXT)")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
-	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
+	tb.Insert(ctx, t, tableName, [][]any{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	t.Run("init", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
 
-	tb.Insert(ctx, t, tableName, [][]interface{}{{6, "F"}, {7, "ggg"}, {8, "QRSTUVWXYZ"}, {9, "Ten"}, {10, "11"}})
+	tb.Insert(ctx, t, tableName, [][]any{{6, "F"}, {7, "ggg"}, {8, "QRSTUVWXYZ"}, {9, "Ten"}, {10, "11"}})
 	t.Run("main", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
 }
 
 func TestBasicDatatypes(t *testing.T) {
 	var ctx, tb = context.Background(), snowflakeTestBackend(t)
 	var uniqueID = "77528227"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER, data TEXT, bdata VARBINARY, fdata FLOAT, bit BOOLEAN, ymd DATE, hms TIME, tstz TIMESTAMP_TZ, tsntz TIMESTAMP_NTZ)")
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT, bdata VARBINARY, fdata FLOAT, bit BOOLEAN, x NUMBER(4, 0), y NUMBER(4, 2))")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	t.Run("discover", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
+
+	tb.Insert(ctx, t, tableName, [][]any{
+		{0, "abcd", []byte{0xFF, 0xA5, 0x00, 0x5A}, 1.32, true, 9999, 99.99},
+		{1, "", []byte{0x00}, 0, true, -1, -0.01},
+		{2, nil, nil, nil, nil, nil, nil},
+	})
+	t.Run("init", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
+
+	tb.Insert(ctx, t, tableName, [][]any{
+		{3, "DCBA", []byte{0xEE, 0x5A, 0x11, 0xA5}, 2.64, false, 0, 0},
+		{4, "    ", []byte{0xFF}, 0.00001, false, -9999, 99.999},
+		{5, nil, nil, nil, nil, nil, nil},
+	})
+	t.Run("main", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
+}
+
+func TestTimestampDatatypes(t *testing.T) {
+	var ctx, tb = context.Background(), snowflakeTestBackend(t)
+	var uniqueID = "38028141"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(ymd DATE, hms TIME, tstz TIMESTAMP_TZ, tsntz TIMESTAMP_NTZ)")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	t.Run("discover", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
 
 	var x = "1991-08-31T09:25:27Z"
-	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "abcd", []byte{0xFF, 0xA5, 0x00, 0x5A}, 1.32, true, "1991-08-31", "09:25:27", x, x}})
-	t.Run("init", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
-
 	var y = "1991-11-25T06:13:44Z"
-	tb.Insert(ctx, t, tableName, [][]interface{}{{1, "DCBA", []byte{0xEE, 0x5A, 0x11, 0xA5}, 2.64, false, "1991-11-25", "06:13:44", y, y}})
-	t.Run("main", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
+	tb.Insert(ctx, t, tableName, [][]any{{"1991-08-31", "09:25:27", x, x}})
+	tb.Insert(ctx, t, tableName, [][]any{{"1991-11-25", "06:13:44", y, y}})
+	t.Run("capture", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
+}
+
+func TestVariantDatatypes(t *testing.T) {
+	var ctx, tb = context.Background(), snowflakeTestBackend(t)
+	var uniqueID = "13308929"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(a VARIANT, b OBJECT, c ARRAY)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	t.Run("discover", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
+
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s SELECT 'hello'::VARIANT, object_construct('foo', 123), array_construct(1, 2, 3)`, tableName))
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s SELECT 321, object_construct(), array_construct()`, tableName))
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s SELECT NULL, NULL, NULL`, tableName))
+	t.Run("capture", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
 }
 
 func TestLargeCapture(t *testing.T) {
