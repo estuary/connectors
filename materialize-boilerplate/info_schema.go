@@ -200,12 +200,5 @@ func (i *InfoSchema) AmbiguousResourcePaths(resourcePaths [][]string) [][]string
 }
 
 func joinPath(in []string) string {
-	var out strings.Builder
-	for idx := range in {
-		out.WriteString(string(in[idx]))
-		if idx != len(in)-1 {
-			out.WriteString(".")
-		}
-	}
-	return out.String()
+	return strings.Join(in, ".")
 }
