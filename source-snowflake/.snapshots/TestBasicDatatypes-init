@@ -1,7 +1,9 @@
 # ================================
-# Collection "acmeCo/test/test_basicdatatypes_77528227": 1 Documents
+# Collection "acmeCo/test/test_basicdatatypes_77528227": 3 Documents
 # ================================
-{"BDATA":"/6UAWg==","BIT":"1","DATA":"abcd","FDATA":"1.32","HMS":"0001-01-01T09:25:27Z","ID":"0","TSNTZ":"1991-08-31T09:25:27Z","TSTZ":"1991-08-31T09:25:27Z","YMD":"1991-08-31T00:00:00Z","_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_BasicDatatypes_77528227","seq":0,"off":0}}}
+{"BDATA":"/6UAWg==","BIT":true,"DATA":"abcd","FDATA":1.32,"ID":0,"X":9999,"Y":99.99,"_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_BasicDatatypes_77528227","seq":0,"off":0}}}
+{"BDATA":"AA==","BIT":true,"DATA":"","FDATA":0,"ID":1,"X":-1,"Y":-0.01,"_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_BasicDatatypes_77528227","seq":0,"off":1}}}
+{"BDATA":null,"BIT":null,"DATA":null,"FDATA":null,"ID":2,"X":null,"Y":null,"_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_BasicDatatypes_77528227","seq":0,"off":2}}}
 # ================================
 # Final State Checkpoint
 # ================================
