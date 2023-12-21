@@ -424,13 +424,17 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	}
 	defer db.Close()
 
-	var resources []Resource
-	for _, binding := range open.Capture.Bindings {
+	var bindings []bindingInfo
+	for idx, binding := range open.Capture.Bindings {
 		var res Resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
-		resources = append(resources, res)
+		bindings = append(bindings, bindingInfo{
+			resource: res,
+			index:    idx,
+			stateKey: boilerplate.StateKey(binding.StateKey),
+		})
 	}
 
 	var state captureState
@@ -439,28 +443,48 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 			return fmt.Errorf("parsing state checkpoint: %w", err)
 		}
 	}
-	state, err = updateResourceStates(state, resources)
+
+	migrated, err := migrateState(&state, open.Capture.Bindings)
+	if err != nil {
+		return fmt.Errorf("migrating binding states: %w", err)
+	}
+
+	state, err = updateResourceStates(state, bindings)
 	if err != nil {
 		return fmt.Errorf("error initializing resource states: %w", err)
+	}
+
+	if err := stream.Ready(false); err != nil {
+		return err
+	}
+
+	if migrated {
+		if cp, err := json.Marshal(state); err != nil {
+			return fmt.Errorf("error serializing checkpoint: %w", err)
+		} else if err := stream.Checkpoint(cp, false); err != nil {
+			return fmt.Errorf("updating migrated checkpoint: %w", err)
+		}
 	}
 
 	var capture = &capture{
 		Config:         &cfg,
 		State:          &state,
 		DB:             db,
-		Resources:      resources,
+		Bindings:       bindings,
 		Output:         stream,
 		TranslateValue: drv.TranslateValue,
 	}
 	return capture.Run(stream.Context())
 }
 
-func updateResourceStates(prevState captureState, resources []Resource) (captureState, error) {
+func updateResourceStates(prevState captureState, bindings []bindingInfo) (captureState, error) {
 	var newState = captureState{
-		Streams: make(map[string]*streamState),
+		Streams: make(map[boilerplate.StateKey]*streamState),
 	}
-	for _, res := range resources {
-		var stream = prevState.Streams[res.Name]
+	for _, binding := range bindings {
+		var sk = binding.stateKey
+		var res = binding.resource
+		var stream = prevState.Streams[sk]
 		if stream != nil && !slices.Equal(stream.CursorNames, res.Cursor) {
 			log.WithFields(log.Fields{
 				"name": res.Name,
@@ -472,7 +496,7 @@ func updateResourceStates(prevState captureState, resources []Resource) (capture
 		if stream == nil {
 			stream = &streamState{CursorNames: res.Cursor}
 		}
-		newState.Streams[res.Name] = stream
+		newState.Streams[sk] = stream
 	}
 	return newState, nil
 }
@@ -481,13 +505,61 @@ type capture struct {
 	Config         *Config
 	State          *captureState
 	DB             *sql.DB
-	Resources      []Resource
+	Bindings       []bindingInfo
 	Output         *boilerplate.PullOutput
 	TranslateValue func(val any, databaseTypeName string) (any, error)
 }
 
+type bindingInfo struct {
+	resource Resource
+	index    int
+	stateKey boilerplate.StateKey
+}
+
 type captureState struct {
-	Streams map[string]*streamState
+	Streams    map[boilerplate.StateKey]*streamState `json:"bindingStateV1,omitempty"`
+	OldStreams map[string]*streamState               `json:"Streams,omitempty"` // TODO(whb): Remove once all captures have migrated.
+}
+
+func migrateState(state *captureState, bindings []*pf.CaptureSpec_Binding) (bool, error) {
+	if state.Streams != nil && state.OldStreams != nil {
+		return false, fmt.Errorf("application error: both Streams and OldStreams were non-nil")
+	} else if state.Streams != nil {
+		log.Info("skipping state migration since it's already done")
+		return false, nil
+	}
+
+	state.Streams = make(map[boilerplate.StateKey]*streamState)
+
+	for _, b := range bindings {
+		if b.StateKey == "" {
+			return false, fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
+		}
+
+		var res Resource
+		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
+			return false, fmt.Errorf("parsing resource config: %w", err)
+		}
+
+		ll := log.WithFields(log.Fields{
+			"stateKey": b.StateKey,
+			"name":     res.Name,
+		})
+
+		stateFromOldStreams, ok := state.OldStreams[res.Name]
+		if !ok {
+			// This may happen if the connector has never emitted any checkpoints.
+			ll.Warn("no state found for binding while migrating state")
+			continue
+		}
+
+		state.Streams[boilerplate.StateKey(b.StateKey)] = stateFromOldStreams
+		ll.Info("migrated binding state")
+	}
+
+	state.OldStreams = nil
+
+	return true, nil
 }
 
 type streamState struct {
@@ -501,21 +573,16 @@ func (s *captureState) Validate() error {
 }
 
 func (c *capture) Run(ctx context.Context) error {
-	// Notify Flow that we're starting.
-	if err := c.Output.Ready(false); err != nil {
-		return err
-	}
-
 	var eg, workerCtx = errgroup.WithContext(ctx)
-	for idx, res := range c.Resources {
+	for idx, binding := range c.Bindings {
 		if idx > 0 {
 			// Slightly stagger worker thread startup. Five seconds should be long
 			// enough for most fast queries to complete their first execution, and
 			// the hope is this reduces peak load on both the database and us.
 			time.Sleep(5 * time.Second)
 		}
-		var idx, res = idx, res // Copy for goroutine closure
-		eg.Go(func() error { return c.worker(workerCtx, idx, &res) })
+		var binding = binding // Copy for goroutine closure
+		eg.Go(func() error { return c.worker(workerCtx, &binding) })
 	}
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("capture terminated with error: %w", err)
@@ -523,7 +590,8 @@ func (c *capture) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) error {
+func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
+	var res = binding.resource
 	log.WithFields(log.Fields{
 		"name":   res.Name,
 		"tmpl":   res.Template,
@@ -537,15 +605,17 @@ func (c *capture) worker(ctx context.Context, bindingIndex int, res *Resource) e
 	}
 
 	for ctx.Err() == nil {
-		if err := c.poll(ctx, bindingIndex, queryTemplate, res); err != nil {
+		if err := c.poll(ctx, binding, queryTemplate); err != nil {
 			return fmt.Errorf("error polling table: %w", err)
 		}
 	}
 	return ctx.Err()
 }
 
-func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Template, res *Resource) error {
-	var state, ok = c.State.Streams[res.Name]
+func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template.Template) error {
+	var res = binding.resource
+	var stateKey = binding.stateKey
+	var state, ok = c.State.Streams[stateKey]
 	if !ok {
 		return fmt.Errorf("internal error: no state for stream %q", res.Name)
 	}
@@ -668,7 +738,7 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 		serializedDocument, err = shape.Encode(serializedDocument, rowValues)
 		if err != nil {
 			return fmt.Errorf("error serializing document: %w", err)
-		} else if err := c.Output.Documents(bindingIndex, serializedDocument); err != nil {
+		} else if err := c.Output.Documents(binding.index, serializedDocument); err != nil {
 			return fmt.Errorf("error emitting document: %w", err)
 		}
 
@@ -684,14 +754,14 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 
 		count++
 		if count%documentsPerCheckpoint == 0 {
-			if err := c.streamStateCheckpoint(res.Name, state); err != nil {
+			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 				return err
 			}
 		}
 	}
 
 	if count%documentsPerCheckpoint != 0 {
-		if err := c.streamStateCheckpoint(res.Name, state); err != nil {
+		if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 			return err
 		}
 	}
@@ -703,9 +773,9 @@ func (c *capture) poll(ctx context.Context, bindingIndex int, tmpl *template.Tem
 	return nil
 }
 
-func (c *capture) streamStateCheckpoint(name string, state *streamState) error {
-	var checkpointPatch = captureState{Streams: make(map[string]*streamState)}
-	checkpointPatch.Streams[name] = state
+func (c *capture) streamStateCheckpoint(sk boilerplate.StateKey, state *streamState) error {
+	var checkpointPatch = captureState{Streams: make(map[boilerplate.StateKey]*streamState)}
+	checkpointPatch.Streams[sk] = state
 
 	if checkpointJSON, err := json.Marshal(checkpointPatch); err != nil {
 		return fmt.Errorf("error serializing state checkpoint: %w", err)
