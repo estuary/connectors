@@ -393,4 +393,8 @@ var snowflakeTypeToJSON = map[string]columnSchema{
 	"TIMESTAMP_TZ":  {jsonType: "string", format: "date-time"},
 	"TIMESTAMP_NTZ": {jsonType: "string", format: "date-time"},
 	"TIMESTAMP_LTZ": {jsonType: "string", format: "date-time"},
+
+	"VARIANT": {},
+	"OBJECT":  {jsonType: "object"},
+	"ARRAY":   {jsonType: "array"},
 }

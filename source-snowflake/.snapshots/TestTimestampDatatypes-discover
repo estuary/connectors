@@ -1,56 +1,41 @@
 Binding 0:
 {
-    "recommended_name": "test_basicdatatypes_77528227",
+    "recommended_name": "test_timestampdatatypes_38028141",
     "resource_config_json": {
       "schema": "PUBLIC",
-      "table": "test_BasicDatatypes_77528227"
+      "table": "test_TimestampDatatypes_38028141"
     },
     "document_schema_json": {
       "$defs": {
-        "Test_BasicDatatypes_77528227": {
+        "Test_TimestampDatatypes_38028141": {
           "type": "object",
-          "required": [
-            "ID"
-          ],
-          "$anchor": "Test_BasicDatatypes_77528227",
+          "$anchor": "Test_TimestampDatatypes_38028141",
           "properties": {
-            "BDATA": {
-              "contentEncoding": "base64",
+            "HMS": {
+              "format": "date-time",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "BIT": {
-              "type": [
-                "boolean",
-                "null"
-              ]
-            },
-            "DATA": {
+            "TSNTZ": {
+              "format": "date-time",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "FDATA": {
+            "TSTZ": {
+              "format": "date-time",
               "type": [
-                "number",
+                "string",
                 "null"
               ]
             },
-            "ID": {
-              "type": "integer"
-            },
-            "X": {
+            "YMD": {
+              "format": "date-time",
               "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "Y": {
-              "type": [
-                "number",
+                "string",
                 "null"
               ]
             }
@@ -71,7 +56,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#Test_BasicDatatypes_77528227",
+                  "$ref": "#Test_TimestampDatatypes_38028141",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -132,12 +117,9 @@ Binding 0:
           }
         },
         {
-          "$ref": "#Test_BasicDatatypes_77528227"
+          "$ref": "#Test_TimestampDatatypes_38028141"
         }
       ]
-    },
-    "key": [
-      "/ID"
-    ]
+    }
   }
 
