@@ -16,9 +16,9 @@ shim_airbyte_cdk.CaptureShim(
         "provider": "zoom",
         "authUrlTemplate": (
             f"https://zoom.us/oauth/authorize?"
-            f"response_type=code&"
-            f"client_id={wrap_with_braces('client_id',3)}&"
-            f"redirect_uri={wrap_with_braces('redirect_uri',3)}"
+            r"client_id={{ client_id }}&"
+            r"redirect_uri={{#urlencode}}{{{ redirect_uri }}}/{{/urlencode}}&"
+            "response_type=code"
         ),
         "accessTokenHeaders": {
             "Authorization": "Basic {{#basicauth}}{{{ client_id }}}:{{{client_secret }}}{{/basicauth}}",
@@ -27,11 +27,21 @@ shim_airbyte_cdk.CaptureShim(
         "accessTokenUrlTemplate": (
             f"https://zoom.us/oauth/token?"
             f"grant_type=authorization_code&"
-            f"redirect_uri={wrap_with_braces('redirect_uri',3)}&"
+            f"redirect_uri={urlencode_field('redirect_uri')}&"
             f"code={urlencode_field('code')}"
         ),
         "accessTokenResponseMap": {
             "access_token": "/access_token"
         }
+        # "accessTokenBody": r"grant_type=account_credentials&account_id=ZO9F-j1DRwey_9r4TjgA5A",
+        # "accessTokenUrlTemplate": "https://zoom.us/oauth/token/",
+        # "accessTokenHeaders": {
+        #     "content-type": "application/x-www-form-urlencoded",
+        #     "authorization": "Basic {{#basicauth}}{{{ client_id }}}:{{{client_secret }}}{{/basicauth}}"
+        # },
+        # "accessTokenResponseMap": {
+        #     "access_token": "/access_token",
+        #     "token_expiry_date": r"{{#now_plus}}{{ expires_in }}{{/now_plus}}"
+        # }
     }
 ).main()
