@@ -14,5 +14,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"Streams":{"basic_capture_826935":{"CursorNames":["id"],"CursorValues":[9],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"basic_capture_826935":{"CursorNames":["id"],"CursorValues":[9],"LastPolled":"<TIMESTAMP>"}}}
 
