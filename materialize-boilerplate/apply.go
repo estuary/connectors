@@ -32,9 +32,9 @@ type BindingUpdate struct {
 	// in the materialization's field selection.
 	NewlyNullableFields []EndpointField
 
-	// NewlyDeltaUpdates is if the materialized was standard updates per the previously applied
-	// materialization spec, and is now not. Some systems may need to do things like drop primary
-	// key restraints in response to this change.
+	// NewlyDeltaUpdates is if the materialized binding was standard updates per the previously
+	// applied materialization spec, and is now delta updates. Some systems may need to do things
+	// like drop primary key restraints in response to this change.
 	NewlyDeltaUpdates bool
 }
 
@@ -211,19 +211,17 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 	}
 
 	// Only update the spec after all other actions have completed successfully.
-	actions = actions[:0]
 	desc, action, err = applier.PutSpec(ctx, req.Materialization, req.Version, storedSpec != nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting PutSpec action: %w", err)
 	}
-	addAction(desc, action)
-
-	// TODO(whb): DryRun as a concept will no longer exist after async applies are active in the
-	// runtime.
-	if !req.DryRun {
-		for _, a := range actions {
-			if err := a(ctx); err != nil {
-				return nil, err
+	// Although all current materializations always do persist a spec, its possible that some may
+	// not in the future as we transition to runtime provided specs for apply.
+	if action != nil {
+		actionDescriptions = append(actionDescriptions, desc)
+		if !req.DryRun { // Don't actually update the spec if its a dry run.
+			if err := action(ctx); err != nil {
+				return nil, fmt.Errorf("updating persisted specification: %w", err)
 			}
 		}
 	}
