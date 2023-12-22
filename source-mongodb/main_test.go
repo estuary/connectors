@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"testing"
 	"time"
@@ -127,8 +128,9 @@ func bindings(t *testing.T, database string, collections ...string) []*flow.Capt
 	for _, col := range collections {
 		out = append(out, &flow.CaptureSpec_Binding{
 			ResourceConfigJson: resourceSpecJson(t, resource{Collection: col, Database: database}),
-			ResourcePath:       []string{col},
+			ResourcePath:       []string{database, col},
 			Collection:         flow.CollectionSpec{Name: flow.Collection(fmt.Sprintf("acmeCo/test/%s", col))},
+			StateKey:           url.QueryEscape(database + "/" + col),
 		})
 	}
 
