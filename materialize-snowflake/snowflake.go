@@ -273,9 +273,6 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_App
 	// The spec will get updated last, after all the other actions are complete, but include it in
 	// the description of actions.
 	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if req.DryRun {
-		return action, nil
-	}
 
 	if len(resolved.ReplaceTables) > 0 {
 		if err := sql.StdIncrementFence(ctx, db, ep, req.Materialization.Name.String()); err != nil {
@@ -680,12 +677,20 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		if err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-		var commitOp = pf.RunAsyncOperation(func() error {
+		var commitOp = pf.RunAsyncOperationWithState(func() (*pf.ConnectorState, error) {
 			select {
 			case <-runtimeAckCh:
-				return d.applyCheckpoint(ctx, cp, false)
+				if err := d.applyCheckpoint(ctx, cp, false); err != nil {
+					return nil, err
+				}
+
+				// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
+				// so that a restart of the connector does not need to run the same queries again
+				// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
+				// can actually be committed
+				return &pf.ConnectorState{UpdatedJson: json.RawMessage("{}")}, nil
 			case <-ctx.Done():
-				return ctx.Err()
+				return nil, ctx.Err()
 			}
 		})
 

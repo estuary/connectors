@@ -148,7 +148,6 @@ func RunApplyTestCases(
 			_, err := driver.Apply(ctx, &pm.Request_Apply{
 				Materialization: spec,
 				Version:         "",
-				DryRun:          false,
 			})
 			require.NoError(t, err)
 
