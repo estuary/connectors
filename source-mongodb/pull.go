@@ -32,6 +32,20 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("parsing config json: %w", err)
 	}
 
+	var bindings = make([]bindingInfo, len(open.Capture.Bindings))
+	for idx, binding := range open.Capture.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return fmt.Errorf("parsing resource config: %w", err)
+		}
+		var sk = boilerplate.StateKey(binding.StateKey)
+		bindings[idx] = bindingInfo{
+			resource: res,
+			index:    idx,
+			stateKey: sk,
+		}
+	}
+
 	var prevState captureState
 	if open.StateJson != nil {
 		if err := json.Unmarshal(open.StateJson, &prevState); err != nil {
@@ -39,13 +53,14 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 
-	var resources = make([]resource, len(open.Capture.Bindings))
-	for idx, binding := range open.Capture.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return fmt.Errorf("parsing resource config: %w", err)
-		}
-		resources[idx] = res
+	migrated, err := migrateState(&prevState, open.Capture.Bindings)
+	if err != nil {
+		return fmt.Errorf("migrating binding states: %w", err)
+	}
+
+	prevState, err = updateResourceStates(prevState, bindings)
+	if err != nil {
+		return fmt.Errorf("error initializing resource states: %w", err)
 	}
 
 	var ctx = stream.Context()
@@ -70,52 +85,36 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var c = capture{
-		cfg:    cfg,
-		Output: stream,
+		cfg:      cfg,
+		Output:   stream,
+		Bindings: bindings,
 	}
 
 	if err := c.Output.Ready(false); err != nil {
 		return err
 	}
 
-	// Remove bindings from the checkpoint that are no longer part of the spec.
-	activeBindings := make(map[string]struct{})
-	for _, res := range resources {
-		activeBindings[resourceId(res)] = struct{}{}
-	}
-	emitCheckpoint := false
-	for res := range prevState.Resources {
-		if _, ok := activeBindings[res]; !ok {
-			log.WithField("resource", res).Info("binding removed from catalog")
-			delete(prevState.Resources, res)
-			emitCheckpoint = true
-		}
-	}
-
-	// if all bindings are removed, reset the state
-	if len(activeBindings) == 0 {
-		prevState = captureState{}
-		emitCheckpoint = true
-	}
-	if emitCheckpoint {
-		if err = c.outputCheckpoint(&prevState, false); err != nil {
+	if migrated {
+		if err := c.outputCheckpoint(&prevState, false); err != nil {
 			return err
 		}
 	}
 
-	if !prevState.isBackfillComplete(resources) {
+	if !prevState.isBackfillComplete(bindings) {
 		var stateUpdated, restartReason = checkBackfillState(&prevState, oldestOplogTime)
 		if restartReason != "" {
 			return c.startOverDueToConsistencyLoss(restartReason)
 		} else if stateUpdated {
-			c.outputCheckpoint(&prevState, false)
+			if err := c.outputCheckpoint(&prevState, false); err != nil {
+				return err
+			}
 		}
 
-		if err = c.backfillAllCollections(ctx, resources, &prevState, client); err != nil {
+		if err = c.backfillAllCollections(ctx, bindings, &prevState, client); err != nil {
 			return fmt.Errorf("backfilling: %w", err)
 		}
 		var totalBackfillTime = time.Now().UTC().Sub(prevState.getBackfillStartTime())
-		log.WithField("totalBackfillTime", totalBackfillTime).Info("completed backfill")
+		log.WithField("totalBackfillTime", totalBackfillTime.String()).Info("completed backfill")
 
 		// Update the timestamp of the oldest oplog entry now that we've finished the backfill
 		oldestOplogTime, err = oldestOplogEntry(ctx, client)
@@ -145,7 +144,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 
-	return c.ChangeStream(ctx, client, resources, prevState)
+	return c.ChangeStream(ctx, client, bindings, prevState)
 }
 
 func (c *capture) outputCheckpoint(state *captureState, merge bool) error {
@@ -158,20 +157,18 @@ func (c *capture) outputCheckpoint(state *captureState, merge bool) error {
 	return nil
 }
 
-func (c *capture) backfillAllCollections(ctx context.Context, resources []resource, state *captureState, client *mongo.Client) error {
+func (c *capture) backfillAllCollections(ctx context.Context, bindings []bindingInfo, state *captureState, client *mongo.Client) error {
 
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.SetLimit(ConcurrentBackfillLimit)
 
-	for idx, resource := range resources {
-		idx := idx
-		resource := resource
-
-		var resState = state.Resources[resourceId(resource)]
+	for _, binding := range bindings {
+		var binding = binding
+		var resState = state.Resources[binding.stateKey]
 
 		if !resState.Backfill.Done {
 			eg.Go(func() error {
-				return c.BackfillCollection(egCtx, client, idx, resource, resState)
+				return c.BackfillCollection(egCtx, client, binding, resState)
 			})
 		}
 	}
@@ -183,12 +180,20 @@ func (c *capture) backfillAllCollections(ctx context.Context, resources []resour
 }
 
 type capture struct {
-	cfg    config
-	Output *boilerplate.PullOutput
+	cfg      config
+	Output   *boilerplate.PullOutput
+	Bindings []bindingInfo
+}
+
+type bindingInfo struct {
+	resource resource
+	index    int
+	stateKey boilerplate.StateKey
 }
 
 type captureState struct {
-	Resources map[string]resourceState `json:"resources,omitempty"`
+	Resources    map[boilerplate.StateKey]resourceState `json:"bindingStateV1,omitempty"`
+	OldResources map[string]resourceState               `json:"resources,omitempty"` // TODO(whb): Remove once all captures have migrated.
 
 	// OplogEmptyBeforeBackfill indicates whether the connector has observed
 	// an empty oplog before starting the backfill, and on every subsequent
@@ -202,6 +207,88 @@ type captureState struct {
 	// Resume token used to continue change stream from where we last left off,
 	// see https://www.mongodb.com/docs/manual/changeStreams/#resume-tokens-from-change-events
 	StreamResumeToken bson.Raw `json:"stream_resume_token,omitempty"`
+}
+
+func migrateState(state *captureState, bindings []*pf.CaptureSpec_Binding) (bool, error) {
+	if state.Resources != nil && state.OldResources != nil {
+		return false, fmt.Errorf("application error: both Resources and OldResources were non-nil")
+	} else if state.Resources != nil {
+		log.Info("skipping state migration since it's already done")
+		return false, nil
+	}
+
+	state.Resources = make(map[boilerplate.StateKey]resourceState)
+
+	for _, b := range bindings {
+		if b.StateKey == "" {
+			return false, fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
+		}
+
+		var res resource
+		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
+			return false, fmt.Errorf("parsing resource config: %w", err)
+		}
+
+		ll := log.WithFields(log.Fields{
+			"stateKey":   b.StateKey,
+			"database":   res.Database,
+			"collection": res.Collection,
+			"resourceId": resourceId(res),
+		})
+
+		stateFromOld, ok := state.OldResources[resourceId(res)]
+		if !ok {
+			// This may happen if the connector has never emitted any checkpoints with data for this
+			// binding.
+			ll.Warn("no state found for binding while migrating state")
+			continue
+		}
+
+		state.Resources[boilerplate.StateKey(b.StateKey)] = stateFromOld
+		ll.Info("migrated binding state")
+	}
+
+	state.OldResources = nil
+
+	return true, nil
+}
+
+func updateResourceStates(prevState captureState, bindings []bindingInfo) (captureState, error) {
+	var newState = captureState{
+		Resources:                make(map[boilerplate.StateKey]resourceState),
+		OplogEmptyBeforeBackfill: prevState.OplogEmptyBeforeBackfill,
+		StreamResumeToken:        prevState.StreamResumeToken,
+	}
+
+	// Only include bindings in the state that are currently active bindings. This is necessary
+	// because the Flow runtime does not yet automatically prune stateKeys that are no longer
+	// included as bindings. A binding becomes inconsistent once removed from the capture
+	// because its change events will begin to be filtered out, and must start over if ever
+	// re-added.
+	for _, binding := range bindings {
+		var sk = binding.stateKey
+		if resState, ok := prevState.Resources[sk]; ok {
+			newState.Resources[sk] = resState
+		}
+	}
+
+	// Clear prior capture-wide state if there is no state for any currently included binding. This
+	// would happen if every binding had its backfill counter incremented, or all the bindings were
+	// removed from the spec. Notably, this removes any checkpointed StreamResumeToken, which may
+	// have become invalid.
+	if len(newState.Resources) == 0 {
+		if newState.OplogEmptyBeforeBackfill != nil || newState.StreamResumeToken != nil {
+			log.WithFields(log.Fields{
+				"OplogEmptyBeforeBackfill": newState.OplogEmptyBeforeBackfill,
+				"StreamResumeToken":        newState.StreamResumeToken,
+			}).Info("clearing capture-wide state variables since all bindings have been removed or reset")
+		}
+
+		newState.OplogEmptyBeforeBackfill = nil
+		newState.StreamResumeToken = nil
+	}
+
+	return newState, nil
 }
 
 func (s *captureState) wasChangeStreamEmptyBeforeBackfill() bool {
@@ -221,9 +308,9 @@ func (s *captureState) getBackfillStartTime() time.Time {
 	return start
 }
 
-func (s *captureState) isBackfillComplete(resources []resource) bool {
-	for _, r := range resources {
-		if !s.Resources[resourceId(r)].Backfill.Done {
+func (s *captureState) isBackfillComplete(bindings []bindingInfo) bool {
+	for _, b := range bindings {
+		if !s.Resources[b.stateKey].Backfill.Done {
 			return false
 		}
 	}
@@ -263,8 +350,8 @@ const resumePointGoneErrorMessage = "the resume point may no longer be in the op
 const resumeTokenNotFoundErrorMessage = "the resume token was not found"
 const unauthorizedMessage = "not authorized on admin to execute command"
 
-func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resources []resource, state captureState) error {
-	if len(resources) < 1 {
+func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, bindings []bindingInfo, state captureState) error {
+	if len(bindings) < 1 {
 		return nil
 	}
 
@@ -277,8 +364,8 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 	}
 
 	var collectionBindingIndex = make(map[string]int)
-	for idx, res := range resources {
-		collectionBindingIndex[resourceId(res)] = idx
+	for _, binding := range bindings {
+		collectionBindingIndex[resourceId(binding.resource)] = binding.index
 	}
 
 	log.WithFields(log.Fields{
@@ -338,9 +425,9 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 				// configured, we error out as we do not support multiple change streams
 				// on different databases. An instance-level change stream must be used
 				// for that scenario
-				var dbName = resources[0].Database
-				for _, res := range resources[1:] {
-					if res.Database != dbName {
+				var dbName = bindings[0].resource.Database
+				for _, binding := range bindings[1:] {
+					if binding.resource.Database != dbName {
 						return fmt.Errorf("We are unable to establish an instance-level change stream on your database due to an error. Please consider granting permission to read all databases to the user: %w", err)
 					}
 				}
@@ -372,7 +459,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 			return fmt.Errorf("decoding document in collection %s.%s: %w", ev.Ns.Database, ev.Ns.Collection, err)
 		}
 		var resId = eventResourceId(ev)
-		var binding, ok = collectionBindingIndex[resId]
+		var bindingIndex, ok = collectionBindingIndex[resId]
 
 		var checkpoint = captureState{
 			StreamResumeToken: cursor.ResumeToken(),
@@ -410,7 +497,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 					return fmt.Errorf("encoding document %v in collection %s.%s as json: %w", doc, ev.Ns.Database, ev.Ns.Collection, err)
 				}
 
-				if err = c.Output.DocumentsAndCheckpoint(checkpointJson, true, binding, js); err != nil {
+				if err = c.Output.DocumentsAndCheckpoint(checkpointJson, true, bindingIndex, js); err != nil {
 					return fmt.Errorf("output documents failed: %w", err)
 				}
 			} else if ev.FullDocument != nil {
@@ -437,7 +524,7 @@ func (c *capture) ChangeStream(ctx context.Context, client *mongo.Client, resour
 					return fmt.Errorf("encoding document %v in collection %s.%s as json: %w", doc, ev.Ns.Database, ev.Ns.Collection, err)
 				}
 
-				if err = c.Output.DocumentsAndCheckpoint(checkpointJson, true, binding, js); err != nil {
+				if err = c.Output.DocumentsAndCheckpoint(checkpointJson, true, bindingIndex, js); err != nil {
 					return fmt.Errorf("output documents failed: %w", err)
 				}
 			}
@@ -514,9 +601,11 @@ const (
 	SortDescending = -1
 )
 
-func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding int, res resource, state resourceState) (_err error) {
-	var db = client.Database(res.Database)
-	var collection = db.Collection(res.Collection)
+func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, binding bindingInfo, state resourceState) (_err error) {
+	var db = client.Database(binding.resource.Database)
+	var collection = db.Collection(binding.resource.Collection)
+	var res = binding.resource
+	var sk = binding.stateKey
 
 	if state.Backfill.StartedAt.IsZero() {
 		// This means we are starting backfill for the first time
@@ -593,7 +682,7 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 			return fmt.Errorf("encoding document %v in collection %s as json: %w", doc, res.Collection, err)
 		}
 
-		if err = c.Output.Documents(binding, js); err != nil {
+		if err = c.Output.Documents(binding.index, js); err != nil {
 			return fmt.Errorf("output documents failed: %w", err)
 		}
 
@@ -602,8 +691,8 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 		// point after a failure.
 		if cursor.RemainingBatchLength() == 0 {
 			var checkpoint = captureState{
-				Resources: map[string]resourceState{
-					resourceId(res): state,
+				Resources: map[boilerplate.StateKey]resourceState{
+					sk: state,
 				},
 			}
 
@@ -619,8 +708,8 @@ func (c *capture) BackfillCollection(ctx context.Context, client *mongo.Client, 
 
 	state.Backfill.Done = true
 	var checkpoint = captureState{
-		Resources: map[string]resourceState{
-			resourceId(res): state,
+		Resources: map[boilerplate.StateKey]resourceState{
+			sk: state,
 		},
 	}
 
