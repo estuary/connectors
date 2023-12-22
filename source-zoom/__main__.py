@@ -16,24 +16,25 @@ shim_airbyte_cdk.CaptureShim(
         "provider": "zoom",
         "authUrlTemplate": (
             f"https://zoom.us/oauth/authorize?"
-            r"client_id={{ client_id }}&"
-            r"redirect_uri={{#urlencode}}{{{ redirect_uri }}}/{{/urlencode}}&"
+            f"client_id={wrap_with_braces('client_id', 3)}&"
+            r"redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&"
             "response_type=code"
         ),
         "accessTokenHeaders": {
             "Authorization": "Basic {{#basicauth}}{{{ client_id }}}:{{{client_secret }}}{{/basicauth}}",
             "Content-Type": "application/x-www-form-urlencoded"
         },
-        "accessTokenUrlTemplate": (
-            f"https://zoom.us/oauth/token?"
-            f"grant_type=authorization_code&"
-            f"redirect_uri={urlencode_field('redirect_uri')}&"
-            f"code={urlencode_field('code')}"
+        "accessTokenBody": (
+            r"code={{ code }}&"
+            "grant_type=authorization_code&"
+            r"redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
         ),
+        "accessTokenUrlTemplate": "https://zoom.us/oauth/token",
         "accessTokenResponseMap": {
-            "access_token": "/access_token"
+            "access_token":  "/access_token",
+            "refresh_token": "/refresh_token"
         }
-        # "accessTokenBody": r"grant_type=account_credentials&account_id=ZO9F-j1DRwey_9r4TjgA5A",
+        # "accessTokenBody": f"grant_type=account_credentials&account_id={wrap_with_braces('account_id', 3)}",
         # "accessTokenUrlTemplate": "https://zoom.us/oauth/token/",
         # "accessTokenHeaders": {
         #     "content-type": "application/x-www-form-urlencoded",

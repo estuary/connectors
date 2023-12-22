@@ -1,7 +1,7 @@
 credentials:
-    account_id: ZO9F-j1DRwey_9r4TjgA5A
-    client_id: 3MvKFWg8QMKee0rrcPOMMg
-    client_secret: 5Apr8xAo81M1rqGn7IDI3MnYgws7ERVl
+    account_id: MqzG6aYDS_eTYHwEUYW7Hw
+    client_id: aF1_kb6YR3iNp5HkhRV23A
+    client_secret: QyzSOZ1oFFqU9pz3zxacaJglw7t13L3Q
 sops:
     kms: []
     gcp_kms:
@@ -11,8 +11,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2023-12-21T19:27:54Z"
-    mac: ENC[AES256_GCM,data:fB67i0dnosE4TucBIGB+kOoN4Cxkry3qCgARdwoM+0JImRMMrKZi+orRT87kJxw4AbJiCbmfN/q+7+fwOqOzmWbtR9A/iT4jtTsATtUmF0CNWb+hYiZmVP+u1MmM1wnsuAaoqfY4RTqSlHtEYrl7H93Wff/dHISFzC5SqMALocw=,iv:+pJLxudtTo/T12ZeI3XW91c8ZJfPqcIGFlXwdK/oAtc=,tag:9HT3A9wJMXWsGxIO8lnK4g==,type:str]
+    lastmodified: "2023-12-22T13:50:44Z"
+    mac: ENC[AES256_GCM,data:kMRUIO+wgrXSXG3UEBwFWu33ghB8WU3ZFsCr2GQ9nlahQPYVlLMnsHa4U1H2eXV+DsjB4seO6oQJmwU9lURXJfo4GRT4FY0P5clbsdcynOP5AUHMVyGUewKuUs5lP28fk8ZmzhK3M14YiHlCdflxDomPbUwic9eVsxeccrVuSFU=,iv:8imN7e++b323+I2Bz3VGwudsw/OgsUsiL4hc4X9dOnU=,tag:12EAVxXbe4aXX4uFLPeziA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
