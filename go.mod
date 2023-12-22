@@ -215,5 +215,3 @@ require (
 	k8s.io/apimachinery v0.26.1 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
-
-replace github.com/estuary/flow => /Users/mahdi/workshop/flow
