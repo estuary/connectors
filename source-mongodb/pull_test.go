@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +28,7 @@ func TestCheckBackfillState(t *testing.T) {
 
 	// Resuming an in progress backfill, which started after the oldest oplog
 	// event and had previously observed the non-empty oplog
-	state.Resources = map[string]resourceState{
+	state.Resources = map[boilerplate.StateKey]resourceState{
 		"testdb.testcollection": {
 			Backfill: backfillState{
 				Done:      false,
