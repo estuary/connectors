@@ -17,6 +17,7 @@ import (
 	_ "net/http/pprof"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	protoio "github.com/gogo/protobuf/io"
 	"github.com/gogo/protobuf/jsonpb"
@@ -29,7 +30,7 @@ type Connector interface {
 	Spec(context.Context, *pm.Request_Spec) (*pm.Response_Spec, error)
 	Validate(context.Context, *pm.Request_Validate) (*pm.Response_Validated, error)
 	Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error)
-	NewTransactor(context.Context, pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error)
+	NewTransactor(context.Context, pm.Request_Open) (m.Transactor, *pm.Response_Opened, error)
 }
 
 // ConnectorServer wraps a Connector to implement the pc.ConnectorServer gRPC service interface.
@@ -136,7 +137,7 @@ func (s *ConnectorServer) Materialize(stream pm.Connector_MaterializeServer) err
 			if err != nil {
 				return err
 			}
-			return pm.RunTransactions(stream, *request.Open, *opened, transactor)
+			return m.RunTransactions(stream, *request.Open, *opened, transactor)
 		default:
 			return fmt.Errorf("unexpected request %#v", request)
 		}
