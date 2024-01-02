@@ -6,7 +6,8 @@ import (
 	"strings"
 	"text/template"
 
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
@@ -105,7 +106,7 @@ type Endpoint struct {
 	// which will be parsed into and validated from a resource configuration.
 	NewResource func(*Endpoint) Resource
 	// NewTransactor returns a Transactor ready for pm.RunTransactions.
-	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open) (pm.Transactor, error)
+	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open) (m.Transactor, error)
 	// Tenant owning this task, as determined from the task name.
 	Tenant string
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy

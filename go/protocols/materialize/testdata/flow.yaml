@@ -1,0 +1,33 @@
+collections:
+  keys/value:
+    schema:
+      type: object
+      properties:
+        key1: { type: integer }
+        key2: { type: boolean }
+        value: { type: string }
+      required: [key1, key2]
+    key: [/key1, /key2]
+
+  messages:
+    schema:
+      type: object
+      properties:
+        message: { type: string }
+      required: [message]
+    key: [/message]
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: keys/value
+        resource: { table: keys_value }
+      - source: messages
+        resource: { table: messages }
+
+storageMappings:
+  "": { stores: [{ provider: S3, bucket: a-bucket }] }
