@@ -8,6 +8,7 @@ import (
 	"strings"
 	"text/template"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/sirupsen/logrus"
@@ -86,7 +87,7 @@ type Endpoint struct {
 	// which will be parsed into and validated from a resource configuration.
 	NewResource func(*Endpoint) Resource
 	// NewTransactor returns a Transactor ready for pm.RunTransactions.
-	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open) (pm.Transactor, error)
+	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open) (m.Transactor, error)
 	// Tenant owning this task, as determined from the task name.
 	Tenant string
 }
