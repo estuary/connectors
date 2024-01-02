@@ -13,6 +13,7 @@ import (
 	"text/template"
 	"time"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -246,7 +247,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
-) (_ pm.Transactor, err error) {
+) (_ m.Transactor, err error) {
 	var cfg = ep.Config.(*config)
 
 	dialect := snowflakeDialect(cfg.Schema)
@@ -350,7 +351,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 
 const MaxConcurrentLoads = 5
 
-func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
 	log.Info("load: starting encoding and uploading of files")
@@ -454,7 +455,7 @@ type checkpoint struct {
 	ToDelete map[string][]string
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	d.store.round++
 
 	log.Info("store: starting encoding and uploading of files")
@@ -518,18 +519,18 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		b.store.mustMerge = false
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
 		var cp = checkpoint{Queries: queries, ToDelete: toDelete}
 
 		var checkpointJSON, err = json.Marshal(cp)
 		if err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-		var commitOp = pf.RunAsyncOperationWithState(func() (pf.ConnectorState, error) {
+		var commitOp = m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
 			select {
 			case <-runtimeAckCh:
 				if err := d.applyCheckpoint(ctx, cp, false); err != nil {
-					return pf.ConnectorState{}, err
+					return nil, err
 				}
 
 				// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
@@ -546,11 +547,11 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 				}
 				checkpointJSON, err = json.Marshal(checkpointClear)
 				if err != nil {
-					return pf.ConnectorState{}, fmt.Errorf("creating checkpoint clearing json: %w", err)
+					return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 				}
-				return pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
+				return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 			case <-ctx.Done():
-				return pf.ConnectorState{}, ctx.Err()
+				return nil, ctx.Err()
 			}
 		})
 
