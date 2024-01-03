@@ -280,6 +280,14 @@ func (t *transactor) storeWorker(
 }
 
 func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
+	// We need to remove the _id property from loaded documents because the
+	// Flow collection schemas may forbid that property. If we left it in, it
+	// could cause validation errors on loaded documents.
+	delete(doc, idField)
+	return sanitizeDocumentInner(doc)
+}
+
+func sanitizeDocumentInner(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		switch v := value.(type) {
 		case float64:
@@ -287,7 +295,7 @@ func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
 				doc[key] = "NaN"
 			}
 		case map[string]interface{}:
-			doc[key] = sanitizeDocument(v)
+			doc[key] = sanitizeDocumentInner(v)
 		}
 	}
 
