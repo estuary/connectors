@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/pubsub"
-	pm "github.com/estuary/flow/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/minio/highwayhash"
 	"golang.org/x/sync/errgroup"
 )
@@ -21,7 +21,7 @@ type topicBinding struct {
 }
 
 // PubSub is delta-update only.
-func (t *transactor) Load(it *pm.LoadIterator, _ func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
 	for it.Next() {
 		panic("driver only supports delta updates")
 	}
@@ -42,7 +42,7 @@ func PackedKeyHash_HH64(packedKey []byte) uint32 {
 // highwayHashKey is a fixed 32 bytes (as required by HighwayHash) read from /dev/random.
 var highwayHashKey, _ = hex.DecodeString("ba737e89155238d47d8067c35aad4d25ecdd1c3488227e011ffa480c022bd3ba")
 
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
 
 	for it.Next() {

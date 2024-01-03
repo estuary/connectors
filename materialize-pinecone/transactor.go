@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/materialize-pinecone/client"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -38,14 +38,14 @@ type upsertDoc struct {
 	metadata map[string]interface{}
 }
 
-func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
 		panic("driver only supports delta updates")
 	}
 	return nil
 }
 
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	t.group, t.groupCtx = errgroup.WithContext(ctx)

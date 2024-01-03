@@ -8,9 +8,9 @@ import (
 	"sort"
 	"time"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/sheets/v4"
 )
@@ -68,7 +68,7 @@ func (b transactorBinding) columnCount() int {
 	return len(b.Fields.Keys) + len(b.Fields.Values) + 1
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	it.WaitForAcknowledged()
 
 	for it.Next() {
@@ -89,7 +89,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return it.Err()
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	started := time.Now()
 
 	// The commit of this transaction within the recovery log will permanently
@@ -268,7 +268,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	// Ensure transactions are spread out enough to not exceed google sheets rate limits.
 	<-time.After(transactionDelay - time.Since(started))
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
 		return &pf.ConnectorState{
 			UpdatedJson: json.RawMessage(fmt.Sprintf("{\"round\":%v}", d.round)),
 			MergePatch:  false,
