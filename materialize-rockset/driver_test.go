@@ -186,7 +186,6 @@ func TestRocksetDriverApply(t *testing.T) {
 			Bindings:   bindings,
 		},
 		Version: "1",
-		DryRun:  false,
 	}
 
 	defer cleanup(config, workspaceName, collectionName)

@@ -297,9 +297,6 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_App
 	// The spec will get updated last, after all the other actions are complete, but include it in
 	// the description of actions.
 	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if req.DryRun {
-		return action, nil
-	}
 
 	if len(filtered.ReplaceTables) > 0 {
 		if _, err := c.query(ctx, fmt.Sprintf(

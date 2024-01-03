@@ -15,6 +15,7 @@ import (
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-boilerplate/validate"
@@ -434,12 +435,8 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 
 	actions := []string{}
 	doAction := func(desc string, fn func() error) error {
-		if !req.DryRun {
-			actions = append(actions, "- "+desc)
-			return fn()
-		}
-		actions = append(actions, "- "+desc+" (skipping due to dry-run)")
-		return nil
+		actions = append(actions, "- "+desc)
+		return fn()
 	}
 
 	if err := doAction(fmt.Sprintf("create index '%s'", defaultFlowMaterializations), func() error {
@@ -509,7 +506,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return &pm.Response_Applied{ActionDescription: strings.Join(actions, "\n")}, nil
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)

@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/elastic/go-elasticsearch/v8/esutil"
-	pm "github.com/estuary/flow/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -47,7 +47,7 @@ type transactor struct {
 	indexToBinding map[string]int
 }
 
-func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
 
 	// We are evaluating loads as they come, so we must wait for the runtime's ack of the previous
@@ -121,7 +121,7 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return group.Wait()
 }
 
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 	errCh := make(chan error, 1)
 

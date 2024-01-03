@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/pubsub"
 	google_auth "github.com/estuary/connectors/go/auth/google"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -228,26 +229,18 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		var t *pubsub.Topic
 		var s *pubsub.Subscription
 
-		if req.DryRun {
-			// No-op, but record the action that would have been taken.
-			actions = append(actions, fmt.Sprintf("to create topic %s", t.ID()))
-			if topic.CreateDefaultSubscription {
-				actions = append(actions, fmt.Sprintf("to create subscription %s for topic %s", s.ID(), t.ID()))
-			}
-		} else {
-			t, err = client.CreateTopic(ctx, topic.TopicName)
-			if err != nil {
-				return nil, fmt.Errorf("pubsub apply create topic error: %w", err)
-			}
-			actions = append(actions, fmt.Sprintf("created topic %s", t.ID()))
+		t, err = client.CreateTopic(ctx, topic.TopicName)
+		if err != nil {
+			return nil, fmt.Errorf("pubsub apply create topic error: %w", err)
+		}
+		actions = append(actions, fmt.Sprintf("created topic %s", t.ID()))
 
-			if topic.CreateDefaultSubscription {
-				s, err = client.CreateSubscription(ctx, fmt.Sprintf("%s-sub", topic.TopicName), pubsub.SubscriptionConfig{Topic: t})
-				if err != nil {
-					return nil, fmt.Errorf("pubsub apply create default subscription: %w", err)
-				}
-				actions = append(actions, fmt.Sprintf("created subscription %s for topic %s", s.ID(), t.ID()))
+		if topic.CreateDefaultSubscription {
+			s, err = client.CreateSubscription(ctx, fmt.Sprintf("%s-sub", topic.TopicName), pubsub.SubscriptionConfig{Topic: t})
+			if err != nil {
+				return nil, fmt.Errorf("pubsub apply create default subscription: %w", err)
 			}
+			actions = append(actions, fmt.Sprintf("created subscription %s for topic %s", s.ID(), t.ID()))
 		}
 	}
 
@@ -256,7 +249,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}, nil
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, err

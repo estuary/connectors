@@ -14,6 +14,7 @@ import (
 	"time"
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -247,9 +248,6 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_App
 	}
 
 	action := strings.Join(append(statements, updateSpec.QueryString), "\n")
-	if req.DryRun {
-		return action, nil
-	}
 
 	if len(resolved.ReplaceTables) > 0 {
 		if err := sql.StdIncrementFence(ctx, db, ep, req.Materialization.Name.String()); err != nil {
@@ -358,14 +356,14 @@ type transactor struct {
 
 func prepareNewTransactor(
 	templates map[string]*template.Template,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (pm.Transactor, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
 		fence sql.Fence,
 		bindings []sql.Table,
 		open pm.Request_Open,
-	) (_ pm.Transactor, err error) {
+	) (_ m.Transactor, err error) {
 		var d = &transactor{templates: templates}
 		d.store.fence = fence
 
@@ -461,7 +459,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	return nil
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
 	var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{})
@@ -556,7 +554,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return nil
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
+func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
 	txn, err := d.store.conn.BeginTx(ctx, &stdsql.TxOptions{})
 	if err != nil {
@@ -634,27 +632,27 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		return nil, fmt.Errorf("store batch insert on %q: %w", d.bindings[lastBinding].tempStoreTableName, err)
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		return nil, pf.RunAsyncOperation(func() error {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+		return nil, m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
 			defer txn.Rollback()
 
 			for _, b := range d.bindings {
 				if b.needsMerge {
 					log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
 					if _, err := txn.ExecContext(ctx, b.mergeInto); err != nil {
-						return fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
+						return nil, fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
 					}
 					log.WithField("table", b.target.Identifier).Info("store: finishing merging data into table")
 				} else {
 					log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
 					if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
-						return fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err)
+						return nil, fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err)
 					}
 					log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
 				}
 
 				if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
-					return fmt.Errorf("truncating store table: %w", err)
+					return nil, fmt.Errorf("truncating store table: %w", err)
 				}
 
 				// reset the value for next transaction
@@ -663,27 +661,27 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 			var err error
 			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
+				return nil, fmt.Errorf("marshalling checkpoint: %w", err)
 			}
 
 			var fenceUpdate strings.Builder
 			if err := d.templates["updateFence"].Execute(&fenceUpdate, d.store.fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
+				return nil, fmt.Errorf("evaluating fence template: %w", err)
 			}
 
 			if results, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating flow checkpoint: %w", err)
+				return nil, fmt.Errorf("updating flow checkpoint: %w", err)
 			} else if rowsAffected, err := results.RowsAffected(); err != nil {
-				return fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
+				return nil, fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
 			} else if rowsAffected < 1 {
-				return fmt.Errorf("This instance was fenced off by another")
+				return nil, fmt.Errorf("This instance was fenced off by another")
 			}
 
 			if err := txn.Commit(); err != nil {
-				return fmt.Errorf("committing Store transaction: %w", err)
+				return nil, fmt.Errorf("committing Store transaction: %w", err)
 			}
 
-			return nil
+			return nil, nil
 		})
 	}, nil
 }
