@@ -63,7 +63,7 @@ func checkOplog(ctx context.Context, client *mongo.Client) (time.Time, error) {
 	// determine that.
 	oldestEntryTime, err := oldestOplogEntry(ctx, client)
 	if err != nil && err != mongo.ErrNoDocuments {
-		return oldestEntryTime, fmt.Errorf("unable to query the MongoDB oplog. Please ensure that the user has access to read the 'local' database and query the 'oplog.rs' collection: %w", err)
+		return oldestEntryTime, fmt.Errorf("unable to query the MongoDB oplog. Please ensure that the user has access to read the 'local' database and query the 'oplog.rs' collection (go.estuary.dev/source-mongodb): %w", err)
 	} else if err == mongo.ErrNoDocuments {
 		// If this is a shared instance, such as an entry-level Atlas server, this is normal.
 		log.Warn("no readable entries found in the MongoDB oplog (this may be normal if capturing from a shared server such as Atlas M0)")
