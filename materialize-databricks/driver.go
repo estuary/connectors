@@ -16,6 +16,7 @@ import (
 	"github.com/databricks/databricks-sdk-go/logger"
 	driverctx "github.com/databricks/databricks-sql-go/driverctx"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -137,7 +138,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
-) (_ pm.Transactor, err error) {
+) (_ m.Transactor, err error) {
 	var cfg = ep.Config.(*config)
 
 	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
@@ -297,7 +298,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *p
 	return nil
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = d.Context(it.Context())
 
 	for _, b := range d.bindings {
@@ -412,7 +413,7 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 	}
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
+func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	d.store.round++
 	ctx := it.Context()
 
@@ -444,7 +445,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 	// all files uploaded across bindings
 	var toDelete []string
 	// mutex to ensure safety of updating these variables
-	m := sync.Mutex{}
+	mtx := sync.Mutex{}
 
 	// we run these processes in parallel
 	group, groupCtx := errgroup.WithContext(ctx)
@@ -460,9 +461,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			if err != nil {
 				return fmt.Errorf("flushing store file for binding[%d]: %w", idxCopy, err)
 			}
-			m.Lock()
+			mtx.Lock()
 			toDelete = append(toDelete, toDeleteBinding...)
-			m.Unlock()
+			mtx.Unlock()
 
 			// In case of delta updates or if there are no existing keys being stored
 			// we directly copy from staged files into the target table. Note that this is retriable
@@ -470,9 +471,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			// not be loaded again
 			// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
 			if bindingCopy.target.DeltaUpdates || !bindingCopy.needsMerge {
-				m.Lock()
+				mtx.Lock()
 				queries = append(queries, renderWithFiles(bindingCopy.copyIntoDirect, toCopy...))
-				m.Unlock()
+				mtx.Unlock()
 			} else {
 				// Create a binding-scoped temporary table for store documents to be merged
 				// into target table
@@ -485,9 +486,9 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 					return fmt.Errorf("store: copying into to temporary table: %w", err)
 				}
 
-				m.Lock()
+				mtx.Lock()
 				queries = append(queries, renderWithFiles(bindingCopy.mergeInto, toCopy...), bindingCopy.dropStoreSQL)
-				m.Unlock()
+				mtx.Unlock()
 			}
 
 			return nil
@@ -500,19 +501,19 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 
 	log.Info("store: finished file upload and copies")
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
 		var cp = checkpoint{Queries: queries, ToDelete: toDelete}
 
 		var checkpointJSON, err = json.Marshal(cp)
 		if err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-		var commitOp = func(ctx context.Context) error {
+		var commitOp = func(ctx context.Context) (*pf.ConnectorState, error) {
 			select {
 			case <-runtimeAckCh:
-				return d.applyCheckpoint(ctx, cp, false)
+				return nil, d.applyCheckpoint(ctx, cp, false)
 			case <-ctx.Done():
-				return ctx.Err()
+				return nil, ctx.Err()
 			}
 		}
 

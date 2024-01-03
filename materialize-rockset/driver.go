@@ -11,6 +11,7 @@ import (
 	// without requiring timezone packages to be installed on the system.
 	_ "time/tzdata"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -215,7 +216,7 @@ func (d *rocksetDriver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.R
 	return response, nil
 }
 
-func (d *rocksetDriver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+func (d *rocksetDriver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	cfg, err := ResolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, err

@@ -12,6 +12,7 @@ import (
 
 	google_auth "github.com/estuary/connectors/go/auth/google"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -228,16 +229,14 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		}
 	}
 
-	if req.DryRun || len(actions) == 0 {
-		// Nothing to do.
-	} else if err = batchRequestWithRetry(ctx, svc, cfg.spreadsheetID(), actions); err != nil {
+	if err = batchRequestWithRetry(ctx, svc, cfg.spreadsheetID(), actions); err != nil {
 		return nil, fmt.Errorf("while updated sheets: %w", err)
 	}
 
 	return &pm.Response_Applied{ActionDescription: description}, nil
 }
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
