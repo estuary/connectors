@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -92,7 +92,7 @@ func (b binding) convert(ts tuple.Tuple, doc json.RawMessage) (map[string]types.
 	return attrs, nil
 }
 
-func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
 
 	// Processing load requests as the arrive, so make sure the previous transaction has fully
@@ -162,7 +162,7 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return group.Wait()
 }
 
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	batches := make(chan map[string][]types.WriteRequest)

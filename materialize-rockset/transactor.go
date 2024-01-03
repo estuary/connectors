@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	rockset "github.com/rockset/rockset-go-client"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -44,8 +44,7 @@ type transactor struct {
 	bindings []*binding
 }
 
-// pm.Transactor
-func (t *transactor) Load(it *pm.LoadIterator, loaded func(binding int, doc json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.RawMessage) error) error {
 	for it.Next() {
 		panic("Rockset is not transactional - Load should never be called")
 	}
@@ -55,8 +54,7 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(binding int, doc json
 // max number of documents to send with each request
 const storeBatchSize = 256
 
-// pm.Transactor
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var errGroup, ctx = errgroup.WithContext(it.Context())
 
 	for it.Next() {
@@ -103,7 +101,6 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 	return nil, errGroup.Wait()
 }
 
-// pm.Transactor
 func (t *transactor) Destroy() {
 	// Nothing to clean up
 }

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math"
 
-	pm "github.com/estuary/flow/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
@@ -39,7 +39,7 @@ type binding struct {
 	deltaUpdates bool
 }
 
-func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
 	it.WaitForAcknowledged()
 
@@ -92,7 +92,7 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return group.Wait()
 }
 
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
 	sendBatches := make(chan storeBatch)
