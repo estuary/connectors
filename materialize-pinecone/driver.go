@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-pinecone/client"
@@ -258,7 +259,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}, nil
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, err

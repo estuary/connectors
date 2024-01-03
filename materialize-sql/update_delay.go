@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 )
@@ -41,19 +42,20 @@ const (
 // SQL materialization), what will happen in this case is that when the connector restarts it will
 // read the previously persisted checkpoint and acknowledge it to the runtime then. In this way the
 // materialization will resume from where it left off with respect to the endpoint state.
-func CommitWithDelay(ctx context.Context, round int, delay time.Duration, stored int, commitFn func(context.Context) error) pf.OpFuture {
-	return pf.RunAsyncOperation(func() error {
+func CommitWithDelay(ctx context.Context, round int, delay time.Duration, stored int, commitFn func(context.Context) (*pf.ConnectorState, error)) m.OpFuture {
+	return m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
 		started := time.Now()
 
-		if err := commitFn(ctx); err != nil {
-			return err
+		state, err := commitFn(ctx)
+		if err != nil {
+			return nil, err
 		}
 
 		if round == 1 {
 			// Always skip the delay on the first round of transactions, which is often an
 			// artificially small transaction of the immediately-ready documents.
 			log.Debug("will not delay commit acknowledgement of the first transaction")
-			return nil
+			return nil, nil
 		}
 
 		remainingDelay := delay - time.Since(started)
@@ -67,16 +69,16 @@ func CommitWithDelay(ctx context.Context, round int, delay time.Duration, stored
 
 		if stored > storeThreshold || remainingDelay <= 0 {
 			logEntry.Debug("will acknowledge commit without further delay")
-			return nil
+			return nil, nil
 		}
 
 		logEntry.Debug("delaying before acknowledging commit")
 
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		case <-time.After(remainingDelay):
-			return nil
+			return state, nil
 		}
 	})
 }

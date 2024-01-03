@@ -18,6 +18,7 @@ import (
 	"time"
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -366,14 +367,14 @@ type transactor struct {
 func prepareNewTransactor(
 	dialect sql.Dialect,
 	templates map[string]*template.Template,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (pm.Transactor, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
 		fence sql.Fence,
 		bindings []sql.Table,
 		open pm.Request_Open,
-	) (_ pm.Transactor, err error) {
+	) (_ m.Transactor, err error) {
 		var d = &transactor{dialect: dialect, templates: templates}
 		d.store.fence = fence
 
@@ -631,7 +632,7 @@ func drainUpdateBatch(ctx context.Context, txn *stdsql.Tx, b *binding, batch bat
 	return nil
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
 	var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{ReadOnly: true})
@@ -737,7 +738,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return nil
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
+func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
 	txn, err := d.store.conn.BeginTx(ctx, &stdsql.TxOptions{})
 	if err != nil {
@@ -863,33 +864,33 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		return nil, pf.RunAsyncOperation(func() error {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+		return nil, m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
 			defer txn.Rollback()
 
 			var err error
 			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
+				return nil, fmt.Errorf("marshalling checkpoint: %w", err)
 			}
 
 			var fenceUpdate strings.Builder
 			if err := d.templates["updateFence"].Execute(&fenceUpdate, d.store.fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
+				return nil, fmt.Errorf("evaluating fence template: %w", err)
 			}
 
 			if results, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating flow checkpoint: %w", err)
+				return nil, fmt.Errorf("updating flow checkpoint: %w", err)
 			} else if rowsAffected, err := results.RowsAffected(); err != nil {
-				return fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
+				return nil, fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
 			} else if rowsAffected < 1 {
-				return fmt.Errorf("This instance was fenced off by another")
+				return nil, fmt.Errorf("This instance was fenced off by another")
 			}
 
 			if err := txn.Commit(); err != nil {
-				return fmt.Errorf("committing Store transaction: %w", err)
+				return nil, fmt.Errorf("committing Store transaction: %w", err)
 			}
 
-			return nil
+			return nil, nil
 		})
 	}, nil
 }
