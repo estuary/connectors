@@ -11,6 +11,7 @@ import (
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -192,7 +193,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
-) (_ pm.Transactor, err error) {
+) (_ m.Transactor, err error) {
 	cfg := ep.Config.(*config)
 
 	s3client, err := cfg.toS3Client(ctx)
@@ -231,14 +232,14 @@ type binding struct {
 	storeFile *stagedFile
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
 		panic("connector must be set to delta updates")
 	}
 	return nil
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	for it.Next() {
@@ -255,25 +256,25 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
 		var err error
 		if d.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
 		var fenceUpdate strings.Builder
 		if err := tplUpdateFence.Execute(&fenceUpdate, d.fence); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
+			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error {
+		return nil, m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
 			// NB: Motherduck doesn't actually support transactions yet, but this code is written
 			// like it does. Eventually Motherduck will probably support transactions, and the
 			// connector pretending like it already does doesn't hurt anything and may make the
 			// eventual transition easier.
 			txn, err := d.storeConn.BeginTx(ctx, nil)
 			if err != nil {
-				return fmt.Errorf("store BeginTx: %w", err)
+				return nil, fmt.Errorf("store BeginTx: %w", err)
 			}
 			defer txn.Rollback()
 
@@ -285,7 +286,7 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 				delete, err := b.storeFile.flush(ctx)
 				if err != nil {
-					return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
+					return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 				}
 				defer delete(ctx)
 
@@ -294,25 +295,25 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 					Table: b.target,
 					Files: b.storeFile.allFiles(),
 				}); err != nil {
-					return err
+					return nil, err
 				}
 
 				if _, err := txn.ExecContext(ctx, storeQuery.String()); err != nil {
-					return fmt.Errorf("executing store query for binding[%d]: %w", idx, err)
+					return nil, fmt.Errorf("executing store query for binding[%d]: %w", idx, err)
 				}
 			}
 
 			if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating checkpoints: %w", err)
+				return nil, fmt.Errorf("updating checkpoints: %w", err)
 			} else if rows, err := res.RowsAffected(); err != nil {
-				return fmt.Errorf("getting fence update rows affected: %w", err)
+				return nil, fmt.Errorf("getting fence update rows affected: %w", err)
 			} else if rows != 1 {
-				return fmt.Errorf("this instance was fenced off by another")
+				return nil, fmt.Errorf("this instance was fenced off by another")
 			} else if err := txn.Commit(); err != nil {
-				return fmt.Errorf("committing store transaction: %w", err)
+				return nil, fmt.Errorf("committing store transaction: %w", err)
 			}
 
-			return nil
+			return nil, nil
 		})
 	}, nil
 }

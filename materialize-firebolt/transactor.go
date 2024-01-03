@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/materialize-firebolt/firebolt"
 	"github.com/estuary/connectors/materialize-firebolt/schemalate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -21,7 +22,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
@@ -107,7 +108,7 @@ type transactor struct {
 }
 
 // firebolt is delta-update only, so loading of data from Firebolt is not necessary
-func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
 		panic("delta updates have no loads")
 	}
@@ -176,7 +177,7 @@ func (t *transactor) projectDocument(spec *pf.MaterializationSpec_Binding, keys 
 	return jsonDoc, nil
 }
 
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var awsConfig = aws.Config{
 		Credentials: credentials.NewStaticCredentials(t.awsKeyId, t.awsSecretKey, ""),
 		Region:      &t.awsRegion,
@@ -229,18 +230,18 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 
 	// Return a StartCommitFunc closure which returns our encoded `checkpoint`,
 	// and will apply it only after the runtime acknowledges its commit.
-	return func(ctx context.Context, _ *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+	return func(ctx context.Context, _ *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
 		var checkpointJSON, err = json.Marshal(checkpoint)
 		if err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
 
-		var commitOp = pf.RunAsyncOperation(func() error {
+		var commitOp = m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
 			select {
 			case <-runtimeAckCh:
-				return applyCheckpoint(ctx, t.fb, checkpoint)
+				return nil, applyCheckpoint(ctx, t.fb, checkpoint)
 			case <-ctx.Done():
-				return ctx.Err()
+				return nil, ctx.Err()
 			}
 		})
 		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, commitOp

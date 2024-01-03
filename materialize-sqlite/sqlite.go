@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -156,7 +157,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
-) (_ pm.Transactor, err error) {
+) (_ m.Transactor, err error) {
 	var d = &transactor{
 		dialect: &sqliteDialect,
 	}
@@ -279,7 +280,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 }
 
 func (d *transactor) Load(
-	it *pm.LoadIterator,
+	it *m.LoadIterator,
 	loaded func(int, json.RawMessage) error,
 ) error {
 
@@ -329,7 +330,7 @@ func (d *transactor) Load(
 	return nil
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if err := checkDatabaseSize(); err != nil {
 		return nil, err
 	}
@@ -358,13 +359,13 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		return nil, pf.RunAsyncOperation(func() error {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, _ <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+		return nil, m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
 			if err = txn.Commit(); err != nil {
-				return fmt.Errorf("commit transaction: %w", err)
+				return nil, fmt.Errorf("commit transaction: %w", err)
 			}
 
-			return nil
+			return nil, nil
 		})
 	}, nil
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-s3-parquet/checkpoint"
@@ -238,7 +239,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return &pm.Response_Applied{}, nil
 }
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
@@ -301,26 +302,26 @@ type transactor struct {
 	lastUploadTime       time.Time
 }
 
-func (t *transactor) Load(it *pm.LoadIterator, _ func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
 	for it.Next() {
 		panic("Load should never be called for materialize-s3-parquet.Driver")
 	}
 	return nil
 }
 
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	for it.Next() {
 		if err := t.fileProcessor.Store(it.Binding, it.Key, it.Values); err != nil {
 			return nil, err
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
 		// Retain runtime checkpoint for it to be potentially encoded in a
 		// driverCheckpointJSON produced as part of a future call to maybeUpload().
 		var err error
 		if t.runtimeCheckpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
 		// We don't await `runtimeAckCh` because it's not required for correctness.
@@ -328,7 +329,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		// with a previous driver checkpoint which will re-produce and upload this
 		// same file.
 		if err := t.maybeUpload(); err != nil {
-			return nil, pf.FinishedOperation(err)
+			return nil, m.FinishedOperation(err)
 		}
 
 		if len(t.driverCheckpointJSON) == 0 {
@@ -336,7 +337,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 
 		return &pf.ConnectorState{UpdatedJson: t.driverCheckpointJSON},
-			pf.FinishedOperation(err)
+			m.FinishedOperation(err)
 	}, nil
 }
 

@@ -151,23 +151,17 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}
 
 	for i, bundle := range queries.Bindings {
-		if !req.DryRun {
-			_, err := fb.Query(bundle.CreateExternalTable)
-			if err != nil {
-				return nil, fmt.Errorf("running external table creation query: %w", err)
-			}
+		_, err := fb.Query(bundle.CreateExternalTable)
+		if err != nil {
+			return nil, fmt.Errorf("running external table creation query: %w", err)
+		}
 
-			_, err = fb.Query(bundle.CreateTable)
-			if err != nil {
-				return nil, fmt.Errorf("running table creation query: %w", err)
-			}
+		_, err = fb.Query(bundle.CreateTable)
+		if err != nil {
+			return nil, fmt.Errorf("running table creation query: %w", err)
 		}
 
 		tables = append(tables, string(req.Materialization.Bindings[i].ResourceConfigJson))
-	}
-
-	if req.DryRun {
-		return &pm.Response_Applied{ActionDescription: fmt.Sprint("to create tables: ", strings.Join(tables, ","))}, nil
 	}
 
 	err = WriteSpec(cfg, req.Materialization, req.Version)

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -122,7 +123,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return &pm.Response_Applied{}, nil
 }
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
@@ -150,7 +151,7 @@ type transactor struct {
 }
 
 // Load should not be called and panics.
-func (d *transactor) Load(it *pm.LoadIterator, _ func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
 	for it.Next() {
 		panic("Load should never be called for webhook.Driver")
 	}
@@ -158,7 +159,7 @@ func (d *transactor) Load(it *pm.LoadIterator, _ func(int, json.RawMessage) erro
 }
 
 // Store invokes the Webhook URL, with a body containing StoreIterator documents.
-func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var bodies = make([]bytes.Buffer, len(d.addresses))
 	var ctx = it.Context()
 

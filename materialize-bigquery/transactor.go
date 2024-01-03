@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -35,7 +36,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
-) (_ pm.Transactor, err error) {
+) (_ m.Transactor, err error) {
 	cfg := ep.Config.(*config)
 
 	client, err := cfg.client(ctx)
@@ -150,7 +151,7 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 	return s, nil
 }
 
-func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
 	log.Info("load: starting encoding and uploading of files")
@@ -230,7 +231,7 @@ func (t *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return nil
 }
 
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 	t.round++
 
@@ -249,18 +250,18 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
 		log.Info("store: starting commit phase")
 		var err error
 		if t.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
 		return nil, sql.CommitWithDelay(ctx, t.round, t.updateDelay, it.Total, t.commit)
 	}, nil
 }
 
-func (t *transactor) commit(ctx context.Context) error {
+func (t *transactor) commit(ctx context.Context) (*pf.ConnectorState, error) {
 	// Build the slice of transactions required for a commit.
 	var subqueries []string
 
@@ -272,7 +273,7 @@ func (t *transactor) commit(ctx context.Context) error {
 	// First we must validate the fence has not been modified.
 	var fenceUpdate strings.Builder
 	if err := tplUpdateFence.Execute(&fenceUpdate, t.fence); err != nil {
-		return fmt.Errorf("evaluating fence template: %w", err)
+		return nil, fmt.Errorf("evaluating fence template: %w", err)
 	}
 	subqueries = append(subqueries, fenceUpdate.String())
 
@@ -287,7 +288,7 @@ func (t *transactor) commit(ctx context.Context) error {
 
 		delete, err := b.storeFile.flush(ctx)
 		if err != nil {
-			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
+			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
 		defer delete(ctx)
 
@@ -315,7 +316,7 @@ func (t *transactor) commit(ctx context.Context) error {
 	// This returns a single row with the error status of the query.
 	job, err := t.client.runQuery(ctx, query)
 	if err != nil {
-		return fmt.Errorf("commit query: %w", err)
+		return nil, fmt.Errorf("commit query: %w", err)
 	}
 	log.Info("store: finished commit")
 
@@ -324,9 +325,9 @@ func (t *transactor) commit(ctx context.Context) error {
 			"job":   job,
 			"error": err,
 		}).Error("Bigquery job failed")
-		return fmt.Errorf("merge error: %s", err)
+		return nil, fmt.Errorf("merge error: %s", err)
 	} else {
-		return nil
+		return nil, nil
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -269,7 +270,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
-) (_ pm.Transactor, err error) {
+) (_ m.Transactor, err error) {
 	var cfg = ep.Config.(*config)
 
 	var d = &transactor{
@@ -444,7 +445,7 @@ func (t *transactor) addBinding(
 	return nil
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 	gotLoads := false
 
@@ -575,7 +576,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return nil
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 	d.round++
 
@@ -642,16 +643,16 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
 		log.Info("store: starting commit phase")
 		var err error
 		if d.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
 		var fenceUpdate strings.Builder
 		if err := tplUpdateFence.Execute(&fenceUpdate, d.fence); err != nil {
-			return nil, pf.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
+			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
 		}
 
 		return nil, sql.CommitWithDelay(
@@ -659,8 +660,8 @@ func (d *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			d.round,
 			d.updateDelay,
 			it.Total,
-			func(ctx context.Context) error {
-				return d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates)
+			func(ctx context.Context) (*pf.ConnectorState, error) {
+				return nil, d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates)
 			},
 		)
 	}, nil

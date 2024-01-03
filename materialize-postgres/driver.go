@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -237,7 +238,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
-) (_ pm.Transactor, err error) {
+) (_ m.Transactor, err error) {
 	var d = &transactor{}
 	d.store.fence = fence
 
@@ -304,7 +305,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	return nil
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
 	// Use a read-only "load" transaction, which will automatically
@@ -369,7 +370,7 @@ func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage)
 	return nil
 }
 
-func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err error) {
+func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
 	txn, err := d.store.conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -400,18 +401,18 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, pf.OpFuture) {
-		return nil, pf.RunAsyncOperation(func() error {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
+		return nil, m.RunAsyncOperation(func() (*pf.ConnectorState, error) {
 			defer txn.Rollback(ctx)
 
 			var err error
 			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
+				return nil, fmt.Errorf("marshalling checkpoint: %w", err)
 			}
 
 			var fenceUpdate strings.Builder
 			if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
+				return nil, fmt.Errorf("evaluating fence template: %w", err)
 			}
 
 			// Add the update to the fence as the last statement in the batch.
@@ -422,22 +423,22 @@ func (d *transactor) Store(it *pm.StoreIterator) (_ pm.StartCommitFunc, err erro
 			// Execute all remaining doc inserts & updates.
 			for i := 0; i < batch.Len()-1; i++ {
 				if _, err := results.Exec(); err != nil {
-					return fmt.Errorf("store at index %d: %w", i, err)
+					return nil, fmt.Errorf("store at index %d: %w", i, err)
 				}
 			}
 
 			// The fence update is always the last operation in the batch.
 			if _, err := results.Exec(); err != nil {
-				return fmt.Errorf("updating flow checkpoint: %w", err)
+				return nil, fmt.Errorf("updating flow checkpoint: %w", err)
 			} else if err = results.Close(); err != nil {
-				return fmt.Errorf("results.Close(): %w", err)
+				return nil, fmt.Errorf("results.Close(): %w", err)
 			}
 
 			if err := txn.Commit(ctx); err != nil {
-				return fmt.Errorf("committing Store transaction: %w", err)
+				return nil, fmt.Errorf("committing Store transaction: %w", err)
 			}
 
-			return nil
+			return nil, nil
 		})
 	}, nil
 }
