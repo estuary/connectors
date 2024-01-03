@@ -137,6 +137,11 @@ flowctl-go api build \
 # Activate the catalog.
 flowctl-go api activate --build-id test-build-id --all --network "flow-test" --log.level info || bail "Activate failed."
 
+# When we try to read the container name below, we assume that there will only be 1
+# materialize-sqlite container. This sleep makes it more likely that any materialize-sqlite
+# containers started by `api activate` will get cleaned up before our loop.
+sleep 15
+
 # Periodically check expected vs actual lines of output, once we reach the same
 # number of lines, we stop the plane and then compare the output
 retry_counter=0
