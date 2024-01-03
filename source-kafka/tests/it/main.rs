@@ -38,6 +38,8 @@ fn check_test() {
         // The connector seems to ignore bindings during validation.
         // That seems wrong, but not something I'm going to try to address at the moment.
         bindings: Vec::new(),
+        last_capture: None,
+        last_version: String::new(),
     };
 
     source_kafka::KafkaConnector::validate(&mut stdout, req).expect("check command to succeed");
