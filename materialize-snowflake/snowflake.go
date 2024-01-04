@@ -523,9 +523,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				// that have been committed in this transaction. The reason is that it may be the case that a binding
 				// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
 				// the binding and running the queries that are pending for its last transaction.
-				var checkpointClear = make(map[string][]string)
+				var checkpointClear = checkpoint{Queries: make(map[string][]string), ToDelete: make(map[string][]string)}
 				for _, b := range d.bindings {
-					checkpointClear[b.target.Identifier] = []string{}
+					checkpointClear.Queries[b.target.Identifier] = []string{}
+					checkpointClear.ToDelete[b.target.Identifier] = []string{}
 				}
 				checkpointJSON, err = json.Marshal(checkpointClear)
 				if err != nil {
@@ -550,16 +551,12 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 	var asyncCtx = sf.WithAsyncMode(ctx)
 	log.Info("store: starting committing changes")
 
-	// TODO: cleanup
-	log.WithField("queries", cp.Queries).WithField("to_delete", cp.ToDelete).Info("checkpoint")
-
 	// Run the queries using AsyncMode, which means that `ExecContext` will not block
 	// until the query is successful, rather we will store the results of these queries
 	// in a map so that we can then call `RowsAffected` on them, blocking until
 	// the queries are actually executed and done
 	var results = make(map[string]stdsql.Result)
 	for table, queries := range cp.Queries {
-		log.WithField("table", table).WithField("has binding", d.hasTableBinding(table)).Info("checkpoint")
 		// during recovery we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
 		if recovery && !d.hasTableBinding(table) {
