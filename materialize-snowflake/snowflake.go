@@ -293,14 +293,14 @@ func newTransactor(
 		}
 	}
 
-	if err = d.applyCheckpoint(ctx, cp, true); err != nil {
-		return nil, fmt.Errorf("applying recovered checkpoint: %w", err)
-	}
-
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding); err != nil {
 			return nil, fmt.Errorf("%v: %w", binding, err)
 		}
+	}
+
+	if err = d.applyCheckpoint(ctx, cp, true); err != nil {
+		return nil, fmt.Errorf("applying recovered checkpoint: %w", err)
 	}
 
 	return d, nil
@@ -318,7 +318,6 @@ type binding struct {
 		stage     *stagedFile
 		mergeInto string
 		copyInto  string
-		mustMerge bool
 	}
 }
 
@@ -469,10 +468,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		} else if err = b.store.stage.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
-
-		if it.Exists {
-			b.store.mustMerge = true
-		}
 	}
 
 	// Upload the staged files and build a list of merge and copy into queries that need to be run
@@ -497,26 +492,13 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, err
 		}
 
-		if !b.store.mustMerge {
-			// We can issue a faster COPY INTO the target table.
-			if v, ok := queries[b.target.Identifier]; ok {
-				queries[b.target.Identifier] = append(v, renderWithDir(b.store.copyInto, dir))
-			} else {
-				queries[b.target.Identifier] = []string{renderWithDir(b.store.copyInto, dir)}
-			}
+		if v, ok := queries[b.target.Identifier]; ok {
+			queries[b.target.Identifier] = append(v, renderWithDir(b.store.mergeInto, dir))
 		} else {
-			// We can issue a faster COPY INTO the target table.
-			if v, ok := queries[b.target.Identifier]; ok {
-				queries[b.target.Identifier] = append(v, renderWithDir(b.store.mergeInto, dir))
-			} else {
-				queries[b.target.Identifier] = []string{renderWithDir(b.store.mergeInto, dir)}
-			}
+			queries[b.target.Identifier] = []string{renderWithDir(b.store.mergeInto, dir)}
 		}
 
 		toDelete[b.target.Identifier] = []string{fmt.Sprintf("@flow_v1/%s", dir)}
-
-		// Reset for next transaction.
-		b.store.mustMerge = false
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, runtimeAckCh <-chan struct{}) (*pf.ConnectorState, m.OpFuture) {
@@ -568,12 +550,16 @@ func (d *transactor) applyCheckpoint(ctx context.Context, cp checkpoint, recover
 	var asyncCtx = sf.WithAsyncMode(ctx)
 	log.Info("store: starting committing changes")
 
+	// TODO: cleanup
+	log.WithField("queries", cp.Queries).WithField("to_delete", cp.ToDelete).Info("checkpoint")
+
 	// Run the queries using AsyncMode, which means that `ExecContext` will not block
 	// until the query is successful, rather we will store the results of these queries
 	// in a map so that we can then call `RowsAffected` on them, blocking until
 	// the queries are actually executed and done
 	var results = make(map[string]stdsql.Result)
 	for table, queries := range cp.Queries {
+		log.WithField("table", table).WithField("has binding", d.hasTableBinding(table)).Info("checkpoint")
 		// during recovery we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
 		if recovery && !d.hasTableBinding(table) {
