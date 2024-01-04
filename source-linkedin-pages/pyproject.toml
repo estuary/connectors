@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "source-linkedin-pages-estuary"
+version = "0.1.0"
+description = ""
+authors = ["Jonathan Wihl <jonathan@estuary.dev>"]
+
+[tool.poetry.dependencies]
+source_linkedin_pages = { path = "source_linkedin_pages", develop = true}
+airbyte-cdk = "^0.52"
+flow-sdk = {path="../python", develop = true}
+jsonlines = "^4.0.0"
+mypy = "^1.5"
+orjson = "^3.9.7"
+pydantic = "1.10.12"
+python = ">=3.11,<3.12"
+requests = "^2.31.0"
+types-requests = "^2.31"
+pytest = "^7.4.3"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-insta = "^0.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+

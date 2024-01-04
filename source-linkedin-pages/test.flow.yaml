@@ -1,0 +1,12 @@
+---
+captures:
+  acmeCo/source-linkedin-pages:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source-linkedin-pages
+        config:
+          credentials: connector_config.yaml
+    bindings: []
