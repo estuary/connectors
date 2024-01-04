@@ -1,21 +1,22 @@
 credentials:
     auth_method: oauth2.0
-    client_id_sops: ENC[AES256_GCM,data:3nndJkjHvaslFFHzMNO2mIARTk/eNhlCmq3oXGGMyRkz1J9O,iv:6zJ2yoxivuSqkfyEWTq1mMJsNUggroq5l1cgjuS5a80=,tag:dqV9JXRe1sV6UqqIrhwIAQ==,type:str]
-    client_secret_sops: ENC[AES256_GCM,data:1Pyk8eLTm9podLQ9bBlCG7pyN9Pqj7qWB8iWrz8alAa0rXfmPVRs2Q==,iv:kkQKCsVMOyb8FTN1wnHD8sG7SoBbtdGLFvGDWniOXyo=,tag:lBwi8yEsfiQ+HZZF9ge99Q==,type:str]
-    tenant_id: f8cdef31-a31e-4b4a-93e4-5f571e91255a
-    refresh_token: M.C106_BAY.-CamKSggG0rJjzlSOEL7oD74Ge6KReo9nVegJw353sA8brwzv7t1v7!y3wUte0us7WHI7D1uUzKIqHKLMXGY4UWpUJd0lGDnBfGs89fcXQZGjU9LRlZBhn3DqvjCQ5drR8aXk0mvdBG2een2GYKGh*BfqbtzPSHEMCAotV7JmojtDicXi1mO7obvP67XMIW!cGDUk6j*eG!FEJ1qqa1rF8ogGBXzPMo!oHmOr9IGKC!lTnvlBzJf3Z5w4or8q67VwsWWUwv1l7aDODI6n18MsQ4YV89meaZX4ZGkg5AfaojRENzca3zamxAj2xfysqZk5bus0aQnc7G3njxqoQzYh2X9FReP1RckcDp2s9cz9ttvADRFVAHX7EQ3Cf8nOFyBGDGZDVJvq*mgsjrzivRX10OM$
-    developer_token: 1072JQDAYU870189
+    client_id_sops: ENC[AES256_GCM,data:NM05NDVgVIiVa/Oc+EixEqqupIlqVOvQvcL4ecaz1Yt9FpTu,iv:s9lFE8zlQk5njvviRqqRlrAMRDWSL19FEVm3Hy1i8Vg=,tag:R7LHFewb9a5MiqRZibW1Og==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:PVwgPRn/vZp2W2b2B2HVmwWZxTag4beSbYZu+qUIwQOfx1m+3CFlNQ==,iv:s7fucPOt9HB0Mmedada1rve7wSuWgXokj7kBh3qNzzk=,tag:0FjxmLJHQaNL5jM4/FIg0w==,type:str]
+    access_token: eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkExMjhDQkMtSFMyNTYiLCJ4NXQiOiJ4NnE0ZUJiR0swSmJTUk5TWXZTaG5KMmZnQ2ciLCJ6aXAiOiJERUYifQ.kdjdP5_IuzCP6eQLIh1woGx5H5QgT0joUwKGe99Fx8bwV8YOGHvRfJglfSJH8E87LWzyhMzLBvES7oMUfwgSfq5NSqPHA8NYKLNauMjJNSTRouNe5-qsmZofNtgIzw6jcDsYlrAf2xQVIEKl__36mFjRd_XXfbJi6oK6uthwwAJbM7EXQe2ZbvYHhba4LtjnTv72tfqdA2ap6LHYyhbALuYvFIfQgVd2P3uSdye5HcuMN2HEdSl_lbOZ86-ZNUeVhMmQ7bHe83-BDANCCh8yIkg7iI45vN-PHiSCet56GtjPXbSJ6ll8B7vjmSQCutwS13jKAo50_KR_BZWLAbOhgw.YsO_18C-A8L2AZPOeWnfxg.Hz9Xjdq0vT091LcM1Hzpz-6sIa3DqCQg_FTqlTfqr1TYBIMv7rw5v5GHYaP8EMvTVhyu0ZVBZ4jFN5ouNfQopjA6xCMEfJwWUAw4m0ku_y7ALNZbgfntZbf56IypZCS9qNeW4el2c-PEUN2cFMwCREe5_vgLqQjtGDtMrkDwOFtJL7yCLpnQ7TehpU8c4m1dOgj4VVP17eF4AJsYeKei-poNWz4xDBE6XNz8SZlyqTcfuTKE5i5ypiXvtAfATckB7_YJX9DP-ujobfYi8tnaiIgbPrGY--up8TKxwcNekpTte8smH6O6u-_hovyyW9hxg7SPcm7VQ-8TCf4MmIzpMDi2rgNDD5dMD8mxD8fJnPsNqasiMxZ2brthae8-b6kzvWUPFj0e5B03sYrnBLA6wm-iJeWsiU6fUuKmGKLksgLPazWm1h3ZtXxHY4zsVE1wwB3nl0F3Nj25mWjOMD5m8ukvHg809RGOdsEkHST1Cy2m35Uo5DRQP7ii7QkhNIs3utWEn8-SnCjrXUQe0VtQkPSZSgGrLhhVNCg-RaBZg0OvL73KFSh85S340FQBBfHnzLFhunEmFodMBqwpnoS1uCxVfi0jFU7LfDb7-slwZ_Vh8_k67iiPYgsPiHCYgK6PhFUgpG_gcCwR3CPH3E9XoteE3ygcgt9Ky5l4Gvujeun3ZnUsQW4ud4f6vDBIRwiUp8ON-TRhmJ_x4PxB976qRNjA_TMoOe1t2dvtcF3_hbOgiytxI9DKKBOuXHNGwwirBz5Ki0fdRAYo0Kmjkd4vaMmS51_NWU4N_o4-kjoYPQfMZlyRecWwi7loDjECNUiX6RmpQTu_EYAHriY32d1-BezVR4hiOKYBX4qd4ZrvUONCUCbgT53dZfXSuko4FNx-I34wPGWK7-1gvvSf1FWecDISrCLNLZjqtGo3PBcRqxvee3w-fkPiFRHa2dhXelRIOySl_Xn_r1w83JZDEEkgrMZwrJrsgHyDBw6c8ZcvYSQnUrqQK5sBfQQC3tuyiZozVTJORTyzm0u5i0pAdDFfSfUHi44uuzEXZP98I9nJKDpYf8RPh0TxWcCha7gV0DolhWtAsHs0Jm3NChFFDkgkwu1i_PWOLjIGVIgahy9dLAFtiqBg6Wxue6igqo2E4EYC7q924ulRLfmYkjQ5zAVGniJWobM7WxuXoDtD_GwZJ2MNl3V00_yMY9GDBQNEXIfg7sMxctyuBWhnaGky35MwioCuEO45r8K5qslCL5I09tDIdGEFuKEu67BtPKnyVVqjs__F4jCfu_waMV3mh3c0ME3nTKWyQi7WmHjfmy79aGKDxJoaCsARIlbhk3xw57GcirwUdgOcuEqQopNarpC0fiw4TcbGPKlBP96XSSj5Tyr_K8TCqITI-wSy4hPP1Thu.LE6Cbn9f1K64HDKgOuboZQ
+    refresh_token: M.C105_SN1.-Cmi44NWuWm61NdDkZik6kAcVwz5jv7dt3FJbngrQE*dCyBebKPNt4WunrBTT5eYMo4LxTySCNlcvSGdf2BKlxG2ei7FQJpX6LfX4!BQJcVg!Mjd5AFOQvZClLN*X3GqPzAqrOIL!4bskNT!k5gG153RFF64GZ!IXM7BYo4tPOStHLKehHYsId4l8fncIKvTdYLzt1WQTROa8uWBkZ!dheg1h4nu1RscWl2UkJnFrSTuCcXDq9awXjbghpbrVx2EgSMR7OeFQv7asaY7Qp1slQDZKXZmmHvvs14PMfVlWVveQcDvL993XZL3Kp7ItoSC1M*JlDz*48rP5hqjVjsz2TjeYbjEdYTmoCzJPcwG6vgqjRM*EZsQGhSW1oIBewlateVilArZx4LcX9vSGss7yOwe8heq8ZDayV6COXGolCImd7fD!65ow42XovIwSuRPquw$$
+    token_expiry_date: "2024-01-04T19:30:16.108Z"
+    developer_token_sops: ENC[AES256_GCM,data:7lZS2oE2rQE0Rtmud96jTA==,iv:o8NSHFpzcJVUkCzNT0imEiBcHRrtPyzkZUV+NJCXMlQ=,tag:b0AUYsfkv26XXSf6ZYFsPg==,type:str]
 sops:
     kms: []
     gcp_kms:
-        - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow
-          created_at: "2023-12-08T17:37:54Z"
-          enc: CiQAW8BC2Crpufkdcy4tzxq0rVLeYpjqd27n2/jZpi52WjP+RGQSSQD00UdD8hJCumY0Ftz7ZNEV+4l6/X7Z6AUG/ef9kRgna2g4BZP4vJms0a8jNu98MKBWWP6pjhRL99cgifu6l4152UMCieFjrN0=
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-01-04T18:35:28Z"
+          enc: CiQAdmEdwrvbD9PP/kFFM67tL/sWXjvi3/WuNGoEJj2EyKBF2VASSQCVvC1zKFXbvch++EOnw75sH+pdMBIInXar1Dy6HjzroLYgg8HZhp1OkVN4ZfPoFLD3eicIogPJF5Nc3XlXrXvfJZeRNfQgqmo=
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2023-12-12T18:36:32Z"
-    mac: ENC[AES256_GCM,data:RWV+1p7Ycv14UytkJtTUhN2pCDqaVyOXkQv5oZrmRVXJO20keuqGoV1SRPnMaYp4J28ywaQeZSgtvBmWHlJbEH6qUcbLBH+91AejKB4ugl47ZBaLP3NAQTYY+kD6N9GYLRE2lT9Tm45l7bM1OeWv1I0eD0PoWNgWP57HrWS3Cw4=,iv:Gw9m6N42NyTk6z7BdsCcsu05+siFkmLIcDvbjIyFZbQ=,tag:vQPOYswDdlPdhGFufRT13w==,type:str]
+    lastmodified: "2024-01-04T18:35:29Z"
+    mac: ENC[AES256_GCM,data:v3lA4LyO4M0nwT7YNrGumW0K+JAugw0T/rZSChLffTVZfoczjKYihxxhtna08nVq5y8AKim00csuqiTHqB1dyWtvz0puLpx5FaGirR4Y6cbukJw5GRLn+kY/l74WgAhLJ5Bv1C/QWBUWz8MW2p5PXJUlJrdWedFaAnfQ+fyaVKM=,iv:C+ylFFws/Xcx7PBoML5JV0BgoZqadRMhz1cUILswJqg=,tag:5ltV6HPucnyBJTpK+RJOuw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
