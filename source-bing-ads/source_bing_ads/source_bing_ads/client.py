@@ -59,8 +59,16 @@ class Client:
         client_id: str = None,
         client_secret: str = None,
         refresh_token: str = None,
+        credentials: dict = None,
         **kwargs: Mapping[str, Any],
     ) -> None:
+        if credentials is not None:
+            refresh_token = credentials["refresh_token"]
+            developer_token = credentials["developer_token"]
+
+            client_id = credentials["client_id"]
+            client_secret = credentials["client_secret"]
+
         self.refresh_token = refresh_token
         self.developer_token = developer_token
 
@@ -96,7 +104,7 @@ class Client:
         )
 
     def _get_access_token(self) -> OAuthTokens:
-        self.logger.info("Fetching access token ...")
+        # self.logger.info("Fetching access token ...")
         # clear caches to be able to use new access token
         self.get_service.cache_clear()
         self._get_auth_data.cache_clear()

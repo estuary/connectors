@@ -314,7 +314,7 @@ class CampaignImpressionPerformanceReport(BingAdsReportingServicePerformanceStre
 
     report_schema_name = "campaign_impression_performance_report"
 
-    primary_key = None
+    primary_key = ["AccountId"]
 
 
 class CampaignImpressionPerformanceReportHourly(HourlyReportTransformerMixin, CampaignImpressionPerformanceReport):
@@ -486,7 +486,7 @@ class GeographicPerformanceReport(BingAdsReportingServicePerformanceStream, ABC)
 
     # Need to override the primary key here because the one inherited from the PerformanceReportsMixin
     # is incorrect for the geographic performance reports
-    primary_key = None
+    primary_key = ["AccountId"]
 
 
 class GeographicPerformanceReportHourly(HourlyReportTransformerMixin, GeographicPerformanceReport):
@@ -549,7 +549,7 @@ class AccountImpressionPerformanceReport(BingAdsReportingServicePerformanceStrea
 
     report_name: str = "AccountPerformanceReport"
     report_schema_name = "account_impression_performance_report"
-    primary_key = None
+    primary_key = ["AccountId"]
 
 
 class AccountImpressionPerformanceReportHourly(HourlyReportTransformerMixin, AccountImpressionPerformanceReport):
@@ -667,7 +667,7 @@ class CustomReport(BingAdsReportingServicePerformanceStream, ABC):
     transformer: TypeTransformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
     custom_report_columns = []
     report_schema_name = None
-    primary_key = None
+    primary_key = ["AccountId"]
 
     @property
     def cursor_field(self) -> Union[str, List[str]]:

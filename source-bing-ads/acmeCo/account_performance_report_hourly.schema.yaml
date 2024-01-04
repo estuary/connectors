@@ -1,0 +1,158 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  AccountId:
+    type:
+      - "null"
+      - integer
+  TimePeriod:
+    type:
+      - "null"
+      - string
+    format: date-time
+  CurrencyCode:
+    type:
+      - "null"
+      - string
+  AdDistribution:
+    type:
+      - "null"
+      - string
+  DeviceType:
+    type:
+      - "null"
+      - string
+  Network:
+    type:
+      - "null"
+      - string
+  DeliveredMatchType:
+    type:
+      - "null"
+      - string
+  DeviceOS:
+    type:
+      - "null"
+      - string
+  TopVsOther:
+    type:
+      - "null"
+      - string
+  BidMatchType:
+    type:
+      - "null"
+      - string
+  AccountName:
+    type:
+      - "null"
+      - string
+  AccountNumber:
+    type:
+      - "null"
+      - string
+  PhoneImpressions:
+    type:
+      - "null"
+      - integer
+  PhoneCalls:
+    type:
+      - "null"
+      - integer
+  Clicks:
+    type:
+      - "null"
+      - integer
+  Ctr:
+    type:
+      - "null"
+      - integer
+  Spend:
+    type:
+      - "null"
+      - integer
+  Impressions:
+    type:
+      - "null"
+      - integer
+  CostPerConversion:
+    type:
+      - "null"
+      - integer
+  Ptr:
+    type:
+      - "null"
+      - integer
+  Assists:
+    type:
+      - "null"
+      - integer
+  ReturnOnAdSpend:
+    type:
+      - "null"
+      - integer
+  CostPerAssist:
+    type:
+      - "null"
+      - integer
+  AverageCpc:
+    type:
+      - "null"
+      - integer
+  AveragePosition:
+    type:
+      - "null"
+      - integer
+  AverageCpm:
+    type:
+      - "null"
+      - integer
+  Conversions:
+    type:
+      - "null"
+      - integer
+  ConversionsQualified:
+    type:
+      - "null"
+      - integer
+  ConversionRate:
+    type:
+      - "null"
+      - integer
+  LowQualityClicks:
+    type:
+      - "null"
+      - integer
+  LowQualityClicksPercent:
+    type:
+      - "null"
+      - integer
+  LowQualityImpressions:
+    type:
+      - "null"
+      - integer
+  LowQualitySophisticatedClicks:
+    type:
+      - "null"
+      - integer
+  LowQualityConversions:
+    type:
+      - "null"
+      - integer
+  LowQualityConversionRate:
+    type:
+      - "null"
+      - integer
+  Revenue:
+    type:
+      - "null"
+      - integer
+  RevenuePerConversion:
+    type:
+      - "null"
+      - integer
+  RevenuePerAssist:
+    type:
+      - "null"
+      - integer
+x-infer-schema: true

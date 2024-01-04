@@ -4,12 +4,51 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Bing Ads Spec",
     "type": "object",
-    "required": ["developer_token", "client_id", "refresh_token"],
+    "required": ["credentials"],
     "additionalProperties": true,
     "properties": {
-      "auth_method": {
-        "type": "string",
-        "const": "oauth2.0"
+      "credentials": {
+        "type": "object",
+        "required": [
+          "developer_token",
+          "client_id",
+          "refresh_token"
+        ],
+        "properties": {
+          "auth_method": {
+            "type": "string",
+            "const": "oauth2.0"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client ID",
+            "description": "The Client ID of your Microsoft Advertising developer application.",
+            "airbyte_secret": true,
+            "order": 1
+          },
+          "client_secret": {
+            "type": "string",
+            "title": "Client Secret",
+            "description": "The Client Secret of your Microsoft Advertising developer application.",
+            "default": "",
+            "airbyte_secret": true,
+            "order": 2
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token",
+            "description": "Refresh Token to renew the expired Access Token.",
+            "airbyte_secret": true,
+            "order": 3
+          },
+          "developer_token": {
+            "type": "string",
+            "title": "Developer Token",
+            "description": "Developer token associated with user. See more info <a href=\"https://docs.microsoft.com/en-us/advertising/guides/get-started?view=bingads-13#get-developer-token\"> in the docs</a>.",
+            "airbyte_secret": true,
+            "order": 4
+          }
+        }
       },
       "tenant_id": {
         "type": "string",
@@ -18,35 +57,6 @@
         "airbyte_secret": true,
         "default": "common",
         "order": 0
-      },
-      "client_id": {
-        "type": "string",
-        "title": "Client ID",
-        "description": "The Client ID of your Microsoft Advertising developer application.",
-        "airbyte_secret": true,
-        "order": 1
-      },
-      "client_secret": {
-        "type": "string",
-        "title": "Client Secret",
-        "description": "The Client Secret of your Microsoft Advertising developer application.",
-        "default": "",
-        "airbyte_secret": true,
-        "order": 2
-      },
-      "refresh_token": {
-        "type": "string",
-        "title": "Refresh Token",
-        "description": "Refresh Token to renew the expired Access Token.",
-        "airbyte_secret": true,
-        "order": 3
-      },
-      "developer_token": {
-        "type": "string",
-        "title": "Developer Token",
-        "description": "Developer token associated with user. See more info <a href=\"https://docs.microsoft.com/en-us/advertising/guides/get-started?view=bingads-13#get-developer-token\"> in the docs</a>.",
-        "airbyte_secret": true,
-        "order": 4
       },
       "account_names": {
         "title": "Account Names Predicates",
@@ -191,7 +201,7 @@
   },
   "advanced_auth": {
     "auth_flow_type": "oauth2.0",
-    "predicate_key": ["auth_method"],
+    "predicate_key": ["credentials", "auth_method"],
     "predicate_value": "oauth2.0",
     "oauth_config_specification": {
       "complete_oauth_output_specification": {
@@ -200,7 +210,7 @@
         "properties": {
           "refresh_token": {
             "type": "string",
-            "path_in_connector_config": ["refresh_token"]
+            "path_in_connector_config": ["credentials", "refresh_token"]
           }
         }
       },
@@ -222,11 +232,11 @@
         "properties": {
           "client_id": {
             "type": "string",
-            "path_in_connector_config": ["client_id"]
+            "path_in_connector_config": ["credentials", "client_id"]
           },
           "client_secret": {
             "type": "string",
-            "path_in_connector_config": ["client_secret"]
+            "path_in_connector_config": ["credentials", "client_secret"]
           }
         }
       },
@@ -236,7 +246,7 @@
         "properties": {
           "tenant_id": {
             "type": "string",
-            "path_in_connector_config": ["tenant_id"]
+            "path_in_connector_config": ["credentials", "tenant_id"]
           }
         }
       }

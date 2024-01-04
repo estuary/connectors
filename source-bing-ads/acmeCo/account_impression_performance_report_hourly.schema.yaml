@@ -1,0 +1,270 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  AccountName:
+    type:
+      - "null"
+      - string
+  AccountNumber:
+    type:
+      - "null"
+      - string
+  AccountId:
+    type:
+      - "null"
+      - integer
+  TimePeriod:
+    type:
+      - "null"
+      - string
+    format: date-time
+  CurrencyCode:
+    type:
+      - "null"
+      - string
+  AdDistribution:
+    type:
+      - "null"
+      - string
+  Impressions:
+    type:
+      - "null"
+      - integer
+  Clicks:
+    type:
+      - "null"
+      - integer
+  Ctr:
+    type:
+      - "null"
+      - integer
+  AverageCpc:
+    type:
+      - "null"
+      - integer
+  Spend:
+    type:
+      - "null"
+      - integer
+  AveragePosition:
+    type:
+      - "null"
+      - integer
+  Conversions:
+    type:
+      - "null"
+      - integer
+  ConversionRate:
+    type:
+      - "null"
+      - integer
+  CostPerConversion:
+    type:
+      - "null"
+      - integer
+  LowQualityClicks:
+    type:
+      - "null"
+      - integer
+  LowQualityClicksPercent:
+    type:
+      - "null"
+      - integer
+  LowQualityImpressions:
+    type:
+      - "null"
+      - integer
+  LowQualityImpressionsPercent:
+    type:
+      - "null"
+      - integer
+  LowQualityConversions:
+    type:
+      - "null"
+      - integer
+  LowQualityConversionRate:
+    type:
+      - "null"
+      - integer
+  DeviceType:
+    type:
+      - "null"
+      - string
+  PhoneImpressions:
+    type:
+      - "null"
+      - integer
+  PhoneCalls:
+    type:
+      - "null"
+      - integer
+  Ptr:
+    type:
+      - "null"
+      - integer
+  Network:
+    type:
+      - "null"
+      - string
+  Assists:
+    type:
+      - "null"
+      - integer
+  Revenue:
+    type:
+      - "null"
+      - integer
+  ReturnOnAdSpend:
+    type:
+      - "null"
+      - integer
+  CostPerAssist:
+    type:
+      - "null"
+      - integer
+  RevenuePerConversion:
+    type:
+      - "null"
+      - integer
+  RevenuePerAssist:
+    type:
+      - "null"
+      - integer
+  AccountStatus:
+    type:
+      - "null"
+      - string
+  LowQualityGeneralClicks:
+    type:
+      - "null"
+      - integer
+  LowQualitySophisticatedClicks:
+    type:
+      - "null"
+      - integer
+  TopImpressionRatePercent:
+    type:
+      - "null"
+      - integer
+  AllConversions:
+    type:
+      - "null"
+      - integer
+  AllRevenue:
+    type:
+      - "null"
+      - integer
+  AllConversionRate:
+    type:
+      - "null"
+      - integer
+  AllCostPerConversion:
+    type:
+      - "null"
+      - integer
+  AllReturnOnAdSpend:
+    type:
+      - "null"
+      - integer
+  AllRevenuePerConversion:
+    type:
+      - "null"
+      - integer
+  ViewThroughConversions:
+    type:
+      - "null"
+      - integer
+  AverageCpm:
+    type:
+      - "null"
+      - integer
+  ConversionsQualified:
+    type:
+      - "null"
+      - integer
+  LowQualityConversionsQualified:
+    type:
+      - "null"
+      - integer
+  AllConversionsQualified:
+    type:
+      - "null"
+      - integer
+  ViewThroughConversionsQualified:
+    type:
+      - "null"
+      - integer
+  ViewThroughRevenue:
+    type:
+      - "null"
+      - integer
+  VideoViews:
+    type:
+      - "null"
+      - integer
+  ViewThroughRate:
+    type:
+      - "null"
+      - integer
+  AverageCPV:
+    type:
+      - "null"
+      - integer
+  VideoViewsAt25Percent:
+    type:
+      - "null"
+      - integer
+  VideoViewsAt50Percent:
+    type:
+      - "null"
+      - integer
+  VideoViewsAt75Percent:
+    type:
+      - "null"
+      - integer
+  CompletedVideoViews:
+    type:
+      - "null"
+      - integer
+  VideoCompletionRate:
+    type:
+      - "null"
+      - integer
+  TotalWatchTimeInMS:
+    type:
+      - "null"
+      - integer
+  AverageWatchTimePerVideoView:
+    type:
+      - "null"
+      - integer
+  AverageWatchTimePerImpression:
+    type:
+      - "null"
+      - integer
+  Sales:
+    type:
+      - "null"
+      - integer
+  CostPerSale:
+    type:
+      - "null"
+      - integer
+  RevenuePerSale:
+    type:
+      - "null"
+      - integer
+  Installs:
+    type:
+      - "null"
+      - integer
+  CostPerInstall:
+    type:
+      - "null"
+      - integer
+  RevenuePerInstall:
+    type:
+      - "null"
+      - integer
+x-infer-schema: true

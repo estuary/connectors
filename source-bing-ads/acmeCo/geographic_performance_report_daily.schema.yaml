@@ -1,0 +1,279 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+additionalProperties: true
+properties:
+  AccountId:
+    type:
+      - "null"
+      - integer
+  CampaignId:
+    type:
+      - "null"
+      - integer
+  AdGroupId:
+    type:
+      - "null"
+      - integer
+  TimePeriod:
+    type:
+      - "null"
+      - string
+    format: date
+  AccountNumber:
+    type:
+      - "null"
+      - string
+  Country:
+    type:
+      - "null"
+      - string
+  State:
+    type:
+      - "null"
+      - string
+  MetroArea:
+    type:
+      - "null"
+      - string
+  City:
+    type:
+      - "null"
+      - string
+  ProximityTargetLocation:
+    type:
+      - "null"
+      - string
+  Radius:
+    type:
+      - "null"
+      - string
+  LocationType:
+    type:
+      - "null"
+      - string
+  MostSpecificLocation:
+    type:
+      - "null"
+      - string
+  AccountStatus:
+    type:
+      - "null"
+      - string
+  CampaignStatus:
+    type:
+      - "null"
+      - string
+  AdGroupStatus:
+    type:
+      - "null"
+      - string
+  County:
+    type:
+      - "null"
+      - string
+  PostalCode:
+    type:
+      - "null"
+      - string
+  LocationId:
+    type:
+      - "null"
+      - string
+  BaseCampaignId:
+    type:
+      - "null"
+      - string
+  Goal:
+    type:
+      - "null"
+      - string
+  GoalType:
+    type:
+      - "null"
+      - string
+  AbsoluteTopImpressionRatePercent:
+    type:
+      - "null"
+      - integer
+  TopImpressionRatePercent:
+    type:
+      - "null"
+      - string
+  AllConversionsQualified:
+    type:
+      - "null"
+      - string
+  Neighborhood:
+    type:
+      - "null"
+      - string
+  ViewThroughRevenue:
+    type:
+      - "null"
+      - string
+  CampaignType:
+    type:
+      - "null"
+      - string
+  AssetGroupId:
+    type:
+      - "null"
+      - string
+  AssetGroupName:
+    type:
+      - "null"
+      - string
+  AssetGroupStatus:
+    type:
+      - "null"
+      - string
+  CurrencyCode:
+    type:
+      - "null"
+      - string
+  DeliveredMatchType:
+    type:
+      - "null"
+      - string
+  AdDistribution:
+    type:
+      - "null"
+      - string
+  DeviceType:
+    type:
+      - "null"
+      - string
+  Language:
+    type:
+      - "null"
+      - string
+  Network:
+    type:
+      - "null"
+      - string
+  DeviceOS:
+    type:
+      - "null"
+      - string
+  TopVsOther:
+    type:
+      - "null"
+      - string
+  BidMatchType:
+    type:
+      - "null"
+      - string
+  AccountName:
+    type:
+      - "null"
+      - string
+  CampaignName:
+    type:
+      - "null"
+      - string
+  AdGroupName:
+    type:
+      - "null"
+      - string
+  Impressions:
+    type:
+      - "null"
+      - integer
+  Clicks:
+    type:
+      - "null"
+      - integer
+  Ctr:
+    type:
+      - "null"
+      - integer
+  Spend:
+    type:
+      - "null"
+      - integer
+  CostPerConversion:
+    type:
+      - "null"
+      - integer
+  Assists:
+    type:
+      - "null"
+      - integer
+  ReturnOnAdSpend:
+    type:
+      - "null"
+      - integer
+  CostPerAssist:
+    type:
+      - "null"
+      - integer
+  ViewThroughConversions:
+    type:
+      - "null"
+      - integer
+  ViewThroughConversionsQualified:
+    type:
+      - "null"
+      - integer
+  AllCostPerConversion:
+    type:
+      - "null"
+      - integer
+  AllReturnOnAdSpend:
+    type:
+      - "null"
+      - integer
+  Conversions:
+    type:
+      - "null"
+      - integer
+  ConversionRate:
+    type:
+      - "null"
+      - integer
+  ConversionsQualified:
+    type:
+      - "null"
+      - integer
+  AverageCpc:
+    type:
+      - "null"
+      - integer
+  AveragePosition:
+    type:
+      - "null"
+      - integer
+  AverageCpm:
+    type:
+      - "null"
+      - integer
+  AllConversions:
+    type:
+      - "null"
+      - integer
+  AllConversionRate:
+    type:
+      - "null"
+      - integer
+  AllRevenue:
+    type:
+      - "null"
+      - integer
+  AllRevenuePerConversion:
+    type:
+      - "null"
+      - integer
+  Revenue:
+    type:
+      - "null"
+      - integer
+  RevenuePerConversion:
+    type:
+      - "null"
+      - integer
+  RevenuePerAssist:
+    type:
+      - "null"
+      - integer
+x-infer-schema: true

@@ -1,0 +1,142 @@
+---
+$schema: "https://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  AccountId:
+    type:
+      - "null"
+      - integer
+  AgeGroup:
+    type:
+      - "null"
+      - string
+  Gender:
+    type:
+      - "null"
+      - string
+  TimePeriod:
+    type:
+      - "null"
+      - string
+    format: date
+  AllConversions:
+    type:
+      - "null"
+      - integer
+  AccountName:
+    type:
+      - "null"
+      - string
+  AccountNumber:
+    type:
+      - "null"
+      - string
+  CampaignName:
+    type:
+      - "null"
+      - string
+  CampaignId:
+    type:
+      - "null"
+      - integer
+  AdGroupName:
+    type:
+      - "null"
+      - string
+  AdGroupId:
+    type:
+      - "null"
+      - integer
+  AdDistribution:
+    type:
+      - "null"
+      - string
+  Impressions:
+    type:
+      - "null"
+      - integer
+  Clicks:
+    type:
+      - "null"
+      - integer
+  Conversions:
+    type:
+      - "null"
+      - integer
+  Spend:
+    type:
+      - "null"
+      - integer
+  Revenue:
+    type:
+      - "null"
+      - integer
+  ExtendedCost:
+    type:
+      - "null"
+      - integer
+  Assists:
+    type:
+      - "null"
+      - integer
+  Language:
+    type:
+      - "null"
+      - string
+  AccountStatus:
+    type:
+      - "null"
+      - string
+  CampaignStatus:
+    type:
+      - "null"
+      - string
+  AdGroupStatus:
+    type:
+      - "null"
+      - string
+  BaseCampaignId:
+    type:
+      - "null"
+      - string
+  AllRevenue:
+    type:
+      - "null"
+      - integer
+  ViewThroughConversions:
+    type:
+      - "null"
+      - integer
+  Goal:
+    type:
+      - "null"
+      - string
+  GoalType:
+    type:
+      - "null"
+      - string
+  AbsoluteTopImpressionRatePercent:
+    type:
+      - "null"
+      - integer
+  TopImpressionRatePercent:
+    type:
+      - "null"
+      - integer
+  ConversionsQualified:
+    type:
+      - "null"
+      - integer
+  AllConversionsQualified:
+    type:
+      - "null"
+      - integer
+  ViewThroughConversionsQualified:
+    type:
+      - "null"
+      - integer
+  ViewThroughRevenue:
+    type:
+      - "null"
+      - integer
+x-infer-schema: true

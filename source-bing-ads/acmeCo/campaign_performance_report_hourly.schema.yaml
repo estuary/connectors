@@ -1,0 +1,231 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  AccountId:
+    type:
+      - "null"
+      - integer
+  CampaignId:
+    type:
+      - "null"
+      - integer
+  TimePeriod:
+    type:
+      - "null"
+      - string
+    format: date-time
+    
+  CurrencyCode:
+    type:
+      - "null"
+      - string
+  AdDistribution:
+    type:
+      - "null"
+      - string
+  DeviceType:
+    type:
+      - "null"
+      - string
+  Network:
+    type:
+      - "null"
+      - string
+  DeliveredMatchType:
+    type:
+      - "null"
+      - string
+  DeviceOS:
+    type:
+      - "null"
+      - string
+  TopVsOther:
+    type:
+      - "null"
+      - string
+  BidMatchType:
+    type:
+      - "null"
+      - string
+  AccountName:
+    type:
+      - "null"
+      - string
+  CampaignName:
+    type:
+      - "null"
+      - string
+  CampaignType:
+    type:
+      - "null"
+      - string
+  CampaignStatus:
+    type:
+      - "null"
+      - string
+  CampaignLabels:
+    type:
+      - "null"
+      - string
+  Impressions:
+    type:
+      - "null"
+      - integer
+  Clicks:
+    type:
+      - "null"
+      - integer
+  Ctr:
+    type:
+      - "null"
+      - integer
+  Spend:
+    type:
+      - "null"
+      - integer
+  CostPerConversion:
+    type:
+      - "null"
+      - integer
+  QualityScore:
+    type:
+      - "null"
+      - integer
+  AdRelevance:
+    type:
+      - "null"
+      - integer
+  LandingPageExperience:
+    type:
+      - "null"
+      - integer
+  PhoneImpressions:
+    type:
+      - "null"
+      - integer
+  PhoneCalls:
+    type:
+      - "null"
+      - integer
+  Ptr:
+    type:
+      - "null"
+      - integer
+  Assists:
+    type:
+      - "null"
+      - integer
+  ReturnOnAdSpend:
+    type:
+      - "null"
+      - integer
+  CostPerAssist:
+    type:
+      - "null"
+      - integer
+  CustomParameters:
+    type:
+      - "null"
+      - string
+  ViewThroughConversions:
+    type:
+      - "null"
+      - integer
+  AllCostPerConversion:
+    type:
+      - "null"
+      - integer
+  AllReturnOnAdSpend:
+    type:
+      - "null"
+      - integer
+  AllConversions:
+    type:
+      - "null"
+      - integer
+  ConversionsQualified:
+    type:
+      - "null"
+      - integer
+  AllConversionRate:
+    type:
+      - "null"
+      - integer
+  AllRevenue:
+    type:
+      - "null"
+      - integer
+  AllRevenuePerConversion:
+    type:
+      - "null"
+      - integer
+  AverageCpc:
+    type:
+      - "null"
+      - integer
+  AveragePosition:
+    type:
+      - "null"
+      - integer
+  AverageCpm:
+    type:
+      - "null"
+      - integer
+  Conversions:
+    type:
+      - "null"
+      - integer
+  ConversionRate:
+    type:
+      - "null"
+      - integer
+  LowQualityClicks:
+    type:
+      - "null"
+      - integer
+  LowQualityClicksPercent:
+    type:
+      - "null"
+      - integer
+  LowQualityImpressions:
+    type:
+      - "null"
+      - integer
+  LowQualitySophisticatedClicks:
+    type:
+      - "null"
+      - integer
+  LowQualityConversions:
+    type:
+      - "null"
+      - integer
+  LowQualityConversionRate:
+    type:
+      - "null"
+      - integer
+  Revenue:
+    type:
+      - "null"
+      - integer
+  RevenuePerConversion:
+    type:
+      - "null"
+      - integer
+  RevenuePerAssist:
+    type:
+      - "null"
+      - integer
+  BudgetName:
+    type:
+      - "null"
+      - string
+  BudgetStatus:
+    type:
+      - "null"
+      - string
+  BudgetAssociationStatus:
+    type:
+      - "null"
+      - string
+x-infer-schema: true

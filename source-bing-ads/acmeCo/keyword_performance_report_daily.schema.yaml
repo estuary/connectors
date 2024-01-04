@@ -1,0 +1,250 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  AccountId:
+    type:
+      - "null"
+      - integer
+  CampaignId:
+    type:
+      - "null"
+      - integer
+  AdGroupId:
+    type:
+      - "null"
+      - integer
+  KeywordId:
+    type:
+      - "null"
+      - integer
+  Keyword:
+    type:
+      - "null"
+      - string
+  AdId:
+    type:
+      - "null"
+      - integer
+  TimePeriod:
+    type:
+      - "null"
+      - string
+    format: date
+  CurrencyCode:
+    type:
+      - "null"
+      - string
+  DeliveredMatchType:
+    type:
+      - "null"
+      - string
+  AdDistribution:
+    type:
+      - "null"
+      - string
+  DeviceType:
+    type:
+      - "null"
+      - string
+  Language:
+    type:
+      - "null"
+      - string
+  Network:
+    type:
+      - "null"
+      - string
+  DeviceOS:
+    type:
+      - "null"
+      - string
+  TopVsOther:
+    type:
+      - "null"
+      - string
+  BidMatchType:
+    type:
+      - "null"
+      - string
+  AccountName:
+    type:
+      - "null"
+      - string
+  CampaignName:
+    type:
+      - "null"
+      - string
+  AdGroupName:
+    type:
+      - "null"
+      - string
+  KeywordStatus:
+    type:
+      - "null"
+      - string
+  HistoricalExpectedCtr:
+    type:
+      - "null"
+      - integer
+  HistoricalAdRelevance:
+    type:
+      - "null"
+      - integer
+  HistoricalLandingPageExperience:
+    type:
+      - "null"
+      - integer
+  HistoricalQualityScore:
+    type:
+      - "null"
+      - integer
+  Impressions:
+    type:
+      - "null"
+      - integer
+  Clicks:
+    type:
+      - "null"
+      - integer
+  Ctr:
+    type:
+      - "null"
+      - integer
+  CurrentMaxCpc:
+    type:
+      - "null"
+      - integer
+  Spend:
+    type:
+      - "null"
+      - integer
+  CostPerConversion:
+    type:
+      - "null"
+      - integer
+  QualityScore:
+    type:
+      - "null"
+      - integer
+  ExpectedCtr:
+    type:
+      - "null"
+      - string
+  AdRelevance:
+    type:
+      - "null"
+      - integer
+  LandingPageExperience:
+    type:
+      - "null"
+      - integer
+  QualityImpact:
+    type:
+      - "null"
+      - integer
+  Assists:
+    type:
+      - "null"
+      - integer
+  ReturnOnAdSpend:
+    type:
+      - "null"
+      - integer
+  CostPerAssist:
+    type:
+      - "null"
+      - integer
+  CustomParameters:
+    type:
+      - "null"
+      - string
+  FinalAppUrl:
+    type:
+      - "null"
+      - string
+  Mainline1Bid:
+    type:
+      - "null"
+      - integer
+  MainlineBid:
+    type:
+      - "null"
+      - integer
+  FirstPageBid:
+    type:
+      - "null"
+      - integer
+  FinalUrlSuffix:
+    type:
+      - "null"
+      - string
+  ViewThroughConversions:
+    type:
+      - "null"
+      - integer
+  ViewThroughConversionsQualified:
+    type:
+      - "null"
+      - integer
+  AllCostPerConversion:
+    type:
+      - "null"
+      - integer
+  AllReturnOnAdSpend:
+    type:
+      - "null"
+      - integer
+  Conversions:
+    type:
+      - "null"
+      - integer
+  ConversionRate:
+    type:
+      - "null"
+      - integer
+  ConversionsQualified:
+    type:
+      - "null"
+      - integer
+  AverageCpc:
+    type:
+      - "null"
+      - integer
+  AveragePosition:
+    type:
+      - "null"
+      - integer
+  AverageCpm:
+    type:
+      - "null"
+      - integer
+  AllConversions:
+    type:
+      - "null"
+      - integer
+  AllConversionRate:
+    type:
+      - "null"
+      - integer
+  AllRevenue:
+    type:
+      - "null"
+      - integer
+  AllRevenuePerConversion:
+    type:
+      - "null"
+      - integer
+  Revenue:
+    type:
+      - "null"
+      - integer
+  RevenuePerConversion:
+    type:
+      - "null"
+      - integer
+  RevenuePerAssist:
+    type:
+      - "null"
+      - integer
+x-infer-schema: true
