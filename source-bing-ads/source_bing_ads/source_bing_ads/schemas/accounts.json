@@ -97,9 +97,7 @@
       "type": ["null", "number"]
     },
     "LastModifiedTime": {
-      "type": ["null", "string"],
-      "format": "date-time",
-      "airbyte_type": "timestamp_without_timezone"
+      "type": ["null", "string"]
     },
     "Name": {
       "type": ["null", "string"]

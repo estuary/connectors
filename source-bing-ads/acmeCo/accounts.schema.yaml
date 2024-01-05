@@ -128,7 +128,6 @@ properties:
     type:
       - "null"
       - string
-    format: date-time
   Name:
     type:
       - "null"
