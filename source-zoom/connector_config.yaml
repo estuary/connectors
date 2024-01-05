@@ -1,18 +1,21 @@
 credentials:
-    account_id: MqzG6aYDS_eTYHwEUYW7Hw
-    client_id: aF1_kb6YR3iNp5HkhRV23A
-    client_secret: QyzSOZ1oFFqU9pz3zxacaJglw7t13L3Q
+    account_id_sops: ENC[AES256_GCM,data:9HUuOx687sl5PhmRns3FdcQxAUGVGA==,iv:28MWHFGiEyDNOHKoe0we3+i1NiOrIemk2jd07rqnzms=,tag:qUB82ctso3NDtiZFO4A7Jg==,type:str]
+    client_id_sops: ENC[AES256_GCM,data:7u93Jo+skgwe+xLg9PGv+XB0BkFWmg==,iv:2WQKrWorVttFK8zdTuq6iRXOd+gkJtemuM+vKXKj/4g=,tag:gCmlDDyB6HdKKiRxhk5Baw==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:iWVyVI5g93wbKDTQBbb7YkZujDVpmLoQNEg/KZip8jw=,iv:/hsMJkbyNCRkCLJ3ojpCye3P6vq/HhLHzRgWhZs3U7k=,tag:G/gOo4JNx715+ED4lhItfg==,type:str]
+    access_token: eyJzdiI6IjAwMDAwMSIsImFsZyI6IkhTNTEyIiwidiI6IjIuMCIsImtpZCI6ImRiZDExOTEzLTYzOGYtNGMwMC1hMWYxLWQ2MzIyYTAwYTIzMiJ9.eyJ2ZXIiOjksImF1aWQiOiI3N2E0MTY4MmZjYWEzMmEyNzZlZjlhZWUwNWNlZDMwOSIsImNvZGUiOiIyam5kdWowbTM5VFBoQlpabXBTU25XaE5VeVJnRFZJVnciLCJpc3MiOiJ6bTpjaWQ6Zmp6VExJdFFURXVURk1sbGRrZnRjQSIsImdubyI6MCwidHlwZSI6MCwidGlkIjowLCJhdWQiOiJodHRwczovL29hdXRoLnpvb20udXMiLCJ1aWQiOiJ2V3JfTHJPb1J6ZXVFdTJJSkRsdEpBIiwibmJmIjoxNzA0NDY1MzI3LCJleHAiOjE3MDQ0Njg5MjcsImlhdCI6MTcwNDQ2NTMyNywiYWlkIjoiWk85Ri1qMURSd2V5XzlyNFRqZ0E1QSJ9.JLRz4dcIugqOjygpMQNLli-ZHNd5bMnyebBBD-ewEqoq0XeS5QjHOXWmJxixQday9ex9xTSB7udJlbIeTx7qaQ
+    refresh_token: eyJzdiI6IjAwMDAwMSIsImFsZyI6IkhTNTEyIiwidiI6IjIuMCIsImtpZCI6IjcwMWUxNjRiLTUwZmQtNGU3ZS04OGFhLTI3M2NlMGI3YzNlZiJ9.eyJ2ZXIiOjksImF1aWQiOiI3N2E0MTY4MmZjYWEzMmEyNzZlZjlhZWUwNWNlZDMwOSIsImNvZGUiOiIyam5kdWowbTM5VFBoQlpabXBTU25XaE5VeVJnRFZJVnciLCJpc3MiOiJ6bTpjaWQ6Zmp6VExJdFFURXVURk1sbGRrZnRjQSIsImdubyI6MCwidHlwZSI6MSwidGlkIjowLCJhdWQiOiJodHRwczovL29hdXRoLnpvb20udXMiLCJ1aWQiOiJ2V3JfTHJPb1J6ZXVFdTJJSkRsdEpBIiwibmJmIjoxNzA0NDY1MzI3LCJleHAiOjE3MTIyNDEzMjcsImlhdCI6MTcwNDQ2NTMyNywiYWlkIjoiWk85Ri1qMURSd2V5XzlyNFRqZ0E1QSJ9.j-83U1rVxILlOhhVIZG5agb-oouCe28RlJWu07rUPJ_JijbCBKBxSiOZ2diAt9GOwBQiqqUObZvoi1xqzjF0Og
+    token_expiry_date: "2024-01-05T15:35:26.860Z"
 sops:
     kms: []
     gcp_kms:
-        - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow
-          created_at: "2023-12-12T20:14:02Z"
-          enc: CiQAW8BC2OzDaKKtm8zMjItUBjJQtYqREnBYSfylkxcHo5G+bQkSSQD00UdDsXRuXWefsumfRSQcy5hCrs20m+X9aE7yMmfBQJRWesgghg9f0RmablDPAZqn8iuIsx4xpu/tl4LY1Se2qHKTr7ZyZTg=
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-01-05T14:43:59Z"
+          enc: CiQAdmEdwsPiEA1GannLLuKymIu+x4OdWglfsN+mj5zAGHiF93ESSQCVvC1zcIP9eYg1iz5tReyWKTvHDN5eMGVTVx8Ug66fWr2VIHn5aThArAXc6nXBQ2UADixPJsGya8oji3jo0i02sk1QAdPUkKs=
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2023-12-22T13:50:44Z"
-    mac: ENC[AES256_GCM,data:kMRUIO+wgrXSXG3UEBwFWu33ghB8WU3ZFsCr2GQ9nlahQPYVlLMnsHa4U1H2eXV+DsjB4seO6oQJmwU9lURXJfo4GRT4FY0P5clbsdcynOP5AUHMVyGUewKuUs5lP28fk8ZmzhK3M14YiHlCdflxDomPbUwic9eVsxeccrVuSFU=,iv:8imN7e++b323+I2Bz3VGwudsw/OgsUsiL4hc4X9dOnU=,tag:12EAVxXbe4aXX4uFLPeziA==,type:str]
+    lastmodified: "2024-01-05T14:44:01Z"
+    mac: ENC[AES256_GCM,data:x8KbPEyj7c7bS8sLNJr2wAFHo1TR58Uv3BI09Pw9r0AlGgBSitTCBifDhg5oM0Pv9QvNTLbRz82jzdl4nrlIgdk8Xf6yaf7qnSc2/yZxqLr97MqKHYdDp5VFnXw7Jb7NHWn3AjfOIZD3oI2JVYHh4RTslHHttOtcTIWjzMUl7IM=,iv:b8aHPfJ1PHSUmSkKTbJ/COJil19j4h49rqaFetztY5M=,tag:Ca9I9zHj/ua+71Q5y7jfHw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
