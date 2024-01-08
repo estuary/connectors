@@ -394,9 +394,10 @@ func newTransactor(
 	var cfg = ep.Config.(*config)
 
 	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
-		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-		Token:       cfg.Credentials.PersonalAccessToken,
-		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+		Host:               fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+		Token:              cfg.Credentials.PersonalAccessToken,
+		Credentials:        dbConfig.PatCredentials{}, // enforce PAT auth
+		HTTPTimeoutSeconds: 5 * 60,                    // This is necessary for file uploads as they can sometimes take longer than the default 60s
 	})
 	if err != nil {
 		return nil, fmt.Errorf("initialising workspace client: %w", err)
