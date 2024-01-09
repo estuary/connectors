@@ -10,9 +10,9 @@ import (
 // OpFuture represents an operation which is executing in the background. The
 // operation has completed when Done selects. Err may be invoked to determine
 // whether the operation succeeded or failed.
-// This is copied from gazette's `client` package.
+// This is inspired by gazette's `client` package.
 type OpFuture interface {
-	// Done selects when operation background execution has finished. The channel
+	// Done selects when the operation's background execution has finished. The channel
 	// also includes an optional ConnectorState to be emitted as part of the
 	// Acknowledge response
 	Done() <-chan *pf.ConnectorState
@@ -20,6 +20,8 @@ type OpFuture interface {
 	Err() error
 }
 
+// A gazette `client.Operation` with the addition of supporting emitting a
+// connector state
 type AsyncOperation struct {
 	inner   *client.AsyncOperation
 	stateCh <-chan *pf.ConnectorState
