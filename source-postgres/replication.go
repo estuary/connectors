@@ -304,6 +304,17 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 	case *pglogrepl.RelationMessage:
 		s.relations[msg.RelationID] = msg
 		return nil, nil
+	case *pglogrepl.OriginMessage:
+		// Origin messages are sent when the postgres instance we're capturing from
+		// is itself replicating from another source instance. They indicate the original
+		// source of the transaction. We just ignore these messages for now, though in the
+		// future it might be desirable to add the origin as a `_meta` property. Sauce:
+		// https://www.highgo.ca/2020/04/18/the-origin-in-postgresql-logical-decoding/
+		logrus.WithFields(logrus.Fields{
+			"originName": msg.Name,
+			"originLSN":  msg.CommitLSN,
+		}).Trace("ignoring Origin message")
+		return nil, nil
 	case *pglogrepl.TypeMessage:
 		logrus.WithFields(logrus.Fields{
 			"datatype":  msg.DataType,
