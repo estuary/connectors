@@ -89,7 +89,7 @@ var databricksDialect = func() sql.Dialect {
 				sql.QuoteTransform("`", "``"),
 			))),
 		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "\\'")),
-		Placeholderer: sql.PlaceholderFn(func(_ int) string {
+		Placeholderer: sql.PlaceholderFn(func(_ int, _ sql.FlatType) string {
 			return "?"
 		}),
 		TypeMapper: mapper,

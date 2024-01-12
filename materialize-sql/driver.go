@@ -255,9 +255,9 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		// some endpoints don't have support for those.
 		var paramArgs = []interface{}{
 			endpoint.Identifier(endpoint.MetaSpecs.Path...),
-			endpoint.Placeholder(0),
-			endpoint.Placeholder(1),
-			endpoint.Placeholder(2),
+			endpoint.Placeholder(0, STRING),
+			endpoint.Placeholder(1, STRING),
+			endpoint.Placeholder(2, STRING),
 		}
 		var params = []interface{}{
 			req.Version,
