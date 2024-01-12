@@ -161,9 +161,9 @@ func (a *sqlApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, 
 		// some endpoints don't have support for those.
 		var paramArgs = []interface{}{
 			a.endpoint.Identifier(a.endpoint.MetaSpecs.Path...),
-			a.endpoint.Placeholder(0),
-			a.endpoint.Placeholder(1),
-			a.endpoint.Placeholder(2),
+			a.endpoint.Placeholder(0, STRING),
+			a.endpoint.Placeholder(1, STRING),
+			a.endpoint.Placeholder(2, STRING),
 		}
 		var params = []interface{}{
 			version,

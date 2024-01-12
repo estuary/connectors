@@ -59,7 +59,7 @@ type Literaler interface {
 // Placeholderer returns the appropriate Endpoint placeholder representation
 // for a parameter at the given zero-offset index.
 type Placeholderer interface {
-	Placeholder(index int) string
+	Placeholder(index int, flatType FlatType) string
 }
 
 // A TypeMapper is a function that maps a Projection into a MappedType.
@@ -89,9 +89,9 @@ type LiteralFn func(s string) string
 func (f LiteralFn) Literal(str string) string { return f(str) }
 
 // PlaceholderFn is a function that implements Placeholderer.
-type PlaceholderFn func(index int) string
+type PlaceholderFn func(index int, flatType FlatType) string
 
-func (f PlaceholderFn) Placeholder(index int) string { return f(index) }
+func (f PlaceholderFn) Placeholder(index int, flatType FlatType) string { return f(index, flatType) }
 
 // TypeMapperFn is a function that implements TypeMapper.
 type TypeMapperFn func(*Projection) (MappedType, error)
@@ -103,7 +103,7 @@ func (f TypeMapperFn) MapType(p *Projection) (MappedType, error) { return f(p) }
 var _ = Dialect{
 	TableLocatorer:  TableLocatorFn(func(path []string) InfoTableLocation { return InfoTableLocation{} }),
 	ColumnLocatorer: ColumnLocatorFn(func(field string) string { return field }),
-	Placeholderer:   PlaceholderFn(func(index int) string { return "" }),
+	Placeholderer:   PlaceholderFn(func(index int, flatType FlatType) string { return "" }),
 	Literaler:       LiteralFn(func(s string) string { return "" }),
 	Identifierer:    IdentifierFn(func(path ...string) string { return "" }),
 	TypeMapper:      &NullableMapper{},

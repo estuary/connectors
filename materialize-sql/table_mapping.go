@@ -178,13 +178,13 @@ func ResolveColumn(index int, projection *Projection, dialect Dialect) (Column, 
 		return Column{}, err
 	}
 
-	_, mustExist := projection.AsFlatType()
+	flatType, mustExist := projection.AsFlatType()
 
 	return Column{
 		Projection:  *projection,
 		MappedType:  mappedType,
 		Identifier:  dialect.Identifier(projection.Field),
-		Placeholder: dialect.Placeholder(index),
+		Placeholder: dialect.Placeholder(index, flatType),
 		MustExist:   mustExist,
 	}, nil
 }
