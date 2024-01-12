@@ -1,1 +1,1 @@
-SELECT * FROM `test`.`foobar`;
+SELECT * FROM `test`.`foobar` ORDER BY `ka`, `kb`, `kc`;
