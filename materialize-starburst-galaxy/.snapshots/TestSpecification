@@ -1,0 +1,125 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-starburst-galaxy/config",
+    "properties": {
+      "host": {
+        "type": "string",
+        "title": "Host and optional port",
+        "order": 0
+      },
+      "catalog": {
+        "type": "string",
+        "title": "Catalog",
+        "order": 1
+      },
+      "schema": {
+        "type": "string",
+        "title": "Schema",
+        "order": 2
+      },
+      "account": {
+        "type": "string",
+        "title": "Account",
+        "order": 3
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "order": 4,
+        "secret": true
+      },
+      "awsAccessKeyId": {
+        "type": "string",
+        "title": "Access Key ID",
+        "order": 5
+      },
+      "awsSecretAccessKey": {
+        "type": "string",
+        "title": "Secret Access Key",
+        "order": 6,
+        "secret": true
+      },
+      "region": {
+        "type": "string",
+        "title": "Region",
+        "order": 7
+      },
+      "bucket": {
+        "type": "string",
+        "title": "Bucket",
+        "order": 8
+      },
+      "dataStoreDir": {
+        "type": "string",
+        "title": "Directory for storing temporary files",
+        "order": 8
+      },
+      "advanced": {
+        "properties": {
+          "updateDelay": {
+            "type": "string",
+            "enum": [
+              "0s",
+              "15m",
+              "30m",
+              "1h",
+              "2h",
+              "4h"
+            ],
+            "title": "Update Delay",
+            "description": "Potentially reduce active warehouse time by increasing the delay between updates. Defaults to 30 minutes if unset."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "host",
+      "catalog",
+      "schema",
+      "account",
+      "password",
+      "awsAccessKeyId",
+      "awsSecretAccessKey",
+      "region",
+      "bucket",
+      "dataStoreDir"
+    ],
+    "title": "SQL Connection"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-starburst-galaxy/table-config",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the table",
+        "x-collection-name": true
+      },
+      "schema": {
+        "type": "string",
+        "title": "Schema",
+        "description": "Schema where the table resides"
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Update",
+        "description": "Should updates to this table be done via delta updates. Default is false.",
+        "default": false
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "SQL Table"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-starburst-galaxy"
+}
