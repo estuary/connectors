@@ -135,9 +135,9 @@ const tableQueryTemplateTemplate = `{{/*****************************************
 	  {{- end -}}
 	  {{$k}} > @flow_cursor_value[{{$i}}]
 	{{- end -}}
-	) ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}}
-	;
+	) 
   {{- end -}}
+  ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};
 {{- else -}}
   SELECT * FROM %[1]s;
 {{- end}}`
