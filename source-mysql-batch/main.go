@@ -124,9 +124,9 @@ const tableQueryTemplateTemplate = `{{/*****************************************
    ***********************************************************/ -}}
 {{if .CursorFields -}}
   {{- if .IsFirstQuery -}}
-    SELECT * FROM %[1]s
+    SELECT * FROM %[1]s 
   {{- else -}}
-    SELECT * FROM %[1]s
+    SELECT * FROM %[1]s 
 	{{- range $i, $k := $.CursorFields -}}
 	  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}
       {{- range $j, $n := $.CursorFields -}}
