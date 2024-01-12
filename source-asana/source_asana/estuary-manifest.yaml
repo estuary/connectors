@@ -1,0 +1,307 @@
+version: "0.29.0"
+
+definitions:
+  url_base: "https://app.asana.com/api/1.0/"
+  url_refresh_token: "https://app.asana.com/-/oauth_token"
+  grant_type: "refresh_token"
+  use_body: true
+  content_type: "application/x-www-form-urlencoded"
+  refresh_token_fields:
+    - grant_type
+    - refresh_token
+
+paginator:
+  page_size: 100
+  opt_field_name: "limit"
+  request_field_name: "next_page"
+
+check_stream: workspaces
+streams:
+  attachments_compact:
+    name: "attachments_compact"
+    primary_key: "gid"
+    schema_name: "attachments_compact.json"
+    path: "attachments"
+    record_extractor: "data"
+    has_pagination: true
+    use_cache: true
+    parent_streams: [
+      {
+        name: "tasks",
+        parent_key: "gid",
+        partition_field: "parent_gid"
+      },
+      {
+        name: "projects",
+        parent_key: "gid",
+        partition_field: "parent_gid"
+      },
+    ]
+    extra_opt:
+      parent: "parent_gid"
+
+  attachments:
+    name: "attachments"
+    primary_key: "gid"
+    schema_name: "attachments.json"
+    path: "attachments/{attachment_gid}"
+    record_extractor: "data"
+    has_pagination: true
+    parent_streams: [
+      {
+        name: "attachments_compact",
+        parent_key: "gid",
+        partition_field: "attachment_gid"
+      }
+    ]
+
+  # events:
+  #   name: "events"
+  #   primary_key: "created_at"
+  #   schema_name: "events.json"
+  #   path: "events"
+  #   record_extractor: "data"
+  #   has_pagination: true
+  #   use_cache: true
+  #   use_sync_token: true
+  #   ignore_error: true
+  #   parent_streams: [
+  #     {
+  #       name: "projects",
+  #       parent_key: "gid",
+  #       partition_field: "resource_gid",
+  #     },
+  #     {
+  #       name: "tasks",
+  #       parent_key: "gid",
+  #       partition_field: "resource_gid",
+  #     },
+  #   ]
+  #   extra_opt:
+  #     resource: "resource_gid"
+
+  portfolios_compact:
+    name: "portfolios_compact"
+    primary_key: "gid"
+    schema_name: "portfolios_compact.json"
+    path: "portfolios"
+    record_extractor: "data"
+    has_pagination: true
+    use_cache: true
+    parent_streams: [
+      {
+        name: "workspaces",
+        parent_key: "gid",
+        partition_field: "workspace_gid"
+      },
+    ]
+    extra_opt:
+      workspace: "workspace_gid"
+      owner: "me"
+
+  portfolios_memberships:
+    name: "portfolios_memberships"
+    primary_key: "gid"
+    schema_name: "portfolios_memberships.json"
+    path: "portfolio_memberships"
+    record_extractor: "data"
+    has_pagination: true
+    parent_streams: [
+      {
+        name: "portfolios_compact",
+        parent_key: "gid",
+        partition_field: "portfolio_gid"
+      }
+    ]
+    extra_opt:
+      portfolio: "portfolio_gid"
+
+  portfolios:
+    name: "portfolios"
+    primary_key: "gid"
+    schema_name: "portfolios.json"
+    path: "portfolios/{portfolio_gid}"
+    record_extractor: "data"
+    has_pagination: true
+    parent_streams: [
+      {
+        name: "portfolios_compact",
+        parent_key: "gid",
+        partition_field: "portfolio_gid"
+      }
+    ]
+
+  projects:
+    name: "projects"
+    primary_key: "gid"
+    schema_name: "projects.json"
+    path: "projects"
+    record_extractor: "data"
+    has_pagination: true
+    use_cache: true
+    parent_streams: [
+      {
+        name: "workspaces",
+        parent_key: "gid",
+        partition_field: "workspace_gid"
+      }
+    ]
+    extra_opt:
+      workspace: "workspace_gid"
+
+  sections_compact:
+    name: "sections_compact"
+    primary_key: "gid"
+    schema_name: "sections_compact.json"
+    path: "projects/{project_gid}/sections"
+    record_extractor: "data"
+    has_pagination: true
+    use_cache: true
+    parent_streams: [
+      {
+        name: "projects",
+        parent_key: "gid",
+        partition_field: "project_gid"
+      }
+    ]
+
+  sections:
+    name: "sections"
+    primary_key: "gid"
+    schema_name: "sections.json"
+    path: "sections/{section_gid}"
+    record_extractor: "data"
+    has_pagination: true
+    parent_streams: [
+      {
+        name: "sections_compact",
+        parent_key: "gid",
+        partition_field: "section_gid"
+      }
+    ]
+
+  stories_compact:
+    name: "stories_compact"
+    primary_key: "gid"
+    schema_name: "stories_compact.json"
+    path: "tasks/{task_gid}/stories"
+    record_extractor: "data"
+    has_pagination: true
+    use_cache: true
+    parent_streams: [
+      {
+        name: "tasks",
+        parent_key: "gid",
+        partition_field: "task_gid"
+      }
+    ]
+
+  stories:
+    name: "stories"
+    primary_key: "gid"
+    schema_name: "stories.json"
+    path: "stories/{story_gid}"
+    record_extractor: "data"
+    has_pagination: true
+    parent_streams: [
+      {
+        name: "stories_compact",
+        parent_key: "gid",
+        partition_field: "story_gid"
+      }
+    ]
+
+  tags:
+    name: "tags"
+    primary_key: "gid"
+    schema_name: "tags.json"
+    path: "tags"
+    record_extractor: "data"
+    has_pagination: true
+    parent_streams: [
+      {
+        name: "workspaces",
+        parent_key: "gid",
+        partition_field: "workspace_gid"
+      }
+    ]
+    extra_opt:
+      workspace: "workspace_gid"
+
+  tasks:
+    name: "tasks"
+    primary_key: "gid"
+    schema_name: "tasks.json"
+    path: "tasks"
+    record_extractor: "data"
+    has_pagination: true
+    use_cache: true
+    parent_streams: [
+      {
+        name: "projects",
+        parent_key: "gid",
+        partition_field: "project_gid"
+      }
+    ]
+    extra_opt:
+      project: "project_gid"
+
+  teams:
+    name: "teams"
+    primary_key: "gid"
+    schema_name: "teams.json"
+    path: "organizations/{workspace_gid}/teams"
+    record_extractor: "data"
+    has_pagination: true
+    use_cache: true
+    parent_streams: [
+      {
+        name: "workspaces",
+        parent_key: "gid",
+        partition_field: "workspace_gid"
+      }
+    ]
+
+  team_memberships:
+    name: "team_memberships"
+    primary_key: "gid"
+    schema_name: "team_memberships.json"
+    path: "teams/{team_gid}/team_memberships"
+    record_extractor: "data"
+    has_pagination: true
+    parent_streams: [
+      {
+        name: "teams",
+        parent_key: "gid",
+        partition_field: "team_gid"
+      }
+    ]
+
+  users:
+    name: "users"
+    primary_key: "gid"
+    schema_name: "users.json"
+    path: "users"
+    record_extractor: "data"
+    has_pagination: true
+    use_cache: true
+    parent_streams: [
+      {
+        name: "workspaces",
+        parent_key: "gid",
+        partition_field: "workspace_gid"
+      }
+    ]
+    extra_opt:
+      workspace: "workspace_gid"
+
+  workspaces:
+    name: "workspaces"
+    primary_key: "gid"
+    schema_name: "workspaces.json"
+    path: "workspaces"
+    record_extractor: "data"
+    has_pagination: true
+    use_cache: true
+
+  
