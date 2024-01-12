@@ -609,6 +609,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return nil
 }
 
+// TODO: use stateKey for the checkpoint
 type checkpoint struct {
 	// Map of table name to query list
 	Queries map[string][]string
@@ -656,9 +657,17 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if v, ok := queries[b.target.Identifier]; ok {
-			queries[b.target.Identifier] = append(v, renderWithDir(b.store.mergeInto, dir))
+			if b.target.DeltaUpdates {
+				queries[b.target.Identifier] = append(v, renderWithDir(b.store.copyInto, dir))
+			} else {
+				queries[b.target.Identifier] = append(v, renderWithDir(b.store.mergeInto, dir))
+			}
 		} else {
-			queries[b.target.Identifier] = []string{renderWithDir(b.store.mergeInto, dir)}
+			if b.target.DeltaUpdates {
+				queries[b.target.Identifier] = []string{renderWithDir(b.store.copyInto, dir)}
+			} else {
+				queries[b.target.Identifier] = []string{renderWithDir(b.store.mergeInto, dir)}
+			}
 		}
 
 		toDelete[b.target.Identifier] = []string{fmt.Sprintf("@flow_v1/%s", dir)}
