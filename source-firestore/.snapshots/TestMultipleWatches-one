@@ -85,5 +85,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"Resources":{"flow_source_tests/*/users/*/docs":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/notes":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"},"flow_source_tests/*/users/*/tasks":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"flow_source_tests%2F%2A%2Fusers%2F%2A%2Fdocs":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"},"flow_source_tests%2F%2A%2Fusers%2F%2A%2Fnotes":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"},"flow_source_tests%2F%2A%2Fusers%2F%2A%2Ftasks":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"}}}
 
