@@ -23,6 +23,10 @@ singer.write_message = write_message_panics
 
 DOCS_URL = os.getenv("DOCS_URL")
 
+# Replication modes from singer_sdk/streams/core.py
+REPLICATION_FULL_TABLE = "FULL_TABLE"
+REPLICATION_INCREMENTAL = "INCREMENTAL"
+
 class Config(t.TypedDict):
     pass
 
@@ -81,6 +85,9 @@ class CaptureShim(Connector):
 
             entry: singer.CatalogEntry = stream._singer_catalog_entry
 
+            if entry.replication_method == REPLICATION_INCREMENTAL and not entry.replication_key:
+                raise RuntimeError(f"Stream {stream.name} must have a replication key in order to use {REPLICATION_INCREMENTAL} replication.")
+            
             # According to the Singer spec, key_properties are top-level
             # properties of the document. We extend this interpretation to
             # also allow for arbitrary JSON pointers.
@@ -92,14 +99,36 @@ class CaptureShim(Connector):
                     for p in entry.key_properties
                 ]
             else:
+                logger.info(f"Stream {stream.name} does not have a primary key, using '/_meta/row_id' as the key.") 
+                if entry.replication_method == REPLICATION_INCREMENTAL:
+                    logger.warn(f"Stream {stream.name} is using {REPLICATION_INCREMENTAL} replication without a primary key. If this is not an append-only data source, updates to existing documents will be captured as inserts with new keys. Switch to {REPLICATION_FULL_TABLE} to fix this.")
+                
                 key = ["/_meta/row_id"]
+                row_id_type = Property("row_id", IntegerType, required=True)
+
+                if entry.schema.properties is not None:
+                    if not "_meta" in entry.schema.properties:
+                        entry.schema.properties["_meta"] = ObjectType(row_id_type)
+                        if not entry.schema.required:
+                            entry.schema.required = []
+                        if not "_meta" in entry.schema.required:
+                            entry.schema.required.append("_meta")
+                    else:
+                        meta = entry.schema.properties["_meta"]
+                        
+                        # Just in case _meta was somehow not required
+                        meta.optional = False
+                        props: ObjectType = meta.wrapped
+                        props.wrapped["row_id"] = row_id_type
+                else:
+                    # We should never get here, this is just to appease type checking
+                    raise RuntimeError(f"Something unexpected happened: schema for stream {stream.name} does not have a properties field.", vars(entry.schema))
 
             for bc, meta in entry.metadata.items():
                 if meta.inclusion == "available":
                     meta.selected = True
 
             resourceConfig = entry.to_dict()
-            
             json_schema = resourceConfig.pop("schema")
             
             if self.usesSchemaInference:
@@ -127,12 +156,12 @@ class CaptureShim(Connector):
             catalog[entry.tap_stream_id] = entry
 
             # It looks[1] like it's incorrect to "upgrade" a stream that does not
-            # have a `replication_key` to use `INCREMENTAL` mode, but it should
+            # have a replication or primary key to use `INCREMENTAL` mode, but it should
             # be possible to "downgrade" an INCREMENTAL stream to FULL_TABLE
             # [1]: https://github.com/meltano/sdk/blob/main/singer_sdk/streams/core.py#L751-L756
 
             if entry.replication_method == "INCREMENTAL" and entry.replication_key is None:
-                raise ValidateError(f"{entry.stream} does not support {entry.replication_method} replication.")
+                raise ValidateError(f"{entry.stream} does not support {entry.replication_method} replication because it does not have a replication key.")
 
             bindings.append(
                 response.ValidatedBinding(resourcePath=[entry.tap_stream_id])
@@ -251,7 +280,7 @@ resource_config_schema = {
     "type": "object",
     "properties": {
         "stream": {"type": "string"},
-        "replication_method": {"type": "string", "enum": ["INCREMENTAL", "FULL_TABLE"]},
+        "replication_method": {"type": "string", "enum": [REPLICATION_INCREMENTAL, REPLICATION_FULL_TABLE]},
         "replication_key": {"type": "string"}
     },
     "required": ["stream", "replication_method"]
