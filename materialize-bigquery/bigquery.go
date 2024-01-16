@@ -241,7 +241,8 @@ func (c client) Apply(ctx context.Context, ep *sql.Endpoint, req *pm.Request_App
 	existing := &sql.ExistingColumns{}
 	for _, ds := range datasets {
 		job, err := client.query(ctx, fmt.Sprintf(
-			"select table_name, column_name, is_nullable, data_type from %s.INFORMATION_SCHEMA.COLUMNS;",
+			"select table_name, column_name, is_nullable, data_type from %s.%s.INFORMATION_SCHEMA.COLUMNS;",
+			bqDialect.Identifier(cfg.ProjectID), // Use the project containing the dataset rather than the billing project if a billing project is configured.
 			bqDialect.Identifier(ds),
 		))
 		if err != nil {
