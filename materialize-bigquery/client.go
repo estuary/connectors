@@ -49,7 +49,8 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 
 	for _, ds := range datasets {
 		job, err := c.query(ctx, fmt.Sprintf(
-			"select table_schema, table_name, column_name, is_nullable, data_type from %s.INFORMATION_SCHEMA.COLUMNS;",
+			"select table_schema, table_name, column_name, is_nullable, data_type from %s.%s.INFORMATION_SCHEMA.COLUMNS;",
+			bqDialect.Identifier(c.cfg.ProjectID), // Use the project containing the dataset rather than the billing project if a billing project is configured.
 			bqDialect.Identifier(ds),
 		))
 		if err != nil {
