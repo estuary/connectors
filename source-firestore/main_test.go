@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -270,6 +271,7 @@ func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
 			Collection:         flow.CollectionSpec{Name: flow.Collection(path)},
 			ResourceConfigJson: json.RawMessage(fmt.Sprintf(`{"path": %q, "backfillMode": "async"}`, path)),
 			ResourcePath:       []string{path},
+			StateKey:           url.QueryEscape(path),
 		})
 	}
 	return bindings
