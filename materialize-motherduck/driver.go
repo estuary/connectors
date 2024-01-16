@@ -73,7 +73,9 @@ func (c *config) Validate() error {
 }
 
 func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
-	db, err := stdsql.Open("duckdb", fmt.Sprintf("md:%s?motherduck_token=%s", c.Database, c.Token))
+	var userAgent = "Estuary"
+
+	db, err := stdsql.Open("duckdb", fmt.Sprintf("md:%s?motherduck_token=%s&custom_user_agent=%s", c.Database, c.Token, userAgent))
 	if err != nil {
 		if strings.Contains(err.Error(), "Jwt header is an invalid JSON (UNAUTHENTICATED") {
 			return nil, fmt.Errorf("invalid token: unauthenticated")
